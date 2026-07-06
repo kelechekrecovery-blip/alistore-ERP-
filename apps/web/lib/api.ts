@@ -251,3 +251,42 @@ export async function fetchOrder(id: string): Promise<OrderDetail | null> {
   if (!res.ok) throw new Error(`order ${res.status}`);
   return (await res.json()) as OrderDetail;
 }
+
+// ---------- approvals (Approval Inbox) ----------
+
+export interface Approval {
+  id: string;
+  action: string;
+  requester: string;
+  approver?: string | null;
+  status: string;
+  reason: string;
+  evidence?: { payload?: { paymentId?: string; amount?: number } | null } | null;
+  createdAt: string;
+}
+
+export async function fetchApprovals(status: string): Promise<Approval[]> {
+  const res = await fetch(`${API_BASE}/approvals?status=${encodeURIComponent(status)}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`approvals ${res.status}`);
+  return (await res.json()) as Approval[];
+}
+
+export async function decideApproval(
+  id: string,
+  status: 'approved' | 'rejected',
+  approver: string,
+  reason?: string,
+): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/approvals/${id}/decide`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status, approver, reason }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as { message?: string }).message ?? `decide ${res.status}`);
+  }
+  return (await res.json()) as { status: string };
+}
