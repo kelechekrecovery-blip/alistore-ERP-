@@ -23,7 +23,7 @@ describe('Dangerous actions via approval (integration)', () => {
     const audit = new AuditService(prisma);
     approvals = new ApprovalsService(prisma, audit);
     products = new ProductsService(prisma, audit, approvals);
-    inventory = new InventoryService(prisma, approvals);
+    inventory = new InventoryService(prisma, audit, approvals);
   });
 
   afterAll(async () => {
