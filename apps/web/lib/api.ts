@@ -104,3 +104,77 @@ export async function createOrder(input: {
   if (!res.ok) throw new Error(`orders responded ${res.status}`);
   return (await res.json()) as CreatedOrder;
 }
+
+// ---------- auth (phone + OTP) ----------
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresIn: string;
+}
+
+export interface AuthUser {
+  customerId: string;
+  phone: string;
+  typ: string;
+}
+
+export interface MyOrder {
+  id: string;
+  channel: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  items: { sku: string; qty: number; price: number }[];
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
+export function authRequestOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
+  return postJson('/auth/otp/request', { phone });
+}
+
+export function authVerifyOtp(phone: string, code: string): Promise<AuthTokens> {
+  return postJson('/auth/otp/verify', { phone, code });
+}
+
+export function authRefresh(refreshToken: string): Promise<AuthTokens> {
+  return postJson('/auth/refresh', { refreshToken });
+}
+
+export async function authLogout(refreshToken: string): Promise<void> {
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  }).catch(() => undefined);
+}
+
+async function getJson<T>(path: string, accessToken: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`request failed ${res.status}`);
+  return (await res.json()) as T;
+}
+
+export function authMe(accessToken: string): Promise<AuthUser> {
+  return getJson('/auth/me', accessToken);
+}
+
+export function fetchMyOrders(accessToken: string): Promise<MyOrder[]> {
+  return getJson('/orders/mine', accessToken);
+}

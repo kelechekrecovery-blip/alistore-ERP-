@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CartButton } from './CartButton';
+import { AuthNav } from './AuthNav';
 
 const NAV = [
   { href: '/', label: 'Каталог' },
@@ -33,12 +34,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            className="hidden rounded-chip border border-ink/15 px-3 py-2 text-sm font-medium text-ink/80 transition hover:border-ink/30 sm:inline-flex"
-          >
-            Избранное
-          </button>
+          <AuthNav />
           <CartButton />
         </div>
       </div>

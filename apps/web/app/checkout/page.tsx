@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCart } from '@/lib/cart';
+import { useAuth } from '@/lib/auth';
 import { som } from '@/lib/format';
 import { createCustomer, createOrder, type CreatedOrder } from '@/lib/api';
 
@@ -21,7 +22,14 @@ const PAYMENT = [
 
 export default function CheckoutPage() {
   const { items, subtotal, clear, hydrated } = useCart();
+  const { user } = useAuth();
   const [phone, setPhone] = useState('');
+
+  // prefill contact for a logged-in customer
+  useEffect(() => {
+    if (user?.phone) setPhone((prev) => prev || user.phone);
+  }, [user]);
+
   const [name, setName] = useState('');
   const [delivery, setDelivery] = useState<(typeof DELIVERY)[number]['id']>('pickup');
   const [payment, setPayment] = useState<(typeof PAYMENT)[number]['id']>('cash');
