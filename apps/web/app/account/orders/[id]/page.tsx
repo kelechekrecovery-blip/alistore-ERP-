@@ -10,6 +10,8 @@ import {
   type OrderDetail,
 } from '@/lib/api';
 import { useCart } from '@/lib/cart';
+import { useAuth } from '@/lib/auth';
+import { WarrantyRequest } from '@/components/WarrantyRequest';
 import { som } from '@/lib/format';
 
 const TIMELINE = [
@@ -36,6 +38,7 @@ const TERMINAL_BAD = new Set(['cancelled', 'returned', 'refunded']);
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { add } = useCart();
+  const { user } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
 
@@ -149,6 +152,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     {bySku.get(i.sku)?.name ?? i.sku}
                   </p>
                   {i.imei && <p className="font-mono text-[11px] text-ink/45">IMEI {i.imei}</p>}
+                  {i.imei && user && (
+                    <div className="mt-1.5">
+                      <WarrantyRequest imei={i.imei} customerId={user.customerId} />
+                    </div>
+                  )}
                 </div>
                 <span className="text-sm text-ink/50">× {i.qty}</span>
                 <span className="w-24 text-right font-mono font-semibold tabular text-ink">
