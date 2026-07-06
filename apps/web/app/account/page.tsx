@@ -54,6 +54,12 @@ export default function AccountPage() {
             <div className="mt-1.5 text-[11px] text-[#8A7F76]">До Platinum осталось 51 000 сом покупок</div>
           </div>
 
+          {/* menu */}
+          <div className="mb-4 grid grid-cols-2 gap-2.5">
+            <Link href="/account/devices" className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4"><div className="text-2xl">📱</div><div className="mt-2 text-[13px] font-semibold">Мои устройства</div></Link>
+            <Link href="/" className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4"><div className="text-2xl">♻️</div><div className="mt-2 text-[13px] font-semibold">Trade-in</div></Link>
+          </div>
+
           <h2 className="mb-2.5 font-display text-base font-bold">Мои заказы</h2>
           {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
           {orders && orders.length === 0 && <p className="py-6 text-center text-sm text-[#8A7F76]">Заказов пока нет</p>}

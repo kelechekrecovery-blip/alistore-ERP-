@@ -5,8 +5,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -16,11 +18,23 @@ import {
 } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
 import { UpsertCustomerDto } from './customers.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthPrincipal } from '../auth/jwt.strategy';
 
 @ApiTags('customers')
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
+
+  @ApiOperation({ summary: 'Devices the authenticated customer bought (IMEI + warranty)' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: "The current customer's devices." })
+  @Get('me/devices')
+  @UseGuards(JwtAuthGuard)
+  myDevices(@CurrentUser() user: AuthPrincipal) {
+    return this.customers.devices(user.customerId);
+  }
 
   @ApiOperation({ summary: 'Get a customer' })
   @ApiParam({ name: 'id', description: 'Customer id' })

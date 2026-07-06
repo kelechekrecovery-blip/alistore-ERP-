@@ -24,4 +24,32 @@ export class CustomersService {
       create: { phone: dto.phone, name: dto.name ?? 'Клиент' },
     });
   }
+
+  /**
+   * Devices the customer bought — the serialized units (IMEI) sold on their orders,
+   * with the product name and any open warranty case. Powers «Мои устройства».
+   */
+  async devices(customerId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: { customerId },
+      select: { id: true },
+    });
+    const orderIds = orders.map((o) => o.id);
+    if (orderIds.length === 0) return [];
+
+    const [units, warranties] = await Promise.all([
+      this.prisma.deviceUnit.findMany({
+        where: { orderId: { in: orderIds }, status: { in: ['sold', 'returned', 'in_repair'] } },
+        include: { product: { select: { name: true } } },
+      }),
+      this.prisma.warrantyCase.findMany({ where: { customerId } }),
+    ]);
+
+    return units.map((u) => ({
+      imei: u.imei,
+      product: u.product.name,
+      status: u.status,
+      warranty: warranties.find((w) => w.imei === u.imei) ?? null,
+    }));
+  }
 }

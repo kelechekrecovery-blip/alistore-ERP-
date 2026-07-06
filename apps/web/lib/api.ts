@@ -179,6 +179,17 @@ export function fetchMyOrders(accessToken: string): Promise<MyOrder[]> {
   return getJson('/orders/mine', accessToken);
 }
 
+export interface MyDevice {
+  imei: string;
+  product: string;
+  status: string;
+  warranty: { id: string; status: string; sla: string } | null;
+}
+
+export function fetchMyDevices(accessToken: string): Promise<MyDevice[]> {
+  return getJson('/customers/me/devices', accessToken);
+}
+
 // ---------- POS ----------
 
 export interface PosLine {
