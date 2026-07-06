@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { fetchCatalog, fetchProduct, type CatalogProduct } from '@/lib/api';
 import { useCart } from '@/lib/cart';
+import { useFavorites } from '@/lib/favorites';
 import { conditionLabel, som } from '@/lib/format';
 
 const TRUST = [
@@ -14,9 +15,9 @@ const TRUST = [
 export default function ProductPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { add } = useCart();
+  const { has, toggle } = useFavorites();
   const [product, setProduct] = useState<CatalogProduct | null | 'missing'>(null);
   const [similar, setSimilar] = useState<CatalogProduct[]>([]);
-  const [fav, setFav] = useState(false);
   const [added, setAdded] = useState(false);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <span className="absolute inset-0 grid place-items-center font-display text-[7rem] font-extrabold text-white/10">{product.name.slice(0, 1)}</span>
             <button type="button" onClick={() => router.back()} className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white">←</button>
             <div className="absolute right-3 top-3 flex gap-2">
-              <button type="button" onClick={() => setFav((f) => !f)} className="grid h-9 w-9 place-items-center rounded-full bg-black/55">{fav ? '❤️' : '🤍'}</button>
+              <button type="button" onClick={() => toggle(product.id)} className="grid h-9 w-9 place-items-center rounded-full bg-black/55">{has(product.id) ? '❤️' : '🤍'}</button>
               <span className="grid h-9 w-9 place-items-center rounded-full bg-black/55">↗</span>
             </div>
             <span className={`absolute bottom-3 left-4 rounded-md px-2 py-0.5 text-[11px] font-bold ${used ? 'bg-ink text-lime' : 'bg-lime text-lime-ink'}`}>{used ? 'Б/У' : 'Новое'}</span>

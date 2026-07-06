@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 import { useCart } from '@/lib/cart';
+import { useFavorites } from '@/lib/favorites';
 import { som, conditionLabel } from '@/lib/format';
 import { MobileTabBar } from '@/components/MobileTabBar';
 
@@ -14,6 +15,7 @@ const icon = (c: string) => CAT_ICON[c] ?? '📦';
 
 export default function HomePage() {
   const { add } = useCart();
+  const { has, toggle } = useFavorites();
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [cat, setCat] = useState('all');
 
@@ -39,6 +41,7 @@ export default function HomePage() {
           <div className="mb-2.5 flex items-center gap-2.5">
             <span className="text-xs text-[#A79C92]">📍 Бишкек ▾</span>
             <div className="ml-auto flex items-center gap-3.5 text-[17px]">
+              <Link href="/favorites">🤍</Link>
               <span>🔔</span>
               <Link href="/account">👤</Link>
             </div>
@@ -108,10 +111,13 @@ export default function HomePage() {
                 const used = conditionLabel(p.attrs) === 'Б/У';
                 return (
                   <div key={p.id} className="overflow-hidden rounded-[16px] border border-[#2E2822] bg-[#221E19]">
-                    <Link href={`/product/${p.id}`} className="relative block h-[110px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-                      <span className="absolute inset-0 grid place-items-center font-display text-4xl font-extrabold text-white/10">{p.name.slice(0, 1)}</span>
+                    <div className="relative h-[110px]">
+                      <Link href={`/product/${p.id}`} className="block h-full bg-gradient-to-br from-[#2A2620] to-[#16130F]">
+                        <span className="absolute inset-0 grid place-items-center font-display text-4xl font-extrabold text-white/10">{p.name.slice(0, 1)}</span>
+                      </Link>
                       <span className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${used ? 'bg-ink text-lime' : 'bg-lime text-lime-ink'}`}>{used ? 'Б/У' : 'Новое'}</span>
-                    </Link>
+                      <button type="button" onClick={() => toggle(p.id)} className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-sm">{has(p.id) ? '❤️' : '🤍'}</button>
+                    </div>
                     <div className="p-2.5">
                       <Link href={`/product/${p.id}`} className="block min-h-[34px] text-[13px] font-semibold leading-tight">{p.name}</Link>
                       <div className="mt-1.5 font-display text-base font-extrabold">{som(p.price)}</div>

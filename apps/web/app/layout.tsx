@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { CartProvider } from '@/lib/cart';
 import { AuthProvider } from '@/lib/auth';
+import { FavoritesProvider } from '@/lib/favorites';
 
 export const metadata: Metadata = {
   title: 'AliStore — электроника с гарантией в Кыргызстане',
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen bg-[#0E0C0A]">
         <AuthProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            <FavoritesProvider>{children}</FavoritesProvider>
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>
