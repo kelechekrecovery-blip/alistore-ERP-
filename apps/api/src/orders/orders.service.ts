@@ -26,6 +26,15 @@ export class OrdersService {
     });
   }
 
+  /** Orders belonging to one customer, newest first (personal account). */
+  listByCustomer(customerId: string) {
+    return this.prisma.order.findMany({
+      where: { customerId },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   /** Create an order (status `created`) and write order.created to the ledger. */
   async create(dto: CreateOrderDto, actor: string) {
     return this.audit.transaction(async (tx) => {

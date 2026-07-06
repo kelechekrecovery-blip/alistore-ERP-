@@ -5,8 +5,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
@@ -18,6 +20,9 @@ import {
 } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, TransitionDto } from './orders.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthPrincipal } from '../auth/jwt.strategy';
 
 /**
  * NOTE: `actor` is hardcoded to a system principal for the MVP core. Auth (JWT +
@@ -30,6 +35,15 @@ const SYSTEM_ACTOR = 'system';
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
+
+  @ApiOperation({ summary: 'Orders of the authenticated customer (personal account)' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: "The current customer's orders, newest first." })
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  mine(@CurrentUser() user: AuthPrincipal) {
+    return this.orders.listByCustomer(user.customerId);
+  }
 
   @ApiOperation({ summary: 'Get an order with items and payments' })
   @ApiParam({ name: 'id', description: 'Order id' })
