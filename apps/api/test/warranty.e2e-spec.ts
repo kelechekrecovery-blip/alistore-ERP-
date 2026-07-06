@@ -26,14 +26,19 @@ describe('Warranty (integration)', () => {
   });
 
   beforeEach(async () => {
+    // FK-safe wipe (payments/items/orders before customers) so leftover rows from
+    // a prior suite — jest suite order varies — never block the customer/product wipe.
     await prisma.auditEvent.deleteMany();
     await prisma.warrantyCase.deleteMany();
+    await prisma.payment.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.reservation.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.courierRun.deleteMany();
-    await prisma.reservation.deleteMany();
     await prisma.approval.deleteMany();
   });
 
