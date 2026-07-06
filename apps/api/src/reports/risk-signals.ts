@@ -1,0 +1,63 @@
+import { Approval, CashShift, CourierRun } from '@prisma/client';
+import { COD_STALE_MS } from './reports.service';
+
+export type RiskSeverity = 'high' | 'medium' | 'low';
+
+export interface RiskSignal {
+  kind: 'cash_discrepancy' | 'cod_outstanding' | 'stale_reservations' | 'pending_approval';
+  severity: RiskSeverity;
+  ref: string;
+  detail: string;
+}
+
+interface RiskInputs {
+  cashDiscrepancies: CashShift[];
+  codOutstanding: CourierRun[];
+  staleReservations: number;
+  pendingApprovals: Approval[];
+}
+
+/** Normalize raw risk rows into a single ranked signal list (high → low). */
+export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
+  const signals: RiskSignal[] = [];
+
+  for (const s of input.cashDiscrepancies) {
+    signals.push({
+      kind: 'cash_discrepancy',
+      severity: 'high',
+      ref: s.id,
+      detail: `Касса ${s.point}: расхождение ${s.diff} сом`,
+    });
+  }
+
+  for (const c of input.codOutstanding) {
+    const stale = now.getTime() - c.createdAt.getTime() > COD_STALE_MS;
+    signals.push({
+      kind: 'cod_outstanding',
+      severity: stale ? 'high' : 'medium',
+      ref: c.id,
+      detail: `Курьер ${c.courierId}: COD ${c.codTotal} сом не сдан${stale ? ' (>24ч)' : ''}`,
+    });
+  }
+
+  if (input.staleReservations > 0) {
+    signals.push({
+      kind: 'stale_reservations',
+      severity: 'medium',
+      ref: '—',
+      detail: `Зависших резервов (истёк срок): ${input.staleReservations}`,
+    });
+  }
+
+  for (const a of input.pendingApprovals) {
+    signals.push({
+      kind: 'pending_approval',
+      severity: 'medium',
+      ref: a.id,
+      detail: `Ожидает одобрения: ${a.action} — ${a.reason}`,
+    });
+  }
+
+  const rank: Record<RiskSeverity, number> = { high: 0, medium: 1, low: 2 };
+  return signals.sort((a, b) => rank[a.severity] - rank[b.severity]);
+}
