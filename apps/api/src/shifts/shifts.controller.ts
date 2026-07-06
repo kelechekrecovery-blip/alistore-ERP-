@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiConflictResponse,
@@ -25,6 +26,13 @@ const SYSTEM_ACTOR = 'system';
 @Controller('shifts')
 export class ShiftsController {
   constructor(private readonly shifts: ShiftsService) {}
+
+  @ApiOperation({ summary: "Staff member's currently open shift (or null)" })
+  @ApiOkResponse({ description: 'Open shift or null.' })
+  @Get('current')
+  current(@Query('staffId') staffId: string) {
+    return this.shifts.currentOpen(staffId);
+  }
 
   @ApiOperation({ summary: 'Get a cash shift with its payments' })
   @ApiParam({ name: 'id', description: 'Cash shift id' })
