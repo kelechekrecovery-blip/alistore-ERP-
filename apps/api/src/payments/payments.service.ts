@@ -70,6 +70,7 @@ export class PaymentsService {
           method: dto.method,
           status: 'received',
           txnId: dto.txnId,
+          shiftId: dto.shiftId,
         },
       });
       events.push({

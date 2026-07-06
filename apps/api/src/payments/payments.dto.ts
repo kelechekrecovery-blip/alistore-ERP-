@@ -18,4 +18,11 @@ export class PayDto {
     example: 'mbank-20260706-0001',
   })
   @IsOptional() @IsString() txnId?: string;
+
+  /** Cash shift to attribute this payment to — drives drawer reconciliation. */
+  @ApiPropertyOptional({
+    description: 'Open cash shift the payment belongs to (POS drawer reconciliation).',
+    example: 'clx_shift_001',
+  })
+  @IsOptional() @IsString() shiftId?: string;
 }
