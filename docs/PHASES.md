@@ -62,13 +62,16 @@
 - ☐ Осталось: приёмка партий UI, инвентаризация со сканером, Evidence Vault (фото).
 **Проверка:** ✅ in-browser fulfill web-заказа → reserved+IMEI; сверка в БД.
 
-## Phase 6 — Approval-цикл + Возвраты 🟡
+## Phase 6 — Approval-цикл + Возвраты + Обмены ✅
 - ✅ **ApprovalsService** (park→202→decide исполняет действие), **Approval Inbox** UI.
 - ✅ Approval-gated **refund** (инв #1) → компенсирующий платёж + order.refunded.
 - ✅ **Returns** (return.requested + машина статусов).
-- ☐ Осталось: **обмен** (return+продажа+доплата+новая гарантия), Refund Money Flow UI,
-  Dispute Center, привязка Return↔Approval↔refund в один поток.
-**Проверка:** ✅ in-browser+БД: рефанд 202→Inbox→одобрить→−платёж+order refunded+ledger.
+- ✅ **Обмен** (`ExchangesService`): атомарно возврат старого + продажа нового + доплата
+  (≥0) + original→exchanged; дешевле → отказ (через возврат+refund). POST /exchanges.
+- ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI, новая гарантия при обмене,
+  exchange-UI для кассира (сейчас — API).
+**Проверка:** ✅ in-browser+БД рефанд (202→Inbox→одобрить→−платёж+order refunded); HTTP+БД
+обмен (APP-2→AW-9-45, доплата 19000, old→returned, order→exchanged, ledger).
 
 ## Phase 7 — Опасные действия полностью (v1) 🟡
 **Цель:** каждое опасное действие — через approval, с ролями и 2FA.
