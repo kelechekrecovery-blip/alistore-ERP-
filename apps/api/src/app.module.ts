@@ -10,6 +10,7 @@ import { ShiftsModule } from './shifts/shifts.module';
 import { CourierModule } from './courier/courier.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { CustomersModule } from './customers/customers.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CustomersModule } from './customers/customers.module';
     CourierModule,
     ReservationsModule,
     CustomersModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

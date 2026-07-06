@@ -349,3 +349,36 @@ model SupportTicket {
   @@index([customerId])
   @@index([status])
 }
+
+// ---------- AUTH ----------
+enum OtpPurpose {
+  login
+}
+
+// One-time login code (phone+OTP). Code stored hashed; short-lived; attempt-capped.
+model OtpChallenge {
+  id         String     @id @default(cuid())
+  phone      String
+  codeHash   String
+  purpose    OtpPurpose @default(login)
+  attempts   Int        @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([phone])
+}
+
+// Rotating refresh token, stored as a sha-256 hash and single-use (revoked on
+// refresh). customerId is a plain indexed string to avoid coupling the Customer
+// model that other modules edit concurrently.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  customerId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId])
+}

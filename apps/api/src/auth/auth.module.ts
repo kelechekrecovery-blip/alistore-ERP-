@@ -1,0 +1,30 @@
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
+import { AuthService } from './auth.service';
+import { TotpService } from './totp.service';
+import { JwtStrategy } from './jwt.strategy';
+import { AuthController } from './auth.controller';
+
+/**
+ * Phone+OTP authentication. AuditService and PrismaService are provided globally;
+ * JWT signing/verification is configured from JWT_SECRET / JWT_ACCESS_TTL.
+ */
+@Module({
+  imports: [
+    PassportModule,
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      // Access-token TTL is applied per-sign in AuthService (a literal that
+      // satisfies the strict `ms` StringValue type); the module only needs the key.
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET') ?? 'dev-insecure-change-me',
+      }),
+    }),
+  ],
+  providers: [AuthService, TotpService, JwtStrategy],
+  controllers: [AuthController],
+  exports: [AuthService, TotpService],
+})
+export class AuthModule {}
