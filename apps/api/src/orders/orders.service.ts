@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
-import { ValidationError } from '../common/errors';
+import { ConflictError, ValidationError } from '../common/errors';
 import { assertTransition } from './order-state-machine';
 import { CreateOrderDto } from './orders.dto';
 
@@ -139,6 +139,102 @@ export class OrdersService {
           },
         ],
       };
+    });
+  }
+
+  /** Orders in a given status, newest first — staff fulfillment queue. */
+  listByStatus(status: OrderStatus, limit = 50) {
+    return this.prisma.order.findMany({
+      where: { status },
+      include: { items: true, customer: { select: { phone: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  /**
+   * Warehouse fulfillment: assign concrete in_stock IMEI units to a web order's
+   * serialized lines (which arrive without an IMEI), then move it to `reserved`.
+   * A serialized line with qty>1 is normalized to one unit per line (like POS), so
+   * every physical device is tracked individually. Insufficient stock → 409.
+   */
+  async fulfill(orderId: string, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!order) {
+        throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+      }
+      assertTransition(order.status, 'reserved');
+
+      const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
+      const events: AuditInput[] = [];
+      const assigned: string[] = [];
+
+      const reserveUnit = async (imei: string, sku: string) => {
+        await tx.deviceUnit.update({
+          where: { imei },
+          data: { status: 'reserved', orderId },
+        });
+        await tx.reservation.create({ data: { orderId, imei, expiresAt, active: true } });
+        assigned.push(imei);
+        events.push({
+          type: EventType.StockReserved,
+          actor,
+          payload: { orderId, imei, sku },
+          refs: [orderId, imei],
+        });
+      };
+
+      for (const item of order.items) {
+        if (item.imei) {
+          // already serialized (e.g. POS) — reserve if still in stock
+          const unit = await tx.deviceUnit.findUnique({ where: { imei: item.imei } });
+          if (unit?.status === 'in_stock') await reserveUnit(item.imei, item.sku);
+          continue;
+        }
+        const product = await tx.product.findUnique({ where: { sku: item.sku } });
+        if (!product) continue; // non-serialized line (accessory) — nothing to assign
+
+        const units = await tx.deviceUnit.findMany({
+          where: { productId: product.id, status: 'in_stock' },
+          take: item.qty,
+          orderBy: { id: 'asc' },
+        });
+        if (units.length < item.qty) {
+          throw new ConflictError(
+            'insufficient_stock',
+            `Недостаточно единиц ${item.sku}: нужно ${item.qty}, в наличии ${units.length}`,
+          );
+        }
+
+        // first unit stays on this line (qty→1); extra units become their own lines
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: { qty: 1, imei: units[0].imei },
+        });
+        await reserveUnit(units[0].imei, item.sku);
+        for (const unit of units.slice(1)) {
+          await tx.orderItem.create({
+            data: { orderId, sku: item.sku, qty: 1, price: item.price, imei: unit.imei },
+          });
+          await reserveUnit(unit.imei, item.sku);
+        }
+      }
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: { status: 'reserved' },
+      });
+      events.push({
+        type: EventType.OrderReserved,
+        actor,
+        payload: { orderId, assigned: assigned.length },
+        refs: [orderId],
+      });
+      return { result: { order: updated, assigned }, events };
     });
   }
 }

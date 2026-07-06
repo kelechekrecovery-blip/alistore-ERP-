@@ -5,8 +5,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
+import { OrderStatus } from '@prisma/client';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -45,6 +47,13 @@ export class OrdersController {
     return this.orders.listByCustomer(user.customerId);
   }
 
+  @ApiOperation({ summary: 'List orders by status — staff fulfillment queue' })
+  @ApiOkResponse({ description: 'Orders in the given status, newest first.' })
+  @Get()
+  queue(@Query('status') status?: string) {
+    return this.orders.listByStatus((status ?? 'created') as OrderStatus);
+  }
+
   @ApiOperation({ summary: 'Get an order with items and payments' })
   @ApiParam({ name: 'id', description: 'Order id' })
   @ApiOkResponse({ description: 'Order found.' })
@@ -76,6 +85,18 @@ export class OrdersController {
   @Post(':id/reserve')
   reserve(@Param('id') id: string) {
     return this.orders.reserve(id, SYSTEM_ACTOR);
+  }
+
+  @ApiOperation({
+    summary: 'Warehouse fulfillment: assign IMEI units to a web order → reserved',
+  })
+  @ApiParam({ name: 'id', description: 'Order id' })
+  @ApiOkResponse({ description: 'Units assigned; order moved to reserved.' })
+  @ApiConflictResponse({ description: 'Insufficient stock for a line.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown order or illegal state.' })
+  @Post(':id/fulfill')
+  fulfill(@Param('id') id: string) {
+    return this.orders.fulfill(id, SYSTEM_ACTOR);
   }
 
   @ApiOperation({
