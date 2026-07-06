@@ -4,6 +4,7 @@ import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
+import { ApprovalsService } from '../src/approvals/approvals.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
 
 /**
@@ -29,7 +30,7 @@ describe('Cash shift reconciliation (integration)', () => {
     units = new UnitsService(prisma);
     shifts = new ShiftsService(prisma, audit);
     orders = new OrdersService(prisma, audit, units);
-    payments = new PaymentsService(prisma, audit, units);
+    payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
   });
 
   afterAll(async () => {

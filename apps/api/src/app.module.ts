@@ -15,6 +15,8 @@ import { OutboxModule } from './outbox/outbox.module';
 import { PosModule } from './pos/pos.module';
 import { MediaModule } from './media/media.module';
 import { ReceiptsModule } from './receipts/receipts.module';
+import { ApprovalsModule } from './approvals/approvals.module';
+import { ReturnsModule } from './returns/returns.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { ReceiptsModule } from './receipts/receipts.module';
     PosModule,
     MediaModule,
     ReceiptsModule,
+    ApprovalsModule,
+    ReturnsModule,
   ],
 })
 export class AppModule {}

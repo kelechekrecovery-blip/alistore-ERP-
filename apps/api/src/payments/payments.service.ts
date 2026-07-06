@@ -5,6 +5,7 @@ import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
 import { ConflictError, ValidationError } from '../common/errors';
 import { assertTransition } from '../orders/order-state-machine';
+import { ApprovalsService } from '../approvals/approvals.service';
 import { PayDto } from './payments.dto';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
@@ -16,7 +17,35 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly units: UnitsService,
+    private readonly approvals: ApprovalsService,
   ) {}
+
+  /**
+   * Request a refund — approval-gated (Approval Rules Matrix: refund любой →
+   * Администратор). Enforces invariant #1: refund needs an existing positive
+   * payment and amount ≤ it. Returns an approvalId; money moves only on approve.
+   */
+  async refund(paymentId: string, amount: number, reason: string, requester: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) {
+      throw new ValidationError('payment_not_found', `Платёж ${paymentId} не найден`);
+    }
+    if (payment.amount <= 0) {
+      throw new ConflictError('not_refundable', 'Нельзя вернуть по возвратному платежу');
+    }
+    if (amount <= 0 || amount > payment.amount) {
+      throw new ValidationError(
+        'invalid_refund_amount',
+        `Сумма возврата должна быть 0 < amount ≤ ${payment.amount}`,
+      );
+    }
+    return this.approvals.request({
+      action: 'refund',
+      requester,
+      reason,
+      payload: { paymentId, amount },
+    });
+  }
 
   find(where: { orderId?: string; shiftId?: string }) {
     return this.prisma.payment.findMany({ where, orderBy: { createdAt: 'desc' } });

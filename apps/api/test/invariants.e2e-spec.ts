@@ -3,6 +3,7 @@ import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
+import { ApprovalsService } from '../src/approvals/approvals.service';
 import { ConflictError } from '../src/common/errors';
 
 /**
@@ -25,7 +26,7 @@ describe('Business invariants (integration)', () => {
     const audit = new AuditService(prisma);
     units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
-    payments = new PaymentsService(prisma, audit, units);
+    payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
   });
 
   afterAll(async () => {

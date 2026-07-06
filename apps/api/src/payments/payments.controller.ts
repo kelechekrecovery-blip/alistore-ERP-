@@ -1,15 +1,17 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
-import { PayDto } from './payments.dto';
+import { PayDto, RefundDto } from './payments.dto';
 
 const SYSTEM_ACTOR = 'system';
 
@@ -36,5 +38,18 @@ export class PaymentsController {
   @Post()
   pay(@Body() dto: PayDto) {
     return this.payments.pay(dto, SYSTEM_ACTOR);
+  }
+
+  @ApiOperation({
+    summary: 'Request a refund — approval-gated (returns 202 { approvalId })',
+  })
+  @ApiParam({ name: 'id', description: 'Original payment id' })
+  @ApiAcceptedResponse({ description: 'Refund parked for approval; not yet executed.' })
+  @ApiConflictResponse({ description: 'Payment is not refundable.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown payment or invalid amount.' })
+  @Post(':id/refund')
+  @HttpCode(202)
+  refund(@Param('id') id: string, @Body() dto: RefundDto) {
+    return this.payments.refund(id, dto.amount, dto.reason, dto.requester ?? SYSTEM_ACTOR);
   }
 }

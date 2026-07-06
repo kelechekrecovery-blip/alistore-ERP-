@@ -26,3 +26,14 @@ export class PayDto {
   })
   @IsOptional() @IsString() shiftId?: string;
 }
+
+export class RefundDto {
+  @ApiProperty({ minimum: 1, example: 109900, description: 'Refund amount (≤ original payment)' })
+  @IsInt() @Min(1) amount!: number;
+
+  @ApiProperty({ example: 'брак, возврат по акту' })
+  @IsString() reason!: string;
+
+  @ApiPropertyOptional({ example: 'senior_seller_azamat' })
+  @IsOptional() @IsString() requester?: string;
+}
