@@ -13,6 +13,7 @@ export function setupOpenApi(app: INestApplication): void {
     .setDescription(description)
     .setVersion('0.1.0')
     .addServer('/api', 'Global API prefix')
+    .addTag('catalog', 'Storefront catalog search and Meilisearch indexing')
     .addTag('orders', 'Order lifecycle, reservation, and state transitions')
     .addTag('payments', 'Payments, payment ledger, and txnId idempotency')
     .build();

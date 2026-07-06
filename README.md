@@ -19,6 +19,8 @@
 - **Order state-machine** `created → reserved → paid` (+ полная таблица переходов).
 - **IMEI/DeviceUnit** lifecycle с запретом двойной продажи.
 - **Payment** с проверкой «нет оплаты без резерва» и идемпотентностью webhook по `txnId`.
+- **Catalog search** `GET /api/catalog/products` с optional Meilisearch acceleration и
+  Postgres fallback; reindex endpoint закрыт maintenance-token по умолчанию.
 - Приёмочные тесты P0 🔴: двойная продажа IMEI → 409, оплата без резерва → 409.
 
 ## Предпосылки
@@ -42,7 +44,14 @@ npm run api
 # API contract
 # Swagger UI:   http://localhost:4000/api/docs
 # OpenAPI JSON: http://localhost:4000/api/docs-json
+
+# Catalog search
+# GET http://localhost:4000/api/catalog/products?q=iphone&stockOnly=true
 ```
+
+Optional Meilisearch acceleration is configured via `MEILI_HOST`, `MEILI_API_KEY`,
+`MEILI_PRODUCTS_INDEX`, and `SEARCH_ADMIN_TOKEN` in `apps/api/.env`. If Meilisearch
+is not configured, catalog search uses Postgres as the source of truth.
 
 ## Тесты
 ```bash
@@ -62,6 +71,7 @@ apps/
       audit/           append-only ledger + транзакционная обёртка
       orders/          state-machine, создание/резерв заказа
       payments/        оплата, инвариант «нет paid без резерва», идемпотентность
+      catalog/         витринный поиск, optional Meilisearch, Postgres fallback
       units/           IMEI lifecycle, запрет двойной продажи
       prisma/  common/
     test/              pure state-machine + P0 приёмочные тесты
