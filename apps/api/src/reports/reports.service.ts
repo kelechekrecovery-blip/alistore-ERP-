@@ -60,7 +60,7 @@ export class ReportsService {
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */
   async risks() {
     const now = new Date();
-    const [cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals] =
+    const [cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue] =
       await Promise.all([
         this.prisma.cashShift.findMany({
           where: { diff: { not: 0 }, closedAt: { not: null } },
@@ -78,10 +78,18 @@ export class ReportsService {
           orderBy: { createdAt: 'desc' },
           take: 20,
         }),
+        this.prisma.warrantyCase.findMany({
+          where: {
+            sla: { lt: now },
+            status: { notIn: ['repaired', 'replaced', 'closed', 'rejected'] },
+          },
+          orderBy: { sla: 'asc' },
+          take: 20,
+        }),
       ]);
 
     const signals = buildRiskSignals(
-      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals },
+      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue },
       now,
     );
     return { count: signals.length, signals };
