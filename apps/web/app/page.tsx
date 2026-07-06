@@ -1,116 +1,139 @@
-import { fetchCatalog } from '@/lib/api';
-import { CatalogControls } from '@/components/CatalogControls';
-import { ProductCard } from '@/components/ProductCard';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+import { useCart } from '@/lib/cart';
+import { som, conditionLabel } from '@/lib/format';
+import { MobileTabBar } from '@/components/MobileTabBar';
 
-interface HomeSearchParams {
-  q?: string;
-  category?: string;
-  stockOnly?: string;
-}
+const CAT_ICON: Record<string, string> = {
+  Смартфоны: '📱', Ноутбуки: '💻', Аудио: '🎧', Часы: '⌚', Планшеты: '📲', Аксессуары: '🔌',
+};
+const icon = (c: string) => CAT_ICON[c] ?? '📦';
 
-const VALUE_PROPS = [
-  { title: 'Гарантия', body: 'На новое и Б/У' },
-  { title: 'IMEI-проверка', body: 'Не краденое, не залок' },
-  { title: 'Скупка · trade-in', body: 'Оценим и выкупим' },
-];
+export default function HomePage() {
+  const { add } = useCart();
+  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [cat, setCat] = useState('all');
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: HomeSearchParams;
-}) {
-  const query = {
-    q: searchParams.q,
-    category: searchParams.category,
-    stockOnly: searchParams.stockOnly === 'true',
-    limit: 48,
-  };
+  useEffect(() => {
+    fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items)).catch(() => setProducts([]));
+  }, []);
 
-  // Parallel: the filtered grid + a broad pull to derive category chips.
-  const [catalog, all] = await Promise.all([
-    fetchCatalog(query),
-    fetchCatalog({ limit: 100 }),
-  ]);
-
-  const categories = Array.from(new Set(all.items.map((p) => p.category))).sort();
-  const offline = catalog.source === 'unavailable';
+  const categories = useMemo(
+    () => Array.from(new Set((products ?? []).map((p) => p.category))).sort(),
+    [products],
+  );
+  const list = (products ?? []).filter((p) => cat === 'all' || p.category === cat);
+  const hero = useMemo(
+    () => (products ?? []).slice().sort((a, b) => b.price - a.price)[0],
+    [products],
+  );
 
   return (
-    <>
-      <section aria-labelledby="hero-heading" className="pt-8 sm:pt-12">
-        <div className="relative overflow-hidden rounded-card border border-ink/10 bg-tint px-6 py-10 shadow-soft sm:px-10 sm:py-14">
-          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-coral/15 blur-2xl" />
-          <div className="relative max-w-2xl">
-            <p className="mb-3 inline-flex items-center gap-2 rounded-chip bg-white/70 px-3 py-1 font-mono text-xs font-semibold text-deep">
-              Бишкек · доставка по КР
-            </p>
-            <h1
-              id="hero-heading"
-              className="font-display text-4xl font-extrabold leading-[1.05] text-ink sm:text-6xl"
-            >
-              Электроника с гарантией —{' '}
-              <span className="whitespace-nowrap text-coral">новое и Б/У</span>
-            </h1>
-            <p className="mt-4 max-w-xl text-lg text-ink/70">
-              Смартфоны, ноутбуки, аудио и часы. Каждое устройство проверено по IMEI.
-              Честная цена, скупка и рассрочка 0-0-12.
-            </p>
-            <dl className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {VALUE_PROPS.map((v) => (
-                <div
-                  key={v.title}
-                  className="rounded-btn border border-ink/10 bg-white/60 px-4 py-3"
-                >
-                  <dt className="font-display text-sm font-bold text-ink">{v.title}</dt>
-                  <dd className="text-sm text-ink/60">{v.body}</dd>
-                </div>
-              ))}
-            </dl>
+    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
+      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">
+        {/* header */}
+        <div className="flex-shrink-0 px-4 pb-3 pt-5">
+          <div className="mb-2.5 flex items-center gap-2.5">
+            <span className="text-xs text-[#A79C92]">📍 Бишкек ▾</span>
+            <div className="ml-auto flex items-center gap-3.5 text-[17px]">
+              <span>🔔</span>
+              <Link href="/account">👤</Link>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="catalog-heading" className="mt-10">
-        <div className="mb-5 flex items-baseline justify-between gap-4">
-          <h2 id="catalog-heading" className="font-display text-2xl font-bold text-ink">
-            Каталог
-          </h2>
-          <p className="font-mono text-sm text-ink/45">
-            {offline ? '—' : `${catalog.total} товаров`}
-          </p>
+          <Link href="/cart" className="flex items-center gap-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] px-3.5 py-3">
+            <span className="text-[#6E645C]">🔍</span>
+            <span className="text-sm text-[#6E645C]">Поиск техники, брендов…</span>
+          </Link>
         </div>
 
-        <CatalogControls categories={categories} />
+        <div className="flex-1 overflow-y-auto px-4 pb-24">
+          {/* delivery banners */}
+          <div className="mb-3.5 flex gap-2">
+            <div className="flex-1 rounded-[15px] bg-gradient-to-br from-coral to-deep p-3.5">
+              <div className="text-xl">⚡</div>
+              <div className="mt-1.5 text-[13px] font-bold">Доставка 1–2 ч</div>
+              <div className="text-[11px] text-[#FFE0D5]">по Бишкеку</div>
+            </div>
+            <div className="flex-1 rounded-[15px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <div className="text-xl">🏬</div>
+              <div className="mt-1.5 text-[13px] font-bold">Самовывоз</div>
+              <div className="text-[11px] text-[#A79C92]">бесплатно</div>
+            </div>
+            <div className="flex-1 rounded-[15px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <div className="text-xl">♻️</div>
+              <div className="mt-1.5 text-[13px] font-bold">Trade-in</div>
+              <div className="text-[11px] text-lime">оценка 30с</div>
+            </div>
+          </div>
 
-        {offline ? (
-          <EmptyState
-            title="Каталог временно недоступен"
-            body="Не удалось связаться с API. Проверьте, что бэкенд запущен на :4000."
-          />
-        ) : catalog.items.length === 0 ? (
-          <EmptyState
-            title="Ничего не найдено"
-            body="Попробуйте изменить запрос или снять фильтры."
-          />
-        ) : (
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {catalog.items.map((product) => (
-              <ProductCard key={product.id} product={product} />
+          {/* categories */}
+          <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+            <button type="button" onClick={() => setCat('all')} className={`flex-shrink-0 rounded-[12px] border px-3.5 py-2.5 text-center ${cat === 'all' ? 'border-lime bg-lime/10' : 'border-[#2E2822] bg-[#221E19]'}`}>
+              <div className="text-2xl">🛍</div>
+              <div className="mt-1 whitespace-nowrap text-[11px] text-[#D8CFC6]">Все</div>
+            </button>
+            {categories.map((c) => (
+              <button key={c} type="button" onClick={() => setCat(c)} className={`flex-shrink-0 rounded-[12px] border px-3.5 py-2.5 text-center ${cat === c ? 'border-lime bg-lime/10' : 'border-[#2E2822] bg-[#221E19]'}`}>
+                <div className="text-2xl">{icon(c)}</div>
+                <div className="mt-1 whitespace-nowrap text-[11px] text-[#D8CFC6]">{c}</div>
+              </button>
             ))}
           </div>
-        )}
-      </section>
-    </>
-  );
-}
 
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="mt-8 rounded-card border border-dashed border-ink/15 bg-white/50 px-6 py-14 text-center">
-      <p className="font-display text-lg font-bold text-ink">{title}</p>
-      <p className="mt-1 text-sm text-ink/55">{body}</p>
+          {/* hero promo */}
+          {hero && (
+            <Link href={`/product/${hero.id}`} className="relative mb-5 block overflow-hidden rounded-[20px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#16130F] p-5">
+              <div className="font-mono text-[11px] text-lime">ХИТ · В НАЛИЧИИ</div>
+              <div className="mt-2 font-display text-2xl font-extrabold leading-none">{hero.name}</div>
+              <div className="mt-1 text-[13px] text-[#A79C92]">от {som(hero.price)} · рассрочка 0-0-12</div>
+              <span className="mt-4 inline-block rounded-[10px] bg-lime px-4 py-2.5 text-[13px] font-bold text-lime-ink">Смотреть</span>
+              <div className="absolute -bottom-3 -right-2 text-[90px] opacity-15">📱</div>
+            </Link>
+          )}
+
+          {/* hits grid */}
+          <div className="mb-3 flex items-center">
+            <span className="font-display text-lg font-bold">🔥 Хиты продаж</span>
+            <span className="ml-auto text-[13px] text-lime">{list.length} тов.</span>
+          </div>
+          {products === null ? (
+            <p className="py-6 font-mono text-sm text-[#8A7F76]">Загрузка…</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {list.map((p) => {
+                const inStock = p.availableUnits > 0;
+                const used = conditionLabel(p.attrs) === 'Б/У';
+                return (
+                  <div key={p.id} className="overflow-hidden rounded-[16px] border border-[#2E2822] bg-[#221E19]">
+                    <Link href={`/product/${p.id}`} className="relative block h-[110px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
+                      <span className="absolute inset-0 grid place-items-center font-display text-4xl font-extrabold text-white/10">{p.name.slice(0, 1)}</span>
+                      <span className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${used ? 'bg-ink text-lime' : 'bg-lime text-lime-ink'}`}>{used ? 'Б/У' : 'Новое'}</span>
+                    </Link>
+                    <div className="p-2.5">
+                      <Link href={`/product/${p.id}`} className="block min-h-[34px] text-[13px] font-semibold leading-tight">{p.name}</Link>
+                      <div className="mt-1.5 font-display text-base font-extrabold">{som(p.price)}</div>
+                      <div className={`mt-0.5 text-[10px] ${inStock ? 'text-[#8A7F76]' : 'text-[#FF8A7A]'}`}>{inStock ? `${p.availableUnits} в наличии` : 'под заказ'}</div>
+                      <button
+                        type="button"
+                        disabled={!inStock}
+                        onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price })}
+                        className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+                      >
+                        В корзину
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <MobileTabBar active="home" />
+      </div>
     </div>
   );
 }
