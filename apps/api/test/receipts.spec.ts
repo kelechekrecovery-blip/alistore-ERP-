@@ -1,8 +1,14 @@
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { ReceiptsService } from '../src/receipts/receipts.service';
 import { ReceiptData } from '../src/receipts/receipts.dto';
 
 describe('ReceiptsService (receiptline)', () => {
-  const receipts = new ReceiptsService();
+  // buildMarkup/render are pure — the DB/config deps are unused here.
+  const receipts = new ReceiptsService(
+    {} as unknown as PrismaService,
+    {} as unknown as ConfigService,
+  );
   const data: ReceiptData = {
     store: { name: 'AliStore', address: 'Бишкек, ул. Чуй 1', phone: '+996700000000' },
     orderId: 'ORD-123',

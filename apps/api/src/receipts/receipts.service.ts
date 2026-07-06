@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { transform } from 'receiptline';
+import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptData } from './receipts.dto';
+import { ValidationError } from '../common/errors';
 
 export interface RenderedReceipt {
   /** receiptline markup — the human-readable source of the receipt. */
@@ -22,6 +25,49 @@ const ENCODING = 'cp866'; // Cyrillic — RU/KG receipts
  */
 @Injectable()
 export class ReceiptsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
+
+  /**
+   * Render the receipt for an existing order. Reads the order, its items and
+   * payment straight from the DB — no coupling to POS/orders service code — maps
+   * to ReceiptData, and renders. Product names are resolved by SKU.
+   */
+  async renderOrder(orderId: string): Promise<RenderedReceipt> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true, payments: true },
+    });
+    if (!order) {
+      throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+    }
+
+    const skus = order.items.map((item) => item.sku);
+    const products = await this.prisma.product.findMany({
+      where: { sku: { in: skus } },
+    });
+    const nameBySku = new Map(products.map((p) => [p.sku, p.name]));
+
+    return this.render({
+      store: {
+        name: this.config.get<string>('STORE_NAME') ?? 'AliStore',
+        address: this.config.get<string>('STORE_ADDRESS') ?? 'Бишкек',
+        phone: this.config.get<string>('STORE_PHONE'),
+      },
+      orderId: order.id,
+      issuedAt: order.createdAt.toISOString(),
+      items: order.items.map((item) => ({
+        name: nameBySku.get(item.sku) ?? item.sku,
+        qty: item.qty,
+        price: item.price,
+      })),
+      total: order.total,
+      payment: order.payments[0]?.method ?? 'cash',
+    });
+  }
+
   /** Build receiptline markup from structured receipt data (pure, testable). */
   buildMarkup(data: ReceiptData): string {
     const lines: string[] = [`^^^${data.store.name}`];
