@@ -13,6 +13,7 @@ import { CustomersModule } from './customers/customers.module';
 import { AuthModule } from './auth/auth.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { PosModule } from './pos/pos.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PosModule } from './pos/pos.module';
     AuthModule,
     OutboxModule,
     PosModule,
+    MediaModule,
   ],
 })
 export class AppModule {}
