@@ -4,7 +4,7 @@ import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ValidationError } from '../common/errors';
-import { canTransition } from '../orders/order-state-machine';
+import { ACTION_EXECUTORS } from './action-executors';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
@@ -122,62 +122,15 @@ export class ApprovalsService {
         },
       ];
 
-      // Execute the parked action.
+      // Execute the parked action via its registered executor.
       const payload = (approval.evidence as { payload?: Record<string, unknown> } | null)
         ?.payload;
-      if (approval.action === 'refund' && payload) {
-        await this.executeRefund(tx, payload, input.approver, id, events);
+      const execute = ACTION_EXECUTORS[approval.action];
+      if (execute && payload) {
+        await execute(tx, payload, input.approver, id, events);
       }
 
       return { result: updated, events };
     });
-  }
-
-  /** Execute an approved refund: a compensating negative Payment, order → refunded. */
-  private async executeRefund(
-    tx: Prisma.TransactionClient,
-    payload: Record<string, unknown>,
-    approver: string,
-    approvalId: string,
-    events: AuditInput[],
-  ): Promise<void> {
-    const paymentId = String(payload['paymentId']);
-    const amount = Number(payload['amount']);
-    const original = await tx.payment.findUnique({ where: { id: paymentId } });
-    if (!original) {
-      throw new ValidationError('payment_not_found', 'Платёж для возврата не найден');
-    }
-    // Invariant #1 re-check at execution time.
-    if (amount <= 0 || amount > original.amount) {
-      throw new ValidationError('invalid_refund_amount', 'Некорректная сумма возврата');
-    }
-
-    const refund = await tx.payment.create({
-      data: {
-        orderId: original.orderId,
-        amount: -Math.abs(amount),
-        method: original.method,
-        status: 'refunded',
-      },
-    });
-    events.push({
-      type: EventType.PaymentRefunded,
-      actor: approver,
-      payload: { approvalId, originalPaymentId: paymentId, refundId: refund.id, amount },
-      refs: [original.orderId, paymentId, refund.id].filter((r): r is string => Boolean(r)),
-    });
-
-    if (original.orderId) {
-      const order = await tx.order.findUnique({ where: { id: original.orderId } });
-      if (order && canTransition(order.status, 'refunded')) {
-        await tx.order.update({ where: { id: order.id }, data: { status: 'refunded' } });
-        events.push({
-          type: 'order.refunded',
-          actor: approver,
-          payload: { orderId: order.id, from: order.status },
-          refs: [order.id],
-        });
-      }
-    }
   }
 }

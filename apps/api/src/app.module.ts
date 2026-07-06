@@ -17,6 +17,9 @@ import { MediaModule } from './media/media.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { ReturnsModule } from './returns/returns.module';
+import { LabelsModule } from './labels/labels.module';
+import { ProductsModule } from './products/products.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -38,6 +41,9 @@ import { ReturnsModule } from './returns/returns.module';
     ReceiptsModule,
     ApprovalsModule,
     ReturnsModule,
+    LabelsModule,
+    ProductsModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}
