@@ -11,6 +11,7 @@ import { CourierModule } from './courier/courier.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { CustomersModule } from './customers/customers.module';
 import { AuthModule } from './auth/auth.module';
+import { OutboxModule } from './outbox/outbox.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuthModule } from './auth/auth.module';
     ReservationsModule,
     CustomersModule,
     AuthModule,
+    OutboxModule,
   ],
 })
 export class AppModule {}

@@ -382,3 +382,28 @@ model RefreshToken {
 
   @@index([customerId])
 }
+
+// ---------- OUTBOX ----------
+enum OutboxStatus {
+  pending
+  sent
+  failed
+}
+
+// Transactional outbox for guaranteed-delivery side-effects (notifications,
+// webhook follow-ups). Producers write a message in the SAME transaction as the
+// business change (invariant #10); a pg-boss relay delivers it with retries.
+model OutboxMessage {
+  id        String       @id @default(cuid())
+  channel   String // sms | email | push | telegram | webhook
+  recipient String
+  template  String
+  payload   Json
+  status    OutboxStatus @default(pending)
+  attempts  Int          @default(0)
+  lastError String?
+  createdAt DateTime     @default(now())
+  sentAt    DateTime?
+
+  @@index([status])
+}
