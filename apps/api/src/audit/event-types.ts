@@ -22,10 +22,13 @@ export const EventType = {
   // stock
   StockReceived: 'stock.received',
   StockReserved: 'stock.reserved',
+  StockReleased: 'stock.released', // compensating: expired reservation returns a held unit to stock
   StockMoved: 'stock.moved',
   StockAdjusted: 'stock.adjusted',
   StockWrittenOff: 'stock.written_off',
   InventoryCounted: 'inventory.counted',
+  // reservations
+  ReservationExpired: 'reservation.expired', // invariant #7: expired hold released by the sweep
   // units (IMEI/SN)
   UnitReceived: 'unit.received',
   UnitSold: 'unit.sold',

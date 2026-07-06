@@ -83,4 +83,29 @@ export class UnitsService {
     }
     await tx.deviceUnit.update({ where: { imei }, data: { status: 'sold' } });
   }
+
+  /**
+   * Release a unit's reservation inside an existing transaction: a unit still
+   * `reserved` for THIS order returns to `in_stock` (orderId cleared). Used by the
+   * reservation-expiry sweep (invariant #7).
+   *
+   * Idempotent and defensive — returns false without touching anything if the
+   * unit was already sold, re-reserved by another order, or is no longer held by
+   * this order, so an expired hold never disturbs a legitimately progressed unit.
+   */
+  async releaseOnTx(
+    tx: Prisma.TransactionClient,
+    imei: string,
+    orderId: string,
+  ): Promise<boolean> {
+    const unit = await tx.deviceUnit.findUnique({ where: { imei } });
+    if (!unit || unit.status !== 'reserved' || unit.orderId !== orderId) {
+      return false;
+    }
+    await tx.deviceUnit.update({
+      where: { imei },
+      data: { status: 'in_stock', orderId: null },
+    });
+    return true;
+  }
 }
