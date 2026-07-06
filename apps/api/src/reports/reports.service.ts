@@ -15,9 +15,38 @@ export const COD_STALE_MS = 24 * 60 * 60 * 1000;
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Aggregated KPIs: money, orders, stock, ops. */
+  /** Sales per day for the last 7 days (revenue chart). UTC-consistent bucketing. */
+  private async revenue7d(): Promise<{ day: string; amount: number }[]> {
+    const days = 7;
+    const dayMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    // start-of-today in UTC, then go back (days-1) so the window ends on today (inclusive)
+    const startMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (days - 1) * dayMs;
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        amount: { gt: 0 },
+        status: { in: ['received', 'reconciled'] },
+        createdAt: { gte: new Date(startMs) },
+      },
+      select: { amount: true, createdAt: true },
+    });
+
+    const buckets: { day: string; amount: number }[] = [];
+    for (let i = 0; i < days; i += 1) {
+      buckets.push({ day: new Date(startMs + i * dayMs).toISOString().slice(0, 10), amount: 0 });
+    }
+    for (const p of payments) {
+      const key = p.createdAt.toISOString().slice(0, 10);
+      const b = buckets.find((x) => x.day === key);
+      if (b) b.amount += p.amount;
+    }
+    return buckets;
+  }
+
+  /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
   async dashboard() {
-    const [sales, refunds, ordersByStatus, unitsByStatus, byMethod, orderCount, openShifts, pendingApprovals] =
+    const [sales, refunds, ordersByStatus, unitsByStatus, byMethod, orderCount, openShifts, pendingApprovals, revenue7d] =
       await Promise.all([
         this.prisma.payment.aggregate({
           _sum: { amount: true },
@@ -34,6 +63,7 @@ export class ReportsService {
         this.prisma.order.count(),
         this.prisma.cashShift.count({ where: { closedAt: null } }),
         this.prisma.approval.count({ where: { status: 'requested' } }),
+        this.revenue7d(),
       ]);
 
     const salesGross = sales._sum.amount ?? 0;
@@ -54,6 +84,7 @@ export class ReportsService {
         byStatus: unitsByStatus.map((u) => ({ status: u.status, count: u._count._all })),
       },
       ops: { openShifts, pendingApprovals },
+      revenue7d,
     };
   }
 

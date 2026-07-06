@@ -5,6 +5,7 @@ export interface Dashboard {
   orders: { total: number; byStatus: { status: string; count: number }[] };
   stock: { byStatus: { status: string; count: number }[] };
   ops: { openShifts: number; pendingApprovals: number };
+  revenue7d: { day: string; amount: number }[];
 }
 
 export interface RiskSignal {
