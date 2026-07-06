@@ -38,6 +38,10 @@ npm run db:seed
 
 # API (http://localhost:4000/api)
 npm run api
+
+# API contract
+# Swagger UI:   http://localhost:4000/api/docs
+# OpenAPI JSON: http://localhost:4000/api/docs-json
 ```
 
 ## Тесты
@@ -69,3 +73,5 @@ design_handoff_alistore/   источник правды: спека, прото
 POS 2.0 экран продажи → витрина (каталог→карточка→корзина→checkout) → auth (телефон+OTP) →
 CashShift / Courier COD → возвраты/обмены и approval-цикл опасных действий (v1).
 См. [`design_handoff_alistore/docs/Roadmap запуска.md`](design_handoff_alistore/docs/Roadmap%20запуска.md).
+
+Open-source candidates and integration order: [`docs/open-source-integrations.md`](docs/open-source-integrations.md).

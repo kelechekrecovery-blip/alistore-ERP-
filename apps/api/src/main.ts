@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { setupOpenApi } from './openapi';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -9,6 +10,7 @@ async function bootstrap(): Promise<void> {
     new ValidationPipe({ whitelist: true, transform: true }),
   );
   app.enableCors();
+  setupOpenApi(app);
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
   // eslint-disable-next-line no-console

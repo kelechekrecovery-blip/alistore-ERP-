@@ -1,20 +1,21 @@
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
-
-const METHODS: PaymentMethod[] = [
-  'cash',
-  'card',
-  'qr_mbank',
-  'qr_odengi',
-  'bakai_pos',
-  'obank',
-  'installment',
-];
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PayDto {
+  @ApiProperty({ example: 'clx_order_001' })
   @IsString() orderId!: string;
-  @IsIn(METHODS) method!: PaymentMethod;
+
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.cash })
+  @IsEnum(PaymentMethod) method!: PaymentMethod;
+
+  @ApiProperty({ minimum: 1, example: 109900 })
   @IsInt() @Min(1) amount!: number;
+
   /** Present on webhook-driven payments; used for txn-level idempotency (dedup). */
+  @ApiPropertyOptional({
+    description: 'External transaction id used to deduplicate webhook retries.',
+    example: 'mbank-20260706-0001',
+  })
   @IsOptional() @IsString() txnId?: string;
 }
