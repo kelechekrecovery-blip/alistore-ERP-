@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sand: #f7f2ec;
+  --tint: #ffefe7;
+  --ink: #201b17;
+  --coral: #ff5b2e;
+  --deep: #e8410f;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--sand);
+    color: var(--ink);
+    font-family: 'Golos Text', system-ui, sans-serif;
+    font-feature-settings: 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: 'Sora', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    background: var(--coral);
+    color: #fff;
+  }
+}
+
+@layer utilities {
+  /* subtle warm paper grain for atmosphere */
+  .bg-grain {
+    background-image: radial-gradient(
+      rgba(32, 27, 23, 0.035) 1px,
+      transparent 1px
+    );
+    background-size: 4px 4px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

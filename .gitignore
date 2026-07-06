@@ -18,3 +18,4 @@ coverage/
 # editor
 .idea/
 .vscode/
+next-env.d.ts
