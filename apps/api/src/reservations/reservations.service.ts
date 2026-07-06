@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
+import { OutboxService } from '../outbox/outbox.service';
 
 /**
  * Reservation lifecycle — enforces Business Invariant #7:
@@ -20,6 +21,7 @@ export class ReservationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly units: UnitsService,
+    private readonly outbox: OutboxService,
   ) {}
 
   /**
@@ -80,6 +82,22 @@ export class ReservationsService {
           },
           refs: fresh.imei ? [fresh.orderId, fresh.imei] : [fresh.orderId],
         });
+
+        // Notify the customer that their hold was released. Enqueued in the SAME
+        // transaction (transactional outbox) so the message ships iff the release
+        // commits — never a phantom "expired" notice for a hold that survived.
+        const order = await tx.order.findUnique({
+          where: { id: fresh.orderId },
+          include: { customer: true },
+        });
+        if (order?.customer) {
+          await this.outbox.enqueueOnTx(tx, {
+            channel: 'sms',
+            recipient: order.customer.phone,
+            template: 'reservation_expired',
+            payload: { orderId: fresh.orderId, imei: fresh.imei ?? null },
+          });
+        }
 
         return { result: true, events };
       });

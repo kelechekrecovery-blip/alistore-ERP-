@@ -3,6 +3,8 @@ import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { ReservationsService } from '../src/reservations/reservations.service';
+import { OutboxService } from '../src/outbox/outbox.service';
+import { LogNotificationTransport } from '../src/outbox/transports/log.transport';
 
 /**
  * Business Invariant #7 (integration, real Postgres transaction):
@@ -23,7 +25,8 @@ describe('Reservation expiry sweep (invariant #7)', () => {
     const audit = new AuditService(prisma);
     units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
-    reservations = new ReservationsService(prisma, audit, units);
+    const outbox = new OutboxService(prisma, new LogNotificationTransport());
+    reservations = new ReservationsService(prisma, audit, units, outbox);
   });
 
   afterAll(async () => {
@@ -31,6 +34,7 @@ describe('Reservation expiry sweep (invariant #7)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.outboxMessage.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
@@ -100,6 +104,13 @@ describe('Reservation expiry sweep (invariant #7)', () => {
     expect(types).toEqual(
       expect.arrayContaining(['stock.released', 'reservation.expired']),
     );
+
+    // A customer notification was enqueued transactionally with the release.
+    const notice = await prisma.outboxMessage.findFirst({
+      where: { template: 'reservation_expired' },
+    });
+    expect(notice).not.toBeNull();
+    expect(notice?.status).toBe('pending');
   });
 
   it('does not touch a still-valid reservation', async () => {
@@ -111,6 +122,7 @@ describe('Reservation expiry sweep (invariant #7)', () => {
     expect((await prisma.deviceUnit.findUnique({ where: { imei } }))?.status).toBe(
       'reserved',
     );
+    expect(await prisma.outboxMessage.count()).toBe(0); // no release → no notice
   });
 
   it('is idempotent — a second sweep releases nothing more', async () => {

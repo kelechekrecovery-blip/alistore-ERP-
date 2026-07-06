@@ -2,13 +2,15 @@ import { Module } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { ReservationsScheduler } from './reservations.scheduler';
 import { UnitsModule } from '../units/units.module';
+import { OutboxModule } from '../outbox/outbox.module';
 
 /**
- * Reservation lifecycle (invariant #7). AuditService is provided globally, so
- * only UnitsModule needs importing to release held units back to stock.
+ * Reservation lifecycle (invariant #7). AuditService is provided globally; the
+ * module imports UnitsModule to release held units and OutboxModule to notify the
+ * customer that an expired hold was released.
  */
 @Module({
-  imports: [UnitsModule],
+  imports: [UnitsModule, OutboxModule],
   providers: [ReservationsService, ReservationsScheduler],
   exports: [ReservationsService],
 })
