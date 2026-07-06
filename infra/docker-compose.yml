@@ -1,0 +1,85 @@
+# AliStore — v1 self-hosted services.
+#
+# ⚠️ Authored but NOT run/verified on the dev machine (no Docker installed here).
+# Bring up where Docker is available and adjust before relying on it:
+#   docker compose -f infra/docker-compose.yml --env-file .env up -d
+#
+# Novu (notifications) is intentionally NOT included: self-hosting it is an
+# 8-service cluster (api/worker/ws/web + MongoDB + Redis). Use Novu Cloud or Novu's
+# official compose and point NOVU_API_URL at it — see infra/README.md. The API
+# delivers to Novu over REST (NovuHttpTransport), so no app change is needed.
+name: alistore-infra
+
+services:
+  # S3-compatible object storage — product photos, Evidence Vault (фото/акты).
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-alistore}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-please}
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # One-shot: create the default bucket and make it read-download on first boot.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-alistore}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-please}
+      MINIO_BUCKET: ${MINIO_BUCKET:-alistore}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+      mc mb --ignore-existing local/$${MINIO_BUCKET};
+      mc anonymous set download local/$${MINIO_BUCKET};
+      exit 0;
+      "
+
+  # Owner BI / Command Center dashboards. Connect it to alistore_dev (read-only
+  # user) from its UI on first boot; this DB holds only Metabase's own app data.
+  metabase:
+    image: metabase/metabase:latest
+    ports:
+      - "3001:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: ${METABASE_DB_PASS:-change-me-please}
+      MB_DB_HOST: metabase-db
+    depends_on:
+      metabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  metabase-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: metabase
+      POSTGRES_USER: metabase
+      POSTGRES_PASSWORD: ${METABASE_DB_PASS:-change-me-please}
+    volumes:
+      - metabase-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metabase"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  minio-data:
+  metabase-db:
