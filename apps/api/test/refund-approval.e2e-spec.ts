@@ -4,7 +4,7 @@ import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
-import { ConflictError, ValidationError } from '../src/common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../src/common/errors';
 
 /**
  * Approval-gated refund (Approval Rules Matrix + invariant #1):
@@ -77,7 +77,7 @@ describe('Refund approval cycle (integration)', () => {
     expect((await prisma.order.findUnique({ where: { id: orderId } }))?.status).toBe('paid');
 
     // approve → compensating negative payment + order refunded
-    await approvals.decide(req.approvalId, { status: 'approved', approver: 'admin_gulnara' });
+    await approvals.decide(req.approvalId, { status: 'approved', approver: 'admin_gulnara', approverRole: 'admin' });
 
     const refunds = await prisma.payment.findMany({ where: { amount: { lt: 0 } } });
     expect(refunds).toHaveLength(1);
@@ -95,14 +95,27 @@ describe('Refund approval cycle (integration)', () => {
     const { paymentId } = await paidOrder();
     const req = await payments.refund(paymentId, 50000, 'спорно', 'senior_azamat');
 
-    await approvals.decide(req.approvalId, { status: 'rejected', approver: 'admin_gulnara' });
+    await approvals.decide(req.approvalId, { status: 'rejected', approver: 'admin_gulnara', approverRole: 'admin' });
     expect(await prisma.payment.count({ where: { amount: { lt: 0 } } })).toBe(0);
 
     const again = await approvals
-      .decide(req.approvalId, { status: 'approved', approver: 'admin_gulnara' })
+      .decide(req.approvalId, { status: 'approved', approver: 'admin_gulnara', approverRole: 'admin' })
       .catch((e) => e);
     expect(again).toBeInstanceOf(ConflictError);
     expect(again.code).toBe('approval_already_decided');
+  });
+
+  it('rejects an approval decision by an unauthorized role (403)', async () => {
+    const { paymentId } = await paidOrder();
+    const req = await payments.refund(paymentId, 10000, 'спорно', 'seller_bob');
+    const err = await approvals
+      .decide(req.approvalId, { status: 'approved', approver: 'seller_bob', approverRole: 'seller' })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(ForbiddenError);
+    expect(err.getStatus()).toBe(403);
+    expect(err.code).toBe('approver_not_authorized');
+    // still pending, no money moved
+    expect(await prisma.payment.count({ where: { amount: { lt: 0 } } })).toBe(0);
   });
 
   it('enforces invariant #1: refund needs a payment and amount ≤ paid', async () => {

@@ -288,12 +288,13 @@ export async function decideApproval(
   id: string,
   status: 'approved' | 'rejected',
   approver: string,
+  approverRole = 'owner',
   reason?: string,
 ): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/approvals/${id}/decide`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ status, approver, reason }),
+    body: JSON.stringify({ status, approver, approverRole, reason }),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));

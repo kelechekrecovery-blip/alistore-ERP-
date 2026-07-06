@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConflictError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { canApprove, Role } from '../rbac/permissions';
 import { ACTION_EXECUTORS } from './action-executors';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
@@ -18,6 +19,7 @@ export interface ApprovalRequest {
 export interface DecideInput {
   status: 'approved' | 'rejected';
   approver: string;
+  approverRole: Role;
   reason?: string;
 }
 
@@ -88,6 +90,13 @@ export class ApprovalsService {
         throw new ConflictError(
           'approval_already_decided',
           `Approval ${id} уже ${approval.status}`,
+        );
+      }
+      // Role Permission Matrix: only an authorized role may decide this action.
+      if (!canApprove(approval.action, input.approverRole)) {
+        throw new ForbiddenError(
+          'approver_not_authorized',
+          `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
 

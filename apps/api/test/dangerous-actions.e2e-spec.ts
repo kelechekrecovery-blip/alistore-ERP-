@@ -60,7 +60,7 @@ describe('Dangerous actions via approval (integration)', () => {
     expect(res.approvalId).toBeDefined();
     expect((await prisma.product.findUnique({ where: { id: p.id } }))?.price).toBe(100000);
 
-    await approvals.decide(res.approvalId, { status: 'approved', approver: 'admin' });
+    await approvals.decide(res.approvalId, { status: 'approved', approver: 'admin', approverRole: 'admin' });
     expect((await prisma.product.findUnique({ where: { id: p.id } }))?.price).toBe(130000);
     const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
     expect(types).toEqual(expect.arrayContaining(['approval.requested', 'approval.approved', 'price.changed']));
@@ -71,7 +71,7 @@ describe('Dangerous actions via approval (integration)', () => {
     const res = (await products.archive(p.id, 'снят', 'owner')) as { approvalId: string };
     expect((await prisma.product.findUnique({ where: { id: p.id } }))?.archived).toBe(false);
 
-    await approvals.decide(res.approvalId, { status: 'approved', approver: 'owner' });
+    await approvals.decide(res.approvalId, { status: 'approved', approver: 'owner', approverRole: 'owner' });
     expect((await prisma.product.findUnique({ where: { id: p.id } }))?.archived).toBe(true);
   });
 
@@ -83,7 +83,7 @@ describe('Dangerous actions via approval (integration)', () => {
     )) as { approvalId: string };
 
     expect(await prisma.inventoryMovement.count()).toBe(0);
-    await approvals.decide(res.approvalId, { status: 'approved', approver: 'owner' });
+    await approvals.decide(res.approvalId, { status: 'approved', approver: 'owner', approverRole: 'owner' });
 
     const mv = await prisma.inventoryMovement.findFirst({ where: { productId: p.id } });
     expect(mv?.type).toBe('write_off');
@@ -98,7 +98,7 @@ describe('Dangerous actions via approval (integration)', () => {
       { productId: p.id, qty: 1, type: 'adjust', reason: 'пересчёт' },
       'warehouse',
     )) as { approvalId: string };
-    await approvals.decide(res.approvalId, { status: 'rejected', approver: 'owner' });
+    await approvals.decide(res.approvalId, { status: 'rejected', approver: 'owner', approverRole: 'owner' });
     expect(await prisma.inventoryMovement.count()).toBe(0);
   });
 });
