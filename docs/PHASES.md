@@ -70,13 +70,20 @@
   Dispute Center, привязка Return↔Approval↔refund в один поток.
 **Проверка:** ✅ in-browser+БД: рефанд 202→Inbox→одобрить→−платёж+order refunded+ledger.
 
-## Phase 7 — Опасные действия полностью (v1) ☐
+## Phase 7 — Опасные действия полностью (v1) 🟡
 **Цель:** каждое опасное действие — через approval, с ролями и 2FA.
-- ☐ Approval-gate: скидка>10%, изменение цены>±15%, списание, изменение остатка,
-  продажа в долг>лимита, удаление (soft-delete), доступ к PII — по Approval Rules Matrix.
-- ☐ **Role Permission Matrix** (9 ролей) — серверная проверка прав/лимитов; 2FA на опасное.
+- ✅ Approval-gate: изменение цены>±15%, списание (write_off), изменение остатка
+  (stock_adjust), удаление (soft-delete→archived) — исполнители в
+  `approvals/action-executors.ts` (ACTION_EXECUTORS); Products + Inventory модули.
+- ✅ Reduction: вынос исполнителей из approvals.service (183→136 строк).
+- ☐ Осталось: скидка>10% в POS (park продажу до одобрения), продажа в долг>лимита,
+  доступ к PII → 2FA.
+- ☐ **Role Permission Matrix** (9 ролей) — серверная проверка прав/лимитов; 2FA на опасное
+  (auth-связано, координировать с Codex).
 - ☐ PII-маскирование младшим ролям; margin-контроль (инв #6).
-**Проверка:** тесты на каждый порог (обычный→выполнено, сверх→202); попытка без прав→403; 2FA-гейт.
+**Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
+эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
+Осталось: тесты порогов скидки/долга; попытка без прав→403; 2FA-гейт.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) ☐
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
@@ -133,10 +140,11 @@
 
 ---
 
-## Статус-снимок (на момент составления)
-Готово: Phase 0–5 ✅, Phase 6 🟡. Backend-модулей: 18 · frontend-роутов: 10 ·
-тест-сьютов: 19 (56 тестов зелёные). Параллельно Codex: catalog-поиск, OpenAPI, auth,
-outbox/Novu, media, receipts, infra.
+## Статус-снимок (обновлён после Phase 7 ядра)
+Готово: Phase 0–5 ✅, Phase 6 🟡, Phase 7 🟡 (product/inventory-действия через approval).
+Backend-модулей: 20 (+products, inventory) · frontend-роутов: 10 · тест-сьютов: 20
+(65 тестов зелёные). Параллельно Codex: catalog-поиск, OpenAPI, auth, outbox/Novu, media,
+receipts, labels, infra.
 
-**Следующая на выполнение:** Phase 7 (опасные действия + роли) — наибольшая ценность
-для «денежной безопасности» и завершения v1.
+**Следующая на выполнение:** дозакрыть Phase 7 (скидка>10% в POS + долг) ИЛИ Phase 8
+(ERP-дашборд + Risk/Command Center из Event Ledger). RBAC/2FA — координировать с Codex.
