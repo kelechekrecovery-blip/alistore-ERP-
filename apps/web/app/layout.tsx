@@ -1,8 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { SiteHeader } from '@/components/SiteHeader';
-import { SiteFooter } from '@/components/SiteFooter';
 import { CartProvider } from '@/lib/cart';
 import { AuthProvider } from '@/lib/auth';
 
@@ -27,13 +25,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-sand bg-grain">
+      <body className="min-h-screen bg-[#0E0C0A]">
         <AuthProvider>
-          <CartProvider>
-            <SiteHeader />
-            <main className="mx-auto w-full max-w-content px-4 sm:px-6">{children}</main>
-            <SiteFooter />
-          </CartProvider>
+          <CartProvider>{children}</CartProvider>
         </AuthProvider>
       </body>
     </html>

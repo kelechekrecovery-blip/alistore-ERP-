@@ -6,115 +6,73 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { fetchMyOrders, type MyOrder } from '@/lib/api';
 import { som } from '@/lib/format';
+import { MobileTabBar } from '@/components/MobileTabBar';
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  draft: { label: 'Черновик', cls: 'bg-ink/10 text-ink/60' },
-  created: { label: 'Оформлен', cls: 'bg-tint text-deep' },
-  reserved: { label: 'Зарезервирован', cls: 'bg-info/15 text-info' },
-  awaiting_payment: { label: 'Ждёт оплаты', cls: 'bg-warn/20 text-warn' },
-  paid: { label: 'Оплачен', cls: 'bg-success/15 text-success' },
-  out_for_delivery: { label: 'В доставке', cls: 'bg-info/15 text-info' },
-  delivered: { label: 'Доставлен', cls: 'bg-success/15 text-success' },
-  completed: { label: 'Завершён', cls: 'bg-success/15 text-success' },
-  cancelled: { label: 'Отменён', cls: 'bg-danger/10 text-danger' },
+  created: { label: 'Оформлен', cls: 'bg-lime/15 text-lime' },
+  reserved: { label: 'Собран', cls: 'bg-info/15 text-info' },
+  paid: { label: 'Оплачен', cls: 'bg-lime/15 text-lime' },
+  completed: { label: 'Завершён', cls: 'bg-lime/15 text-lime' },
+  cancelled: { label: 'Отменён', cls: 'bg-danger/10 text-[#FF8A7A]' },
+  refunded: { label: 'Возврат', cls: 'bg-danger/10 text-[#FF8A7A]' },
+  exchanged: { label: 'Обмен', cls: 'bg-warn/15 text-warn' },
 };
-
-function statusOf(s: string) {
-  return STATUS[s] ?? { label: s, cls: 'bg-ink/10 text-ink/60' };
-}
+const st = (s: string) => STATUS[s] ?? { label: s, cls: 'bg-[#2E2822] text-[#8A7F76]' };
 
 export default function AccountPage() {
   const { user, hydrated, authed, logout } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    if (hydrated && !user) router.replace('/login?next=/account');
-  }, [hydrated, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    authed(fetchMyOrders)
-      .then(setOrders)
-      .catch(() => setLoadError(true));
-  }, [user, authed]);
+  useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account'); }, [hydrated, user, router]);
+  useEffect(() => { if (user) authed(fetchMyOrders).then(setOrders).catch(() => setOrders([])); }, [user, authed]);
 
   if (!hydrated || !user) {
-    return (
-      <div className="py-24 text-center font-mono text-sm text-ink/40">Загрузка…</div>
-    );
+    return <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
   }
 
   return (
-    <div className="py-8">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-extrabold text-ink">Личный кабинет</h1>
-          <p className="mt-1 font-mono text-sm text-ink/50">{user.phone}</p>
-        </div>
-        <button
-          type="button"
-          onClick={async () => {
-            await logout();
-            router.push('/');
-          }}
-          className="rounded-btn border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 transition hover:border-danger/40 hover:text-danger"
-        >
-          Выйти
-        </button>
-      </div>
+    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
+      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">
+        <div className="flex-1 overflow-y-auto px-4 pb-24 pt-5">
+          {/* profile card */}
+          <div className="mb-2 flex items-center gap-3.5 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
+            <span className="grid h-13 w-13 place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-xl font-extrabold" style={{ height: 52, width: 52 }}>{user.phone.slice(-2)}</span>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-display text-base font-bold">Клиент</span>
+                <span className="rounded-chip bg-warn px-2 py-0.5 text-[10px] font-bold text-lime-ink">GOLD</span>
+              </div>
+              <div className="font-mono text-xs text-[#A79C92]">{user.phone}</div>
+            </div>
+          </div>
 
-      <h2 className="mb-4 font-display text-xl font-bold text-ink">Мои заказы</h2>
+          {/* level */}
+          <div className="mb-3.5 rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
+            <div className="mb-2 flex justify-between text-[13px]"><span className="text-[#D8CFC6]">Уровень Gold</span><span className="font-mono text-lime">4 820 бонусов</span></div>
+            <div className="h-[7px] overflow-hidden rounded-chip bg-[#16130F]"><div className="h-full w-[72%] bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" /></div>
+            <div className="mt-1.5 text-[11px] text-[#8A7F76]">До Platinum осталось 51 000 сом покупок</div>
+          </div>
 
-      {orders === null && !loadError && (
-        <p className="font-mono text-sm text-ink/40">Загружаем заказы…</p>
-      )}
-
-      {loadError && (
-        <p className="rounded-card border border-dashed border-danger/30 bg-white/50 px-6 py-8 text-center text-sm text-danger">
-          Не удалось загрузить заказы. Обновите страницу.
-        </p>
-      )}
-
-      {orders && orders.length === 0 && (
-        <div className="rounded-card border border-dashed border-ink/15 bg-white/50 px-6 py-14 text-center">
-          <p className="font-display text-lg font-bold text-ink">Заказов пока нет</p>
-          <Link href="/" className="mt-4 inline-flex text-sm text-coral hover:text-deep">
-            В каталог →
-          </Link>
-        </div>
-      )}
-
-      {orders && orders.length > 0 && (
-        <ul className="flex flex-col gap-3">
-          {orders.map((o) => {
-            const st = statusOf(o.status);
-            const count = o.items.reduce((s, i) => s + i.qty, 0);
+          <h2 className="mb-2.5 font-display text-base font-bold">Мои заказы</h2>
+          {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+          {orders && orders.length === 0 && <p className="py-6 text-center text-sm text-[#8A7F76]">Заказов пока нет</p>}
+          {(orders ?? []).map((o) => {
+            const s = st(o.status);
             return (
-              <li key={o.id}>
-                <Link
-                  href={`/account/orders/${o.id}`}
-                  className="flex flex-wrap items-center gap-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft transition hover:border-ink/25 hover:shadow-lift"
-                >
-                <span className="font-mono text-sm font-semibold text-ink">
-                  #{o.id.slice(-8)}
-                </span>
-                <span className={`rounded-chip px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>
-                  {st.label}
-                </span>
-                <span className="text-sm text-ink/55">
-                  {count} {count === 1 ? 'товар' : 'товара/ов'} · {o.channel}
-                </span>
-                <span className="ml-auto font-mono font-bold tabular text-ink">
-                  {som(o.total)}
-                </span>
-                </Link>
-              </li>
+              <Link key={o.id} href={`/account/orders/${o.id}`} className="mb-2.5 flex items-center gap-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                <span className="font-mono text-sm font-bold">#{o.id.slice(-6)}</span>
+                <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>
+                <span className="text-[13px] text-[#A79C92]">{o.channel}</span>
+                <span className="ml-auto font-display font-extrabold text-lime">{som(o.total)}</span>
+              </Link>
             );
           })}
-        </ul>
-      )}
+
+          <button type="button" onClick={async () => { await logout(); router.push('/'); }} className="mt-4 w-full text-center text-[13px] text-[#FF8A7A]">Выйти из аккаунта</button>
+        </div>
+        <MobileTabBar active="account" />
+      </div>
     </div>
   );
 }
