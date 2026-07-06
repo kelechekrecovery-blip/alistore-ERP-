@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { LabelsService } from './labels.service';
 import { ImeiLabelDto, QrLabelDto } from './labels.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -8,7 +8,13 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class LabelsController {
   constructor(private readonly labels: LabelsService) {}
 
-  /** Code128 IMEI sticker (SVG). */
+  /** IMEI sticker for a stored unit (looked up by IMEI). */
+  @Get('unit/:imei')
+  unit(@Param('imei') imei: string) {
+    return this.labels.unitLabel(imei);
+  }
+
+  /** Code128 IMEI sticker (SVG) from a raw IMEI. */
   @Post('imei')
   imei(@Body() dto: ImeiLabelDto) {
     return { svg: this.labels.imeiBarcode(dto.imei) };

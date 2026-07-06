@@ -1,8 +1,10 @@
 import { LabelsService } from '../src/labels/labels.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { ValidationError } from '../src/common/errors';
 
 describe('LabelsService (bwip-js)', () => {
-  const labels = new LabelsService();
+  // imeiBarcode/qrLabel are pure — the DB dep is unused here.
+  const labels = new LabelsService({} as unknown as PrismaService);
 
   it('generates a Code128 SVG for an IMEI', () => {
     const svg = labels.imeiBarcode('353915090123456');
