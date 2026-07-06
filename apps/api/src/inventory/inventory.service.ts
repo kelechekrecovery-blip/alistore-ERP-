@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
-import { MovementDto, TransferDto } from './inventory.dto';
+import { CountDto, MovementDto, TransferDto } from './inventory.dto';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -36,6 +36,44 @@ export class InventoryService {
       requester,
       reason: dto.reason,
       payload: { productId: dto.productId, qty: dto.qty, reason: dto.reason },
+    });
+  }
+
+  /**
+   * Take inventory for one product at a location: compare counted vs the in_stock
+   * units on record (inventory.counted). A non-zero diff is recorded for follow-up;
+   * the actual correction is a separate approval-gated stock adjustment.
+   */
+  async count(dto: CountDto, actor: string) {
+    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+    if (!product) {
+      throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+    }
+    const expected = await this.prisma.deviceUnit.count({
+      where: { productId: dto.productId, location: dto.location, status: 'in_stock' },
+    });
+    const diff = dto.counted - expected;
+    return this.audit.transaction(async (tx) => {
+      const movement = await tx.inventoryMovement.create({
+        data: {
+          productId: dto.productId,
+          qty: diff,
+          type: 'count',
+          from: dto.location,
+          reason: `counted ${dto.counted} vs expected ${expected}`,
+        },
+      });
+      return {
+        result: { productId: dto.productId, location: dto.location, expected, counted: dto.counted, diff, movementId: movement.id },
+        events: [
+          {
+            type: EventType.InventoryCounted,
+            actor,
+            payload: { productId: dto.productId, location: dto.location, expected, counted: dto.counted, diff },
+            refs: [dto.productId, movement.id],
+          },
+        ],
+      };
     });
   }
 

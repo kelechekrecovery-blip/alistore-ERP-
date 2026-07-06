@@ -8,7 +8,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import { MovementDto, TransferDto } from './inventory.dto';
+import { CountDto, MovementDto, TransferDto } from './inventory.dto';
 
 const SYSTEM_ACTOR = 'system';
 
@@ -35,5 +35,13 @@ export class InventoryController {
   @Post('transfer')
   transfer(@Body() dto: TransferDto) {
     return this.inventory.transfer(dto, dto.requester ?? SYSTEM_ACTOR);
+  }
+
+  @ApiOperation({ summary: 'Take inventory for a product at a location (inventory.counted)' })
+  @ApiCreatedResponse({ description: 'Count recorded with counted/expected/diff.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown product.' })
+  @Post('count')
+  count(@Body() dto: CountDto) {
+    return this.inventory.count(dto, dto.requester ?? SYSTEM_ACTOR);
   }
 }

@@ -1,6 +1,20 @@
 import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class CountDto {
+  @ApiProperty({ example: 'clx_product_001' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1', description: 'Location being counted' })
+  @IsString() location!: string;
+
+  @ApiProperty({ minimum: 0, example: 7, description: 'Physically counted quantity' })
+  @IsInt() @Min(0) counted!: number;
+
+  @ApiPropertyOptional({ example: 'warehouse_lead' })
+  @IsOptional() @IsString() requester?: string;
+}
+
 export class TransferDto {
   @ApiProperty({ example: 'IPH-15-128-UNIT-1', description: 'IMEI of the unit to move' })
   @IsString() imei!: string;
