@@ -15,6 +15,15 @@ import { ConflictError, ValidationError } from '../common/errors';
 export class UnitsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Available (in_stock) units for a product, oldest first — POS unit assignment. */
+  listAvailable(productId: string, limit: number) {
+    return this.prisma.deviceUnit.findMany({
+      where: { productId, status: 'in_stock' },
+      take: limit,
+      orderBy: { id: 'asc' },
+    });
+  }
+
   /** Приёмка партии — register a new physical unit (status in_stock). */
   async receive(input: {
     imei: string;

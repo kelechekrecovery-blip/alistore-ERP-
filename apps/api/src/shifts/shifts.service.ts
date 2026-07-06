@@ -31,6 +31,13 @@ export class ShiftsService {
     });
   }
 
+  /** The staff member's currently open shift, if any (POS attaches sales to it). */
+  currentOpen(staffId: string) {
+    return this.prisma.cashShift.findFirst({
+      where: { staffId, closedAt: null },
+    });
+  }
+
   /** Open a shift. A staff member can hold only one open shift at a time (409). */
   async open(dto: OpenShiftDto, actor: string) {
     const existing = await this.prisma.cashShift.findFirst({
