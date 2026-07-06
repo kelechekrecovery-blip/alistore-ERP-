@@ -206,3 +206,48 @@ export function posSale(input: {
 }): Promise<PosSaleResult> {
   return postJson('/pos/sale', input);
 }
+
+// ---------- warehouse / fulfillment ----------
+
+export interface QueueOrder {
+  id: string;
+  channel: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  customer?: { phone: string; name: string };
+  items: { sku: string; qty: number; price: number; imei?: string | null }[];
+}
+
+export async function fetchOrdersByStatus(status: string): Promise<QueueOrder[]> {
+  const res = await fetch(`${API_BASE}/orders?status=${encodeURIComponent(status)}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`orders queue ${res.status}`);
+  return (await res.json()) as QueueOrder[];
+}
+
+export function fulfillOrder(id: string): Promise<{ order?: { status: string }; assigned: string[] }> {
+  return postJson(`/orders/${id}/fulfill`, {});
+}
+
+export function transitionOrder(id: string, to: string): Promise<{ status: string }> {
+  return postJson(`/orders/${id}/transition`, { to });
+}
+
+export interface OrderDetail {
+  id: string;
+  channel: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  items: { sku: string; qty: number; price: number; imei?: string | null }[];
+  payments: { amount: number; method: string; status: string }[];
+}
+
+export async function fetchOrder(id: string): Promise<OrderDetail | null> {
+  const res = await fetch(`${API_BASE}/orders/${id}`, { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`order ${res.status}`);
+  return (await res.json()) as OrderDetail;
+}

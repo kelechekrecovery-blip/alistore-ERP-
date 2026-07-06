@@ -92,10 +92,11 @@ export default function AccountPage() {
             const st = statusOf(o.status);
             const count = o.items.reduce((s, i) => s + i.qty, 0);
             return (
-              <li
-                key={o.id}
-                className="flex flex-wrap items-center gap-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft"
-              >
+              <li key={o.id}>
+                <Link
+                  href={`/account/orders/${o.id}`}
+                  className="flex flex-wrap items-center gap-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft transition hover:border-ink/25 hover:shadow-lift"
+                >
                 <span className="font-mono text-sm font-semibold text-ink">
                   #{o.id.slice(-8)}
                 </span>
@@ -108,6 +109,7 @@ export default function AccountPage() {
                 <span className="ml-auto font-mono font-bold tabular text-ink">
                   {som(o.total)}
                 </span>
+                </Link>
               </li>
             );
           })}
