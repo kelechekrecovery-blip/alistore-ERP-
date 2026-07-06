@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{width:6px;} .sc::-webkit-scrollbar-thumb{background:#2E2822;border-radius:3px;}</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; font-family: 'Golos Text', sans-serif;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="width: 1280px; height: 820px; background: #16130F; border-radius: 20px; border: 1px solid #2E2822; overflow: hidden; display: flex; box-shadow: 0 40px 90px rgba(0,0,0,0.5);">
+
+    <!-- SIDEBAR -->
+    <div style="width: 230px; flex-shrink: 0; background: #1A1611; border-right: 1px solid #2E2822; display: flex; flex-direction: column; padding: 18px 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+        <div style="width: 32px; height: 32px; border-radius: 9px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 17px;">A</div>
+        <div><div style="font-family: 'Sora'; font-weight: 800; font-size: 15px; color: #fff;">AliStore ERP</div><div style="font-size: 10px; color: #8A7F76;">Владелец</div></div>
+      </div>
+      <sc-for list="{{ menu }}" as="m" hint-placeholder-count="8">
+        <div onClick="{{ m.go }}" style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 10px; margin-bottom: 3px; cursor: pointer; background: {{ m.bg }};"><span style="font-size: 16px;">{{ m.icon }}</span><span style="font-size: 13px; font-weight: {{ m.weight }}; color: {{ m.color }};">{{ m.label }}</span><sc-if value="{{ m.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="margin-left: auto; background: #FF5B2E; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 7px;">{{ m.badge }}</span></sc-if></div>
+      </sc-for>
+      <div style="margin-top: auto; background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 12px;"><div style="font-size: 11px; color: #8A7F76;">Сеть</div><div style="font-size: 13px; color: #fff; font-weight: 600; margin-top: 2px;">3 филиала · онлайн</div></div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="sc" style="flex: 1; overflow-y: auto;">
+      <!-- topbar -->
+      <div style="position: sticky; top: 0; background: #16130F; border-bottom: 1px solid #2E2822; padding: 16px 26px; display: flex; align-items: center; z-index: 5;">
+        <div><div style="font-family: 'Sora'; font-weight: 700; font-size: 20px; color: #fff;">{{ pageTitle }}</div><div style="font-size: 12px; color: #8A7F76;">{{ pageSub }}</div></div>
+        <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+          <div onClick="{{ goAI }}" style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 10px; padding: 9px 15px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;">🤖 AI-ассистент</div>
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: #2A241F; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px;">В</div>
+        </div>
+      </div>
+
+      <div style="padding: 22px 26px;">
+
+        <!-- DASHBOARD -->
+        <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px;">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <div style="background: {{ k.bg }}; border: 1px solid #2E2822; border-radius: 16px; padding: 18px;"><div style="font-size: 12px; color: #8A7F76;">{{ k.label }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 26px; color: {{ k.color }}; margin-top: 6px;">{{ k.value }}</div><div style="font-size: 11px; color: {{ k.deltaColor }}; margin-top: 4px;">{{ k.delta }}</div></div>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
+            <!-- revenue chart -->
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 16px;">Выручка · 7 дней</div>
+              <div style="display: flex; align-items: flex-end; gap: 10px; height: 160px;">
+                <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+                  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;"><div style="width: 100%; height: {{ b.h }}; background: linear-gradient(180deg,#C6FF3D,#8FD40F); border-radius: 6px 6px 0 0;"></div><span style="font-size: 10px; color: #8A7F76;">{{ b.day }}</span></div>
+                </sc-for>
+              </div>
+            </div>
+            <!-- decisions -->
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 14px;">Требуют решения</div>
+              <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="3">
+                <div style="border-left: 3px solid {{ d.color }}; padding: 4px 0 4px 12px; margin-bottom: 12px;"><div style="font-size: 13px; color: #fff; line-height: 1.4;">{{ d.text }}</div><div onClick="{{ d.act }}" style="font-size: 12px; color: #C6FF3D; margin-top: 4px; cursor: pointer;">{{ d.action }} →</div></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- WAREHOUSE -->
+        <sc-if value="{{ isWarehouse }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;">
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">Позиций</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">1 247</div></div>
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">На сумму</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">42.8 млн</div></div>
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">Мало остатка</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #E5B23C;">8</div></div>
+          </div>
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 12px; color: #8A7F76;"><span>Товар</span><span>Остаток</span><span>Цена</span><span>Статус</span></div>
+            <sc-for list="{{ stock }}" as="r" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #221E19; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ r.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ r.qtyColor }};">{{ r.qty }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #D8CFC6;">{{ r.price }}</span><span><span style="background: {{ r.bg }}; color: {{ r.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ r.status }}</span></span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- FINANCE -->
+        <sc-if value="{{ isFinance }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">Выручка</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">8.42 млн</div></div>
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">Себестоимость</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">6.10 млн</div></div>
+            <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">Валовая</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #C6FF3D;">2.32 млн</div></div>
+            <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 12px; color: #8A7F76;">Чистая</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #FF8A5F;">1.14 млн</div></div>
+          </div>
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+            <div style="display: flex; align-items: center; margin-bottom: 14px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Отчёт P&amp;L</span><span onClick="{{ exportXls }}" style="margin-left: auto; background: #1F3D2E; color: #C6FF3D; border-radius: 9px; padding: 8px 14px; font-size: 12px; cursor: pointer;">↓ Excel</span></div>
+            <sc-for list="{{ pnl }}" as="p" hint-placeholder-count="5">
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #221E19; font-size: 13px;"><span style="color: {{ p.color }};">{{ p.label }}</span><span style="font-family: 'JetBrains Mono'; color: {{ p.color }};">{{ p.value }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- TASKS -->
+        <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+            <sc-for list="{{ columns }}" as="col" hint-placeholder-count="3">
+              <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 16px; padding: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{ col.dot }};"></span><span style="font-size: 13px; font-weight: 700; color: #fff;">{{ col.title }}</span><span style="color: #8A7F76; font-size: 12px;">{{ col.count }}</span></div>
+                <sc-for list="{{ col.cards }}" as="c" hint-placeholder-count="2">
+                  <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 11px; padding: 12px; margin-bottom: 8px;"><div style="font-size: 13px; color: #fff; line-height: 1.4;">{{ c.text }}</div><div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;"><span style="background: {{ c.tagBg }}; color: {{ c.tagFg }}; border-radius: 5px; padding: 2px 7px; font-size: 10px;">{{ c.tag }}</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">{{ c.who }}</span></div></div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- KPI / STAFF -->
+        <sc-if value="{{ isKpi }}" hint-placeholder-val="{{ false }}">
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+            <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 12px; color: #8A7F76;"><span>Сотрудник</span><span>Продажи</span><span>KPI</span><span>Бонус</span><span>Штраф</span></div>
+            <sc-for list="{{ staff }}" as="e" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; padding: 14px 18px; border-bottom: 1px solid #221E19; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ e.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #D8CFC6;">{{ e.sales }}</span><span><span style="background: {{ e.kpiBg }}; color: {{ e.kpiFg }}; border-radius: 6px; padding: 3px 9px; font-size: 12px; font-family: 'JetBrains Mono';">{{ e.kpi }}</span></span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #C6FF3D;">{{ e.bonus }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ e.penColor }};">{{ e.pen }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- CRM -->
+        <sc-if value="{{ isCrm }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+            <sc-for list="{{ crmSeg }}" as="c" hint-placeholder-count="4">
+              <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 22px;">{{ c.icon }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 8px;">{{ c.count }}</div><div style="font-size: 12px; color: #8A7F76;">{{ c.label }}</div></div>
+            </sc-for>
+          </div>
+          <div style="background: linear-gradient(135deg,#2A2A2E,#1A1611); border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+            <div style="font-size: 12px; color: #C6FF3D; font-family: 'JetBrains Mono'; margin-bottom: 8px;">🤖 AI РЕКОМЕНДАЦИЯ</div>
+            <div style="font-size: 14px; color: #fff; line-height: 1.5;">340 клиентов не покупали 60+ дней. Запустить кампанию реактивации со скидкой −10% через WhatsApp — прогноз возврата ~12%.</div>
+            <a href="AliStore CRM Кампании.dc.html" style="text-decoration: none;"><div style="display: inline-block; background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 13px; margin-top: 14px; cursor: pointer;">Открыть кампании →</div></a>
+          </div>
+        </sc-if>
+
+        <!-- AI ASSISTANT -->
+        <sc-if value="{{ isAI }}" hint-placeholder-val="{{ false }}">
+          <div style="max-width: 720px;">
+            <sc-for list="{{ chat }}" as="c" hint-placeholder-count="4">
+              <div style="display: flex; justify-content: {{ c.align }}; margin-bottom: 12px;"><div style="max-width: 78%; background: {{ c.bg }}; color: {{ c.fg }}; border-radius: {{ c.radius }}; padding: 13px 16px; font-size: 14px; line-height: 1.5;">{{ c.text }}</div></div>
+            </sc-for>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;">
+              <sc-for list="{{ prompts }}" as="p" hint-placeholder-count="3">
+                <div onClick="{{ p.ask }}" style="background: #221E19; border: 1px solid #2E2822; border-radius: 999px; padding: 9px 15px; font-size: 13px; color: #C6FF3D; cursor: pointer;">{{ p.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { route:"dash", chat:[{q:false,text:"Я вижу все данные сети. Спросите про деньги, склад, сотрудников или задачи."}] };
+  go(r){ this.setState({route:r}); }
+
+  renderVals(){
+    const s=this.state, r=s.route, R=x=>r===x;
+    const menuDef=[["dash","Дашборд","▦"],["warehouse","Склад","📦"],["finance","Финансы","💰"],["tasks","Задачи","✅"],["kpi","KPI и ЗП","📊"],["crm","CRM","👥"],["ai","AI-ассистент","🤖"]];
+    const menu=menuDef.map(m=>({icon:m[2],label:m[1],go:()=>this.go(m[0]),
+      bg:r===m[0]?"#221E19":"transparent",color:r===m[0]?"#fff":"#A79C92",weight:r===m[0]?700:500,
+      hasBadge:m[0]==="tasks",badge:"3"}));
+
+    const titles={dash:["Дашборд","Обзор сети · сегодня"],warehouse:["Склад","1 247 позиций · 3 филиала"],finance:["Финансы","Июнь 2026"],tasks:["Задачи","Kanban команды"],kpi:["KPI и зарплаты","Июнь 2026"],crm:["CRM","База клиентов"],ai:["AI-ассистент","Знает всю систему"]};
+
+    const kpis=[
+      {label:"Выручка сегодня",value:"1.24 млн",color:"#fff",delta:"▲ 12% ко вчера",deltaColor:"#C6FF3D",bg:"#1A1611"},
+      {label:"Чеков",value:"47",color:"#fff",delta:"средний 26 400",deltaColor:"#8A7F76",bg:"#1A1611"},
+      {label:"Наличные в кассе",value:"312к",color:"#fff",delta:"3 филиала",deltaColor:"#8A7F76",bg:"#1A1611"},
+      {label:"Долги/рассрочка",value:"1.8 млн",color:"#E5B23C",delta:"6 просрочек",deltaColor:"#FF8A7A",bg:"#221E19"}
+    ];
+    const bars=[["Пн",60],["Вт",80],["Ср",55],["Чт",95],["Пт",120],["Сб",140],["Вс",100]].map(b=>({day:b[0],h:b[1]+"px"}));
+    const decisions=[
+      {text:"iPhone 15 осталось на 2 дня",action:"Оформить закупку 40 шт",color:"#FF5B2E",act:()=>this.go("warehouse")},
+      {text:"Филиал Ош отстаёт по KPI −18%",action:"Открыть KPI",color:"#E5B23C",act:()=>this.go("kpi")},
+      {text:"340 уснувших клиентов",action:"Запустить реактивацию",color:"#7FB0EC",act:()=>this.go("crm")}
+    ];
+
+    const stock=[
+      {name:"iPhone 15 128",qty:"8",qtyColor:"#E5B23C",price:"109 900",status:"мало",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C"},
+      {name:"MacBook Air M2",qty:"3",qtyColor:"#E5B23C",price:"189 900",status:"мало",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C"},
+      {name:"AirPods Pro 2",qty:"25",qtyColor:"#C6FF3D",price:"24 900",status:"ок",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D"},
+      {name:"Galaxy S24",qty:"6",qtyColor:"#C6FF3D",price:"99 900",status:"ок",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D"},
+      {name:"iPad Air",qty:"5",qtyColor:"#C6FF3D",price:"74 900",status:"ок",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D"},
+      {name:"Apple Watch S9",qty:"2",qtyColor:"#FF8A7A",price:"44 900",status:"критично",bg:"rgba(255,138,122,0.15)",fg:"#FF8A7A"}
+    ];
+
+    const pnl=[
+      {label:"Выручка",value:"8 420 000",color:"#fff"},
+      {label:"Себестоимость товаров",value:"−6 100 000",color:"#FF8A7A"},
+      {label:"Валовая прибыль",value:"2 320 000",color:"#C6FF3D"},
+      {label:"Операционные расходы",value:"−1 180 000",color:"#FF8A7A"},
+      {label:"Чистая прибыль",value:"1 140 000",color:"#C6FF3D"}
+    ];
+
+    const columns=[
+      {title:"К выполнению",dot:"#8A7F76",count:"2",cards:[{text:"Инвентаризация склада Центр",tag:"склад",tagBg:"rgba(127,176,236,0.15)",tagFg:"#7FB0EC",who:"Сыдык"},{text:"Обновить витрину новинками",tag:"витрина",tagBg:"rgba(229,178,60,0.15)",tagFg:"#E5B23C",who:"Сайкал"}]},
+      {title:"В работе",dot:"#E5B23C",count:"2",cards:[{text:"Закупка iPhone 15 ×40",tag:"закупка",tagBg:"rgba(255,91,46,0.15)",tagFg:"#FF8A5F",who:"Али"},{text:"Реактивация уснувших",tag:"CRM",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D",who:"Тахсир"}]},
+      {title:"Готово",dot:"#C6FF3D",count:"2",cards:[{text:"Приёмка партии AirPods",tag:"склад",tagBg:"rgba(127,176,236,0.15)",tagFg:"#7FB0EC",who:"Риезидин"},{text:"Z-отчёт за вчера",tag:"касса",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D",who:"Азизбек"}]}
+    ];
+
+    const staff=[
+      {name:"Азизбек",sales:"620к",kpi:"96%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+13 800",pen:"−1 000",penColor:"#FF8A7A"},
+      {name:"Сайкал",sales:"540к",kpi:"88%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+9 200",pen:"0",penColor:"#8A7F76"},
+      {name:"Сыдык",sales:"410к",kpi:"74%",kpiBg:"rgba(229,178,60,0.15)",kpiFg:"#E5B23C",bonus:"+4 100",pen:"−2 000",penColor:"#FF8A7A"},
+      {name:"Риезидин",sales:"480к",kpi:"82%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+7 400",pen:"0",penColor:"#8A7F76"},
+      {name:"Тахсир",sales:"390к",kpi:"71%",kpiBg:"rgba(229,178,60,0.15)",kpiFg:"#E5B23C",bonus:"+3 800",pen:"0",penColor:"#8A7F76"},
+      {name:"Али",sales:"560к",kpi:"91%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+11 200",pen:"0",penColor:"#8A7F76"}
+    ];
+
+    const crmSeg=[
+      {icon:"👥",count:"4 210",label:"Всего клиентов"},
+      {icon:"⭐",count:"128",label:"VIP / Gold"},
+      {icon:"😴",count:"340",label:"Уснувшие"},
+      {icon:"🎂",count:"19",label:"ДР на неделе"}
+    ];
+
+    const chat=s.chat.map(c=>({text:c.text,align:c.q?"flex-end":"flex-start",
+      bg:c.q?"#FF5B2E":"#221E19",fg:c.q?"#fff":"#E5DCD3",radius:c.q?"14px 14px 4px 14px":"14px 14px 14px 4px"}));
+    const promptDef=[
+      ["Выручка за сегодня","Сегодня 1.24 млн сом (+12%), 47 чеков, средний чек 26 400. Лучший филиал — Центр."],
+      ["Что закупить?","Заканчивается iPhone 15 (2 дня) и Apple Watch S9 (критично, 2 шт). Рекомендую закупку на 3.2 млн — оформить?"],
+      ["Лучший продавец","Азизбек: 620к продаж, KPI 96%. Начислить бонус 13 800 сом?"]
+    ];
+    const prompts=promptDef.map(p=>({label:p[0],ask:()=>{ this.setState({chat:[...s.chat,{q:true,text:p[0]},{q:false,text:p[1]}]}); }}));
+
+    return {
+      menu, pageTitle:titles[r][0], pageSub:titles[r][1], goAI:()=>this.go("ai"),
+      isDash:R("dash"), isWarehouse:R("warehouse"), isFinance:R("finance"), isTasks:R("tasks"), isKpi:R("kpi"), isCrm:R("crm"), isAI:R("ai"),
+      kpis, bars, decisions, stock, pnl, columns, staff, crmSeg, chat, prompts,
+      exportXls:()=>{}
+    };
+  }
+}
+</script>
+</body>
+</html>

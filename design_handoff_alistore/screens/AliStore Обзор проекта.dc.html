@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  ::selection { background: #FF5B2E; color: #fff; }
+  a { text-decoration: none; color: inherit; }
+  .cardh { transition: transform .15s ease, box-shadow .15s ease; }
+  .cardh:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(32,27,23,0.12); }
+</style>
+</helmet>
+
+<div style="background: #F7F2EC; font-family: 'Golos Text', sans-serif; color: #201B17; min-height: 100vh; padding: 0 0 80px;">
+
+  <!-- HERO -->
+  <div style="max-width: 1180px; margin: 0 auto; padding: 64px 40px 40px;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 40px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 21px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 21px;">AliStore</span>
+      <span style="margin-left: auto; font-family: 'JetBrains Mono'; font-size: 12px; color: #8A7F76; text-transform: uppercase; letter-spacing: 0.08em;">Обзор проекта · оглавление</span>
+    </div>
+    <h1 style="font-family: 'Sora'; font-weight: 800; font-size: 56px; line-height: 1.0; letter-spacing: -0.03em; margin: 0 0 16px;">Экосистема AliStore</h1>
+    <p style="font-size: 18px; color: #554C44; line-height: 1.55; max-width: 640px; margin: 0;">Все части проекта в одном месте. Нажмите на карточку, чтобы открыть экран. Маркетплейс электроники для Кыргызстана — сайт, 3 приложения и ERP на едином ядре.</p>
+  </div>
+
+  <!-- SECTION: DOCS -->
+  <div style="max-width: 1180px; margin: 24px auto 0; padding: 0 40px;">
+    <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF5B2E; border-top: 2px solid #201B17; padding-top: 14px; margin-bottom: 18px;">ДОКУМЕНТАЦИЯ</div>
+    <a href="AliStore Клиент Прототип.dc.html">
+      <div class="cardh" style="background: #FF5B2E; border-radius: 22px; padding: 28px; color: #fff; display: flex; align-items: center; gap: 24px; cursor: pointer; margin-bottom: 14px;">
+        <div style="width: 60px; height: 60px; border-radius: 16px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 30px;">▶️</div>
+        <div style="flex: 1;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 20px;">Живой кликабельный прототип</div>
+          <div style="font-size: 14px; color: #FFE4D8; margin-top: 6px; line-height: 1.5;">Рабочее клиентское приложение: корзина, оформление, уровни-геймификация, лог действий — тестируйте по кнопкам.</div>
+        </div>
+        <span style="font-size: 26px;">→</span>
+      </div>
+    </a>
+    <a href="AliStore Экосистема.dc.html">
+      <div class="cardh" style="background: #201B17; border-radius: 22px; padding: 32px; color: #fff; display: flex; align-items: center; gap: 24px; cursor: pointer;">
+        <div style="width: 64px; height: 64px; border-radius: 16px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; font-size: 32px;">🗺️</div>
+        <div style="flex: 1;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 22px;">Мастер-документ архитектуры</div>
+          <div style="font-size: 15px; color: #C9BFB6; margin-top: 6px; line-height: 1.5;">Дизайн-система, карта экосистемы, все модули ERP, AI, стратегия, тех-стек, роли и логи.</div>
+        </div>
+        <span style="font-size: 28px; color: #FF8A5F;">→</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- SECTION: PRODUCTS -->
+  <div style="max-width: 1180px; margin: 40px auto 0; padding: 0 40px;">
+    <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF5B2E; border-top: 2px solid #201B17; padding-top: 14px; margin-bottom: 18px;">ПРОДУКТЫ · ЖИВЫЕ ЭКРАНЫ</div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;">
+
+      <a href="AliStore Сайт.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🛒</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Сайт маркетплейса</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Витрина, карточка товара, оформление заказа, AI-консультант, блок Б/У.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">3 страницы →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Клиент App 2.0.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">📱</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Клиентское приложение ⚡</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Живой e-commerce: каталог, корзина, checkout, заказы, trade-in, гарантия, возврат.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">Флагман 2.0 · 21 экран →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Сотрудник App 2.0.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🧑‍💼</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Приложение сотрудника ⚡</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Живой: смена с фото, заказы, задачи+KPI, добавление товара, скупка.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">Флагман 2.0 →</div>
+        </div>
+      </a>
+
+      <a href="AliStore POS 2.0.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🏬</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">POS оффлайн-магазина ⚡</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Живая касса: чек, скидки, смешанная оплата КР, чек и печать.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">Флагман 2.0 →</div>
+        </div>
+      </a>
+
+      <a href="AliStore ERP 2.0.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">📊</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">ERP-панель ⚡</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Живой кокпит: дашборд, склад, финансы, задачи, KPI, CRM, AI-ассистент.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">Флагман 2.0 · 7 модулей →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Супер-админ.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">👑</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Супер-админ панель</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Обзор сети, push, акции, QR оплаты, флаги функций, журнал аудита, роли.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">Открыть →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Скупка и договор.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">♻️</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Скупка Б/У и договор</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Интерактивный цикл: AI-оценка, регламент, данные клиента, договор по КР, печать.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">Интерактивно →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Вход.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🔐</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Вход и регистрация</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Клиент: телефон/SMS, соцсети, биометрия. Сотрудник: 2FA, PIN, QR-бейдж.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">4 экрана →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Курьер App.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🛵</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Приложение курьера</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">AI-маршрут, список доставок, вручение с фото и подписью, оплата, заработок.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">4 экрана →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Telegram-бот.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">✈️</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Telegram-бот и Mini App</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Магазин в мессенджере: диалог, каталог Mini App, уведомления, бот владельца /admin.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">4 экрана →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Онбординг и состояния.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🚀</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Онбординг и состояния</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Первый запуск, пустая корзина, нет интернета, ничего не найдено.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">4 экрана →</div>
+        </div>
+      </a>
+
+      <a href="AliStore Локализация и тема.dc.html">
+        <div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; cursor: pointer; height: 100%;">
+          <div style="width: 52px; height: 52px; border-radius: 14px; background: #FFEFE7; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px;">🌐</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px;">Языки и тёмная тема</div>
+          <div style="font-size: 14px; color: #6E645C; margin-top: 6px; line-height: 1.5;">Русский / кыргызский, светлая и тёмная тема, переключатель, валюта сом.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF5B2E; margin-top: 14px;">4 экрана →</div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- SECTION: OPS PROCESSES (P0) -->
+  <div style="max-width: 1180px; margin: 40px auto 0; padding: 0 40px;">
+    <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF5B2E; border-top: 2px solid #201B17; padding-top: 14px; margin-bottom: 18px;">PROCESS COMPLETION PASS · P0 · ядро операций</div>
+    <a href="AliStore Process Map 2.0.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 22px; cursor: pointer; margin-bottom: 14px; display: flex; align-items: center; gap: 18px;"><div style="font-size: 30px;">🗺️</div><div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 700; font-size: 17px; color: #fff;">Process Map 2.0</div><div style="font-size: 13px; color: #A79C92; margin-top: 2px;">Все процессы: владелец, старт→результат, статусы, экраны, доказательства.</div></div><div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">16 процессов →</div></div></a>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+      <a href="AliStore Order State Machine.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔀</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Order State Machine</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">12+ статусов заказа: роли, кнопки, события, видимость.</div></div></a>
+      <a href="AliStore Payment Ledger.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">💵</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Payment Ledger</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Книга денег: где каждый сом, сверка, привязки.</div></div></a>
+      <a href="AliStore Cash Shift Opening.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🌅</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Открытие смены</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Остаток, методы, чек-лист, ошибки.</div></div></a>
+      <a href="AliStore Cash Shift Closing.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🌙</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Закрытие смены</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Сверка, расхождение, фото, инцидент.</div></div></a>
+      <a href="AliStore Approval Rules Matrix.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">✅</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Approval Matrix</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Правила подтверждений: кто, лимит, доказательства.</div></div></a>
+      <a href="AliStore Role Permission Matrix.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔐</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Role Matrix</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Права 9 ролей, скрытые данные, 2FA.</div></div></a>
+      <a href="AliStore Inventory Count.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📋</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Inventory Count</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Инвентаризация: скан, расхождение, списание.</div></div></a>
+      <a href="AliStore IMEI Lifecycle.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📱</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">IMEI Lifecycle</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Timeline устройства: приход→продажа→списание.</div></div></a>
+      <a href="AliStore Courier Cash Handover.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🤝</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Courier Cash Handover</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Сдача COD-денег курьером, сверка, расхождение.</div></div></a>
+      <a href="AliStore Failed Delivery.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📦</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Failed Delivery</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">7 причин, следующий шаг, товар и деньги под контролем.</div></div></a>
+      <a href="AliStore Refund Money Flow.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">💸</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Refund Money Flow</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Возврат денег: способ, approval, проведение, сверка.</div></div></a>
+      <a href="AliStore Warranty Case Detail.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🛡</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Warranty Case</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Гарантийный кейс: диагностика→ремонт/замена, SLA.</div></div></a>
+      <a href="AliStore Списание товара.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🗑️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Списание товара</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">start→approval→event→final, evidence, audit.</div></div></a>
+      <a href="AliStore Продажа в долг.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🧾</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Продажа в долг</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Лимит→approval→долг→график, данные клиента.</div></div></a>
+      <a href="AliStore Изменение цены.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🏷️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Изменение цены</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Порог 15%→approval→публикация, история цены.</div></div></a>
+      <a href="AliStore Изменение остатка.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📊</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Изменение остатка</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Учёт vs факт→approval→sync, причина+фото.</div></div></a>
+      <a href="AliStore Удаление товара.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🗄️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Удаление товара</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Soft-delete: проверки→approval→архив, история цела.</div></div></a>
+    </div>
+  </div>
+
+  <div style="max-width: 1180px; margin: 40px auto 0; padding: 0 40px;">
+    <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF5B2E; border-top: 2px solid #201B17; padding-top: 14px; margin-bottom: 18px;">P1 · CRM, ПОДДЕРЖКА, ПОСТАВЩИКИ, ФРАНШИЗА</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+      <a href="AliStore Support Inbox.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📥</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Support Inbox</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Все каналы в одном окне, SLA, эскалация.</div></div></a>
+      <a href="AliStore Notification Preferences.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔔</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Notification Preferences</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Каналы, consent, отписка, частота.</div></div></a>
+      <a href="AliStore Marketing Segment Builder.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🎯</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Segment Builder</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Условия → аудитория → прогноз → consent-фильтр.</div></div></a>
+      <a href="AliStore Campaign ROI.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📊</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Campaign ROI</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Бюджет→выручка→маржа→ROI, отписки.</div></div></a>
+      <a href="AliStore Supplier Scorecard.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🏭</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Supplier Scorecard</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Рейтинг поставщиков: брак, задержки, риск.</div></div></a>
+      <a href="AliStore Franchise Audit Checklist.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🤝</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Franchise Audit</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Чек-лист стандартов, рейтинг, план исправления.</div></div></a>
+    </div>
+  </div>
+
+  <div style="max-width: 1180px; margin: 40px auto 0; padding: 0 40px;">
+    <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF5B2E; border-top: 2px solid #201B17; padding-top: 14px; margin-bottom: 18px;">P2 · ДЛЯ РАЗРАБОТКИ</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+      <a href="AliStore API Data Contracts.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔌</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">API &amp; Data Contracts</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">18 сущностей: поля, связи, endpoints, события, PII.</div></div></a>
+      <a href="AliStore QA Test Scenarios.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🧪</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">QA Test Scenarios</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">15 приёмочных сценариев по приоритету и риску.</div></div></a>
+    </div>
+  </div>
+
+  <div style="max-width: 1180px; margin: 40px auto 0; padding: 0 40px;">
+    <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF5B2E; border-top: 2px solid #201B17; padding-top: 14px; margin-bottom: 18px;">ОПЕРАЦИОННЫЕ ПРОЦЕССЫ · рабочая логика</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+      <a href="AliStore Command Center.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🎛️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Command Center</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Кокпит владельца: деньги, риски, решения.</div></div></a>
+      <a href="AliStore Возврат.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">↩️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Возврат / refund</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Машина состояний, подтверждение старшего, аудит.</div></div></a>
+      <a href="AliStore Резервы.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📦</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Резервы склада</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Lifecycle резерва, зависшие, освобождение.</div></div></a>
+      <a href="AliStore Сверка кассы.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">💰</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Сверка кассы</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Ожидается/факт, расхождение с причиной.</div></div></a>
+      <a href="AliStore IMEI реестр.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔢</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">IMEI / SN реестр</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Учёт единиц, запрет двойной продажи.</div></div></a>
+      <a href="AliStore Курьер Workflow.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🛵</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Курьер lifecycle</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Недозвон, отказ, оплата, сдача денег.</div></div></a>
+      <a href="AliStore Обращения и гарантия.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🛠️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Обращения / гарантия</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Тикеты, SLA, связь с заказом и IMEI.</div></div></a>
+      <a href="AliStore Risk Center.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🚨</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Risk Center</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Центр тревог владельца, severity, детали.</div></div></a>
+      <a href="AliStore Уведомления Outbox.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📨</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Notifications Outbox</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Журнал событий, каналы, retry.</div></div></a>
+      <a href="AliStore Долги и рассрочка.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">💳</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Долги и рассрочка</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">График платежей, просрочка, приём, напоминания.</div></div></a>
+      <a href="AliStore Order Timeline.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🧭</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Order Timeline</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Единая правда по заказу: деньги/склад/курьер.</div></div></a>
+      <a href="AliStore Approval Inbox.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🗳️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Approval Inbox</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Единая очередь решений владельца.</div></div></a>
+      <a href="AliStore Margin Control.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📈</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Контроль маржи</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Цена/себестоимость/скидка, approval ниже лимита.</div></div></a>
+      <a href="AliStore Supplier RMA.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🏭</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Возврат поставщику</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Брак → диагностика → замена/компенсация/списание.</div></div></a>
+      <a href="AliStore Dispute Center.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">⚖️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Центр споров</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Расследование по фактам, ответственный.</div></div></a>
+      <a href="AliStore AI Dev Agent.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🤖</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">AI Dev Agent</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Ловит ошибки бота, предлагает фиксы кода, PR.</div></div></a>
+      <a href="AliStore Карта системы.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🗺️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Карта системы</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Как всё связано: заказ → деньги/склад/аудит.</div></div></a>
+      <a href="AliStore Event Ledger.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📖</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Event Ledger</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Единая книга событий → правила → аудит → отчёты.</div></div></a>
+      <a href="AliStore Платёжная сверка.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🏦</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Платёжная сверка</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Система vs банк, дубли webhook, комиссии.</div></div></a>
+      <a href="AliStore Offline POS.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">✈️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Offline POS</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Продажа без сети, очередь, синхр., конфликты.</div></div></a>
+      <a href="AliStore Обмен товара.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔄</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Обмен товара</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Возврат+продажа, доплата, новая гарантия.</div></div></a>
+      <a href="AliStore Customer 360.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">👤</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Customer 360</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Единая карточка клиента: всё в одном месте.</div></div></a>
+      <a href="AliStore Evidence Vault.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔒</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Evidence Vault</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Фото и документы, привязанные к событиям.</div></div></a>
+      <a href="AliStore Incident Recovery.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🚨</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Incident &amp; Recovery</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Сбои, компенсации, восстановление.</div></div></a>
+      <a href="AliStore Data Migration.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📥</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Импорт данных</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Переход с Excel/тетради, валидация, откат.</div></div></a>
+      <a href="AliStore Презентация.dc.html"><div class="cardh" style="background: #100D0B; border: 1px solid #2A241F; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🎤</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Презентация проекта</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Питч-дека: проблема, решение, рынок, готовность.</div></div></a>
+      <a href="AliStore Курс урок.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🎓</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Курс + аттестация</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Уроки и тест-аттестация → допуск к скупке.</div></div></a>
+      <a href="AliStore CRM Кампании.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📣</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">CRM Кампании</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Сегменты, рассылки, удержание, ROI.</div></div></a>
+      <a href="AliStore Клиент App 2.0.dc.html"><div class="cardh" style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">⭐</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Клиент App 2.0 ⚡</div><div style="font-size: 13px; color: #FFE0D5; margin-top: 4px; line-height: 1.5;">Флагман: полный e-commerce, 21 экран, всё кликабельно.</div></div></a>
+      <a href="AliStore Сайт 2.0.dc.html"><div class="cardh" style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🛍️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Сайт 2.0 ⚡</div><div style="font-size: 13px; color: #FFE0D5; margin-top: 4px; line-height: 1.5;">Живой e-commerce: каталог, фильтры, товар, корзина, checkout.</div></div></a>
+      <a href="AliStore POS 2.0.dc.html"><div class="cardh" style="background: linear-gradient(135deg,#2A2A2E,#16130F); border: 1px solid #2E2822; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🖥️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">POS 2.0 ⚡</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Живая касса: чек, скидки, смешанная оплата КР.</div></div></a>
+      <a href="AliStore Сотрудник App 2.0.dc.html"><div class="cardh" style="background: linear-gradient(135deg,#2A2A2E,#16130F); border: 1px solid #2E2822; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🧑‍💼</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Сотрудник App 2.0 ⚡</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Живой: смена+фото, заказы, KPI, добавить товар, скупка.</div></div></a>
+      <a href="AliStore ERP 2.0.dc.html"><div class="cardh" style="background: linear-gradient(135deg,#2A2A2E,#16130F); border: 1px solid #2E2822; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🖲️</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">ERP 2.0 ⚡</div><div style="font-size: 13px; color: #A79C92; margin-top: 4px; line-height: 1.5;">Живой кокпит: склад, финансы, задачи, KPI, CRM, AI.</div></div></a>
+      <a href="AliStore Перемещения.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🔀</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Перемещения</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Между филиалами: в пути → приёмка с подтверждением.</div></div></a>
+      <a href="AliStore Аналитика воронки.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">📉</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Аналитика воронки</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">view→cart→checkout→purchase, где теряем.</div></div></a>
+      <a href="AliStore Обучение сотрудников.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🎓</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Обучение сотрудников</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Курсы, тесты, аттестация → допуск к операциям.</div></div></a>
+      <a href="AliStore Франшиза.dc.html"><div class="cardh" style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 20px; cursor: pointer; height: 100%;"><div style="font-size: 24px; margin-bottom: 10px;">🏪</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px;">Франшиза</div><div style="font-size: 13px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Партнёрская сеть: статус, роялти, нарушения.</div></div></a>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div style="max-width: 1180px; margin: 40px auto 0; padding: 0 40px;">
+    <div style="background: #fff; border: 1px solid #EBE2D8; border-radius: 20px; padding: 26px; display: flex; align-items: center; gap: 20px;">
+      <div style="font-size: 32px;">✅</div>
+      <div style="flex: 1;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px;">Все ключевые экраны готовы</div>
+        <div style="font-size: 14px; color: #6E645C; margin-top: 4px; line-height: 1.5;">Единый кликабельный прототип. Осталось заменить иконки-плейсхолдеры на реальные фото товаров — пришлите фото или логотипы брендов.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

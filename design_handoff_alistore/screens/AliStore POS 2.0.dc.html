@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{width:0;}</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; font-family: 'Golos Text', sans-serif;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <!-- TABLET -->
+  <div style="width: 1180px; height: 800px; background: #16130F; border-radius: 24px; border: 10px solid #201B17; overflow: hidden; display: flex; box-shadow: 0 40px 90px rgba(0,0,0,0.5);">
+
+    <!-- LEFT: catalog -->
+    <div style="flex: 1; display: flex; flex-direction: column; border-right: 1px solid #2E2822;">
+      <!-- topbar -->
+      <div style="flex-shrink: 0; padding: 16px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #2E2822;">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 18px;">A</div>
+        <div><div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff;">POS · Касса</div><div style="font-size: 12px; color: #8A7F76;">Смена открыта · {{ cashier }} · {{ shopName }}</div></div>
+        <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+          <div onClick="{{ toggleScan }}" style="background: #221E19; border: 1px solid #2E2822; border-radius: 10px; padding: 9px 14px; color: #C6FF3D; font-size: 13px; cursor: pointer;">📷 Скан</div>
+          <div style="background: {{ netBg }}; border-radius: 999px; padding: 7px 12px; font-size: 12px; color: {{ netFg }};">{{ netLabel }}</div>
+        </div>
+      </div>
+
+      <!-- search + cats -->
+      <div style="flex-shrink: 0; padding: 14px 20px 8px;">
+        <div style="display: flex; align-items: center; gap: 10px; background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 11px 14px; margin-bottom: 12px;"><span style="color: #6E645C;">🔍</span><span style="color: #6E645C; font-size: 14px;">Поиск или скан штрихкода…</span></div>
+        <div style="display: flex; gap: 8px; overflow-x: auto;">
+          <sc-for list="{{ cats }}" as="c" hint-placeholder-count="5">
+            <div onClick="{{ c.pick }}" style="flex-shrink: 0; background: {{ c.bg }}; color: {{ c.fg }}; border: 1px solid {{ c.border }}; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ c.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- product grid -->
+      <div class="sc" style="flex: 1; overflow-y: auto; padding: 8px 20px 20px;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+          <sc-for list="{{ grid }}" as="p" hint-placeholder-count="9">
+            <div onClick="{{ p.add }}" style="background: #221E19; border: 1px solid #2E2822; border-radius: 14px; padding: 12px; cursor: pointer;">
+              <div style="height: 84px; border-radius: 10px; background: {{ p.thumb }}; background-size: cover; background-position: center; margin-bottom: 10px; position: relative;"><sc-if value="{{ p.low }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: 6px; right: 6px; background: #E5B23C; color: #14110E; font-size: 9px; font-weight: 700; border-radius: 5px; padding: 2px 6px;">{{ p.stock }}</span></sc-if></div>
+              <div style="font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; min-height: 34px;">{{ p.name }}</div>
+              <div style="font-family: 'Sora'; font-weight: 800; font-size: 15px; color: #C6FF3D; margin-top: 4px;">{{ p.price }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: receipt -->
+    <div style="width: 420px; flex-shrink: 0; display: flex; flex-direction: column; background: #1A1611;">
+      <div style="flex-shrink: 0; padding: 18px 20px; border-bottom: 1px solid #2E2822; display: flex; align-items: center;">
+        <span style="font-family: 'Sora'; font-weight: 700; font-size: 17px; color: #fff;">Чек</span>
+        <span style="margin-left: 8px; color: #8A7F76; font-size: 13px;">{{ cartCount }}</span>
+        <sc-if value="{{ hasCart }}" hint-placeholder-val="{{ false }}"><span onClick="{{ clearCart }}" style="margin-left: auto; color: #FF8A7A; font-size: 13px; cursor: pointer;">Очистить</span></sc-if>
+      </div>
+
+      <div class="sc" style="flex: 1; overflow-y: auto; padding: 12px 20px;">
+        <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="text-align: center; padding: 60px 20px; color: #6E645C;"><div style="font-size: 44px;">🧾</div><div style="font-size: 14px; margin-top: 12px;">Добавьте товары<br>тапом или сканом</div></div>
+        </sc-if>
+        <sc-for list="{{ cartList }}" as="i" hint-placeholder-count="3">
+          <div style="display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid #221E19;">
+            <div style="width: 46px; height: 46px; border-radius: 9px; background: {{ i.thumb }}; background-size: cover; background-position: center; flex-shrink: 0;"></div>
+            <div style="flex: 1; min-width: 0;"><div style="font-size: 13px; font-weight: 600; color: #fff;">{{ i.name }}</div><div style="font-size: 12px; color: #8A7F76; margin-top: 2px;">{{ i.unit }}</div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;"><div style="display: flex; align-items: center; gap: 10px; background: #221E19; border-radius: 7px; padding: 3px 8px;"><span onClick="{{ i.dec }}" style="color: #fff; cursor: pointer;">−</span><span style="color: #fff; font-size: 13px; font-family: 'JetBrains Mono';">{{ i.qty }}</span><span onClick="{{ i.inc }}" style="color: #fff; cursor: pointer;">+</span></div><span style="margin-left: auto; font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">{{ i.total }}</span></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- discount + totals -->
+      <sc-if value="{{ hasCart }}" hint-placeholder-val="{{ false }}">
+        <div style="flex-shrink: 0; padding: 14px 20px; border-top: 1px solid #2E2822;">
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <sc-for list="{{ discounts }}" as="d" hint-placeholder-count="4">
+              <div onClick="{{ d.pick }}" style="flex: 1; background: {{ d.bg }}; color: {{ d.fg }}; border: 1px solid {{ d.border }}; border-radius: 9px; padding: 8px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer;">{{ d.label }}</div>
+            </sc-for>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 3px 0;">Подытог <span style="color: #D8CFC6;">{{ subtotal }}</span></div>
+          <sc-if value="{{ hasDiscount }}" hint-placeholder-val="{{ false }}"><div style="display: flex; justify-content: space-between; font-size: 13px; color: #C6FF3D; padding: 3px 0;">Скидка {{ discPct }} <span>−{{ discountAmt }}</span></div></sc-if>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 17px; color: #fff;">Итого</span><span style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #C6FF3D;">{{ total }}</span></div>
+          <div onClick="{{ goPay }}" style="background: #C6FF3D; color: #14110E; border-radius: 12px; padding: 15px; text-align: center; font-weight: 700; font-size: 16px; margin-top: 12px; cursor: pointer;">К оплате</div>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- PAYMENT OVERLAY -->
+    <sc-if value="{{ isPay }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; background: rgba(10,8,6,0.8); display: flex; align-items: center; justify-content: center; z-index: 40;">
+        <div style="width: 640px; background: #1A1611; border: 1px solid #2E2822; border-radius: 22px; padding: 28px;">
+          <sc-if value="{{ payPick }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; align-items: center; margin-bottom: 6px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 20px; color: #fff;">Оплата</span><span style="margin-left: auto; font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #C6FF3D;">{{ total }}</span></div>
+            <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">Выберите способ · можно разделить чек</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <sc-for list="{{ payMethods }}" as="m" hint-placeholder-count="8">
+                <div onClick="{{ m.pick }}" style="display: flex; align-items: center; gap: 10px; background: #221E19; border: 1px solid {{ m.border }}; border-radius: 12px; padding: 14px; cursor: pointer;"><span style="font-size: 20px;">{{ m.icon }}</span><span style="font-size: 14px; color: #fff; font-weight: 600;">{{ m.name }}</span></div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ hasPaid }}" hint-placeholder-val="{{ false }}">
+              <div style="background: #221E19; border-radius: 12px; padding: 14px; margin-top: 16px;">
+                <div style="font-size: 12px; color: #8A7F76; margin-bottom: 8px;">Внесено</div>
+                <sc-for list="{{ paidList }}" as="p" hint-placeholder-count="2">
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: #D8CFC6; padding: 3px 0;">{{ p.name }} <span style="font-family: 'JetBrains Mono';">{{ p.amt }}</span></div>
+                </sc-for>
+                <div style="border-top: 1px solid #2E2822; margin: 8px 0;"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: {{ remainColor }};">Осталось <span style="font-family: 'JetBrains Mono';">{{ remain }}</span></div>
+              </div>
+            </sc-if>
+            <div style="display: flex; gap: 10px; margin-top: 18px;">
+              <div onClick="{{ finishPay }}" style="flex: 1; background: {{ canFinish ? '#C6FF3D' : '#3A342E' }}; color: {{ canFinish ? '#14110E' : '#6E645C' }}; border-radius: 12px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer;">Завершить продажу</div>
+              <div onClick="{{ cancelPay }}" style="background: #221E19; border: 1px solid #2E2822; color: #D8CFC6; border-radius: 12px; padding: 15px 22px; text-align: center; font-weight: 600; font-size: 15px; cursor: pointer;">Отмена</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ payDone }}" hint-placeholder-val="{{ false }}">
+            <div style="text-align: center; padding: 20px 10px;">
+              <div style="width: 76px; height: 76px; border-radius: 50%; background: rgba(198,255,61,0.15); display: flex; align-items: center; justify-content: center; font-size: 38px; margin: 0 auto;">✓</div>
+              <div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff; margin-top: 16px;">Продажа завершена</div>
+              <div style="font-size: 14px; color: #A79C92; margin-top: 8px;">Чек {{ receiptNo }} · {{ total }} · записано в Event Ledger</div>
+              <div style="display: flex; gap: 10px; margin-top: 22px; justify-content: center;">
+                <div onClick="{{ printReceipt }}" style="background: #221E19; border: 1px solid #2E2822; color: #D8CFC6; border-radius: 11px; padding: 12px 20px; font-size: 14px; cursor: pointer;">🖨 Печать чека</div>
+                <div onClick="{{ sendReceipt }}" style="background: #221E19; border: 1px solid #2E2822; color: #D8CFC6; border-radius: 11px; padding: 12px 20px; font-size: 14px; cursor: pointer;">✈ Отправить</div>
+                <div onClick="{{ newSale }}" style="background: #C6FF3D; color: #14110E; border-radius: 11px; padding: 12px 20px; font-weight: 700; font-size: 14px; cursor: pointer;">Новая продажа</div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- TOAST -->
+    <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); background: #C6FF3D; color: #14110E; border-radius: 12px; padding: 12px 22px; font-size: 14px; font-weight: 600; z-index: 50;">{{ toast }}</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { cart:{}, cat:"all", disc:0, route:"sell", paid:[], payMethod:-1, toast:"", offline:false };
+
+  products() {
+    return [
+      { id:0, name:"iPhone 15 128", price:109900, thumb:"url('assets/p-iphone.png')", stockN:8, cat:"phone" },
+      { id:1, name:"MacBook Air M2", price:189900, thumb:"url('assets/p-macbook.png')", stockN:3, cat:"laptop" },
+      { id:2, name:"AirPods Pro 2", price:24900, thumb:"url('assets/p-airpods.png')", stockN:25, cat:"audio" },
+      { id:3, name:"Apple Watch S9", price:44900, thumb:"url('assets/p-watch.png')", stockN:2, cat:"watch" },
+      { id:4, name:"iPhone 14 Б/У A", price:58900, thumb:"url('assets/p-iphone.png')", stockN:4, cat:"phone" },
+      { id:5, name:"Galaxy S24", price:99900, thumb:"url('assets/p-samsung.png')", stockN:6, cat:"phone" },
+      { id:6, name:"iPad Air", price:74900, thumb:"url('assets/p-ipad.png')", stockN:5, cat:"tablet" },
+      { id:7, name:"Чехол iPhone", price:1900, thumb:"", stockN:40, cat:"acc" },
+      { id:8, name:"Зарядка 20W", price:2400, thumb:"", stockN:30, cat:"acc" }
+    ];
+  }
+  fmt(n){ return n.toLocaleString('ru-RU').replace(/,/g,' ')+" сом"; }
+  thumbOf(p){ return p.thumb || "linear-gradient(135deg,#2A2A2E,#3A3A40)"; }
+  subN(){ const P=this.products(); return Object.entries(this.state.cart).reduce((s,[id,q])=>s+P[id].price*q,0); }
+  discPctN(){ return [0,5,10,15][this.state.disc]; }
+  totalN(){ return Math.round(this.subN()*(1-this.discPctN()/100)); }
+  paidN(){ return this.state.paid.reduce((s,p)=>s+p.n,0); }
+  toast(m){ this.setState({toast:m}); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:""}),1600); }
+
+  renderVals(){
+    const s=this.state, P=this.products();
+    const catDef=[["all","Все"],["phone","Смартфоны"],["laptop","Ноутбуки"],["tablet","Планшеты"],["audio","Аудио"],["watch","Часы"],["acc","Аксессуары"]];
+    const cats=catDef.map(c=>({label:c[1],pick:()=>this.setState({cat:c[0]}),
+      bg:s.cat===c[0]?"#C6FF3D":"#221E19",fg:s.cat===c[0]?"#14110E":"#D8CFC6",border:s.cat===c[0]?"#C6FF3D":"#2E2822"}));
+    const grid=P.filter(p=>s.cat==="all"||p.cat===s.cat).map(p=>({
+      name:p.name, price:this.fmt(p.price), thumb:this.thumbOf(p),
+      low:p.stockN<5, stock:p.stockN+" шт",
+      add:()=>{ const c={...s.cart}; c[p.id]=(c[p.id]||0)+1; this.setState({cart:c}); this.toast(p.name+" в чек"); } }));
+
+    const ids=Object.keys(s.cart).map(Number);
+    const cartList=ids.map(id=>{ const p=P[id],q=s.cart[id]; return {
+      name:p.name, thumb:this.thumbOf(p), qty:q, unit:this.fmt(p.price), total:this.fmt(p.price*q),
+      inc:()=>{const c={...s.cart};c[id]++;this.setState({cart:c});},
+      dec:()=>{const c={...s.cart};c[id]--;if(c[id]<=0)delete c[id];this.setState({cart:c});} }; });
+    const cartEmpty=ids.length===0;
+
+    const discDef=[["Без скидки",0],["5%",5],["10%",10],["15%",15]];
+    const discounts=discDef.map((d,i)=>({label:d[0]==="Без скидки"?"0%":d[0],pick:()=>this.setState({disc:i}),
+      bg:s.disc===i?"#C6FF3D":"#221E19",fg:s.disc===i?"#14110E":"#D8CFC6",border:s.disc===i?"#C6FF3D":"#2E2822"}));
+
+    const total=this.totalN();
+    const paid=this.paidN();
+    const remain=Math.max(0,total-paid);
+
+    const pmDef=[["💵","Наличные"],["💳","Карта"],["📱","MBank QR"],["📱","O!Деньги"],["🏦","Bakai POS"],["🏦","О!Банк"],["📅","Рассрочка M+"],["📅","Zero 0-0-12"]];
+    const payMethods=pmDef.map(m=>({icon:m[0],name:m[1],border:"#2E2822",
+      pick:()=>{ const amt=remain; const paidArr=[...s.paid,{name:m[1],n:amt,amt:this.fmt(amt)}]; this.setState({paid:paidArr}); } }));
+
+    return {
+      cashier:"Азизбек", shopName:"AliStore Центр",
+      netLabel: s.offline?"● офлайн":"● онлайн", netBg: s.offline?"rgba(229,178,60,0.15)":"rgba(198,255,61,0.12)", netFg: s.offline?"#E5B23C":"#C6FF3D",
+      toggleScan:()=>this.toast("Сканер активен — наведите на штрихкод"),
+      cats, grid, cartList, cartEmpty, hasCart:!cartEmpty, cartCount:ids.length+" поз.",
+      clearCart:()=>this.setState({cart:{}}),
+      subtotal:this.fmt(this.subN()), hasDiscount:this.discPctN()>0, discPct:this.discPctN()+"%",
+      discountAmt:this.fmt(this.subN()-total), total:this.fmt(total), discounts,
+      goPay:()=>this.setState({route:"pay",paid:[]}),
+
+      isPay: s.route==="pay"||s.route==="done",
+      payPick: s.route==="pay", payDone: s.route==="done",
+      payMethods, hasPaid: s.paid.length>0,
+      paidList: s.paid.map(p=>({name:p.name,amt:this.fmt(p.n)})),
+      remain:this.fmt(remain), remainColor: remain===0?"#C6FF3D":"#E5B23C",
+      canFinish: paid>=total && total>0,
+      finishPay:()=>{ if(this.paidN()>=total&&total>0) this.setState({route:"done"}); else this.toast("Внесите полную сумму"); },
+      cancelPay:()=>this.setState({route:"sell",paid:[]}),
+      receiptNo:"#POS-4471",
+      printReceipt:()=>this.toast("Чек напечатан"), sendReceipt:()=>this.toast("Чек отправлен на SMS"),
+      newSale:()=>this.setState({route:"sell",cart:{},disc:0,paid:[]}),
+
+      hasToast:!!s.toast, toast:s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{width:6px;} .sc::-webkit-scrollbar-thumb{background:#2E2822;border-radius:3px;}</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="max-width: 1240px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">API &amp; Data Contracts</span>
+      <span style="margin-left: auto; font-size: 13px; color: #8A7F76;">Для разработчиков · сущности, события, endpoints</span>
+    </div>
+    <p style="font-size: 14px; color: #8A7F76; margin: 0 0 20px 46px;">Кликните сущность — поля, связи, события, endpoints, idempotency, кто читает/пишет, персональные данные.</p>
+
+    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 18px;">
+      <!-- entity list -->
+      <div class="sc" style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 8px; max-height: 640px; overflow-y: auto; align-self: start;">
+        <sc-for list="{{ entities }}" as="e" hint-placeholder-count="12">
+          <div onClick="{{ e.pick }}" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 9px; margin-bottom: 2px; cursor: pointer; background: {{ e.bg }};"><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ e.color }};">{{ e.name }}</span><sc-if value="{{ e.pii }}" hint-placeholder-val="{{ false }}"><span style="margin-left: auto; font-size: 9px; color: #FF8A7A; background: rgba(255,138,122,0.12); border-radius: 4px; padding: 1px 5px;">PII</span></sc-if></div>
+        </sc-for>
+      </div>
+
+      <!-- detail -->
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 18px; padding: 24px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;"><span style="font-family: 'JetBrains Mono'; font-weight: 700; font-size: 22px; color: #fff;">{{ d.name }}</span><sc-if value="{{ d.pii }}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: #FF8A7A; background: rgba(255,138,122,0.12); border-radius: 5px; padding: 2px 8px;">персональные данные</span></sc-if></div>
+        <div style="font-size: 13px; color: #A79C92; margin-bottom: 18px;">{{ d.desc }}</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;">
+            <div style="font-size: 11px; color: #6E645C; text-transform: uppercase; margin-bottom: 8px;">Ключевые поля</div>
+            <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6; line-height: 1.8;">{{ d.fields }}</div>
+          </div>
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;">
+            <div style="font-size: 11px; color: #6E645C; text-transform: uppercase; margin-bottom: 8px;">Связи</div>
+            <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #7FB0EC; line-height: 1.8;">{{ d.relations }}</div>
+          </div>
+        </div>
+
+        <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-size: 11px; color: #6E645C; text-transform: uppercase; margin-bottom: 8px;">Endpoints</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <sc-for list="{{ d.endpoints }}" as="ep" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 10px;"><span style="font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 700; color: {{ ep.mColor }}; width: 52px;">{{ ep.method }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ ep.path }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;"><div style="font-size: 11px; color: #6E645C; text-transform: uppercase; margin-bottom: 8px;">📖 События (Ledger)</div><div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D; line-height: 1.8;">{{ d.events }}</div></div>
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;"><div style="font-size: 11px; color: #6E645C; text-transform: uppercase; margin-bottom: 8px;">Доступ · idempotency</div><div style="font-size: 12px; color: #A79C92; line-height: 1.6;">{{ d.access }}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { sel: 0 };
+  data(){
+    const ep=(m,p)=>({method:m,path:p,mColor: m==="GET"?"#7FB0EC":m==="POST"?"#C6FF3D":m==="PATCH"?"#E5B23C":"#FF8A7A"});
+    return [
+      { name:"Customer", pii:true, desc:"Клиент: контакты, согласия на маркетинг, сегменты, LTV.", fields:"id, phone, name,\nconsent, segment[], ltv", relations:"→ Order[]\n→ SupportTicket[]\n→ TradeInDevice[]", endpoints:[ep("GET","/customers/:id"),ep("POST","/customers"),ep("PATCH","/customers/:id")], events:"customer.created\ncustomer.consent_changed", access:"read: staff+ (PII маскируется мл. ролям)\nwrite: admin" },
+      { name:"Product / SKU", pii:false, desc:"Товар и складская единица с ценой и атрибутами.", fields:"id, sku, name, price,\ncost, category, attrs", relations:"→ DeviceUnit[]\n→ InventoryMovement[]", endpoints:[ep("GET","/products"),ep("POST","/products"),ep("PATCH","/products/:id")], events:"product.created\nprice.changed (approval)", access:"read: all\nwrite: manager+" },
+      { name:"DeviceUnit (IMEI)", pii:false, desc:"Отдельная единица с IMEI/SN и статусом.", fields:"id, imei, sku,\nstatus, grade, location", relations:"→ Order\n→ WarrantyCase\n→ TradeInDevice", endpoints:[ep("GET","/units/:imei"),ep("POST","/units"),ep("PATCH","/units/:id/status")], events:"unit.received\nunit.sold\nunit.written_off", access:"read: staff\nwrite: warehouse+ · dup-IMEI blocked" },
+      { name:"Order", pii:false, desc:"Заказ и его позиции, статусная машина.", fields:"id, customerId, status,\nitems[], total, channel", relations:"→ Payment[]\n→ DeviceUnit[]\n→ Delivery", endpoints:[ep("GET","/orders/:id"),ep("POST","/orders"),ep("PATCH","/orders/:id/transition")], events:"order.* (12 статусов)", access:"read: owner+staff\nwrite: staff · idempotency: orderKey" },
+      { name:"Payment", pii:false, desc:"Платёж/возврат, привязка к заказу и смене.", fields:"id, orderId, amount,\nmethod, status, shiftId", relations:"→ Order\n→ CashShift", endpoints:[ep("GET","/payments"),ep("POST","/payments"),ep("POST","/payments/:id/refund")], events:"payment.received\npayment.refunded", access:"write: cashier+ · idempotency: txnId (webhook dedup)" },
+      { name:"CashShift", pii:false, desc:"Смена кассы: открытие/закрытие, сверка.", fields:"id, staffId, point,\nopenCash, closeCash, diff", relations:"→ Payment[]\n→ AuditEvent[]", endpoints:[ep("GET","/shifts/:id"),ep("POST","/shifts/open"),ep("POST","/shifts/:id/close")], events:"shift.opened\nshift.closed", access:"write: cashier · close diff → approval" },
+      { name:"InventoryMovement", pii:false, desc:"Движение остатка: приход, перемещение, списание, инвентаризация.", fields:"id, sku, qty, type,\nfrom, to, reason", relations:"→ Product\n→ DeviceUnit", endpoints:[ep("GET","/inventory/movements"),ep("POST","/inventory/movements")], events:"stock.received\nstock.moved\ninventory.counted", access:"write: warehouse+ · write-off → owner approval" },
+      { name:"Return / Exchange", pii:false, desc:"Возврат и обмен, решение о restock.", fields:"id, orderId, reason,\nstatus, refundId", relations:"→ Order\n→ Payment", endpoints:[ep("POST","/returns"),ep("PATCH","/returns/:id"),ep("POST","/exchanges")], events:"return.requested\norder.exchanged", access:"write: sr_seller+ · refund → approval" },
+      { name:"WarrantyCase", pii:false, desc:"Гарантийное обращение и сервис.", fields:"id, imei, problem,\nstatus, sla, assignee", relations:"→ DeviceUnit\n→ Customer", endpoints:[ep("GET","/warranty/:id"),ep("POST","/warranty"),ep("PATCH","/warranty/:id")], events:"warranty.created\nwarranty.closed", access:"write: service+" },
+      { name:"TradeInDevice", pii:true, desc:"Скупка Б/У: оценка, договор, паспорт клиента.", fields:"id, model, grade,\nprice, contractId, sellerPassport", relations:"→ Customer\n→ DeviceUnit", endpoints:[ep("POST","/tradein/assess"),ep("POST","/tradein/contract")], events:"tradein.assessed\ntradein.contracted", access:"PII protected · write: appraiser+ · anti-fraud check" },
+      { name:"CourierRun", pii:false, desc:"Рейс курьера, доставки и сдача денег.", fields:"id, courierId, orders[],\ncodTotal, handedOver", relations:"→ Order[]\n→ Payment[]", endpoints:[ep("GET","/courier/runs/:id"),ep("POST","/courier/handover")], events:"delivery.*\ncash.handover", access:"write: courier+cashier" },
+      { name:"Approval", pii:false, desc:"Запрос на подтверждение опасного действия.", fields:"id, action, requester,\napprover, status, reason", relations:"→ AuditEvent", endpoints:[ep("POST","/approvals"),ep("PATCH","/approvals/:id")], events:"approval.requested\napproval.decided", access:"decide: role per matrix" },
+      { name:"AuditEvent", pii:false, desc:"Неизменяемое событие. Основа Event Ledger — только append.", fields:"id, type, actor, ts,\npayload, refs[]", relations:"↔ все сущности", endpoints:[ep("GET","/audit"),ep("POST","/audit")], events:"(это и есть события)", access:"read: owner\nwrite: system-only · append-only, no update/delete" },
+      { name:"Campaign", pii:false, desc:"Маркетинговая кампания и её метрики.", fields:"id, segment, channel,\nbudget, orders, revenue", relations:"→ Customer[]\n→ Order[]", endpoints:[ep("GET","/campaigns"),ep("POST","/campaigns")], events:"campaign.sent\ncampaign.converted", access:"write: marketer+ · consent-filtered" },
+      { name:"SupportTicket", pii:true, desc:"Обращение клиента из любого канала.", fields:"id, customerId, channel,\npriority, sla, status", relations:"→ Customer\n→ Order", endpoints:[ep("GET","/tickets"),ep("POST","/tickets"),ep("PATCH","/tickets/:id")], events:"ticket.created\nticket.escalated", access:"read: support+ (PII masked)" }
+    ];
+  }
+  renderVals(){
+    const s=this.state, d=this.data();
+    const entities=d.map((e,i)=>({name:e.name,pii:e.pii,pick:()=>this.setState({sel:i}),
+      bg:s.sel===i?"#221E19":"transparent",color:s.sel===i?"#C6FF3D":"#A79C92"}));
+    return { entities, d:d[s.sel] };
+  }
+}
+</script>
+</body>
+</html>

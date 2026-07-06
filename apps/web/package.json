@@ -1,0 +1,9 @@
+{
+  "name": "@alistore/web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AliStore storefront + apps (Next.js 14) — scaffolded in the next iteration",
+  "scripts": {
+    "dev": "echo \"web app not scaffolded yet\" && exit 0"
+  }
+}

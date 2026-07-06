@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="max-width: 1240px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">QA Test Scenarios</span>
+      <span style="margin-left: auto; font-size: 13px; color: #8A7F76;">Приёмочные сценарии</span>
+    </div>
+    <p style="font-size: 14px; color: #8A7F76; margin: 0 0 18px 46px;">Ключевые сквозные проверки бизнес-логики. Фильтр по приоритету.</p>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+        <div onClick="{{ f.pick }}" style="background: {{ f.bg }}; color: {{ f.fg }}; border: 1px solid {{ f.border }}; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ f.label }}</div>
+      </sc-for>
+    </div>
+
+    <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+      <div style="display: grid; grid-template-columns: 1.6fr 0.8fr 2fr 0.7fr 70px; padding: 12px 16px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Сценарий</span><span>Роль</span><span>Ожидаемый результат</span><span>Приор.</span><span>Риск</span></div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="13">
+        <div style="display: grid; grid-template-columns: 1.6fr 0.8fr 2fr 0.7fr 70px; padding: 13px 16px; border-bottom: 1px solid #1A1611; align-items: center;">
+          <span style="font-size: 13px; color: #fff;">{{ r.name }}</span>
+          <span style="font-size: 12px; color: #A79C92;">{{ r.role }}</span>
+          <span style="font-size: 12px; color: #D8CFC6; line-height: 1.4;">{{ r.expect }}</span>
+          <span><span style="background: {{ r.pBg }}; color: {{ r.pFg }}; border-radius: 5px; padding: 2px 8px; font-size: 11px;">{{ r.prio }}</span></span>
+          <span style="text-align: center; font-size: 14px;">{{ r.risk }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="font-size: 12px; color: #6E645C; margin-top: 12px; line-height: 1.5;">🔴 высокий риск потери денег/данных · 🟡 средний · 🟢 функциональный. Каждый сценарий проверяет статусы, доказательства и запись в Event Ledger.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { f:"all" };
+  base(){
+    const P=(p)=> p==="P0"?["P0","rgba(255,138,122,0.15)","#FF8A7A"] : p==="P1"?["P1","rgba(229,178,60,0.15)","#E5B23C"] : ["P2","rgba(198,255,61,0.12)","#C6FF3D"];
+    const mk=(name,role,expect,p,risk)=>{const x=P(p);return{name,role,expect,prio:x[0],pBg:x[1],pFg:x[2],risk,p};};
+    return [
+      mk("Заказ с онлайн-оплатой","Клиент","payment.received → резерв держится → заказ paid, чек выдан","P0","🔴"),
+      mk("Оплата при получении","Курьер","Заказ не закрыт до сдачи денег; cash.handover сверяется","P0","🔴"),
+      mk("Неудачная доставка","Курьер","Причина+фото обязательны, товар возвращается на склад","P0","🟡"),
+      mk("Возврат денег","Ст. продавец","Требует approval, refund тем же способом, сверка","P0","🔴"),
+      mk("Обмен товара","Ст. продавец","Атомарно: возврат+продажа+доплата, новая гарантия","P0","🔴"),
+      mk("Скидка выше лимита","Продавец","Блокируется без approval старшего, причина в audit","P0","🔴"),
+      mk("Продажа в долг","Продавец","Approval + данные клиента, долг в Payment Ledger","P0","🔴"),
+      mk("Продажа по IMEI","Кассир","Один IMEI нельзя продать дважды — блок","P0","🔴"),
+      mk("Гарантийное обращение","Клиент","Кейс создаётся, SLA считается, статусы идут","P1","🟡"),
+      mk("Касса не сходится","Кассир","Закрытие с расхождением → approval + Risk Center","P0","🔴"),
+      mk("Товар не найден на складе","Кладовщик","Заказ не уходит в paid без резерва; алерт","P0","🟡"),
+      mk("Чужой заказ без OTP","Клиент","Доступ запрещён без подтверждения телефона","P0","🔴"),
+      mk("Офлайн-продажа POS","Кассир","Продажа в очередь, синк при сети, разрешение конфликтов","P1","🟡"),
+      mk("Дубль webhook оплаты","Система","Идемпотентность по txnId — второй игнорируется","P1","🟡"),
+      mk("Кампания без consent","Маркетолог","Клиенты без согласия исключаются из рассылки","P1","🟡")
+    ];
+  }
+  renderVals(){
+    const s=this.state, b=this.base();
+    const fDef=[["all","Все"],["P0","P0"],["P1","P1"],["P2","P2"]];
+    const filters=fDef.map(f=>({label:f[1],pick:()=>this.setState({f:f[0]}),
+      bg:s.f===f[0]?"#C6FF3D":"#16130F",fg:s.f===f[0]?"#14110E":"#D8CFC6",border:s.f===f[0]?"#C6FF3D":"#2E2822"}));
+    const rows=b.filter(r=>s.f==="all"||r.p===s.f);
+    return { filters, rows };
+  }
+}
+</script>
+</body>
+</html>

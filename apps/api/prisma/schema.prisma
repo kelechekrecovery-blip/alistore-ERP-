@@ -1,0 +1,351 @@
+// AliStore — Prisma schema (PostgreSQL)
+// Origin: design_handoff_alistore/reference/schema.prisma («API Data Contracts»).
+// Faithful to the reference. Two kinds of adaptation applied, both non-behavioral:
+//   1. Payment<->CashShift made into a real Prisma relation (reference declared only
+//      one side, which fails `prisma validate`).
+//   2. @@index added on hot query paths. No field semantics changed.
+// Business invariants (see docs/AliStore Business Invariants.md) are enforced in the
+// service layer inside transactions, not by the schema alone.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- ENUMS ----------
+enum Role {
+  seller
+  senior_seller
+  cashier
+  warehouse
+  courier
+  marketer
+  admin
+  owner
+  franchise
+}
+
+enum OrderStatus {
+  draft
+  created
+  awaiting_confirmation
+  confirmed
+  reserved
+  awaiting_payment
+  paid
+  picking
+  packed
+  ready_for_pickup
+  courier_assigned
+  out_for_delivery
+  delivered
+  completed
+  cancelled
+  return_requested
+  returned
+  exchanged
+  refunded
+}
+
+enum PaymentMethod {
+  cash
+  card
+  qr_mbank
+  qr_odengi
+  bakai_pos
+  obank
+  installment
+}
+
+enum PaymentStatus {
+  pending
+  received
+  reconciled
+  disputed
+  refunded
+}
+
+enum UnitStatus {
+  in_stock
+  reserved
+  sold
+  returned
+  in_repair
+  written_off
+}
+
+enum Grade {
+  A
+  B
+  C
+}
+
+enum ApprovalStatus {
+  requested
+  approved
+  rejected
+}
+
+enum ReturnStatus {
+  requested
+  under_review
+  approved
+  rejected
+  processing
+  paid
+  reconciled
+}
+
+enum WarrantyStatus {
+  created
+  received
+  diagnostics
+  waiting_supplier
+  approved
+  rejected
+  repaired
+  replaced
+  closed
+}
+
+enum TicketStatus {
+  new
+  in_progress
+  waiting
+  resolved
+  closed
+}
+
+// ---------- CORE ----------
+model Customer {
+  id        String          @id @default(cuid())
+  phone     String          @unique // PII — маскировать младшим ролям
+  name      String
+  consent   Boolean         @default(false) // маркетинг только при true
+  segments  String[]
+  ltv       Int             @default(0)
+  orders    Order[]
+  tickets   SupportTicket[]
+  tradeIns  TradeInDevice[]
+  createdAt DateTime        @default(now())
+}
+
+model Product {
+  id        String              @id @default(cuid())
+  sku       String              @unique
+  name      String
+  price     Int
+  cost      Int
+  category  String
+  attrs     Json
+  archived  Boolean             @default(false) // soft-delete: НЕ удалять физически
+  units     DeviceUnit[]
+  movements InventoryMovement[]
+
+  @@index([category])
+  @@index([archived])
+}
+
+model DeviceUnit {
+  id        String     @id @default(cuid())
+  imei      String     @unique // один IMEI нельзя продать дважды
+  product   Product    @relation(fields: [productId], references: [id])
+  productId String
+  status    UnitStatus @default(in_stock)
+  grade     Grade?
+  location  String
+  orderId   String?
+  // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
+
+  @@index([productId])
+  @@index([status])
+  @@index([orderId])
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  customerId String
+  status     OrderStatus @default(draft)
+  channel    String // web | app | pos | telegram
+  total      Int
+  items      OrderItem[]
+  payments   Payment[]
+  createdAt  DateTime    @default(now())
+  // переходы статусов — только через сервис state-machine + запись AuditEvent
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id      String  @id @default(cuid())
+  order   Order   @relation(fields: [orderId], references: [id])
+  orderId String
+  sku     String
+  qty     Int
+  price   Int
+  imei    String?
+
+  @@index([orderId])
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  order     Order?        @relation(fields: [orderId], references: [id])
+  orderId   String?
+  amount    Int // отрицательное = возврат
+  method    PaymentMethod
+  status    PaymentStatus @default(pending)
+  shift     CashShift?    @relation(fields: [shiftId], references: [id])
+  shiftId   String?
+  txnId     String?       @unique // идемпотентность webhook (dedup)
+  createdAt DateTime      @default(now())
+
+  @@index([orderId])
+  @@index([shiftId])
+}
+
+model CashShift {
+  id        String    @id @default(cuid())
+  staffId   String
+  point     String
+  openCash  Int
+  closeCash Int?
+  diff      Int? // расхождение → approval + Risk
+  openedAt  DateTime  @default(now())
+  closedAt  DateTime?
+  payments  Payment[]
+}
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int
+  type      String // received | moved | write_off | adjust | count
+  from      String?
+  to        String?
+  reason    String?
+  createdAt DateTime @default(now())
+  // write_off / adjust → owner approval + evidence
+
+  @@index([productId])
+  @@index([type])
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  orderId   String
+  imei      String?
+  expiresAt DateTime // зависший резерв → Risk
+  active    Boolean  @default(true)
+
+  @@index([orderId])
+  @@index([imei])
+  @@index([active])
+}
+
+model Return {
+  id        String       @id @default(cuid())
+  orderId   String
+  reason    String
+  status    ReturnStatus @default(requested)
+  refundId  String? // refund → approval, тем же способом
+  createdAt DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model WarrantyCase {
+  id         String         @id @default(cuid())
+  imei       String
+  customerId String
+  problem    String
+  status     WarrantyStatus @default(created)
+  sla        DateTime
+  assignee   String?
+
+  @@index([imei])
+  @@index([status])
+}
+
+model TradeInDevice {
+  id             String   @id @default(cuid())
+  customer       Customer @relation(fields: [customerId], references: [id])
+  customerId     String // PII: паспорт продавца
+  model          String
+  grade          Grade
+  price          Int
+  contractId     String?
+  sellerPassport String // защищённое поле + anti-fraud
+
+  @@index([customerId])
+}
+
+model CourierRun {
+  id         String   @id @default(cuid())
+  courierId  String
+  codTotal   Int // COD не сдан >24ч → Risk
+  handedOver Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([courierId])
+  @@index([handedOver])
+}
+
+model Approval {
+  id        String         @id @default(cuid())
+  action    String // discount | refund | write_off | price | debt | delete | stock_adjust | pii
+  requester String
+  approver  String?
+  status    ApprovalStatus @default(requested)
+  reason    String
+  evidence  Json? // обязательно для high-risk
+  createdAt DateTime       @default(now())
+
+  @@index([status])
+  @@index([action])
+}
+
+// Неизменяемо. Только append. Никаких update/delete. Источник правды.
+model AuditEvent {
+  id      String   @id @default(cuid())
+  type    String // order.* payment.* stock.* approval.* и т.д.
+  actor   String
+  ts      DateTime @default(now())
+  payload Json
+  refs    String[] // связанные id (orderId, imei, shiftId…)
+
+  @@index([type])
+  @@index([actor])
+  @@index([refs])
+}
+
+model Campaign {
+  id      String @id @default(cuid())
+  segment String
+  channel String
+  budget  Int
+  orders  Int    @default(0)
+  revenue Int    @default(0)
+  // аудитория фильтруется по Customer.consent
+}
+
+model SupportTicket {
+  id         String       @id @default(cuid())
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  customerId String
+  channel    String // web | app | whatsapp | telegram | call | store
+  priority   String
+  sla        DateTime
+  status     TicketStatus @default(new)
+
+  @@index([customerId])
+  @@index([status])
+}

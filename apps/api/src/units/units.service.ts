@@ -1,0 +1,86 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { ConflictError, ValidationError } from '../common/errors';
+
+/**
+ * DeviceUnit (IMEI/SN) lifecycle. Enforces the hard invariant:
+ *   «Нельзя продать один IMEI дважды» — a unit moves in_stock → reserved → sold,
+ *   and a sold unit can never be reserved or sold again (409).
+ *
+ * The reserve/sell operations take a transaction client so they compose inside a
+ * single Order/Payment transaction together with the ledger event.
+ */
+@Injectable()
+export class UnitsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** Приёмка партии — register a new physical unit (status in_stock). */
+  async receive(input: {
+    imei: string;
+    productId: string;
+    location: string;
+    grade?: 'A' | 'B' | 'C';
+  }) {
+    return this.prisma.deviceUnit.create({
+      data: {
+        imei: input.imei,
+        productId: input.productId,
+        location: input.location,
+        grade: input.grade,
+        status: 'in_stock',
+      },
+    });
+  }
+
+  /**
+   * Reserve a unit for an order inside an existing transaction.
+   * Only an in_stock unit can be reserved; anything else (reserved/sold/…) → 409.
+   */
+  async reserveOnTx(
+    tx: Prisma.TransactionClient,
+    imei: string,
+    orderId: string,
+  ): Promise<void> {
+    const unit = await tx.deviceUnit.findUnique({ where: { imei } });
+    if (!unit) {
+      throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+    }
+    if (unit.status !== 'in_stock') {
+      throw new ConflictError(
+        'unit_not_available',
+        `IMEI ${imei} недоступен для резерва (статус: ${unit.status})`,
+      );
+    }
+    await tx.deviceUnit.update({
+      where: { imei },
+      data: { status: 'reserved', orderId },
+    });
+  }
+
+  /**
+   * Sell a reserved unit inside an existing transaction.
+   * A sold unit is rejected (409) — the double-sale guard. The unit must be
+   * reserved by THIS order.
+   */
+  async sellOnTx(
+    tx: Prisma.TransactionClient,
+    imei: string,
+    orderId: string,
+  ): Promise<void> {
+    const unit = await tx.deviceUnit.findUnique({ where: { imei } });
+    if (!unit) {
+      throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+    }
+    if (unit.status === 'sold') {
+      throw new ConflictError('unit_already_sold', `IMEI ${imei} уже продан`);
+    }
+    if (unit.status !== 'reserved' || unit.orderId !== orderId) {
+      throw new ConflictError(
+        'unit_not_reserved_for_order',
+        `IMEI ${imei} не зарезервирован под заказ ${orderId}`,
+      );
+    }
+    await tx.deviceUnit.update({ where: { imei }, data: { status: 'sold' } });
+  }
+}

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #C9C0B4; } ::selection { background: #C6FF3D; color: #14110E; } .scr::-webkit-scrollbar{width:0;}</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px; font-family: 'Golos Text', sans-serif; gap: 24px; flex-wrap: wrap;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #14110E; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="width: 402px; height: 858px; background: #14110E; border-radius: 46px; padding: 10px; box-shadow: 0 40px 90px rgba(0,0,0,0.35); flex-shrink: 0; position: sticky; top: 24px;">
+    <div style="width: 100%; height: 100%; background: #16130F; border-radius: 38px; overflow: hidden; position: relative; display: flex; flex-direction: column;">
+
+      <div style="height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; color: #fff; font-size: 13px; font-weight: 600;">
+        <span>9:41</span><span style="font-family: 'JetBrains Mono';">Сотрудник</span><span>▪▪▪ 100%</span>
+      </div>
+
+      <!-- header -->
+      <div style="flex-shrink: 0; padding: 6px 16px 12px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg,#FF5B2E,#E8410F); display: flex; align-items: center; justify-content: center; font-family: 'Sora'; font-weight: 800; font-size: 18px; color: #fff;">Аз</div>
+        <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff;">Азизбек</div><div style="font-size: 12px; color: #8A7F76;">Продавец · AliStore Центр</div></div>
+        <div style="background: {{ shiftBg }}; color: {{ shiftFg }}; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600;">{{ shiftLabel }}</div>
+      </div>
+
+      <div class="scr" style="flex: 1; overflow-y: auto;">
+
+        <!-- HOME / DASHBOARD -->
+        <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+          <div style="padding: 4px 16px 20px;">
+            <!-- shift card -->
+            <sc-if value="{{ shiftClosed }}" hint-placeholder-val="{{ true }}">
+              <div style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 18px; padding: 20px; margin-bottom: 16px;">
+                <div style="color: #fff; font-family: 'Sora'; font-weight: 700; font-size: 17px;">Смена не открыта</div>
+                <div style="color: #FFE0D5; font-size: 13px; margin-top: 4px; line-height: 1.4;">Отметьте выход и сфотографируйте витрину для открытия.</div>
+                <div onClick="{{ openShift }}" style="background: #fff; color: #E8410F; border-radius: 11px; padding: 12px; text-align: center; font-weight: 700; font-size: 14px; margin-top: 14px; cursor: pointer;">📷 Открыть смену</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ shiftOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 18px; padding: 18px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: #C6FF3D; font-size: 13px; font-weight: 600;">● Смена открыта с 09:58</span><span onClick="{{ closeShift }}" style="color: #FF8A7A; font-size: 12px; cursor: pointer;">Закрыть</span></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px;">
+                  <div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #fff;">12</div><div style="font-size: 11px; color: #8A7F76;">продаж</div></div>
+                  <div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #fff;">418к</div><div style="font-size: 11px; color: #8A7F76;">выручка</div></div>
+                  <div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #C6FF3D;">92%</div><div style="font-size: 11px; color: #8A7F76;">KPI</div></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- quick actions -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+              <sc-for list="{{ actions }}" as="a" hint-placeholder-count="4">
+                <div onClick="{{ a.go }}" style="background: #221E19; border: 1px solid #2E2822; border-radius: 14px; padding: 16px; cursor: pointer;"><div style="font-size: 24px;">{{ a.icon }}</div><div style="font-size: 13px; font-weight: 600; color: #fff; margin-top: 8px;">{{ a.label }}</div><sc-if value="{{ a.hasBadge }}" hint-placeholder-val="{{ false }}"><div style="font-size: 11px; color: #C6FF3D; margin-top: 2px;">{{ a.badge }}</div></sc-if></div>
+              </sc-for>
+            </div>
+
+            <!-- AI task -->
+            <div style="background: linear-gradient(135deg,#2A2A2E,#221E19); border: 1px solid #2E2822; border-radius: 16px; padding: 16px;">
+              <div style="font-size: 12px; color: #C6FF3D; font-family: 'JetBrains Mono'; margin-bottom: 8px;">🤖 ЗАДАЧА ОТ AI</div>
+              <div style="font-size: 14px; color: #fff; line-height: 1.5;">Мало продаж аксессуаров сегодня. Предложи чехол/зарядку к каждому телефону — цель +5 к чеку.</div>
+              <div onClick="{{ goTasks }}" style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 10px; text-align: center; font-weight: 700; font-size: 13px; margin-top: 12px; cursor: pointer;">К задачам</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- SHIFT PHOTO -->
+        <sc-if value="{{ isShiftPhoto }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;"><span onClick="{{ goHome }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 19px; color: #fff;">{{ photoTitle }}</span></div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 14px; line-height: 1.5;">Сфотографируйте витрину и торговый зал. Фото попадёт в Evidence Vault с привязкой к смене.</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+              <sc-for list="{{ photoSlots }}" as="p" hint-placeholder-count="4">
+                <div onClick="{{ p.snap }}" style="height: 110px; border-radius: 12px; border: 1px dashed {{ p.border }}; background: {{ p.bg }}; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;"><div style="font-size: 26px;">{{ p.icon }}</div><div style="font-size: 11px; color: {{ p.fg }}; margin-top: 6px;">{{ p.label }}</div></div>
+              </sc-for>
+            </div>
+            <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; margin-bottom: 14px;"><div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 3px 0;">Проверка кассы <span style="color: #C6FF3D;">✓ 25 000 сом</span></div><div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 3px 0;">Чек-лист открытия <span style="color: #C6FF3D;">✓ готов</span></div></div>
+            <div onClick="{{ confirmShift }}" style="background: {{ photoReady ? '#C6FF3D' : '#3A342E' }}; color: {{ photoReady ? '#14110E' : '#6E645C' }}; border-radius: 12px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer;">{{ photoBtnLabel }}</div>
+          </div>
+        </sc-if>
+
+        <!-- ORDERS -->
+        <sc-if value="{{ isOrders }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goHome }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 19px; color: #fff;">Заказы</span></div>
+            <sc-for list="{{ orders }}" as="o" hint-placeholder-count="4">
+              <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 14px; padding: 14px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;"><span style="font-size: 14px; font-weight: 700; color: #fff;">{{ o.no }}</span><span style="background: {{ o.bg }}; color: {{ o.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ o.status }}</span></div>
+                <div style="font-size: 13px; color: #A79C92; margin-top: 6px;">{{ o.items }} · {{ o.total }}</div>
+                <sc-if value="{{ o.actionable }}" hint-placeholder-val="{{ false }}"><div onClick="{{ o.act }}" style="background: #C6FF3D; color: #14110E; border-radius: 9px; padding: 9px; text-align: center; font-weight: 700; font-size: 12px; margin-top: 10px; cursor: pointer;">{{ o.actLabel }}</div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- TASKS + KPI -->
+        <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goHome }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 19px; color: #fff;">Задачи и KPI</span></div>
+            <div style="background: linear-gradient(135deg,#2A2A2E,#221E19); border: 1px solid #2E2822; border-radius: 16px; padding: 16px; margin-bottom: 14px;">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;"><span style="color: #D8CFC6;">KPI месяца</span><span style="color: #C6FF3D; font-family: 'JetBrains Mono';">92%</span></div>
+              <div style="height: 8px; background: #16130F; border-radius: 999px; overflow: hidden;"><div style="height: 100%; width: 92%; background: linear-gradient(90deg,#C6FF3D,#8FD40F);"></div></div>
+              <div style="font-size: 11px; color: #8A7F76; margin-top: 8px;">До бонуса 15 000 сом осталось 8%</div>
+            </div>
+            <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="4">
+              <div onClick="{{ t.toggle }}" style="display: flex; align-items: center; gap: 12px; background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 13px; margin-bottom: 8px; cursor: pointer;"><span style="width: 22px; height: 22px; border-radius: 7px; border: 2px solid {{ t.done ? '#C6FF3D' : '#3A342E' }}; background: {{ t.done ? '#C6FF3D' : 'transparent' }}; color: #14110E; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">{{ t.mark }}</span><span style="font-size: 13px; color: {{ t.color }}; text-decoration: {{ t.strike }};">{{ t.label }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ADD PRODUCT -->
+        <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goHome }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 19px; color: #fff;">Добавить товар</span></div>
+            <sc-if value="{{ addDone }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align: center; padding: 30px 10px;"><div style="width: 72px; height: 72px; border-radius: 50%; background: rgba(198,255,61,0.15); display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto;">✓</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 18px; color: #fff; margin-top: 16px;">Товар отправлен на модерацию</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px; line-height: 1.5;">SKU: ALS-IP15-128 · штрихкод сгенерирован. После проверки появится в каталоге.</div>
+                <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 16px; margin-top: 16px;"><div style="height: 40px; background: repeating-linear-gradient(90deg,#fff 0 2px,transparent 2px 4px,#fff 4px 5px,transparent 5px 9px); margin-bottom: 8px;"></div><div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6; letter-spacing: 0.1em;">4 870123 456789</div></div>
+                <div onClick="{{ printLabel }}" style="background: #221E19; border: 1px solid #2E2822; color: #C6FF3D; border-radius: 11px; padding: 12px; text-align: center; font-size: 13px; margin-top: 12px; cursor: pointer;">🖨 Печать этикетки 40×40</div>
+                <div onClick="{{ resetAdd }}" style="background: #C6FF3D; color: #14110E; border-radius: 11px; padding: 12px; text-align: center; font-weight: 700; font-size: 14px; margin-top: 10px; cursor: pointer;">Добавить ещё</div></div>
+            </sc-if>
+            <sc-if value="{{ addForm }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ scanAdd }}" style="height: 90px; border-radius: 12px; border: 1px dashed {{ scanned ? '#C6FF3D' : '#3A342E' }}; background: {{ scanned ? 'rgba(198,255,61,0.06)' : '#221E19' }}; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; margin-bottom: 14px;"><div style="font-size: 28px;">{{ scanIcon }}</div><div style="font-size: 12px; color: {{ scanned ? '#C6FF3D' : '#8A7F76' }}; margin-top: 6px;">{{ scanLabel }}</div></div>
+              <sc-if value="{{ scanned }}" hint-placeholder-val="{{ false }}">
+                <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; margin-bottom: 10px;"><div style="font-size: 11px; color: #C6FF3D; margin-bottom: 8px;">🤖 AI заполнил карточку</div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 3px 0;">Модель <span style="color: #fff;">iPhone 15 128 ГБ</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 3px 0;">Категория <span style="color: #fff;">Смартфоны</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 3px 0;">Цена (рынок) <span style="color: #C6FF3D;">109 900 сом</span></div>
+                </div>
+                <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 10px; padding: 12px; color: #fff; font-size: 14px; margin-bottom: 10px;">Остаток: 10 шт</div>
+              </sc-if>
+              <div onClick="{{ submitAdd }}" style="background: {{ scanned ? '#C6FF3D' : '#3A342E' }}; color: {{ scanned ? '#14110E' : '#6E645C' }}; border-radius: 12px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer;">Отправить на модерацию</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- BUYBACK -->
+        <sc-if value="{{ isBuyback }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goHome }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 19px; color: #fff;">Скупка Б/У</span></div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 14px; line-height: 1.5;">Проверьте по регламенту. Полный процесс — на экране «Скупка и договор».</div>
+            <sc-for list="{{ buybackSteps }}" as="b" hint-placeholder-count="5">
+              <div onClick="{{ b.toggle }}" style="display: flex; align-items: center; gap: 12px; background: #221E19; border: 1px solid #2E2822; border-radius: 12px; padding: 13px; margin-bottom: 8px; cursor: pointer;"><span style="width: 22px; height: 22px; border-radius: 7px; border: 2px solid {{ b.done ? '#C6FF3D' : '#3A342E' }}; background: {{ b.done ? '#C6FF3D' : 'transparent' }}; color: #14110E; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">{{ b.mark }}</span><span style="font-size: 13px; color: {{ b.color }};">{{ b.label }}</span></div>
+            </sc-for>
+            <a href="AliStore Скупка и договор.dc.html" style="text-decoration: none;"><div style="background: {{ buybackReady ? '#C6FF3D' : '#3A342E' }}; color: {{ buybackReady ? '#14110E' : '#6E645C' }}; border-radius: 12px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 8px; cursor: pointer;">К договору купли-продажи →</div></a>
+          </div>
+        </sc-if>
+
+      </div>
+
+      <!-- TOAST -->
+      <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; bottom: 90px; left: 16px; right: 16px; background: #C6FF3D; color: #14110E; border-radius: 12px; padding: 13px 16px; font-size: 13px; font-weight: 600; text-align: center; z-index: 20;">{{ toast }}</div>
+      </sc-if>
+
+      <!-- BOTTOM NAV -->
+      <div style="flex-shrink: 0; background: #1A1611; border-top: 1px solid #2E2822; display: flex; padding: 8px 6px 20px;">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+          <div onClick="{{ n.go }}" style="flex: 1; text-align: center; cursor: pointer;"><div style="font-size: 20px;">{{ n.icon }}</div><div style="font-size: 10px; color: {{ n.color }}; margin-top: 3px; font-weight: {{ n.weight }};">{{ n.label }}</div></div>
+        </sc-for>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- side note -->
+  <div style="width: 320px; flex-shrink: 0; background: #16130F; border: 1px solid #2E2822; border-radius: 20px; padding: 22px; color: #D8CFC6; align-self: flex-start;">
+    <div style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: #fff; margin-bottom: 8px;">Сотрудник App 2.0</div>
+    <div style="font-size: 13px; color: #8A7F76; line-height: 1.6;">Живой прототип: открытие смены с фото, заказы, задачи+KPI, добавление товара с AI и печатью этикетки, скупка Б/У с регламентом. Тапайте по экрану.</div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { route:"home", shift:"closed", photos:{}, closing:false, tasks:[false,false,false,false], buyback:[false,false,false,false,false], scanned:false, addDone:false, toast:"" };
+  toast(m){ this.setState({toast:m}); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:""}),1600); }
+  go(r){ this.setState({route:r}); }
+
+  renderVals(){
+    const s=this.state;
+    const R=x=>s.route===x;
+
+    const navDef=[["home","Главная","⌂"],["orders","Заказы","📦"],["tasks","KPI","📊"],["buyback","Скупка","♻️"]];
+    const nav=navDef.map(n=>({icon:n[2],label:n[1],go:()=>this.go(n[0]),color:s.route===n[0]?"#C6FF3D":"#8A7F76",weight:s.route===n[0]?700:500}));
+
+    const actions=[
+      {icon:"📦",label:"Заказы",badge:"3 новых",hasBadge:true,go:()=>this.go("orders")},
+      {icon:"➕",label:"Добавить товар",hasBadge:false,go:()=>this.go("add")},
+      {icon:"♻️",label:"Скупка Б/У",hasBadge:false,go:()=>this.go("buyback")},
+      {icon:"📊",label:"Задачи и KPI",badge:"2 активных",hasBadge:true,go:()=>this.go("tasks")}
+    ];
+
+    // photo slots
+    const slotDef=[["Витрина","🏪"],["Зал","🛋"],["Касса","💵"],["Вход","🚪"]];
+    const photoSlots=slotDef.map((p,i)=>({label:s.photos[i]?"✓ снято":p[0],icon:s.photos[i]?"✅":p[1],
+      snap:()=>{const ph={...s.photos};ph[i]=1;this.setState({photos:ph});},
+      border:s.photos[i]?"#C6FF3D":"#3A342E",bg:s.photos[i]?"rgba(198,255,61,0.06)":"#221E19",fg:s.photos[i]?"#C6FF3D":"#8A7F76"}));
+    const photoCount=Object.keys(s.photos).length;
+    const photoReady=photoCount>=2;
+
+    const orders=[
+      {no:"№4102",status:"Новый",bg:"rgba(198,255,61,0.15)",fg:"#C6FF3D",items:"iPhone 15 ×1",total:"109 900",actionable:true,actLabel:"Взять в работу",act:()=>this.toast("Заказ в работе")},
+      {no:"№4098",status:"Сборка",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C",items:"AirPods ×2",total:"49 800",actionable:true,actLabel:"Собрано → курьеру",act:()=>this.toast("Передано курьеру")},
+      {no:"№4090",status:"Выдан",bg:"#2E2822",fg:"#8A7F76",items:"MacBook Air",total:"189 900",actionable:false}
+    ];
+
+    const taskDef=["Предлагать аксессуары к телефонам","Обновить ценники на витрине","Пройти тест по новым тарифам","Проверить остатки Apple Watch"];
+    const tasks=taskDef.map((t,i)=>({label:t,done:s.tasks[i],mark:s.tasks[i]?"✓":"",
+      toggle:()=>{const a=[...s.tasks];a[i]=!a[i];this.setState({tasks:a});},
+      color:s.tasks[i]?"#6E645C":"#D8CFC6",strike:s.tasks[i]?"line-through":"none"}));
+
+    const bbDef=["Проверить IMEI по базе краденого","Осмотреть состояние, присвоить грейд","Сделать фото (4 ракурса)","Внести данные клиента и паспорт","Проверить чек/коробку/комплект"];
+    const buyback=bbDef.map((b,i)=>({label:b,done:s.buyback[i],mark:s.buyback[i]?"✓":"",
+      toggle:()=>{const a=[...s.buyback];a[i]=!a[i];this.setState({buyback:a});},
+      color:s.buyback[i]?"#6E645C":"#D8CFC6"}));
+    const buybackReady=s.buyback.filter(Boolean).length>=3;
+
+    return {
+      shiftLabel: s.shift==="open"?"● на смене":"○ вне смены", shiftBg: s.shift==="open"?"rgba(198,255,61,0.12)":"#221E19", shiftFg: s.shift==="open"?"#C6FF3D":"#8A7F76",
+      isHome:R("home"), isShiftPhoto:R("shiftphoto"), isOrders:R("orders"), isTasks:R("tasks"), isAdd:R("add"), isBuyback:R("buyback"),
+      shiftClosed: s.shift==="closed", shiftOpen: s.shift==="open",
+      openShift:()=>{this.setState({closing:false,photos:{}});this.go("shiftphoto");},
+      closeShift:()=>{this.setState({closing:true,photos:{}});this.go("shiftphoto");},
+      goHome:()=>this.go("home"), goTasks:()=>this.go("tasks"),
+      nav, actions,
+
+      photoTitle: s.closing?"Закрытие смены":"Открытие смены",
+      photoSlots, photoReady,
+      photoBtnLabel: s.closing?"Закрыть смену + Z-отчёт":"Открыть смену",
+      confirmShift:()=>{ if(!photoReady){this.toast("Сделайте минимум 2 фото");return;} this.setState({shift: s.closing?"closed":"open"}); this.toast(s.closing?"Смена закрыта":"Смена открыта"); this.go("home"); },
+
+      orders, tasks, buyback, buybackReady,
+
+      addForm: !s.addDone, addDone: s.addDone,
+      scanned: s.scanned, scanIcon: s.scanned?"✅":"📷", scanLabel: s.scanned?"Штрихкод распознан":"Сканировать штрихкод / фото",
+      scanAdd:()=>this.setState({scanned:true}),
+      submitAdd:()=>{ if(s.scanned) this.setState({addDone:true}); else this.toast("Сначала отсканируйте товар"); },
+      printLabel:()=>this.toast("Этикетка отправлена на принтер"),
+      resetAdd:()=>this.setState({addDone:false,scanned:false}),
+
+      hasToast:!!s.toast, toast:s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

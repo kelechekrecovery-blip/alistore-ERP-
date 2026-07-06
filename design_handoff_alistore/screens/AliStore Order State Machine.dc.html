@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{height:8px;} .sc::-webkit-scrollbar-thumb{background:#2E2822;border-radius:4px;}</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 80px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="max-width: 1240px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Order State Machine</span>
+    </div>
+    <p style="font-size: 14px; color: #8A7F76; margin: 0 0 22px 46px; max-width: 780px;">Единая логика заказа. Кликните статус слева — справа: кто переводит, условия, кнопки, уведомления, запись в Event Ledger и что видит каждая роль.</p>
+
+    <!-- flow strip -->
+    <div class="sc" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 20px;">
+      <sc-for list="{{ strip }}" as="f" hint-placeholder-count="10">
+        <div onClick="{{ f.pick }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <span style="background: {{ f.bg }}; color: {{ f.fg }}; border: 1px solid {{ f.border }}; border-radius: 8px; padding: 7px 12px; font-family: 'JetBrains Mono'; font-size: 12px; white-space: nowrap;">{{ f.label }}</span>
+          <sc-if value="{{ f.arrow }}" hint-placeholder-val="{{ true }}"><span style="color: #3A342E;">→</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 260px 1fr; gap: 20px;">
+      <!-- status list -->
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 10px; align-self: start;">
+        <sc-for list="{{ list }}" as="s" hint-placeholder-count="12">
+          <div onClick="{{ s.pick }}" style="display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 9px; margin-bottom: 2px; cursor: pointer; background: {{ s.bg }};">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ s.dot }}; flex-shrink: 0;"></span>
+            <span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ s.color }};">{{ s.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- detail -->
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 18px; padding: 26px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+          <span style="width: 12px; height: 12px; border-radius: 50%; background: {{ d.dot }};"></span>
+          <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff; font-family: 'JetBrains Mono';">{{ d.name }}</span>
+          <span style="margin-left: auto; font-size: 12px; color: #8A7F76;">шаг {{ d.step }} / 12</span>
+        </div>
+        <div style="font-size: 14px; color: #A79C92; margin-bottom: 20px; line-height: 1.5;">{{ d.desc }}</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;"><div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Кто переводит</div><div style="font-size: 14px; color: #fff;">{{ d.who }}</div></div>
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;"><div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Условие перехода</div><div style="font-size: 14px; color: #fff;">{{ d.cond }}</div></div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;">Доступные кнопки</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <sc-for list="{{ d.buttons }}" as="b" hint-placeholder-count="3">
+              <span style="background: {{ b.bg }}; color: {{ b.fg }}; border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 600;">{{ b.label }}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;"><div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">🔔 Уведомления</div><div style="font-size: 13px; color: #D8CFC6; line-height: 1.5;">{{ d.notif }}</div></div>
+          <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;"><div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">📖 Event Ledger</div><div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D; line-height: 1.6;">{{ d.event }}</div></div>
+        </div>
+
+        <div style="background: #1A1611; border: 1px solid #2E2822; border-radius: 12px; padding: 14px;">
+          <div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;">Что видит каждая роль</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; gap: 10px; font-size: 13px;"><span style="width: 90px; color: #8A7F76; flex-shrink: 0;">🛍 Клиент</span><span style="color: #D8CFC6;">{{ d.client }}</span></div>
+            <div style="display: flex; gap: 10px; font-size: 13px;"><span style="width: 90px; color: #8A7F76; flex-shrink: 0;">🧑‍💼 Сотрудник</span><span style="color: #D8CFC6;">{{ d.staff }}</span></div>
+            <div style="display: flex; gap: 10px; font-size: 13px;"><span style="width: 90px; color: #8A7F76; flex-shrink: 0;">👑 Владелец</span><span style="color: #D8CFC6;">{{ d.owner }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { sel: 0 };
+  data() {
+    return [
+      { name:"created", color:"#C6FF3D", desc:"Заказ создан клиентом или сотрудником. Позиции зафиксированы, но товар ещё не зарезервирован.", who:"Клиент / сотрудник", cond:"Корзина не пуста, контакты указаны", buttons:[["Подтвердить","act"],["Отменить","danger"]], notif:"Клиенту: «Заказ принят»", event:"order.created", client:"Заказ №, состав, статус «Принят»", staff:"Новый заказ в очереди", owner:"+1 к воронке" },
+      { name:"awaiting_confirmation", color:"#E5B23C", desc:"Ожидает подтверждения наличия и данных. Сотрудник проверяет остаток и адрес.", who:"Сотрудник", cond:"Проверка наличия и контактов", buttons:[["Подтвердить","act"],["Связаться","neutral"],["Отменить","danger"]], notif:"—", event:"order.confirmation_requested", client:"«Проверяем наличие»", staff:"Задача: подтвердить заказ", owner:"Заказы к подтверждению" },
+      { name:"confirmed", color:"#C6FF3D", desc:"Наличие и данные подтверждены. Готов к резервированию товара под заказ.", who:"Сотрудник", cond:"Товар есть на складе", buttons:[["Зарезервировать","act"]], notif:"Клиенту: «Заказ подтверждён»", event:"order.confirmed", client:"«Подтверждён»", staff:"Готов к сборке", owner:"—" },
+      { name:"reserved", color:"#7FB0EC", desc:"Товар (и IMEI) закреплён за заказом, снят с доступного остатка. Резерв имеет срок жизни.", who:"Система", cond:"Успешный резерв остатка/IMEI", buttons:[["Ожидать оплату","act"],["Снять резерв","danger"]], notif:"—", event:"stock.reserved + imei.reserved", client:"«Товар зарезервирован»", staff:"Резерв активен, срок 24 ч", owner:"Резервы истекают → Risk" },
+      { name:"awaiting_payment", color:"#E5B23C", desc:"Ожидается оплата (онлайн/при получении/рассрочка). Для оплаты при получении статус проходится быстро.", who:"Клиент / платёжка", cond:"Способ оплаты выбран", buttons:[["Отметить оплату","act"],["Отменить","danger"]], notif:"Клиенту: ссылка на оплату", event:"payment.awaited", client:"«Ожидает оплаты»", staff:"—", owner:"—" },
+      { name:"paid", color:"#7FD3A0", desc:"Оплата получена (или зафиксирована как оплата при получении/долг). Пишется в Payment Ledger.", who:"Платёжка / кассир", cond:"Сумма ≥ итог (или согласован долг)", buttons:[["В сборку","act"],["Печать чека","neutral"]], notif:"Клиенту: «Оплата получена» + чек", event:"payment.received → Payment Ledger", client:"«Оплачено», чек", staff:"Задача: собрать заказ", owner:"Выручка +, касса +" },
+      { name:"picking", color:"#7FB0EC", desc:"Сотрудник собирает заказ на складе, сканирует IMEI позиций.", who:"Кладовщик", cond:"Заказ оплачен", buttons:[["Собрано","act"],["Нет товара","danger"]], notif:"—", event:"order.picking", client:"«Собираем заказ»", staff:"Лист сборки + скан IMEI", owner:"—" },
+      { name:"packed", color:"#7FB0EC", desc:"Заказ собран и упакован. Готов к передаче курьеру или к выдаче.", who:"Кладовщик", cond:"Все позиции собраны", buttons:[["Курьеру","act"],["К выдаче","act"]], notif:"Клиенту: «Заказ собран»", event:"order.packed", client:"«Собран»", staff:"Готов к отгрузке", owner:"—" },
+      { name:"courier_assigned", color:"#FF8A5F", desc:"Назначен курьер, начинается доставка. Оплата при получении — деньги под ответственностью курьера.", who:"Логистика", cond:"Курьер свободен, маршрут построен", buttons:[["В путь","act"],["Переназначить","neutral"]], notif:"Клиенту: «Курьер назначен»", event:"delivery.assigned", client:"Курьер и телефон", staff:"Курьер: заказ в рейсе", owner:"Деньги у курьера (COD)" },
+      { name:"out_for_delivery", color:"#FF8A5F", desc:"Курьер в пути. Возможны сценарии неудачной доставки.", who:"Курьер", cond:"—", buttons:[["Доставлен","act"],["Неудача","danger"]], notif:"Клиенту: «Курьер в пути»", event:"delivery.out", client:"Трекинг курьера", staff:"Статус доставки", owner:"Доставки в процессе" },
+      { name:"delivered", color:"#7FD3A0", desc:"Товар вручён, подпись/код подтверждения получены. COD-деньги ждут сдачи в кассу.", who:"Курьер", cond:"Подпись/код клиента", buttons:[["Завершить","act"]], notif:"Клиенту: «Доставлено» + гарантия", event:"delivery.delivered + evidence.signature", client:"«Доставлено», талон", staff:"Курьер: сдать деньги", owner:"Cash handover ожидается" },
+      { name:"completed", color:"#7FD3A0", desc:"Заказ закрыт, деньги сверены, гарантия активна. Финальное состояние успешного пути.", who:"Система", cond:"Доставлен + деньги сверены", buttons:[["Оставить отзыв","neutral"]], notif:"Клиенту: запрос отзыва + бонусы", event:"order.completed", client:"«Завершён», бонусы", staff:"—", owner:"LTV клиента +" }
+    ];
+  }
+  // terminal/alt states shown separately
+  altData() {
+    return [
+      { name:"cancelled", color:"#FF8A7A", desc:"Заказ отменён. Резерв снят, оплата (если была) уходит в возврат. После передачи курьеру — только через поддержку.", who:"Клиент (до сборки) / сотрудник", cond:"Не доставлен; после отгрузки — approval", buttons:[["Подтвердить отмену","danger"]], notif:"Клиенту: «Заказ отменён»", event:"order.cancelled (+refund.requested)", client:"«Отменён»", staff:"Вернуть резерв на склад", owner:"Причина отмены в аналитике" },
+      { name:"return_requested", color:"#E5B23C", desc:"Клиент запросил возврат после получения. Запускает Refund Money Flow.", who:"Клиент", cond:"В течение 14 дней", buttons:[["В обработку","act"]], notif:"Клиенту: «Заявка принята»", event:"return.requested", client:"Статус возврата", staff:"Проверить товар", owner:"Возвраты на проверке" },
+      { name:"returned", color:"#FF8A7A", desc:"Товар принят обратно, проверен, решение о restock/списании принято.", who:"Ст. продавец", cond:"Товар проверен + approval", buttons:[["Вернуть деньги","act"]], notif:"—", event:"return.completed", client:"«Товар принят»", staff:"Restock или списание", owner:"—" },
+      { name:"exchanged", color:"#7FD3A0", desc:"Обмен: возврат старого + продажа нового одной атомарной транзакцией.", who:"Ст. продавец", cond:"Approval старшего", buttons:[["Оформить обмен","act"]], notif:"Клиенту: новый чек+гарантия", event:"order.exchanged", client:"Новый товар и гарантия", staff:"Старый → диагностика", owner:"—" },
+      { name:"refunded", color:"#FF8A7A", desc:"Деньги возвращены тем же способом. Проведено в Payment Ledger и сверено.", who:"Финансы", cond:"Refund approved + проведён", buttons:[["Сверить","act"]], notif:"Клиенту: «Деньги возвращены»", event:"payment.refunded → Payment Ledger", client:"«Деньги возвращены»", staff:"—", owner:"Возвраты в P&L" }
+    ];
+  }
+  renderVals() {
+    const all = [...this.data(), ...this.altData()];
+    const main = this.data();
+    const sel = this.state.sel;
+    const d = all[sel];
+
+    const strip = main.map((s,i)=>({ label:s.name, pick:()=>this.setState({sel:i}), arrow:i<main.length-1,
+      bg: sel===i?"#C6FF3D":"#16130F", fg: sel===i?"#14110E":"#D8CFC6", border: sel===i?"#C6FF3D":"#2E2822" }));
+
+    const list = all.map((s,i)=>({ name:s.name, pick:()=>this.setState({sel:i}), dot:s.color,
+      bg: sel===i?"#221E19":"transparent", color: sel===i?"#fff":"#A79C92" }));
+
+    const btnStyle = (t)=> t==="act"?["#C6FF3D","#14110E"] : t==="danger"?["#3A1F1C","#FF8A7A"] : ["#221E19","#D8CFC6"];
+    const buttons = d.buttons.map(b=>{ const c=btnStyle(b[1]); return { label:b[0], bg:c[0], fg:c[1] }; });
+
+    return {
+      strip, list, d: { ...d, step: sel<main.length? sel+1 : "alt", dot:d.color, buttons }
+    };
+  }
+}
+</script>
+</body>
+</html>

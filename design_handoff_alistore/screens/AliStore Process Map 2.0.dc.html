@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 80px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="max-width: 1240px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Process Map 2.0</span>
+    </div>
+    <p style="font-size: 14px; color: #8A7F76; margin: 0 0 24px 46px; max-width: 760px;">Все бизнес-процессы AliStore: владелец, старт → результат, ключевые статусы, связанные экраны и где хранятся доказательства. Кликните экран, чтобы открыть.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+      <sc-for list="{{ procs }}" as="p" hint-placeholder-count="8">
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 18px; padding: 20px; border-left: 4px solid {{ p.accent }};">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <span style="font-size: 22px;">{{ p.icon }}</span>
+            <span style="font-family: 'Sora'; font-weight: 700; font-size: 17px; color: #fff;">{{ p.name }}</span>
+            <span style="margin-left: auto; font-family: 'JetBrains Mono'; font-size: 11px; color: {{ p.accent }}; background: #221E19; border-radius: 6px; padding: 3px 8px;">{{ p.owner }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #A79C92; margin-bottom: 12px;">
+            <span style="background: #221E19; border-radius: 6px; padding: 4px 9px;">{{ p.start }}</span>
+            <span style="color: #FF5B2E;">→</span>
+            <span style="background: rgba(198,255,61,0.1); color: #C6FF3D; border-radius: 6px; padding: 4px 9px;">{{ p.result }}</span>
+          </div>
+          <div style="font-size: 11px; color: #6E645C; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Ключевые статусы</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px;">
+            <sc-for list="{{ p.statuses }}" as="st" hint-placeholder-count="4">
+              <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #D8CFC6; background: #221E19; border: 1px solid #2E2822; border-radius: 5px; padding: 2px 7px;">{{ st }}</span>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+            <sc-for list="{{ p.screens }}" as="sc" hint-placeholder-count="3">
+              <a href="{{ sc.href }}" style="text-decoration: none;"><span style="font-size: 12px; color: #7FB0EC; background: rgba(127,176,236,0.1); border-radius: 6px; padding: 4px 10px; cursor: pointer;">{{ sc.label }} →</span></a>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8A7F76; border-top: 1px solid #221E19; padding-top: 10px;"><span>🔒 Доказательства:</span><span style="color: #A79C92;">{{ p.evidence }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const S = (label, href) => ({ label, href });
+    return { procs: [
+      { icon:"🛒", name:"Заказ клиента", owner:"Продажи", accent:"#C6FF3D", start:"Клиент оформил", result:"completed",
+        statuses:["created","paid","picking","delivered","completed"],
+        screens:[S("Order State Machine","AliStore Order State Machine.dc.html"),S("Order Timeline","AliStore Order Timeline.dc.html"),S("Клиент 2.0","AliStore Клиент App 2.0.dc.html")],
+        evidence:"чек, подпись клиента, OTP" },
+      { icon:"💰", name:"Деньги и оплата", owner:"Финансы", accent:"#7FD3A0", start:"Платёж принят", result:"reconciled",
+        statuses:["received","split","debt","refunded","reconciled"],
+        screens:[S("Payment Ledger","AliStore Payment Ledger.dc.html"),S("Платёжная сверка","AliStore Платёжная сверка.dc.html")],
+        evidence:"чек, слип терминала, фото" },
+      { icon:"🗄️", name:"Касса и смена", owner:"Кассир", accent:"#E5B23C", start:"Открытие смены", result:"closed+сверено",
+        statuses:["open","selling","closing","reconciled","incident"],
+        screens:[S("Открытие смены","AliStore Cash Shift Opening.dc.html"),S("Закрытие смены","AliStore Cash Shift Closing.dc.html")],
+        evidence:"фото кассы, Z-отчёт" },
+      { icon:"📦", name:"Склад и остатки", owner:"Кладовщик", accent:"#7FB0EC", start:"Приёмка/движение", result:"актуальный остаток",
+        statuses:["received","reserved","moved","counted","written_off"],
+        screens:[S("Inventory Count","AliStore Inventory Count.dc.html"),S("Резервы","AliStore Резервы.dc.html"),S("Перемещения","AliStore Перемещения.dc.html")],
+        evidence:"накладная, фото, акт расхождений" },
+      { icon:"📱", name:"IMEI / устройство", owner:"Склад/Продажи", accent:"#C6A8FF", start:"Приход",result:"продан/списан",
+        statuses:["in_stock","reserved","sold","returned","written_off"],
+        screens:[S("IMEI Lifecycle","AliStore IMEI Lifecycle.dc.html"),S("IMEI реестр","AliStore IMEI реестр.dc.html")],
+        evidence:"фото, договор, чек" },
+      { icon:"🛵", name:"Доставка", owner:"Логистика", accent:"#FF8A5F", start:"Курьер назначен", result:"delivered/возврат",
+        statuses:["assigned","out","delivered","failed","cash_handover"],
+        screens:[S("Курьер Workflow","AliStore Курьер Workflow.dc.html"),S("Failed Delivery","AliStore Failed Delivery.dc.html"),S("Cash Handover","AliStore Courier Cash Handover.dc.html")],
+        evidence:"подпись, фото, код вручения" },
+      { icon:"↩️", name:"Возврат денег", owner:"Ст. продавец", accent:"#FF8A7A", start:"Заявка клиента", result:"refunded",
+        statuses:["requested","approved","processing","paid","reconciled"],
+        screens:[S("Refund Money Flow","AliStore Refund Money Flow.dc.html"),S("Возврат","AliStore Возврат.dc.html")],
+        evidence:"акт возврата, фото товара" },
+      { icon:"🔄", name:"Обмен товара", owner:"Ст. продавец", accent:"#7FD3A0", start:"Клиент принёс", result:"exchanged",
+        statuses:["opened","priced","approved","done"],
+        screens:[S("Exchange Flow","AliStore Обмен товара.dc.html")],
+        evidence:"акт обмена, новый чек+гарантия" },
+      { icon:"🛡", name:"Гарантия / сервис", owner:"Сервис", accent:"#7FB0EC", start:"Обращение", result:"repaired/replaced",
+        statuses:["created","diagnostics","approved","repaired","closed"],
+        screens:[S("Warranty Case","AliStore Warranty Case Detail.dc.html"),S("Обращения","AliStore Обращения и гарантия.dc.html")],
+        evidence:"видео диагностики, IMEI, чек" },
+      { icon:"♻️", name:"Trade-in / скупка", owner:"Приёмщик", accent:"#C6FF3D", start:"Оценка", result:"выкуплен+договор",
+        statuses:["assessed","checked","contract","paid","in_stock"],
+        screens:[S("Скупка и договор","AliStore Скупка и договор.dc.html")],
+        evidence:"фото, паспорт, договор" },
+      { icon:"👥", name:"CRM / удержание", owner:"Маркетинг", accent:"#FF8A5F", start:"Сегмент", result:"повторная продажа",
+        statuses:["segment","campaign","sent","converted"],
+        screens:[S("Segment Builder","AliStore Marketing Segment Builder.dc.html"),S("Campaign ROI","AliStore Campaign ROI.dc.html"),S("Customer 360","AliStore Customer 360.dc.html")],
+        evidence:"consent, ROI-отчёт" },
+      { icon:"🚨", name:"Риски и инциденты", owner:"Владелец", accent:"#FF5B2E", start:"Флаг/сбой", result:"компенсировано",
+        statuses:["flagged","investigating","compensated","closed"],
+        screens:[S("Risk Center","AliStore Risk Center.dc.html"),S("Incident Recovery","AliStore Incident Recovery.dc.html")],
+        evidence:"аудит, компенсирующее событие" },
+      { icon:"✅", name:"Подтверждения", owner:"Ст. роли", accent:"#E5B23C", start:"Опасное действие", result:"approved/rejected",
+        statuses:["requested","approved","rejected"],
+        screens:[S("Approval Matrix","AliStore Approval Rules Matrix.dc.html"),S("Approval Inbox","AliStore Approval Inbox.dc.html")],
+        evidence:"причина, audit log" },
+      { icon:"📖", name:"Данные и аудит", owner:"Архитектор", accent:"#C6A8FF", start:"Любое событие", result:"immutable log",
+        statuses:["appended"],
+        screens:[S("API & Data","AliStore API Data Contracts.dc.html"),S("Event Ledger","AliStore Event Ledger.dc.html"),S("Evidence Vault","AliStore Evidence Vault.dc.html")],
+        evidence:"неизменяемый Event Ledger" },
+      { icon:"🤝", name:"Франшиза", owner:"Владелец", accent:"#7FD3A0", start:"Партнёрская точка", result:"соответствие стандарту",
+        statuses:["active","audit","violation","fixed"],
+        screens:[S("Franchise Audit","AliStore Franchise Audit Checklist.dc.html"),S("Франшиза","AliStore Франшиза.dc.html")],
+        evidence:"фото, чек-лист аудита" },
+      { icon:"🔐", name:"Роли и доступ", owner:"Админ", accent:"#7FB0EC", start:"Назначение роли", result:"права+2FA",
+        statuses:["assigned","training","active","revoked"],
+        screens:[S("Role Matrix","AliStore Role Permission Matrix.dc.html"),S("Обучение","AliStore Обучение сотрудников.dc.html")],
+        evidence:"журнал входов, аттестация" }
+    ] };
+  }
+}
+</script>
+</body>
+</html>
