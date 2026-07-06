@@ -178,3 +178,31 @@ export function authMe(accessToken: string): Promise<AuthUser> {
 export function fetchMyOrders(accessToken: string): Promise<MyOrder[]> {
   return getJson('/orders/mine', accessToken);
 }
+
+// ---------- POS ----------
+
+export interface PosLine {
+  productId: string;
+  sku: string;
+  price: number;
+  qty: number;
+}
+
+export interface PosSaleResult {
+  orderId: string;
+  receiptNo: string;
+  total: number;
+  status: string;
+  shiftId: string;
+  imeis: string[];
+}
+
+export function posSale(input: {
+  staffId: string;
+  point: string;
+  method: string;
+  discountPct?: number;
+  lines: PosLine[];
+}): Promise<PosSaleResult> {
+  return postJson('/pos/sale', input);
+}
