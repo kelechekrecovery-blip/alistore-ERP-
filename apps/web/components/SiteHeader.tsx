@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CartButton } from './CartButton';
 
 const NAV = [
   { href: '/', label: 'Каталог' },
@@ -38,15 +39,7 @@ export function SiteHeader() {
           >
             Избранное
           </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-btn bg-ink px-4 py-2 text-sm font-semibold text-sand transition hover:bg-ink-dark"
-          >
-            Корзина
-            <span className="rounded-chip bg-lime px-1.5 py-0.5 font-mono text-xs font-bold text-lime-ink">
-              0
-            </span>
-          </button>
+          <CartButton />
         </div>
       </div>
     </header>

@@ -34,6 +34,12 @@
   }
 }
 
+@layer components {
+  .input {
+    @apply w-full rounded-btn border border-ink/15 bg-white px-4 py-2.5 text-base text-ink outline-none transition placeholder:text-ink/35 focus:border-coral focus:ring-4 focus:ring-coral/15;
+  }
+}
+
 @layer utilities {
   /* subtle warm paper grain for atmosphere */
   .bg-grain {

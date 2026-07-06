@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
+import { CartProvider } from '@/lib/cart';
 
 export const metadata: Metadata = {
   title: 'AliStore — электроника с гарантией в Кыргызстане',
@@ -26,9 +27,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="min-h-screen bg-sand bg-grain">
-        <SiteHeader />
-        <main className="mx-auto w-full max-w-content px-4 sm:px-6">{children}</main>
-        <SiteFooter />
+        <CartProvider>
+          <SiteHeader />
+          <main className="mx-auto w-full max-w-content px-4 sm:px-6">{children}</main>
+          <SiteFooter />
+        </CartProvider>
       </body>
     </html>
   );
