@@ -139,6 +139,22 @@ p, owner, suppliers, rma_read
 p, warehouse, suppliers, rma_transition
 p, admin, suppliers, rma_transition
 p, owner, suppliers, rma_transition
+p, cashier, debts, create
+p, seller, debts, create
+p, senior_seller, debts, create
+p, franchise, debts, create
+p, admin, debts, create
+p, owner, debts, create
+p, cashier, debts, read
+p, seller, debts, read
+p, senior_seller, debts, read
+p, franchise, debts, read
+p, admin, debts, read
+p, owner, debts, read
+p, cashier, debts, pay
+p, senior_seller, debts, pay
+p, admin, debts, pay
+p, owner, debts, pay
 g, owner, admin
 g, admin, senior_seller
 `;
