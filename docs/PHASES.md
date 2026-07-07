@@ -100,7 +100,9 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
   порога (APPROVAL_THRESHOLDS.discountPct=10) park'ит approval и возвращает **202
   {approvalId}** без проведения продажи; кассир повторяет с `approvalId` после одобрения
   старшим (request→approve→retry); анти-подмена: одобренный % должен совпадать (discount_mismatch).
-- ☐ Осталось: доступ к PII → 2FA.
+  **UI POS 2.0**: экран «Нужно одобрение» (approvalId) → «Провести после одобрения» → чек
+  (браузер+БД проверено end-to-end: 15% → park → approve → продажа 161415, IMEI записан).
+- ☐ Осталось (лана Codex/auth): доступ к PII → 2FA; вход сотрудника с ролью в JWT + guards.
 - ☐ **Role Permission Matrix** (9 ролей) — серверная проверка прав/лимитов; 2FA на опасное
   (auth-связано, координировать с Codex).
 - ☐ PII-маскирование младшим ролям; margin-контроль (инв #6).

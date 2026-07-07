@@ -2,7 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchCatalog, posSale, type CatalogProduct, type PosSaleResult } from '@/lib/api';
+import {
+  fetchCatalog,
+  posSale,
+  type CatalogProduct,
+  type PosPendingApproval,
+  type PosSaleResult,
+} from '@/lib/api';
 import { som } from '@/lib/format';
 
 const STAFF_ID = 'pos_azizbek';
@@ -25,11 +31,12 @@ export default function PosPage() {
   const [cat, setCat] = useState('all');
   const [ticket, setTicket] = useState<Record<string, number>>({});
   const [discIdx, setDiscIdx] = useState(0);
-  const [route, setRoute] = useState<'sell' | 'pay' | 'done'>('sell');
+  const [route, setRoute] = useState<'sell' | 'pay' | 'pending' | 'done'>('sell');
   const [method, setMethod] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
   const [result, setResult] = useState<PosSaleResult | null>(null);
+  const [pending, setPending] = useState<PosPendingApproval | null>(null);
 
   useEffect(() => {
     fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items));
@@ -84,6 +91,7 @@ export default function PosPage() {
         point: POINT,
         method,
         discountPct: discPct,
+        approvalId: pending?.approvalId,
         lines: lines.map((l) => ({
           productId: l.product.id,
           sku: l.product.sku,
@@ -91,8 +99,14 @@ export default function PosPage() {
           qty: l.qty,
         })),
       });
-      setResult(res);
-      setRoute('done');
+      if (res.pendingApproval) {
+        setPending(res);
+        setRoute('pending');
+      } else {
+        setResult(res);
+        setPending(null);
+        setRoute('done');
+      }
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка продажи');
     } finally {
@@ -105,6 +119,7 @@ export default function PosPage() {
     setDiscIdx(0);
     setMethod(null);
     setResult(null);
+    setPending(null);
     setRoute('sell');
     fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items)); // refresh stock
   }
@@ -282,9 +297,41 @@ export default function PosPage() {
         </div>
 
         {/* PAYMENT OVERLAY */}
-        {(route === 'pay' || route === 'done') && (
+        {(route === 'pay' || route === 'pending' || route === 'done') && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(10,8,6,0.82)] p-4">
             <div className="w-full max-w-[640px] rounded-[22px] border border-[#2E2822] bg-[#1A1611] p-7">
+              {route === 'pending' && pending && (
+                <div className="py-4 text-center">
+                  <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-warn/15 text-4xl text-warn">
+                    🔒
+                  </div>
+                  <div className="mt-4 font-display text-2xl font-extrabold text-white">Нужно одобрение</div>
+                  <div className="mt-2 text-sm text-[#A79C92]">
+                    Скидка {pending.discountPct}% превышает лимит {DISCOUNTS[2]}%. Продажа не проведена —
+                    ожидает одобрения старшего в Approval Inbox.
+                  </div>
+                  <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] px-4 py-2.5 font-mono text-xs text-[#8A7F76]">
+                    approval #{pending.approvalId.slice(-8)}
+                  </div>
+                  <div className="mt-6 flex gap-2.5">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={finish}
+                      className="flex-1 rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+                    >
+                      {busy ? 'Проверяем…' : 'Провести после одобрения'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPending(null); setRoute('sell'); }}
+                      className="rounded-[12px] border border-[#2E2822] bg-[#221E19] px-6 py-3.5 text-[15px] font-semibold text-[#D8CFC6]"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
               {route === 'pay' && (
                 <>
                   <div className="mb-1 flex items-center">
