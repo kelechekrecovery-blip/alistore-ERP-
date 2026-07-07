@@ -102,7 +102,7 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
 (`GET /api/units/:imei` 200, `POST /api/exchanges` 201, без failed requests/console errors/
 overflow). units-lookup: 2 теста.
 
-## Phase 7 — Опасные действия полностью (v1) 🟡
+## Phase 7 — Опасные действия полностью (v1) ✅
 **Цель:** каждое опасное действие — через approval, с ролями и 2FA.
 - ✅ Approval-gate: изменение цены>±15%, списание (write_off), изменение остатка
   (stock_adjust), удаление (soft-delete→archived) — исполнители в
@@ -166,13 +166,16 @@ overflow). units-lookup: 2 теста.
   staff JWT + returns permission. `GET /units/:imei` и `POST /exchanges` требуют active
   staff JWT; exchange actor берётся из staff token. `/account/returns` отправляет customer
   token, `/exchange` использует shared staff session.
-- ☐ Margin-контроль (инв #6).
+- ✅ **Margin-control** (инв #6): POS sale считает маржу по серверному `Product.cost`,
+  `price - cost - discount >= minMarginSom` (сейчас 0 сом/ед.) и паркует `discount`
+  approval, если хотя бы одна строка уходит ниже порога. Approval хранит fingerprint
+  product/cost/price/qty, поэтому одобрение нельзя переиспользовать на изменённую продажу.
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
 RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; returns/exchanges
-RBAC tests; полный Jest 71 suites / 222 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; margin-control POS tests; полный Jest 71 suites / 225 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
 `/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
 без overflow.
@@ -220,7 +223,10 @@ in-browser /erp: вкладка «Маржа·KPI» на реальных дан
   POST /debts/:id/payments, GET /debts. Staff RBAC: seller/cashier/senior/franchise/admin/
   owner создают/читают, cashier/senior/admin/owner принимают платежи; actor/requester из
   staff JWT.
-- ☐ Напоминания по долгам, KPI/зарплаты, смены с фотоотчётом (Evidence Vault).
+- ✅ **Зарплаты продавцов** (`reports/payroll.ts`, `GET /reports/payroll`): база +
+  комиссия с оборота по продавцу (из received-платежей через shift.staffId) + фонд ЗП;
+  карточка «Зарплаты продавцов» в ERP-вкладке «Маржа·KPI». 6 тестов. Расчётный (не платит).
+- ☐ Напоминания по долгам (Codex-уведомления), смены с фотоотчётом (Evidence Vault).
 - 🟡 Импорт данных из Excel/тетради при запуске (Data Migration) — Codex (`import/`, WIP).
 **Проверка:** ✅ гарантия created→received через консоль (БД + ledger); SLA-breach ловится
 в Risk Center. ✅ Supplier RMA: 6 тестов зелёные + HTTP-смоук created→…→closed (unit
@@ -318,20 +324,20 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
 ## Статус-снимок (обновлён: моя-лана MVP закрыта)
 **Функциональное ядро прототипа готово end-to-end.** Готово в моей лане:
 - Phase 0–6 ✅ (ядро/деньги/витрина/аккаунт/POS/склад/approval-цикл+возвраты+обмены).
-- Phase 7 🟡→по существу закрыто: опасные действия через approval (цена/write_off/adjust/
+- Phase 7 ✅: опасные действия через approval (цена/write_off/adjust/
   delete/**долг**/**скидка>10% в POS backend+UI**), staff JWT для Approval Inbox,
   PII masking/read policy, step-up 2FA для approve, staff-session rollout на
   POS/warehouse/staff ops, Role Permission Matrix phase 1 на POS/shifts/inventory/
   fulfillment, phase 2 на courier COD/delivery и print/export, phase 3 на products/refunds,
   phase 4 на warranty split, phase 5 на support/CRM split, phase 6 на supplier/RMA split.
-  phase 7 на debt/installment split, phase 8 на trade-in split. Остаток — разделить
-  public/customer self-service и staff/admin mutations в returns/exchanges и закрыть
-  margin-control.
+  phase 7 на debt/installment split, phase 8 на trade-in split, phase 9 на returns/exchanges
+  split, плюс margin-control по себестоимости.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
 - Phase 9 🟡: WarrantyCase, мультисклад (перемещения+инвентаризация+UI), **Supplier RMA+scorecard**,
-  **долги/рассрочка**. Остаток — долг-напоминания (Codex-уведомления), KPI/зарплаты, Evidence Vault.
+  **долги/рассрочка**, **зарплаты продавцов**. Остаток — долг-напоминания (Codex-уведомления),
+  Evidence Vault (смены с фотоотчётом).
 - Phase 10 🟡: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**.
   Остаток — Novu-доставка/Segment/Campaign = **лана Codex**.
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
@@ -346,7 +352,7 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 69 (215 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 71 (225 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
