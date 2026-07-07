@@ -23,6 +23,8 @@ describe('Auth throttling', () => {
           useValue: {
             requestOtp: async () => ({ challengeId: 'stub' }),
             verifyOtp: async () => ({}),
+            requestRecoveryOtp: async () => ({ challengeId: 'stub' }),
+            verifyRecoveryOtp: async () => ({}),
             refresh: async () => ({}),
             logout: async () => undefined,
           },

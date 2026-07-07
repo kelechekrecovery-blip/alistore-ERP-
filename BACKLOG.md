@@ -1,10 +1,14 @@
 # BACKLOG
 
 ## Next
+- Broaden PDF/print polish for documents.
+- Write infra runbook for Caddy/backups deployment.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
+- Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Add OTP access recovery with refresh-session revocation.
 - Print split payment tenders on receipts.
 - Add consent-filtered Campaign Segment Builder and ROI.
 - Make Excel product import idempotent.

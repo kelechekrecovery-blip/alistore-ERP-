@@ -85,6 +85,35 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     expect((reused as ValidationError).code).toBe('refresh_invalid');
   });
 
+  it('recovers access and revokes previous refresh sessions', async () => {
+    const phone = nextPhone();
+    await prisma.customer.create({ data: { phone, name: 'Recover Me' } });
+
+    const loginOtp = await auth.requestOtp(phone);
+    const first = await auth.verifyOtp(phone, loginOtp.devCode as string);
+
+    const recoveryOtp = await auth.requestRecoveryOtp(phone);
+    const recovered = await auth.verifyRecoveryOtp(phone, recoveryOtp.devCode as string);
+    expect(recovered.refreshToken).not.toBe(first.refreshToken);
+
+    const oldRefresh = await auth.refresh(first.refreshToken).catch((e) => e);
+    expect(oldRefresh).toBeInstanceOf(ValidationError);
+    expect((oldRefresh as ValidationError).code).toBe('refresh_invalid');
+
+    const rotated = await auth.refresh(recovered.refreshToken);
+    expect(rotated.accessToken.split('.')).toHaveLength(3);
+  });
+
+  it('does not create an account during recovery verify', async () => {
+    const phone = nextPhone();
+    const recoveryOtp = await auth.requestRecoveryOtp(phone);
+    const err = await auth.verifyRecoveryOtp(phone, recoveryOtp.devCode as string).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('customer_not_found');
+    await expect(prisma.customer.findUnique({ where: { phone } })).resolves.toBeNull();
+  });
+
   it('does not verify an expired OTP', async () => {
     const phone = nextPhone();
     const { challengeId } = await auth.requestOtp(phone);

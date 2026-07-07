@@ -21,6 +21,14 @@ export function authVerifyOtp(phone: string, code: string): Promise<AuthTokens> 
   return postJson('/auth/otp/verify', { phone, code });
 }
 
+export function authRequestRecoveryOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
+  return postJson('/auth/recovery/request', { phone });
+}
+
+export function authVerifyRecoveryOtp(phone: string, code: string): Promise<AuthTokens> {
+  return postJson('/auth/recovery/verify', { phone, code });
+}
+
 export function authRefresh(refreshToken: string): Promise<AuthTokens> {
   return postJson('/auth/refresh', { refreshToken });
 }

@@ -182,6 +182,15 @@
 
 ## 2026-07-07
 
+- Task: add OTP access recovery with refresh-session revocation.
+- Files changed: `apps/api/src/auth/*`, `apps/api/test/auth.e2e-spec.ts`, `apps/api/test/auth-throttle.e2e-spec.ts`, `apps/web/lib/api/auth.ts`, `apps/web/lib/auth.tsx`, `apps/web/app/login/page.tsx`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: `/auth/recovery/request` issues a recovery OTP without revealing account existence; `/auth/recovery/verify` validates an existing customer, revokes old refresh tokens, and issues a fresh token pair. `/login` now has a recovery mode and no longer presents inert social buttons as active actions.
+- Checks run: targeted Jest for `auth`; `npm run api:build`; `npm run build -w @alistore/web`; browser QA on mobile `/login` recovery flow; DB verification query.
+- Outcome: auth tests passed 6 suites / 21 tests; API build passed; web build passed; browser QA reached `/account` with recovery request/verify 201 and `/auth/me` 200; DB showed 2 refresh rows for the QA customer with 1 revoked old token and 1 active new token.
+- Next step: remaining bounded unblocked work is broader PDF/print polish or infra runbook; real social providers remain blocked on Apple/Telegram credentials.
+
+## 2026-07-07
+
 - Task: print split payment tenders on receipts.
 - Files changed: `apps/api/src/receipts/receipts.dto.ts`, `apps/api/src/receipts/receipts.service.ts`, `apps/api/test/receipts.spec.ts`, `apps/api/test/receipts-order.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: receipts now keep backward-compatible `payment` but can render `payments[]`; `renderOrder()` prints every received/reconciled positive tender with method and amount, so POS split payments appear correctly on printed receipts.

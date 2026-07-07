@@ -8,21 +8,25 @@
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-1. **Восстановление доступа / соцвход** — auth-лана.
-   - Приёмка: сброс по OTP/e-mail; вход через соц-провайдера создаёт/связывает Customer.
-2. **PDF/печать полировка** — receipts/labels/documents.
+1. **PDF/печать полировка** — receipts/labels/documents.
    - Приёмка: чек/накладная/договор скупки печатаются с корректными полями и локалью.
+2. **Infra runbook** — Caddy + бэкапы + запуск self-hosted окружения.
+   - Приёмка: документированный запуск и restore-check.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
 debt reminders через outbox, consent-filtered Campaign Segment Builder + Campaign ROI,
-Excel import idempotency, realtime/socket.io, Sentry/GlitchTip hook, i18n, health-checks.
+Excel import idempotency, OTP access recovery with refresh-session revocation,
+realtime/socket.io, Sentry/GlitchTip hook, i18n, health-checks.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 
-10. **Повтор IMEI (скупка + продажа) как риск.** Нужно поле `imei String?` в `TradeInDevice`
-    (+ приём в `POST /tradeins/intake`). Затем Claude/или Codex добавит детектор в
-    `reports/risk-signals.ts` (сопоставление `TradeInDevice.imei` ↔ проданный `DeviceUnit.imei`).
-    - Приёмка: один IMEI и в скупке, и в продаже → high-риск в Risk Center.
+10. **Повтор IMEI (скупка + продажа) как риск.** ✅ Схема (`TradeInDevice.imei`, миграция
+    `20260707173249_tradein_imei`) и детектор (`reports/risk-signals.ts` → `imei_reuse`,
+    сопоставление с проданными `DeviceUnit.imei`) — СДЕЛАНО Claude, работает вживую.
+    **Остаток для Codex (owns tradeins):** принимать `imei` в `POST /tradeins/intake` (DTO +
+    сервис) и писать в `TradeInDevice.imei`. Поле nullable — до этого детектор просто пуст.
+    - Приёмка: staff intake с imei → запись в БД; тот же imei и в скупке, и в продаже →
+      high-риск `imei_reuse` в Risk Center (детектор уже готов).
 11. **Споры v2 (если нужна отдельная модель).** MVP уже использует refund/return approval flow
     и `/approvals` Refund Money Flow; отдельный `Dispute` нужен только для расширенной машины
     статусов. Приёмка: открыть спор → машина статусов → решение пишет ledger.
@@ -33,7 +37,8 @@ Excel import idempotency, realtime/socket.io, Sentry/GlitchTip hook, i18n, healt
     Плуминг LLM готов (`ai/openrouter-provider.ts`, порт `InsightProvider`); vision/scout —
     расширение того же паттерна. Активация: `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` (+`AI_MODEL`).
 14. **Каналы (Phase 12)** — Telegram Mini App / WhatsApp-магазин: нужны аккаунты/токены ботов.
-15. **Физическое железо (Phase 13)** — ESC/POS/QZ печать, банковские терминалы, реальный сканер:
+15. **Соцвход через реальные провайдеры** — нужны Apple/Telegram app credentials и callback URLs.
+16. **Физическое железо (Phase 13)** — ESC/POS/QZ печать, банковские терминалы, реальный сканер:
     нужны устройства и SDK. Софт-слой offline POS + browser-fallback уже готов.
 
 ## Гейт приёмки (для КАЖДОГО пункта)

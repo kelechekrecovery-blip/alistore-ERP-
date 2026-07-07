@@ -53,12 +53,44 @@ export class AuthService {
       : { challengeId: challenge.id };
   }
 
+  /** Issue an access-recovery OTP. Uses the same SMS channel without revealing account existence. */
+  requestRecoveryOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
+    return this.requestOtp(phone);
+  }
+
   /**
    * Verify an OTP and log the customer in (find-or-create by phone). Wrong codes
    * increment an attempt counter and lock the challenge after OTP_MAX_ATTEMPTS; a
    * consumed or expired challenge cannot be reused.
    */
   async verifyOtp(phone: string, code: string): Promise<AuthTokens> {
+    await this.consumeOtp(phone, code);
+    const customer = await this.prisma.customer.upsert({
+      where: { phone },
+      update: {},
+      create: { phone, name: '' },
+    });
+    return this.issueTokens(customer.id, customer.phone);
+  }
+
+  /**
+   * Verify a recovery OTP for an existing account, revoke all old refresh tokens,
+   * then issue a fresh pair. This is the safe "lost phone/session" path.
+   */
+  async verifyRecoveryOtp(phone: string, code: string): Promise<AuthTokens> {
+    await this.consumeOtp(phone, code);
+    const customer = await this.prisma.customer.findUnique({ where: { phone } });
+    if (!customer) {
+      throw new ValidationError('customer_not_found', 'Аккаунт не найден');
+    }
+    await this.prisma.refreshToken.updateMany({
+      where: { customerId: customer.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return this.issueTokens(customer.id, customer.phone);
+  }
+
+  private async consumeOtp(phone: string, code: string): Promise<void> {
     const challenge = await this.prisma.otpChallenge.findFirst({
       where: { phone, consumedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
@@ -86,12 +118,6 @@ export class AuthService {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     });
-    const customer = await this.prisma.customer.upsert({
-      where: { phone },
-      update: {},
-      create: { phone, name: '' },
-    });
-    return this.issueTokens(customer.id, customer.phone);
   }
 
   /** Rotate a refresh token: the presented token is revoked and a new pair issued. */

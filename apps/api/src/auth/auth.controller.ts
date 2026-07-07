@@ -25,6 +25,20 @@ export class AuthController {
     return this.auth.verifyOtp(dto.phone, dto.code);
   }
 
+  /** Request an account recovery OTP. Same SMS channel, separate product intent. */
+  @Post('recovery/request')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestRecovery(@Body() dto: RequestOtpDto) {
+    return this.auth.requestRecoveryOtp(dto.phone);
+  }
+
+  /** Verify recovery OTP, revoke old refresh sessions, issue fresh tokens. */
+  @Post('recovery/verify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  verifyRecovery(@Body() dto: VerifyOtpDto) {
+    return this.auth.verifyRecoveryOtp(dto.phone, dto.code);
+  }
+
   /** Rotate the refresh token → a fresh access + refresh pair. */
   @Post('refresh')
   refresh(@Body() dto: RefreshDto) {

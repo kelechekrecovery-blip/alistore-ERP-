@@ -14,7 +14,9 @@ import {
   authLogout,
   authMe,
   authRefresh,
+  authRequestRecoveryOtp,
   authRequestOtp,
+  authVerifyRecoveryOtp,
   authVerifyOtp,
   type AuthTokens,
   type AuthUser,
@@ -25,6 +27,8 @@ interface AuthContextValue {
   hydrated: boolean;
   requestOtp: (phone: string) => Promise<{ devCode?: string }>;
   verifyOtp: (phone: string, code: string) => Promise<void>;
+  requestRecoveryOtp: (phone: string) => Promise<{ devCode?: string }>;
+  verifyRecoveryOtp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Run an authed request with the access token, refreshing once on failure. */
   authed: <T>(fn: (accessToken: string) => Promise<T>) => Promise<T>;
@@ -105,6 +109,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const requestRecoveryOtp = useCallback(async (phone: string) => {
+    const { devCode } = await authRequestRecoveryOtp(phone);
+    return { devCode };
+  }, []);
+
+  const verifyRecoveryOtp = useCallback(
+    async (phone: string, code: string) => {
+      const t = await authVerifyRecoveryOtp(phone, code);
+      persist(t);
+      setUser(await authMe(t.accessToken));
+    },
+    [persist],
+  );
+
   const logout = useCallback(async () => {
     const stored = tokens.current;
     if (stored) await authLogout(stored.refreshToken);
@@ -133,8 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, hydrated, requestOtp, verifyOtp, logout, authed }),
-    [user, hydrated, requestOtp, verifyOtp, logout, authed],
+    () => ({ user, hydrated, requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp, logout, authed }),
+    [user, hydrated, requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp, logout, authed],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
