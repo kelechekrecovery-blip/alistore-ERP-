@@ -8,3 +8,4 @@ export * from './api/pos';
 export * from './api/warehouse';
 export * from './api/exchanges';
 export * from './api/approvals';
+export * from './api/tradeins';

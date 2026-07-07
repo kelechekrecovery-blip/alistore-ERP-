@@ -2,8 +2,18 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import type { FormEvent, HTMLAttributes } from 'react';
 import { closeShift, currentShift, fetchShift, openShift, type Shift } from '@/lib/staff';
-import { fetchOrdersByStatus, fulfillOrder, transitionOrder, type QueueOrder } from '@/lib/api';
+import {
+  createCustomer,
+  createTradeIn,
+  fetchOrdersByStatus,
+  fulfillOrder,
+  transitionOrder,
+  type QueueOrder,
+  type TradeIn,
+  type TradeInGrade,
+} from '@/lib/api';
 import { som } from '@/lib/format';
 
 const STAFF = { staffId: 'pos_azizbek', point: 'BISHKEK-1', name: 'Азизбек', role: 'Продавец · AliStore Центр' };
@@ -24,6 +34,15 @@ export default function StaffPage() {
   const [orders, setOrders] = useState<QueueOrder[] | null>(null);
   const [tasks, setTasks] = useState<boolean[]>(TASKS.map(() => false));
   const [buyback, setBuyback] = useState<boolean[]>(BUYBACK.map(() => false));
+  const [tradeIn, setTradeIn] = useState<TradeIn | null>(null);
+  const [buybackForm, setBuybackForm] = useState({
+    phone: '+996',
+    name: '',
+    model: '',
+    grade: 'B' as TradeInGrade,
+    price: '',
+    passport: '',
+  });
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -61,6 +80,31 @@ export default function StaffPage() {
       else { await transitionOrder(o.id, 'picking'); flash('В сборке'); }
       loadOrders();
     } catch (e) { flash(e instanceof Error ? e.message : 'Ошибка'); } finally { setBusy(null); }
+  }
+  async function submitBuyback(e: FormEvent) {
+    e.preventDefault();
+    setBusy('buyback');
+    try {
+      const customer = await createCustomer({
+        phone: buybackForm.phone.trim(),
+        name: buybackForm.name.trim() || 'Клиент скупки',
+      });
+      const result = await createTradeIn({
+        customerId: customer.id,
+        model: buybackForm.model.trim(),
+        grade: buybackForm.grade,
+        price: Number(buybackForm.price),
+        sellerPassport: buybackForm.passport.trim(),
+        actor: STAFF.staffId,
+      });
+      setTradeIn(result);
+      setBuyback(BUYBACK.map(() => true));
+      flash('Договор оформлен');
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка скупки');
+    } finally {
+      setBusy(null);
+    }
   }
 
   const cashSales = (shift?.payments ?? []).filter((p) => p.method === 'cash');
@@ -166,6 +210,69 @@ export default function StaffPage() {
               {BUYBACK.map((b, i) => (
                 <Check key={i} label={b} done={buyback[i]} onClick={() => setBuyback((a) => a.map((v, j) => (j === i ? !v : v)))} />
               ))}
+              <form onSubmit={submitBuyback} className="mt-4 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
+                <div className="mb-3 font-display text-[15px] font-bold">Договор скупки</div>
+                <Field
+                  label="Телефон"
+                  value={buybackForm.phone}
+                  onChange={(phone) => setBuybackForm((f) => ({ ...f, phone }))}
+                  inputMode="tel"
+                />
+                <Field
+                  label="Имя"
+                  value={buybackForm.name}
+                  onChange={(name) => setBuybackForm((f) => ({ ...f, name }))}
+                />
+                <Field
+                  label="Модель"
+                  value={buybackForm.model}
+                  onChange={(model) => setBuybackForm((f) => ({ ...f, model }))}
+                  required
+                />
+                <div className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
+                  <span className="text-[12px] font-semibold text-[#8A7F76]">Грейд</span>
+                  <select
+                    value={buybackForm.grade}
+                    onChange={(e) => setBuybackForm((f) => ({ ...f, grade: e.target.value as TradeInGrade }))}
+                    className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
+                  >
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                  </select>
+                </div>
+                <Field
+                  label="Цена"
+                  value={buybackForm.price}
+                  onChange={(price) => setBuybackForm((f) => ({ ...f, price }))}
+                  inputMode="numeric"
+                  required
+                />
+                <Field
+                  label="Паспорт"
+                  value={buybackForm.passport}
+                  onChange={(passport) => setBuybackForm((f) => ({ ...f, passport }))}
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={busy === 'buyback'}
+                  className="mt-2 w-full rounded-[11px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60"
+                >
+                  {busy === 'buyback' ? '…' : 'Оформить договор'}
+                </button>
+                {tradeIn && (
+                  <div className="mt-3 rounded-[12px] border border-lime/20 bg-lime/10 p-3">
+                    <div className="font-mono text-[12px] text-lime">{tradeIn.contractId}</div>
+                    <div className="mt-1 text-[12px] text-[#D8CFC6]">
+                      {tradeIn.model} · Grade {tradeIn.grade} · {som(tradeIn.price)}
+                    </div>
+                    <div className="mt-1 text-[11px] text-[#8A7F76]">
+                      Паспорт {tradeIn.sellerPassportMasked}
+                    </div>
+                  </div>
+                )}
+              </form>
             </div>
           )}
         </div>
@@ -218,5 +325,31 @@ function Check({ label, done, onClick }: { label: string; done: boolean; onClick
       <span className={`grid h-5.5 w-5.5 flex-shrink-0 place-items-center rounded-[7px] border-2 text-xs ${done ? 'border-lime bg-lime text-lime-ink' : 'border-[#3A342E]'}`} style={{ height: 22, width: 22 }}>{done ? '✓' : ''}</span>
       <span className={`text-[13px] ${done ? 'text-[#6E645C] line-through' : 'text-[#D8CFC6]'}`}>{label}</span>
     </button>
+  );
+}
+function Field({
+  label,
+  value,
+  onChange,
+  inputMode,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  inputMode?: HTMLAttributes<HTMLInputElement>['inputMode'];
+  required?: boolean;
+}) {
+  return (
+    <label className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
+      <span className="text-[12px] font-semibold text-[#8A7F76]">{label}</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        required={required}
+        className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
+      />
+    </label>
   );
 }
