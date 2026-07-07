@@ -1,19 +1,33 @@
 'use client';
 
 import { useState } from 'react';
+import { uploadEvidenceImages } from '@/lib/api';
 import { openWarranty } from '@/lib/warranty';
+import { EvidencePicker } from './EvidencePicker';
 
 /** Per-device warranty request on the customer order detail. */
 export function WarrantyRequest({ imei, customerId }: { imei: string; customerId: string }) {
   const [open, setOpen] = useState(false);
   const [problem, setProblem] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [evidenceCount, setEvidenceCount] = useState(0);
 
   async function submit() {
     if (!problem.trim()) return;
     setState('sending');
     try {
-      await openWarranty({ imei, customerId, problem: problem.trim() });
+      const warranty = await openWarranty({ imei, customerId, problem: problem.trim() });
+      const evidence = files.length
+        ? await uploadEvidenceImages({
+            files,
+            entityType: 'warranty',
+            entityId: warranty.id,
+            label: 'defect_photo',
+            actor: customerId,
+          })
+        : [];
+      setEvidenceCount(evidence.length);
       setState('done');
     } catch {
       setState('idle');
@@ -21,7 +35,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
   }
 
   if (state === 'done') {
-    return <span className="font-mono text-[11px] text-lime">✓ Гарантийное обращение принято</span>;
+    return <span className="font-mono text-[11px] text-lime">✓ Гарантийное обращение принято · фото {evidenceCount}</span>;
   }
 
   if (!open) {
@@ -37,7 +51,8 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
   }
 
   return (
-    <div className="flex w-full items-center gap-2">
+    <div className="w-full">
+      <div className="flex w-full items-center gap-2">
       <input
         type="text"
         value={problem}
@@ -54,6 +69,10 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
       >
         {state === 'sending' ? '…' : 'Отправить'}
       </button>
+      </div>
+      <div className="mt-2">
+        <EvidencePicker files={files} onChange={setFiles} label="Фото дефекта" hint="Экран, корпус, IMEI/SN или ошибка" max={3} />
+      </div>
     </div>
   );
 }

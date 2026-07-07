@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { fetchMyOrders, openReturnRequest, type MyOrder, type ReturnRequest } from '@/lib/api';
+import { fetchMyOrders, openReturnRequest, uploadEvidenceImages, type MyOrder, type ReturnRequest } from '@/lib/api';
 import { som } from '@/lib/format';
 
 const reasons = ['Не подошёл / передумал', 'Брак / не работает', 'Не соответствует описанию', 'Пришёл не тот товар'];
@@ -18,8 +19,9 @@ export default function ReturnsPage() {
   const [orderId, setOrderId] = useState('');
   const [reason, setReason] = useState('');
   const [photoNote, setPhotoNote] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<ReturnRequest | null>(null);
+  const [done, setDone] = useState<{ ret: ReturnRequest; evidenceCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account/returns'); }, [hydrated, user, router]);
@@ -45,9 +47,18 @@ export default function ReturnsPage() {
         reason: photoNote.trim() ? `${reason}; фото/комментарий: ${photoNote.trim()}` : reason,
         requester: user?.customerId ?? 'customer_app',
       });
-      setDone(ret);
+      const evidence = files.length
+        ? await uploadEvidenceImages({
+            files,
+            entityType: 'return',
+            entityId: ret.id,
+            label: 'return_photo',
+            actor: user?.customerId ?? 'customer_app',
+          })
+        : [];
+      setDone({ ret, evidenceCount: evidence.length });
     } catch {
-      setError('Не удалось отправить заявку. Проверьте заказ и попробуйте ещё раз.');
+      setError('Не удалось отправить заявку или загрузить фото. Проверьте заказ и попробуйте ещё раз.');
     } finally {
       setBusy(false);
     }
@@ -59,11 +70,12 @@ export default function ReturnsPage() {
 
   if (done) {
     return (
-      <MobileAppFrame title="Возврат товара" subtitle={`Заявка ${done.id.slice(-8)} принята.`} backHref="/account">
+      <MobileAppFrame title="Возврат товара" subtitle={`Заявка ${done.ret.id.slice(-8)} принята.`} backHref="/account">
         <div className="py-7 text-center">
           <div className="mx-auto grid h-18 w-18 place-items-center rounded-full bg-lime/15 text-4xl" style={{ height: 72, width: 72 }}>✓</div>
           <div className="mt-4 font-display text-lg font-bold">Заявка отправлена</div>
           <div className="mt-2 text-[13px] leading-relaxed text-[#A79C92]">Рассмотрим за 24 часа. Статус придёт в уведомления и Support Inbox.</div>
+          <div className="mt-2 font-mono text-[12px] text-lime">Evidence Vault: {done.evidenceCount} фото</div>
         </div>
         <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
           <Step active label="Заявка принята" />
@@ -112,7 +124,10 @@ export default function ReturnsPage() {
               <span className="text-[13px] text-[#D8CFC6]">{r}</span>
             </button>
           ))}
-          <textarea value={photoNote} onChange={(e) => setPhotoNote(e.target.value)} placeholder="Комментарий, фото, IMEI или детали проблемы" className="mt-1 min-h-[86px] w-full rounded-[12px] border border-dashed border-[#3A342E] bg-[#221E19] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
+          <textarea value={photoNote} onChange={(e) => setPhotoNote(e.target.value)} placeholder="Комментарий, IMEI или детали проблемы" className="mt-1 min-h-[86px] w-full rounded-[12px] border border-[#3A342E] bg-[#221E19] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
+          <div className="mt-2">
+            <EvidencePicker files={files} onChange={setFiles} label="Фото товара/чека" hint="Фото дефекта, комплекта, упаковки или чека" />
+          </div>
           {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
           <button type="button" disabled={busy || !reason || !orderId} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Отправляем…' : 'Отправить заявку'}</button>
         </>

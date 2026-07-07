@@ -11,3 +11,4 @@ export * from './api/approvals';
 export * from './api/tradeins';
 export * from './api/support';
 export * from './api/returns';
+export * from './api/evidence';

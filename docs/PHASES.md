@@ -76,7 +76,8 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 ## Phase 5 — Склад / Fulfillment ✅
 - ✅ `/warehouse` консоль; `POST /orders/:id/fulfill` (назначение IMEI web-заказам,
   нормализация qty>1), движение статусов, очередь `GET /orders?status=`.
-- ☐ Осталось: приёмка партий UI, инвентаризация со сканером, Evidence Vault (фото).
+- ✅ Evidence Vault: фото к перемещениям/инвентаризации → WebP storage + `evidence.attached`.
+- ☐ Осталось: приёмка партий UI, инвентаризация со сканером.
 **Проверка:** ✅ in-browser fulfill web-заказа → reserved+IMEI; сверка в БД.
 
 ## Phase 6 — Approval-цикл + Возвраты + Обмены ✅
@@ -240,13 +241,14 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
   присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
   `tradein.contracted` в Event Ledger. PDF-договор уже доступен через `documents/`.
-  Клиентский экран оценки `/trade-in` ✅; остаток для полного MVP-UX: evidence-фото/приёмка.
+  Клиентский экран оценки `/trade-in` ✅; evidence-фото → `evidence.attached` ✅.
+  Остаток для полного MVP-UX: приёмка в точке.
 - Прототип-экраны (Клиент App 2.0): все ✅ (витрина/кабинет/устройства/избранное/**сравнение**/
   **гарантийный талон**/**статус-заказа timeline**/**поиск**/**возвраты**/**support**/**trade-in**/
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 53 (167 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 55 (173 теста зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

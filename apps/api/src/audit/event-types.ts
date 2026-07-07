@@ -69,6 +69,7 @@ export const EventType = {
   DebtSettled: 'debt.settled',
   TradeInAssessed: 'tradein.assessed',
   TradeInContracted: 'tradein.contracted',
+  EvidenceAttached: 'evidence.attached',
   ConsentChanged: 'customer.consent_changed',
   CampaignSent: 'campaign.sent',
   CampaignConverted: 'campaign.converted',

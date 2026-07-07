@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { createCustomer, createTradeIn, type TradeIn, type TradeInGrade } from '@/lib/api';
+import { createCustomer, createTradeIn, uploadEvidenceImages, type TradeIn, type TradeInGrade } from '@/lib/api';
 import { som } from '@/lib/format';
 
 const grades: { id: TradeInGrade; label: string; desc: string; factor: number }[] = [
@@ -33,8 +34,9 @@ export default function TradeInPage() {
   const [name, setName] = useState('');
   const [passport, setPassport] = useState('');
   const [note, setNote] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<TradeIn | null>(null);
+  const [done, setDone] = useState<{ tradeIn: TradeIn; evidenceCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
@@ -57,9 +59,18 @@ export default function TradeInPage() {
         sellerPassport: passport.trim(),
         actor: 'customer_app',
       });
-      setDone(tradeIn);
+      const evidence = files.length
+        ? await uploadEvidenceImages({
+            files,
+            entityType: 'tradein',
+            entityId: tradeIn.id,
+            label: 'device_photo',
+            actor: 'customer_app',
+          })
+        : [];
+      setDone({ tradeIn, evidenceCount: evidence.length });
     } catch {
-      setError('Не удалось оформить trade-in. Проверьте телефон и документ.');
+      setError('Не удалось оформить trade-in или загрузить фото. Проверьте данные и попробуйте ещё раз.');
     } finally {
       setBusy(false);
     }
@@ -70,9 +81,10 @@ export default function TradeInPage() {
       <MobileAppFrame title="Trade-in оценка" subtitle="Заявка создана, договор доступен сотруднику." active="home" backHref="/account">
         <div className="rounded-[18px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-5 text-center">
           <div className="text-[13px] text-[#A79C92]">Предварительная оценка</div>
-          <div className="mt-2 font-display text-[34px] font-extrabold leading-none text-lime">{som(done.price)}</div>
-          <div className="mt-2 font-mono text-[12px] text-[#8A7F76]">{done.contractId}</div>
-          <div className="mt-2 text-[12px] leading-relaxed text-[#8A7F76]">Паспорт сохранён в защищённом виде: {done.sellerPassportMasked}</div>
+          <div className="mt-2 font-display text-[34px] font-extrabold leading-none text-lime">{som(done.tradeIn.price)}</div>
+          <div className="mt-2 font-mono text-[12px] text-[#8A7F76]">{done.tradeIn.contractId}</div>
+          <div className="mt-2 text-[12px] leading-relaxed text-[#8A7F76]">Паспорт сохранён в защищённом виде: {done.tradeIn.sellerPassportMasked}</div>
+          <div className="mt-2 text-[12px] text-lime">Evidence Vault: {done.evidenceCount} фото</div>
         </div>
         <Link href="/" className="mt-4 block rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">Выбрать новое устройство</Link>
         <button type="button" onClick={() => setDone(null)} className="mt-3 w-full text-center text-[13px] text-[#A79C92]">Оценить другое</button>
@@ -103,6 +115,10 @@ export default function TradeInPage() {
       ))}
 
       <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Память, батарея, комплект, дефекты" className="mt-1 min-h-[76px] w-full rounded-[12px] border border-dashed border-[#3A342E] bg-[#221E19] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
+
+      <div className="mt-3">
+        <EvidencePicker files={files} onChange={setFiles} label="Фото устройства" hint="4 ракурса: экран, корпус, IMEI/серийник, комплект" />
+      </div>
 
       {!user && (
         <div className="mt-3 grid grid-cols-1 gap-2">

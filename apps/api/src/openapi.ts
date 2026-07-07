@@ -17,6 +17,7 @@ export function setupOpenApi(app: INestApplication): void {
     .addTag('orders', 'Order lifecycle, reservation, and state transitions')
     .addTag('payments', 'Payments, payment ledger, and txnId idempotency')
     .addTag('tradeins', 'Used-device buyback assessment, contracts, and audit events')
+    .addTag('evidence', 'Evidence Vault image uploads linked to Event Ledger')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {

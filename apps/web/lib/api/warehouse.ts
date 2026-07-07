@@ -17,6 +17,7 @@ export interface CountResult {
   expected: number;
   counted: number;
   diff: number;
+  movementId: string;
 }
 
 export function inventoryCount(productId: string, location: string, counted: number): Promise<CountResult> {

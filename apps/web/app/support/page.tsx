@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { createCustomer, fetchSupportTickets, openSupportTicket, type SupportTicket } from '@/lib/api';
+import { createCustomer, fetchSupportTickets, openSupportTicket, uploadEvidenceImages, type SupportTicket } from '@/lib/api';
 
 const faq = ['Как отследить заказ?', 'Условия возврата и обмена', 'Как работает рассрочка?', 'Гарантия на Б/У технику'];
 const channels = [
@@ -19,8 +20,9 @@ export default function SupportPage() {
   const [body, setBody] = useState('');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [done, setDone] = useState<SupportTicket | null>(null);
+  const [done, setDone] = useState<{ ticket: SupportTicket; evidenceCount: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,10 +46,20 @@ export default function SupportPage() {
         priority: subject.toLowerCase().includes('возврат') || subject.toLowerCase().includes('гарант') ? 'high' : 'normal',
         actor: 'customer_app',
       });
-      setDone(ticket);
+      const evidence = files.length
+        ? await uploadEvidenceImages({
+            files,
+            entityType: 'support',
+            entityId: ticket.id,
+            label: 'support_attachment',
+            actor: customerId,
+          })
+        : [];
+      setDone({ ticket, evidenceCount: evidence.length });
       setBody('');
+      setFiles([]);
     } catch {
-      setError('Не удалось создать обращение. Проверьте телефон и текст обращения.');
+      setError('Не удалось создать обращение или загрузить фото. Проверьте телефон и текст обращения.');
     } finally {
       setBusy(false);
     }
@@ -82,7 +94,10 @@ export default function SupportPage() {
         )}
         <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Тема" className="mb-2 w-full rounded-[12px] border border-[#2E2822] bg-[#16130F] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
         <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Опишите ситуацию: заказ, IMEI, что произошло" className="min-h-[96px] w-full rounded-[12px] border border-[#2E2822] bg-[#16130F] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
-        {done && <p className="mt-2 font-mono text-[12px] text-lime">✓ Тикет #{done.id.slice(-8)} создан, SLA: {new Date(done.sla).toLocaleString('ru-RU')}</p>}
+        <div className="mt-2">
+          <EvidencePicker files={files} onChange={setFiles} label="Фото к обращению" hint="Чек, дефект, скрин ошибки" max={4} />
+        </div>
+        {done && <p className="mt-2 font-mono text-[12px] text-lime">✓ Тикет #{done.ticket.id.slice(-8)} создан · фото {done.evidenceCount} · SLA: {new Date(done.ticket.sla).toLocaleString('ru-RU')}</p>}
         {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
         <button type="button" disabled={busy || !subject.trim() || !body.trim() || (!user && phone.trim().length < 9)} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Создаём…' : 'Создать обращение'}</button>
       </div>

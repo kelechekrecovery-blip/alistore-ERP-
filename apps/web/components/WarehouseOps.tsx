@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchCatalog, inventoryCount, transferUnit, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, inventoryCount, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
+import { EvidencePicker } from './EvidencePicker';
 
 /** Transfer + inventory-count operations for the warehouse console. */
 export function WarehouseOps() {
@@ -11,6 +12,8 @@ export function WarehouseOps() {
   const [productId, setProductId] = useState('');
   const [location, setLocation] = useState('BISHKEK-1');
   const [counted, setCounted] = useState('');
+  const [transferFiles, setTransferFiles] = useState<File[]>([]);
+  const [countFiles, setCountFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -31,8 +34,18 @@ export function WarehouseOps() {
     setBusy('transfer');
     try {
       const r = await transferUnit(imei.trim(), dest.trim());
-      flash(`✓ ${r.imei}: ${r.from} → ${r.to}`);
+      const evidence = transferFiles.length
+        ? await uploadEvidenceImages({
+            files: transferFiles,
+            entityType: 'inventory',
+            entityId: r.movementId,
+            label: 'transfer_photo',
+            actor: 'warehouse',
+          })
+        : [];
+      flash(`✓ ${r.imei}: ${r.from} → ${r.to} · фото ${evidence.length}`);
       setImei('');
+      setTransferFiles([]);
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка перемещения');
     } finally {
@@ -45,8 +58,18 @@ export function WarehouseOps() {
     setBusy('count');
     try {
       const r = await inventoryCount(productId, location.trim(), Number(counted));
-      flash(`✓ Учтено ${r.counted}, было ${r.expected}, расхождение ${r.diff}`);
+      const evidence = countFiles.length
+        ? await uploadEvidenceImages({
+            files: countFiles,
+            entityType: 'inventory',
+            entityId: r.movementId,
+            label: 'count_photo',
+            actor: 'warehouse',
+          })
+        : [];
+      flash(`✓ Учтено ${r.counted}, было ${r.expected}, расхождение ${r.diff} · фото ${evidence.length}`);
       setCounted('');
+      setCountFiles([]);
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка учёта');
     } finally {
@@ -67,6 +90,7 @@ export function WarehouseOps() {
               <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="куда (склад)" className="flex-1 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
               <button type="button" disabled={busy === 'transfer'} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-[#2E2822]">Переместить</button>
             </div>
+            <EvidencePicker files={transferFiles} onChange={setTransferFiles} label="Фото перемещения" hint="Коробка, IMEI или полка" max={3} />
           </div>
         </div>
         {/* count */}
@@ -81,6 +105,7 @@ export function WarehouseOps() {
               <input value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
               <button type="button" disabled={busy === 'count'} onClick={doCount} className="flex-1 rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-[#2E2822]">Записать</button>
             </div>
+            <EvidencePicker files={countFiles} onChange={setCountFiles} label="Фото полки" hint="Общий вид и спорные позиции" max={4} />
           </div>
         </div>
       </div>
