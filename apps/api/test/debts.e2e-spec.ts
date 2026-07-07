@@ -5,6 +5,8 @@ import { ApprovalsService } from '../src/approvals/approvals.service';
 import { DebtsService, DEBT_LIMIT } from '../src/debts/debts.service';
 import { ReportsService } from '../src/reports/reports.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
+import { OutboxService } from '../src/outbox/outbox.service';
+import { LogNotificationTransport } from '../src/outbox/transports/log.transport';
 
 /**
  * Debt / installment sales (Phase 9): book a sale on credit, gate debts over the
@@ -23,7 +25,8 @@ describe('Debts (integration)', () => {
     await prisma.$connect();
     const audit = new AuditService(prisma);
     approvals = new ApprovalsService(prisma, audit);
-    debts = new DebtsService(prisma, audit, approvals);
+    const outbox = new OutboxService(prisma, new LogNotificationTransport());
+    debts = new DebtsService(prisma, audit, approvals, outbox);
     reports = new ReportsService(prisma);
   });
 
@@ -32,6 +35,7 @@ describe('Debts (integration)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.outboxMessage.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.debtPlan.deleteMany();
     await prisma.payment.deleteMany();
@@ -136,5 +140,67 @@ describe('Debts (integration)', () => {
     });
     const r = await reports.risks();
     expect(r.signals.map((s) => s.kind)).toContain('debt_overdue');
+  });
+
+  it('queues due-soon and overdue reminders through outbox idempotently', async () => {
+    const now = new Date('2026-07-07T08:00:00.000Z');
+    const dueSoon = await order();
+    const overdue = await order();
+    const future = await order();
+    const settled = await order();
+
+    await prisma.debtPlan.createMany({
+      data: [
+        {
+          orderId: dueSoon.orderId,
+          customerId: dueSoon.customer.id,
+          principal: 10000,
+          balance: 7000,
+          installments: 1,
+          dueDate: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000),
+          status: 'open',
+        },
+        {
+          orderId: overdue.orderId,
+          customerId: overdue.customer.id,
+          principal: 15000,
+          balance: 15000,
+          installments: 1,
+          dueDate: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          status: 'open',
+        },
+        {
+          orderId: future.orderId,
+          customerId: future.customer.id,
+          principal: 20000,
+          balance: 20000,
+          installments: 1,
+          dueDate: new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000),
+          status: 'open',
+        },
+        {
+          orderId: settled.orderId,
+          customerId: settled.customer.id,
+          principal: 30000,
+          balance: 0,
+          installments: 1,
+          dueDate: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          status: 'settled',
+        },
+      ],
+    });
+
+    expect(await debts.enqueueReminders({ now, dueSoonDays: 3 })).toEqual({ considered: 2, queued: 2 });
+    expect(await debts.enqueueReminders({ now, dueSoonDays: 3 })).toEqual({ considered: 2, queued: 0 });
+
+    const outbox = await prisma.outboxMessage.findMany({ orderBy: { createdAt: 'asc' } });
+    expect(outbox.map((message) => message.template).sort()).toEqual(['debt_due_soon', 'debt_overdue']);
+    expect(outbox.every((message) => message.channel === 'sms' && message.status === 'pending')).toBe(true);
+
+    const events = await prisma.auditEvent.findMany({ where: { type: 'debt.reminder_queued' } });
+    expect(events).toHaveLength(2);
+    expect(events.flatMap((event) => event.refs)).toEqual(
+      expect.arrayContaining(['debt_due_soon', 'debt_overdue']),
+    );
   });
 });

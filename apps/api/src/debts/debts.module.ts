@@ -4,10 +4,12 @@ import { DebtsController } from './debts.controller';
 import { ApprovalsModule } from '../approvals/approvals.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
+import { OutboxModule } from '../outbox/outbox.module';
+import { DebtsReminderScheduler } from './debts.scheduler';
 
 @Module({
-  imports: [ApprovalsModule, StaffAuthModule, AuthzModule],
-  providers: [DebtsService],
+  imports: [ApprovalsModule, StaffAuthModule, AuthzModule, OutboxModule],
+  providers: [DebtsService, DebtsReminderScheduler],
   controllers: [DebtsController],
   exports: [DebtsService],
 })

@@ -218,6 +218,15 @@
 
 ## 2026-07-07
 
+- Task: add debt reminder notifications.
+- Files changed: `apps/api/src/debts/*`, `apps/api/src/audit/event-types.ts`, `apps/api/src/outbox/outbox.relay.ts`, `apps/api/src/reservations/reservations.scheduler.ts`, `apps/api/test/debts.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `PROGRESS.md`.
+- Result: open debts due within three days or already overdue can now enqueue idempotent SMS reminders through the transactional outbox, with matching `debt.reminder_queued` ledger events; a pg-boss scheduler can run the sweep daily when `DEBT_REMINDERS_ENABLED=true`. Queue owners now lazy-load `pg-boss`, so disabled schedulers no longer break Jest module imports.
+- Checks run: targeted Jest for `debts`, `debt-rbac`, and `reservation-expiry`; `npm run api:build`; `git diff --check`.
+- Outcome: targeted Jest passed 3 suites / 11 tests; API build passed; due-soon and overdue reminders produce pending outbox rows and are idempotent on repeat sweep.
+- Next step: add shift close photo report.
+
+## 2026-07-07
+
 - Task: build Refund Money Flow / Dispute Center staff UI.
 - Files changed: `apps/web/app/approvals/page.tsx`, `apps/web/lib/api/payments.ts`, `apps/web/app/layout.tsx`, `apps/web/app/icon.svg`, `BACKLOG.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: Approval Inbox now has a staff refund request form that posts `paymentId`, amount, and reason to the existing approval-gated `POST /payments/:id/refund` endpoint; successful requests reset the form, switch to the requested queue, and show the refund approval row. The app also serves an SVG favicon so browser QA does not report the old `/favicon.ico` 404.

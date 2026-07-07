@@ -67,6 +67,7 @@ export const EventType = {
   DebtCreated: 'debt.created',
   DebtPaid: 'debt.payment',
   DebtSettled: 'debt.settled',
+  DebtReminderQueued: 'debt.reminder_queued',
   TradeInAssessed: 'tradein.assessed',
   TradeInContracted: 'tradein.contracted',
   EvidenceAttached: 'evidence.attached',

@@ -4,6 +4,7 @@ import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { insertDebt } from './debt-insert';
 import { CreateDebtDto, DebtPaymentDto } from './debts.dto';
 
@@ -11,6 +12,10 @@ import { CreateDebtDto, DebtPaymentDto } from './debts.dto';
 export const DEBT_LIMIT = 50_000;
 const DEFAULT_TERM_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_REMINDER_DAYS = 3;
+const DEFAULT_REMINDER_LIMIT = 100;
+
+type DebtReminderKind = 'debt_due_soon' | 'debt_overdue';
 
 /**
  * Sale on credit / installments. A debt within the limit is booked directly; a debt
@@ -23,6 +28,7 @@ export class DebtsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly approvals: ApprovalsService,
+    private readonly outbox: OutboxService,
   ) {}
 
   get(id: string) {
@@ -113,6 +119,81 @@ export class DebtsService {
         });
       }
       return { result: { debt: updated, paymentId: payment.id, settled }, events };
+    });
+  }
+
+  /**
+   * Queue debt reminders through the transactional outbox. Idempotent per
+   * debt+kind, so the sweep can run repeatedly; a due-soon reminder does not
+   * block a later overdue reminder after the due date passes.
+   */
+  async enqueueReminders(options?: { now?: Date; dueSoonDays?: number; limit?: number }, actor = 'system') {
+    const now = options?.now ?? new Date();
+    const dueSoonDays = options?.dueSoonDays ?? DEFAULT_REMINDER_DAYS;
+    const limit = options?.limit ?? DEFAULT_REMINDER_LIMIT;
+    const dueSoonUntil = new Date(now.getTime() + dueSoonDays * DAY_MS);
+
+    return this.audit.transaction(async (tx) => {
+      const debts = await tx.debtPlan.findMany({
+        where: {
+          status: 'open',
+          dueDate: { lte: dueSoonUntil },
+        },
+        orderBy: { dueDate: 'asc' },
+        take: limit,
+      });
+      const customers = await tx.customer.findMany({
+        where: { id: { in: [...new Set(debts.map((d) => d.customerId))] } },
+      });
+      const customerById = new Map(customers.map((customer) => [customer.id, customer]));
+      const events: AuditInput[] = [];
+      let queued = 0;
+
+      for (const debt of debts) {
+        const kind: DebtReminderKind = debt.dueDate.getTime() <= now.getTime() ? 'debt_overdue' : 'debt_due_soon';
+        const alreadyQueued = await tx.auditEvent.findFirst({
+          where: {
+            type: EventType.DebtReminderQueued,
+            refs: { hasEvery: [debt.id, kind] },
+          },
+        });
+        if (alreadyQueued) continue;
+
+        const customer = customerById.get(debt.customerId);
+        if (!customer?.phone) continue;
+
+        const daysUntilDue = Math.ceil((debt.dueDate.getTime() - now.getTime()) / DAY_MS);
+        await this.outbox.enqueueOnTx(tx, {
+          channel: 'sms',
+          recipient: customer.phone,
+          template: kind,
+          payload: {
+            debtId: debt.id,
+            orderId: debt.orderId,
+            customerId: debt.customerId,
+            balance: debt.balance,
+            dueDate: debt.dueDate.toISOString(),
+            daysUntilDue,
+          },
+        });
+        events.push({
+          type: EventType.DebtReminderQueued,
+          actor,
+          payload: {
+            debtId: debt.id,
+            orderId: debt.orderId,
+            customerId: debt.customerId,
+            kind,
+            balance: debt.balance,
+            dueDate: debt.dueDate.toISOString(),
+            daysUntilDue,
+          },
+          refs: [debt.id, debt.orderId, debt.customerId, kind],
+        });
+        queued += 1;
+      }
+
+      return { result: { considered: debts.length, queued }, events };
     });
   }
 }

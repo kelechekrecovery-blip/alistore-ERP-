@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PgBoss } from 'pg-boss';
+import type { PgBoss as PgBossClient } from 'pg-boss';
 import { OutboxService } from './outbox.service';
 
 const QUEUE = 'outbox-relay';
@@ -20,7 +20,7 @@ const EVERY_MINUTE = '* * * * *';
 @Injectable()
 export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OutboxRelay.name);
-  private boss?: PgBoss;
+  private boss?: PgBossClient;
 
   constructor(
     private readonly config: ConfigService,
@@ -41,6 +41,7 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
+      const { PgBoss } = await import('pg-boss');
       this.boss = new PgBoss(connectionString);
       this.boss.on('error', (err) =>
         this.logger.error('pg-boss error', err as Error),
