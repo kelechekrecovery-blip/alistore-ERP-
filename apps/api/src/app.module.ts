@@ -35,6 +35,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { LocalizationModule } from './localization/localization.module';
 import { StaffAuthModule } from './staff-auth/staff-auth.module';
 import { TradeInsModule } from './tradeins/tradeins.module';
+import { AiModule } from './ai/ai.module';
 import { EvidenceModule } from './evidence/evidence.module';
 
 @Module({
@@ -76,6 +77,7 @@ import { EvidenceModule } from './evidence/evidence.module';
     StaffAuthModule,
     TradeInsModule,
     EvidenceModule,
+    AiModule,
   ],
 })
 export class AppModule {}

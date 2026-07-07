@@ -46,6 +46,14 @@ export const fetchKpi = () => get<Kpi>('/reports/kpi');
 /** Daily revenue buckets for the last N days (dashboard period filter). */
 export const fetchRevenue = (days: number) =>
   get<{ day: string; amount: number }[]>(`/reports/revenue?days=${days}`);
+
+export interface Insight {
+  tone: 'positive' | 'warning' | 'info';
+  title: string;
+  detail: string;
+}
+/** Owner AI assistant — ledger-derived insights (keyless rules; LLM when a key is set). */
+export const fetchInsights = () => get<{ source: string; insights: Insight[] }>('/ai/insights');
 export const fetchRisks = () => get<{ count: number; signals: RiskSignal[] }>('/reports/risks');
 export const fetchLedger = () => get<LedgerEvent[]>('/reports/ledger');
 /** Ledger events referencing a specific id (e.g. an orderId) — powers order tracking. */
