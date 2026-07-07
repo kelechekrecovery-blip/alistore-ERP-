@@ -227,15 +227,19 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 - Phase 0–6 ✅ (ядро/деньги/витрина/аккаунт/POS/склад/approval-цикл+возвраты+обмены).
 - Phase 7 🟡→по существу закрыто: опасные действия через approval (цена/write_off/adjust/
   delete/**долг**/**скидка>10% в POS backend+UI**). Остаток — staff-JWT-роли+guards/PII/2FA = **лана Codex** (`authz/` casbin).
-- Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **Command Center** ✅.
+- Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
+- Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
+  **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
 - Phase 9 🟡: WarrantyCase, мультисклад (перемещения+инвентаризация+UI), **Supplier RMA+scorecard**,
   **долги/рассрочка**. Остаток — долг-напоминания (Codex-уведомления), KPI/зарплаты, Evidence Vault.
 - Phase 10 🟡: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**.
   Остаток — Novu-доставка/Segment/Campaign = **лана Codex**.
 - Прототип-экраны (Клиент App 2.0): все ✅ (витрина/кабинет/устройства/избранное/**сравнение**/
   **гарантийный талон**/**статус-заказа timeline**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
+- Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 44 (145 тестов зелёные, `jest --runInBand`).
+Backend-модулей ~30 · тест-сьютов 48 (158 тестов зелёные, `jest --runInBand`; при
+конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
 - **Лана Codex** (не трогаю): authz/casbin/JWT-роли/PII/2FA, outbox/Novu-доставка,
