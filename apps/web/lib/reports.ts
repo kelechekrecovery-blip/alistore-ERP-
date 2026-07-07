@@ -43,6 +43,9 @@ export interface Kpi {
 
 export const fetchDashboard = () => get<Dashboard>('/reports/dashboard');
 export const fetchKpi = () => get<Kpi>('/reports/kpi');
+/** Daily revenue buckets for the last N days (dashboard period filter). */
+export const fetchRevenue = (days: number) =>
+  get<{ day: string; amount: number }[]>(`/reports/revenue?days=${days}`);
 export const fetchRisks = () => get<{ count: number; signals: RiskSignal[] }>('/reports/risks');
 export const fetchLedger = () => get<LedgerEvent[]>('/reports/ledger');
 /** Ledger events referencing a specific id (e.g. an orderId) — powers order tracking. */

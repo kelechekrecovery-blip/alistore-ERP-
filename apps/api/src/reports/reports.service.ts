@@ -3,6 +3,7 @@ import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildRiskSignals } from './risk-signals';
 import { buildKpi } from './kpi';
+import { buildRevenueBuckets, revenueWindowStartMs } from './revenue-buckets';
 
 /** COD older than this without handover is a risk (Risk Center). */
 export const COD_STALE_MS = 24 * 60 * 60 * 1000;
@@ -17,13 +18,11 @@ export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Sales per day for the last 7 days (revenue chart). UTC-consistent bucketing. */
-  private async revenue7d(): Promise<{ day: string; amount: number }[]> {
-    const days = 7;
-    const dayMs = 24 * 60 * 60 * 1000;
+  /** Daily revenue buckets for the last N days (UTC-consistent). Powers the dashboard chart. */
+  async revenue(days = 7): Promise<{ day: string; amount: number }[]> {
+    const span = Math.min(90, Math.max(1, Math.round(days))); // clamp 1..90
     const now = new Date();
-    // start-of-today in UTC, then go back (days-1) so the window ends on today (inclusive)
-    const startMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (days - 1) * dayMs;
-
+    const startMs = revenueWindowStartMs(span, now);
     const payments = await this.prisma.payment.findMany({
       where: {
         amount: { gt: 0 },
@@ -32,17 +31,7 @@ export class ReportsService {
       },
       select: { amount: true, createdAt: true },
     });
-
-    const buckets: { day: string; amount: number }[] = [];
-    for (let i = 0; i < days; i += 1) {
-      buckets.push({ day: new Date(startMs + i * dayMs).toISOString().slice(0, 10), amount: 0 });
-    }
-    for (const p of payments) {
-      const key = p.createdAt.toISOString().slice(0, 10);
-      const b = buckets.find((x) => x.day === key);
-      if (b) b.amount += p.amount;
-    }
-    return buckets;
+    return buildRevenueBuckets(payments, span, now);
   }
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
@@ -64,7 +53,7 @@ export class ReportsService {
         this.prisma.order.count(),
         this.prisma.cashShift.count({ where: { closedAt: null } }),
         this.prisma.approval.count({ where: { status: 'requested' } }),
-        this.revenue7d(),
+        this.revenue(7),
       ]);
 
     const salesGross = sales._sum.amount ?? 0;

@@ -7,6 +7,7 @@ import {
   fetchDashboard,
   fetchKpi,
   fetchLedger,
+  fetchRevenue,
   fetchRisks,
   type Dashboard,
   type Kpi,
@@ -63,6 +64,8 @@ export default function ErpPage() {
   const [kpi, setKpi] = useState<Kpi | null>(null);
   const [risks, setRisks] = useState<RiskSignal[]>([]);
   const [ledger, setLedger] = useState<LedgerEvent[]>([]);
+  const [period, setPeriod] = useState(7);
+  const [revenue, setRevenue] = useState<{ day: string; amount: number }[]>([]);
 
   useEffect(() => {
     fetchDashboard().then(setD).catch(() => setD(null));
@@ -70,6 +73,10 @@ export default function ErpPage() {
     fetchRisks().then((r) => setRisks(r.signals)).catch(() => setRisks([]));
     fetchLedger().then(setLedger).catch(() => setLedger([]));
   }, []);
+
+  useEffect(() => {
+    fetchRevenue(period).then(setRevenue).catch(() => setRevenue([]));
+  }, [period]);
 
   /** Command Center: jump from a risk signal to the screen that resolves it. */
   function actOnSignal(kind: string) {
@@ -131,7 +138,9 @@ export default function ErpPage() {
         </div>
 
         <div className="p-7">
-          {route === 'dash' && <DashboardView d={d} risks={risks} onSignal={actOnSignal} />}
+          {route === 'dash' && (
+            <DashboardView d={d} risks={risks} revenue={revenue} period={period} onPeriod={setPeriod} onSignal={actOnSignal} />
+          )}
           {route === 'finance' && <FinanceView d={d} />}
           {route === 'kpi' && <KpiView kpi={kpi} />}
           {route === 'stock' && <StockView d={d} />}
@@ -157,8 +166,19 @@ function Kpi({ label, value, color = '#fff' }: { label: string; value: string; c
   );
 }
 
-function DashboardView({ d, risks, onSignal }: { d: Dashboard | null; risks: RiskSignal[]; onSignal: (kind: string) => void }) {
-  const max = Math.max(1, ...(d?.revenue7d ?? []).map((r) => r.amount));
+function DashboardView({
+  d, risks, revenue, period, onPeriod, onSignal,
+}: {
+  d: Dashboard | null;
+  risks: RiskSignal[];
+  revenue: { day: string; amount: number }[];
+  period: number;
+  onPeriod: (days: number) => void;
+  onSignal: (kind: string) => void;
+}) {
+  const data = revenue.length ? revenue : (d?.revenue7d ?? []);
+  const max = Math.max(1, ...data.map((r) => r.amount));
+  const total = data.reduce((s, b) => s + b.amount, 0);
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
@@ -169,17 +189,35 @@ function DashboardView({ d, risks, onSignal }: { d: Dashboard | null; risks: Ris
       </div>
       <div className="grid gap-3.5 lg:grid-cols-[2fr_1fr]">
         <Card>
-          <div className="mb-4 font-display text-[15px] font-bold">Выручка · 7 дней</div>
-          <div className="flex h-40 items-end gap-2.5">
-            {(d?.revenue7d ?? []).map((b) => (
+          <div className="mb-4 flex items-center gap-3">
+            <span className="font-display text-[15px] font-bold">Выручка · {som(total)}</span>
+            <div className="ml-auto flex gap-1">
+              {[7, 30].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onPeriod(p)}
+                  className={`rounded-chip px-2.5 py-1 text-[11px] font-semibold transition ${
+                    period === p ? 'bg-lime text-lime-ink' : 'bg-[#221E19] text-[#A79C92] hover:text-white'
+                  }`}
+                >
+                  {p} дн
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex h-40 items-end gap-1">
+            {data.map((b, i) => (
               <div key={b.day} className="flex flex-1 flex-col items-center gap-1.5">
                 <div
-                  className="w-full rounded-t-md bg-gradient-to-b from-[#C6FF3D] to-[#8FD40F]"
-                  style={{ height: `${Math.max(4, (b.amount / max) * 150)}px` }}
-                  title={som(b.amount)}
+                  className="w-full rounded-t-sm bg-gradient-to-b from-[#C6FF3D] to-[#8FD40F]"
+                  style={{ height: `${Math.max(3, (b.amount / max) * 150)}px` }}
+                  title={`${b.day}: ${som(b.amount)}`}
                 />
-                <span className="text-[10px] text-[#8A7F76]">
-                  {new Date(b.day).toLocaleDateString('ru-RU', { weekday: 'short' })}
+                <span className="text-[9px] text-[#8A7F76]">
+                  {period <= 7
+                    ? new Date(b.day).toLocaleDateString('ru-RU', { weekday: 'short' })
+                    : i % 5 === 0 ? b.day.slice(8) : ''}
                 </span>
               </div>
             ))}

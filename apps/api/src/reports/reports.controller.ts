@@ -21,6 +21,14 @@ export class ReportsController {
     return this.reports.kpi();
   }
 
+  @ApiOperation({ summary: 'Daily revenue buckets for the last N days (default 7, max 90)' })
+  @ApiQuery({ name: 'days', required: false, example: 30 })
+  @ApiOkResponse({ description: 'One {day, amount} bucket per day, oldest first.' })
+  @Get('revenue')
+  revenue(@Query('days') days?: string) {
+    return this.reports.revenue(days ? Number(days) : 7);
+  }
+
   @ApiOperation({ summary: 'Risk Center — ranked risk signals' })
   @ApiOkResponse({ description: 'Discrepancies, outstanding COD, stale reservations, approvals.' })
   @Get('risks')
