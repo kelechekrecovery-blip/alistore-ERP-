@@ -7,7 +7,7 @@ import { ShiftsService } from '../src/shifts/shifts.service';
 import { CustomersService } from '../src/customers/customers.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
-import { ConflictError } from '../src/common/errors';
+import { ConflictError, ValidationError } from '../src/common/errors';
 
 /**
  * POS counter sale: one call opens a shift, assigns IMEI units, and drives the
@@ -106,6 +106,60 @@ describe('POS sale (integration)', () => {
     expect(types).toEqual(
       expect.arrayContaining(['shift.opened', 'order.created', 'order.reserved', 'payment.received', 'unit.sold', 'order.paid']),
     );
+  });
+
+  it('completes a split payment sale and records each tender separately', async () => {
+    const product = await seedProduct(1);
+
+    const result = expectCompleted(await pos.sale({
+      staffId: 'staff_pos_split',
+      point: 'BISHKEK-1',
+      payments: [
+        { method: 'cash', amount: 40000 },
+        { method: 'card', amount: 60000 },
+      ],
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    }));
+
+    expect(result.status).toBe('paid');
+    expect(result.total).toBe(100000);
+
+    const payments = await prisma.payment.findMany({
+      where: { orderId: result.orderId },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(payments).toHaveLength(2);
+    expect(payments.map((payment) => ({ method: payment.method, amount: payment.amount }))).toEqual([
+      { method: 'cash', amount: 40000 },
+      { method: 'card', amount: 60000 },
+    ]);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
+
+    const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
+    expect(types.filter((type) => type === 'payment.received')).toHaveLength(2);
+    expect(types.filter((type) => type === 'order.paid')).toHaveLength(1);
+  });
+
+  it('rejects split payments when tender amounts do not equal the sale total', async () => {
+    const product = await seedProduct(1);
+
+    const err = await pos
+      .sale({
+        staffId: 'staff_pos_split_bad',
+        point: 'BISHKEK-1',
+        payments: [
+          { method: 'cash', amount: 30000 },
+          { method: 'card', amount: 50000 },
+        ],
+        lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+      })
+      .catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.code).toBe('payment_split_mismatch');
+    expect(await prisma.order.count()).toBe(0);
+    expect(await prisma.payment.count()).toBe(0);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
   });
 
   it('reuses an already-open shift instead of opening a second', async () => {

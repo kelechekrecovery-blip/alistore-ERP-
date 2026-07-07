@@ -19,6 +19,9 @@ GET   /payments?orderId=&shiftId=
 POST  /payments                       { orderId, method, amount }  (idempotent)
 POST  /payments/:id/refund            approval-gated → Refund flow
 POST  /webhooks/payment               dedup by txnId
+# POS
+POST  /pos/sale                       { point, method? | payments[], lines[], discountPct?, clientSaleId? }
+                                       payments[].amount суммарно == итог; split пишет отдельные payment.received
 # Смены
 POST  /shifts/open                    { staffId, point, openCash }
 POST  /shifts/:id/close               { closeCash, evidence }  diff≠0 → approval+Risk

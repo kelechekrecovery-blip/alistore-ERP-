@@ -86,6 +86,11 @@ function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: P
   `).join('');
   const imeis = result?.imeis?.length ? `<p><b>IMEI:</b> ${escapeHtml(result.imeis.join(', '))}</p>` : '';
   const status = result ? 'Event Ledger: synced' : 'Offline receipt: pending sync';
+  const paymentSummary = snapshot.payments?.length
+    ? snapshot.payments
+      .map((payment) => `${escapeHtml(methodName(payment.method))}: ${som(payment.amount)}`)
+      .join('<br/>')
+    : escapeHtml(methodName(snapshot.method));
 
   return `<!doctype html>
   <html>
@@ -117,7 +122,7 @@ function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: P
       </table>
       <p>Подытог: ${som(snapshot.subtotal)}</p>
       ${snapshot.discountPct > 0 ? `<p>Скидка: ${snapshot.discountPct}%</p>` : ''}
-      <p>Оплата: ${escapeHtml(methodName(snapshot.method))}</p>
+      <p>Оплата: ${paymentSummary}</p>
       ${imeis}
       <div class="total"><span>Итого</span><span>${som(snapshot.total)}</span></div>
       <p class="muted">${escapeHtml(status)}</p>

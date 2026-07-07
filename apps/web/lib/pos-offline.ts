@@ -1,4 +1,4 @@
-import type { PosLine, PosPendingApproval, PosSaleOutcome, PosSaleResult } from './api/pos';
+import type { PosLine, PosPayment, PosPendingApproval, PosSaleOutcome, PosSaleResult } from './api/pos';
 
 const STORAGE_KEY = 'alistore.pos.offlineQueue.v1';
 
@@ -8,6 +8,7 @@ export interface OfflinePosPayload {
   staffId: string;
   point: string;
   method: string;
+  payments?: PosPayment[];
   discountPct?: number;
   approvalId?: string;
   clientSaleId?: string;
@@ -25,6 +26,7 @@ export interface PosReceiptSnapshot {
   shop: string;
   point: string;
   method: string;
+  payments?: PosPayment[];
   subtotal: number;
   total: number;
   discountPct: number;

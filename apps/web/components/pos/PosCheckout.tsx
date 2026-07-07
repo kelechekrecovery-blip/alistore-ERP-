@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { som } from '@/lib/format';
-import type { PosPendingApproval, PosSaleResult } from '@/lib/api';
+import type { PosPayment, PosPendingApproval, PosSaleResult } from '@/lib/api';
 import type { OfflinePosQueueItem } from '@/lib/pos-offline';
 
 const METHODS: { id: string; icon: string; name: string }[] = [
@@ -24,7 +25,7 @@ interface PosCheckoutProps {
   result: PosSaleResult | null;
   offlineResult?: OfflinePosQueueItem | null;
   onSelectMethod: (id: string) => void;
-  onFinish: () => void;
+  onFinish: (payments?: PosPayment[]) => void;
   onCancel: () => void;
   onNewSale: () => void;
   onPrintReceipt?: () => void;
@@ -33,7 +34,48 @@ interface PosCheckoutProps {
 /** POS checkout overlay: payment method → pending-approval (discount over limit) → done. */
 export function PosCheckout(props: PosCheckoutProps) {
   const { route, total, discountLimit, method, busy, pending, result, offlineResult } = props;
+  const [split, setSplit] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<PosPayment[]>(() => defaultSplit(total, method));
   const pendingMessage = pending ? approvalMessage(pending, discountLimit) : '';
+  const activePayments = useMemo(
+    () => (split ? splitPayments : method ? [{ method, amount: total }] : []),
+    [method, split, splitPayments, total],
+  );
+  const splitTotal = splitPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const splitRemainder = total - splitTotal;
+  const splitValid = splitPayments.length >= 2 && splitPayments.every((payment) => payment.method && payment.amount > 0) && splitTotal === total;
+  const canFinish = split ? splitValid : Boolean(method);
+
+  useEffect(() => {
+    if (route === 'pay') {
+      setSplit(false);
+      setSplitPayments(defaultSplit(total, method));
+    }
+  }, [route, total]);
+
+  useEffect(() => {
+    if (!split) setSplitPayments(defaultSplit(total, method));
+  }, [method, split, total]);
+
+  function updateSplitPayment(index: number, patch: Partial<PosPayment>) {
+    setSplitPayments((current) => current.map((payment, row) => (row === index ? { ...payment, ...patch } : payment)));
+  }
+
+  function fillRemainder(index: number) {
+    const otherTotal = splitPayments.reduce((sum, payment, row) => (row === index ? sum : sum + payment.amount), 0);
+    updateSplitPayment(index, { amount: Math.max(total - otherTotal, 0) });
+  }
+
+  function addSplitPayment() {
+    const existing = new Set(splitPayments.map((payment) => payment.method));
+    const nextMethod = METHODS.find((candidate) => !existing.has(candidate.id))?.id ?? 'cash';
+    setSplitPayments((current) => [...current, { method: nextMethod, amount: Math.max(total - splitTotal, 0) }]);
+  }
+
+  function removeSplitPayment(index: number) {
+    setSplitPayments((current) => current.filter((_, row) => row !== index));
+  }
+
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(10,8,6,0.82)] p-4">
       <div className="w-full max-w-[640px] rounded-[22px] border border-[#2E2822] bg-[#1A1611] p-7">
@@ -51,7 +93,7 @@ export function PosCheckout(props: PosCheckoutProps) {
               <button
                 type="button"
                 disabled={busy}
-                onClick={props.onFinish}
+                onClick={() => props.onFinish(activePayments)}
                 className="flex-1 rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
               >
                 {busy ? 'Проверяем…' : 'Провести после одобрения'}
@@ -69,29 +111,99 @@ export function PosCheckout(props: PosCheckoutProps) {
               <span className="font-display text-xl font-bold text-white">Оплата</span>
               <span className="ml-auto font-display text-2xl font-extrabold text-lime tabular">{som(total)}</span>
             </div>
-            <div className="mb-4 text-[13px] text-[#8A7F76]">Выберите способ оплаты</div>
-            <div className="grid grid-cols-2 gap-2.5">
-              {METHODS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => props.onSelectMethod(m.id)}
-                  className={`flex items-center gap-2.5 rounded-[12px] border bg-[#221E19] p-3.5 text-left transition ${
-                    method === m.id ? 'border-lime ring-1 ring-lime/40' : 'border-[#2E2822] hover:border-[#3A342E]'
-                  }`}
-                >
-                  <span className="text-xl">{m.icon}</span>
-                  <span className="text-sm font-semibold text-white">{m.name}</span>
-                </button>
-              ))}
+            <div className="mb-4 flex rounded-[12px] border border-[#2E2822] bg-[#120F0C] p-1">
+              <button
+                type="button"
+                onClick={() => setSplit(false)}
+                className={`flex-1 rounded-[9px] px-3 py-2 text-sm font-semibold ${!split ? 'bg-lime text-lime-ink' : 'text-[#A79C92]'}`}
+              >
+                Один способ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSplitPayments(defaultSplit(total, method));
+                  setSplit(true);
+                }}
+                className={`flex-1 rounded-[9px] px-3 py-2 text-sm font-semibold ${split ? 'bg-lime text-lime-ink' : 'text-[#A79C92]'}`}
+              >
+                Split
+              </button>
             </div>
+            {!split ? (
+              <div className="grid grid-cols-2 gap-2.5">
+                {METHODS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => props.onSelectMethod(m.id)}
+                    className={`flex items-center gap-2.5 rounded-[12px] border bg-[#221E19] p-3.5 text-left transition ${
+                      method === m.id ? 'border-lime ring-1 ring-lime/40' : 'border-[#2E2822] hover:border-[#3A342E]'
+                    }`}
+                  >
+                    <span className="text-xl">{m.icon}</span>
+                    <span className="text-sm font-semibold text-white">{m.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {splitPayments.map((payment, index) => (
+                  <div key={`${index}-${payment.method}`} className="grid grid-cols-[1fr_132px_78px_38px] gap-2">
+                    <select
+                      value={payment.method}
+                      onChange={(event) => updateSplitPayment(index, { method: event.target.value })}
+                      className="min-w-0 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm font-semibold text-white outline-none focus:border-lime"
+                    >
+                      {METHODS.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={payment.amount}
+                      onChange={(event) => updateSplitPayment(index, { amount: Math.max(0, Math.round(Number(event.target.value) || 0)) })}
+                      className="min-w-0 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-right font-mono text-sm text-white outline-none focus:border-lime"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fillRemainder(index)}
+                      className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-2 text-xs font-semibold text-[#D8CFC6]"
+                    >
+                      Остаток
+                    </button>
+                    <button
+                      type="button"
+                      disabled={splitPayments.length <= 2}
+                      onClick={() => removeSplitPayment(index)}
+                      className="rounded-[10px] border border-[#2E2822] bg-[#221E19] text-lg font-semibold text-[#D8CFC6] disabled:text-[#4B433B]"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-3 rounded-[10px] border border-[#2E2822] bg-[#120F0C] px-3 py-2 text-xs">
+                  <span className="text-[#8A7F76]">Распределено</span>
+                  <span className="font-mono text-[#D8CFC6]">{som(splitTotal)}</span>
+                  <span className={splitRemainder === 0 ? 'text-lime' : 'text-warn'}>
+                    Остаток {som(splitRemainder)}
+                  </span>
+                  <button type="button" onClick={addSplitPayment} className="ml-auto font-semibold text-lime hover:text-white">
+                    + строка
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="mt-5 flex gap-2.5">
               <button
                 type="button"
-                disabled={!method || busy}
-                onClick={props.onFinish}
+                disabled={!canFinish || busy}
+                onClick={() => props.onFinish(activePayments)}
                 className="flex-1 rounded-[12px] py-3.5 text-center text-[15px] font-bold transition disabled:cursor-not-allowed"
-                style={{ background: method && !busy ? '#C6FF3D' : '#3A342E', color: method && !busy ? '#14110E' : '#6E645C' }}
+                style={{ background: canFinish && !busy ? '#C6FF3D' : '#3A342E', color: canFinish && !busy ? '#14110E' : '#6E645C' }}
               >
                 {busy ? 'Проводим…' : 'Завершить продажу'}
               </button>
@@ -140,6 +252,15 @@ export function PosCheckout(props: PosCheckoutProps) {
       </div>
     </div>
   );
+}
+
+function defaultSplit(total: number, method: string | null): PosPayment[] {
+  const primary = method ?? 'cash';
+  const secondary = primary === 'card' ? 'cash' : 'card';
+  return [
+    { method: primary, amount: total },
+    { method: secondary, amount: 0 },
+  ];
 }
 
 function approvalMessage(pending: PosPendingApproval, discountLimit: number) {

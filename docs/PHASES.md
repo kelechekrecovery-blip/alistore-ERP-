@@ -77,8 +77,12 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ Скидка>лимита→approval; `clientSaleId` идемпотентность для offline retry; scanner
   keyboard-wedge/manual SKU; печать локального/серверного чека через browser print; очередь
   синхронизации с конфликтами/approval-required статусами.
-- ☐ Осталось: сплит-оплата и сертификация конкретного физического железа в точке.
-**Проверка:** ✅ in-browser продажа со скидкой→оплата; в БД order paid, unit sold, платёж в смене.
+- ✅ Сплит-оплата: POS принимает `payments[]`, проверяет точное равенство tender-сумм итогу,
+  пишет отдельные Payment/ledger lines и переводит заказ в `paid` только после полной оплаты.
+  UI checkout поддерживает режим Split; offline queue/receipt сохраняют разбивку.
+- ☐ Осталось: сертификация конкретного физического железа в точке.
+**Проверка:** ✅ in-browser продажа со скидкой→оплата; ✅ browser QA split 30000 cash + 70000 card
+→ `POST /api/pos/sale` 201, order paid, unit sold, две tender lines; в БД платёж в смене.
 
 ## Phase 5 — Склад / Fulfillment ✅
 - ✅ `/warehouse` консоль; `POST /orders/:id/fulfill` (назначение IMEI web-заказам,

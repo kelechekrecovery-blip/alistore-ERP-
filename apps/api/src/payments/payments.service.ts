@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { type Payment } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -10,6 +11,12 @@ import { PayDto } from './payments.dto';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
+
+interface PaymentTender {
+  method: PayDto['method'];
+  amount: number;
+  txnId?: string;
+}
 
 @Injectable()
 export class PaymentsService {
@@ -55,15 +62,6 @@ export class PaymentsService {
     return this.prisma.payment.findUnique({ where: { txnId } });
   }
 
-  /**
-   * Take payment for an order and move it to `paid`.
-   *
-   * Enforces two invariants in one transaction:
-   *  - «Заказ не paid без резерва» → an order that is not reserved is rejected (409).
-   *  - «Нельзя продать один IMEI дважды» → reserved units are marked sold; a sold
-   *    unit throws (409).
-   * Webhook idempotency: a repeated txnId is a no-op returning the existing payment.
-   */
   async pay(dto: PayDto, actor: string) {
     // Idempotent dedup by txnId (webhook may fire twice) — checked before the tx.
     if (dto.txnId) {
@@ -75,6 +73,55 @@ export class PaymentsService {
           where: { id: existing.orderId ?? dto.orderId },
         });
         return { order, payment: existing, idempotent: true };
+      }
+    }
+
+    const paid = await this.payMany(
+      {
+        orderId: dto.orderId,
+        shiftId: dto.shiftId,
+        payments: [{ method: dto.method, amount: dto.amount, txnId: dto.txnId }],
+      },
+      actor,
+    );
+    return { ...paid, payment: paid.payments[0] };
+  }
+
+  /**
+   * Take one or more tenders for an order. The order moves to `paid` only when
+   * received positive payments cover the order total; partial payments keep the
+   * reservation live and never mark IMEI units sold early.
+   */
+  async payMany(
+    dto: { orderId: string; shiftId?: string; payments: PaymentTender[] },
+    actor: string,
+  ) {
+    if (dto.payments.length === 0) {
+      throw new ValidationError('payment_required', 'Нужен хотя бы один платёж');
+    }
+    const invalid = dto.payments.find((payment) => payment.amount <= 0);
+    if (invalid) {
+      throw new ValidationError('invalid_payment_amount', 'Сумма платежа должна быть больше 0');
+    }
+    const txnIds = dto.payments.map((payment) => payment.txnId).filter((id): id is string => Boolean(id));
+    if (new Set(txnIds).size !== txnIds.length) {
+      throw new ValidationError('duplicate_payment_txn', 'txnId платежей не должны повторяться');
+    }
+
+    // Split POS retries dedupe by the first txnId; the batch transaction is all-or-nothing.
+    if (txnIds[0]) {
+      const existing = await this.prisma.payment.findUnique({
+        where: { txnId: txnIds[0] },
+      });
+      if (existing) {
+        const [order, payments] = await Promise.all([
+          this.prisma.order.findUnique({ where: { id: existing.orderId ?? dto.orderId } }),
+          this.prisma.payment.findMany({
+            where: { orderId: existing.orderId ?? dto.orderId },
+            orderBy: { createdAt: 'asc' },
+          }),
+        ]);
+        return { order, payment: existing, payments, idempotent: true };
       }
     }
 
@@ -95,23 +142,37 @@ export class PaymentsService {
         );
       }
 
+      const received = await tx.payment.aggregate({
+        where: { orderId: order.id, amount: { gt: 0 } },
+        _sum: { amount: true },
+      });
+      const alreadyReceived = received._sum.amount ?? 0;
+      const batchTotal = dto.payments.reduce((sum, payment) => sum + payment.amount, 0);
       const events: AuditInput[] = [];
-      const payment = await tx.payment.create({
-        data: {
-          orderId: order.id,
-          amount: dto.amount,
-          method: dto.method,
-          status: 'received',
-          txnId: dto.txnId,
-          shiftId: dto.shiftId,
-        },
-      });
-      events.push({
-        type: EventType.PaymentReceived,
-        actor,
-        payload: { orderId: order.id, amount: dto.amount, method: dto.method },
-        refs: [order.id, payment.id],
-      });
+      const payments: Payment[] = [];
+      for (const tender of dto.payments) {
+        const payment = await tx.payment.create({
+          data: {
+            orderId: order.id,
+            amount: tender.amount,
+            method: tender.method,
+            status: 'received',
+            txnId: tender.txnId,
+            shiftId: dto.shiftId,
+          },
+        });
+        payments.push(payment);
+        events.push({
+          type: EventType.PaymentReceived,
+          actor,
+          payload: { orderId: order.id, amount: tender.amount, method: tender.method },
+          refs: [order.id, payment.id],
+        });
+      }
+
+      if (alreadyReceived + batchTotal < order.total) {
+        return { result: { order, payment: payments[0], payments, idempotent: false }, events };
+      }
 
       // Convert every reserved IMEI unit to sold (double-sale guard lives here too).
       for (const item of order.items) {
@@ -142,7 +203,7 @@ export class PaymentsService {
         refs: [order.id],
       });
 
-      return { result: { order: paid, payment, idempotent: false }, events };
+      return { result: { order: paid, payment: payments[0], payments, idempotent: false }, events };
     });
   }
 }

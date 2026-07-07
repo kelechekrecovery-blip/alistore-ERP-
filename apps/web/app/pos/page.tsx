@@ -19,6 +19,7 @@ import {
   syncOfflinePosQueue,
   type CatalogProduct,
   type OfflinePosPayload,
+  type PosPayment,
   type OfflinePosQueueItem,
   type PosPendingApproval,
   type PosReceiptSnapshot,
@@ -138,11 +139,12 @@ export default function PosPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [products]);
 
-  function buildPayload(clientSaleId: string): OfflinePosPayload {
+  function buildPayload(clientSaleId: string, salePayments: PosPayment[]): OfflinePosPayload {
     return {
       staffId: session?.staffId ?? '',
       point: POINT,
-      method: method ?? 'cash',
+      method: salePayments[0]?.method ?? method ?? 'cash',
+      payments: salePayments.length > 1 ? salePayments : undefined,
       discountPct: discPct,
       approvalId: pending?.approvalId,
       clientSaleId,
@@ -155,14 +157,15 @@ export default function PosPage() {
     };
   }
 
-  function buildSnapshot(clientSaleId: string): PosReceiptSnapshot {
+  function buildSnapshot(clientSaleId: string, salePayments: PosPayment[]): PosReceiptSnapshot {
     return {
       clientSaleId,
       localReceiptNo: createLocalReceiptNo(clientSaleId),
       cashier,
       shop: SHOP,
       point: POINT,
-      method: method ?? 'cash',
+      method: salePayments.length > 1 ? 'split' : salePayments[0]?.method ?? method ?? 'cash',
+      payments: salePayments.length > 1 ? salePayments : undefined,
       subtotal,
       total,
       discountPct: discPct,
@@ -177,17 +180,22 @@ export default function PosPage() {
     };
   }
 
-  async function finish() {
-    if (!method || !session) return;
+  async function finish(checkoutPayments?: PosPayment[]) {
+    if (!session) return;
+    const salePayments = normalizeSalePayments(checkoutPayments);
+    if (salePayments.length === 0) return;
     const clientSaleId = activeClientSaleId || createPosClientSaleId();
     setActiveClientSaleId(clientSaleId);
-    const payload = buildPayload(clientSaleId);
-    const snapshot = buildSnapshot(clientSaleId);
+    setMethod(salePayments[0]?.method ?? null);
+    const payload = buildPayload(clientSaleId, salePayments);
+    const snapshot = buildSnapshot(clientSaleId, salePayments);
     setBusy(true);
     try {
-      const terminal = await checkPaymentTerminal(method, online);
-      setTerminalMessage(terminal.message);
-      if (!terminal.ok) throw new Error(terminal.message);
+      for (const payment of salePayments) {
+        const terminal = await checkPaymentTerminal(payment.method, online);
+        setTerminalMessage(terminal.message);
+        if (!terminal.ok) throw new Error(terminal.message);
+      }
 
       const res = await posSale(payload, session.accessToken);
       if (res.pendingApproval) {
@@ -216,6 +224,15 @@ export default function PosPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function normalizeSalePayments(checkoutPayments?: PosPayment[]): PosPayment[] {
+    if (checkoutPayments?.length) {
+      return checkoutPayments
+        .map((payment) => ({ method: payment.method, amount: Math.round(payment.amount) }))
+        .filter((payment) => payment.method && payment.amount > 0);
+    }
+    return method ? [{ method, amount: total }] : [];
   }
 
   async function syncQueue() {

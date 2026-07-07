@@ -27,6 +27,14 @@ export class PosLineDto {
   @IsInt() @Min(1) qty!: number;
 }
 
+export class PosPaymentDto {
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.cash })
+  @IsEnum(PaymentMethod) method!: PaymentMethod;
+
+  @ApiProperty({ minimum: 1, example: 50000 })
+  @IsInt() @Min(1) amount!: number;
+}
+
 export class PosSaleDto {
   @ApiProperty({ example: 'staff_seller_01' })
   @IsString() staffId!: string;
@@ -34,8 +42,25 @@ export class PosSaleDto {
   @ApiProperty({ example: 'BISHKEK-1' })
   @IsString() point!: string;
 
-  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.cash })
-  @IsEnum(PaymentMethod) method!: PaymentMethod;
+  @ApiPropertyOptional({
+    enum: PaymentMethod,
+    example: PaymentMethod.cash,
+    description: 'Legacy single payment method. Use payments[] for split tenders.',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
+
+  @ApiPropertyOptional({
+    type: () => [PosPaymentDto],
+    description: 'Split payment tenders. Amounts must add up exactly to the sale total.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => PosPaymentDto)
+  payments?: PosPaymentDto[];
 
   @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 10, description: 'Discount %' })
   @IsOptional() @IsInt() @Min(0) @Max(100) discountPct?: number;

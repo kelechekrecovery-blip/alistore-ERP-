@@ -7,6 +7,11 @@ export interface PosLine {
   qty: number;
 }
 
+export interface PosPayment {
+  method: string;
+  amount: number;
+}
+
 export interface PosSaleResult {
   pendingApproval?: false;
   orderId: string;
@@ -36,7 +41,8 @@ export type PosSaleOutcome = PosSaleResult | PosPendingApproval;
 export function posSale(input: {
   staffId: string;
   point: string;
-  method: string;
+  method?: string;
+  payments?: PosPayment[];
   discountPct?: number;
   approvalId?: string;
   clientSaleId?: string;

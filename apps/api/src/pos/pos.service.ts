@@ -21,6 +21,11 @@ interface OrderLine {
   imei?: string;
 }
 
+interface NormalizedPosPayment {
+  method: NonNullable<PosSaleDto['method']>;
+  amount: number;
+}
+
 /**
  * POS sale orchestration. One call performs the whole counter sale by composing the
  * invariant-guarded services in sequence:
@@ -54,6 +59,8 @@ export class PosService {
     }
 
     const margin = await this.evaluateMargin(dto, pct);
+    const total = margin.total;
+    const payments = this.normalizePayments(dto, total);
     const discountApprovalNeeded = pct > APPROVAL_THRESHOLDS.discountPct;
     const marginApprovalNeeded = margin.breaches.length > 0;
     const approvalReason = this.approvalReason(discountApprovalNeeded, marginApprovalNeeded);
@@ -128,15 +135,20 @@ export class PosService {
       }
     }
 
-    const total = margin.total;
-
     const order = await this.orders.create(
       { customerId: customer.id, channel: 'pos', total, items },
       actor,
     );
     await this.orders.reserve(order.id, actor);
-    const paid = await this.payments.pay(
-      { orderId: order.id, method: dto.method, amount: total, shiftId: shift.id, txnId },
+    const paid = await this.payments.payMany(
+      {
+        orderId: order.id,
+        shiftId: shift.id,
+        payments: payments.map((payment, index) => ({
+          ...payment,
+          txnId: txnId ? (index === 0 ? txnId : `${txnId}:${index}`) : undefined,
+        })),
+      },
       actor,
     );
 
@@ -149,6 +161,24 @@ export class PosService {
       shiftId: shift.id,
       imeis: items.filter((i) => i.imei).map((i) => i.imei as string),
     };
+  }
+
+  private normalizePayments(dto: PosSaleDto, total: number): NormalizedPosPayment[] {
+    if (dto.payments?.length) {
+      const paymentTotal = dto.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      if (paymentTotal !== total) {
+        throw new ValidationError(
+          'payment_split_mismatch',
+          `Сумма split-платежей ${paymentTotal} должна равняться итогу ${total}`,
+        );
+      }
+      return dto.payments.map((payment) => ({ method: payment.method, amount: payment.amount }));
+    }
+
+    if (!dto.method) {
+      throw new ValidationError('payment_method_required', 'Укажите способ оплаты или split-платежи');
+    }
+    return [{ method: dto.method, amount: total }];
   }
 
   private async evaluateMargin(dto: PosSaleDto, pct: number): Promise<MarginControlResult> {
