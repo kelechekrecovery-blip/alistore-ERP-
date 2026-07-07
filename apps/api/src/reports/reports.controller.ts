@@ -1,5 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiUnprocessableEntityResponse,
+} from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 
 @ApiTags('reports')
@@ -27,6 +33,16 @@ export class ReportsController {
   @Get('revenue')
   revenue(@Query('days') days?: string) {
     return this.reports.revenue(days ? Number(days) : 7);
+  }
+
+  @ApiOperation({ summary: 'Revenue for an arbitrary date range (from & to, YYYY-MM-DD, inclusive)' })
+  @ApiQuery({ name: 'from', required: true, example: '2026-06-01' })
+  @ApiQuery({ name: 'to', required: true, example: '2026-06-30' })
+  @ApiOkResponse({ description: '{ from, to, days, total, buckets[] }.' })
+  @ApiUnprocessableEntityResponse({ description: 'Invalid date/range.' })
+  @Get('revenue-range')
+  revenueRange(@Query('from') from: string, @Query('to') to: string) {
+    return this.reports.revenueRange(from, to);
   }
 
   @ApiOperation({ summary: 'Revenue trend — last N days vs the previous N days (default 7)' })

@@ -5,11 +5,18 @@ import { buildRiskSignals } from './risk-signals';
 import { buildKpi } from './kpi';
 import { buildPayroll } from './payroll';
 import {
+  buildRangeBuckets,
   buildRevenueBuckets,
   buildRevenueTrend,
+  DAY_MS,
+  parseUtcDay,
   previousWindowStartMs,
   revenueWindowStartMs,
 } from './revenue-buckets';
+import { ValidationError } from '../common/errors';
+
+/** Widest custom revenue window a single query will bucket. */
+const MAX_RANGE_DAYS = 366;
 
 /** COD older than this without handover is a risk (Risk Center). */
 export const COD_STALE_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +68,33 @@ export class ReportsService {
       }),
     ]);
     return buildRevenueTrend(cur._sum.amount ?? 0, prev._sum.amount ?? 0);
+  }
+
+  /** Daily revenue buckets for an arbitrary [from, to] date range (YYYY-MM-DD, inclusive). */
+  async revenueRange(fromIso: string, toIso: string) {
+    const fromMs = parseUtcDay(fromIso);
+    const toMs = parseUtcDay(toIso);
+    if (fromMs === null || toMs === null) {
+      throw new ValidationError('invalid_date', 'Даты должны быть в формате YYYY-MM-DD');
+    }
+    if (fromMs > toMs) {
+      throw new ValidationError('invalid_range', '«from» должно быть не позже «to»');
+    }
+    const spanDays = Math.floor((toMs - fromMs) / DAY_MS) + 1;
+    if (spanDays > MAX_RANGE_DAYS) {
+      throw new ValidationError('range_too_wide', `Максимум ${MAX_RANGE_DAYS} дней в одном запросе`);
+    }
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        amount: { gt: 0 },
+        status: { in: ['received', 'reconciled'] },
+        createdAt: { gte: new Date(fromMs), lt: new Date(toMs + DAY_MS) }, // include the whole «to» day
+      },
+      select: { amount: true, createdAt: true },
+    });
+    const buckets = buildRangeBuckets(payments, fromMs, toMs);
+    const total = buckets.reduce((sum, b) => sum + b.amount, 0);
+    return { from: fromIso, to: toIso, days: spanDays, total, buckets };
   }
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */

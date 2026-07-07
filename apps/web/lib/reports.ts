@@ -74,6 +74,17 @@ export interface RevenueTrend {
 export const fetchRevenueTrend = (days: number) =>
   get<RevenueTrend>(`/reports/revenue-trend?days=${days}`);
 
+export interface RevenueRange {
+  from: string;
+  to: string;
+  days: number;
+  total: number;
+  buckets: { day: string; amount: number }[];
+}
+/** Revenue for an arbitrary [from, to] date range (YYYY-MM-DD, inclusive). */
+export const fetchRevenueRange = (from: string, to: string) =>
+  get<RevenueRange>(`/reports/revenue-range?from=${from}&to=${to}`);
+
 export interface Insight {
   tone: 'positive' | 'warning' | 'info';
   title: string;

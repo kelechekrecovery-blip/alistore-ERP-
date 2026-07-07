@@ -24,6 +24,7 @@ import { AiView } from '@/components/erp/AiView';
 import { PricingView } from '@/components/erp/PricingView';
 import { ReorderView } from '@/components/erp/ReorderView';
 import { KpiView } from '@/components/erp/KpiView';
+import { DashboardView } from '@/components/erp/DashboardView';
 
 type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
 
@@ -176,111 +177,6 @@ export default function ErpPage() {
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">{children}</div>;
-}
-
-function Kpi({ label, value, color = '#fff' }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-4.5" style={{ padding: 18 }}>
-      <div className="text-xs text-[#8A7F76]">{label}</div>
-      <div className="mt-1.5 font-display text-2xl font-extrabold tabular" style={{ color }}>{value}</div>
-    </div>
-  );
-}
-
-function TrendBadge({ trend }: { trend: RevenueTrend | null }) {
-  if (!trend) return null;
-  const color = trend.direction === 'up' ? '#C6FF3D' : trend.direction === 'down' ? '#FF8A7A' : '#8A7F76';
-  const arrow = trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '▬';
-  const label = trend.deltaPct === null ? 'нов.' : `${trend.deltaPct > 0 ? '+' : ''}${trend.deltaPct}%`;
-  return (
-    <span
-      className="rounded-chip px-2 py-0.5 font-mono text-[11px] font-semibold"
-      style={{ color, background: `${color}1A` }}
-      title="к предыдущему периоду"
-    >
-      {arrow} {label}
-    </span>
-  );
-}
-
-function DashboardView({
-  d, risks, revenue, trend, period, onPeriod, onSignal,
-}: {
-  d: Dashboard | null;
-  risks: RiskSignal[];
-  revenue: { day: string; amount: number }[];
-  trend: RevenueTrend | null;
-  period: number;
-  onPeriod: (days: number) => void;
-  onSignal: (kind: string) => void;
-}) {
-  const data = revenue.length ? revenue : (d?.revenue7d ?? []);
-  const max = Math.max(1, ...data.map((r) => r.amount));
-  const total = data.reduce((s, b) => s + b.amount, 0);
-  return (
-    <>
-      <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        <Kpi label="Продажи" value={d ? som(d.money.salesGross) : '…'} />
-        <Kpi label="Чистыми" value={d ? som(d.money.net) : '…'} color="#C6FF3D" />
-        <Kpi label="Заказов" value={d ? String(d.orders.total) : '…'} />
-        <Kpi label="На одобрении" value={d ? String(d.ops.pendingApprovals) : '…'} color={d && d.ops.pendingApprovals > 0 ? '#E5B23C' : '#fff'} />
-      </div>
-      <div className="grid gap-3.5 lg:grid-cols-[2fr_1fr]">
-        <Card>
-          <div className="mb-4 flex items-center gap-3">
-            <span className="font-display text-[15px] font-bold">Выручка · {som(total)}</span>
-            <TrendBadge trend={trend} />
-            <div className="ml-auto flex gap-1">
-              {[7, 30].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => onPeriod(p)}
-                  className={`rounded-chip px-2.5 py-1 text-[11px] font-semibold transition ${
-                    period === p ? 'bg-lime text-lime-ink' : 'bg-[#221E19] text-[#A79C92] hover:text-white'
-                  }`}
-                >
-                  {p} дн
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex h-40 items-end gap-1">
-            {data.map((b, i) => (
-              <div key={b.day} className="flex flex-1 flex-col items-center gap-1.5">
-                <div
-                  className="w-full rounded-t-sm bg-gradient-to-b from-[#C6FF3D] to-[#8FD40F]"
-                  style={{ height: `${Math.max(3, (b.amount / max) * 150)}px` }}
-                  title={`${b.day}: ${som(b.amount)}`}
-                />
-                <span className="text-[9px] text-[#8A7F76]">
-                  {period <= 7
-                    ? new Date(b.day).toLocaleDateString('ru-RU', { weekday: 'short' })
-                    : i % 5 === 0 ? b.day.slice(8) : ''}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card>
-          <div className="mb-3.5 font-display text-[15px] font-bold">Требуют решения</div>
-          {risks.length === 0 && <p className="text-sm text-[#8A7F76]">✓ Тревог нет</p>}
-          {risks.slice(0, 5).map((r, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onSignal(r.kind)}
-              className="mb-3 block w-full border-l-[3px] pl-3 text-left transition hover:opacity-80"
-              style={{ borderColor: SEV_COLOR[r.severity] }}
-            >
-              <div className="text-[13px] leading-snug text-white">{r.detail}</div>
-              <div className="mt-0.5 font-mono text-[11px]" style={{ color: SEV_COLOR[r.severity] }}>{r.severity} · перейти →</div>
-            </button>
-          ))}
-        </Card>
-      </div>
-    </>
-  );
 }
 
 function FinanceView({ d }: { d: Dashboard | null }) {
