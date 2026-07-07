@@ -21,6 +21,7 @@ import { CrmView } from '@/components/erp/CrmView';
 import { AiView } from '@/components/erp/AiView';
 import { PricingView } from '@/components/erp/PricingView';
 import { ReorderView } from '@/components/erp/ReorderView';
+import { KpiView } from '@/components/erp/KpiView';
 
 type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
 
@@ -333,54 +334,6 @@ function RisksView({ risks, onSignal }: { risks: RiskSignal[]; onSignal: (kind: 
         ))}
       </ul>
     </Card>
-  );
-}
-
-function KpiView({ kpi }: { kpi: Kpi | null }) {
-  if (!kpi) return <p className="font-mono text-sm text-[#6E645C]">Загрузка…</p>;
-  const maxRev = Math.max(1, ...kpi.topProducts.map((p) => p.revenue));
-  return (
-    <>
-      <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        <Kpi label="Валовая маржа" value={som(kpi.grossMargin)} color="#C6FF3D" />
-        <Kpi label="Маржа %" value={`${kpi.marginPct}%`} color={kpi.marginPct < 10 ? '#E5B23C' : '#C6FF3D'} />
-        <Kpi label="Средний чек" value={som(kpi.avgCheck)} />
-        <Kpi label="Себестоимость" value={som(kpi.cogs)} color="#FF8A7A" />
-      </div>
-      <Card>
-        <div className="mb-4 flex items-center">
-          <span className="font-display text-[15px] font-bold">Топ товары по выручке</span>
-          <span className="ml-auto text-xs text-[#8A7F76]">выручка · {kpi.paidOrders} оплаченных заказов</span>
-        </div>
-        {kpi.topProducts.length === 0 && <p className="text-sm text-[#8A7F76]">Пока нет продаж.</p>}
-        {kpi.topProducts.map((p) => (
-          <div key={p.sku} className="mb-3">
-            <div className="mb-1 flex items-center justify-between text-[13px]">
-              <span className="text-[#D8CFC6]">{p.name}</span>
-              <span className="font-mono tabular text-white">{som(p.revenue)} · {p.units} шт</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-[#221E19]">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" style={{ width: `${(p.revenue / maxRev) * 100}%` }} />
-            </div>
-          </div>
-        ))}
-      </Card>
-
-      <div className="mt-3.5">
-        <Card>
-          <div className="mb-3.5 font-display text-[15px] font-bold">KPI продавцов</div>
-          {kpi.sellers.length === 0 && <p className="text-sm text-[#8A7F76]">Нет продаж по сменам.</p>}
-          {kpi.sellers.map((s, i) => (
-            <div key={s.staffId} className="flex items-center gap-3 border-b border-[#221E19] py-2.5 text-[13px] last:border-0">
-              <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-[#2A241F] font-mono text-[11px] text-[#8A7F76]">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-[#D8CFC6]">{s.staffId}</span>
-              <span className="text-[#8A7F76]">{s.sales} продаж</span>
-              <span className="font-mono tabular font-semibold text-white">{som(s.revenue)}</span>
-            </div>
-          ))}
-        </Card>
-      </div>
-    </>
   );
 }
 

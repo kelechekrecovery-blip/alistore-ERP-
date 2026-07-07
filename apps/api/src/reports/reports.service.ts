@@ -3,6 +3,7 @@ import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildRiskSignals } from './risk-signals';
 import { buildKpi } from './kpi';
+import { buildPayroll } from './payroll';
 import { buildRevenueBuckets, revenueWindowStartMs } from './revenue-buckets';
 
 /** COD older than this without handover is a risk (Risk Center). */
@@ -105,6 +106,24 @@ export class ReportsService {
       .filter((p) => p.shift)
       .map((p) => ({ staffId: p.shift!.staffId, amount: p.amount }));
     return buildKpi({ revenue, cogs, paidOrders, items, names, sellerRows });
+  }
+
+  /** Seller payroll: base + commission on turnover, per seller (via shift.staffId). */
+  async payroll() {
+    const sellerPayments = await this.prisma.payment.findMany({
+      where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, shiftId: { not: null } },
+      select: { amount: true, shift: { select: { staffId: true } } },
+    });
+    const bySeller = new Map<string, { revenue: number; sales: number }>();
+    for (const p of sellerPayments) {
+      if (!p.shift) continue;
+      const cur = bySeller.get(p.shift.staffId) ?? { revenue: 0, sales: 0 };
+      cur.revenue += p.amount;
+      cur.sales += 1;
+      bySeller.set(p.shift.staffId, cur);
+    }
+    const sellers = [...bySeller.entries()].map(([staffId, v]) => ({ staffId, ...v }));
+    return buildPayroll(sellers);
   }
 
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */

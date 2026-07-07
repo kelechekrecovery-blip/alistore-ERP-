@@ -29,6 +29,13 @@ export class ReportsController {
     return this.reports.revenue(days ? Number(days) : 7);
   }
 
+  @ApiOperation({ summary: 'Seller payroll — base + commission on turnover, per seller' })
+  @ApiOkResponse({ description: 'Advisory pay per seller from ledger-backed payments.' })
+  @Get('payroll')
+  payroll() {
+    return this.reports.payroll();
+  }
+
   @ApiOperation({ summary: 'Risk Center — ranked risk signals' })
   @ApiOkResponse({ description: 'Discrepancies, outstanding COD, stale reservations, approvals.' })
   @Get('risks')

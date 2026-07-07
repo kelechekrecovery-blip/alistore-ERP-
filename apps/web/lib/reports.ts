@@ -41,8 +41,25 @@ export interface Kpi {
   sellers: { staffId: string; revenue: number; sales: number }[];
 }
 
+export interface PayrollRow {
+  staffId: string;
+  revenue: number;
+  sales: number;
+  base: number;
+  commission: number;
+  total: number;
+}
+export interface Payroll {
+  base: number;
+  commissionPct: number;
+  rows: PayrollRow[];
+  totalPayout: number;
+}
+
 export const fetchDashboard = () => get<Dashboard>('/reports/dashboard');
 export const fetchKpi = () => get<Kpi>('/reports/kpi');
+/** Seller payroll — base + commission on turnover (Phase 9). */
+export const fetchPayroll = () => get<Payroll>('/reports/payroll');
 /** Daily revenue buckets for the last N days (dashboard period filter). */
 export const fetchRevenue = (days: number) =>
   get<{ day: string; amount: number }[]>(`/reports/revenue?days=${days}`);
