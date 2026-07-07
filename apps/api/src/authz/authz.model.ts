@@ -73,6 +73,36 @@ p, warehouse, orders, transition
 p, courier, orders, transition
 p, admin, orders, transition
 p, owner, orders, transition
+p, courier, courier, read
+p, warehouse, courier, read
+p, admin, courier, read
+p, owner, courier, read
+p, warehouse, courier, assign
+p, admin, courier, assign
+p, owner, courier, assign
+p, courier, courier, handover
+p, cashier, courier, handover
+p, admin, courier, handover
+p, owner, courier, handover
+p, courier, delivery, fail
+p, admin, delivery, fail
+p, owner, delivery, fail
+p, seller, documents, read
+p, cashier, documents, read
+p, warehouse, documents, read
+p, admin, documents, read
+p, owner, documents, read
+p, seller, labels, print
+p, cashier, labels, print
+p, warehouse, labels, print
+p, admin, labels, print
+p, owner, labels, print
+p, seller, receipts, print
+p, cashier, receipts, print
+p, senior_seller, receipts, print
+p, franchise, receipts, print
+p, admin, receipts, print
+p, owner, receipts, print
 g, owner, admin
 g, admin, senior_seller
 `;

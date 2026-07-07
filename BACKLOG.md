@@ -1,11 +1,12 @@
 # BACKLOG
 
 ## Next
-- Extend Role Permission Matrix to remaining non-staff-session endpoints: courier, warranty, support, suppliers, debts, trade-in intake, and admin documents.
+- Split public/customer self-service from staff/admin Role Permission Matrix gates for warranty, support/CRM, suppliers, debts, trade-in intake, returns/exchanges, products, and payment refunds.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Enforce active staff RBAC on courier COD/delivery and print/export endpoints.
 - Enforce Role Permission Matrix on POS/warehouse/staff-session operational endpoints.
 - Finish staff-session rollout for POS/warehouse/staff operational endpoints.
 - Add staff TOTP step-up 2FA for Approval Inbox approve decisions, with setup/enable/disable staff auth endpoints and UI enrollment.

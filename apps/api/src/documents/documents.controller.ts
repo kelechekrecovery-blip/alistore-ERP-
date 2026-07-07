@@ -1,9 +1,13 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 @Controller('documents')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@RequirePermission('documents', 'read')
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 

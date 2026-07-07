@@ -6,6 +6,7 @@ import { StaffAuthController } from './staff-auth.controller';
 import { resolveJwtSecret } from '../auth/jwt-secret';
 import { AuthzModule } from '../authz/authz.module';
 import { AuthModule } from '../auth/auth.module';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
 
 /**
  * Staff auth. Signs with the same JWT_SECRET as customer auth, so the shared
@@ -22,8 +23,8 @@ import { AuthModule } from '../auth/auth.module';
       }),
     }),
   ],
-  providers: [StaffAuthService],
+  providers: [StaffAuthService, ActiveStaffGuard],
   controllers: [StaffAuthController],
-  exports: [StaffAuthService],
+  exports: [StaffAuthService, ActiveStaffGuard],
 })
 export class StaffAuthModule {}

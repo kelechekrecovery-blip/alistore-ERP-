@@ -2,9 +2,13 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { LabelsService } from './labels.service';
 import { ImeiLabelDto, QrLabelDto } from './labels.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 @Controller('labels')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@RequirePermission('labels', 'print')
 export class LabelsController {
   constructor(private readonly labels: LabelsService) {}
 

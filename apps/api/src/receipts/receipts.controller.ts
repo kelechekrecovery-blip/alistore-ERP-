@@ -2,9 +2,13 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ReceiptsService } from './receipts.service';
 import { ReceiptData } from './receipts.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 @Controller('receipts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@RequirePermission('receipts', 'print')
 export class ReceiptsController {
   constructor(private readonly receipts: ReceiptsService) {}
 

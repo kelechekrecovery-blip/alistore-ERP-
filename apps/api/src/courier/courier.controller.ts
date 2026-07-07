@@ -5,8 +5,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
@@ -18,11 +20,17 @@ import {
 } from '@nestjs/swagger';
 import { CourierService } from './courier.service';
 import { CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
-
-const SYSTEM_ACTOR = 'system';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 
 @ApiTags('courier')
+@ApiBearerAuth()
 @Controller('courier')
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
 export class CourierController {
   constructor(private readonly courier: CourierService) {}
 
@@ -31,6 +39,7 @@ export class CourierController {
   @ApiOkResponse({ description: 'Run found.' })
   @ApiNotFoundResponse({ description: 'Run does not exist.' })
   @Get('runs/:id')
+  @RequirePermission('courier', 'read')
   async getRun(@Param('id') id: string) {
     const run = await this.courier.getRun(id);
     if (!run) throw new NotFoundException(`Курьерский рейс ${id} не найден`);
@@ -40,8 +49,9 @@ export class CourierController {
   @ApiOperation({ summary: 'Assign a courier run with its COD total (delivery.assigned)' })
   @ApiCreatedResponse({ description: 'Run created.' })
   @Post('runs')
-  createRun(@Body() dto: CreateRunDto) {
-    return this.courier.createRun(dto, SYSTEM_ACTOR);
+  @RequirePermission('courier', 'assign')
+  createRun(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateRunDto) {
+    return this.courier.createRun(dto, user.customerId);
   }
 
   @ApiOperation({
@@ -53,7 +63,8 @@ export class CourierController {
     description: 'Unknown run, or a discrepancy with no reason (invariant #4).',
   })
   @Post('handover')
-  handover(@Body() dto: HandoverDto) {
-    return this.courier.handover(dto, SYSTEM_ACTOR);
+  @RequirePermission('courier', 'handover')
+  handover(@CurrentUser() user: AuthPrincipal, @Body() dto: HandoverDto) {
+    return this.courier.handover(dto, user.customerId);
   }
 }

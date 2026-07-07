@@ -1,5 +1,6 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -8,11 +9,17 @@ import {
 } from '@nestjs/swagger';
 import { CourierService } from './courier.service';
 import { FailDeliveryDto } from './courier.dto';
-
-const SYSTEM_ACTOR = 'system';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 
 @ApiTags('deliveries')
+@ApiBearerAuth()
 @Controller('deliveries')
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
 export class DeliveriesController {
   constructor(private readonly courier: CourierService) {}
 
@@ -21,7 +28,8 @@ export class DeliveriesController {
   @ApiOkResponse({ description: 'Failure recorded in the ledger.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order.' })
   @Post(':id/fail')
-  fail(@Param('id') id: string, @Body() dto: FailDeliveryDto) {
-    return this.courier.failDelivery(id, dto, SYSTEM_ACTOR);
+  @RequirePermission('delivery', 'fail')
+  fail(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: FailDeliveryDto) {
+    return this.courier.failDelivery(id, dto, user.customerId);
   }
 }

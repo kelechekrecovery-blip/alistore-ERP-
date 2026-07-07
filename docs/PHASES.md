@@ -129,13 +129,18 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
   shifts open/close/read, inventory movement/transfer/count, order queue/reserve/
   fulfill/transition. Проверены 403 для валидного staff JWT с неправильной ролью
   (warehouse→POS, cashier→inventory, seller→fulfillment) и 201/200 для правильных ролей.
-- ☐ **Role Permission Matrix** remaining: courier, warranty, support, suppliers, debts,
-  trade-in intake, admin documents/labels/receipts.
+- ✅ **Role Permission Matrix** phase 2: `ActiveStaffGuard` + casbin на courier COD/delivery
+  (`/courier/runs`, `/courier/handover`, `/deliveries/:id/fail`) и print/export
+  (`/documents`, `/labels`, `/receipts`). Actor берётся из staff JWT; customer/неверная
+  staff role не проходит.
+- ☐ **Role Permission Matrix** remaining: аккуратно разделить customer self-service и
+  staff/admin mutations для warranty, support/CRM, suppliers, debts, trade-in intake,
+  returns/exchanges, products, payment refunds.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
-Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; полный
-Jest 60 suites / 195 tests; browser QA `/approvals` login→2FA setup и `/pos` staff login →
+Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
+print-export RBAC tests; полный Jest 61 suites / 198 tests; browser QA `/approvals` login→2FA setup и `/pos` staff login →
 `/warehouse`/`/staff` shared session без overflow.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
@@ -264,8 +269,9 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   delete/**долг**/**скидка>10% в POS backend+UI**), staff JWT для Approval Inbox,
   PII masking/read policy, step-up 2FA для approve, staff-session rollout на
   POS/warehouse/staff ops, Role Permission Matrix phase 1 на POS/shifts/inventory/
-  fulfillment. Остаток — расширить матрицу на courier/warranty/support/suppliers/
-  debts/trade-in/admin docs и закрыть margin-control.
+  fulfillment, phase 2 на courier COD/delivery и print/export. Остаток — разделить
+  public/customer self-service и staff/admin mutations в warranty/support/suppliers/
+  debts/trade-in/returns/exchanges/products/refunds и закрыть margin-control.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
@@ -283,7 +289,7 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 60 (195 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 61 (198 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
