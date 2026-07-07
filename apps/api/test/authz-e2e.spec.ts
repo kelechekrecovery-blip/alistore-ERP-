@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { AuthzModule } from '../src/authz/authz.module';
 import { PermissionGuard } from '../src/authz/permission.guard';
 import { RequirePermission } from '../src/authz/require-permission.decorator';
+import { TotpService } from '../src/auth/totp.service';
 
 /** A dangerous endpoint guarded exactly how the real ones should be. */
 @Controller('demo-danger')
@@ -48,6 +49,7 @@ describe('Authz end-to-end (staff role → casbin guard)', () => {
       controllers: [DemoController],
       providers: [
         StaffAuthService,
+        TotpService,
         JwtStrategy,
         { provide: PrismaService, useValue: prisma },
         {

@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
-import { CreateStaffDto, StaffLoginDto } from './staff-auth.dto';
+import { CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
@@ -39,17 +39,43 @@ export class StaffAuthController {
   /** The current staff principal. */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: AuthPrincipal) {
-    return { staffId: user.customerId, role: user.role, typ: user.typ };
+  async me(@CurrentUser() user: AuthPrincipal) {
+    this.assertStaff(user);
+    return { ...(await this.staffAuth.me(user.customerId)), typ: user.typ };
+  }
+
+  /** Create/replace a pending TOTP secret for the current staff account. */
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  setupTotp(@CurrentUser() user: AuthPrincipal) {
+    this.assertStaff(user);
+    return this.staffAuth.setupTotp(user.customerId);
+  }
+
+  /** Enable 2FA after verifying the authenticator code. */
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  enableTotp(@CurrentUser() user: AuthPrincipal, @Body() dto: StaffTotpTokenDto) {
+    this.assertStaff(user);
+    return this.staffAuth.enableTotp(user.customerId, dto.token);
+  }
+
+  /** Disable self 2FA after a valid current code. */
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  disableTotp(@CurrentUser() user: AuthPrincipal, @Body() dto: StaffTotpTokenDto) {
+    this.assertStaff(user);
+    return this.staffAuth.disableTotp(user.customerId, dto.token);
   }
 
   /** Never expose the password hash. */
   private publicView(staff: StaffUser) {
-    return {
-      id: staff.id,
-      username: staff.username,
-      role: staff.role,
-      active: staff.active,
-    };
+    return this.staffAuth.publicView(staff);
+  }
+
+  private assertStaff(user: AuthPrincipal) {
+    if (user.typ !== 'staff' || !user.role) {
+      throw new ForbiddenException('Требуется staff JWT');
+    }
   }
 }

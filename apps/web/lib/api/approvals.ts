@@ -25,11 +25,12 @@ export async function decideApproval(
   status: 'approved' | 'rejected',
   accessToken: string,
   reason?: string,
+  totpToken?: string,
 ): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/approvals/${id}/decide`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ status, reason }),
+    body: JSON.stringify({ status, reason, totpToken }),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));

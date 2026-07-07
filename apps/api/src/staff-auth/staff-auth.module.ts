@@ -5,6 +5,7 @@ import { StaffAuthService } from './staff-auth.service';
 import { StaffAuthController } from './staff-auth.controller';
 import { resolveJwtSecret } from '../auth/jwt-secret';
 import { AuthzModule } from '../authz/authz.module';
+import { AuthModule } from '../auth/auth.module';
 
 /**
  * Staff auth. Signs with the same JWT_SECRET as customer auth, so the shared
@@ -13,6 +14,7 @@ import { AuthzModule } from '../authz/authz.module';
 @Module({
   imports: [
     AuthzModule,
+    AuthModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

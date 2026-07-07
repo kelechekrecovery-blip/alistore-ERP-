@@ -11,3 +11,7 @@ export class CreateStaffDto {
   @IsString() @IsNotEmpty() password!: string;
   @IsEnum(Role) role!: Role;
 }
+
+export class StaffTotpTokenDto {
+  @IsString() @IsNotEmpty() token!: string;
+}

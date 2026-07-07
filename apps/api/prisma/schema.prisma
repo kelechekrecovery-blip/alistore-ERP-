@@ -482,6 +482,8 @@ model StaffUser {
   passwordHash String
   role         Role
   active       Boolean  @default(true)
+  totpSecret   String?
+  totpEnabled  Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   @@index([role])

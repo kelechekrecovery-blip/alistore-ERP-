@@ -23,11 +23,15 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { Role } from '../rbac/permissions';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 @ApiTags('approvals')
 @Controller('approvals')
 export class ApprovalsController {
-  constructor(private readonly approvals: ApprovalsService) {}
+  constructor(
+    private readonly approvals: ApprovalsService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @ApiOperation({ summary: 'List approvals (default: pending) — Approval Inbox' })
   @ApiBearerAuth()
@@ -57,8 +61,11 @@ export class ApprovalsController {
   @ApiConflictResponse({ description: 'Approval already decided.' })
   @Patch(':id/decide')
   @UseGuards(JwtAuthGuard)
-  decide(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DecideApprovalDto) {
+  async decide(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DecideApprovalDto) {
     this.assertStaff(user);
+    if (dto.status === 'approved') {
+      await this.staffAuth.verifyStepUp(user.customerId, dto.totpToken);
+    }
     return this.approvals.decide(id, {
       status: dto.status,
       approver: user.customerId,

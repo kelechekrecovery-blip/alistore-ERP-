@@ -3,10 +3,19 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { decideApproval, fetchApprovals, staffLogin, type Approval } from '@/lib/api';
+import {
+  decideApproval,
+  fetchApprovals,
+  staffLogin,
+  staffTotpEnable,
+  staffTotpSetup,
+  type Approval,
+  type StaffTotpSetupResult,
+} from '@/lib/api';
 import { som } from '@/lib/format';
 
 const STAFF_SESSION_KEY = 'alistore.staff.auth.v1';
+type StaffSession = { accessToken: string; role: string; totpEnabled: boolean };
 
 const TABS = [
   { status: 'requested', label: 'Ожидают' },
@@ -30,13 +39,20 @@ export default function ApprovalsPage() {
   const [items, setItems] = useState<Approval[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
-  const [session, setSession] = useState<{ accessToken: string; role: string } | null>(null);
+  const [session, setSession] = useState<StaffSession | null>(null);
   const [login, setLogin] = useState({ username: '', password: '' });
+  const [totpSetup, setTotpSetup] = useState<StaffTotpSetupResult | null>(null);
+  const [totpToken, setTotpToken] = useState('');
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STAFF_SESSION_KEY);
-      if (raw) setSession(JSON.parse(raw) as { accessToken: string; role: string });
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<StaffSession>;
+        if (parsed.accessToken && parsed.role) {
+          setSession({ accessToken: parsed.accessToken, role: parsed.role, totpEnabled: Boolean(parsed.totpEnabled) });
+        }
+      }
     } catch {
       setSession(null);
     }
@@ -81,13 +97,55 @@ export default function ApprovalsPage() {
 
   async function decide(a: Approval, status: 'approved' | 'rejected') {
     if (!session) return;
+    const code = totpToken.trim();
+    if (status === 'approved' && !session.totpEnabled) {
+      flash('Включите 2FA для одобрения');
+      return;
+    }
+    if (status === 'approved' && !code) {
+      flash('Введите код 2FA');
+      return;
+    }
     setBusy(a.id);
     try {
-      await decideApproval(a.id, status, session.accessToken);
+      await decideApproval(a.id, status, session.accessToken, undefined, status === 'approved' ? code : undefined);
+      if (status === 'approved') setTotpToken('');
       flash(status === 'approved' ? 'Одобрено · действие выполнено' : 'Отклонено');
       load(tab.status);
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function startTotpSetup() {
+    if (!session) return;
+    setBusy('2fa-setup');
+    try {
+      setTotpSetup(await staffTotpSetup(session.accessToken));
+      flash('Секрет 2FA создан');
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка 2FA');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function enableTotp(e: FormEvent) {
+    e.preventDefault();
+    if (!session) return;
+    setBusy('2fa-enable');
+    try {
+      const profile = await staffTotpEnable(session.accessToken, totpToken.trim());
+      const next = { ...session, totpEnabled: profile.totpEnabled };
+      setSession(next);
+      localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(next));
+      setTotpSetup(null);
+      setTotpToken('');
+      flash('2FA включена');
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка 2FA');
     } finally {
       setBusy(null);
     }
@@ -110,6 +168,8 @@ export default function ApprovalsPage() {
               localStorage.removeItem(STAFF_SESSION_KEY);
               setSession(null);
               setItems(null);
+              setTotpSetup(null);
+              setTotpToken('');
             }}
             className="ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
           >
@@ -169,6 +229,61 @@ export default function ApprovalsPage() {
           )}
           {session && (
             <>
+          <div className="mb-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-display text-base font-bold text-ink">
+                  Step-up 2FA · {session.totpEnabled ? 'включена' : 'требуется'}
+                </div>
+                <div className="mt-1 text-sm text-ink/55">
+                  Для одобрения опасных действий нужен 6-значный код.
+                </div>
+              </div>
+              {!session.totpEnabled && !totpSetup && (
+                <button
+                  type="button"
+                  disabled={busy === '2fa-setup'}
+                  onClick={startTotpSetup}
+                  className="rounded-btn bg-ink px-4 py-2 text-sm font-semibold text-sand disabled:opacity-50"
+                >
+                  {busy === '2fa-setup' ? '…' : 'Настроить'}
+                </button>
+              )}
+            </div>
+            {totpSetup && !session.totpEnabled && (
+              <form onSubmit={enableTotp} className="mt-4 rounded-btn border border-ink/10 bg-sand/60 p-4">
+                <div className="text-xs font-semibold uppercase text-ink/45">Secret</div>
+                <div className="mt-1 break-all font-mono text-sm text-ink">{totpSetup.secret}</div>
+                <div className="mt-3 text-xs font-semibold uppercase text-ink/45">otpauth</div>
+                <div className="mt-1 break-all font-mono text-xs text-ink/60">{totpSetup.otpauthUrl}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <input
+                    value={totpToken}
+                    onChange={(e) => setTotpToken(e.target.value)}
+                    inputMode="numeric"
+                    placeholder="123456"
+                    className="min-w-40 flex-1 rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy === '2fa-enable'}
+                    className="rounded-btn bg-success px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {busy === '2fa-enable' ? '…' : 'Подтвердить'}
+                  </button>
+                </div>
+              </form>
+            )}
+            {session.totpEnabled && tab.status === 'requested' && (
+              <input
+                value={totpToken}
+                onChange={(e) => setTotpToken(e.target.value)}
+                inputMode="numeric"
+                placeholder="Код 2FA для одобрения"
+                className="mt-4 w-full rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40"
+              />
+            )}
+          </div>
           {items === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
           {items && items.length === 0 && (
             <div className="rounded-card border border-dashed border-ink/15 bg-white/50 px-6 py-16 text-center">

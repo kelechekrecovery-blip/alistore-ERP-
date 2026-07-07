@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Role } from '@prisma/client';
+import { Role, StaffUser } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
-import { ValidationError } from '../common/errors';
+import { ForbiddenError, ValidationError } from '../common/errors';
+import { TotpService } from '../auth/totp.service';
 
 export interface StaffTokens {
   accessToken: string;
   role: Role;
+  totpEnabled: boolean;
 }
 
 /**
@@ -21,6 +23,7 @@ export class StaffAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly totp: TotpService,
   ) {}
 
   /** Provision a staff account (owner tooling / seed). Password stored via argon2. */
@@ -60,6 +63,100 @@ export class StaffAuthService {
       { sub: staff.id, role: staff.role, typ: 'staff' },
       { expiresIn: '8h' },
     );
-    return { accessToken, role: staff.role };
+    return { accessToken, role: staff.role, totpEnabled: staff.totpEnabled };
+  }
+
+  /** Current staff profile for session refresh / UI gates. */
+  async me(staffId: string) {
+    return this.publicView(await this.getActiveStaff(staffId));
+  }
+
+  /** Start TOTP enrollment. Regenerating before enable invalidates older setup codes. */
+  async setupTotp(staffId: string) {
+    const staff = await this.getActiveStaff(staffId);
+    if (staff.totpEnabled) {
+      throw new ValidationError('staff_2fa_already_enabled', '2FA уже включена');
+    }
+    const secret = this.totp.generateSecret();
+    await this.prisma.staffUser.update({
+      where: { id: staff.id },
+      data: { totpSecret: secret, totpEnabled: false },
+    });
+    return {
+      secret,
+      otpauthUrl: this.totp.keyUri(staff.username, 'AliStore', secret),
+      totpEnabled: false,
+    };
+  }
+
+  /** Verify the first authenticator code and mark staff 2FA as enabled. */
+  async enableTotp(staffId: string, token: string) {
+    const staff = await this.getActiveStaff(staffId);
+    if (!staff.totpSecret) {
+      throw new ValidationError(
+        'staff_2fa_setup_required',
+        'Сначала создайте секрет 2FA',
+      );
+    }
+    if (!this.totp.verify(token, staff.totpSecret)) {
+      throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
+    }
+    const updated = await this.prisma.staffUser.update({
+      where: { id: staff.id },
+      data: { totpEnabled: true },
+    });
+    return this.publicView(updated);
+  }
+
+  /** Disable self 2FA after a valid current code. */
+  async disableTotp(staffId: string, token: string) {
+    const staff = await this.getActiveStaff(staffId);
+    if (!staff.totpEnabled || !staff.totpSecret) {
+      return this.publicView(staff);
+    }
+    if (!this.totp.verify(token, staff.totpSecret)) {
+      throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
+    }
+    const updated = await this.prisma.staffUser.update({
+      where: { id: staff.id },
+      data: { totpEnabled: false, totpSecret: null },
+    });
+    return this.publicView(updated);
+  }
+
+  /** Step-up gate for approving dangerous actions. Rejecting remains fast. */
+  async verifyStepUp(staffId: string, token?: string) {
+    const staff = await this.getActiveStaff(staffId);
+    if (!staff.totpEnabled || !staff.totpSecret) {
+      throw new ForbiddenError(
+        'staff_2fa_required',
+        'Включите 2FA перед одобрением опасных действий',
+      );
+    }
+    if (!token) {
+      throw new ForbiddenError('staff_2fa_token_required', 'Введите код 2FA');
+    }
+    if (!this.totp.verify(token, staff.totpSecret)) {
+      throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
+    }
+  }
+
+  private async getActiveStaff(staffId: string): Promise<StaffUser> {
+    const staff = await this.prisma.staffUser.findUnique({ where: { id: staffId } });
+    if (!staff || !staff.active) {
+      throw new ForbiddenError('staff_not_found', 'Сотрудник не найден или отключён');
+    }
+    return staff;
+  }
+
+  /** Never expose the password hash or TOTP secret. */
+  publicView(staff: StaffUser) {
+    return {
+      id: staff.id,
+      username: staff.username,
+      role: staff.role,
+      active: staff.active,
+      totpEnabled: staff.totpEnabled,
+    };
   }
 }

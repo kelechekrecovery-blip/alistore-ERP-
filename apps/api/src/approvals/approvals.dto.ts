@@ -21,4 +21,9 @@ export class DecideApprovalDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @ApiPropertyOptional({ example: '123456', description: 'TOTP step-up code required when approving.' })
+  @IsOptional()
+  @IsString()
+  totpToken?: string;
 }

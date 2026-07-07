@@ -117,13 +117,17 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
 - ✅ Staff JWT hardening: Customer PII reads mask phone for anonymous/junior roles; full PII
   only for customer-self or staff admin/owner. Approval Inbox decision ignores body
   `approverRole`; approve/reject uses staff JWT role and service-side Role Permission Matrix.
-- ☐ Осталось: step-up 2FA для опасного approve, staff-session rollout для POS/warehouse/staff ops.
-- ☐ **Role Permission Matrix** (9 ролей) — расширить на все operational endpoints; 2FA на опасное
-  (auth-связано, координировать с Codex).
+- ✅ Step-up 2FA для опасного approve: StaffUser хранит TOTP enrollment (`totpSecret`,
+  `totpEnabled`), staff API даёт setup/enable/disable, Approval Inbox approve требует
+  валидный TOTP-код; reject остаётся быстрым без step-up.
+- ☐ Осталось: staff-session rollout для POS/warehouse/staff ops.
+- ☐ **Role Permission Matrix** (9 ролей) — расширить на все operational endpoints.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
-Осталось: тесты порогов скидки/долга; попытка без прав→403; 2FA-гейт.
+Добавлено: targeted staff/approval 2FA tests; полный Jest 59 suites / 187 tests; browser QA
+`/approvals` login→2FA setup на mobile viewport без overflow. Осталось: staff-session rollout
+для POS/warehouse/staff ops.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
@@ -249,7 +253,8 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 - Phase 0–6 ✅ (ядро/деньги/витрина/аккаунт/POS/склад/approval-цикл+возвраты+обмены).
 - Phase 7 🟡→по существу закрыто: опасные действия через approval (цена/write_off/adjust/
   delete/**долг**/**скидка>10% в POS backend+UI**), staff JWT для Approval Inbox,
-  PII masking/read policy. Остаток — step-up 2FA + rollout staff-session на POS/warehouse ops.
+  PII masking/read policy, step-up 2FA для approve. Остаток — rollout staff-session на
+  POS/warehouse ops.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
