@@ -145,14 +145,18 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
   list/transition/escalate требуют active staff JWT + роль admin/owner; `ticket.created`
   и `ticket.*` actor берутся из customer/staff token path, body actor игнорируется.
   ERP CRM tab использует общий staff session.
+- ✅ **Role Permission Matrix** phase 6: supplier/RMA split. `/suppliers` master data,
+  `/suppliers/rma`, transitions and scorecard теперь требуют active staff JWT: admin/owner
+  создают поставщиков и смотрят scorecard, warehouse/admin/owner ведут RMA. `rma.*`
+  actor берётся из staff JWT, body actor игнорируется.
 - ☐ **Role Permission Matrix** remaining: аккуратно разделить customer self-service и
-  staff/admin mutations для suppliers, debts, trade-in intake, returns/exchanges.
+  staff/admin mutations для debts, trade-in intake, returns/exchanges.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
-RBAC tests; полный Jest 64 suites / 203 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; supplier RBAC tests; полный Jest 65 suites / 204 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
 `/erp` CRM staff login без overflow.
 
@@ -190,6 +194,8 @@ in-browser /erp: вкладка «Маржа·KPI» на реальных дан
   refunded/rejected→written_off), SLA 30 дней → Risk Center (`rma_sla_breach`), scorecard
   по поставщику (volume/resolution rate/backlog, `scorecard.ts`). POST /suppliers,
   POST /suppliers/rma, PATCH /suppliers/rma/:id/transition, GET /suppliers/scorecard.
+  Staff RBAC: admin/owner создают поставщиков и смотрят scorecard, warehouse/admin/owner
+  ведут RMA; actor берётся из staff JWT.
 - ✅ **Долги/рассрочка** (`debts/` модуль): продажа в долг/рассрочку по заказу, лимит
   50000 сом (сверх → approval action=debt, executor бронирует при одобрении), погашение
   платежами (method=installment) до settled, ledger debt.created→debt.payment→debt.settled;
@@ -200,6 +206,7 @@ in-browser /erp: вкладка «Маржа·KPI» на реальных дан
 **Проверка:** ✅ гарантия created→received через консоль (БД + ledger); SLA-breach ловится
 в Risk Center. ✅ Supplier RMA: 6 тестов зелёные + HTTP-смоук created→…→closed (unit
 in_stock→in_repair→in_stock; scorecard resolved=1/rate=1; ledger rma.opened→…→rma.closed).
+✅ Supplier RBAC: no-token/seller denied, admin/warehouse allowed by permission, actor spoof ignored.
 ✅ Долги: 6 тестов + HTTP-смоук (book→pay→pay→settled: 30000→18000→0; долг>лимита→202
 approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.settled). Осталось:
 импорт идемпотентен.
@@ -287,8 +294,8 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   PII masking/read policy, step-up 2FA для approve, staff-session rollout на
   POS/warehouse/staff ops, Role Permission Matrix phase 1 на POS/shifts/inventory/
   fulfillment, phase 2 на courier COD/delivery и print/export, phase 3 на products/refunds,
-  phase 4 на warranty split, phase 5 на support/CRM split. Остаток — разделить
-  public/customer self-service и staff/admin mutations в suppliers/debts/trade-in/returns/exchanges и закрыть
+  phase 4 на warranty split, phase 5 на support/CRM split, phase 6 на supplier/RMA split.
+  Остаток — разделить public/customer self-service и staff/admin mutations в debts/trade-in/returns/exchanges и закрыть
   margin-control.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
@@ -307,7 +314,7 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 64 (203 теста зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 65 (204 теста зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

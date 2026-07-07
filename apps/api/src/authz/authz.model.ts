@@ -123,6 +123,22 @@ p, admin, support, transition
 p, owner, support, transition
 p, admin, support, escalate
 p, owner, support, escalate
+p, admin, suppliers, create
+p, owner, suppliers, create
+p, warehouse, suppliers, read
+p, admin, suppliers, read
+p, owner, suppliers, read
+p, admin, suppliers, scorecard
+p, owner, suppliers, scorecard
+p, warehouse, suppliers, rma_open
+p, admin, suppliers, rma_open
+p, owner, suppliers, rma_open
+p, warehouse, suppliers, rma_read
+p, admin, suppliers, rma_read
+p, owner, suppliers, rma_read
+p, warehouse, suppliers, rma_transition
+p, admin, suppliers, rma_transition
+p, owner, suppliers, rma_transition
 g, owner, admin
 g, admin, senior_seller
 `;
