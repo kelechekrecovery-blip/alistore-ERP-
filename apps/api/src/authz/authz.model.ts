@@ -103,6 +103,14 @@ p, senior_seller, receipts, print
 p, franchise, receipts, print
 p, admin, receipts, print
 p, owner, receipts, print
+p, admin, products, price
+p, owner, products, price
+p, admin, products, archive
+p, owner, products, archive
+p, cashier, payments, refund
+p, senior_seller, payments, refund
+p, admin, payments, refund
+p, owner, payments, refund
 g, owner, admin
 g, admin, senior_seller
 `;

@@ -7,8 +7,10 @@ import {
   NotFoundException,
   Param,
   Patch,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiAcceptedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -18,8 +20,12 @@ import {
 } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { ChangePriceDto, DeleteProductDto } from './products.dto';
-
-const SYSTEM_ACTOR = 'system';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 
 @ApiTags('products')
 @Controller('products')
@@ -41,8 +47,11 @@ export class ProductsController {
   @ApiParam({ name: 'id', description: 'Product id' })
   @ApiOkResponse({ description: 'Applied, or parked for approval (see body).' })
   @Patch(':id/price')
-  changePrice(@Param('id') id: string, @Body() dto: ChangePriceDto) {
-    return this.products.changePrice(id, dto.price, dto.reason, dto.requester ?? SYSTEM_ACTOR);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'price')
+  changePrice(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ChangePriceDto) {
+    return this.products.changePrice(id, dto.price, dto.reason, user.customerId);
   }
 
   @ApiOperation({ summary: 'Delete a product — always approval-gated → soft-delete (202)' })
@@ -50,7 +59,10 @@ export class ProductsController {
   @ApiAcceptedResponse({ description: 'Delete parked for approval; not yet archived.' })
   @Delete(':id')
   @HttpCode(202)
-  remove(@Param('id') id: string, @Body() dto: DeleteProductDto) {
-    return this.products.archive(id, dto.reason, dto.requester ?? SYSTEM_ACTOR);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'archive')
+  remove(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DeleteProductDto) {
+    return this.products.archive(id, dto.reason, user.customerId);
   }
 }

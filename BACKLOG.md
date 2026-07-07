@@ -1,11 +1,12 @@
 # BACKLOG
 
 ## Next
-- Split public/customer self-service from staff/admin Role Permission Matrix gates for warranty, support/CRM, suppliers, debts, trade-in intake, returns/exchanges, products, and payment refunds.
+- Split public/customer self-service from staff/admin Role Permission Matrix gates for warranty, support/CRM, suppliers, debts, trade-in intake, and returns/exchanges.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Enforce active staff RBAC on product price/archive and payment refund request endpoints.
 - Enforce active staff RBAC on courier COD/delivery and print/export endpoints.
 - Enforce Role Permission Matrix on POS/warehouse/staff-session operational endpoints.
 - Finish staff-session rollout for POS/warehouse/staff operational endpoints.

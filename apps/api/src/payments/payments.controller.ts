@@ -1,6 +1,7 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -14,6 +15,12 @@ import { PaymentsService } from './payments.service';
 import { PayDto, RefundDto } from './payments.dto';
 import { PaymentIntentsService } from './payment-intents.service';
 import { CreatePaymentIntentDto, PaymentWebhookDto } from './payment-intents.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 
 const SYSTEM_ACTOR = 'system';
 
@@ -77,7 +84,10 @@ export class PaymentsController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown payment or invalid amount.' })
   @Post(':id/refund')
   @HttpCode(202)
-  refund(@Param('id') id: string, @Body() dto: RefundDto) {
-    return this.payments.refund(id, dto.amount, dto.reason, dto.requester ?? SYSTEM_ACTOR);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'refund')
+  refund(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: RefundDto) {
+    return this.payments.refund(id, dto.amount, dto.reason, user.customerId);
   }
 }

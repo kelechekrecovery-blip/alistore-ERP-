@@ -5,9 +5,11 @@ import { UnitsModule } from '../units/units.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentIntentsService } from './payment-intents.service';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { AuthzModule } from '../authz/authz.module';
 
 @Module({
-  imports: [UnitsModule, ApprovalsModule, OrdersModule],
+  imports: [UnitsModule, ApprovalsModule, OrdersModule, StaffAuthModule, AuthzModule],
   providers: [PaymentsService, PaymentIntentsService],
   controllers: [PaymentsController],
   exports: [PaymentsService],
