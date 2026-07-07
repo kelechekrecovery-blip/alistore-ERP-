@@ -215,3 +215,12 @@
 - Checks run: `npm run build -w @alistore/web`; browser QA on `/warehouse` scanner-assisted count.
 - Outcome: web build passed; browser QA passed with duplicate scan input deduped to 2 unique IMEIs, `POST /api/inventory/count` 201, payload `counted:2`, response `expected:2 counted:2 diff:0`, visible success toast, and screenshot `/tmp/alistore-warehouse-scanner-count.png`.
 - Next step: remaining backlog is external/provider-gated: physical POS hardware certification and campaign delivery integrations.
+
+## 2026-07-07
+
+- Task: ensure exchanges create visible warranty coverage for the new device.
+- Files changed: `apps/api/test/exchange.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`.
+- Result: exchange warranty behavior is now locked by regression coverage: after an exchange, the new sold IMEI appears in `customers.devices()` with warranty coverage derived from the new paid exchange order date.
+- Checks run: targeted Jest for `exchange`; `npm run api:build`.
+- Outcome: exchange-targeted tests passed 2 suites / 3 tests; API build passed.
+- Next step: build Refund Money Flow / Dispute Center staff UI, then debt reminders and shift close photo report.

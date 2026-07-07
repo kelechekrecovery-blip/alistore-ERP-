@@ -1,10 +1,14 @@
 # BACKLOG
 
 ## Next
+- Build Refund Money Flow / Dispute Center staff UI.
+- Add debt reminder notifications.
+- Add shift close photo report.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Ensure exchanges create visible warranty coverage for the new device.
 - Add scanner-assisted inventory count UI.
 - Add warehouse batch receiving UI/API.
 - Add POS split payments.

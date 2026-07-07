@@ -107,12 +107,15 @@ count → `POST /api/inventory/count` 201, expected=2 counted=2 diff=0; свер
 - ✅ **Exchange-UI кассира** (`/exchange` + `GET /units/:imei` lookup): найти проданный IMEI →
   выбрать новый товар → доплата → способ → оформить. Тёмная консоль с shared staff session;
   unit lookup и `POST /exchanges` требуют active staff JWT, actor берётся из токена.
-- ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI, новая гарантия при обмене.
+- ✅ Новая гарантия при обмене: новый IMEI продаётся через новый paid exchange-order того же
+  клиента, поэтому `customers.devices()` показывает warrantyUntil/daysLeft от даты обмена.
+- ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI.
 **Проверка:** ✅ in-browser+БД рефанд (202→Inbox→одобрить→−платёж+order refunded); ✅ обмен-UI
 end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000; refunded-заказ→корректный
 отказ «refunded→exchanged»); ✅ browser QA `/exchange` staff login→unit lookup→exchange
 (`GET /api/units/:imei` 200, `POST /api/exchanges` 201, без failed requests/console errors/
-overflow). units-lookup: 2 теста.
+overflow). units-lookup: 2 теста; exchange warranty coverage regression: новый IMEI имеет
+warrantyUntil и daysLeft > 300.
 
 ## Phase 7 — Опасные действия полностью (v1) ✅
 **Цель:** каждое опасное действие — через approval, с ролями и 2FA.

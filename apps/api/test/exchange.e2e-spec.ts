@@ -2,6 +2,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ExchangesService } from '../src/exchanges/exchanges.service';
 import { ValidationError } from '../src/common/errors';
+import { CustomersService } from '../src/customers/customers.service';
 
 /**
  * Обмен (Phase 6): atomic return + sale + surcharge. Old unit → returned, new
@@ -11,12 +12,15 @@ import { ValidationError } from '../src/common/errors';
 describe('Exchange (integration)', () => {
   let prisma: PrismaService;
   let exchanges: ExchangesService;
+  let customers: CustomersService;
   let seq = 0;
 
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    exchanges = new ExchangesService(prisma, new AuditService(prisma));
+    const audit = new AuditService(prisma);
+    exchanges = new ExchangesService(prisma, audit);
+    customers = new CustomersService(prisma, audit);
   });
 
   afterAll(async () => {
@@ -53,11 +57,11 @@ describe('Exchange (integration)', () => {
         items: { create: [{ sku: oldProduct.sku, qty: 1, price: oldPrice, imei: oldImei }] },
       },
     });
-    return { order, oldImei, newProduct };
+    return { customer, order, oldImei, newProduct };
   }
 
   it('swaps devices, collects surcharge, marks original exchanged', async () => {
-    const { order, oldImei, newProduct } = await setup(100000, 130000);
+    const { customer, order, oldImei, newProduct } = await setup(100000, 130000);
 
     const res = await exchanges.exchange(
       { originalOrderId: order.id, oldImei, newProductId: newProduct.id, method: 'cash' },
@@ -75,6 +79,11 @@ describe('Exchange (integration)', () => {
 
     const payment = await prisma.payment.findFirst({ where: { orderId: res.exchangeOrderId } });
     expect(payment?.amount).toBe(30000);
+
+    const devices = await customers.devices(customer.id);
+    const newDevice = devices.find((device) => device.imei === res.newImei);
+    expect(newDevice?.warrantyUntil).toBeTruthy();
+    expect(newDevice?.daysLeft).toBeGreaterThan(300);
 
     const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
     expect(types).toEqual(
