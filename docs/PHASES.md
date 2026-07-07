@@ -195,8 +195,14 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
 - ✅ ERP-дашборд `/erp`: деньги (продажи/возвраты/net, по способам), заказы/склад по
   статусам, ops (смены, на одобрении). `reports/` модуль, `GET /reports/dashboard`.
-- ✅ **Risk Center**: касса≠, COD не сдан >24ч, зависший резерв, ожидающие approval —
-  ранжировано по severity (`reports/risk-signals.ts`, reduction). `GET /reports/risks`.
+- ✅ **Risk Center**: касса≠, COD не сдан >24ч, зависший резерв, ожидающие approval,
+  SLA-брейчи (гарантия/RMA/тикет), просроченный долг — ранжировано по severity
+  (`reports/risk-signals.ts`). `GET /reports/risks`.
+- ✅ **Loss-prevention сигналы** (схемо-независимые, `risk-signals.ts`): `margin_leak`
+  (продажа оплаченной позиции ниже себестоимости, worst-per-SKU) и `stock_money_mismatch`
+  (юнит `sold` без заказа = склад≠деньги, high). Всплывают в том же Risk Center + Command
+  Center (margin_leak→Маржа·KPI, mismatch→Склад). Проверено вживую: mismatch ловит реальную
+  аномалию (1 юнит sold без orderId). 5 тестов.
 - ✅ **Event Ledger** просмотр (feed) в дашборде. `GET /reports/ledger`.
 - ✅ **Маржа/KPI** (`reports.kpi()` + `reports/kpi.ts`, `GET /reports/kpi`): валовая маржа
   = выручка(received-платежи) − себестоимость(cost проданных единиц), маржа %, средний чек,
