@@ -88,16 +88,19 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 ## Phase 6 — Approval-цикл + Возвраты + Обмены ✅
 - ✅ **ApprovalsService** (park→202→decide исполняет действие), **Approval Inbox** UI.
 - ✅ Approval-gated **refund** (инв #1) → компенсирующий платёж + order.refunded.
-- ✅ **Returns** (return.requested + машина статусов).
+- ✅ **Returns** (return.requested + машина статусов): клиентская заявка требует
+  customer JWT и проверяет владение заказом; staff list/get/transition закрыты RBAC.
 - ✅ **Обмен** (`ExchangesService`): атомарно возврат старого + продажа нового + доплата
   (≥0) + original→exchanged; дешевле → отказ (через возврат+refund). POST /exchanges.
 - ✅ **Exchange-UI кассира** (`/exchange` + `GET /units/:imei` lookup): найти проданный IMEI →
-  выбрать новый товар → доплата → способ → оформить. Тёмная консоль; guard'ы (не «продан»/
-  дешевле/терминальный заказ).
+  выбрать новый товар → доплата → способ → оформить. Тёмная консоль с shared staff session;
+  unit lookup и `POST /exchanges` требуют active staff JWT, actor берётся из токена.
 - ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI, новая гарантия при обмене.
 **Проверка:** ✅ in-browser+БД рефанд (202→Inbox→одобрить→−платёж+order refunded); ✅ обмен-UI
 end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000; refunded-заказ→корректный
-отказ «refunded→exchanged»). units-lookup: 2 теста.
+отказ «refunded→exchanged»); ✅ browser QA `/exchange` staff login→unit lookup→exchange
+(`GET /api/units/:imei` 200, `POST /api/exchanges` 201, без failed requests/console errors/
+overflow). units-lookup: 2 теста.
 
 ## Phase 7 — Опасные действия полностью (v1) 🟡
 **Цель:** каждое опасное действие — через approval, с ролями и 2FA.
@@ -158,17 +161,21 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
   Staff intake идёт через `POST /tradeins/intake` с active staff JWT + seller/cashier/
   senior/franchise/admin/owner; `GET /tradeins/:id` staff-read guarded. Staff app
   отправляет Bearer token.
-- ☐ **Role Permission Matrix** remaining: аккуратно разделить customer self-service и
-  staff/admin mutations для returns/exchanges.
+- ✅ **Role Permission Matrix** phase 9: returns/exchanges split. `POST /returns` требует
+  customer JWT и проверяет владение заказом; staff list/get/transition требуют active
+  staff JWT + returns permission. `GET /units/:imei` и `POST /exchanges` требуют active
+  staff JWT; exchange actor берётся из staff token. `/account/returns` отправляет customer
+  token, `/exchange` использует shared staff session.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
-RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; полный Jest
-69 suites / 215 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; returns/exchanges
+RBAC tests; полный Jest 71 suites / 222 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
-`/erp` CRM staff login, `/staff` buyback intake без overflow.
+`/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
+без overflow.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.

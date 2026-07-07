@@ -3,7 +3,7 @@ import { ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ValidationError } from '../common/errors';
+import { ForbiddenError, ValidationError } from '../common/errors';
 
 /**
  * Return requests (Return state machine). Recording a return is separate from the
@@ -30,12 +30,16 @@ export class ReturnsService {
     });
   }
 
-  async request(orderId: string, reason: string, requester: string) {
+  async request(orderId: string, reason: string, requester?: string, expectedCustomerId?: string) {
     return this.audit.transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
+      if (expectedCustomerId && order.customerId !== expectedCustomerId) {
+        throw new ForbiddenError('return_order_forbidden', 'Нельзя оформить возврат по чужому заказу');
+      }
+      const actor = requester ?? order.customerId;
       const ret = await tx.return.create({
         data: { orderId, reason, status: 'requested' },
       });
@@ -44,7 +48,7 @@ export class ReturnsService {
         events: [
           {
             type: EventType.ReturnRequested,
-            actor: requester,
+            actor,
             payload: { returnId: ret.id, orderId, reason },
             refs: [ret.id, orderId],
           },

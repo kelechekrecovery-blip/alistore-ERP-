@@ -42,11 +42,11 @@ export default function ReturnsPage() {
     setBusy(true);
     setError(null);
     try {
-      const ret = await openReturnRequest({
+      const ret = await authed((token) => openReturnRequest({
         orderId,
         reason: photoNote.trim() ? `${reason}; фото/комментарий: ${photoNote.trim()}` : reason,
         requester: user?.customerId ?? 'customer_app',
-      });
+      }, token));
       const evidence = files.length
         ? await uploadEvidenceImages({
             files,

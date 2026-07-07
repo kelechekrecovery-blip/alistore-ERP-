@@ -1,11 +1,11 @@
 # BACKLOG
 
 ## Next
-- Split public/customer self-service from staff/admin Role Permission Matrix gates for returns/exchanges.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Split returns/exchanges customer self-service from staff/cashier RBAC gates.
 - Split trade-in customer self-service from staff intake RBAC gates.
 - Enforce debt/installment staff RBAC gates.
 - Enforce supplier/RMA/scorecard staff RBAC gates.

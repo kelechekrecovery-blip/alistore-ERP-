@@ -77,6 +77,7 @@ describe('Dangerous product/refund endpoint RBAC', () => {
     await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
 

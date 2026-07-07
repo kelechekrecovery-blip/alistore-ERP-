@@ -11,15 +11,17 @@ import {
   type UnitLookup,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const METHODS = [
   { id: 'cash', name: '💵 Наличные' },
   { id: 'card', name: '💳 Карта' },
   { id: 'qr_mbank', name: '📱 MBank' },
 ];
-const STAFF = 'pos_azizbek';
-
 export default function ExchangePage() {
+  const [session, setSession] = useState<StaffSession | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const [imei, setImei] = useState('');
   const [unit, setUnit] = useState<UnitLookup | null>(null);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -30,6 +32,8 @@ export default function ExchangePage() {
   const [result, setResult] = useState<ExchangeResult | null>(null);
 
   useEffect(() => {
+    setSession(loadStaffSession());
+    setHydrated(true);
     fetchCatalog({ limit: 100, stockOnly: true }).then((c) => setProducts(c.items)).catch(() => setProducts([]));
   }, []);
 
@@ -38,10 +42,10 @@ export default function ExchangePage() {
   const canSubmit = !!unit && unit.status === 'sold' && !!unit.orderId && !!newProduct && surcharge >= 0;
 
   async function lookup() {
-    if (!imei.trim()) return;
+    if (!imei.trim() || !session) return;
     setErr(''); setUnit(null); setBusy(true);
     try {
-      setUnit(await fetchUnit(imei.trim()));
+      setUnit(await fetchUnit(imei.trim(), session.accessToken));
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'IMEI не найден');
     } finally {
@@ -50,7 +54,7 @@ export default function ExchangePage() {
   }
 
   async function submit() {
-    if (!unit?.orderId || !newProduct) return;
+    if (!unit?.orderId || !newProduct || !session) return;
     setErr(''); setBusy(true);
     try {
       const r = await exchangeDevice({
@@ -58,8 +62,8 @@ export default function ExchangePage() {
         oldImei: unit.imei,
         newProductId: newProduct.id,
         method,
-        requester: STAFF,
-      });
+        requester: session.staffId,
+      }, session.accessToken);
       setResult(r);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка обмена');
@@ -72,6 +76,28 @@ export default function ExchangePage() {
     setImei(''); setUnit(null); setNewId(''); setResult(null); setErr('');
   }
 
+  function logout() {
+    clearStaffSession();
+    setSession(null);
+    reset();
+  }
+
+  if (!hydrated) {
+    return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0E0C0A] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
+  }
+
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-[#0E0C0A] p-5 font-sans">
+        <StaffSessionLogin
+          title="Обмен · вход"
+          caption="Нужна роль кассира, продавца или администратора."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A] font-sans text-white">
       <header className="flex items-center gap-4 border-b border-[#2E2822] bg-[#16130F] px-6 py-4">
@@ -80,7 +106,11 @@ export default function ExchangePage() {
           <div className="font-display text-lg font-bold">Обмен товара</div>
           <div className="text-xs text-[#8A7F76]">Возврат старого + продажа нового + доплата</div>
         </div>
-        <Link href="/pos" className="ml-auto rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">⌂ POS</Link>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="hidden text-xs text-[#8A7F76] sm:inline">{session.username} · {session.role}</span>
+          <button type="button" onClick={logout} className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">Выйти</button>
+          <Link href="/pos" className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">⌂ POS</Link>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">

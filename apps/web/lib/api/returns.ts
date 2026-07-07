@@ -1,4 +1,4 @@
-import { postJson } from './http';
+import { postAuthJson } from './http';
 
 export interface ReturnRequest {
   id: string;
@@ -12,6 +12,6 @@ export function openReturnRequest(input: {
   orderId: string;
   reason: string;
   requester?: string;
-}): Promise<ReturnRequest> {
-  return postJson('/returns', input);
+}, accessToken: string): Promise<ReturnRequest> {
+  return postAuthJson('/returns', input, accessToken);
 }

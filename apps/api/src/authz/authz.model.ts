@@ -167,6 +167,31 @@ p, senior_seller, tradeins, read
 p, franchise, tradeins, read
 p, admin, tradeins, read
 p, owner, tradeins, read
+p, cashier, returns, read
+p, seller, returns, read
+p, senior_seller, returns, read
+p, warehouse, returns, read
+p, admin, returns, read
+p, owner, returns, read
+p, cashier, returns, transition
+p, seller, returns, transition
+p, senior_seller, returns, transition
+p, warehouse, returns, transition
+p, admin, returns, transition
+p, owner, returns, transition
+p, cashier, exchanges, create
+p, seller, exchanges, create
+p, senior_seller, exchanges, create
+p, franchise, exchanges, create
+p, admin, exchanges, create
+p, owner, exchanges, create
+p, cashier, units, read
+p, seller, units, read
+p, senior_seller, units, read
+p, franchise, units, read
+p, warehouse, units, read
+p, admin, units, read
+p, owner, units, read
 g, owner, admin
 g, admin, senior_seller
 `;
