@@ -20,10 +20,20 @@ export interface RiskSignal {
     | 'warranty_sla_breach'
     | 'rma_sla_breach'
     | 'debt_overdue'
-    | 'ticket_sla_breach';
+    | 'ticket_sla_breach'
+    | 'margin_leak'
+    | 'stock_money_mismatch';
   severity: RiskSeverity;
   ref: string;
   detail: string;
+}
+
+/** A paid line sold below its product cost — a margin leak worth investigating. */
+export interface MarginLeak {
+  sku: string;
+  name: string;
+  price: number;
+  cost: number;
 }
 
 interface RiskInputs {
@@ -35,6 +45,8 @@ interface RiskInputs {
   rmaOverdue: SupplierRma[];
   debtsOverdue: DebtPlan[];
   ticketsOverdue: SupportTicket[];
+  marginLeaks: MarginLeak[]; // paid items sold under cost
+  soldWithoutOrder: number; // units marked sold with no order attached (stock≠money)
 }
 
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
@@ -111,6 +123,26 @@ export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
       severity: t.priority === 'urgent' ? 'high' : 'medium',
       ref: t.id,
       detail: `Тикет «${t.subject}» просрочил SLA (${t.priority}/${t.status})`,
+    });
+  }
+
+  // Margin leak: a paid line sold below product cost (loss-making sale).
+  for (const m of input.marginLeaks) {
+    signals.push({
+      kind: 'margin_leak',
+      severity: 'medium',
+      ref: m.sku,
+      detail: `Продажа ниже себестоимости: ${m.name} за ${m.price} при закупке ${m.cost} сом`,
+    });
+  }
+
+  // Stock≠money: a unit left inventory (sold) without an order to back it.
+  if (input.soldWithoutOrder > 0) {
+    signals.push({
+      kind: 'stock_money_mismatch',
+      severity: 'high',
+      ref: '—',
+      detail: `Продано без заказа (склад≠деньги): ${input.soldWithoutOrder} юнит(ов)`,
     });
   }
 

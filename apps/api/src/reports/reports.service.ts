@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildRiskSignals } from './risk-signals';
+import { buildRiskSignals, MarginLeak } from './risk-signals';
 import { buildKpi } from './kpi';
 import { buildPayroll } from './payroll';
 import {
@@ -191,8 +191,20 @@ export class ReportsService {
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */
   async risks() {
     const now = new Date();
-    const [cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue] =
-      await Promise.all([
+    const paid: OrderStatus[] = ['paid', 'completed', 'exchanged'];
+    const [
+      cashDiscrepancies,
+      codOutstanding,
+      staleReservations,
+      pendingApprovals,
+      warrantyOverdue,
+      rmaOverdue,
+      debtsOverdue,
+      ticketsOverdue,
+      paidItems,
+      productCosts,
+      soldWithoutOrder,
+    ] = await Promise.all([
         this.prisma.cashShift.findMany({
           where: { diff: { not: 0 }, closedAt: { not: null } },
           orderBy: { closedAt: 'desc' },
@@ -232,10 +244,29 @@ export class ReportsService {
           orderBy: { sla: 'asc' },
           take: 20,
         }),
+        this.prisma.orderItem.findMany({
+          where: { order: { status: { in: paid } } },
+          select: { sku: true, price: true },
+        }),
+        this.prisma.product.findMany({ select: { sku: true, name: true, cost: true } }),
+        this.prisma.deviceUnit.count({ where: { status: 'sold', orderId: null } }),
       ]);
 
+    // A paid line priced under its product cost is a margin leak; keep the worst per SKU.
+    const costBySku = new Map(productCosts.map((p) => [p.sku, p]));
+    const leakBySku = new Map<string, MarginLeak>();
+    for (const it of paidItems) {
+      const p = costBySku.get(it.sku);
+      if (!p || it.price >= p.cost) continue;
+      const prev = leakBySku.get(it.sku);
+      if (!prev || it.price < prev.price) {
+        leakBySku.set(it.sku, { sku: it.sku, name: p.name, price: it.price, cost: p.cost });
+      }
+    }
+    const marginLeaks = [...leakBySku.values()].slice(0, 10);
+
     const signals = buildRiskSignals(
-      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue },
+      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrder },
       now,
     );
     return { count: signals.length, signals };
