@@ -91,9 +91,11 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ Приёмка партий: `POST /inventory/receive` (warehouse/admin/owner RBAC) создаёт IMEI units,
   пишет `InventoryMovement(received)`, `stock.received` и `unit.received`; `/warehouse`
   даёт форму batch receive с многострочным IMEI/SN вводом.
-- ☐ Осталось: инвентаризация со сканером.
+- ✅ Инвентаризация со сканером: `/warehouse` принимает многострочный/keyboard-wedge ввод
+  IMEI/SN, считает уникальные сканы и отправляет `POST /inventory/count` с рассчитанным фактом.
 **Проверка:** ✅ in-browser fulfill web-заказа → reserved+IMEI; ✅ browser QA `/warehouse`
-batch receive → `POST /api/inventory/receive` 201, 2 IMEI in_stock, movement+ledger; сверка в БД.
+batch receive → `POST /api/inventory/receive` 201, 2 IMEI in_stock, movement+ledger; ✅ scanner
+count → `POST /api/inventory/count` 201, expected=2 counted=2 diff=0; сверка в БД.
 
 ## Phase 6 — Approval-цикл + Возвраты + Обмены ✅
 - ✅ **ApprovalsService** (park→202→decide исполняет действие), **Approval Inbox** UI.

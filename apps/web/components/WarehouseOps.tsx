@@ -12,6 +12,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [productId, setProductId] = useState('');
   const [location, setLocation] = useState('BISHKEK-1');
   const [counted, setCounted] = useState('');
+  const [countScans, setCountScans] = useState('');
   const [receiveProductId, setReceiveProductId] = useState('');
   const [receiveLocation, setReceiveLocation] = useState('BISHKEK-1');
   const [receiveGrade, setReceiveGrade] = useState('A');
@@ -61,10 +62,12 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   }
 
   async function doCount() {
-    if (!productId || !location.trim() || counted === '') return;
+    const scannedImeis = parseImeis(countScans);
+    const effectiveCounted = counted === '' ? scannedImeis.length : Number(counted);
+    if (!productId || !location.trim() || (counted === '' && scannedImeis.length === 0)) return;
     setBusy('count');
     try {
-      const r = await inventoryCount(productId, location.trim(), Number(counted), accessToken);
+      const r = await inventoryCount(productId, location.trim(), effectiveCounted, accessToken);
       const evidence = countFiles.length
         ? await uploadEvidenceImages({
             files: countFiles,
@@ -74,8 +77,9 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
             actor,
           })
         : [];
-      flash(`✓ Учтено ${r.counted}, было ${r.expected}, расхождение ${r.diff} · фото ${evidence.length}`);
+      flash(`✓ Учтено ${r.counted}, было ${r.expected}, расхождение ${r.diff} · сканов ${scannedImeis.length} · фото ${evidence.length}`);
       setCounted('');
+      setCountScans('');
       setCountFiles([]);
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка учёта');
@@ -156,6 +160,18 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
               <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="склад" className="w-28 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
               <input value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
               <button type="button" disabled={busy === 'count'} onClick={doCount} className="flex-1 rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-[#2E2822]">Записать</button>
+            </div>
+            <textarea
+              value={countScans}
+              onChange={(e) => setCountScans(e.target.value)}
+              placeholder="Скан IMEI/SN, каждый с новой строки"
+              className="min-h-[72px] resize-none rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-[#6E645C] focus:border-coral"
+            />
+            <div className="flex items-center gap-2 text-xs text-[#8A7F76]">
+              <span>Сканов: {parseImeis(countScans).length}</span>
+              <button type="button" onClick={() => setCounted(String(parseImeis(countScans).length))} className="ml-auto font-semibold text-lime hover:text-white">
+                Факт = сканы
+              </button>
             </div>
             <EvidencePicker files={countFiles} onChange={setCountFiles} label="Фото полки" hint="Общий вид и спорные позиции" max={4} />
           </div>
