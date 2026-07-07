@@ -46,7 +46,7 @@ interface RiskInputs {
   debtsOverdue: DebtPlan[];
   ticketsOverdue: SupportTicket[];
   marginLeaks: MarginLeak[]; // paid items sold under cost
-  soldWithoutOrder: number; // units marked sold with no order attached (stock≠money)
+  soldWithoutOrderImeis: string[]; // IMEIs of units marked sold with no order (stock≠money)
 }
 
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
@@ -137,12 +137,13 @@ export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
   }
 
   // Stock≠money: a unit left inventory (sold) without an order to back it.
-  if (input.soldWithoutOrder > 0) {
+  if (input.soldWithoutOrderImeis.length > 0) {
+    const sample = input.soldWithoutOrderImeis.slice(0, 3).join(', ');
     signals.push({
       kind: 'stock_money_mismatch',
       severity: 'high',
-      ref: '—',
-      detail: `Продано без заказа (склад≠деньги): ${input.soldWithoutOrder} юнит(ов)`,
+      ref: input.soldWithoutOrderImeis[0],
+      detail: `Продано без заказа (склад≠деньги): ${input.soldWithoutOrderImeis.length} юнит(ов) — ${sample}`,
     });
   }
 

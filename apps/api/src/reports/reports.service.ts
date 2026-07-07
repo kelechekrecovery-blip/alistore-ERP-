@@ -249,8 +249,13 @@ export class ReportsService {
           select: { sku: true, price: true },
         }),
         this.prisma.product.findMany({ select: { sku: true, name: true, cost: true } }),
-        this.prisma.deviceUnit.count({ where: { status: 'sold', orderId: null } }),
+        this.prisma.deviceUnit.findMany({
+          where: { status: 'sold', orderId: null },
+          select: { imei: true },
+          take: 20,
+        }),
       ]);
+    const soldWithoutOrderImeis = soldWithoutOrder.map((u) => u.imei);
 
     // A paid line priced under its product cost is a margin leak; keep the worst per SKU.
     const costBySku = new Map(productCosts.map((p) => [p.sku, p]));
@@ -266,7 +271,7 @@ export class ReportsService {
     const marginLeaks = [...leakBySku.values()].slice(0, 10);
 
     const signals = buildRiskSignals(
-      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrder },
+      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrderImeis },
       now,
     );
     return { count: signals.length, signals };
