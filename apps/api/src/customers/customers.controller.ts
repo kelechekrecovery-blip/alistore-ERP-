@@ -20,8 +20,11 @@ import {
 import { CustomersService } from './customers.service';
 import { SetConsentDto, UpsertCustomerDto } from './customers.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
+import type { Customer } from '@prisma/client';
+import type { CustomerOverview } from './customer-overview';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -42,8 +45,9 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Aggregated customer overview.' })
   @ApiNotFoundResponse({ description: 'Customer does not exist.' })
   @Get(':id/overview')
-  overview(@Param('id') id: string) {
-    return this.customers.overview(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async overview(@Param('id') id: string, @CurrentUser() user?: AuthPrincipal) {
+    return this.maskOverview(await this.customers.overview(id), user);
   }
 
   @ApiOperation({ summary: 'Get a customer' })
@@ -51,10 +55,11 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Customer found.' })
   @ApiNotFoundResponse({ description: 'Customer does not exist.' })
   @Get(':id')
-  async get(@Param('id') id: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async get(@Param('id') id: string, @CurrentUser() user?: AuthPrincipal) {
     const customer = await this.customers.get(id);
     if (!customer) throw new NotFoundException(`Клиент ${id} не найден`);
-    return customer;
+    return this.maskCustomer(customer, user);
   }
 
   @ApiOperation({ summary: 'Find-or-create a customer by phone (guest checkout)' })
@@ -71,5 +76,34 @@ export class CustomersController {
   @Patch(':id/consent')
   setConsent(@Param('id') id: string, @Body() dto: SetConsentDto) {
     return this.customers.setConsent(id, dto.consent, dto.actor ?? 'customer');
+  }
+
+  private maskOverview(overview: CustomerOverview, user?: AuthPrincipal): CustomerOverview {
+    if (this.canReadPii(user, overview.customer.id)) return overview;
+    return {
+      ...overview,
+      customer: {
+        ...overview.customer,
+        phone: this.maskPhone(overview.customer.phone),
+      },
+    };
+  }
+
+  private maskCustomer(customer: Customer, user?: AuthPrincipal): Customer {
+    if (this.canReadPii(user, customer.id)) return customer;
+    return { ...customer, phone: this.maskPhone(customer.phone) };
+  }
+
+  private canReadPii(user: AuthPrincipal | undefined, customerId: string): boolean {
+    if (user?.typ === 'customer') return user.customerId === customerId;
+    if (user?.typ === 'staff') return user.role === 'admin' || user.role === 'owner';
+    return false;
+  }
+
+  private maskPhone(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length <= 4) return '***';
+    const prefix = phone.startsWith('+') ? `+${digits.slice(0, 3)}` : digits.slice(0, 3);
+    return `${prefix}******${digits.slice(-2)}`;
   }
 }

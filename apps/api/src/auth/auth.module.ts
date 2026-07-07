@@ -8,6 +8,7 @@ import { TotpService } from './totp.service';
 import { JwtStrategy } from './jwt.strategy';
 import { resolveJwtSecret } from './jwt-secret';
 import { AuthController } from './auth.controller';
+import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 
 /**
  * Phone+OTP authentication. AuditService and PrismaService are provided globally;
@@ -27,8 +28,8 @@ import { AuthController } from './auth.controller';
       }),
     }),
   ],
-  providers: [AuthService, TotpService, JwtStrategy],
+  providers: [AuthService, TotpService, JwtStrategy, OptionalJwtAuthGuard],
   controllers: [AuthController],
-  exports: [AuthService, TotpService],
+  exports: [AuthService, TotpService, OptionalJwtAuthGuard],
 })
 export class AuthModule {}

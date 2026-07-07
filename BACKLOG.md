@@ -1,11 +1,12 @@
 # BACKLOG
 
 ## Next
-- Complete staff JWT role rollout for production PII/2FA gates across dangerous actions.
+- Finish step-up 2FA and staff-session rollout for POS/warehouse/staff operational endpoints.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Harden staff JWT authorization for Customer PII reads and Approval Inbox decisions; approval role now comes from JWT, not request body.
 - Build offline POS queue/sync with `clientSaleId` idempotency, conflict states, scanner input, receipt printing, and terminal readiness fallback.
 - Add provider-shaped payment intents and sandbox webhook reconciliation for card, MBank QR, O!Деньги QR, and installments.
 - Add real Evidence Vault image upload flows for trade-in, returns, warranty, support, and warehouse operations on top of the media service.

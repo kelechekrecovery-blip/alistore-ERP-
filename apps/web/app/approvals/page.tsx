@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { decideApproval, fetchApprovals, type Approval } from '@/lib/api';
+import type { FormEvent } from 'react';
+import { decideApproval, fetchApprovals, staffLogin, type Approval } from '@/lib/api';
 import { som } from '@/lib/format';
 
-const APPROVER = 'admin_gulnara';
+const STAFF_SESSION_KEY = 'alistore.staff.auth.v1';
 
 const TABS = [
   { status: 'requested', label: 'Ожидают' },
@@ -29,27 +30,60 @@ export default function ApprovalsPage() {
   const [items, setItems] = useState<Approval[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [session, setSession] = useState<{ accessToken: string; role: string } | null>(null);
+  const [login, setLogin] = useState({ username: '', password: '' });
 
-  const load = useCallback((status: string) => {
-    setItems(null);
-    fetchApprovals(status)
-      .then(setItems)
-      .catch(() => setItems([]));
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STAFF_SESSION_KEY);
+      if (raw) setSession(JSON.parse(raw) as { accessToken: string; role: string });
+    } catch {
+      setSession(null);
+    }
   }, []);
+
+  const load = useCallback((status: string, token = session?.accessToken) => {
+    if (!token) return;
+    setItems(null);
+    fetchApprovals(status, token)
+      .then(setItems)
+      .catch(() => {
+        setItems([]);
+        setSession(null);
+        localStorage.removeItem(STAFF_SESSION_KEY);
+      });
+  }, [session?.accessToken]);
 
   useEffect(() => {
     load(tab.status);
-  }, [tab, load]);
+  }, [tab, load, session?.accessToken]);
 
   function flash(m: string) {
     setToast(m);
     window.setTimeout(() => setToast(''), 1800);
   }
 
+  async function doLogin(e: FormEvent) {
+    e.preventDefault();
+    setBusy('login');
+    try {
+      const next = await staffLogin(login.username.trim(), login.password);
+      setSession(next);
+      localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(next));
+      flash(`Вход: ${next.role}`);
+      load(tab.status, next.accessToken);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка входа');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function decide(a: Approval, status: 'approved' | 'rejected') {
+    if (!session) return;
     setBusy(a.id);
     try {
-      await decideApproval(a.id, status, APPROVER);
+      await decideApproval(a.id, status, session.accessToken);
       flash(status === 'approved' ? 'Одобрено · действие выполнено' : 'Отклонено');
       load(tab.status);
     } catch (e) {
@@ -67,35 +101,74 @@ export default function ApprovalsPage() {
         </span>
         <div>
           <div className="font-display text-lg font-bold text-ink">Approval Inbox</div>
-          <div className="text-xs text-ink/50">Одобрение опасных действий · {APPROVER}</div>
+          <div className="text-xs text-ink/50">Одобрение опасных действий · {session ? session.role : 'требуется вход'}</div>
         </div>
+        {session && (
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem(STAFF_SESSION_KEY);
+              setSession(null);
+              setItems(null);
+            }}
+            className="ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
+          >
+            Выйти staff
+          </button>
+        )}
         <Link
           href="/"
-          className="ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
+          className={session ? 'rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30' : 'ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30'}
         >
           ⌂ Выйти
         </Link>
       </header>
 
-      <div className="flex flex-shrink-0 gap-2 border-b border-ink/10 bg-white/50 px-6 py-3">
-        {TABS.map((t) => (
-          <button
-            key={t.status}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`rounded-chip px-4 py-2 text-sm font-semibold transition ${
-              tab.status === t.status
-                ? 'bg-ink text-sand'
-                : 'border border-ink/15 bg-white text-ink/70 hover:border-ink/30'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {session && (
+        <div className="flex flex-shrink-0 gap-2 border-b border-ink/10 bg-white/50 px-6 py-3">
+          {TABS.map((t) => (
+            <button
+              key={t.status}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`rounded-chip px-4 py-2 text-sm font-semibold transition ${
+                tab.status === t.status
+                  ? 'bg-ink text-sand'
+                  : 'border border-ink/15 bg-white text-ink/70 hover:border-ink/30'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl">
+          {!session && (
+            <form onSubmit={doLogin} className="rounded-card border border-ink/10 bg-white p-6 shadow-soft">
+              <div className="font-display text-xl font-bold text-ink">Вход сотрудника</div>
+              <div className="mt-1 text-sm text-ink/55">Введите рабочий логин, чтобы открыть очередь одобрений.</div>
+              <input
+                value={login.username}
+                onChange={(e) => setLogin((v) => ({ ...v, username: e.target.value }))}
+                placeholder="username"
+                className="mt-5 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40"
+              />
+              <input
+                value={login.password}
+                onChange={(e) => setLogin((v) => ({ ...v, password: e.target.value }))}
+                placeholder="password"
+                type="password"
+                className="mt-3 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40"
+              />
+              <button type="submit" disabled={busy === 'login'} className="mt-4 rounded-btn bg-ink px-5 py-3 text-sm font-semibold text-sand disabled:opacity-50">
+                {busy === 'login' ? 'Входим…' : 'Войти'}
+              </button>
+            </form>
+          )}
+          {session && (
+            <>
           {items === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
           {items && items.length === 0 && (
             <div className="rounded-card border border-dashed border-ink/15 bg-white/50 px-6 py-16 text-center">
@@ -151,6 +224,8 @@ export default function ApprovalsPage() {
                 );
               })}
             </ul>
+          )}
+            </>
           )}
         </div>
       </div>

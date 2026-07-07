@@ -114,10 +114,13 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
   старшим (request→approve→retry); анти-подмена: одобренный % должен совпадать (discount_mismatch).
   **UI POS 2.0**: экран «Нужно одобрение» (approvalId) → «Провести после одобрения» → чек
   (браузер+БД проверено end-to-end: 15% → park → approve → продажа 161415, IMEI записан).
-- ☐ Осталось (лана Codex/auth): доступ к PII → 2FA; вход сотрудника с ролью в JWT + guards.
-- ☐ **Role Permission Matrix** (9 ролей) — серверная проверка прав/лимитов; 2FA на опасное
+- ✅ Staff JWT hardening: Customer PII reads mask phone for anonymous/junior roles; full PII
+  only for customer-self or staff admin/owner. Approval Inbox decision ignores body
+  `approverRole`; approve/reject uses staff JWT role and service-side Role Permission Matrix.
+- ☐ Осталось: step-up 2FA для опасного approve, staff-session rollout для POS/warehouse/staff ops.
+- ☐ **Role Permission Matrix** (9 ролей) — расширить на все operational endpoints; 2FA на опасное
   (auth-связано, координировать с Codex).
-- ☐ PII-маскирование младшим ролям; margin-контроль (инв #6).
+- ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
 Осталось: тесты порогов скидки/долга; попытка без прав→403; 2FA-гейт.
@@ -245,7 +248,8 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 **Функциональное ядро прототипа готово end-to-end.** Готово в моей лане:
 - Phase 0–6 ✅ (ядро/деньги/витрина/аккаунт/POS/склад/approval-цикл+возвраты+обмены).
 - Phase 7 🟡→по существу закрыто: опасные действия через approval (цена/write_off/adjust/
-  delete/**долг**/**скидка>10% в POS backend+UI**). Остаток — staff-JWT-роли+guards/PII/2FA = **лана Codex** (`authz/` casbin).
+  delete/**долг**/**скидка>10% в POS backend+UI**), staff JWT для Approval Inbox,
+  PII masking/read policy. Остаток — step-up 2FA + rollout staff-session на POS/warehouse ops.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
@@ -263,11 +267,11 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 57 (180 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 59 (184 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
-- **Лана Codex** (не трогаю): authz/casbin/JWT-роли/PII/2FA, outbox/Novu-доставка,
+- **Лана Codex** (не трогаю): step-up 2FA, POS/warehouse staff-session rollout, outbox/Novu-доставка,
   Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF,
   realtime (socket.io), observability (sentry), i18n, health, infra (Caddy/бэкапы).
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),

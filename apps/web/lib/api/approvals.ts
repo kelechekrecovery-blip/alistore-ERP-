@@ -11,8 +11,9 @@ export interface Approval {
   createdAt: string;
 }
 
-export async function fetchApprovals(status: string): Promise<Approval[]> {
+export async function fetchApprovals(status: string, accessToken: string): Promise<Approval[]> {
   const res = await fetch(`${API_BASE}/approvals?status=${encodeURIComponent(status)}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`approvals ${res.status}`);
@@ -22,14 +23,13 @@ export async function fetchApprovals(status: string): Promise<Approval[]> {
 export async function decideApproval(
   id: string,
   status: 'approved' | 'rejected',
-  approver: string,
-  approverRole = 'owner',
+  accessToken: string,
   reason?: string,
 ): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/approvals/${id}/decide`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ status, approver, approverRole, reason }),
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ status, reason }),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));

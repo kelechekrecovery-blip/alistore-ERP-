@@ -35,3 +35,12 @@
 - Checks run: `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`.
 - Outcome: API build passed; web build passed; Jest passed 57 suites / 180 tests.
 - Next step: staff JWT role rollout for PII/2FA dangerous-action gates, then external campaign/provider integrations.
+
+## 2026-07-07
+
+- Task: harden staff JWT authorization for PII reads and approval decisions.
+- Files changed: `apps/api/src/auth/*`, `apps/api/src/customers/customers.controller.ts`, `apps/api/src/approvals/*`, `apps/api/test/customer-pii-guard.e2e-spec.ts`, `apps/api/test/approvals-jwt-guard.e2e-spec.ts`, `apps/web/app/approvals/page.tsx`, `apps/web/lib/api/approvals.ts`, `apps/web/lib/api/staff-auth.ts`, `BACKLOG.md`, `docs/PHASES.md`.
+- Result: customer phone is masked for anonymous/junior reads and revealed only to self/admin/owner; Approval Inbox requires staff JWT and approve/reject uses JWT role instead of body-supplied `approverRole`.
+- Checks run: `npm run api:build`; `npm run build -w @alistore/web`; targeted Jest for PII/approval JWT; `npm run api:test`; headless Chrome screenshot of `/approvals`.
+- Outcome: API build passed; web build passed; targeted authz tests passed; Jest passed 59 suites / 184 tests.
+- Next step: step-up 2FA and staff-session rollout for POS/warehouse/staff operational endpoints.

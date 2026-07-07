@@ -7,13 +7,15 @@ export class DecideApprovalDto {
   @IsIn(['approved', 'rejected'])
   status!: 'approved' | 'rejected';
 
-  @ApiProperty({ example: 'admin_gulnara' })
+  @ApiPropertyOptional({ example: 'admin_gulnara', description: 'Deprecated: ignored when staff JWT is present.' })
+  @IsOptional()
   @IsString()
-  approver!: string;
+  approver?: string;
 
-  @ApiProperty({ enum: Role, example: Role.admin, description: 'Approver role (Role Permission Matrix)' })
+  @ApiPropertyOptional({ enum: Role, example: Role.admin, description: 'Deprecated: role comes from staff JWT.' })
+  @IsOptional()
   @IsEnum(Role)
-  approverRole!: Role;
+  approverRole?: Role;
 
   @ApiPropertyOptional({ example: 'проверил акт возврата' })
   @IsOptional()
