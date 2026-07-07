@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ReportsService } from '../reports/reports.service';
 import { InsightContext, InsightProvider, RuleInsightProvider } from './insight-provider';
+import { PricingService } from './pricing.service';
+import { ReorderService } from './reorder.service';
 
 /**
  * Owner AI assistant (Phase 11). Builds an insight context from the same ledger-backed
@@ -15,18 +17,27 @@ export class InsightsService {
   private readonly provider: InsightProvider;
   private readonly fallback = new RuleInsightProvider();
 
-  constructor(private readonly reports: ReportsService) {
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly pricing: PricingService,
+    private readonly reorder: ReorderService,
+  ) {
     // A real provider is wired here when a server-side key exists (never in the client).
     // Until then — and whenever the provider errors — the deterministic rules run.
     this.provider = process.env.AI_PROVIDER_KEY ? this.fallback : this.fallback;
   }
 
   async insights() {
-    const [dashboard, kpi, risksRes] = await Promise.all([
+    const [dashboard, kpi, risksRes, pricing, reorder] = await Promise.all([
       this.reports.dashboard(),
       this.reports.kpi(),
       this.reports.risks(),
+      this.pricing.review(),
+      this.reorder.review(),
     ]);
+
+    const urgent = reorder.reviews.filter((r) => r.urgency === 'high');
+    const overstockItems = pricing.reviews.filter((r) => r.action === 'discount');
 
     const ctx: InsightContext = {
       marginPct: kpi.marginPct,
@@ -43,6 +54,8 @@ export class InsightsService {
       refunds: dashboard.money.refunds,
       pendingApprovals: dashboard.ops.pendingApprovals,
       risks: risksRes.signals.map((s) => ({ kind: s.kind, severity: s.severity, detail: s.detail })),
+      reorderUrgent: { count: urgent.length, names: urgent.map((r) => r.name) },
+      overstock: { count: overstockItems.length, topName: overstockItems[0]?.name ?? null },
     };
 
     let source = this.provider.source;

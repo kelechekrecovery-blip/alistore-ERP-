@@ -5,6 +5,7 @@
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Connect owner AI assistant to merchandising signals.
 - Add ERP revenue trend comparison.
 - Enforce POS margin-control approval gate.
 - Split returns/exchanges customer self-service from staff/cashier RBAC gates.

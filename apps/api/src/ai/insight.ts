@@ -20,6 +20,9 @@ interface InsightInput {
   refunds: number;
   pendingApprovals: number;
   risks: { kind: string; severity: string; detail: string }[];
+  // Merchandising signals (optional) — fed from the pricing/reorder rule engines.
+  reorderUrgent?: { count: number; names: string[] };
+  overstock?: { count: number; topName: string | null };
 }
 
 /**
@@ -63,6 +66,25 @@ export function buildInsights(input: InsightInput): Insight[] {
       tone: 'positive',
       title: `Лучший продавец: ${input.topSeller.staffId}`,
       detail: `Принёс ${fmt(input.topSeller.revenue)} сом — кандидат на бонус.`,
+    });
+  }
+
+  // restock urgency (understock — from the reorder engine)
+  if (input.reorderUrgent && input.reorderUrgent.count > 0) {
+    const names = input.reorderUrgent.names.slice(0, 3).join(', ');
+    out.push({
+      tone: 'warning',
+      title: `Дефицит: ${input.reorderUrgent.count} поз. нет в наличии`,
+      detail: `Есть спрос, но пусто на складе${names ? `: ${names}` : ''}. Дозакажите — вкладка «Закупки».`,
+    });
+  }
+
+  // overstock (from the pricing engine)
+  if (input.overstock && input.overstock.count > 0) {
+    out.push({
+      tone: 'info',
+      title: `Затоварка: ${input.overstock.count} поз. без продаж`,
+      detail: `${input.overstock.topName ?? 'Товары'} лежат без движения — снизьте цену (вкладка «Цены»).`,
     });
   }
 

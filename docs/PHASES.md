@@ -175,7 +175,7 @@ overflow). units-lookup: 2 теста.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
 RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; returns/exchanges
-RBAC tests; margin-control POS tests; revenue-trend tests; полный Jest 73 suites / 237 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; margin-control POS tests; revenue-trend tests; AI insights wiring tests; полный Jest 74 suites / 241 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
 `/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
 без overflow.
@@ -273,9 +273,9 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
 Бесключевое ядро AI-мерчандайзинга — все фичи за единым **паттерном порта**: правила сейчас
 (работают офлайн, детерминированные, покрыты тестами), LLM/vision подключаются при `AI_PROVIDER_KEY`
 без переписывания, с откатом на правила при сбое провайдера; **ключей в клиенте нет**.
-- ✅ **AI-ассистент владельца** (`GET /ai/insights`): инсайты из Event Ledger (маржа/лидер-товар/
-  лучший продавец/возвраты/тревоги) через порт `InsightProvider` + `RuleInsightProvider`.
-  Вкладка «🧠 Ассистент». 4 теста.
+- ✅ **AI-ассистент владельца** (`GET /ai/insights`): инсайты из Event Ledger + rule engines
+  мерчандайзинга (маржа/лидер-товар/лучший продавец/возвраты/тревоги/дефицит/затоварка)
+  через порт `InsightProvider` + `RuleInsightProvider`. Вкладка «🧠 Ассистент». 8 тестов.
 - ✅ **Оценка Б/У** (`POST /ai/assess`): депрециация по grade/возрасту/дефектам → перепродажа/выкуп.
   Консоль «/assess». Тесты на движок.
 - ✅ **Авто-категоризация** (`POST /ai/categorize`): классификация товара по ключевым словам (RU/EN).
@@ -287,7 +287,8 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
 - ☐ **Требуют ключа AI-провайдера:** оценка Б/У по фото (vision-грейдинг), разведка рыночных цен,
   обогащение карточек (LLM), оффлайн-eval на референс-датасете — плагины за тем же паттерном порта.
 **Проверка:** ✅ все 5 бесключевых фич работают end-to-end (браузер + curl на реальных данных);
-✅ юнит-тесты rule-движков зелёные. Осталось только то, что требует внешнего ключа/провайдера.
+✅ юнит-тесты rule-движков зелёные; AI-assistant service wiring проверяет, что pricing/reorder
+сигналы попадают в `/ai/insights`. Осталось только то, что требует внешнего ключа/провайдера.
 
 ## Phase 12 — Каналы и рост (v2) ☐
 - ☐ Telegram Mini App / WhatsApp-магазин; франшиза + аудит партнёрских точек;
@@ -355,7 +356,7 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 73 (237 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 74 (241 тест зелёный, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

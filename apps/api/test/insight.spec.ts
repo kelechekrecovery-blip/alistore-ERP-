@@ -41,4 +41,34 @@ describe('buildInsights', () => {
     const ins = buildInsights(base);
     expect(ins.some((i) => i.title === 'Всё сходится' && i.tone === 'positive')).toBe(true);
   });
+
+  it('surfaces a restock warning with product names when items are urgent', () => {
+    const ins = buildInsights({
+      ...base,
+      reorderUrgent: { count: 3, names: ['iPhone 15', 'MacBook Pro', 'AirPods'] },
+    });
+    const warn = ins.find((i) => i.title.includes('Дефицит: 3'));
+    expect(warn?.tone).toBe('warning');
+    expect(warn?.detail).toContain('iPhone 15');
+  });
+
+  it('surfaces an overstock hint pointing at the pricing tab', () => {
+    const ins = buildInsights({
+      ...base,
+      overstock: { count: 2, topName: 'Samsung Galaxy S24' },
+    });
+    const hint = ins.find((i) => i.title.includes('Затоварка: 2'));
+    expect(hint?.tone).toBe('info');
+    expect(hint?.detail).toContain('Samsung Galaxy S24');
+  });
+
+  it('omits merchandising insights when there is nothing to act on', () => {
+    const ins = buildInsights({
+      ...base,
+      reorderUrgent: { count: 0, names: [] },
+      overstock: { count: 0, topName: null },
+    });
+    expect(ins.some((i) => i.title.includes('Дефицит'))).toBe(false);
+    expect(ins.some((i) => i.title.includes('Затоварка'))).toBe(false);
+  });
 });

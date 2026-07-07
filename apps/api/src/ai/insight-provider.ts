@@ -12,6 +12,8 @@ export interface InsightContext {
   refunds: number;
   pendingApprovals: number;
   risks: { kind: string; severity: string; detail: string }[];
+  reorderUrgent?: { count: number; names: string[] };
+  overstock?: { count: number; topName: string | null };
 }
 
 /**
