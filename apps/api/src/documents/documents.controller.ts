@@ -24,4 +24,10 @@ export class DocumentsController {
   writeOffAct(@Param('movementId') movementId: string) {
     return this.documents.writeOffAct(movementId);
   }
+
+  /** Return act (акт возврата) PDF for a Return (base64). */
+  @Get('return/:id/act')
+  returnAct(@Param('id') id: string) {
+    return this.documents.returnAct(id);
+  }
 }

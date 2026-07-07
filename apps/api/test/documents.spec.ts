@@ -132,4 +132,32 @@ describe('DocumentsService.tradeInContract (integration)', () => {
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('not_a_writeoff');
   });
+
+  it('renders a return act PDF for a Return record', async () => {
+    const customer = await prisma.customer.create({
+      data: { phone: `+996${RUN}03`, name: 'Возврат Клиент' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        total: 50000,
+        status: 'return_requested',
+      },
+    });
+    const ret = await prisma.return.create({
+      data: { orderId: order.id, reason: 'не подошёл', status: 'requested' },
+    });
+
+    const out = await documents.returnAct(ret.id);
+    const pdf = Buffer.from(out.pdfBase64, 'base64');
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(out.bytes).toBeGreaterThan(1000);
+  });
+
+  it('throws 422 for an unknown return id', async () => {
+    const err = await documents.returnAct('does-not-exist').catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('return_not_found');
+  });
 });

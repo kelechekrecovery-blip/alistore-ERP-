@@ -180,6 +180,51 @@ export class DocumentsService {
     };
   }
 
+  /** Render a return act (акт возврата) for a Return record. */
+  async returnAct(
+    returnId: string,
+  ): Promise<{ pdfBase64: string; bytes: number }> {
+    const ret = await this.prisma.return.findUnique({ where: { id: returnId } });
+    if (!ret) {
+      throw new ValidationError('return_not_found', `Возврат ${returnId} не найден`);
+    }
+    const order = await this.prisma.order.findUnique({
+      where: { id: ret.orderId },
+      include: { customer: true },
+    });
+
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    const font = await doc.embedFont(this.fontBytes);
+    const page = doc.addPage([595.28, 841.89]); // A4
+
+    const writer = this.lineWriter(page, font);
+    writer('АКТ ВОЗВРАТА товара', 16, 28);
+    writer('AliStore · г. Бишкек, Кыргызстан', 11, 26);
+    writer(`№ ${ret.id}`, 10, 16);
+    writer(`Дата: ${ret.createdAt.toISOString().slice(0, 10)}`, 10, 24);
+
+    writer(`Заказ: ${ret.orderId}`, 11, 16);
+    if (order?.customer) {
+      writer(
+        `Клиент: ${order.customer.name} · тел. ${order.customer.phone}`,
+        11,
+        16,
+      );
+    }
+    writer(`Причина возврата: ${ret.reason}`, 11, 16);
+    writer(`Статус: ${ret.status}`, 11, 24);
+
+    writer('Возврат денег — по approval, тем же способом оплаты.', 10, 24);
+    writer('Принял: __________________     Клиент: __________________', 10, 16);
+
+    const bytes = await doc.save();
+    return {
+      pdfBase64: Buffer.from(bytes).toString('base64'),
+      bytes: bytes.length,
+    };
+  }
+
   /** A top-down line writer bound to a page + font. */
   private lineWriter(page: PDFPage, font: PDFFont) {
     let y = page.getSize().height - 60;
