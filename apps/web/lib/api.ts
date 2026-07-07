@@ -246,6 +246,16 @@ export function transitionOrder(id: string, to: string): Promise<{ status: strin
   return postJson(`/orders/${id}/transition`, { to });
 }
 
+export interface TransferResult { imei: string; from: string; to: string; movementId: string }
+export function transferUnit(imei: string, to: string, reason?: string): Promise<TransferResult> {
+  return postJson('/inventory/transfer', { imei, to, reason });
+}
+
+export interface CountResult { productId: string; location: string; expected: number; counted: number; diff: number }
+export function inventoryCount(productId: string, location: string, counted: number): Promise<CountResult> {
+  return postJson('/inventory/count', { productId, location, counted });
+}
+
 export interface OrderDetail {
   id: string;
   channel: string;

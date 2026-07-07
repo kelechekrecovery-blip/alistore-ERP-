@@ -9,6 +9,7 @@ import {
   type QueueOrder,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { WarehouseOps } from '@/components/WarehouseOps';
 
 interface Stage {
   status: string;
@@ -103,6 +104,7 @@ export default function WarehousePage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-4xl">
+          <WarehouseOps />
           {orders === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
           {orders && orders.length === 0 && (
             <div className="rounded-card border border-dashed border-ink/15 bg-white/50 px-6 py-16 text-center">
