@@ -218,6 +218,15 @@
 
 ## 2026-07-07
 
+- Task: build Refund Money Flow / Dispute Center staff UI.
+- Files changed: `apps/web/app/approvals/page.tsx`, `apps/web/lib/api/payments.ts`, `apps/web/app/layout.tsx`, `apps/web/app/icon.svg`, `BACKLOG.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: Approval Inbox now has a staff refund request form that posts `paymentId`, amount, and reason to the existing approval-gated `POST /payments/:id/refund` endpoint; successful requests reset the form, switch to the requested queue, and show the refund approval row. The app also serves an SVG favicon so browser QA does not report the old `/favicon.ico` 404.
+- Checks run: `npm run build -w @alistore/web`; targeted Jest for `refund-approval`; browser QA on `/approvals` refund request.
+- Outcome: web build passed; refund approval Jest passed 1 suite / 4 tests; browser QA passed with `POST /api/payments/:id/refund` 202, visible `Возврат денег` row and 25 000 amount, no failed requests, no 4xx responses, and screenshot `/tmp/alistore-refund-request-ui.png`.
+- Next step: add debt reminder notifications, then shift close photo report.
+
+## 2026-07-07
+
 - Task: ensure exchanges create visible warranty coverage for the new device.
 - Files changed: `apps/api/test/exchange.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`.
 - Result: exchange warranty behavior is now locked by regression coverage: after an exchange, the new sold IMEI appears in `customers.devices()` with warranty coverage derived from the new paid exchange order date.

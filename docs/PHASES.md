@@ -109,8 +109,11 @@ count → `POST /api/inventory/count` 201, expected=2 counted=2 diff=0; свер
   unit lookup и `POST /exchanges` требуют active staff JWT, actor берётся из токена.
 - ✅ Новая гарантия при обмене: новый IMEI продаётся через новый paid exchange-order того же
   клиента, поэтому `customers.devices()` показывает warrantyUntil/daysLeft от даты обмена.
-- ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI.
-**Проверка:** ✅ in-browser+БД рефанд (202→Inbox→одобрить→−платёж+order refunded); ✅ обмен-UI
+- ✅ **Refund Money Flow / Dispute Center UI**: `/approvals` создаёт refund-заявку по
+  paymentId/сумме/причине; деньги не двигаются до approval, заявка сразу видна в Inbox.
+**Проверка:** ✅ browser QA `/approvals` staff login→refund form→`POST /api/payments/:id/refund`
+202→Inbox row 25 000, без failed requests/4xx; ✅ in-browser+БД рефанд
+(202→Inbox→одобрить→−платёж+order refunded); ✅ обмен-UI
 end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000; refunded-заказ→корректный
 отказ «refunded→exchanged»); ✅ browser QA `/exchange` staff login→unit lookup→exchange
 (`GET /api/units/:imei` 200, `POST /api/exchanges` 201, без failed requests/console errors/

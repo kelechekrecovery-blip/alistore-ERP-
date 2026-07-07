@@ -1,4 +1,4 @@
-import { postJson } from './http';
+import { postAuthJson, postJson } from './http';
 
 export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
 
@@ -39,4 +39,12 @@ export function confirmSandboxPayment(input: {
   txnId: string;
 }): Promise<PaymentConfirmResult> {
   return postJson('/payments/webhooks/sandbox', { ...input, status: 'succeeded', actor: 'sandbox' });
+}
+
+export function requestPaymentRefund(
+  paymentId: string,
+  input: { amount: number; reason: string },
+  accessToken: string,
+): Promise<{ approvalId: string; status: 'requested' }> {
+  return postAuthJson(`/payments/${encodeURIComponent(paymentId)}/refund`, input, accessToken);
 }
