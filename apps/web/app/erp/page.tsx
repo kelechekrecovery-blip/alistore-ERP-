@@ -19,12 +19,14 @@ import {
 import { som } from '@/lib/format';
 import { CrmView } from '@/components/erp/CrmView';
 import { AiView } from '@/components/erp/AiView';
+import { PricingView } from '@/components/erp/PricingView';
 
-type Route = 'dash' | 'ai' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
+type Route = 'dash' | 'ai' | 'pricing' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
 
 const NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
   { id: 'ai', icon: '🧠', label: 'Ассистент' },
+  { id: 'pricing', icon: '🏷️', label: 'Цены' },
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
   { id: 'stock', icon: '📦', label: 'Склад' },
@@ -35,6 +37,7 @@ const NAV: { id: Route; icon: string; label: string }[] = [
 const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор · всё из Event Ledger'],
   ai: ['AI-ассистент', 'Инсайты владельца из Event Ledger'],
+  pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
   finance: ['Финансы', 'Деньги · P&L'],
   kpi: ['Маржа · KPI', 'Валовая маржа, средний чек, топ-товары'],
   stock: ['Склад', 'Остатки по статусам'],
@@ -149,6 +152,7 @@ export default function ErpPage() {
             <DashboardView d={d} risks={risks} revenue={revenue} period={period} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
           {route === 'ai' && <AiView insights={insights} />}
+          {route === 'pricing' && <PricingView />}
           {route === 'finance' && <FinanceView d={d} />}
           {route === 'kpi' && <KpiView kpi={kpi} />}
           {route === 'stock' && <StockView d={d} />}

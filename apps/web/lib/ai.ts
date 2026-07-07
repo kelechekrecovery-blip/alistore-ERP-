@@ -28,3 +28,30 @@ export async function assessUsed(input: {
   }
   return (await res.json()) as Valuation;
 }
+
+export interface PricingReview {
+  sku: string;
+  name: string;
+  category: string;
+  inStock: number;
+  soldUnits: number;
+  current: number;
+  suggested: number;
+  deltaPct: number;
+  action: 'raise' | 'hold' | 'discount';
+  reason: string;
+}
+
+export interface PricingReport {
+  source: 'rules';
+  generatedForCount: number;
+  actionable: number;
+  reviews: PricingReview[];
+}
+
+/** Dynamic-pricing review (Phase 11): stock-vs-demand recommendations, keyless. */
+export async function fetchPricing(): Promise<PricingReport> {
+  const res = await fetch(`${API_BASE}/ai/pricing`);
+  if (!res.ok) throw new Error(`pricing ${res.status}`);
+  return (await res.json()) as PricingReport;
+}

@@ -5,10 +5,12 @@ import { InsightsController } from './insights.controller';
 import { ValuationService } from './valuation.service';
 import { ValuationController } from './valuation.controller';
 import { CategorizeController } from './categorize.controller';
+import { PricingService } from './pricing.service';
+import { PricingController } from './pricing.controller';
 
 @Module({
   imports: [ReportsModule],
-  providers: [InsightsService, ValuationService],
-  controllers: [InsightsController, ValuationController, CategorizeController],
+  providers: [InsightsService, ValuationService, PricingService],
+  controllers: [InsightsController, ValuationController, CategorizeController, PricingController],
 })
 export class AiModule {}
