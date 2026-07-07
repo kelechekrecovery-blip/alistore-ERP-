@@ -30,6 +30,23 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   if (amount <= 0 || amount > original.amount) {
     throw new ValidationError('invalid_refund_amount', 'Некорректная сумма возврата');
   }
+  if (original.orderId) {
+    // Serialize concurrent refunds on this order (row lock), then cap total
+    // refunds at net paid (invariant #1: сумма возвратов ≤ оплаченной) — two
+    // 100k refunds against a 100k order can't both land.
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${original.orderId} FOR UPDATE`;
+    const agg = await tx.payment.aggregate({
+      where: { orderId: original.orderId },
+      _sum: { amount: true },
+    });
+    const netPaid = agg._sum.amount ?? 0;
+    if (amount > netPaid) {
+      throw new ValidationError(
+        'refund_exceeds_paid',
+        'Сумма возвратов превышает оплаченную по заказу',
+      );
+    }
+  }
   const compensating = await tx.payment.create({
     data: {
       orderId: original.orderId,

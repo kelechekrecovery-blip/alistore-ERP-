@@ -100,11 +100,23 @@ export class ApprovalsService {
         );
       }
 
+      // Atomically claim the decision — two concurrent decides cannot both flip
+      // requested→(approved|rejected). count===0 ⇒ another decider won the race
+      // (prevents a double refund / double price change from one approval).
+      const decidedStatus = input.status === 'rejected' ? 'rejected' : 'approved';
+      const claim = await tx.approval.updateMany({
+        where: { id, status: 'requested' },
+        data: { status: decidedStatus, approver: input.approver },
+      });
+      if (claim.count === 0) {
+        throw new ConflictError(
+          'approval_already_decided',
+          `Approval ${id} уже решён другим аппрувером`,
+        );
+      }
+      const updated = await tx.approval.findUnique({ where: { id } });
+
       if (input.status === 'rejected') {
-        const updated = await tx.approval.update({
-          where: { id },
-          data: { status: 'rejected', approver: input.approver },
-        });
         return {
           result: updated,
           events: [
@@ -117,11 +129,6 @@ export class ApprovalsService {
           ],
         };
       }
-
-      const updated = await tx.approval.update({
-        where: { id },
-        data: { status: 'approved', approver: input.approver },
-      });
       const events: AuditInput[] = [
         {
           type: EventType.ApprovalApproved,

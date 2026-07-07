@@ -70,20 +70,24 @@ export class UnitsService {
     imei: string,
     orderId: string,
   ): Promise<void> {
-    const unit = await tx.deviceUnit.findUnique({ where: { imei } });
-    if (!unit) {
-      throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
-    }
-    if (unit.status !== 'in_stock') {
+    // Conditional update = atomic guard: under Read Committed the UPDATE re-checks
+    // status on the locked row, so two concurrent reservations of the same IMEI
+    // cannot both flip in_stock→reserved (invariant #2). A findUnique→update would
+    // let both pass the check and double-reserve (one device → two customers).
+    const { count } = await tx.deviceUnit.updateMany({
+      where: { imei, status: 'in_stock' },
+      data: { status: 'reserved', orderId },
+    });
+    if (count === 0) {
+      const unit = await tx.deviceUnit.findUnique({ where: { imei } });
+      if (!unit) {
+        throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+      }
       throw new ConflictError(
         'unit_not_available',
         `IMEI ${imei} недоступен для резерва (статус: ${unit.status})`,
       );
     }
-    await tx.deviceUnit.update({
-      where: { imei },
-      data: { status: 'reserved', orderId },
-    });
   }
 
   /**
@@ -96,20 +100,23 @@ export class UnitsService {
     imei: string,
     orderId: string,
   ): Promise<void> {
-    const unit = await tx.deviceUnit.findUnique({ where: { imei } });
-    if (!unit) {
-      throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
-    }
-    if (unit.status === 'sold') {
-      throw new ConflictError('unit_already_sold', `IMEI ${imei} уже продан`);
-    }
-    if (unit.status !== 'reserved' || unit.orderId !== orderId) {
+    const { count } = await tx.deviceUnit.updateMany({
+      where: { imei, status: 'reserved', orderId },
+      data: { status: 'sold' },
+    });
+    if (count === 0) {
+      const unit = await tx.deviceUnit.findUnique({ where: { imei } });
+      if (!unit) {
+        throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+      }
+      if (unit.status === 'sold') {
+        throw new ConflictError('unit_already_sold', `IMEI ${imei} уже продан`);
+      }
       throw new ConflictError(
         'unit_not_reserved_for_order',
         `IMEI ${imei} не зарезервирован под заказ ${orderId}`,
       );
     }
-    await tx.deviceUnit.update({ where: { imei }, data: { status: 'sold' } });
   }
 
   /**
@@ -126,14 +133,12 @@ export class UnitsService {
     imei: string,
     orderId: string,
   ): Promise<boolean> {
-    const unit = await tx.deviceUnit.findUnique({ where: { imei } });
-    if (!unit || unit.status !== 'reserved' || unit.orderId !== orderId) {
-      return false;
-    }
-    await tx.deviceUnit.update({
-      where: { imei },
+    // Conditional update — only releases a unit still reserved for THIS order,
+    // atomically. Returns whether it actually freed one.
+    const { count } = await tx.deviceUnit.updateMany({
+      where: { imei, status: 'reserved', orderId },
       data: { status: 'in_stock', orderId: null },
     });
-    return true;
+    return count > 0;
   }
 }
