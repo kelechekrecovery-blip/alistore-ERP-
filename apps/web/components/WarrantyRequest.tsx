@@ -43,7 +43,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
         value={problem}
         onChange={(e) => setProblem(e.target.value)}
         placeholder="Опишите проблему…"
-        className="flex-1 rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-1.5 text-xs outline-none focus:border-info"
+        className="flex-1 rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-1.5 text-xs text-white outline-none placeholder:text-[#6E645C] focus:border-info"
         autoFocus
       />
       <button
