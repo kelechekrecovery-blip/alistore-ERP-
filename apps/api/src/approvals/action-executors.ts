@@ -3,6 +3,7 @@ import { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { canTransition } from '../orders/order-state-machine';
+import { insertDebt } from '../debts/debt-insert';
 
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
@@ -118,10 +119,27 @@ const del: ActionExecutor = async (tx, payload, approver, approvalId, events) =>
   });
 };
 
+/** debt — book a sale-on-credit that exceeded the debt limit (owner/senior approved). */
+const debt: ActionExecutor = async (tx, payload, approver, _approvalId, events) => {
+  await insertDebt(
+    tx,
+    {
+      orderId: String(payload['orderId']),
+      customerId: String(payload['customerId']),
+      principal: Number(payload['principal']),
+      installments: Number(payload['installments'] ?? 1),
+      dueDate: new Date(String(payload['dueDate'])),
+    },
+    approver,
+    events,
+  );
+};
+
 export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   refund,
   price,
   write_off,
   stock_adjust,
   delete: del,
+  debt,
 };

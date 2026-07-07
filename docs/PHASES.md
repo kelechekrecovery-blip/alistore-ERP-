@@ -89,8 +89,10 @@
   (stock_adjust), удаление (soft-delete→archived) — исполнители в
   `approvals/action-executors.ts` (ACTION_EXECUTORS); Products + Inventory модули.
 - ✅ Reduction: вынос исполнителей из approvals.service (183→136 строк).
-- ☐ Осталось: скидка>10% в POS (park продажу до одобрения), продажа в долг>лимита,
-  доступ к PII → 2FA.
+- ✅ Продажа в долг>лимита → approval (action=debt): `debts/` модуль park'ит долг >50000
+  сом до одобрения, исполнитель `debt` в ACTION_EXECUTORS бронирует его в той же
+  транзакции (см. Phase 9).
+- ☐ Осталось: скидка>10% в POS (park продажу до одобрения), доступ к PII → 2FA.
 - ☐ **Role Permission Matrix** (9 ролей) — серверная проверка прав/лимитов; 2FA на опасное
   (auth-связано, координировать с Codex).
 - ☐ PII-маскирование младшим ролям; margin-контроль (инв #6).
@@ -121,12 +123,19 @@
   refunded/rejected→written_off), SLA 30 дней → Risk Center (`rma_sla_breach`), scorecard
   по поставщику (volume/resolution rate/backlog, `scorecard.ts`). POST /suppliers,
   POST /suppliers/rma, PATCH /suppliers/rma/:id/transition, GET /suppliers/scorecard.
-- ☐ Долги/рассрочка + напоминания, KPI/зарплаты, смены с фотоотчётом (Evidence Vault).
+- ✅ **Долги/рассрочка** (`debts/` модуль): продажа в долг/рассрочку по заказу, лимит
+  50000 сом (сверх → approval action=debt, executor бронирует при одобрении), погашение
+  платежами (method=installment) до settled, ledger debt.created→debt.payment→debt.settled;
+  просрочка (open+dueDate<now) → Risk Center (`debt_overdue`). POST /debts,
+  POST /debts/:id/payments, GET /debts.
+- ☐ Напоминания по долгам, KPI/зарплаты, смены с фотоотчётом (Evidence Vault).
 - 🟡 Импорт данных из Excel/тетради при запуске (Data Migration) — Codex (`import/`, WIP).
 **Проверка:** ✅ гарантия created→received через консоль (БД + ledger); SLA-breach ловится
 в Risk Center. ✅ Supplier RMA: 6 тестов зелёные + HTTP-смоук created→…→closed (unit
 in_stock→in_repair→in_stock; scorecard resolved=1/rate=1; ledger rma.opened→…→rma.closed).
-Осталось: импорт идемпотентен.
+✅ Долги: 6 тестов + HTTP-смоук (book→pay→pay→settled: 30000→18000→0; долг>лимита→202
+approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.settled). Осталось:
+импорт идемпотентен.
 
 ## Phase 10 — Уведомления + Support/CRM (v1→v2) 🟡
 - 🟡 Transactional outbox + relay (Codex начал); Novu-доставка (Codex).

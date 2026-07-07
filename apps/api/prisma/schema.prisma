@@ -131,6 +131,12 @@ enum RmaStatus {
   closed
 }
 
+enum DebtStatus {
+  open
+  settled
+  written_off
+}
+
 // ---------- CORE ----------
 model Customer {
   id        String          @id @default(cuid())
@@ -310,6 +316,24 @@ model SupplierRma {
   @@index([supplierId])
   @@index([imei])
   @@index([status])
+}
+
+// Продажа в долг / рассрочка. Долг сверх лимита — через approval (action=debt).
+// balance гасится платежами; просрочка (open + dueDate<now) → Risk Center.
+model DebtPlan {
+  id           String     @id @default(cuid())
+  orderId      String
+  customerId   String
+  principal    Int // исходная сумма долга
+  balance      Int // остаток к погашению
+  installments Int        @default(1) // число платежей (рассрочка)
+  dueDate      DateTime
+  status       DebtStatus @default(open)
+  createdAt    DateTime   @default(now())
+
+  @@index([customerId])
+  @@index([status])
+  @@index([orderId])
 }
 
 model TradeInDevice {
