@@ -25,6 +25,8 @@ import { CreateOrderDto, TransitionDto } from './orders.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireActiveStaff } from '../auth/staff-principal';
 
 /**
  * NOTE: `actor` is hardcoded to a system principal for the MVP core. Auth (JWT +
@@ -36,7 +38,10 @@ const SYSTEM_ACTOR = 'system';
 @ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @ApiOperation({ summary: 'Orders of the authenticated customer (personal account)' })
   @ApiBearerAuth()
@@ -48,9 +53,12 @@ export class OrdersController {
   }
 
   @ApiOperation({ summary: 'List orders by status — staff fulfillment queue' })
+  @ApiBearerAuth()
   @ApiOkResponse({ description: 'Orders in the given status, newest first.' })
   @Get()
-  queue(@Query('status') status?: string) {
+  @UseGuards(JwtAuthGuard)
+  async queue(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
+    await requireActiveStaff(user, this.staffAuth);
     return this.orders.listByStatus((status ?? 'created') as OrderStatus);
   }
 
@@ -83,8 +91,9 @@ export class OrdersController {
   @ApiConflictResponse({ description: 'IMEI is unavailable or already sold.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or illegal state.' })
   @Post(':id/reserve')
-  reserve(@Param('id') id: string) {
-    return this.orders.reserve(id, SYSTEM_ACTOR);
+  @UseGuards(JwtAuthGuard)
+  async reserve(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.orders.reserve(id, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({
@@ -95,8 +104,9 @@ export class OrdersController {
   @ApiConflictResponse({ description: 'Insufficient stock for a line.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or illegal state.' })
   @Post(':id/fulfill')
-  fulfill(@Param('id') id: string) {
-    return this.orders.fulfill(id, SYSTEM_ACTOR);
+  @UseGuards(JwtAuthGuard)
+  async fulfill(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.orders.fulfill(id, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({
@@ -106,7 +116,8 @@ export class OrdersController {
   @ApiOkResponse({ description: 'Order status updated.' })
   @ApiUnprocessableEntityResponse({ description: 'Illegal transition.' })
   @Post(':id/transition')
-  transition(@Param('id') id: string, @Body() dto: TransitionDto) {
-    return this.orders.transition(id, dto.to, SYSTEM_ACTOR);
+  @UseGuards(JwtAuthGuard)
+  async transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: TransitionDto) {
+    return this.orders.transition(id, dto.to, await requireActiveStaff(user, this.staffAuth));
   }
 }

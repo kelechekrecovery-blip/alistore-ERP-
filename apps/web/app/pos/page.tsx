@@ -26,10 +26,14 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { PosCheckout } from '@/components/pos/PosCheckout';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import {
+  clearStaffSession,
+  loadStaffSession,
+  type StaffSession,
+} from '@/lib/staff-session';
 
-const STAFF_ID = 'pos_azizbek';
 const POINT = 'BISHKEK-1';
-const CASHIER = 'Азизбек';
 const SHOP = 'AliStore Центр';
 const DISCOUNTS = [0, 5, 10, 15];
 
@@ -52,6 +56,11 @@ export default function PosPage() {
   const [syncing, setSyncing] = useState(false);
   const [scanCode, setScanCode] = useState('');
   const [terminalMessage, setTerminalMessage] = useState('Терминал готов к проверке');
+  const [session, setSession] = useState<StaffSession | null>(null);
+
+  useEffect(() => {
+    setSession(loadStaffSession());
+  }, []);
 
   useEffect(() => {
     fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items));
@@ -82,6 +91,7 @@ export default function PosPage() {
   const total = Math.round(subtotal * (1 - discPct / 100));
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const queueSummary = offlineQueueStats(queue);
+  const cashier = session?.username || session?.role || 'staff';
 
   function flash(m: string) {
     setToast(m);
@@ -130,7 +140,7 @@ export default function PosPage() {
 
   function buildPayload(clientSaleId: string): OfflinePosPayload {
     return {
-      staffId: STAFF_ID,
+      staffId: session?.staffId ?? '',
       point: POINT,
       method: method ?? 'cash',
       discountPct: discPct,
@@ -149,7 +159,7 @@ export default function PosPage() {
     return {
       clientSaleId,
       localReceiptNo: createLocalReceiptNo(clientSaleId),
-      cashier: CASHIER,
+      cashier,
       shop: SHOP,
       point: POINT,
       method: method ?? 'cash',
@@ -168,7 +178,7 @@ export default function PosPage() {
   }
 
   async function finish() {
-    if (!method) return;
+    if (!method || !session) return;
     const clientSaleId = activeClientSaleId || createPosClientSaleId();
     setActiveClientSaleId(clientSaleId);
     const payload = buildPayload(clientSaleId);
@@ -179,7 +189,7 @@ export default function PosPage() {
       setTerminalMessage(terminal.message);
       if (!terminal.ok) throw new Error(terminal.message);
 
-      const res = await posSale(payload);
+      const res = await posSale(payload, session.accessToken);
       if (res.pendingApproval) {
         setPending(res);
         setRoute('pending');
@@ -209,9 +219,16 @@ export default function PosPage() {
   }
 
   async function syncQueue() {
+    if (!session) {
+      flash('Войдите сотрудником');
+      return;
+    }
     setSyncing(true);
     try {
-      const next = await syncOfflinePosQueue(posSale, setQueue);
+      const next = await syncOfflinePosQueue(
+        (payload) => posSale({ ...payload, staffId: session.staffId }, session.accessToken),
+        setQueue,
+      );
       setQueue(next);
       const stats = offlineQueueStats(next);
       if (stats.failed > 0) flash(`Конфликты синка: ${stats.failed}`);
@@ -238,6 +255,24 @@ export default function PosPage() {
     fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items)); // refresh stock
   }
 
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4 font-sans">
+        <Link
+          href="/"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          ⌂ Выйти
+        </Link>
+        <StaffSessionLogin
+          title="POS · вход"
+          caption="Откройте кассу под своей staff-сессией."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4 font-sans text-white">
       <Link
@@ -257,9 +292,19 @@ export default function PosPage() {
             <div>
               <div className="font-display text-base font-bold text-white">POS · Касса</div>
               <div className="text-xs text-[#8A7F76]">
-                Смена · {CASHIER} · {SHOP}
+                Смена · {cashier} · {SHOP}
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                clearStaffSession();
+                setSession(null);
+              }}
+              className="rounded-chip border border-[#2E2822] px-3 py-1.5 text-xs font-semibold text-[#D8CFC6] hover:border-[#3A342E]"
+            >
+              Выйти staff
+            </button>
             <span className={`ml-auto rounded-chip px-3 py-1.5 text-xs ${online ? 'bg-lime/10 text-lime' : 'bg-warn/15 text-warn'}`}>
               {online ? '● онлайн' : '○ offline'} · {queueSummary.pending} в очереди
             </span>

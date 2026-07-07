@@ -1,4 +1,4 @@
-import { postJson } from './http';
+import { postAuthJson } from './http';
 
 export interface PosLine {
   productId: string;
@@ -35,6 +35,6 @@ export function posSale(input: {
   approvalId?: string;
   clientSaleId?: string;
   lines: PosLine[];
-}): Promise<PosSaleOutcome> {
-  return postJson('/pos/sale', input);
+}, accessToken: string): Promise<PosSaleOutcome> {
+  return postAuthJson('/pos/sale', input, accessToken);
 }

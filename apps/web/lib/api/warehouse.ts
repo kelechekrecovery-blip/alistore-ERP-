@@ -1,4 +1,4 @@
-import { postJson } from './http';
+import { postAuthJson } from './http';
 
 export interface TransferResult {
   imei: string;
@@ -7,8 +7,13 @@ export interface TransferResult {
   movementId: string;
 }
 
-export function transferUnit(imei: string, to: string, reason?: string): Promise<TransferResult> {
-  return postJson('/inventory/transfer', { imei, to, reason });
+export function transferUnit(
+  imei: string,
+  to: string,
+  accessToken: string,
+  reason?: string,
+): Promise<TransferResult> {
+  return postAuthJson('/inventory/transfer', { imei, to, reason }, accessToken);
 }
 
 export interface CountResult {
@@ -20,6 +25,11 @@ export interface CountResult {
   movementId: string;
 }
 
-export function inventoryCount(productId: string, location: string, counted: number): Promise<CountResult> {
-  return postJson('/inventory/count', { productId, location, counted });
+export function inventoryCount(
+  productId: string,
+  location: string,
+  counted: number,
+  accessToken: string,
+): Promise<CountResult> {
+  return postAuthJson('/inventory/count', { productId, location, counted }, accessToken);
 }

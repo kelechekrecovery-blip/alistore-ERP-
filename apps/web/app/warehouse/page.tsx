@@ -10,6 +10,12 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { WarehouseOps } from '@/components/WarehouseOps';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import {
+  clearStaffSession,
+  loadStaffSession,
+  type StaffSession,
+} from '@/lib/staff-session';
 
 interface Stage {
   status: string;
@@ -32,17 +38,23 @@ export default function WarehousePage() {
   const [orders, setOrders] = useState<QueueOrder[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
-
-  const load = useCallback((s: Stage) => {
-    setOrders(null);
-    fetchOrdersByStatus(s.status)
-      .then(setOrders)
-      .catch(() => setOrders([]));
-  }, []);
+  const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
-    load(stage);
-  }, [stage, load]);
+    setSession(loadStaffSession());
+  }, []);
+
+  const load = useCallback((s: Stage) => {
+    if (!session) return;
+    setOrders(null);
+    fetchOrdersByStatus(s.status, session.accessToken)
+      .then(setOrders)
+      .catch(() => setOrders([]));
+  }, [session]);
+
+  useEffect(() => {
+    if (session) load(stage);
+  }, [stage, load, session]);
 
   function flash(m: string) {
     setToast(m);
@@ -50,13 +62,14 @@ export default function WarehousePage() {
   }
 
   async function act(order: QueueOrder) {
+    if (!session) return;
     setBusy(order.id);
     try {
       if (stage.kind === 'fulfill') {
-        const res = await fulfillOrder(order.id);
+        const res = await fulfillOrder(order.id, session.accessToken);
         flash(`Назначено IMEI: ${res.assigned.length} · заказ #${order.id.slice(-6)}`);
       } else if (stage.to) {
-        await transitionOrder(order.id, stage.to);
+        await transitionOrder(order.id, stage.to, session.accessToken);
         flash(`Заказ #${order.id.slice(-6)} → ${stage.to}`);
       }
       load(stage);
@@ -67,6 +80,24 @@ export default function WarehousePage() {
     }
   }
 
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+        <Link
+          href="/"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          ⌂ Выйти
+        </Link>
+        <StaffSessionLogin
+          title="Склад · вход"
+          caption="Войдите, чтобы открыть складские операции."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A]">
       <header className="flex items-center gap-4 border-b border-[#2E2822] bg-[#16130F]/90 px-6 py-4 backdrop-blur">
@@ -75,11 +106,22 @@ export default function WarehousePage() {
         </span>
         <div>
           <div className="font-display text-lg font-bold text-white">Склад · Сборка заказов</div>
-          <div className="text-xs text-[#8A7F76]">Назначение IMEI и движение по статусам</div>
+          <div className="text-xs text-[#8A7F76]">Назначение IMEI и движение по статусам · {session.username}</div>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            clearStaffSession();
+            setSession(null);
+            setOrders(null);
+          }}
+          className="ml-auto rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#3A342E]"
+        >
+          Выйти staff
+        </button>
         <Link
           href="/"
-          className="ml-auto rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]"
+          className="rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]"
         >
           ⌂ Выйти
         </Link>
@@ -104,7 +146,7 @@ export default function WarehousePage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-4xl">
-          <WarehouseOps />
+          <WarehouseOps accessToken={session.accessToken} actor={session.staffId} />
           {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
           {orders && orders.length === 0 && (
             <div className="rounded-card border border-dashed border-[#2E2822] bg-[#1A1611] px-6 py-16 text-center">

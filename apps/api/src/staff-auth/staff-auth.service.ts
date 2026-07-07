@@ -8,6 +8,8 @@ import { TotpService } from '../auth/totp.service';
 
 export interface StaffTokens {
   accessToken: string;
+  staffId: string;
+  username: string;
   role: Role;
   totpEnabled: boolean;
 }
@@ -63,7 +65,13 @@ export class StaffAuthService {
       { sub: staff.id, role: staff.role, typ: 'staff' },
       { expiresIn: '8h' },
     );
-    return { accessToken, role: staff.role, totpEnabled: staff.totpEnabled };
+    return {
+      accessToken,
+      staffId: staff.id,
+      username: staff.username,
+      role: staff.role,
+      totpEnabled: staff.totpEnabled,
+    };
   }
 
   /** Current staff profile for session refresh / UI gates. */

@@ -2,6 +2,8 @@ import { postAuthJson, postJson } from './http';
 
 export interface StaffLoginResult {
   accessToken: string;
+  staffId: string;
+  username: string;
   role: string;
   totpEnabled: boolean;
 }

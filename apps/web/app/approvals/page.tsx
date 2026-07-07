@@ -13,9 +13,12 @@ import {
   type StaffTotpSetupResult,
 } from '@/lib/api';
 import { som } from '@/lib/format';
-
-const STAFF_SESSION_KEY = 'alistore.staff.auth.v1';
-type StaffSession = { accessToken: string; role: string; totpEnabled: boolean };
+import {
+  clearStaffSession,
+  loadStaffSession,
+  saveStaffSession,
+  type StaffSession,
+} from '@/lib/staff-session';
 
 const TABS = [
   { status: 'requested', label: 'Ожидают' },
@@ -45,17 +48,7 @@ export default function ApprovalsPage() {
   const [totpToken, setTotpToken] = useState('');
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STAFF_SESSION_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<StaffSession>;
-        if (parsed.accessToken && parsed.role) {
-          setSession({ accessToken: parsed.accessToken, role: parsed.role, totpEnabled: Boolean(parsed.totpEnabled) });
-        }
-      }
-    } catch {
-      setSession(null);
-    }
+    setSession(loadStaffSession());
   }, []);
 
   const load = useCallback((status: string, token = session?.accessToken) => {
@@ -66,7 +59,7 @@ export default function ApprovalsPage() {
       .catch(() => {
         setItems([]);
         setSession(null);
-        localStorage.removeItem(STAFF_SESSION_KEY);
+        clearStaffSession();
       });
   }, [session?.accessToken]);
 
@@ -85,7 +78,7 @@ export default function ApprovalsPage() {
     try {
       const next = await staffLogin(login.username.trim(), login.password);
       setSession(next);
-      localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(next));
+      saveStaffSession(next);
       flash(`Вход: ${next.role}`);
       load(tab.status, next.accessToken);
     } catch (e) {
@@ -140,7 +133,7 @@ export default function ApprovalsPage() {
       const profile = await staffTotpEnable(session.accessToken, totpToken.trim());
       const next = { ...session, totpEnabled: profile.totpEnabled };
       setSession(next);
-      localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(next));
+      saveStaffSession(next);
       setTotpSetup(null);
       setTotpToken('');
       flash('2FA включена');
@@ -165,7 +158,7 @@ export default function ApprovalsPage() {
           <button
             type="button"
             onClick={() => {
-              localStorage.removeItem(STAFF_SESSION_KEY);
+              clearStaffSession();
               setSession(null);
               setItems(null);
               setTotpSetup(null);

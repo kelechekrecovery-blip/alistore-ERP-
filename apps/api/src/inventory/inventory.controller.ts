@@ -1,6 +1,7 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiOperation,
@@ -9,13 +10,21 @@ import {
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { CountDto, MovementDto, TransferDto } from './inventory.dto';
-
-const SYSTEM_ACTOR = 'system';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireActiveStaff } from '../auth/staff-principal';
 
 @ApiTags('inventory')
+@ApiBearerAuth()
 @Controller('inventory')
+@UseGuards(JwtAuthGuard)
 export class InventoryController {
-  constructor(private readonly inventory: InventoryService) {}
+  constructor(
+    private readonly inventory: InventoryService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @ApiOperation({
     summary: 'Stock write-off / adjustment — always approval-gated (202 { approvalId })',
@@ -24,8 +33,8 @@ export class InventoryController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown product.' })
   @Post('movements')
   @HttpCode(202)
-  movement(@Body() dto: MovementDto) {
-    return this.inventory.movement(dto, dto.requester ?? SYSTEM_ACTOR);
+  async movement(@CurrentUser() user: AuthPrincipal, @Body() dto: MovementDto) {
+    return this.inventory.movement(dto, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({ summary: 'Transfer an in_stock unit to another branch (stock.moved)' })
@@ -33,15 +42,15 @@ export class InventoryController {
   @ApiConflictResponse({ description: 'Unit not in stock (sold/reserved).' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown unit or same location.' })
   @Post('transfer')
-  transfer(@Body() dto: TransferDto) {
-    return this.inventory.transfer(dto, dto.requester ?? SYSTEM_ACTOR);
+  async transfer(@CurrentUser() user: AuthPrincipal, @Body() dto: TransferDto) {
+    return this.inventory.transfer(dto, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({ summary: 'Take inventory for a product at a location (inventory.counted)' })
   @ApiCreatedResponse({ description: 'Count recorded with counted/expected/diff.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown product.' })
   @Post('count')
-  count(@Body() dto: CountDto) {
-    return this.inventory.count(dto, dto.requester ?? SYSTEM_ACTOR);
+  async count(@CurrentUser() user: AuthPrincipal, @Body() dto: CountDto) {
+    return this.inventory.count(dto, await requireActiveStaff(user, this.staffAuth));
   }
 }

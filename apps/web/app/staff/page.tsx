@@ -15,8 +15,15 @@ import {
   type TradeInGrade,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import {
+  clearStaffSession,
+  loadStaffSession,
+  type StaffSession,
+} from '@/lib/staff-session';
 
-const STAFF = { staffId: 'pos_azizbek', point: 'BISHKEK-1', name: 'Азизбек', role: 'Продавец · AliStore Центр' };
+const POINT = 'BISHKEK-1';
+const SHOP = 'AliStore Центр';
 
 type Tab = 'home' | 'orders' | 'tasks' | 'buyback';
 const NAV: { id: Tab; icon: string; label: string }[] = [
@@ -45,44 +52,57 @@ export default function StaffPage() {
   });
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [session, setSession] = useState<StaffSession | null>(null);
+
+  useEffect(() => {
+    setSession(loadStaffSession());
+  }, []);
 
   const loadShift = useCallback(async () => {
-    const s = await currentShift(STAFF.staffId);
-    setShift(s ? await fetchShift(s.id) : null);
-  }, []);
-  useEffect(() => { loadShift(); }, [loadShift]);
+    if (!session) return;
+    const s = await currentShift(session.accessToken);
+    setShift(s ? await fetchShift(s.id, session.accessToken) : null);
+  }, [session]);
+  useEffect(() => { if (session) loadShift(); }, [loadShift, session]);
 
   const loadOrders = useCallback(async () => {
+    if (!session) return;
     setOrders(null);
-    const [a, b] = await Promise.all([fetchOrdersByStatus('created'), fetchOrdersByStatus('reserved')]);
+    const [a, b] = await Promise.all([
+      fetchOrdersByStatus('created', session.accessToken),
+      fetchOrdersByStatus('reserved', session.accessToken),
+    ]);
     setOrders([...a, ...b]);
-  }, []);
-  useEffect(() => { if (tab === 'orders') loadOrders(); }, [tab, loadOrders]);
+  }, [session]);
+  useEffect(() => { if (tab === 'orders' && session) loadOrders(); }, [tab, loadOrders, session]);
 
   function flash(m: string) { setToast(m); window.setTimeout(() => setToast(''), 1600); }
 
   async function doOpenShift() {
+    if (!session) return;
     setBusy('shift');
-    try { await openShift({ staffId: STAFF.staffId, point: STAFF.point, openCash: 0 }); await loadShift(); flash('Смена открыта'); }
+    try { await openShift({ staffId: session.staffId, point: POINT, openCash: 0 }, session.accessToken); await loadShift(); flash('Смена открыта'); }
     catch { flash('Ошибка'); } finally { setBusy(null); }
   }
   async function doCloseShift() {
-    if (!shift) return;
+    if (!shift || !session) return;
     const expected = shift.openCash + (shift.payments ?? []).filter((p) => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
     setBusy('shift');
-    try { await closeShift(shift.id, expected); await loadShift(); flash('Смена закрыта'); }
+    try { await closeShift(shift.id, expected, session.accessToken); await loadShift(); flash('Смена закрыта'); }
     catch { flash('Ошибка закрытия'); } finally { setBusy(null); }
   }
   async function orderAction(o: QueueOrder) {
+    if (!session) return;
     setBusy(o.id);
     try {
-      if (o.status === 'created') { await fulfillOrder(o.id); flash('IMEI назначены'); }
-      else { await transitionOrder(o.id, 'picking'); flash('В сборке'); }
+      if (o.status === 'created') { await fulfillOrder(o.id, session.accessToken); flash('IMEI назначены'); }
+      else { await transitionOrder(o.id, 'picking', session.accessToken); flash('В сборке'); }
       loadOrders();
     } catch (e) { flash(e instanceof Error ? e.message : 'Ошибка'); } finally { setBusy(null); }
   }
   async function submitBuyback(e: FormEvent) {
     e.preventDefault();
+    if (!session) return;
     setBusy('buyback');
     try {
       const customer = await createCustomer({
@@ -95,7 +115,7 @@ export default function StaffPage() {
         grade: buybackForm.grade,
         price: Number(buybackForm.price),
         sellerPassport: buybackForm.passport.trim(),
-        actor: STAFF.staffId,
+        actor: session.staffId,
       });
       setTradeIn(result);
       setBuyback(BUYBACK.map(() => true));
@@ -110,20 +130,47 @@ export default function StaffPage() {
   const cashSales = (shift?.payments ?? []).filter((p) => p.method === 'cash');
   const revenue = (shift?.payments ?? []).reduce((s, p) => s + p.amount, 0);
 
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-center bg-[#0E0C0A] p-5 font-sans">
+        <div className="flex h-full w-full max-w-[420px] items-center justify-center">
+          <StaffSessionLogin
+            title="Staff app · вход"
+            caption="Войдите в рабочую смену."
+            onAuthenticated={setSession}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-center bg-[#0E0C0A] font-sans">
       <div className="flex h-full w-full max-w-[420px] flex-col bg-[#16130F] text-white">
         {/* header */}
         <div className="flex flex-shrink-0 items-center gap-3 px-4 pb-3 pt-5">
-          <span className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-lg font-extrabold">Аз</span>
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-lg font-extrabold">
+            {session.username.slice(0, 2).toUpperCase()}
+          </span>
           <div className="flex-1">
-            <div className="font-display text-base font-bold">{STAFF.name}</div>
-            <div className="text-xs text-[#8A7F76]">{STAFF.role}</div>
+            <div className="font-display text-base font-bold">{session.username}</div>
+            <div className="text-xs text-[#8A7F76]">{session.role} · {SHOP}</div>
           </div>
           <span className={`rounded-chip px-3 py-1.5 text-xs font-semibold ${shift ? 'bg-lime/10 text-lime' : 'bg-[#221E19] text-[#8A7F76]'}`}>
             {shift ? '● на смене' : '○ вне смены'}
           </span>
-          <Link href="/" className="text-[#8A7F76]">✕</Link>
+          <button
+            type="button"
+            onClick={() => {
+              clearStaffSession();
+              setSession(null);
+              setShift(null);
+              setOrders(null);
+            }}
+            className="text-[#8A7F76]"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4">

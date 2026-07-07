@@ -5,7 +5,7 @@ import { fetchCatalog, inventoryCount, transferUnit, uploadEvidenceImages, type 
 import { EvidencePicker } from './EvidencePicker';
 
 /** Transfer + inventory-count operations for the warehouse console. */
-export function WarehouseOps() {
+export function WarehouseOps({ accessToken, actor }: { accessToken: string; actor: string }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [imei, setImei] = useState('');
   const [dest, setDest] = useState('BISHKEK-2');
@@ -33,14 +33,14 @@ export function WarehouseOps() {
     if (!imei.trim() || !dest.trim()) return;
     setBusy('transfer');
     try {
-      const r = await transferUnit(imei.trim(), dest.trim());
+      const r = await transferUnit(imei.trim(), dest.trim(), accessToken);
       const evidence = transferFiles.length
         ? await uploadEvidenceImages({
             files: transferFiles,
             entityType: 'inventory',
             entityId: r.movementId,
             label: 'transfer_photo',
-            actor: 'warehouse',
+            actor,
           })
         : [];
       flash(`✓ ${r.imei}: ${r.from} → ${r.to} · фото ${evidence.length}`);
@@ -57,14 +57,14 @@ export function WarehouseOps() {
     if (!productId || !location.trim() || counted === '') return;
     setBusy('count');
     try {
-      const r = await inventoryCount(productId, location.trim(), Number(counted));
+      const r = await inventoryCount(productId, location.trim(), Number(counted), accessToken);
       const evidence = countFiles.length
         ? await uploadEvidenceImages({
             files: countFiles,
             entityType: 'inventory',
             entityId: r.movementId,
             label: 'count_photo',
-            actor: 'warehouse',
+            actor,
           })
         : [];
       flash(`✓ Учтено ${r.counted}, было ${r.expected}, расхождение ${r.diff} · фото ${evidence.length}`);

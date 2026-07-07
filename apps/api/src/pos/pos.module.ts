@@ -7,6 +7,7 @@ import { UnitsModule } from '../units/units.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ApprovalsModule } from '../approvals/approvals.module';
     OrdersModule,
     PaymentsModule,
     ApprovalsModule,
+    StaffAuthModule,
   ],
   providers: [PosService],
   controllers: [PosController],

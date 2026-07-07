@@ -120,14 +120,18 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
 - ✅ Step-up 2FA для опасного approve: StaffUser хранит TOTP enrollment (`totpSecret`,
   `totpEnabled`), staff API даёт setup/enable/disable, Approval Inbox approve требует
   валидный TOTP-код; reject остаётся быстрым без step-up.
-- ☐ Осталось: staff-session rollout для POS/warehouse/staff ops.
+- ✅ Staff-session rollout для POS/warehouse/staff ops: POS sale, shifts, inventory
+  movement/transfer/count, order queue/reserve/fulfill/transition требуют активный
+  staff JWT; `staffId`/actor берутся из токена, а не из body/query. `/pos`, `/warehouse`,
+  `/staff` используют общий staff-login/session; offline POS sync отправляет текущий
+  staff token.
 - ☐ **Role Permission Matrix** (9 ролей) — расширить на все operational endpoints.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
-Добавлено: targeted staff/approval 2FA tests; полный Jest 59 suites / 187 tests; browser QA
-`/approvals` login→2FA setup на mobile viewport без overflow. Осталось: staff-session rollout
-для POS/warehouse/staff ops.
+Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops tests; полный Jest
+60 suites / 191 tests; browser QA `/approvals` login→2FA setup и `/pos` staff login →
+`/warehouse`/`/staff` shared session без overflow.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
@@ -253,8 +257,9 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 - Phase 0–6 ✅ (ядро/деньги/витрина/аккаунт/POS/склад/approval-цикл+возвраты+обмены).
 - Phase 7 🟡→по существу закрыто: опасные действия через approval (цена/write_off/adjust/
   delete/**долг**/**скидка>10% в POS backend+UI**), staff JWT для Approval Inbox,
-  PII masking/read policy, step-up 2FA для approve. Остаток — rollout staff-session на
-  POS/warehouse ops.
+  PII masking/read policy, step-up 2FA для approve, staff-session rollout на
+  POS/warehouse/staff ops. Остаток — расширить Role Permission Matrix на остальные
+  operational endpoints и закрыть margin-control.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
@@ -272,11 +277,11 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 59 (184 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 60 (191 тест зелёный, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
-- **Лана Codex** (не трогаю): step-up 2FA, POS/warehouse staff-session rollout, outbox/Novu-доставка,
+- **Лана Codex** (не трогаю): Role Permission Matrix rollout, outbox/Novu-доставка,
   Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF,
   realtime (socket.io), observability (sentry), i18n, health, infra (Caddy/бэкапы).
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),

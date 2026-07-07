@@ -6,8 +6,10 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
@@ -19,18 +21,27 @@ import {
 } from '@nestjs/swagger';
 import { ShiftsService } from './shifts.service';
 import { CloseShiftDto, OpenShiftDto } from './shifts.dto';
-
-const SYSTEM_ACTOR = 'system';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireActiveStaff } from '../auth/staff-principal';
 
 @ApiTags('shifts')
+@ApiBearerAuth()
 @Controller('shifts')
+@UseGuards(JwtAuthGuard)
 export class ShiftsController {
-  constructor(private readonly shifts: ShiftsService) {}
+  constructor(
+    private readonly shifts: ShiftsService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @ApiOperation({ summary: "Staff member's currently open shift (or null)" })
   @ApiOkResponse({ description: 'Open shift or null.' })
   @Get('current')
-  current(@Query('staffId') staffId: string) {
+  async current(@CurrentUser() user: AuthPrincipal, @Query('staffId') _staffId?: string) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
     return this.shifts.currentOpen(staffId);
   }
 
@@ -39,7 +50,8 @@ export class ShiftsController {
   @ApiOkResponse({ description: 'Shift found.' })
   @ApiNotFoundResponse({ description: 'Shift does not exist.' })
   @Get(':id')
-  async get(@Param('id') id: string) {
+  async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    await requireActiveStaff(user, this.staffAuth);
     const shift = await this.shifts.get(id);
     if (!shift) throw new NotFoundException(`Смена ${id} не найдена`);
     return shift;
@@ -49,8 +61,9 @@ export class ShiftsController {
   @ApiCreatedResponse({ description: 'Shift opened.' })
   @ApiConflictResponse({ description: 'Staff already has an open shift.' })
   @Post('open')
-  open(@Body() dto: OpenShiftDto) {
-    return this.shifts.open(dto, SYSTEM_ACTOR);
+  async open(@CurrentUser() user: AuthPrincipal, @Body() dto: OpenShiftDto) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.shifts.open({ ...dto, staffId }, staffId);
   }
 
   @ApiOperation({
@@ -63,7 +76,8 @@ export class ShiftsController {
     description: 'Unknown shift, or a discrepancy with no reason (invariant #3).',
   })
   @Post(':id/close')
-  close(@Param('id') id: string, @Body() dto: CloseShiftDto) {
-    return this.shifts.close(id, dto, SYSTEM_ACTOR);
+  async close(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CloseShiftDto) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.shifts.close(id, dto, staffId);
   }
 }

@@ -1,4 +1,4 @@
-import { API_BASE, getJson, postJson } from './http';
+import { API_BASE, getJson, postAuthJson } from './http';
 
 export interface OrderLine {
   sku: string;
@@ -62,20 +62,24 @@ export interface QueueOrder {
   items: { sku: string; qty: number; price: number; imei?: string | null }[];
 }
 
-export async function fetchOrdersByStatus(status: string): Promise<QueueOrder[]> {
+export async function fetchOrdersByStatus(status: string, accessToken: string): Promise<QueueOrder[]> {
   const res = await fetch(`${API_BASE}/orders?status=${encodeURIComponent(status)}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`orders queue ${res.status}`);
   return (await res.json()) as QueueOrder[];
 }
 
-export function fulfillOrder(id: string): Promise<{ order?: { status: string }; assigned: string[] }> {
-  return postJson(`/orders/${id}/fulfill`, {});
+export function fulfillOrder(
+  id: string,
+  accessToken: string,
+): Promise<{ order?: { status: string }; assigned: string[] }> {
+  return postAuthJson(`/orders/${id}/fulfill`, {}, accessToken);
 }
 
-export function transitionOrder(id: string, to: string): Promise<{ status: string }> {
-  return postJson(`/orders/${id}/transition`, { to });
+export function transitionOrder(id: string, to: string, accessToken: string): Promise<{ status: string }> {
+  return postAuthJson(`/orders/${id}/transition`, { to }, accessToken);
 }
 
 export interface OrderDetail {

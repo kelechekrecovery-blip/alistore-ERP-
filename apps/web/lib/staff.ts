@@ -12,8 +12,9 @@ export interface Shift {
   payments?: { amount: number; method: string }[];
 }
 
-export async function currentShift(staffId: string): Promise<Shift | null> {
-  const res = await fetch(`${API_BASE}/shifts/current?staffId=${encodeURIComponent(staffId)}`, {
+export async function currentShift(accessToken: string): Promise<Shift | null> {
+  const res = await fetch(`${API_BASE}/shifts/current`, {
+    headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
   if (!res.ok) return null;
@@ -21,26 +22,37 @@ export async function currentShift(staffId: string): Promise<Shift | null> {
   return text ? (JSON.parse(text) as Shift) : null;
 }
 
-export async function fetchShift(id: string): Promise<Shift | null> {
-  const res = await fetch(`${API_BASE}/shifts/${id}`, { cache: 'no-store' });
+export async function fetchShift(id: string, accessToken: string): Promise<Shift | null> {
+  const res = await fetch(`${API_BASE}/shifts/${id}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
   if (!res.ok) return null;
   return (await res.json()) as Shift;
 }
 
-export async function openShift(input: { staffId: string; point: string; openCash: number }): Promise<Shift> {
+export async function openShift(
+  input: { staffId: string; point: string; openCash: number },
+  accessToken: string,
+): Promise<Shift> {
   const res = await fetch(`${API_BASE}/shifts/open`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`open shift ${res.status}`);
   return (await res.json()) as Shift;
 }
 
-export async function closeShift(id: string, closeCash: number, reason?: string): Promise<Shift> {
+export async function closeShift(
+  id: string,
+  closeCash: number,
+  accessToken: string,
+  reason?: string,
+): Promise<Shift> {
   const res = await fetch(`${API_BASE}/shifts/${id}/close`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ closeCash, reason }),
   });
   if (!res.ok) throw new Error(`close shift ${res.status}`);
