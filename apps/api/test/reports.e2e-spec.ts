@@ -30,6 +30,7 @@ describe('Reports (integration)', () => {
     await prisma.cashShift.deleteMany();
     await prisma.courierRun.deleteMany();
     await prisma.approval.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
 

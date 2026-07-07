@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpsertCustomerDto {
@@ -12,4 +12,15 @@ export class UpsertCustomerDto {
   @IsString()
   @MaxLength(120)
   name?: string;
+}
+
+export class SetConsentDto {
+  @ApiProperty({ example: true, description: 'Marketing consent — false stops all campaigns' })
+  @IsBoolean()
+  consent!: boolean;
+
+  @ApiPropertyOptional({ example: 'customer', description: 'Who toggled it (customer/agent)' })
+  @IsOptional()
+  @IsString()
+  actor?: string;
 }

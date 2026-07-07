@@ -24,7 +24,7 @@ describe('POS sale (integration)', () => {
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     pos = new PosService(
-      new CustomersService(prisma),
+      new CustomersService(prisma, audit),
       new ShiftsService(prisma, audit),
       units,
       new OrdersService(prisma, audit, units),
@@ -45,6 +45,7 @@ describe('POS sale (integration)', () => {
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.cashShift.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
 

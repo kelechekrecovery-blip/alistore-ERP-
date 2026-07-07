@@ -28,6 +28,7 @@ describe('Orders by customer (account)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
 

@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -17,7 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
-import { UpsertCustomerDto } from './customers.dto';
+import { SetConsentDto, UpsertCustomerDto } from './customers.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
@@ -61,5 +62,14 @@ export class CustomersController {
   @Post()
   upsert(@Body() dto: UpsertCustomerDto) {
     return this.customers.upsert(dto);
+  }
+
+  @ApiOperation({ summary: 'Set marketing consent (Notification Preferences, customer.consent_changed)' })
+  @ApiParam({ name: 'id', description: 'Customer id' })
+  @ApiOkResponse({ description: 'Consent updated.' })
+  @ApiNotFoundResponse({ description: 'Customer does not exist.' })
+  @Patch(':id/consent')
+  setConsent(@Param('id') id: string, @Body() dto: SetConsentDto) {
+    return this.customers.setConsent(id, dto.consent, dto.actor ?? 'customer');
   }
 }

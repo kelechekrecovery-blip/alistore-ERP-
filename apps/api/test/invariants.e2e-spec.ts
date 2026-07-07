@@ -42,6 +42,7 @@ describe('Business invariants (integration)', () => {
     await prisma.order.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
 

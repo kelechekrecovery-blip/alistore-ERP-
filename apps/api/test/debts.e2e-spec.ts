@@ -40,6 +40,7 @@ describe('Debts (integration)', () => {
     await prisma.reservation.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.courierRun.deleteMany();

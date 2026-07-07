@@ -1,4 +1,5 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { AuditService } from '../src/audit/audit.service';
 import { CustomersService } from '../src/customers/customers.service';
 import { ValidationError } from '../src/common/errors';
 
@@ -15,7 +16,7 @@ describe('Customer 360 (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    customers = new CustomersService(prisma);
+    customers = new CustomersService(prisma, new AuditService(prisma));
   });
 
   afterAll(async () => {

@@ -32,6 +32,7 @@ describe('Support tickets (integration)', () => {
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.courierRun.deleteMany();

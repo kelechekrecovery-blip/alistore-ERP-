@@ -149,7 +149,9 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
   профиль+consent+LTV, заказы (кол-во + spent из received-платежей, Event-Ledger-first),
   долги DebtPlan (open-баланс), гарантии WarrantyCase (open), тикеты SupportTicket (open).
   Чистый билдер `customer-overview.ts`. GET /customers/:id/overview.
-- ☐ Notification Preferences (consent-переключатель, customer.consent_changed).
+- ✅ **Notification Preferences** (consent): PATCH /customers/:id/consent переключает
+  Customer.consent, пишет customer.consent_changed в ledger только при реальном флипе
+  (идемпотентно). Отзыв согласия = стоп всех рассылок (фильтр — лана Codex).
 - ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex).
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;

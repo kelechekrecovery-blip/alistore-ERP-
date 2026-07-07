@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { UpsertCustomerDto } from './customers.dto';
 import { buildCustomerOverview, CustomerOverview } from './customer-overview';
@@ -12,10 +14,40 @@ import { buildCustomerOverview, CustomerOverview } from './customer-overview';
  */
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   get(id: string) {
     return this.prisma.customer.findUnique({ where: { id } });
+  }
+
+  /**
+   * Toggle marketing consent (Notification Preferences). Idempotent — writes the
+   * customer.consent_changed ledger event only when the value actually flips, so the
+   * audit trail records real consent decisions (withdrawal must stop all campaigns).
+   */
+  async setConsent(customerId: string, consent: boolean, actor: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
+    }
+    return this.audit.transaction(async (tx) => {
+      const updated = await tx.customer.update({ where: { id: customerId }, data: { consent } });
+      const events =
+        customer.consent === consent
+          ? []
+          : [
+              {
+                type: EventType.ConsentChanged,
+                actor,
+                payload: { customerId, from: customer.consent, to: consent },
+                refs: [customerId],
+              },
+            ];
+      return { result: updated, events };
+    });
   }
 
   /** Find-or-create by phone; updates the name only when a new one is provided. */
