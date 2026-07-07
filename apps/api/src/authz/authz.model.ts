@@ -155,6 +155,18 @@ p, cashier, debts, pay
 p, senior_seller, debts, pay
 p, admin, debts, pay
 p, owner, debts, pay
+p, cashier, tradeins, intake
+p, seller, tradeins, intake
+p, senior_seller, tradeins, intake
+p, franchise, tradeins, intake
+p, admin, tradeins, intake
+p, owner, tradeins, intake
+p, cashier, tradeins, read
+p, seller, tradeins, read
+p, senior_seller, tradeins, read
+p, franchise, tradeins, read
+p, admin, tradeins, read
+p, owner, tradeins, read
 g, owner, admin
 g, admin, senior_seller
 `;

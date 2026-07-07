@@ -153,16 +153,22 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
   `GET /debts`, `POST /debts/:id/payments` требуют active staff JWT: seller/cashier/
   senior/franchise/admin/owner создают/читают, cashier/senior/admin/owner принимают
   платежи. `debt.*` actor и over-limit approval requester берутся из staff JWT.
+- ✅ **Role Permission Matrix** phase 8: trade-in split. `POST /tradeins` остаётся
+  customer self-service, но body actor игнорируется и ledger actor = customerId.
+  Staff intake идёт через `POST /tradeins/intake` с active staff JWT + seller/cashier/
+  senior/franchise/admin/owner; `GET /tradeins/:id` staff-read guarded. Staff app
+  отправляет Bearer token.
 - ☐ **Role Permission Matrix** remaining: аккуратно разделить customer self-service и
-  staff/admin mutations для trade-in intake, returns/exchanges.
+  staff/admin mutations для returns/exchanges.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
-RBAC tests; supplier RBAC tests; debt RBAC tests; полный Jest 66 suites / 205 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; полный Jest
+69 suites / 215 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
-`/erp` CRM staff login без overflow.
+`/erp` CRM staff login, `/staff` buyback intake без overflow.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
@@ -302,7 +308,8 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   POS/warehouse/staff ops, Role Permission Matrix phase 1 на POS/shifts/inventory/
   fulfillment, phase 2 на courier COD/delivery и print/export, phase 3 на products/refunds,
   phase 4 на warranty split, phase 5 на support/CRM split, phase 6 на supplier/RMA split.
-  phase 7 на debt/installment split. Остаток — разделить public/customer self-service и staff/admin mutations в trade-in/returns/exchanges и закрыть
+  phase 7 на debt/installment split, phase 8 на trade-in split. Остаток — разделить
+  public/customer self-service и staff/admin mutations в returns/exchanges и закрыть
   margin-control.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
@@ -313,15 +320,17 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   Остаток — Novu-доставка/Segment/Campaign = **лана Codex**.
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
   присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
-  `tradein.contracted` в Event Ledger. PDF-договор уже доступен через `documents/`.
-  Клиентский экран оценки `/trade-in` ✅; evidence-фото → `evidence.attached` ✅.
-  Остаток для полного MVP-UX: приёмка в точке.
+  `tradein.contracted` в Event Ledger; actor для customer self-service = customerId.
+  Staff intake: `POST /tradeins/intake` + staff JWT, Staff app `/staff` отправляет Bearer
+  token; `GET /tradeins/:id` staff-read guarded. PDF-договор уже доступен через
+  `documents/`. Клиентский экран оценки `/trade-in` ✅; evidence-фото →
+  `evidence.attached` ✅.
 - Прототип-экраны (Клиент App 2.0): все ✅ (витрина/кабинет/устройства/избранное/**сравнение**/
   **гарантийный талон**/**статус-заказа timeline**/**поиск**/**возвраты**/**support**/**trade-in**/
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 66 (205 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 69 (215 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

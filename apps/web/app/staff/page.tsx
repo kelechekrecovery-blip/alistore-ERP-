@@ -116,7 +116,7 @@ export default function StaffPage() {
         price: Number(buybackForm.price),
         sellerPassport: buybackForm.passport.trim(),
         actor: session.staffId,
-      });
+      }, session.accessToken);
       setTradeIn(result);
       setBuyback(BUYBACK.map(() => true));
       flash('Договор оформлен');

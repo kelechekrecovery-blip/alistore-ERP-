@@ -1,5 +1,6 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -10,6 +11,12 @@ import {
 } from '@nestjs/swagger';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
 import { TradeInsService } from './tradeins.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 
 @ApiTags('tradeins')
 @Controller('tradeins')
@@ -25,7 +32,22 @@ export class TradeInsController {
   @ApiUnprocessableEntityResponse({ description: 'Customer does not exist or payload is invalid.' })
   @Post()
   create(@Body() dto: CreateTradeInDto) {
-    return this.tradeIns.create(dto);
+    return this.tradeIns.create(dto, dto.customerId);
+  }
+
+  @ApiOperation({
+    summary: 'Staff intake for an in-store used-device buyback',
+    description:
+      'Same contract creation as customer self-service, but actor comes from the active staff JWT.',
+  })
+  @ApiCreatedResponse({ type: TradeInViewDto })
+  @ApiUnprocessableEntityResponse({ description: 'Customer does not exist or payload is invalid.' })
+  @Post('intake')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('tradeins', 'intake')
+  intake(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateTradeInDto) {
+    return this.tradeIns.create(dto, user.customerId);
   }
 
   @ApiOperation({ summary: 'Get a trade-in by id with protected fields masked' })
@@ -33,6 +55,9 @@ export class TradeInsController {
   @ApiOkResponse({ type: TradeInViewDto })
   @ApiNotFoundResponse({ description: 'Trade-in does not exist.' })
   @Get(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('tradeins', 'read')
   async get(@Param('id') id: string) {
     const tradeIn = await this.tradeIns.get(id);
     if (!tradeIn) throw new NotFoundException(`Скупка ${id} не найдена`);

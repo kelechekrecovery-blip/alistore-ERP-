@@ -19,8 +19,7 @@ export class TradeInsService {
     return tradeIn ? this.view(tradeIn) : null;
   }
 
-  async create(dto: CreateTradeInDto): Promise<TradeInViewDto> {
-    const actor = dto.actor ?? 'system';
+  async create(dto: CreateTradeInDto, actor = dto.customerId): Promise<TradeInViewDto> {
     const customer = await this.prisma.customer.findUnique({
       where: { id: dto.customerId },
       select: { id: true },

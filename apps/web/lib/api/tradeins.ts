@@ -1,4 +1,4 @@
-import { postJson } from './http';
+import { postAuthJson, postJson } from './http';
 
 export type TradeInGrade = 'A' | 'B' | 'C';
 
@@ -19,6 +19,9 @@ export function createTradeIn(input: {
   price: number;
   sellerPassport: string;
   actor?: string;
-}): Promise<TradeIn> {
+}, accessToken?: string): Promise<TradeIn> {
+  if (accessToken) {
+    return postAuthJson('/tradeins/intake', input, accessToken);
+  }
   return postJson('/tradeins', input);
 }
