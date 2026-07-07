@@ -218,6 +218,15 @@
 
 ## 2026-07-07
 
+- Task: make Excel product import idempotent.
+- Files changed: `apps/api/src/import/import.service.ts`, `apps/api/src/import/import.types.ts`, `apps/api/test/import.spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `PROGRESS.md`.
+- Result: repeated imports of the same product workbook now skip unchanged rows and report `unchanged` instead of re-updating; changed SKUs still update and new SKUs still create, preserving natural-key idempotency by SKU.
+- Checks run: targeted Jest for `import`; `npm run api:build`; `git diff --check`.
+- Outcome: import tests passed 1 suite / 4 tests; API build passed; repeat workbook produced created 0 / updated 0 / unchanged 1 and kept one Product row.
+- Next step: remaining BACKLOG items require external POS hardware/provider accounts; unblocked software polish is PDF/print/auth/social from handoff.
+
+## 2026-07-07
+
 - Task: add shift close photo report.
 - Files changed: `apps/web/app/staff/page.tsx`, `apps/web/components/StaffSessionLogin.tsx`, `apps/api/test/evidence.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `PROGRESS.md`.
 - Result: Staff app can attach Evidence Vault photos when opening and closing a cash shift; uploads are linked to the shift with `shift_open_photo` / `shift_close_photo` labels. Shared staff login now includes browser autocomplete hints.

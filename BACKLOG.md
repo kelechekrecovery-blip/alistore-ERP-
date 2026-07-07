@@ -5,6 +5,7 @@
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Make Excel product import idempotent.
 - Add shift close photo report.
 - Add debt reminder notifications.
 - Build Refund Money Flow / Dispute Center staff UI.

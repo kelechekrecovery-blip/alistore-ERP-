@@ -39,6 +39,7 @@ describe('ImportService (exceljs)', () => {
 
     const res = await importer.importProducts(buf);
     expect(res.created).toBe(2);
+    expect(res.unchanged).toBe(0);
     expect(res.errors).toHaveLength(1);
     expect(res.errors[0].sku).toBe(`SKU-X-${RUN}-3`);
 
@@ -56,10 +57,21 @@ describe('ImportService (exceljs)', () => {
     );
     expect(res.updated).toBe(1);
     expect(res.created).toBe(0);
+    expect(res.unchanged).toBe(0);
 
     const p = await prisma.product.findUnique({ where: { sku: `SKU-X-${RUN}-9` } });
     expect(p?.name).toBe('New name');
     expect(p?.price).toBe(120);
+  });
+
+  it('is idempotent when the same workbook is imported again', async () => {
+    const sku = `SKU-X-${RUN}-IDEMP`;
+    const buf = await xlsx([[sku, 'Same Phone', 1000, 700, 'phones']]);
+
+    expect(await importer.importProducts(buf)).toMatchObject({ created: 1, updated: 0, unchanged: 0 });
+    expect(await importer.importProducts(buf)).toMatchObject({ created: 0, updated: 0, unchanged: 1 });
+
+    expect(await prisma.product.count({ where: { sku } })).toBe(1);
   });
 
   it('rejects a file missing required columns', async () => {

@@ -259,7 +259,9 @@ badge на дашборде. HTTP+БД сверка.
   карточка «Зарплаты продавцов» в ERP-вкладке «Маржа·KPI». 6 тестов. Расчётный (не платит).
 - ✅ **Смены с фотоотчётом** (`/staff` + Evidence Vault): фото открытия/закрытия
   прикрепляются к `entityType=shift`, ledger labels `shift_open_photo`/`shift_close_photo`.
-- 🟡 Импорт данных из Excel/тетради при запуске (Data Migration) — Codex (`import/`, WIP).
+- ✅ **Импорт данных из Excel/тетради** (`import/`): product workbook маппит колонки по
+  header, создаёт новые SKU, обновляет изменённые и возвращает `unchanged` при повторе
+  того же файла без дублей.
 **Проверка:** ✅ гарантия created→received через консоль (БД + ledger); SLA-breach ловится
 в Risk Center. ✅ Supplier RMA: 6 тестов зелёные + HTTP-смоук created→…→closed (unit
 in_stock→in_repair→in_stock; scorecard resolved=1/rate=1; ledger rma.opened→…→rma.closed).
@@ -269,7 +271,8 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
 no-token/warehouse denied, seller create/read, cashier pay, actor/requester spoof ignored.
 ✅ Debt reminders: due-soon/overdue open debts enqueue SMS outbox + `debt.reminder_queued`,
 повтор sweep идемпотентен. ✅ Shift photo QA: `/staff` open→photo 201→close→photo 201,
-ledger `evidence.attached` x2. Осталось: импорт идемпотентен.
+ledger `evidence.attached` x2. ✅ Import idempotency: repeat workbook → created 0 / updated 0 /
+unchanged 1, Product count stays 1.
 
 ## Phase 10 — Уведомления + Support/CRM (v1→v2) 🟡
 - 🟡 Transactional outbox + relay (Codex начал); Novu-доставка (Codex).

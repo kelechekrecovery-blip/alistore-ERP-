@@ -69,26 +69,50 @@ export class ImportService {
     const { rows, errors } = await this.parseProducts(buffer);
     let created = 0;
     let updated = 0;
+    let unchanged = 0;
     for (const p of rows) {
       const existing = await this.prisma.product.findUnique({
         where: { sku: p.sku },
       });
-      await this.prisma.product.upsert({
+
+      if (!existing) {
+        await this.prisma.product.create({
+          data: {
+            sku: p.sku,
+            name: p.name,
+            price: p.price,
+            cost: p.cost,
+            category: p.category,
+            attrs: {},
+          },
+        });
+        created += 1;
+        continue;
+      }
+
+      if (
+        existing.name === p.name &&
+        existing.price === p.price &&
+        existing.cost === p.cost &&
+        existing.category === p.category
+      ) {
+        unchanged += 1;
+        continue;
+      }
+
+      await this.prisma.product.update({
         where: { sku: p.sku },
-        update: { name: p.name, price: p.price, cost: p.cost, category: p.category },
-        create: {
+        data: {
           sku: p.sku,
           name: p.name,
           price: p.price,
           cost: p.cost,
           category: p.category,
-          attrs: {},
         },
       });
-      if (existing) updated += 1;
-      else created += 1;
+      updated += 1;
     }
-    return { created, updated, errors };
+    return { created, updated, unchanged, errors };
   }
 
   private str(value: unknown): string {
