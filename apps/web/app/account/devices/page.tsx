@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
@@ -62,6 +63,13 @@ export default function DevicesPage() {
                     <WarrantyRequest imei={d.imei} customerId={user.customerId} />
                   )}
                 </div>
+                <Link
+                  href={`/account/warranty/${encodeURIComponent(d.imei)}`}
+                  className="mt-3 flex items-center justify-between border-t border-[#2E2822] pt-3 text-[13px] text-[#D8CFC6]"
+                >
+                  <span>🛡 Гарантийный талон{d.daysLeft != null ? ` · ещё ${d.daysLeft} дн` : ''}</span>
+                  <span className="text-lime">→</span>
+                </Link>
               </div>
             );
           })}

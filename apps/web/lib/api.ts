@@ -183,6 +183,8 @@ export interface MyDevice {
   imei: string;
   product: string;
   status: string;
+  warrantyUntil: string | null;
+  daysLeft: number | null;
   warranty: { id: string; status: string; sla: string } | null;
 }
 

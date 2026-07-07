@@ -5,6 +5,7 @@ import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { UpsertCustomerDto } from './customers.dto';
 import { buildCustomerOverview, CustomerOverview } from './customer-overview';
+import { warrantyCoverage } from './warranty-coverage';
 
 /**
  * Customers for storefront/guest checkout. Phone is the natural key (unique), so
@@ -66,10 +67,11 @@ export class CustomersService {
   async devices(customerId: string) {
     const orders = await this.prisma.order.findMany({
       where: { customerId },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) return [];
+    const purchasedAt = new Map(orders.map((o) => [o.id, o.createdAt]));
 
     const [units, warranties] = await Promise.all([
       this.prisma.deviceUnit.findMany({
@@ -79,12 +81,17 @@ export class CustomersService {
       this.prisma.warrantyCase.findMany({ where: { customerId } }),
     ]);
 
-    return units.map((u) => ({
-      imei: u.imei,
-      product: u.product.name,
-      status: u.status,
-      warranty: warranties.find((w) => w.imei === u.imei) ?? null,
-    }));
+    return units.map((u) => {
+      const cover = warrantyCoverage(u.orderId ? purchasedAt.get(u.orderId) : undefined);
+      return {
+        imei: u.imei,
+        product: u.product.name,
+        status: u.status,
+        warrantyUntil: cover?.until.toISOString() ?? null,
+        daysLeft: cover?.daysLeft ?? null,
+        warranty: warranties.find((w) => w.imei === u.imei) ?? null,
+      };
+    });
   }
 
   /**
