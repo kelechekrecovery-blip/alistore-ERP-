@@ -15,9 +15,12 @@ export interface Ticket {
   createdAt: string;
 }
 
-export async function fetchTickets(status?: string): Promise<Ticket[]> {
+export async function fetchTickets(status: string | undefined, accessToken: string): Promise<Ticket[]> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-  const res = await fetch(`${API_BASE}/support/tickets${qs}`, { cache: 'no-store' });
+  const res = await fetch(`${API_BASE}/support/tickets${qs}`, {
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error(`tickets ${res.status}`);
   return (await res.json()) as Ticket[];
 }
@@ -35,12 +38,25 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function transitionTicket(id: string, to: string, actor = 'agent'): Promise<Ticket> {
-  return patch(`/support/tickets/${id}/transition`, { to, actor });
+async function patchAuth<T>(path: string, body: unknown, accessToken: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as { message?: string }).message ?? `request ${res.status}`);
+  }
+  return (await res.json()) as T;
 }
 
-export function escalateTicket(id: string, actor = 'lead'): Promise<Ticket> {
-  return patch(`/support/tickets/${id}/escalate`, { actor });
+export function transitionTicket(id: string, to: string, accessToken: string): Promise<Ticket> {
+  return patchAuth(`/support/tickets/${id}/transition`, { to }, accessToken);
+}
+
+export function escalateTicket(id: string, accessToken: string): Promise<Ticket> {
+  return patchAuth(`/support/tickets/${id}/escalate`, {}, accessToken);
 }
 
 // ---------- Customer 360 ----------

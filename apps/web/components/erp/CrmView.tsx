@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { escalateTicket, fetchTickets, transitionTicket, type Ticket } from '@/lib/crm';
 import { CustomerCard } from './CustomerCard';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const PRIORITY_COLOR: Record<string, string> = { urgent: '#FF5B2E', high: '#E5B23C', normal: '#8A7F76' };
 const STATUS_RU: Record<string, string> = {
@@ -23,19 +25,27 @@ const FILTERS = ['all', 'new', 'in_progress', 'waiting', 'resolved'] as const;
 
 /** Support Inbox + Customer 360 — the CRM cockpit surface of ERP 2.0. */
 export function CrmView() {
+  const [session, setSession] = useState<StaffSession | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    if (!session) return;
     setTickets(null);
-    fetchTickets(filter === 'all' ? undefined : filter)
+    fetchTickets(filter === 'all' ? undefined : filter, session.accessToken)
       .then(setTickets)
       .catch(() => setTickets([]));
-  }, [filter]);
+  }, [filter, session]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setSession(loadStaffSession());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => { if (session) load(); }, [load, session]);
 
   async function act(t: Ticket, fn: () => Promise<Ticket>) {
     setBusy(t.id);
@@ -51,9 +61,43 @@ export function CrmView() {
 
   const overdue = (t: Ticket) => new Date(t.sla).getTime() < Date.now() && t.status !== 'closed' && t.status !== 'resolved';
 
+  function logout() {
+    clearStaffSession();
+    setSession(null);
+    setTickets(null);
+    setSelected(null);
+  }
+
+  if (!hydrated) {
+    return <p className="font-mono text-sm text-[#6E645C]">Загрузка…</p>;
+  }
+
+  if (!session) {
+    return (
+      <div className="grid min-h-[420px] place-items-center">
+        <StaffSessionLogin
+          title="CRM · вход"
+          caption="Нужна роль администратора или владельца."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       <div>
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[#8A7F76]">
+          <span>{session.username} · {session.role}</span>
+          <button
+            type="button"
+            onClick={logout}
+            className="rounded-chip border border-[#2E2822] px-3 py-1.5 font-semibold text-[#A79C92] hover:text-white"
+          >
+            Выйти staff
+          </button>
+        </div>
+
         {/* filter chips */}
         <div className="mb-3 flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
@@ -112,7 +156,7 @@ export function CrmView() {
                       key={to}
                       type="button"
                       disabled={busy === t.id}
-                      onClick={() => act(t, () => transitionTicket(t.id, to))}
+                      onClick={() => act(t, () => transitionTicket(t.id, to, session.accessToken))}
                       className="rounded-btn bg-[#221E19] px-2.5 py-1 text-[11px] font-semibold text-[#D8CFC6] transition hover:bg-[#2A241F] disabled:opacity-40"
                     >
                       → {STATUS_RU[to]}
@@ -122,7 +166,7 @@ export function CrmView() {
                     <button
                       type="button"
                       disabled={busy === t.id}
-                      onClick={() => act(t, () => escalateTicket(t.id))}
+                      onClick={() => act(t, () => escalateTicket(t.id, session.accessToken))}
                       className="rounded-btn bg-[#3A2016] px-2.5 py-1 text-[11px] font-semibold text-[#FF8A7A] transition hover:bg-[#4A281C] disabled:opacity-40"
                     >
                       ↑ Эскалировать

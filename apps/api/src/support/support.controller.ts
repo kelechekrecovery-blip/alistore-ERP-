@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -9,25 +10,42 @@ import {
 } from '@nestjs/swagger';
 import { SupportService } from './support.service';
 import { EscalateTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
-
-const SYSTEM_ACTOR = 'system';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { AuthzService } from '../authz/authz.service';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 @ApiTags('support')
 @Controller('support/tickets')
 export class SupportController {
-  constructor(private readonly support: SupportService) {}
+  constructor(
+    private readonly support: SupportService,
+    private readonly staffAuth: StaffAuthService,
+    private readonly authz: AuthzService,
+  ) {}
 
   @ApiOperation({ summary: 'Open a support ticket (SLA from priority, ticket.created)' })
   @ApiCreatedResponse({ description: 'Ticket opened.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown customer.' })
   @Post()
   open(@Body() dto: OpenTicketDto) {
-    return this.support.open(dto, dto.actor ?? SYSTEM_ACTOR);
+    return this.support.open(dto, dto.customerId);
   }
 
   @ApiOperation({ summary: 'List tickets (filter by customerId/status), SLA-first' })
   @Get()
-  list(@Query('customerId') customerId?: string, @Query('status') status?: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async list(
+    @CurrentUser() user: AuthPrincipal | undefined,
+    @Query('customerId') customerId?: string,
+    @Query('status') status?: string,
+  ) {
+    if (!customerId) await this.requireStaffPermission(user, 'read');
     return this.support.list({ customerId, status });
   }
 
@@ -36,15 +54,31 @@ export class SupportController {
   @ApiConflictResponse({ description: 'Illegal transition.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown ticket.' })
   @Patch(':id/transition')
-  transition(@Param('id') id: string, @Body() dto: TicketTransitionDto) {
-    return this.support.transition(id, dto.to, dto, dto.actor ?? SYSTEM_ACTOR);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('support', 'transition')
+  transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: TicketTransitionDto) {
+    return this.support.transition(id, dto.to, dto, user.customerId);
   }
 
   @ApiOperation({ summary: 'Escalate a ticket one priority step (ticket.escalated)' })
   @ApiOkResponse({ description: 'Ticket escalated.' })
   @ApiConflictResponse({ description: 'Ticket closed/resolved or already at max priority.' })
   @Patch(':id/escalate')
-  escalate(@Param('id') id: string, @Body() dto: EscalateTicketDto) {
-    return this.support.escalate(id, dto.actor ?? SYSTEM_ACTOR);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('support', 'escalate')
+  escalate(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() _dto: EscalateTicketDto) {
+    return this.support.escalate(id, user.customerId);
+  }
+
+  private async requireStaffPermission(user: AuthPrincipal | undefined, action: string) {
+    if (user?.typ !== 'staff' || !user.role) {
+      throw new ForbiddenException('Требуется staff JWT');
+    }
+    await this.staffAuth.me(user.customerId);
+    if (!(await this.authz.can(user.role, 'support', action))) {
+      throw new ForbiddenException('Недостаточно прав для этого действия');
+    }
   }
 }

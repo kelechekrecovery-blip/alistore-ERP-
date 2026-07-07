@@ -117,6 +117,12 @@ p, owner, warranty, read
 p, warehouse, warranty, transition
 p, admin, warranty, transition
 p, owner, warranty, transition
+p, admin, support, read
+p, owner, support, read
+p, admin, support, transition
+p, owner, support, transition
+p, admin, support, escalate
+p, owner, support, escalate
 g, owner, admin
 g, admin, senior_seller
 `;

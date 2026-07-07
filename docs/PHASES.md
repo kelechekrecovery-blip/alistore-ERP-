@@ -140,15 +140,21 @@ end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000
 - ✅ **Role Permission Matrix** phase 4: warranty split. `POST /warranty` остаётся
   customer self-service, а console list/get/transition требуют active staff JWT +
   роль warehouse/admin/owner; `/warranty` UI использует общий staff session.
+- ✅ **Role Permission Matrix** phase 5: support/CRM split. `POST /support/tickets`
+  и `GET /support/tickets?customerId=…` остаются customer self-service; CRM inbox
+  list/transition/escalate требуют active staff JWT + роль admin/owner; `ticket.created`
+  и `ticket.*` actor берутся из customer/staff token path, body actor игнорируется.
+  ERP CRM tab использует общий staff session.
 - ☐ **Role Permission Matrix** remaining: аккуратно разделить customer self-service и
-  staff/admin mutations для support/CRM, suppliers, debts, trade-in intake, returns/exchanges.
+  staff/admin mutations для suppliers, debts, trade-in intake, returns/exchanges.
 - ☐ Margin-контроль (инв #6).
 **Проверка:** ✅ 5 тестов (в пороге→применено, сверх→202→approve→применено, reject→нет
 эффекта); in-browser +30% цена → Approval Inbox → одобрить → применено + price.changed.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
-print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; полный Jest
-63 suites / 202 tests; browser QA `/approvals` login→2FA setup, `/pos` staff login →
-`/warehouse`/`/staff` shared session, `/warranty` staff login без overflow.
+print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
+RBAC tests; полный Jest 64 suites / 203 tests; browser QA `/approvals` login→2FA setup,
+`/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
+`/erp` CRM staff login без overflow.
 
 ## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
@@ -205,7 +211,8 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
   статусов new→in_progress→waiting→resolved→closed (`ticket-state.ts`), эскалация на шаг
   вверх по лестнице приоритетов (ужимает SLA), просрочка открытых → Risk Center
   (`ticket_sla_breach`). POST /support/tickets, PATCH …/transition, PATCH …/escalate,
-  GET /support/tickets. (UI-инбокс — следом.)
+  GET /support/tickets. Public open/list-by-customer остаётся customer self-service;
+  CRM inbox list/transition/escalate закрыты active staff JWT + admin/owner.
 - ✅ **Customer 360** (`customers/overview`): один read-агрегатор по customerId —
   профиль+consent+LTV, заказы (кол-во + spent из received-платежей, Event-Ledger-first),
   долги DebtPlan (open-баланс), гарантии WarrantyCase (open), тикеты SupportTicket (open).
@@ -215,13 +222,16 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
   (идемпотентно). Отзыв согласия = стоп всех рассылок (фильтр — лана Codex).
 - ✅ **CRM UI** (ERP 2.0 вкладка «CRM · Инбокс», `components/erp/`): Support Inbox (лента
   тикетов с фильтрами по статусу + переходы + эскалация) и Customer 360 карточка (потрачено/
-  заказы/долг/гарантии/обращения + consent-переключатель). API-клиенты в `lib/crm.ts`.
+  заказы/долг/гарантии/обращения + consent-переключатель). Вкладка использует общий staff
+  session; API-клиенты в `lib/crm.ts`.
 - ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex).
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;
-SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP-смоук (реальный клиент:
-3 заказа, spent 109900, 1 гарантия; неизвестный → 422). Осталось (Codex-лана): доставка
-с retry; consent-фильтр рассылок.
+SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/list-by-customer,
+403 для no-token/seller CRM inbox, admin list/transition/escalate, actor spoof ignored.
+✅ Customer 360: 3 теста + HTTP-смоук (реальный клиент: 3 заказа, spent 109900,
+1 гарантия; неизвестный → 422). Осталось (Codex-лана): доставка с retry; consent-фильтр
+рассылок.
 
 ## Phase 11 — AI-слой (v2) 🟡
 - ✅ **AI-ассистент владельца** (`ai/` модуль, `GET /ai/insights`): инсайты из Event Ledger
@@ -276,9 +286,9 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   delete/**долг**/**скидка>10% в POS backend+UI**), staff JWT для Approval Inbox,
   PII masking/read policy, step-up 2FA для approve, staff-session rollout на
   POS/warehouse/staff ops, Role Permission Matrix phase 1 на POS/shifts/inventory/
-  fulfillment, phase 2 на courier COD/delivery и print/export, phase 3 на products/refunds.
-  phase 4 на warranty split. Остаток — разделить public/customer self-service и
-  staff/admin mutations в support/suppliers/debts/trade-in/returns/exchanges и закрыть
+  fulfillment, phase 2 на courier COD/delivery и print/export, phase 3 на products/refunds,
+  phase 4 на warranty split, phase 5 на support/CRM split. Остаток — разделить
+  public/customer self-service и staff/admin mutations в suppliers/debts/trade-in/returns/exchanges и закрыть
   margin-control.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
@@ -297,7 +307,7 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 63 (202 теста зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 64 (203 теста зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
