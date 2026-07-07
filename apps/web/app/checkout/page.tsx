@@ -6,7 +6,14 @@ import { useEffect, useState } from 'react';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { som } from '@/lib/format';
-import { createCustomer, createOrder, type CreatedOrder } from '@/lib/api';
+import {
+  confirmSandboxPayment,
+  createCustomer,
+  createOrder,
+  createPaymentIntent,
+  type CreatedOrder,
+  type PaymentIntent,
+} from '@/lib/api';
 import { loadAddresses, mainAddress, type SavedAddress } from '@/lib/account-local';
 
 const DELIVERY = [
@@ -17,10 +24,13 @@ const DELIVERY = [
 const PAYMENT = [
   { id: 'cash', icon: '💵', name: 'Наличными при получении' },
   { id: 'card', icon: '💳', name: 'Картой' },
-  { id: 'qr', icon: '📱', name: 'QR · MBank / O!Деньги' },
+  { id: 'qr_mbank', icon: '📱', name: 'QR · MBank' },
+  { id: 'qr_odengi', icon: '📲', name: 'QR · O!Деньги' },
   { id: 'installment', icon: '📅', name: 'Рассрочка 0-0-12' },
-];
+] as const;
+type PaymentChoice = (typeof PAYMENT)[number]['id'];
 const STEPS = ['Получение', 'Контакты', 'Оплата', 'Подтверждение'];
+type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean };
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -28,13 +38,13 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState('pickup');
-  const [payment, setPayment] = useState('cash');
+  const [payment, setPayment] = useState<PaymentChoice>('cash');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [address, setAddress] = useState<SavedAddress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<CreatedOrder | null>(null);
+  const [done, setDone] = useState<DoneState | null>(null);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
   useEffect(() => { setAddress(mainAddress(loadAddresses())); }, []);
@@ -47,8 +57,38 @@ export default function CheckoutPage() {
     try {
       const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
       const order = await createOrder({ customerId: customer.id, channel: 'web', total: payable, items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })) });
-      setDone(order); clear();
+      if (payment === 'cash') {
+        setDone({ order });
+        clear();
+        return;
+      }
+      const intent = await createPaymentIntent({
+        orderId: order.id,
+        method: payment,
+        amount: payable,
+        actor: 'web_checkout',
+      });
+      setDone({ order: { ...order, status: intent.orderStatus }, intent });
     } catch { setError('Не удалось оформить заказ.'); } finally { setBusy(false); }
+  }
+
+  async function confirmPayment() {
+    if (!done?.intent) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await confirmSandboxPayment({
+        orderId: done.intent.orderId,
+        method: done.intent.method,
+        amount: done.intent.amount,
+        txnId: done.intent.txnId,
+      });
+      setDone({ ...done, order: { ...done.order, status: res.order?.status ?? 'paid' }, paid: true });
+      clear();
+    } catch {
+      setError('Платёж не подтверждён. Попробуйте ещё раз.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   const wrap = (children: React.ReactNode) => (
@@ -61,9 +101,20 @@ export default function CheckoutPage() {
     return wrap(
       <div className="flex flex-1 flex-col items-center justify-center px-7 text-center">
         <div className="grid h-20 w-20 place-items-center rounded-full bg-lime/15 text-4xl">✓</div>
-        <div className="mt-5 font-display text-2xl font-extrabold">Заказ оформлен!</div>
-        <div className="mt-2.5 text-sm text-[#A79C92]">№ <span className="font-mono text-white">{done.id.slice(-8)}</span> · {done.status}. Мы свяжемся для подтверждения.</div>
-        <Link href={`/account/orders/${done.id}`} className="mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Отследить заказ</Link>
+        <div className="mt-5 font-display text-2xl font-extrabold">{done.intent && !done.paid ? 'Ожидаем оплату' : 'Заказ оформлен!'}</div>
+        <div className="mt-2.5 text-sm text-[#A79C92]">№ <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · {done.order.status}. Мы свяжемся для подтверждения.</div>
+        {done.intent && !done.paid && (
+          <div className="mt-5 w-full rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
+            <div className="text-[13px] font-semibold text-white">{PAYMENT.find((p) => p.id === done.intent?.method)?.name}</div>
+            <div className="mt-1 font-mono text-[11px] break-all text-[#8A7F76]">{done.intent.qrPayload ?? done.intent.paymentUrl}</div>
+            <div className="mt-2 text-[12px] text-[#A79C92]">Sandbox intent: {done.intent.intentId} · до {new Date(done.intent.expiresAt).toLocaleTimeString('ru-RU')}</div>
+            <button type="button" disabled={busy} onClick={confirmPayment} className="mt-3 w-full rounded-[12px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60">
+              {busy ? 'Проверяем…' : 'Подтвердить sandbox-платёж'}
+            </button>
+            {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
+          </div>
+        )}
+        <Link href={`/account/orders/${done.order.id}`} className="mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Отследить заказ</Link>
         <Link href="/" className="mt-4 text-sm text-[#A79C92]">На главную</Link>
       </div>,
     );

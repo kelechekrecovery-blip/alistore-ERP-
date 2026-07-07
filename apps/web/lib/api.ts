@@ -12,3 +12,4 @@ export * from './api/tradeins';
 export * from './api/support';
 export * from './api/returns';
 export * from './api/evidence';
+export * from './api/payments';

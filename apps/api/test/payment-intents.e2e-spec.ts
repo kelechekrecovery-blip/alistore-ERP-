@@ -1,0 +1,105 @@
+import { AuditService } from '../src/audit/audit.service';
+import { ConflictError, ValidationError } from '../src/common/errors';
+import { OrdersService } from '../src/orders/orders.service';
+import { ApprovalsService } from '../src/approvals/approvals.service';
+import { PaymentIntentsService } from '../src/payments/payment-intents.service';
+import { PaymentsService } from '../src/payments/payments.service';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { UnitsService } from '../src/units/units.service';
+
+describe('Online payment intents (integration)', () => {
+  let prisma: PrismaService;
+  let orders: OrdersService;
+  let intents: PaymentIntentsService;
+  let units: UnitsService;
+  let seq = 0;
+
+  beforeAll(async () => {
+    prisma = new PrismaService();
+    await prisma.$connect();
+    const audit = new AuditService(prisma);
+    units = new UnitsService(prisma);
+    orders = new OrdersService(prisma, audit, units);
+    const payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
+    intents = new PaymentIntentsService(prisma, orders, payments);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await prisma.auditEvent.deleteMany();
+    await prisma.reservation.deleteMany();
+    await prisma.payment.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.deviceUnit.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.customer.deleteMany();
+  });
+
+  async function webOrder() {
+    seq += 1;
+    const customer = await prisma.customer.create({ data: { phone: `+9967018${seq.toString().padStart(4, '0')}`, name: 'Pay Web' } });
+    const product = await prisma.product.create({
+      data: { sku: `PAY-${seq}`, name: 'iPhone Pay', price: 100000, cost: 82000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.create({ data: { imei: `PAY-IMEI-${seq}`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
+    return orders.create(
+      { customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] },
+      'web',
+    );
+  }
+
+  it('creates a QR intent by reserving stock, then confirms payment idempotently', async () => {
+    const order = await webOrder();
+
+    const intent = await intents.create({ orderId: order.id, method: 'qr_mbank', amount: 100000, actor: 'web_checkout' });
+    expect(intent.provider).toBe('mbank');
+    expect(intent.orderStatus).toBe('awaiting_payment');
+    expect(intent.qrPayload).toContain('alistore-mbank://pay');
+
+    const reserved = await prisma.deviceUnit.findFirst({ where: { orderId: order.id } });
+    expect(reserved?.status).toBe('reserved');
+    expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('awaiting_payment');
+
+    const paid = await intents.webhook({
+      orderId: order.id,
+      method: 'qr_mbank',
+      amount: 100000,
+      txnId: intent.txnId,
+      status: 'succeeded',
+      actor: 'mbank',
+    });
+    expect(paid.order?.status).toBe('paid');
+    expect(paid.payment.method).toBe('qr_mbank');
+    expect(paid.idempotent).toBe(false);
+
+    const again = await intents.webhook({
+      orderId: order.id,
+      method: 'qr_mbank',
+      amount: 100000,
+      txnId: intent.txnId,
+      status: 'succeeded',
+      actor: 'mbank',
+    });
+    expect(again.idempotent).toBe(true);
+    expect(await prisma.payment.count({ where: { txnId: intent.txnId } })).toBe(1);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold', orderId: order.id } })).toBe(1);
+  });
+
+  it('rejects an amount mismatch and already-paid orders', async () => {
+    const order = await webOrder();
+    const mismatch = await intents.create({ orderId: order.id, method: 'card', amount: 999 }).catch((e) => e);
+    expect(mismatch).toBeInstanceOf(ValidationError);
+    expect(mismatch.code).toBe('payment_amount_mismatch');
+
+    const intent = await intents.create({ orderId: order.id, method: 'card', amount: 100000 });
+    await intents.webhook({ orderId: order.id, method: 'card', amount: 100000, txnId: intent.txnId, status: 'succeeded' });
+    const paidAgain = await intents.create({ orderId: order.id, method: 'card', amount: 100000 }).catch((e) => e);
+    expect(paidAgain).toBeInstanceOf(ConflictError);
+    expect(paidAgain.code).toBe('order_already_paid');
+  });
+});

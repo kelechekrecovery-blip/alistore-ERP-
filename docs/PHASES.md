@@ -49,6 +49,8 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 ## Phase 1 — Денежный контур MVP ✅
 **Цель:** «продавать и не терять деньги».
 - ✅ Payment + «нет paid без резерва» + идемпотентность webhook по txnId.
+- ✅ Online Payment Intents: card/MBank/O!Деньги/installment → reserve/awaiting_payment
+  → sandbox/provider webhook → `payments.pay` (idempotent).
 - ✅ **CashShift** сверка кассы (инв #3), **Courier COD** handover (инв #4).
 - ✅ Reservation-expiry sweep (инв #7, pg-boss — Codex).
 **Проверка:** ✅ приёмочные тесты shift/courier/invariants; HTTP-смоук потока created→reserved→paid.
@@ -254,7 +256,7 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 55 (173 теста зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 56 (175 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

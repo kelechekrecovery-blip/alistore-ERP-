@@ -17,3 +17,12 @@
 - Checks run: `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`.
 - Outcome: API build passed; web build passed; Jest passed 55 suites / 173 tests.
 - Next step: external payment adapters and offline/hardware POS from `BACKLOG.md`.
+
+## 2026-07-07
+
+- Task: add production-shaped online payment adapters for checkout.
+- Files changed: `apps/api/src/payments/payment-intents.*`, `apps/api/test/payment-intents.e2e-spec.ts`, `apps/web/lib/api/payments.ts`, `apps/web/app/checkout/page.tsx`.
+- Result: card/MBank/O!Деньги/installment checkout creates a payment intent, reserves stock, moves the order to `awaiting_payment`, and confirms through an idempotent sandbox/provider webhook.
+- Checks run: `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`.
+- Outcome: API build passed; web build passed; Jest passed 56 suites / 175 tests.
+- Next step: offline POS queue/sync and hardware adapters from `BACKLOG.md`.
