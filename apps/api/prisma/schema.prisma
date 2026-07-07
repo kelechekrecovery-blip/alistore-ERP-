@@ -472,3 +472,17 @@ model OutboxMessage {
 
   @@index([status])
 }
+
+// ---------- STAFF AUTH ----------
+// Staff login carries a role in the JWT so dangerous actions are authorized on
+// the server (Role Permission Matrix), not trusted from the request body.
+model StaffUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([role])
+}

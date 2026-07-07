@@ -6,15 +6,17 @@ import { resolveJwtSecret } from './jwt-secret';
 
 export interface JwtPayload {
   sub: string;
-  phone: string;
+  phone?: string;
   typ: string;
+  role?: string; // staff tokens carry a role for authorization
 }
 
 /** What `request.user` becomes after a valid access token. */
 export interface AuthPrincipal {
   customerId: string;
-  phone: string;
+  phone?: string;
   typ: string;
+  role?: string;
 }
 
 @Injectable()
@@ -28,6 +30,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): AuthPrincipal {
-    return { customerId: payload.sub, phone: payload.phone, typ: payload.typ };
+    return {
+      customerId: payload.sub,
+      phone: payload.phone,
+      typ: payload.typ,
+      role: payload.role,
+    };
   }
 }
