@@ -1,0 +1,41 @@
+# AliStore — edge reverse proxy: auto-TLS + security headers + routing.
+#
+# ⚠️ Authored, NOT run locally (no Caddy/Docker here). Deploy on the edge host:
+#     caddy run --config infra/Caddyfile
+# Caddy issues/renews Let's Encrypt certs automatically for the domains below.
+#
+# Security headers are enforced HERE, at the edge — the clean place for them,
+# without touching the app's main.ts (closes the helmet/CSP gap).
+
+{
+	email admin@alistore.kg
+}
+
+# --- API (NestJS) ---
+api.alistore.kg {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:4000
+}
+
+# --- Storefront (Next.js) ---
+alistore.kg, www.alistore.kg {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# A storefront CSP; tighten script-src to your real origins/nonce.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.alistore.kg; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:3000
+}
