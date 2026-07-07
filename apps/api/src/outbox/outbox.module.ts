@@ -4,6 +4,7 @@ import { OutboxService } from './outbox.service';
 import { OutboxRelay } from './outbox.relay';
 import { LogNotificationTransport } from './transports/log.transport';
 import { NovuHttpTransport } from './transports/novu.transport';
+import { EmailNotificationTransport } from './transports/email.transport';
 import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
 
 /**
@@ -17,15 +18,20 @@ import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
   providers: [
     OutboxService,
     OutboxRelay,
-    // Novu when configured (NOTIFICATION_TRANSPORT=novu + NOVU_API_KEY), else log.
+    // Delivery transport by NOTIFICATION_TRANSPORT: novu (+NOVU_API_KEY) | email | log.
     {
       provide: NOTIFICATION_TRANSPORT,
       inject: [ConfigService],
-      useFactory: (config: ConfigService): NotificationTransport =>
-        config.get<string>('NOTIFICATION_TRANSPORT') === 'novu' &&
-        config.get<string>('NOVU_API_KEY')
-          ? new NovuHttpTransport(config)
-          : new LogNotificationTransport(),
+      useFactory: (config: ConfigService): NotificationTransport => {
+        const mode = config.get<string>('NOTIFICATION_TRANSPORT');
+        if (mode === 'novu' && config.get<string>('NOVU_API_KEY')) {
+          return new NovuHttpTransport(config);
+        }
+        if (mode === 'email') {
+          return new EmailNotificationTransport(config);
+        }
+        return new LogNotificationTransport();
+      },
     },
   ],
   exports: [OutboxService],
