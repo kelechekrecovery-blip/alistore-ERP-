@@ -4,8 +4,9 @@ import { AuthNav } from './AuthNav';
 
 const NAV = [
   { href: '/', label: 'Каталог' },
-  { href: '/#trade-in', label: 'Скупка Б/У' },
+  { href: '/trade-in', label: 'Скупка Б/У' },
   { href: '/#warranty', label: 'Гарантия' },
+  { href: '/support', label: 'Поддержка' },
 ];
 
 export function SiteHeader() {

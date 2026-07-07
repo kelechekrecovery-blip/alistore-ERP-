@@ -107,7 +107,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
-      <button type="button" onClick={reorder} className="mt-4 w-full rounded-[13px] border border-[#2E2822] bg-[#221E19] py-3.5 text-center text-[13px] font-semibold text-lime">🔁 Повторить заказ</button>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button type="button" onClick={reorder} className="rounded-[13px] border border-[#2E2822] bg-[#221E19] py-3.5 text-center text-[13px] font-semibold text-lime">🔁 Повторить</button>
+        <Link href="/account/returns" className="rounded-[13px] border border-[#2E2822] bg-[#221E19] py-3.5 text-center text-[13px] font-semibold text-[#D8CFC6]">↩ Возврат</Link>
+      </div>
+      <Link href="/support" className="mt-2 block rounded-[13px] border border-[#2E2822] bg-[#221E19] py-3.5 text-center text-[13px] font-semibold text-[#D8CFC6]">💬 Написать в поддержку</Link>
     </div>,
   );
 }

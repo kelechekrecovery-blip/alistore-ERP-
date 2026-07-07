@@ -18,6 +18,16 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   exchanged: { label: 'Обмен', cls: 'bg-warn/15 text-warn' },
 };
 const st = (s: string) => STATUS[s] ?? { label: s, cls: 'bg-[#2E2822] text-[#8A7F76]' };
+const MENU = [
+  { href: '/account/devices', icon: '📱', label: 'Мои устройства', badge: '' },
+  { href: '/account/returns', icon: '↩', label: 'Возвраты', badge: '' },
+  { href: '/account/bonuses', icon: '🎁', label: 'Бонусы', badge: '4 820' },
+  { href: '/account/addresses', icon: '📍', label: 'Адреса', badge: '' },
+  { href: '/account/notifications', icon: '🔔', label: 'Уведомления', badge: '' },
+  { href: '/support', icon: '💬', label: 'Поддержка', badge: '' },
+  { href: '/trade-in', icon: '♻', label: 'Trade-in', badge: 'оценка' },
+  { href: '/account/settings', icon: '⚙', label: 'Настройки', badge: '' },
+];
 
 export default function AccountPage() {
   const { user, hydrated, authed, logout } = useAuth();
@@ -56,8 +66,13 @@ export default function AccountPage() {
 
           {/* menu */}
           <div className="mb-4 grid grid-cols-2 gap-2.5">
-            <Link href="/account/devices" className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4"><div className="text-2xl">📱</div><div className="mt-2 text-[13px] font-semibold">Мои устройства</div></Link>
-            <Link href="/" className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4"><div className="text-2xl">♻️</div><div className="mt-2 text-[13px] font-semibold">Trade-in</div></Link>
+            {MENU.map((m) => (
+              <Link key={m.href} href={m.href} className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+                <div className="text-2xl">{m.icon}</div>
+                <div className="mt-2 text-[13px] font-semibold">{m.label}</div>
+                {m.badge && <div className="mt-1 text-[11px] text-lime">{m.badge}</div>}
+              </Link>
+            ))}
           </div>
 
           <h2 className="mb-2.5 font-display text-base font-bold">Мои заказы</h2>

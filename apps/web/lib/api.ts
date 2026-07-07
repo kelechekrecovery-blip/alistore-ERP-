@@ -9,3 +9,5 @@ export * from './api/warehouse';
 export * from './api/exchanges';
 export * from './api/approvals';
 export * from './api/tradeins';
+export * from './api/support';
+export * from './api/returns';

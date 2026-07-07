@@ -7,10 +7,34 @@ import { som } from '@/lib/format';
 import { MobileTabBar } from '@/components/MobileTabBar';
 
 export default function CartPage() {
-  const { items, subtotal, setQty, remove, hydrated } = useCart();
-  const [bonus, setBonus] = useState(false);
-  const discount = bonus ? Math.min(subtotal, 4820) : 0;
-  const total = subtotal - discount;
+  const {
+    items,
+    subtotal,
+    total,
+    promoCode,
+    promoDiscount,
+    bonusApplied,
+    bonusDiscount,
+    setQty,
+    remove,
+    hydrated,
+    applyPromo,
+    clearPromo,
+    toggleBonus,
+  } = useCart();
+  const [promoInput, setPromoInput] = useState(promoCode ?? '');
+  const [promoError, setPromoError] = useState<string | null>(null);
+
+  function submitPromo() {
+    if (promoCode) {
+      clearPromo();
+      setPromoInput('');
+      setPromoError(null);
+      return;
+    }
+    const ok = applyPromo(promoInput);
+    setPromoError(ok ? null : 'Попробуйте SALE5000 или ALI10');
+  }
 
   return (
     <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
@@ -48,17 +72,27 @@ export default function CartPage() {
               {items.length > 0 && (
                 <>
                   <div className="mt-1.5 flex gap-2">
-                    <div className="flex-1 rounded-[11px] border border-[#2E2822] bg-[#221E19] p-3 text-[13px] text-[#6E645C]">Промокод</div>
-                    <button type="button" className="rounded-[11px] bg-[#2E2822] px-4.5 py-3 text-[13px] font-semibold text-[#8A7F76]" style={{ padding: '12px 18px' }}>Применить</button>
+                    <input
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value)}
+                      placeholder="Промокод"
+                      className="min-w-0 flex-1 rounded-[11px] border border-[#2E2822] bg-[#221E19] p-3 text-[13px] text-white outline-none placeholder:text-[#6E645C] focus:border-lime"
+                    />
+                    <button type="button" onClick={submitPromo} className="rounded-[11px] bg-[#2E2822] px-4 py-3 text-[13px] font-semibold text-[#D8CFC6]">
+                      {promoCode ? 'Убрать' : 'Применить'}
+                    </button>
                   </div>
-                  <button type="button" onClick={() => setBonus((b) => !b)} className="mt-2 flex w-full items-center gap-2.5 rounded-[11px] border border-[#2E2822] bg-[#221E19] p-3">
-                    <span className={`grid h-5 w-5 place-items-center rounded-[6px] border-2 text-xs ${bonus ? 'border-lime bg-lime text-lime-ink' : 'border-[#3A342E]'}`}>{bonus ? '✓' : ''}</span>
+                  {promoError && <div className="mt-1.5 text-[11px] text-[#FF8A7A]">{promoError}</div>}
+                  {promoCode && <div className="mt-1.5 text-[11px] text-lime">{promoCode} применён: −{som(promoDiscount)}</div>}
+                  <button type="button" onClick={toggleBonus} className="mt-2 flex w-full items-center gap-2.5 rounded-[11px] border border-[#2E2822] bg-[#221E19] p-3">
+                    <span className={`grid h-5 w-5 place-items-center rounded-[6px] border-2 text-xs ${bonusApplied ? 'border-lime bg-lime text-lime-ink' : 'border-[#3A342E]'}`}>{bonusApplied ? '✓' : ''}</span>
                     <span className="text-[13px] text-[#D8CFC6]">Списать 4 820 бонусов</span>
                   </button>
 
                   <div className="mt-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
                     <div className="flex justify-between py-1 text-[13px] text-[#A79C92]">Товары <span className="text-[#D8CFC6]">{som(subtotal)}</span></div>
-                    {discount > 0 && <div className="flex justify-between py-1 text-[13px] text-lime">Бонусы <span>−{som(discount)}</span></div>}
+                    {promoDiscount > 0 && <div className="flex justify-between py-1 text-[13px] text-lime">Промокод <span>−{som(promoDiscount)}</span></div>}
+                    {bonusDiscount > 0 && <div className="flex justify-between py-1 text-[13px] text-lime">Бонусы <span>−{som(bonusDiscount)}</span></div>}
                     <div className="flex justify-between py-1 text-[13px] text-[#A79C92]">Доставка <span className="text-[#D8CFC6]">бесплатно</span></div>
                     <div className="my-2 border-t border-[#2E2822]" />
                     <div className="flex items-center justify-between">

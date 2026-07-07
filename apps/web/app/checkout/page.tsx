@@ -7,11 +7,12 @@ import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { som } from '@/lib/format';
 import { createCustomer, createOrder, type CreatedOrder } from '@/lib/api';
+import { loadAddresses, mainAddress, type SavedAddress } from '@/lib/account-local';
 
 const DELIVERY = [
-  { id: 'pickup', icon: '🏬', name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно' },
-  { id: 'courier', icon: '🚚', name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с' },
-  { id: 'express', icon: '⚡', name: 'Экспресс', meta: 'в течение часа', price: '400 с' },
+  { id: 'pickup', icon: '🏬', name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
+  { id: 'courier', icon: '🚚', name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с', fee: 200 },
+  { id: 'express', icon: '⚡', name: 'Экспресс', meta: 'в течение часа', price: '400 с', fee: 400 },
 ];
 const PAYMENT = [
   { id: 'cash', icon: '💵', name: 'Наличными при получении' },
@@ -23,25 +24,29 @@ const STEPS = ['Получение', 'Контакты', 'Оплата', 'Под
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, clear, hydrated } = useCart();
+  const { items, subtotal, total, promoDiscount, bonusDiscount, promoCode, clear, hydrated } = useCart();
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState('pickup');
   const [payment, setPayment] = useState('cash');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [address, setAddress] = useState<SavedAddress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<CreatedOrder | null>(null);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
+  useEffect(() => { setAddress(mainAddress(loadAddresses())); }, []);
   const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
+  const deliveryFee = DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
+  const payable = total + deliveryFee;
 
   async function place() {
     setBusy(true); setError(null);
     try {
       const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
-      const order = await createOrder({ customerId: customer.id, channel: 'web', total: subtotal, items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })) });
+      const order = await createOrder({ customerId: customer.id, channel: 'web', total: payable, items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })) });
       setDone(order); clear();
     } catch { setError('Не удалось оформить заказ.'); } finally { setBusy(false); }
   }
@@ -88,6 +93,15 @@ export default function CheckoutPage() {
                 <span className="text-[13px] text-[#D8CFC6]">{d.price}</span>
               </button>
             ))}
+            {delivery !== 'pickup' && (
+              <Link href="/account/addresses" className="mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                <div className="flex items-center justify-between text-[13px] font-semibold">
+                  <span>Адрес доставки</span>
+                  <span className="text-lime">изменить</span>
+                </div>
+                <div className="mt-1.5 text-[12px] leading-relaxed text-[#A79C92]">{address ? `${address.title}: ${address.text}` : 'Добавьте адрес доставки'}</div>
+              </Link>
+            )}
             <button type="button" onClick={() => setStep(1)} className="mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">Далее</button>
           </>
         )}
@@ -118,11 +132,16 @@ export default function CheckoutPage() {
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
             <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
+              {delivery !== 'pickup' && <Row k="Адрес" v={address?.text ?? 'не указан'} />}
               <Row k="Оплата" v={PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
               <Row k="Телефон" v={phone} />
               <Row k="Товаров" v={String(items.reduce((s, i) => s + i.qty, 0))} />
               <div className="my-2 border-t border-[#2E2822]" />
-              <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(subtotal)}</span></div>
+              <Row k="Товары" v={som(subtotal)} />
+              {promoDiscount > 0 && <Row k={`Промокод ${promoCode ?? ''}`} v={`−${som(promoDiscount)}`} />}
+              {bonusDiscount > 0 && <Row k="Бонусы" v={`−${som(bonusDiscount)}`} />}
+              <Row k="Доставка" v={deliveryFee ? som(deliveryFee) : 'бесплатно'} />
+              <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(payable)}</span></div>
             </div>
             {error && <p className="mt-3 text-sm text-[#FF8A7A]">{error}</p>}
             <button type="button" disabled={busy} onClick={place} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
@@ -134,5 +153,10 @@ export default function CheckoutPage() {
 }
 
 function Row({ k, v }: { k: string; v: string }) {
-  return <div className="flex justify-between py-1.5 text-[13px] text-[#A79C92]">{k} <span className="text-[#D8CFC6]">{v}</span></div>;
+  return (
+    <div className="flex gap-3 py-1.5 text-[13px] text-[#A79C92]">
+      <span className="flex-shrink-0">{k}</span>
+      <span className="ml-auto min-w-0 text-right text-[#D8CFC6]">{v}</span>
+    </div>
+  );
 }

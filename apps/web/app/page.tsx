@@ -42,11 +42,11 @@ export default function HomePage() {
             <span className="text-xs text-[#A79C92]">📍 Бишкек ▾</span>
             <div className="ml-auto flex items-center gap-3.5 text-[17px]">
               <Link href="/favorites">🤍</Link>
-              <span>🔔</span>
+              <Link href="/account/notifications">🔔</Link>
               <Link href="/account">👤</Link>
             </div>
           </div>
-          <Link href="/cart" className="flex items-center gap-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] px-3.5 py-3">
+          <Link href="/search" className="flex items-center gap-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] px-3.5 py-3">
             <span className="text-[#6E645C]">🔍</span>
             <span className="text-sm text-[#6E645C]">Поиск техники, брендов…</span>
           </Link>
@@ -65,11 +65,11 @@ export default function HomePage() {
               <div className="mt-1.5 text-[13px] font-bold">Самовывоз</div>
               <div className="text-[11px] text-[#A79C92]">бесплатно</div>
             </div>
-            <div className="flex-1 rounded-[15px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <Link href="/trade-in" className="flex-1 rounded-[15px] border border-[#2E2822] bg-[#221E19] p-3.5">
               <div className="text-xl">♻️</div>
               <div className="mt-1.5 text-[13px] font-bold">Trade-in</div>
               <div className="text-[11px] text-lime">оценка 30с</div>
-            </div>
+            </Link>
           </div>
 
           {/* categories */}
