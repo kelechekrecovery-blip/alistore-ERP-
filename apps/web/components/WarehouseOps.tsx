@@ -55,36 +55,36 @@ export function WarehouseOps() {
   }
 
   return (
-    <div className="mb-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft">
-      <div className="mb-3 font-display text-sm font-bold text-ink">Операции склада</div>
+    <div className="mb-4 rounded-card border border-[#2E2822] bg-[#1A1611] p-4 ">
+      <div className="mb-3 font-display text-sm font-bold text-white">Операции склада</div>
       <div className="grid gap-4 sm:grid-cols-2">
         {/* transfer */}
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">Перемещение по IMEI</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Перемещение по IMEI</p>
           <div className="flex flex-col gap-2">
-            <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="IMEI единицы" className="rounded-btn border border-ink/15 px-3 py-2 text-sm outline-none focus:border-coral" />
+            <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="IMEI единицы" className="rounded-btn border border-[#2E2822] px-3 py-2 text-sm outline-none focus:border-coral" />
             <div className="flex gap-2">
-              <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="куда (склад)" className="flex-1 rounded-btn border border-ink/15 px-3 py-2 text-sm outline-none focus:border-coral" />
-              <button type="button" disabled={busy === 'transfer'} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-ink/20">Переместить</button>
+              <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="куда (склад)" className="flex-1 rounded-btn border border-[#2E2822] px-3 py-2 text-sm outline-none focus:border-coral" />
+              <button type="button" disabled={busy === 'transfer'} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-[#2E2822]">Переместить</button>
             </div>
           </div>
         </div>
         {/* count */}
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">Инвентаризация</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Инвентаризация</p>
           <div className="flex flex-col gap-2">
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} className="rounded-btn border border-ink/15 bg-white px-3 py-2 text-sm outline-none focus:border-coral">
+            <select value={productId} onChange={(e) => setProductId(e.target.value)} className="rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-2 text-sm outline-none focus:border-coral">
               {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <div className="flex gap-2">
-              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="склад" className="w-28 rounded-btn border border-ink/15 px-3 py-2 text-sm outline-none focus:border-coral" />
-              <input value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-ink/15 px-3 py-2 text-sm outline-none focus:border-coral" />
-              <button type="button" disabled={busy === 'count'} onClick={doCount} className="flex-1 rounded-btn bg-ink px-4 py-2 text-sm font-semibold text-sand transition hover:bg-ink-dark disabled:bg-ink/20">Записать</button>
+              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="склад" className="w-28 rounded-btn border border-[#2E2822] px-3 py-2 text-sm outline-none focus:border-coral" />
+              <input value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-[#2E2822] px-3 py-2 text-sm outline-none focus:border-coral" />
+              <button type="button" disabled={busy === 'count'} onClick={doCount} className="flex-1 rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-[#2E2822]">Записать</button>
             </div>
           </div>
         </div>
       </div>
-      {msg && <div className="mt-3 rounded-btn bg-tint px-3 py-2 text-sm text-deep">{msg}</div>}
+      {msg && <div className="mt-3 rounded-btn bg-[#221E19] px-3 py-2 text-sm text-lime">{msg}</div>}
     </div>
   );
 }

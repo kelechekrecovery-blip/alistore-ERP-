@@ -21,7 +21,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
   }
 
   if (state === 'done') {
-    return <span className="font-mono text-[11px] text-success">✓ Гарантийное обращение принято</span>;
+    return <span className="font-mono text-[11px] text-lime">✓ Гарантийное обращение принято</span>;
   }
 
   if (!open) {
@@ -29,7 +29,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-chip border border-ink/15 px-2.5 py-1 text-[11px] font-medium text-ink/60 transition hover:border-info/40 hover:text-info"
+        className="rounded-chip border border-[#2E2822] px-2.5 py-1 text-[11px] font-medium text-[#8A7F76] transition hover:border-info/40 hover:text-info"
       >
         Заявить гарантию
       </button>
@@ -43,7 +43,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
         value={problem}
         onChange={(e) => setProblem(e.target.value)}
         placeholder="Опишите проблему…"
-        className="flex-1 rounded-btn border border-ink/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-info"
+        className="flex-1 rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-1.5 text-xs outline-none focus:border-info"
         autoFocus
       />
       <button
