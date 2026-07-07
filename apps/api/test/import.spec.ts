@@ -1,0 +1,76 @@
+import { Workbook } from 'exceljs';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { ImportService } from '../src/import/import.service';
+import { ValidationError } from '../src/common/errors';
+
+/**
+ * exceljs product import — real xlsx round-trip against Postgres. No global wipe
+ * (grown FK-linked schema): unique SKUs per run.
+ */
+describe('ImportService (exceljs)', () => {
+  let prisma: PrismaService;
+  let importer: ImportService;
+  const RUN = Math.floor(Math.random() * 1_000_000);
+
+  beforeAll(async () => {
+    prisma = new PrismaService();
+    await prisma.$connect();
+    importer = new ImportService(prisma);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  async function xlsx(rows: (string | number)[][]): Promise<Buffer> {
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('products');
+    ws.addRow(['sku', 'name', 'price', 'cost', 'category']);
+    rows.forEach((r) => ws.addRow(r));
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  it('imports valid products (upsert by SKU) and reports bad rows', async () => {
+    const buf = await xlsx([
+      [`SKU-X-${RUN}-1`, 'iPhone 15', 100000, 80000, 'phones'],
+      [`SKU-X-${RUN}-2`, 'Чехол', 500, 200, 'accessories'],
+      [`SKU-X-${RUN}-3`, '', 'notanumber', 0, 'phones'], // no name + non-numeric price
+    ]);
+
+    const res = await importer.importProducts(buf);
+    expect(res.created).toBe(2);
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0].sku).toBe(`SKU-X-${RUN}-3`);
+
+    const p = await prisma.product.findUnique({ where: { sku: `SKU-X-${RUN}-1` } });
+    expect(p?.name).toBe('iPhone 15');
+    expect(p?.price).toBe(100000);
+  });
+
+  it('updates an existing product on re-import', async () => {
+    await importer.importProducts(
+      await xlsx([[`SKU-X-${RUN}-9`, 'Old', 100, 50, 'phones']]),
+    );
+    const res = await importer.importProducts(
+      await xlsx([[`SKU-X-${RUN}-9`, 'New name', 120, 60, 'phones']]),
+    );
+    expect(res.updated).toBe(1);
+    expect(res.created).toBe(0);
+
+    const p = await prisma.product.findUnique({ where: { sku: `SKU-X-${RUN}-9` } });
+    expect(p?.name).toBe('New name');
+    expect(p?.price).toBe(120);
+  });
+
+  it('rejects a file missing required columns', async () => {
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('p');
+    ws.addRow(['sku', 'name']); // missing price/cost/category
+    ws.addRow(['SKU-Z', 'x']);
+    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const err = await importer.importProducts(buf).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('missing_columns');
+  });
+});
