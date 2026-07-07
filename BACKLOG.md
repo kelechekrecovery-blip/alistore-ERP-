@@ -5,6 +5,7 @@
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Optimize product detail related products.
 - Connect owner AI assistant to merchandising signals.
 - Add ERP revenue trend comparison.
 - Enforce POS margin-control approval gate.

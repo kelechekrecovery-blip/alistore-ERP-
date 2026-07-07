@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { fetchCatalog, fetchProduct, type CatalogProduct } from '@/lib/api';
+import { fetchProductWithRelated, type CatalogProduct } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
@@ -23,8 +23,23 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [added, setAdded] = useState(false);
 
   useEffect(() => {
-    fetchProduct(params.id).then((p) => setProduct(p ?? 'missing'));
-    fetchCatalog({ limit: 100 }).then((c) => setSimilar(c.items));
+    let active = true;
+    setProduct(null);
+    setSimilar([]);
+    fetchProductWithRelated(params.id)
+      .then(({ product: nextProduct, related }) => {
+        if (!active) return;
+        setProduct(nextProduct ?? 'missing');
+        setSimilar(related);
+      })
+      .catch(() => {
+        if (!active) return;
+        setProduct('missing');
+        setSimilar([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [params.id]);
 
   if (product === null) {
@@ -44,7 +59,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const inStock = product.availableUnits > 0;
   const used = conditionLabel(product.attrs) === 'Б/У';
   const specs = Object.entries(product.attrs ?? {}).filter(([, v]) => typeof v === 'string' || typeof v === 'number');
-  const related = similar.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 6);
+  const related = similar;
 
   function addToCart() {
     if (!product || product === 'missing') return;
@@ -119,7 +134,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             {related.length > 0 && (
               <>
                 <div className="mt-5 mb-2.5 font-display text-[15px] font-bold">Похожие товары</div>
-                <div className="flex gap-2.5 overflow-x-auto pb-1.5">
+                <div className="flex gap-2.5 overflow-x-auto pb-1.5" aria-label="Похожие товары">
                   {related.map((r) => (
                     <Link key={r.id} href={`/product/${r.id}`} className="w-[120px] flex-shrink-0">
                       <div className="grid h-[92px] place-items-center rounded-[12px] bg-gradient-to-br from-[#2A2620] to-[#16130F] font-display text-3xl font-extrabold text-white/10">{r.name.slice(0, 1)}</div>

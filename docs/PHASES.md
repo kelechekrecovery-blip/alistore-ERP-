@@ -59,7 +59,8 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ Каталог (на живом API), карточка товара, корзина (persist), checkout → заказ.
 - ✅ Customers find-or-create (гость), дизайн-токены хендоффа.
 - ✅ Избранное/сравнение persist, поиск (`/search`), промокоды/бонусы в корзине → checkout total.
-- 🟡 Осталось: «похожие товары», отзывы.
+- ✅ Похожие товары на карточке: same-category рекомендации, in-stock/price-near ранжирование.
+- 🟡 Осталось: отзывы.
 **Проверка:** ✅ in-browser add→cart→checkout→order (channel=web) + сверка в БД.
 
 ## Phase 3 — Аккаунт + Auth ✅
