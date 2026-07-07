@@ -234,6 +234,10 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **долги/рассрочка**. Остаток — долг-напоминания (Codex-уведомления), KPI/зарплаты, Evidence Vault.
 - Phase 10 🟡: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**.
   Остаток — Novu-доставка/Segment/Campaign = **лана Codex**.
+- **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
+  присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
+  `tradein.contracted` в Event Ledger. PDF-договор уже доступен через `documents/`.
+  Остаток для полного MVP-UX: экран оценки/приёмки + evidence-фото.
 - Прототип-экраны (Клиент App 2.0): все ✅ (витрина/кабинет/устройства/избранное/**сравнение**/
   **гарантийный талон**/**статус-заказа timeline**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).

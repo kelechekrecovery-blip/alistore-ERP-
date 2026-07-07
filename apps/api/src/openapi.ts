@@ -16,6 +16,7 @@ export function setupOpenApi(app: INestApplication): void {
     .addTag('catalog', 'Storefront catalog search and Meilisearch indexing')
     .addTag('orders', 'Order lifecycle, reservation, and state transitions')
     .addTag('payments', 'Payments, payment ledger, and txnId idempotency')
+    .addTag('tradeins', 'Used-device buyback assessment, contracts, and audit events')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {

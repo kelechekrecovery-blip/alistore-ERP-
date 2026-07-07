@@ -7,6 +7,8 @@ import {
 } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
 
+const READINESS_HEAP_LIMIT_BYTES = 1536 * 1024 * 1024;
+
 @Controller('health')
 export class HealthController {
   constructor(
@@ -22,7 +24,7 @@ export class HealthController {
   check() {
     return this.health.check([
       () => this.db.pingCheck('database', this.prisma),
-      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
+      () => this.memory.checkHeap('memory_heap', READINESS_HEAP_LIMIT_BYTES),
     ]);
   }
 

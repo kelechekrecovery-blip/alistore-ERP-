@@ -43,6 +43,7 @@ describe('Refund approval cycle (integration)', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.deviceUnit.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();

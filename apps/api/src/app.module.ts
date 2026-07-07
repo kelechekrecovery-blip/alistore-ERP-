@@ -28,6 +28,13 @@ import { ImportModule } from './import/import.module';
 import { DebtsModule } from './debts/debts.module';
 import { SupportModule } from './support/support.module';
 import { HealthModule } from './health/health.module';
+import { DocumentsModule } from './documents/documents.module';
+import { ObservabilityModule } from './observability/observability.module';
+import { AuthzModule } from './authz/authz.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { LocalizationModule } from './localization/localization.module';
+import { StaffAuthModule } from './staff-auth/staff-auth.module';
+import { TradeInsModule } from './tradeins/tradeins.module';
 
 @Module({
   imports: [
@@ -60,6 +67,13 @@ import { HealthModule } from './health/health.module';
     DebtsModule,
     SupportModule,
     HealthModule,
+    DocumentsModule,
+    ObservabilityModule,
+    AuthzModule,
+    RealtimeModule,
+    LocalizationModule,
+    StaffAuthModule,
+    TradeInsModule,
   ],
 })
 export class AppModule {}
