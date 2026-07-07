@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { TotpService } from './totp.service';
 import { JwtStrategy } from './jwt.strategy';
+import { resolveJwtSecret } from './jwt-secret';
 import { AuthController } from './auth.controller';
 
 /**
@@ -22,7 +23,7 @@ import { AuthController } from './auth.controller';
       // Access-token TTL is applied per-sign in AuthService (a literal that
       // satisfies the strict `ms` StringValue type); the module only needs the key.
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') ?? 'dev-insecure-change-me',
+        secret: resolveJwtSecret(config),
       }),
     }),
   ],
