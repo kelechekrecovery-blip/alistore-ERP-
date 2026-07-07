@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { CartProvider } from '@/lib/cart';
 import { AuthProvider } from '@/lib/auth';
 import { FavoritesProvider } from '@/lib/favorites';
+import { CompareProvider } from '@/lib/compare';
 
 export const metadata: Metadata = {
   title: 'AliStore — электроника с гарантией в Кыргызстане',
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen bg-[#0E0C0A]">
         <AuthProvider>
           <CartProvider>
-            <FavoritesProvider>{children}</FavoritesProvider>
+            <FavoritesProvider>
+              <CompareProvider>{children}</CompareProvider>
+            </FavoritesProvider>
           </CartProvider>
         </AuthProvider>
       </body>

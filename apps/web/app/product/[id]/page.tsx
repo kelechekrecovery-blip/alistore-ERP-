@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { fetchCatalog, fetchProduct, type CatalogProduct } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
+import { useCompare } from '@/lib/compare';
 import { conditionLabel, som } from '@/lib/format';
 
 const TRUST = [
@@ -16,6 +17,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { add } = useCart();
   const { has, toggle } = useFavorites();
+  const compare = useCompare();
   const [product, setProduct] = useState<CatalogProduct | null | 'missing'>(null);
   const [similar, setSimilar] = useState<CatalogProduct[]>([]);
   const [added, setAdded] = useState(false);
@@ -61,7 +63,15 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <button type="button" onClick={() => router.back()} className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white">←</button>
             <div className="absolute right-3 top-3 flex gap-2">
               <button type="button" onClick={() => toggle(product.id)} className="grid h-9 w-9 place-items-center rounded-full bg-black/55">{has(product.id) ? '❤️' : '🤍'}</button>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-black/55">↗</span>
+              <button
+                type="button"
+                onClick={() => compare.toggle(product.id)}
+                className={`grid h-9 w-9 place-items-center rounded-full text-[15px] ${compare.has(product.id) ? 'bg-lime text-lime-ink' : 'bg-black/55 text-white'}`}
+                title="Сравнить"
+              >
+                ⇄
+              </button>
+              <Link href="/compare" className="grid h-9 w-9 place-items-center rounded-full bg-black/55 text-sm">↗</Link>
             </div>
             <span className={`absolute bottom-3 left-4 rounded-md px-2 py-0.5 text-[11px] font-bold ${used ? 'bg-ink text-lime' : 'bg-lime text-lime-ink'}`}>{used ? 'Б/У' : 'Новое'}</span>
           </div>
