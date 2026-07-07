@@ -36,6 +36,15 @@ export class CustomersController {
     return this.customers.devices(user.customerId);
   }
 
+  @ApiOperation({ summary: 'Customer 360 — orders, spend, debts, warranties, tickets (CRM read)' })
+  @ApiParam({ name: 'id', description: 'Customer id' })
+  @ApiOkResponse({ description: 'Aggregated customer overview.' })
+  @ApiNotFoundResponse({ description: 'Customer does not exist.' })
+  @Get(':id/overview')
+  overview(@Param('id') id: string) {
+    return this.customers.overview(id);
+  }
+
   @ApiOperation({ summary: 'Get a customer' })
   @ApiParam({ name: 'id', description: 'Customer id' })
   @ApiOkResponse({ description: 'Customer found.' })

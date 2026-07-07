@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ValidationError } from '../common/errors';
 import { UpsertCustomerDto } from './customers.dto';
+import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 
 /**
  * Customers for storefront/guest checkout. Phone is the natural key (unique), so
@@ -51,5 +53,34 @@ export class CustomersService {
       status: u.status,
       warranty: warranties.find((w) => w.imei === u.imei) ?? null,
     }));
+  }
+
+  /**
+   * Customer 360 — one read that folds the customer's orders, spend, debts,
+   * warranties and support tickets together. Read-only; every figure is derived
+   * from the underlying tables (Event-Ledger-first), never a stored aggregate.
+   */
+  async overview(customerId: string): Promise<CustomerOverview> {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
+    }
+    const orders = await this.prisma.order.findMany({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const orderIds = orders.map((o) => o.id);
+    const [payments, debts, warranties, tickets] = await Promise.all([
+      orderIds.length
+        ? this.prisma.payment.findMany({
+            where: { orderId: { in: orderIds } },
+            select: { amount: true, status: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.debtPlan.findMany({ where: { customerId }, orderBy: { dueDate: 'asc' } }),
+      this.prisma.warrantyCase.findMany({ where: { customerId }, orderBy: { sla: 'asc' } }),
+      this.prisma.supportTicket.findMany({ where: { customerId }, orderBy: { sla: 'asc' } }),
+    ]);
+    return buildCustomerOverview({ customer, orders, payments, debts, warranties, tickets });
   }
 }

@@ -145,11 +145,17 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
   вверх по лестнице приоритетов (ужимает SLA), просрочка открытых → Risk Center
   (`ticket_sla_breach`). POST /support/tickets, PATCH …/transition, PATCH …/escalate,
   GET /support/tickets. (UI-инбокс — следом.)
+- ✅ **Customer 360** (`customers/overview`): один read-агрегатор по customerId —
+  профиль+consent+LTV, заказы (кол-во + spent из received-платежей, Event-Ledger-first),
+  долги DebtPlan (open-баланс), гарантии WarrantyCase (open), тикеты SupportTicket (open).
+  Чистый билдер `customer-overview.ts`. GET /customers/:id/overview.
 - ☐ Notification Preferences (consent-переключатель, customer.consent_changed).
-- ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex), Customer 360.
+- ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex).
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;
-SLA-breach ловится в Risk Center). Осталось (Codex-лана): доставка с retry; consent-фильтр.
+SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP-смоук (реальный клиент:
+3 заказа, spent 109900, 1 гарантия; неизвестный → 422). Осталось (Codex-лана): доставка
+с retry; consent-фильтр рассылок.
 
 ## Phase 11 — AI-слой (v2) ☐
 - ☐ Оценка Б/У по фото, динамические цены (разведка рынка), ассистент владельца,
