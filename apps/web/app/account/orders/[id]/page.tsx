@@ -54,7 +54,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         <button type="button" onClick={() => router.back()} className="text-xl">←</button>
         <span className="font-display text-xl font-bold">Заказ #{order.id.slice(-8)}</span>
       </div>
-      <div className="mb-4 ml-8 text-[13px] text-[#A79C92]">{order.channel} · {som(order.total)}</div>
+      <div className="mb-3 ml-8 text-[13px] text-[#A79C92]">{order.channel} · {som(order.total)}</div>
+
+      {!bad && (
+        <Link href={`/account/orders/${order.id}/status`} className="mb-4 flex items-center justify-between rounded-[13px] bg-lime px-4 py-3 text-[13px] font-bold text-lime-ink">
+          <span>📍 Отследить заказ</span>
+          <span>→</span>
+        </Link>
+      )}
 
       {bad ? (
         <div className="mb-4 rounded-[14px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-4 text-sm font-semibold text-[#FF8A7A]">

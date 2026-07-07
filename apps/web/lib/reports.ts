@@ -33,3 +33,6 @@ async function get<T>(path: string): Promise<T> {
 export const fetchDashboard = () => get<Dashboard>('/reports/dashboard');
 export const fetchRisks = () => get<{ count: number; signals: RiskSignal[] }>('/reports/risks');
 export const fetchLedger = () => get<LedgerEvent[]>('/reports/ledger');
+/** Ledger events referencing a specific id (e.g. an orderId) — powers order tracking. */
+export const fetchLedgerByRef = (ref: string) =>
+  get<LedgerEvent[]>(`/reports/ledger?ref=${encodeURIComponent(ref)}`);
