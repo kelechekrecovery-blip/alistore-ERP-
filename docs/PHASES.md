@@ -198,12 +198,14 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
   касса/COD→Финансы, резерв→Склад) — `SIGNAL_ACTION` в `/erp`.
 - ✅ **KPI продавцов**: выручка+кол-во продаж по staffId (через shift.staffId), карточка
   «KPI продавцов» в ERP (`reports/kpi.ts` sellers).
-- ✅ **Период-фильтр выручки + тренд**: `GET /reports/revenue?days=N` и
-  `GET /reports/revenue-trend?days=N` (`revenue-buckets.ts`, clamp 1..90) + чипы
-  «7 дн / 30 дн» в ERP-дашборде; график перестраивается, бейдж показывает текущий
-  период vs предыдущий. 10 pure-тестов бакетирования/тренда.
-- ☐ Осталось (v2): произвольные диапазоны дат, повтор IMEI (trade-in+продажа) как риск
-  (нужно поле imei в TradeInDevice — миграция схемы).
+- ✅ **Период-фильтр выручки + тренд + произвольный диапазон**: `GET /reports/revenue?days=N`,
+  `GET /reports/revenue-trend?days=N` и `GET /reports/revenue-range?from=&to=`
+  (`revenue-buckets.ts`, clamp/валидация дат, 422 на кривой/инвертированный/>366 дн) + чипы
+  «7 дн / 30 дн / Период» в ERP-дашборде; график перестраивается, бейдж — период vs
+  предыдущий (скрыт в кастом-режиме). 16 pure-тестов бакетирования/тренда/диапазона.
+  Reduction: DashboardView вынесен в `components/erp/DashboardView.tsx` (страница 376→272).
+- ☐ Осталось (v2): повтор IMEI (trade-in+продажа) как риск (нужно поле imei в
+  TradeInDevice — миграция схемы).
 **Проверка:** ✅ 2 теста дашборда + 3 теста buildKpi (маржа/средний чек/топ, деление на 0);
 in-browser /erp: вкладка «Маржа·KPI» на реальных данных (маржа 16250/3.9%, средний чек 104063,
 топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад), revenue trend
