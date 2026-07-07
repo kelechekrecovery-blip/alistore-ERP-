@@ -139,9 +139,17 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
 
 ## Phase 10 — Уведомления + Support/CRM (v1→v2) 🟡
 - 🟡 Transactional outbox + relay (Codex начал); Novu-доставка (Codex).
-- ☐ Support Inbox (сайт/app/WhatsApp/Telegram), Notification Preferences (consent).
-- ☐ Segment Builder + Campaign ROI (аудитория consent-filtered), Customer 360.
-**Проверка:** событие→гарантированная доставка (retry); рассылка только по consent=true; отписка мгновенна и логируется.
+- ✅ **Support Inbox** (`support/` модуль): тикеты из любого канала (web/app/whatsapp/
+  telegram/call/store), SLA по приоритету (normal 72ч / high 24ч / urgent 4ч), машина
+  статусов new→in_progress→waiting→resolved→closed (`ticket-state.ts`), эскалация на шаг
+  вверх по лестнице приоритетов (ужимает SLA), просрочка открытых → Risk Center
+  (`ticket_sla_breach`). POST /support/tickets, PATCH …/transition, PATCH …/escalate,
+  GET /support/tickets. (UI-инбокс — следом.)
+- ☐ Notification Preferences (consent-переключатель, customer.consent_changed).
+- ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex), Customer 360.
+**Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
+transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;
+SLA-breach ловится в Risk Center). Осталось (Codex-лана): доставка с retry; consent-фильтр.
 
 ## Phase 11 — AI-слой (v2) ☐
 - ☐ Оценка Б/У по фото, динамические цены (разведка рынка), ассистент владельца,

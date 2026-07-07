@@ -26,6 +26,8 @@ import { WarrantyModule } from './warranty/warranty.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { ImportModule } from './import/import.module';
 import { DebtsModule } from './debts/debts.module';
+import { SupportModule } from './support/support.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -56,6 +58,8 @@ import { DebtsModule } from './debts/debts.module';
     SuppliersModule,
     ImportModule,
     DebtsModule,
+    SupportModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

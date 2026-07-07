@@ -1,4 +1,12 @@
-import { Approval, CashShift, CourierRun, DebtPlan, SupplierRma, WarrantyCase } from '@prisma/client';
+import {
+  Approval,
+  CashShift,
+  CourierRun,
+  DebtPlan,
+  SupplierRma,
+  SupportTicket,
+  WarrantyCase,
+} from '@prisma/client';
 import { COD_STALE_MS } from './reports.service';
 
 export type RiskSeverity = 'high' | 'medium' | 'low';
@@ -11,7 +19,8 @@ export interface RiskSignal {
     | 'pending_approval'
     | 'warranty_sla_breach'
     | 'rma_sla_breach'
-    | 'debt_overdue';
+    | 'debt_overdue'
+    | 'ticket_sla_breach';
   severity: RiskSeverity;
   ref: string;
   detail: string;
@@ -25,6 +34,7 @@ interface RiskInputs {
   warrantyOverdue: WarrantyCase[];
   rmaOverdue: SupplierRma[];
   debtsOverdue: DebtPlan[];
+  ticketsOverdue: SupportTicket[];
 }
 
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
@@ -92,6 +102,15 @@ export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
       severity: 'high',
       ref: d.id,
       detail: `Просрочен долг: остаток ${d.balance} сом (клиент ${d.customerId})`,
+    });
+  }
+
+  for (const t of input.ticketsOverdue) {
+    signals.push({
+      kind: 'ticket_sla_breach',
+      severity: t.priority === 'urgent' ? 'high' : 'medium',
+      ref: t.id,
+      detail: `Тикет «${t.subject}» просрочил SLA (${t.priority}/${t.status})`,
     });
   }
 

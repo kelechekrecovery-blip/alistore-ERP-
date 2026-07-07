@@ -146,9 +146,10 @@ model Customer {
   segments  String[]
   ltv       Int             @default(0)
   orders    Order[]
-  tickets   SupportTicket[]
   tradeIns  TradeInDevice[]
   createdAt DateTime        @default(now())
+  // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
+  // без @relation, чтобы очистка в тестах не каскадила через FK.
 }
 
 model Product {
@@ -400,12 +401,15 @@ model Campaign {
 
 model SupportTicket {
   id         String       @id @default(cuid())
-  customer   Customer     @relation(fields: [customerId], references: [id])
-  customerId String
+  customerId String // ссылка строкой, без @relation (см. Customer)
   channel    String // web | app | whatsapp | telegram | call | store
-  priority   String
+  subject    String
+  body       String?
+  priority   String // normal | high | urgent (эскалация повышает уровень)
   sla        DateTime
   status     TicketStatus @default(new)
+  assignee   String?
+  createdAt  DateTime     @default(now())
 
   @@index([customerId])
   @@index([status])
