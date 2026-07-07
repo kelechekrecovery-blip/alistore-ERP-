@@ -7,11 +7,12 @@
 
 ## Соответствие прототипам (обязательно)
 Все экраны — **строго по `.dc.html` прототипам** (пиксель-в-пиксель, токены хендоффа).
-Статус выравнивания: `/pos` → POS 2.0 ✅ · `/erp` → ERP 2.0 ✅ (тёмный сайдбар-кокпит) ·
-`/staff` → Сотрудник App 2.0 ✅ (мобильное прил. сотрудника) · **вся витрина+кабинет →
-Клиент App 2.0 ✅** (тёмное мобильное прил.: home/каталог/карточка/корзина/checkout-4-шага/
-кабинет+уровень/деталь заказа/login). Консоли `/warehouse /warranty /approvals` — рабочие
-инструменты, их мобильную точку входа даёт `/staff`.
+Статус выравнивания: `/pos` → POS 2.0 ✅ · `/erp` → ERP 2.0 ✅ (тёмный сайдбар-кокпит,
++ вкладка **CRM · Инбокс**: Support Inbox + Customer 360) · `/staff` → Сотрудник App 2.0 ✅
+(мобильное прил. сотрудника) · **вся витрина+кабинет → Клиент App 2.0 ✅** (тёмное мобильное
+прил.: home/каталог/карточка/корзина/checkout-4-шага/кабинет+уровень/деталь заказа/login).
+Консоли `/warehouse /warranty /approvals` — рабочие инструменты, их мобильную точку входа
+даёт `/staff`.
 Осталось по прототипу (мелочи): избранное/сравнение экраны, «Мои устройства»+гарантийный
 талон в кабинете, статус-заказа timeline как отдельный экран.
 
@@ -152,6 +153,9 @@ approvalId→approve→booked; ledger debt.created→debt.payment×2→debt.sett
 - ✅ **Notification Preferences** (consent): PATCH /customers/:id/consent переключает
   Customer.consent, пишет customer.consent_changed в ledger только при реальном флипе
   (идемпотентно). Отзыв согласия = стоп всех рассылок (фильтр — лана Codex).
+- ✅ **CRM UI** (ERP 2.0 вкладка «CRM · Инбокс», `components/erp/`): Support Inbox (лента
+  тикетов с фильтрами по статусу + переходы + эскалация) и Customer 360 карточка (потрачено/
+  заказы/долг/гарантии/обращения + consent-переключатель). API-клиенты в `lib/crm.ts`.
 - ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex).
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;

@@ -11,13 +11,15 @@ import {
   type RiskSignal,
 } from '@/lib/reports';
 import { som } from '@/lib/format';
+import { CrmView } from '@/components/erp/CrmView';
 
-type Route = 'dash' | 'finance' | 'stock' | 'risks' | 'ledger';
+type Route = 'dash' | 'finance' | 'stock' | 'crm' | 'risks' | 'ledger';
 
 const NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'stock', icon: '📦', label: 'Склад' },
+  { id: 'crm', icon: '💬', label: 'CRM · Инбокс' },
   { id: 'risks', icon: '⚠', label: 'Риски' },
   { id: 'ledger', icon: '📜', label: 'Event Ledger' },
 ];
@@ -25,6 +27,7 @@ const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор · всё из Event Ledger'],
   finance: ['Финансы', 'Деньги · P&L'],
   stock: ['Склад', 'Остатки по статусам'],
+  crm: ['CRM · Поддержка', 'Инбокс обращений + Customer 360'],
   risks: ['Риски', 'Центр тревог'],
   ledger: ['Event Ledger', 'Единая книга событий'],
 };
@@ -104,6 +107,7 @@ export default function ErpPage() {
           {route === 'dash' && <DashboardView d={d} risks={risks} />}
           {route === 'finance' && <FinanceView d={d} />}
           {route === 'stock' && <StockView d={d} />}
+          {route === 'crm' && <CrmView />}
           {route === 'risks' && <RisksView risks={risks} />}
           {route === 'ledger' && <LedgerView ledger={ledger} />}
         </div>
