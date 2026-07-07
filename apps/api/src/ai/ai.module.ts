@@ -9,16 +9,19 @@ import { PricingService } from './pricing.service';
 import { PricingController } from './pricing.controller';
 import { ReorderService } from './reorder.service';
 import { ReorderController } from './reorder.controller';
+import { DescribeService } from './describe.service';
+import { DescribeController } from './describe.controller';
 
 @Module({
   imports: [ReportsModule],
-  providers: [InsightsService, ValuationService, PricingService, ReorderService],
+  providers: [InsightsService, ValuationService, PricingService, ReorderService, DescribeService],
   controllers: [
     InsightsController,
     ValuationController,
     CategorizeController,
     PricingController,
     ReorderController,
+    DescribeController,
   ],
 })
 export class AiModule {}
