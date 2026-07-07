@@ -33,6 +33,7 @@ interface PosCheckoutProps {
 /** POS checkout overlay: payment method → pending-approval (discount over limit) → done. */
 export function PosCheckout(props: PosCheckoutProps) {
   const { route, total, discountLimit, method, busy, pending, result, offlineResult } = props;
+  const pendingMessage = pending ? approvalMessage(pending, discountLimit) : '';
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(10,8,6,0.82)] p-4">
       <div className="w-full max-w-[640px] rounded-[22px] border border-[#2E2822] bg-[#1A1611] p-7">
@@ -41,8 +42,7 @@ export function PosCheckout(props: PosCheckoutProps) {
             <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-warn/15 text-4xl text-warn">🔒</div>
             <div className="mt-4 font-display text-2xl font-extrabold text-white">Нужно одобрение</div>
             <div className="mt-2 text-sm text-[#A79C92]">
-              Скидка {pending.discountPct}% превышает лимит {discountLimit}%. Продажа не проведена —
-              ожидает одобрения старшего в Approval Inbox.
+              {pendingMessage} Продажа не проведена — ожидает одобрения старшего в Approval Inbox.
             </div>
             <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] px-4 py-2.5 font-mono text-xs text-[#8A7F76]">
               approval #{pending.approvalId.slice(-8)}
@@ -140,6 +140,16 @@ export function PosCheckout(props: PosCheckoutProps) {
       </div>
     </div>
   );
+}
+
+function approvalMessage(pending: PosPendingApproval, discountLimit: number) {
+  if (pending.reason === 'margin') {
+    return `Маржа ${som(pending.margin?.worstMargin ?? 0)} ниже лимита ${som(pending.margin?.minMargin ?? 0)}.`;
+  }
+  if (pending.reason === 'discount_and_margin') {
+    return `Скидка ${pending.discountPct}% превышает лимит ${discountLimit}%, маржа ${som(pending.margin?.worstMargin ?? 0)} ниже лимита ${som(pending.margin?.minMargin ?? 0)}.`;
+  }
+  return `Скидка ${pending.discountPct}% превышает лимит ${discountLimit}%.`;
 }
 
 export { METHODS };

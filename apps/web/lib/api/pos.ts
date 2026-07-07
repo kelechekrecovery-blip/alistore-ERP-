@@ -23,6 +23,12 @@ export interface PosPendingApproval {
   pendingApproval: true;
   approvalId: string;
   discountPct: number;
+  reason?: 'discount' | 'margin' | 'discount_and_margin';
+  margin?: {
+    minMargin: number;
+    worstMargin: number;
+    breaches: Array<{ sku: string; margin: number; minMargin: number }>;
+  };
 }
 
 export type PosSaleOutcome = PosSaleResult | PosPendingApproval;

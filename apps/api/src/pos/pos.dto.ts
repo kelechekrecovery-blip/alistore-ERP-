@@ -40,7 +40,7 @@ export class PosSaleDto {
   @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 10, description: 'Discount %' })
   @IsOptional() @IsInt() @Min(0) @Max(100) discountPct?: number;
 
-  @ApiPropertyOptional({ description: 'Approved discount approvalId — required to complete a sale whose discount exceeds the limit' })
+  @ApiPropertyOptional({ description: 'Approved discount/margin approvalId — required to complete a gated sale' })
   @IsOptional() @IsString() approvalId?: string;
 
   @ApiPropertyOptional({ example: 'постоянный клиент, акция' })

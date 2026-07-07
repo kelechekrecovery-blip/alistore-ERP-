@@ -175,7 +175,7 @@ overflow). units-lookup: 2 теста.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
 RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; returns/exchanges
-RBAC tests; margin-control POS tests; полный Jest 71 suites / 225 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; margin-control POS tests; полный Jest 72 suites / 231 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
 `/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
 без overflow.
@@ -352,7 +352,7 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 71 (225 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 72 (231 тест зелёный, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

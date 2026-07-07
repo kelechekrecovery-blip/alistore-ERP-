@@ -5,6 +5,7 @@
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Enforce POS margin-control approval gate.
 - Split returns/exchanges customer self-service from staff/cashier RBAC gates.
 - Split trade-in customer self-service from staff intake RBAC gates.
 - Enforce debt/installment staff RBAC gates.

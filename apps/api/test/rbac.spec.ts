@@ -1,4 +1,4 @@
-import { canApprove, canDiscountDirectly } from '../src/rbac/permissions';
+import { APPROVAL_THRESHOLDS, canApprove, canDiscountDirectly } from '../src/rbac/permissions';
 
 /** Role Permission Matrix — pure policy, no DB. */
 describe('RBAC policy', () => {
@@ -24,5 +24,9 @@ describe('RBAC policy', () => {
     expect(canDiscountDirectly('senior_seller', 15)).toBe(true);
     expect(canDiscountDirectly('warehouse', 1)).toBe(false);
     expect(canDiscountDirectly('owner', 100)).toBe(true);
+  });
+
+  it('defines the minimum direct-sale margin threshold', () => {
+    expect(APPROVAL_THRESHOLDS.minMarginSom).toBe(0);
   });
 });

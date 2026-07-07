@@ -6,8 +6,10 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_THRESHOLDS } from '../rbac/permissions';
+import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PosSaleDto } from './pos.dto';
+import { evaluateMarginControl, MarginControlResult } from './margin-control';
 
 /** Walk-in retail customer — POS sales without a named buyer attach here. */
 const WALKIN_PHONE = '+000000000000';
@@ -30,6 +32,7 @@ interface OrderLine {
 @Injectable()
 export class PosService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly customers: CustomersService,
     private readonly shifts: ShiftsService,
     private readonly units: UnitsService,
@@ -50,21 +53,48 @@ export class PosService {
       }
     }
 
-    // Discount over the limit (Approval Rules Matrix): park the sale for approval and
-    // return the approvalId. The cashier re-submits with that id once a senior role
-    // approves; only then does the sale run.
-    if (pct > APPROVAL_THRESHOLDS.discountPct) {
+    const margin = await this.evaluateMargin(dto, pct);
+    const discountApprovalNeeded = pct > APPROVAL_THRESHOLDS.discountPct;
+    const marginApprovalNeeded = margin.breaches.length > 0;
+    const approvalReason = this.approvalReason(discountApprovalNeeded, marginApprovalNeeded);
+
+    // Discount or margin breach (Approval Rules Matrix): park the sale for approval.
+    // The cashier re-submits with the approvalId once a senior role approves; only
+    // then does the sale run. The fingerprint prevents reusing one approval for a
+    // different product/cost/price mix with the same discount percentage.
+    if (discountApprovalNeeded || marginApprovalNeeded) {
       if (!dto.approvalId) {
-        const gross = dto.lines.reduce((sum, l) => sum + l.price * l.qty, 0);
         const parked = await this.approvals.request({
           action: 'discount',
           requester: actor,
-          reason: dto.reason ?? `Скидка ${pct}% в POS (> лимита ${APPROVAL_THRESHOLDS.discountPct}%)`,
-          payload: { staffId: dto.staffId, point: dto.point, discountPct: pct, gross, lines: dto.lines.length },
+          reason: dto.reason ?? this.defaultApprovalMessage(approvalReason, pct, margin),
+          payload: {
+            staffId: dto.staffId,
+            point: dto.point,
+            discountPct: pct,
+            gross: margin.gross,
+            total: margin.total,
+            lines: dto.lines.length,
+            approvalReason,
+            minMargin: margin.minMargin,
+            worstMargin: margin.worstMargin,
+            marginBreaches: margin.breaches,
+            marginFingerprint: margin.fingerprint,
+          },
         });
-        return { pendingApproval: true as const, approvalId: parked.approvalId, discountPct: pct };
+        return {
+          pendingApproval: true as const,
+          approvalId: parked.approvalId,
+          discountPct: pct,
+          reason: approvalReason,
+          margin: {
+            minMargin: margin.minMargin,
+            worstMargin: margin.worstMargin,
+            breaches: margin.breaches,
+          },
+        };
       }
-      await this.assertDiscountApproved(dto.approvalId, pct);
+      await this.assertDiscountApproved(dto.approvalId, pct, margin.fingerprint, marginApprovalNeeded);
     }
 
     const customer = await this.customers.upsert({
@@ -82,9 +112,7 @@ export class PosService {
 
     // Assign concrete IMEI units per line; accessories (no units) sell as plain lines.
     const items: OrderLine[] = [];
-    let gross = 0;
     for (const line of dto.lines) {
-      gross += line.price * line.qty;
       const available = await this.units.listAvailable(line.productId, line.qty);
       if (available.length >= line.qty) {
         for (const unit of available.slice(0, line.qty)) {
@@ -100,7 +128,7 @@ export class PosService {
       }
     }
 
-    const total = Math.round(gross * (1 - pct / 100));
+    const total = margin.total;
 
     const order = await this.orders.create(
       { customerId: customer.id, channel: 'pos', total, items },
@@ -123,8 +151,37 @@ export class PosService {
     };
   }
 
-  /** Verify a discount approval is approved and its % matches the sale (anti-tamper). */
-  private async assertDiscountApproved(approvalId: string, pct: number): Promise<void> {
+  private async evaluateMargin(dto: PosSaleDto, pct: number): Promise<MarginControlResult> {
+    const productIds = [...new Set(dto.lines.map((line) => line.productId))];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, cost: true },
+    });
+    const costs = new Map(products.map((product) => [product.id, product.cost]));
+    const missing = productIds.find((id) => !costs.has(id));
+    if (missing) {
+      throw new ValidationError('product_not_found', `Товар ${missing} не найден`);
+    }
+    return evaluateMarginControl(
+      dto.lines.map((line) => ({
+        productId: line.productId,
+        sku: line.sku,
+        qty: line.qty,
+        price: line.price,
+        cost: costs.get(line.productId) ?? 0,
+      })),
+      pct,
+      APPROVAL_THRESHOLDS.minMarginSom,
+    );
+  }
+
+  /** Verify a discount approval is approved and matches sale percentage and margin fingerprint. */
+  private async assertDiscountApproved(
+    approvalId: string,
+    pct: number,
+    marginFingerprint: string,
+    requiresMarginApproval: boolean,
+  ): Promise<void> {
     const approval = await this.approvals.get(approvalId);
     if (!approval || approval.action !== 'discount') {
       throw new ValidationError('discount_approval_not_found', 'Одобрение скидки не найдено');
@@ -132,10 +189,35 @@ export class PosService {
     if (approval.status !== 'approved') {
       throw new ForbiddenError('discount_not_approved', `Скидка ещё не одобрена (${approval.status})`);
     }
-    const approvedPct = (approval.evidence as { payload?: { discountPct?: number } } | null)?.payload?.discountPct;
+    const payload = (approval.evidence as {
+      payload?: { discountPct?: number; marginFingerprint?: string };
+    } | null)?.payload;
+    const approvedPct = payload?.discountPct;
     if (approvedPct !== pct) {
       throw new ForbiddenError('discount_mismatch', `Одобрено ${approvedPct}%, применяется ${pct}%`);
     }
+    if (requiresMarginApproval && payload?.marginFingerprint !== marginFingerprint) {
+      throw new ForbiddenError('margin_mismatch', 'Одобрение маржи не совпадает с текущей продажей');
+    }
+    if (payload?.marginFingerprint && payload.marginFingerprint !== marginFingerprint) {
+      throw new ForbiddenError('discount_mismatch', 'Одобрение скидки не совпадает с текущей продажей');
+    }
+  }
+
+  private approvalReason(discountApprovalNeeded: boolean, marginApprovalNeeded: boolean) {
+    if (discountApprovalNeeded && marginApprovalNeeded) return 'discount_and_margin';
+    if (marginApprovalNeeded) return 'margin';
+    return 'discount';
+  }
+
+  private defaultApprovalMessage(reason: string, pct: number, margin: MarginControlResult) {
+    if (reason === 'margin') {
+      return `Маржа ${margin.worstMargin} сом ниже лимита ${margin.minMargin} сом в POS`;
+    }
+    if (reason === 'discount_and_margin') {
+      return `Скидка ${pct}% и маржа ${margin.worstMargin} сом ниже лимита ${margin.minMargin} сом в POS`;
+    }
+    return `Скидка ${pct}% в POS (> лимита ${APPROVAL_THRESHOLDS.discountPct}%)`;
   }
 
   private async completedFromExistingPayment(orderId: string, shiftId: string | null) {

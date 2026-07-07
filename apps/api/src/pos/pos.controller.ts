@@ -32,7 +32,7 @@ export class PosController {
   })
   @ApiBearerAuth()
   @ApiCreatedResponse({ description: 'Sale completed; order paid, units sold, ledger written.' })
-  @ApiAcceptedResponse({ description: 'Discount over the limit — parked for approval (202 { approvalId }).' })
+  @ApiAcceptedResponse({ description: 'Discount or margin breach — parked for approval (202 { approvalId }).' })
   @ApiConflictResponse({ description: 'Insufficient stock for a line.' })
   @ApiUnprocessableEntityResponse({ description: 'Invalid sale payload.' })
   @Post('sale')

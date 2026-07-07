@@ -26,6 +26,7 @@ describe('POS sale (integration)', () => {
     const units = new UnitsService(prisma);
     approvals = new ApprovalsService(prisma, audit);
     pos = new PosService(
+      prisma,
       new CustomersService(prisma, audit),
       new ShiftsService(prisma, audit),
       units,
@@ -177,6 +178,34 @@ describe('POS sale (integration)', () => {
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
   });
 
+  it('parks an under-margin POS sale even when the discount is within the normal limit', async () => {
+    const product = await seedProduct(1);
+    await prisma.product.update({ where: { id: product.id }, data: { cost: 98000 } });
+    const dto = {
+      staffId: 'staff_pos_margin',
+      point: 'BISHKEK-1',
+      method: 'cash' as const,
+      discountPct: 5,
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    };
+
+    const parked = await pos.sale(dto);
+    expect(parked.pendingApproval).toBe(true);
+    expect((parked as { reason: string }).reason).toBe('margin');
+    expect(await prisma.order.count()).toBe(0);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
+
+    const approvalId = (parked as { approvalId: string }).approvalId;
+    const approval = await prisma.approval.findUnique({ where: { id: approvalId } });
+    const payload = approval?.evidence as { payload?: { marginBreaches?: Array<{ sku: string; margin: number }> } } | null;
+    expect(payload?.payload?.marginBreaches?.[0]).toMatchObject({ sku: product.sku, margin: -3000 });
+
+    await approvals.decide(approvalId, { status: 'approved', approver: 'senior_1', approverRole: 'senior_seller' });
+    const done = expectCompleted(await pos.sale({ ...dto, approvalId }));
+    expect(done.total).toBe(95000);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
+  });
+
   it('refuses to complete a discounted sale whose approval % does not match', async () => {
     const product = await seedProduct(1);
     const parked = await pos.sale({
@@ -194,6 +223,33 @@ describe('POS sale (integration)', () => {
       })
       .catch((e) => e);
     expect(err.code).toBe('discount_mismatch');
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
+  });
+
+  it('refuses to reuse an approved margin breach for a changed sale payload', async () => {
+    const product = await seedProduct(1);
+    await prisma.product.update({ where: { id: product.id }, data: { cost: 98000 } });
+    const parked = await pos.sale({
+      staffId: 'staff_pos_margin_tamper',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      discountPct: 5,
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    });
+    const approvalId = (parked as { approvalId: string }).approvalId;
+    await approvals.decide(approvalId, { status: 'approved', approver: 'senior_1', approverRole: 'senior_seller' });
+
+    const err = await pos
+      .sale({
+        staffId: 'staff_pos_margin_tamper',
+        point: 'BISHKEK-1',
+        method: 'cash',
+        discountPct: 5,
+        approvalId,
+        lines: [{ productId: product.id, sku: product.sku, price: 99000, qty: 1 }],
+      })
+      .catch((e) => e);
+    expect(err.code).toBe('margin_mismatch');
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
   });
 });

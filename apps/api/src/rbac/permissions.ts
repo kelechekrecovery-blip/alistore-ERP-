@@ -37,6 +37,7 @@ export const APPROVAL_APPROVER_ROLES: Record<string, Role[]> = {
 export const APPROVAL_THRESHOLDS = {
   discountPct: 10, // скидка > 10%
   priceChangePct: 15, // изменение цены > ±15%
+  minMarginSom: 0, // margin per unit must not go below this without approval
 } as const;
 
 /** Max discount a role may apply directly, without approval (%). */
