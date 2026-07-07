@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildRiskSignals } from './risk-signals';
+import { buildKpi } from './kpi';
 
 /** COD older than this without handover is a risk (Risk Center). */
 export const COD_STALE_MS = 24 * 60 * 60 * 1000;
@@ -86,6 +87,28 @@ export class ReportsService {
       ops: { openShifts, pendingApprovals },
       revenue7d,
     };
+  }
+
+  /** Owner KPIs: gross margin (revenue − COGS), average check, top products. */
+  async kpi() {
+    const paid: OrderStatus[] = ['paid', 'completed', 'exchanged'];
+    const [rev, soldUnits, paidOrders, items, products] = await Promise.all([
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
+      }),
+      this.prisma.deviceUnit.findMany({ where: { status: 'sold' }, select: { product: { select: { cost: true } } } }),
+      this.prisma.order.count({ where: { status: { in: paid } } }),
+      this.prisma.orderItem.findMany({
+        where: { order: { status: { in: paid } } },
+        select: { sku: true, qty: true, price: true },
+      }),
+      this.prisma.product.findMany({ select: { sku: true, name: true } }),
+    ]);
+    const revenue = rev._sum.amount ?? 0;
+    const cogs = soldUnits.reduce((sum, u) => sum + (u.product?.cost ?? 0), 0);
+    const names = Object.fromEntries(products.map((p) => [p.sku, p.name]));
+    return buildKpi({ revenue, cogs, paidOrders, items, names });
   }
 
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */

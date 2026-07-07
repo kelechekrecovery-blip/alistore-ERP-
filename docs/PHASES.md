@@ -117,10 +117,16 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ **Risk Center**: касса≠, COD не сдан >24ч, зависший резерв, ожидающие approval —
   ранжировано по severity (`reports/risk-signals.ts`, reduction). `GET /reports/risks`.
 - ✅ **Event Ledger** просмотр (feed) в дашборде. `GET /reports/ledger`.
-- ☐ Осталось: KPI сотрудников/маржа, периоды/фильтры, Command Center действия
-  (переход из тревоги в действие), повтор IMEI (trade-in+продажа) как риск.
-**Проверка:** ✅ 2 теста (net = продажи−возвраты; риски ловятся); in-browser /erp на
-реальных данных (net 0 после тест-возвратов, риск «зависший резерв», live-лента событий).
+- ✅ **Маржа/KPI** (`reports.kpi()` + `reports/kpi.ts`, `GET /reports/kpi`): валовая маржа
+  = выручка(received-платежи) − себестоимость(cost проданных единиц), маржа %, средний чек,
+  топ-товары по выручке. Вкладка «Маржа · KPI» в ERP с карточками + бары топ-товаров.
+- ✅ **Command Center**: сигналы Risk-панели кликабельны → переход на экран-решение
+  (pending_approval→/approvals, warranty→/warranty, rma→/warehouse, ticket/debt→CRM,
+  касса/COD→Финансы, резерв→Склад) — `SIGNAL_ACTION` в `/erp`.
+- ☐ Осталось (v2): KPI по сотрудникам, периоды/фильтры, повтор IMEI (trade-in+продажа) как риск.
+**Проверка:** ✅ 2 теста дашборда + 3 теста buildKpi (маржа/средний чек/топ, деление на 0);
+in-browser /erp: вкладка «Маржа·KPI» на реальных данных (маржа 16250/3.9%, средний чек 104063,
+топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад). HTTP+БД сверка.
 
 ## Phase 9 — Мультисклад, склад-операции, гарантия (v1) 🟡
 - ✅ **WarrantyCase** с SLA (14 дней): open по IMEI + машина статусов + консоль
@@ -207,11 +213,24 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 
 ---
 
-## Статус-снимок (обновлён после Phase 7 ядра)
-Готово: Phase 0–5 ✅, Phase 6 🟡, Phase 7 🟡 (product/inventory-действия через approval).
-Backend-модулей: 20 (+products, inventory) · frontend-роутов: 10 · тест-сьютов: 20
-(65 тестов зелёные). Параллельно Codex: catalog-поиск, OpenAPI, auth, outbox/Novu, media,
-receipts, labels, infra.
+## Статус-снимок (обновлён: моя-лана MVP закрыта)
+**Функциональное ядро прототипа готово end-to-end.** Готово в моей лане:
+- Phase 0–6 ✅ (ядро/деньги/витрина/аккаунт/POS/склад/approval-цикл+возвраты+обмены).
+- Phase 7 🟡→по существу закрыто: опасные действия через approval (цена/write_off/adjust/
+  delete/**долг**/**скидка>10% в POS backend+UI**). Остаток — staff-JWT-роли+guards/PII/2FA = **лана Codex** (`authz/` casbin).
+- Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **Command Center** ✅.
+- Phase 9 🟡: WarrantyCase, мультисклад (перемещения+инвентаризация+UI), **Supplier RMA+scorecard**,
+  **долги/рассрочка**. Остаток — долг-напоминания (Codex-уведомления), KPI/зарплаты, Evidence Vault.
+- Phase 10 🟡: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**.
+  Остаток — Novu-доставка/Segment/Campaign = **лана Codex**.
+- Прототип-экраны (Клиент App 2.0): все ✅ (витрина/кабинет/устройства/избранное/**сравнение**/
+  **гарантийный талон**/**статус-заказа timeline**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 
-**Следующая на выполнение:** дозакрыть Phase 7 (скидка>10% в POS + долг) ИЛИ Phase 8
-(ERP-дашборд + Risk/Command Center из Event Ledger). RBAC/2FA — координировать с Codex.
+Backend-модулей ~30 · тест-сьютов 44 (145 тестов зелёные, `jest --runInBand`).
+
+**Осталось (не в моей лане):**
+- **Лана Codex** (не трогаю): authz/casbin/JWT-роли/PII/2FA, outbox/Novu-доставка,
+  Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF, media/Evidence Vault,
+  realtime (socket.io), observability (sentry), i18n, health, infra (Caddy/бэкапы).
+- **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),
+  Phase 12 каналы (Telegram/WhatsApp-аккаунты), Phase 13 hardware (сканер/принтер/терминал) + Offline POS.

@@ -30,7 +30,18 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface Kpi {
+  revenue: number;
+  cogs: number;
+  grossMargin: number;
+  marginPct: number;
+  avgCheck: number;
+  paidOrders: number;
+  topProducts: { sku: string; name: string; units: number; revenue: number }[];
+}
+
 export const fetchDashboard = () => get<Dashboard>('/reports/dashboard');
+export const fetchKpi = () => get<Kpi>('/reports/kpi');
 export const fetchRisks = () => get<{ count: number; signals: RiskSignal[] }>('/reports/risks');
 export const fetchLedger = () => get<LedgerEvent[]>('/reports/ledger');
 /** Ledger events referencing a specific id (e.g. an orderId) — powers order tracking. */

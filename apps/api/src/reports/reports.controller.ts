@@ -14,6 +14,13 @@ export class ReportsController {
     return this.reports.dashboard();
   }
 
+  @ApiOperation({ summary: 'Owner KPIs — gross margin, average check, top products' })
+  @ApiOkResponse({ description: 'Margin/COGS/avg-check derived from ledger-backed tables.' })
+  @Get('kpi')
+  kpi() {
+    return this.reports.kpi();
+  }
+
   @ApiOperation({ summary: 'Risk Center — ranked risk signals' })
   @ApiOkResponse({ description: 'Discrepancies, outstanding COD, stale reservations, approvals.' })
   @Get('risks')
