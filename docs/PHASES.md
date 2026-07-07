@@ -115,11 +115,18 @@
   сотрудника `/warranty` + запрос клиента из деталей заказа; SLA-breach → Risk Center.
 - ✅ Мультифилиал: перемещения (POST /inventory/transfer, stock.moved) + инвентаризация
   (POST /inventory/count, inventory.counted) + UI на складской консоли (WarehouseOps).
-- ☐ **Supplier RMA** + Scorecard.
+- ✅ **Supplier RMA + Scorecard** (`suppliers/` модуль): возврат брака поставщику по IMEI,
+  машина статусов created→shipped→accepted→{repaired|replaced|refunded|rejected}→closed
+  (`rma-state.ts`), unit-эффекты (open→in_repair; repaired/replaced→in_stock;
+  refunded/rejected→written_off), SLA 30 дней → Risk Center (`rma_sla_breach`), scorecard
+  по поставщику (volume/resolution rate/backlog, `scorecard.ts`). POST /suppliers,
+  POST /suppliers/rma, PATCH /suppliers/rma/:id/transition, GET /suppliers/scorecard.
 - ☐ Долги/рассрочка + напоминания, KPI/зарплаты, смены с фотоотчётом (Evidence Vault).
-- ☐ Импорт данных из Excel/тетради при запуске (Data Migration).
+- 🟡 Импорт данных из Excel/тетради при запуске (Data Migration) — Codex (`import/`, WIP).
 **Проверка:** ✅ гарантия created→received через консоль (БД + ledger); SLA-breach ловится
-в Risk Center. Осталось: перемещение сходится по остаткам; импорт идемпотентен.
+в Risk Center. ✅ Supplier RMA: 6 тестов зелёные + HTTP-смоук created→…→closed (unit
+in_stock→in_repair→in_stock; scorecard resolved=1/rate=1; ledger rma.opened→…→rma.closed).
+Осталось: импорт идемпотентен.
 
 ## Phase 10 — Уведомления + Support/CRM (v1→v2) 🟡
 - 🟡 Transactional outbox + relay (Codex начал); Novu-доставка (Codex).

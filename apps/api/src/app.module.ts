@@ -23,6 +23,8 @@ import { InventoryModule } from './inventory/inventory.module';
 import { ReportsModule } from './reports/reports.module';
 import { ExchangesModule } from './exchanges/exchanges.module';
 import { WarrantyModule } from './warranty/warranty.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { ImportModule } from './import/import.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { WarrantyModule } from './warranty/warranty.module';
     ReportsModule,
     ExchangesModule,
     WarrantyModule,
+    SuppliersModule,
+    ImportModule,
   ],
 })
 export class AppModule {}

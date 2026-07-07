@@ -51,6 +51,12 @@ export const EventType = {
   // warranty
   WarrantyCreated: 'warranty.created',
   WarrantyClosed: 'warranty.closed',
+  // supplier RMA
+  RmaOpened: 'rma.opened',
+  RmaShipped: 'rma.shipped',
+  RmaResolved: 'rma.resolved',
+  RmaRejected: 'rma.rejected',
+  RmaClosed: 'rma.closed',
   // approvals
   ApprovalRequested: 'approval.requested',
   ApprovalApproved: 'approval.approved',

@@ -120,6 +120,17 @@ enum TicketStatus {
   closed
 }
 
+enum RmaStatus {
+  created
+  shipped
+  accepted
+  repaired
+  replaced
+  refunded
+  rejected
+  closed
+}
+
 // ---------- CORE ----------
 model Customer {
   id        String          @id @default(cuid())
@@ -271,6 +282,32 @@ model WarrantyCase {
   sla        DateTime
   assignee   String?
 
+  @@index([imei])
+  @@index([status])
+}
+
+// Поставщик техники. Scorecard считается из связанных RMA.
+model Supplier {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  contact   String?
+  rmas      SupplierRma[]
+  createdAt DateTime      @default(now())
+}
+
+// Возврат брака поставщику (RMA). Машина статусов + SLA; просрочка → Risk Center.
+model SupplierRma {
+  id         String    @id @default(cuid())
+  supplier   Supplier  @relation(fields: [supplierId], references: [id])
+  supplierId String
+  imei       String
+  defect     String
+  status     RmaStatus @default(created)
+  sla        DateTime
+  resolution String? // repaired | replaced | refunded | rejected — итог для scorecard
+  createdAt  DateTime  @default(now())
+
+  @@index([supplierId])
   @@index([imei])
   @@index([status])
 }

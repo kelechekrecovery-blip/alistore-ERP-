@@ -1,4 +1,4 @@
-import { Approval, CashShift, CourierRun, WarrantyCase } from '@prisma/client';
+import { Approval, CashShift, CourierRun, SupplierRma, WarrantyCase } from '@prisma/client';
 import { COD_STALE_MS } from './reports.service';
 
 export type RiskSeverity = 'high' | 'medium' | 'low';
@@ -9,7 +9,8 @@ export interface RiskSignal {
     | 'cod_outstanding'
     | 'stale_reservations'
     | 'pending_approval'
-    | 'warranty_sla_breach';
+    | 'warranty_sla_breach'
+    | 'rma_sla_breach';
   severity: RiskSeverity;
   ref: string;
   detail: string;
@@ -21,6 +22,7 @@ interface RiskInputs {
   staleReservations: number;
   pendingApprovals: Approval[];
   warrantyOverdue: WarrantyCase[];
+  rmaOverdue: SupplierRma[];
 }
 
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
@@ -70,6 +72,15 @@ export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
       severity: 'high',
       ref: w.id,
       detail: `Гарантия ${w.imei} просрочила SLA (${w.status})`,
+    });
+  }
+
+  for (const r of input.rmaOverdue) {
+    signals.push({
+      kind: 'rma_sla_breach',
+      severity: 'medium',
+      ref: r.id,
+      detail: `RMA поставщику по ${r.imei} просрочена (${r.status})`,
     });
   }
 
