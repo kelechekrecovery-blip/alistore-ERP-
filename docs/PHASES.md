@@ -196,8 +196,8 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 Текущие цели (на момент составления):
 - ☐ `apps/web/lib/api.ts` (292) → разнести по доменам: `lib/api/catalog.ts`, `orders.ts`,
   `auth.ts`, `pos.ts`, `warehouse.ts`, `approvals.ts` (+ общий `http.ts`).
-- ☐ `apps/web/app/pos/page.tsx` (372) → извлечь `PosCatalog`, `PosReceipt`, `PosPayment`,
-  `usePosSale` в `components/pos/*`.
+- 🟡 `apps/web/app/pos/page.tsx` (419→316) → извлечён `components/pos/PosCheckout.tsx`
+  (pay/pending/done + METHODS); под лимитом. Остаток: PosCatalog/PosTicket при след. касании.
 - ☐ `apps/api/src/orders/orders.service.ts` (240) → выделить `order-fulfillment.ts`
   (fulfill/assign) из основного сервиса при следующем касании.
 - ☐ `apps/web/app/checkout/page.tsx` (239) → вынести `CheckoutForm`/`OrderSummary`.

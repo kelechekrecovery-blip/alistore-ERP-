@@ -10,21 +10,13 @@ import {
   type PosSaleResult,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { PosCheckout } from '@/components/pos/PosCheckout';
 
 const STAFF_ID = 'pos_azizbek';
 const POINT = 'BISHKEK-1';
 const CASHIER = 'Азизбек';
 const SHOP = 'AliStore Центр';
 const DISCOUNTS = [0, 5, 10, 15];
-const METHODS: { id: string; icon: string; name: string }[] = [
-  { id: 'cash', icon: '💵', name: 'Наличные' },
-  { id: 'card', icon: '💳', name: 'Карта' },
-  { id: 'qr_mbank', icon: '📱', name: 'MBank QR' },
-  { id: 'qr_odengi', icon: '📱', name: 'O!Деньги' },
-  { id: 'bakai_pos', icon: '🏦', name: 'Bakai POS' },
-  { id: 'obank', icon: '🏦', name: 'О!Банк' },
-  { id: 'installment', icon: '📅', name: 'Рассрочка' },
-];
 
 export default function PosPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -297,115 +289,20 @@ export default function PosPage() {
         </div>
 
         {/* PAYMENT OVERLAY */}
-        {(route === 'pay' || route === 'pending' || route === 'done') && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(10,8,6,0.82)] p-4">
-            <div className="w-full max-w-[640px] rounded-[22px] border border-[#2E2822] bg-[#1A1611] p-7">
-              {route === 'pending' && pending && (
-                <div className="py-4 text-center">
-                  <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-warn/15 text-4xl text-warn">
-                    🔒
-                  </div>
-                  <div className="mt-4 font-display text-2xl font-extrabold text-white">Нужно одобрение</div>
-                  <div className="mt-2 text-sm text-[#A79C92]">
-                    Скидка {pending.discountPct}% превышает лимит {DISCOUNTS[2]}%. Продажа не проведена —
-                    ожидает одобрения старшего в Approval Inbox.
-                  </div>
-                  <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] px-4 py-2.5 font-mono text-xs text-[#8A7F76]">
-                    approval #{pending.approvalId.slice(-8)}
-                  </div>
-                  <div className="mt-6 flex gap-2.5">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={finish}
-                      className="flex-1 rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
-                    >
-                      {busy ? 'Проверяем…' : 'Провести после одобрения'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setPending(null); setRoute('sell'); }}
-                      className="rounded-[12px] border border-[#2E2822] bg-[#221E19] px-6 py-3.5 text-[15px] font-semibold text-[#D8CFC6]"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                </div>
-              )}
-              {route === 'pay' && (
-                <>
-                  <div className="mb-1 flex items-center">
-                    <span className="font-display text-xl font-bold text-white">Оплата</span>
-                    <span className="ml-auto font-display text-2xl font-extrabold text-lime tabular">
-                      {som(total)}
-                    </span>
-                  </div>
-                  <div className="mb-4 text-[13px] text-[#8A7F76]">Выберите способ оплаты</div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {METHODS.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setMethod(m.id)}
-                        className={`flex items-center gap-2.5 rounded-[12px] border bg-[#221E19] p-3.5 text-left transition ${
-                          method === m.id ? 'border-lime ring-1 ring-lime/40' : 'border-[#2E2822] hover:border-[#3A342E]'
-                        }`}
-                      >
-                        <span className="text-xl">{m.icon}</span>
-                        <span className="text-sm font-semibold text-white">{m.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-5 flex gap-2.5">
-                    <button
-                      type="button"
-                      disabled={!method || busy}
-                      onClick={finish}
-                      className="flex-1 rounded-[12px] py-3.5 text-center text-[15px] font-bold transition disabled:cursor-not-allowed"
-                      style={{
-                        background: method && !busy ? '#C6FF3D' : '#3A342E',
-                        color: method && !busy ? '#14110E' : '#6E645C',
-                      }}
-                    >
-                      {busy ? 'Проводим…' : 'Завершить продажу'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRoute('sell')}
-                      className="rounded-[12px] border border-[#2E2822] bg-[#221E19] px-6 py-3.5 text-[15px] font-semibold text-[#D8CFC6]"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                </>
-              )}
-              {route === 'done' && result && (
-                <div className="py-5 text-center">
-                  <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-lime/15 text-4xl text-lime">
-                    ✓
-                  </div>
-                  <div className="mt-4 font-display text-2xl font-extrabold text-white">
-                    Продажа завершена
-                  </div>
-                  <div className="mt-2 text-sm text-[#A79C92]">
-                    Чек {result.receiptNo} · {som(result.total)} · записано в Event Ledger
-                  </div>
-                  {result.imeis.length > 0 && (
-                    <div className="mt-2 font-mono text-xs text-[#6E645C]">
-                      IMEI: {result.imeis.join(', ')}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={newSale}
-                    className="mt-6 rounded-[11px] bg-lime px-6 py-3 font-bold text-lime-ink"
-                  >
-                    Новая продажа
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+        {route !== 'sell' && (
+          <PosCheckout
+            route={route}
+            total={total}
+            discountLimit={DISCOUNTS[2]}
+            method={method}
+            busy={busy}
+            pending={pending}
+            result={result}
+            onSelectMethod={setMethod}
+            onFinish={finish}
+            onCancel={() => { setPending(null); setRoute('sell'); }}
+            onNewSale={newSale}
+          />
         )}
 
         {toast && (
