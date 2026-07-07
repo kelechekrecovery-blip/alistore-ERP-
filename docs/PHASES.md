@@ -209,11 +209,13 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
 - ✅ **Risk Center**: касса≠, COD не сдан >24ч, зависший резерв, ожидающие approval,
   SLA-брейчи (гарантия/RMA/тикет), просроченный долг — ранжировано по severity
   (`reports/risk-signals.ts`). `GET /reports/risks`.
-- ✅ **Loss-prevention сигналы** (схемо-независимые, `risk-signals.ts`): `margin_leak`
-  (продажа оплаченной позиции ниже себестоимости, worst-per-SKU) и `stock_money_mismatch`
-  (юнит `sold` без заказа = склад≠деньги, high). Всплывают в том же Risk Center + Command
-  Center (margin_leak→Маржа·KPI, mismatch→Склад). Проверено вживую: mismatch ловит реальную
-  аномалию (1 юнит sold без orderId). 5 тестов.
+- ✅ **Loss-prevention сигналы** (`risk-signals.ts`): `margin_leak` (продажа позиции ниже
+  себестоимости, worst-per-SKU), `stock_money_mismatch` (юнит `sold` без заказа = склад≠деньги,
+  high, называет IMEI) и `imei_reuse` (тот же IMEI в скупке Б/У и среди проданных = подмена,
+  high; поле `TradeInDevice.imei` + миграция `20260707173249_tradein_imei`). Всплывают в Risk
+  Center + Command Center (margin_leak→Маржа·KPI, mismatch→Склад, imei_reuse→/warehouse).
+  Проверено вживую: mismatch ловит реальную аномалию, imei_reuse — коллизию. 6 тестов.
+  Остаток (Codex, owns tradeins): наполнять `imei` на `POST /tradeins/intake` — см. CODEX-HANDOFF B10.
 - ✅ **Event Ledger** просмотр (feed) в дашборде. `GET /reports/ledger`.
 - ✅ **Маржа/KPI** (`reports.kpi()` + `reports/kpi.ts`, `GET /reports/kpi`): валовая маржа
   = выручка(received-платежи) − себестоимость(cost проданных единиц), маржа %, средний чек,
@@ -229,8 +231,7 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
   «7 дн / 30 дн / Период» в ERP-дашборде; график перестраивается, бейдж — период vs
   предыдущий (скрыт в кастом-режиме). 16 pure-тестов бакетирования/тренда/диапазона.
   Reduction: DashboardView вынесен в `components/erp/DashboardView.tsx` (страница 376→272).
-- ☐ Осталось (v2): повтор IMEI (trade-in+продажа) как риск (нужно поле imei в
-  TradeInDevice — миграция схемы).
+- ☐ Осталось (v2): произвольное сравнение периодов (period-over-period для кастом-диапазона).
 **Проверка:** ✅ 2 теста дашборда + 3 теста buildKpi (маржа/средний чек/топ, деление на 0);
 in-browser /erp: вкладка «Маржа·KPI» на реальных данных (маржа 16250/3.9%, средний чек 104063,
 топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад), revenue trend
