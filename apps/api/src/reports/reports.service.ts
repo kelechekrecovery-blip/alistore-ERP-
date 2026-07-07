@@ -204,6 +204,7 @@ export class ReportsService {
       paidItems,
       productCosts,
       soldWithoutOrder,
+      tradeins,
     ] = await Promise.all([
         this.prisma.cashShift.findMany({
           where: { diff: { not: 0 }, closedAt: { not: null } },
@@ -254,8 +255,24 @@ export class ReportsService {
           select: { imei: true },
           take: 20,
         }),
+        this.prisma.tradeInDevice.findMany({
+          where: { imei: { not: null } },
+          select: { imei: true },
+          take: 200,
+        }),
       ]);
     const soldWithoutOrderImeis = soldWithoutOrder.map((u) => u.imei);
+
+    // Anti-fraud: a buyback IMEI that also exists among sold units (swap/laundering).
+    const tradeinImeis = tradeins.map((t) => t.imei).filter((v): v is string => !!v);
+    const imeiReuse = tradeinImeis.length
+      ? (
+          await this.prisma.deviceUnit.findMany({
+            where: { status: 'sold', imei: { in: tradeinImeis } },
+            select: { imei: true },
+          })
+        ).map((u) => u.imei)
+      : [];
 
     // A paid line priced under its product cost is a margin leak; keep the worst per SKU.
     const costBySku = new Map(productCosts.map((p) => [p.sku, p]));
@@ -271,7 +288,7 @@ export class ReportsService {
     const marginLeaks = [...leakBySku.values()].slice(0, 10);
 
     const signals = buildRiskSignals(
-      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrderImeis },
+      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrderImeis, imeiReuse },
       now,
     );
     return { count: signals.length, signals };

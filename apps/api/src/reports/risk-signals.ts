@@ -22,7 +22,8 @@ export interface RiskSignal {
     | 'debt_overdue'
     | 'ticket_sla_breach'
     | 'margin_leak'
-    | 'stock_money_mismatch';
+    | 'stock_money_mismatch'
+    | 'imei_reuse';
   severity: RiskSeverity;
   ref: string;
   detail: string;
@@ -47,6 +48,7 @@ interface RiskInputs {
   ticketsOverdue: SupportTicket[];
   marginLeaks: MarginLeak[]; // paid items sold under cost
   soldWithoutOrderImeis: string[]; // IMEIs of units marked sold with no order (stock≠money)
+  imeiReuse: string[]; // IMEIs that appear both in a trade-in and among sold units (fraud)
 }
 
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
@@ -133,6 +135,17 @@ export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
       severity: 'medium',
       ref: m.sku,
       detail: `Продажа ниже себестоимости: ${m.name} за ${m.price} при закупке ${m.cost} сом`,
+    });
+  }
+
+  // IMEI reuse: the same IMEI shows up both in a buyback and among sold units — a classic
+  // used-device swap/laundering pattern that warrants a manual check.
+  for (const imei of input.imeiReuse) {
+    signals.push({
+      kind: 'imei_reuse',
+      severity: 'high',
+      ref: imei,
+      detail: `IMEI ${imei} есть и в скупке Б/У, и среди проданных — проверьте на подмену`,
     });
   }
 

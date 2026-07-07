@@ -12,6 +12,7 @@ const base = {
   ticketsOverdue: [],
   marginLeaks: [],
   soldWithoutOrderImeis: [],
+  imeiReuse: [],
 };
 const now = new Date('2026-07-07T00:00:00Z');
 
@@ -39,6 +40,14 @@ describe('buildRiskSignals', () => {
     expect(mm?.detail).toContain('3');
     expect(mm?.detail).toContain('IMEI-A');
     expect(mm?.ref).toBe('IMEI-A');
+  });
+
+  it('flags an IMEI present in both a buyback and a sale as reuse (high)', () => {
+    const s = buildRiskSignals({ ...base, imeiReuse: ['359-DUP-1'] }, now);
+    const reuse = s.find((x) => x.kind === 'imei_reuse');
+    expect(reuse?.severity).toBe('high');
+    expect(reuse?.ref).toBe('359-DUP-1');
+    expect(reuse?.detail).toContain('359-DUP-1');
   });
 
   it('omits the mismatch signal when zero units are affected', () => {

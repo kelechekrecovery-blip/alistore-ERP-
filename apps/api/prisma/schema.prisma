@@ -363,8 +363,10 @@ model TradeInDevice {
   price          Int
   contractId     String?
   sellerPassport String // защищённое поле + anti-fraud
+  imei           String? // anti-fraud: тот же IMEI в скупке И в продаже → risk-флаг
 
   @@index([customerId])
+  @@index([imei])
 }
 
 model CourierRun {
