@@ -1,4 +1,4 @@
-import { API_BASE } from './http';
+import { API_BASE, postAuthJson } from './http';
 
 export interface CatalogProduct {
   id: string;
@@ -65,6 +65,22 @@ export interface ProductWithRelated {
   related: CatalogProduct[];
 }
 
+export interface ProductReview {
+  id: string;
+  rating: number;
+  text: string | null;
+  customerName: string;
+  createdAt: string;
+}
+
+export interface ProductReviews {
+  productId: string;
+  sku: string;
+  count: number;
+  avgRating: number | null;
+  items: ProductReview[];
+}
+
 const PRODUCT_DETAIL_CACHE_MS = 30_000;
 const productDetailCache = new Map<string, { expiresAt: number; promise: Promise<ProductWithRelated> }>();
 
@@ -101,4 +117,20 @@ async function fetchProductWithRelatedUncached(id: string, relatedLimit: number)
     .slice(0, relatedLimit);
 
   return { product, related };
+}
+
+export async function fetchProductReviews(id: string): Promise<ProductReviews> {
+  const res = await fetch(`${API_BASE}/products/${encodeURIComponent(id)}/reviews`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`reviews responded ${res.status}`);
+  return (await res.json()) as ProductReviews;
+}
+
+export function createProductReview(
+  productId: string,
+  input: { rating: number; text?: string },
+  accessToken: string,
+): Promise<ProductReview> {
+  return postAuthJson(`/products/${encodeURIComponent(productId)}/reviews`, input, accessToken);
 }

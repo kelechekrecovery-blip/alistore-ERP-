@@ -60,7 +60,8 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ Customers find-or-create (гость), дизайн-токены хендоффа.
 - ✅ Избранное/сравнение persist, поиск (`/search`), промокоды/бонусы в корзине → checkout total.
 - ✅ Похожие товары на карточке: same-category рекомендации, in-stock/price-near ранжирование.
-- 🟡 Осталось: отзывы.
+- ✅ Отзывы: live summary/list на карточке товара + customer JWT create после paid/completed покупки,
+  duplicate guard на product/customer/order.
 **Проверка:** ✅ in-browser add→cart→checkout→order (channel=web) + сверка в БД.
 
 ## Phase 3 — Аккаунт + Auth ✅
@@ -176,7 +177,8 @@ overflow). units-lookup: 2 теста.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
 RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; returns/exchanges
-RBAC tests; margin-control POS tests; revenue-trend tests; AI insights wiring tests; полный Jest 74 suites / 241 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; margin-control POS tests; revenue-trend tests; AI insights wiring tests; product-reviews
+tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
 `/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
 без overflow.
@@ -357,7 +359,7 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 74 (241 тест зелёный, `jest`; при
+Backend-модулей ~30 · тест-сьютов 75 (242 теста зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**

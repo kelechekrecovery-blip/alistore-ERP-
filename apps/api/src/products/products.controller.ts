@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,7 +20,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
-import { ChangePriceDto, DeleteProductDto } from './products.dto';
+import { ChangePriceDto, CreateProductReviewDto, DeleteProductDto } from './products.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -39,6 +40,23 @@ export class ProductsController {
     const product = await this.products.get(id);
     if (!product) throw new NotFoundException(`Товар ${id} не найден`);
     return product;
+  }
+
+  @ApiOperation({ summary: 'List product reviews and summary rating' })
+  @ApiParam({ name: 'id', description: 'Product id' })
+  @ApiOkResponse({ description: '{ productId, sku, count, avgRating, items[] }.' })
+  @Get(':id/reviews')
+  reviews(@Param('id') id: string) {
+    return this.products.reviews(id);
+  }
+
+  @ApiOperation({ summary: 'Create a customer review for a purchased product' })
+  @ApiParam({ name: 'id', description: 'Product id' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/reviews')
+  createReview(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CreateProductReviewDto) {
+    return this.products.createReview(id, user, dto);
   }
 
   @ApiOperation({

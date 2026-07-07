@@ -168,6 +168,23 @@ model Product {
   @@index([archived])
 }
 
+model ProductReview {
+  id           String   @id @default(cuid())
+  productId    String
+  sku          String
+  customerId   String
+  customerName String
+  orderId      String
+  rating       Int
+  text         String?
+  createdAt    DateTime @default(now())
+
+  @@unique([productId, customerId, orderId])
+  @@index([productId])
+  @@index([customerId])
+  @@index([orderId])
+}
+
 model DeviceUnit {
   id        String     @id @default(cuid())
   imei      String     @unique // один IMEI нельзя продать дважды

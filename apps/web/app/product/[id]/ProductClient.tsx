@@ -3,10 +3,18 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { fetchProductWithRelated, type CatalogProduct } from '@/lib/api';
+import type { FormEvent } from 'react';
+import {
+  createProductReview,
+  fetchProductReviews,
+  fetchProductWithRelated,
+  type CatalogProduct,
+  type ProductReviews,
+} from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
+import { useAuth } from '@/lib/auth';
 import { conditionLabel, som } from '@/lib/format';
 
 const TRUST = [
@@ -18,14 +26,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const { add } = useCart();
   const { has, toggle } = useFavorites();
   const compare = useCompare();
+  const { user, hydrated, authed } = useAuth();
   const [product, setProduct] = useState<CatalogProduct | null | 'missing'>(null);
   const [similar, setSimilar] = useState<CatalogProduct[]>([]);
+  const [reviews, setReviews] = useState<ProductReviews | null>(null);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, text: '' });
+  const [reviewMsg, setReviewMsg] = useState('');
   const [added, setAdded] = useState(false);
 
   useEffect(() => {
     let active = true;
     setProduct(null);
     setSimilar([]);
+    setReviews(null);
+    setReviewMsg('');
     fetchProductWithRelated(params.id)
       .then(({ product: nextProduct, related }) => {
         if (!active) return;
@@ -36,6 +50,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         if (!active) return;
         setProduct('missing');
         setSimilar([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [params.id]);
+
+  useEffect(() => {
+    let active = true;
+    fetchProductReviews(params.id)
+      .then((nextReviews) => {
+        if (active) setReviews(nextReviews);
+      })
+      .catch(() => {
+        if (active) setReviews(null);
       });
     return () => {
       active = false;
@@ -67,6 +95,26 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
   }
+
+  async function submitReview(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!product || product === 'missing') return;
+    setReviewMsg('Сохраняем…');
+    try {
+      await authed((token) =>
+        createProductReview(product.id, { rating: reviewForm.rating, text: reviewForm.text }, token),
+      );
+      setReviewForm({ rating: 5, text: '' });
+      setReviews(await fetchProductReviews(product.id));
+      setReviewMsg('Спасибо, отзыв опубликован.');
+    } catch (err) {
+      setReviewMsg(err instanceof Error ? err.message : 'Не удалось сохранить отзыв');
+    }
+  }
+
+  const reviewLabel = reviews && reviews.count > 0
+    ? `★ ${(reviews.avgRating ?? 0).toFixed(1)} · ${reviews.count}`
+    : 'Нет отзывов';
 
   return (
     <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
@@ -127,7 +175,54 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             {/* reviews summary */}
             <div className="mt-5 flex items-center">
               <span className="font-display text-[15px] font-bold">Отзывы</span>
-              <span className="ml-auto text-[13px] text-[#E5B23C]">★ 4.9 · 128</span>
+              <span className="ml-auto text-[13px] text-[#E5B23C]">{reviewLabel}</span>
+            </div>
+            {reviews?.items.length ? (
+              <div className="mt-2 space-y-2">
+                {reviews.items.slice(0, 3).map((r) => (
+                  <div key={r.id} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-semibold text-[#D8CFC6]">{r.customerName}</span>
+                      <span className="ml-auto text-[#E5B23C]">{'★'.repeat(r.rating)}</span>
+                    </div>
+                    {r.text && <p className="mt-1.5 text-[12px] leading-snug text-[#A79C92]">{r.text}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-2.5 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
+              {hydrated && user ? (
+                <form onSubmit={submitReview} className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[#A79C92]">Ваша оценка</span>
+                    <select
+                      value={reviewForm.rating}
+                      onChange={(e) => setReviewForm((f) => ({ ...f, rating: Number(e.target.value) }))}
+                      className="ml-auto rounded-[9px] border border-[#2E2822] bg-[#16130F] px-2 py-1 text-xs text-white"
+                    >
+                      {[5, 4, 3, 2, 1].map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <textarea
+                    value={reviewForm.text}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))}
+                    maxLength={500}
+                    rows={3}
+                    className="w-full resize-none rounded-[10px] border border-[#2E2822] bg-[#16130F] p-2.5 text-sm text-white outline-none focus:border-lime"
+                    placeholder="Что понравилось?"
+                  />
+                  <button type="submit" className="rounded-[10px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink">
+                    Опубликовать
+                  </button>
+                  {reviewMsg && <span className="ml-2 text-[11px] text-[#A79C92]">{reviewMsg}</span>}
+                </form>
+              ) : (
+                <Link href={`/login?next=/product/${product.id}`} className="text-xs font-semibold text-lime">
+                  Войти, чтобы оставить отзыв
+                </Link>
+              )}
             </div>
 
             {/* similar */}
