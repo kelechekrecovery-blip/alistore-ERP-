@@ -5,6 +5,7 @@
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Print split payment tenders on receipts.
 - Add consent-filtered Campaign Segment Builder and ROI.
 - Make Excel product import idempotent.
 - Add shift close photo report.

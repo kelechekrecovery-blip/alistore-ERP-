@@ -79,7 +79,8 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
   синхронизации с конфликтами/approval-required статусами.
 - ✅ Сплит-оплата: POS принимает `payments[]`, проверяет точное равенство tender-сумм итогу,
   пишет отдельные Payment/ledger lines и переводит заказ в `paid` только после полной оплаты.
-  UI checkout поддерживает режим Split; offline queue/receipt сохраняют разбивку.
+  UI checkout поддерживает режим Split; offline queue/receipt и серверный чек по заказу
+  сохраняют разбивку по tender-суммам.
 - ☐ Осталось: сертификация конкретного физического железа в точке.
 **Проверка:** ✅ in-browser продажа со скидкой→оплата; ✅ browser QA split 30000 cash + 70000 card
 → `POST /api/pos/sale` 201, order paid, unit sold, две tender lines; в БД платёж в смене.

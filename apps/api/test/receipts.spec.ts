@@ -37,6 +37,19 @@ describe('ReceiptsService (receiptline)', () => {
     expect(markup).toContain('2 x 500 | 1 000');
   });
 
+  it('prints split payment tenders with their amounts', () => {
+    const markup = receipts.buildMarkup({
+      ...data,
+      payments: [
+        { method: 'cash', amount: 30000 },
+        { method: 'card', amount: 71000 },
+      ],
+    });
+    expect(markup).toContain('Оплата:');
+    expect(markup).toContain(' cash | 30 000');
+    expect(markup).toContain(' card | 71 000');
+  });
+
   it('renders an SVG preview and ESC/POS init command', () => {
     const out = receipts.render(data);
     expect(out.svg.startsWith('<svg')).toBe(true);

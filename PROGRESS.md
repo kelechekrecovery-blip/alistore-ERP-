@@ -182,6 +182,15 @@
 
 ## 2026-07-07
 
+- Task: print split payment tenders on receipts.
+- Files changed: `apps/api/src/receipts/receipts.dto.ts`, `apps/api/src/receipts/receipts.service.ts`, `apps/api/test/receipts.spec.ts`, `apps/api/test/receipts-order.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: receipts now keep backward-compatible `payment` but can render `payments[]`; `renderOrder()` prints every received/reconciled positive tender with method and amount, so POS split payments appear correctly on printed receipts.
+- Checks run: targeted Jest for `receipts`; `npm run api:build`; `git diff --check`.
+- Outcome: receipts tests passed 2 suites / 7 tests; API build passed; split order receipt includes `cash | 30 000` and `card | 70 000`.
+- Next step: remaining bounded unblocked work is auth recovery/social login, broader PDF/print polish for documents, or infra runbook; provider/hardware work still waits for accounts/devices.
+
+## 2026-07-07
+
 - Task: add consent-filtered Campaign Segment Builder and ROI.
 - Files changed: `apps/api/src/campaigns/*`, `apps/api/src/app.module.ts`, `apps/api/src/authz/authz.model.ts`, `apps/api/test/campaigns.e2e-spec.ts`, `apps/web/components/erp/CampaignsView.tsx`, `apps/web/app/erp/page.tsx`, `apps/web/lib/api/campaigns.ts`, `apps/web/lib/api.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: marketer/admin/owner staff can preview consent-filtered audience segments by level/city/tags/spend/ltv, create campaigns that enqueue outbox messages only for consenting customers, and attribute paid orders once for Campaign ROI from received payments. ERP now has a working “Кампании” cockpit tab for preview, launch, and ROI conversion.

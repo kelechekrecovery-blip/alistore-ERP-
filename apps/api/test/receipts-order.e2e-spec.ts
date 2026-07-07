@@ -33,7 +33,7 @@ describe('ReceiptsService.renderOrder (integration)', () => {
   // test seeds unique rows and reads its order back by id, so leftovers are harmless.
   const RUN = Math.floor(Math.random() * 1_000_000);
 
-  async function seedPaidOrder() {
+  async function seedPaidOrder(split = false) {
     seq += 1;
     const suffix = `${RUN}-${seq}`;
     const customer = await prisma.customer.create({
@@ -58,9 +58,18 @@ describe('ReceiptsService.renderOrder (integration)', () => {
         items: { create: [{ sku: product.sku, qty: 1, price: 100000 }] },
       },
     });
-    await prisma.payment.create({
-      data: { orderId: order.id, amount: 100000, method: 'cash', status: 'received' },
-    });
+    if (split) {
+      await prisma.payment.createMany({
+        data: [
+          { orderId: order.id, amount: 30000, method: 'cash', status: 'received' },
+          { orderId: order.id, amount: 70000, method: 'card', status: 'received' },
+        ],
+      });
+    } else {
+      await prisma.payment.create({
+        data: { orderId: order.id, amount: 100000, method: 'cash', status: 'received' },
+      });
+    }
     return order;
   }
 
@@ -71,7 +80,7 @@ describe('ReceiptsService.renderOrder (integration)', () => {
     expect(out.markup).toContain('AliStore');
     expect(out.markup).toContain('iPhone 15'); // name resolved by SKU
     expect(out.markup).toContain('100 000');
-    expect(out.markup).toContain('Оплата: cash');
+    expect(out.markup).toContain(' cash | 100 000');
     expect(out.svg.startsWith('<svg')).toBe(true);
     expect(Buffer.from(out.escposBase64, 'base64').length).toBeGreaterThan(0);
   });
@@ -80,5 +89,14 @@ describe('ReceiptsService.renderOrder (integration)', () => {
     const err = await receipts.renderOrder('does-not-exist').catch((e) => e);
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('order_not_found');
+  });
+
+  it('renders all split payment tenders for a real order', async () => {
+    const order = await seedPaidOrder(true);
+    const out = await receipts.renderOrder(order.id);
+
+    expect(out.markup).toContain(' cash | 30 000');
+    expect(out.markup).toContain(' card | 70 000');
+    expect(out.markup).not.toContain('Оплата: cash\n\nСпасибо');
   });
 });

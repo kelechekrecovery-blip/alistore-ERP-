@@ -65,6 +65,14 @@ export class ReceiptsService {
       })),
       total: order.total,
       payment: order.payments[0]?.method ?? 'cash',
+      payments: order.payments
+        .filter((payment) =>
+          payment.amount > 0 && ['received', 'reconciled'].includes(payment.status),
+        )
+        .map((payment) => ({
+          method: payment.method,
+          amount: payment.amount,
+        })),
     });
   }
 
@@ -81,7 +89,15 @@ export class ReceiptsService {
       lines.push(item.name);
       lines.push(` ${item.qty} x ${this.money(item.price)} | ${this.money(lineTotal)}`);
     }
-    lines.push('---', `^ИТОГО | ${this.money(data.total)}`, `Оплата: ${data.payment}`);
+    lines.push('---', `^ИТОГО | ${this.money(data.total)}`);
+    if (data.payments?.length) {
+      lines.push('Оплата:');
+      for (const payment of data.payments) {
+        lines.push(` ${payment.method} | ${this.money(payment.amount)}`);
+      }
+    } else {
+      lines.push(`Оплата: ${data.payment}`);
+    }
     lines.push('', 'Спасибо за покупку!');
     return lines.join('\n');
   }

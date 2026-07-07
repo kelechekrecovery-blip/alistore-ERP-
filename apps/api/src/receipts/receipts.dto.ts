@@ -21,6 +21,11 @@ export class ReceiptItemDto {
   @IsInt() @Min(0) price!: number;
 }
 
+export class ReceiptPaymentDto {
+  @IsString() method!: string;
+  @IsInt() @Min(0) amount!: number;
+}
+
 export class ReceiptData {
   @ValidateNested() @Type(() => ReceiptStoreDto) store!: ReceiptStoreDto;
   @IsString() orderId!: string;
@@ -32,5 +37,10 @@ export class ReceiptData {
   items!: ReceiptItemDto[];
   @IsInt() @Min(0) total!: number;
   @IsString() payment!: string;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReceiptPaymentDto)
+  payments?: ReceiptPaymentDto[];
   @IsOptional() @IsString() cashier?: string;
 }
