@@ -80,6 +80,7 @@ export interface RevenueRange {
   days: number;
   total: number;
   buckets: { day: string; amount: number }[];
+  trend: RevenueTrend;
 }
 /** Revenue for an arbitrary [from, to] date range (YYYY-MM-DD, inclusive). */
 export const fetchRevenueRange = (from: string, to: string) =>

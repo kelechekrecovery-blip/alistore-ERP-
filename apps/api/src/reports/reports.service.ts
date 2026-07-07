@@ -84,17 +84,30 @@ export class ReportsService {
     if (spanDays > MAX_RANGE_DAYS) {
       throw new ValidationError('range_too_wide', `Максимум ${MAX_RANGE_DAYS} дней в одном запросе`);
     }
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        amount: { gt: 0 },
-        status: { in: ['received', 'reconciled'] },
-        createdAt: { gte: new Date(fromMs), lt: new Date(toMs + DAY_MS) }, // include the whole «to» day
-      },
-      select: { amount: true, createdAt: true },
-    });
+    const endExclusive = new Date(toMs + DAY_MS); // include the whole «to» day
+    const prevFromMs = fromMs - spanDays * DAY_MS; // equal-length window immediately before
+    const [payments, prevAgg] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: {
+          amount: { gt: 0 },
+          status: { in: ['received', 'reconciled'] },
+          createdAt: { gte: new Date(fromMs), lt: endExclusive },
+        },
+        select: { amount: true, createdAt: true },
+      }),
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          amount: { gt: 0 },
+          status: { in: ['received', 'reconciled'] },
+          createdAt: { gte: new Date(prevFromMs), lt: new Date(fromMs) },
+        },
+      }),
+    ]);
     const buckets = buildRangeBuckets(payments, fromMs, toMs);
     const total = buckets.reduce((sum, b) => sum + b.amount, 0);
-    return { from: fromIso, to: toIso, days: spanDays, total, buckets };
+    const trend = buildRevenueTrend(total, prevAgg._sum.amount ?? 0);
+    return { from: fromIso, to: toIso, days: spanDays, total, buckets, trend };
   }
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */

@@ -92,7 +92,7 @@ export function DashboardView({ d, risks, revenue, trend, period, onPeriod, onSi
         <Card>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <span className="font-display text-[15px] font-bold">Выручка · {som(total)}</span>
-            {!custom && <TrendBadge trend={trend} />}
+            <TrendBadge trend={custom ? range.trend : trend} />
             {custom && (
               <span className="rounded-chip bg-[#221E19] px-2 py-0.5 font-mono text-[11px] text-[#A79C92]">
                 {range.from} → {range.to} · {range.days} дн
