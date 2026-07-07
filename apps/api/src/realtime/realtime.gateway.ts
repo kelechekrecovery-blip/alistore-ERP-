@@ -32,6 +32,7 @@ export class RealtimeGateway {
     status: string,
     payload: Record<string, unknown> = {},
   ): void {
+    if (!this.server) return; // no adapter bound (e.g. unit tests) → no-op
     this.server
       .to(`order:${orderId}`)
       .emit('order:status', { orderId, status, ...payload });
