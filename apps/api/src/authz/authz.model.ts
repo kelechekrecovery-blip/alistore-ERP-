@@ -111,6 +111,12 @@ p, cashier, payments, refund
 p, senior_seller, payments, refund
 p, admin, payments, refund
 p, owner, payments, refund
+p, warehouse, warranty, read
+p, admin, warranty, read
+p, owner, warranty, read
+p, warehouse, warranty, transition
+p, admin, warranty, transition
+p, owner, warranty, transition
 g, owner, admin
 g, admin, senior_seller
 `;

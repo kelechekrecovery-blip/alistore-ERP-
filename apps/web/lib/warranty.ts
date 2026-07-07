@@ -14,12 +14,16 @@ export async function fetchWarranty(params: {
   customerId?: string;
   imei?: string;
   status?: string;
+  accessToken?: string;
 }): Promise<WarrantyCase[]> {
   const qs = new URLSearchParams();
   if (params.customerId) qs.set('customerId', params.customerId);
   if (params.imei) qs.set('imei', params.imei);
   if (params.status) qs.set('status', params.status);
-  const res = await fetch(`${API_BASE}/warranty?${qs.toString()}`, { cache: 'no-store' });
+  const res = await fetch(`${API_BASE}/warranty?${qs.toString()}`, {
+    cache: 'no-store',
+    headers: params.accessToken ? { Authorization: `Bearer ${params.accessToken}` } : undefined,
+  });
   if (!res.ok) throw new Error(`warranty ${res.status}`);
   return (await res.json()) as WarrantyCase[];
 }
@@ -38,10 +42,10 @@ export async function openWarranty(input: {
   return (await res.json()) as WarrantyCase;
 }
 
-export async function transitionWarranty(id: string, status: string): Promise<WarrantyCase> {
+export async function transitionWarranty(id: string, status: string, accessToken: string): Promise<WarrantyCase> {
   const res = await fetch(`${API_BASE}/warranty/${id}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ status }),
   });
   if (!res.ok) throw new Error(`transition warranty ${res.status}`);

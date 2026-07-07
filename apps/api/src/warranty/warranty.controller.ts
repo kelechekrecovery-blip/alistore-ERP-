@@ -7,8 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -19,6 +21,12 @@ import {
 } from '@nestjs/swagger';
 import { WarrantyService } from './warranty.service';
 import { OpenWarrantyDto, WarrantyStatusDto } from './warranty.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 
 const SYSTEM_ACTOR = 'system';
 
@@ -33,6 +41,9 @@ export class WarrantyController {
   @ApiQuery({ name: 'status', required: false })
   @ApiOkResponse({ description: 'Cases ordered by SLA (soonest first).' })
   @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('warranty', 'read')
   list(
     @Query('customerId') customerId?: string,
     @Query('imei') imei?: string,
@@ -44,6 +55,9 @@ export class WarrantyController {
   @ApiOperation({ summary: 'Get a warranty case' })
   @ApiNotFoundResponse({ description: 'Case does not exist.' })
   @Get(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('warranty', 'read')
   async getOne(@Param('id') id: string) {
     const wc = await this.warranty.get(id);
     if (!wc) throw new NotFoundException(`Гарантия ${id} не найдена`);
@@ -62,7 +76,10 @@ export class WarrantyController {
   @ApiOkResponse({ description: 'Status updated.' })
   @ApiUnprocessableEntityResponse({ description: 'Illegal transition.' })
   @Patch(':id')
-  transition(@Param('id') id: string, @Body() dto: WarrantyStatusDto) {
-    return this.warranty.transition(id, dto.status, SYSTEM_ACTOR);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('warranty', 'transition')
+  transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: WarrantyStatusDto) {
+    return this.warranty.transition(id, dto.status, user.customerId);
   }
 }

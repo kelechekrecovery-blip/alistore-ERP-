@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { fetchWarranty, transitionWarranty, type WarrantyCase } from '@/lib/warranty';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 interface Stage {
   status: string;
@@ -20,21 +22,29 @@ const STAGES: Stage[] = [
 ];
 
 export default function WarrantyConsolePage() {
+  const [session, setSession] = useState<StaffSession | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const [stage, setStage] = useState<Stage>(STAGES[0]);
   const [cases, setCases] = useState<WarrantyCase[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
 
   const load = useCallback((s: Stage) => {
+    if (!session) return;
     setCases(null);
-    fetchWarranty({ status: s.status })
+    fetchWarranty({ status: s.status, accessToken: session.accessToken })
       .then(setCases)
       .catch(() => setCases([]));
+  }, [session]);
+
+  useEffect(() => {
+    setSession(loadStaffSession());
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
-    load(stage);
-  }, [stage, load]);
+    if (session) load(stage);
+  }, [stage, load, session]);
 
   function flash(m: string) {
     setToast(m);
@@ -42,9 +52,10 @@ export default function WarrantyConsolePage() {
   }
 
   async function advance(wc: WarrantyCase) {
+    if (!session) return;
     setBusy(wc.id);
     try {
-      await transitionWarranty(wc.id, stage.to);
+      await transitionWarranty(wc.id, stage.to, session.accessToken);
       flash(`Гарантия ${wc.imei} → ${stage.to}`);
       load(stage);
     } catch {
@@ -52,6 +63,28 @@ export default function WarrantyConsolePage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function logout() {
+    clearStaffSession();
+    setSession(null);
+    setCases(null);
+  }
+
+  if (!hydrated) {
+    return <div className="fixed inset-0 z-50 bg-[#0E0C0A]" />;
+  }
+
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-[#0E0C0A] px-4">
+        <StaffSessionLogin
+          title="Гарантия · вход"
+          caption="Нужна роль склада или администратора."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
   }
 
   return (
@@ -62,9 +95,18 @@ export default function WarrantyConsolePage() {
         </span>
         <div>
           <div className="font-display text-lg font-bold text-white">Гарантия · Обращения</div>
-          <div className="text-xs text-[#8A7F76]">Привязано к IMEI · SLA 14 дней</div>
+          <div className="text-xs text-[#8A7F76]">
+            {session.username} · {session.role} · SLA 14 дней
+          </div>
         </div>
-        <Link href="/" className="ml-auto rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]">
+        <button
+          type="button"
+          onClick={logout}
+          className="ml-auto rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]"
+        >
+          Выйти staff
+        </button>
+        <Link href="/" className="rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]">
           ⌂ Выйти
         </Link>
       </header>
