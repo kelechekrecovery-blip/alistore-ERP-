@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ReportsService } from '../reports/reports.service';
 import { InsightContext, InsightProvider, RuleInsightProvider } from './insight-provider';
+import { OpenRouterInsightProvider } from './openrouter-provider';
 import { PricingService } from './pricing.service';
 import { ReorderService } from './reorder.service';
 
@@ -22,9 +23,14 @@ export class InsightsService {
     private readonly pricing: PricingService,
     private readonly reorder: ReorderService,
   ) {
-    // A real provider is wired here when a server-side key exists (never in the client).
-    // Until then — and whenever the provider errors — the deterministic rules run.
-    this.provider = process.env.AI_PROVIDER_KEY ? this.fallback : this.fallback;
+    // A real LLM provider is wired when a server-side key exists (never in the client).
+    // OpenRouter = one key, any model (override the default via AI_MODEL). Until a key is
+    // set — and whenever the provider errors at request time — the deterministic rules run.
+    const key = process.env.AI_PROVIDER_KEY ?? process.env.OPENROUTER_API_KEY;
+    this.provider = key
+      ? new OpenRouterInsightProvider({ apiKey: key, model: process.env.AI_MODEL })
+      : this.fallback;
+    if (key) this.logger.log(`AI insights provider: ${this.provider.source}`);
   }
 
   async insights() {
