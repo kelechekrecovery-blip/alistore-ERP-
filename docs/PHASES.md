@@ -113,7 +113,8 @@
 ## Phase 9 — Мультисклад, склад-операции, гарантия (v1) 🟡
 - ✅ **WarrantyCase** с SLA (14 дней): open по IMEI + машина статусов + консоль
   сотрудника `/warranty` + запрос клиента из деталей заказа; SLA-breach → Risk Center.
-- ☐ Мультифилиал + перемещения (stock.moved), инвентаризация со сканером.
+- ✅ Мультифилиал: перемещения (POST /inventory/transfer, stock.moved) + инвентаризация
+  (POST /inventory/count, inventory.counted) + UI на складской консоли (WarehouseOps).
 - ☐ **Supplier RMA** + Scorecard.
 - ☐ Долги/рассрочка + напоминания, KPI/зарплаты, смены с фотоотчётом (Evidence Vault).
 - ☐ Импорт данных из Excel/тетради при запуске (Data Migration).
