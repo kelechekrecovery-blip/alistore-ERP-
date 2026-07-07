@@ -175,7 +175,7 @@ overflow). units-lookup: 2 теста.
 Добавлено: targeted staff/approval 2FA tests; targeted staff-session ops/RBAC tests; courier/
 print-export RBAC tests; dangerous endpoint RBAC tests; warranty RBAC tests; support/CRM
 RBAC tests; supplier RBAC tests; debt RBAC tests; trade-in RBAC tests; returns/exchanges
-RBAC tests; margin-control POS tests; полный Jest 72 suites / 231 tests; browser QA `/approvals` login→2FA setup,
+RBAC tests; margin-control POS tests; revenue-trend tests; полный Jest 73 suites / 237 tests; browser QA `/approvals` login→2FA setup,
 `/pos` staff login → `/warehouse`/`/staff` shared session, `/warranty` staff login,
 `/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
 без overflow.
@@ -195,13 +195,16 @@ RBAC tests; margin-control POS tests; полный Jest 72 suites / 231 tests; b
   касса/COD→Финансы, резерв→Склад) — `SIGNAL_ACTION` в `/erp`.
 - ✅ **KPI продавцов**: выручка+кол-во продаж по staffId (через shift.staffId), карточка
   «KPI продавцов» в ERP (`reports/kpi.ts` sellers).
-- ✅ **Период-фильтр выручки**: `GET /reports/revenue?days=N` (`reports.revenue(days)` +
-  `revenue-buckets.ts`, clamp 1..90) + чипы «7 дн / 30 дн» в ERP-дашборде (график
-  перестраивается). 4 теста бакетирования.
-- ☐ Осталось (v2): произвольные периоды/сравнение, повтор IMEI (trade-in+продажа) как риск.
+- ✅ **Период-фильтр выручки + тренд**: `GET /reports/revenue?days=N` и
+  `GET /reports/revenue-trend?days=N` (`revenue-buckets.ts`, clamp 1..90) + чипы
+  «7 дн / 30 дн» в ERP-дашборде; график перестраивается, бейдж показывает текущий
+  период vs предыдущий. 10 pure-тестов бакетирования/тренда.
+- ☐ Осталось (v2): произвольные диапазоны дат, повтор IMEI (trade-in+продажа) как риск
+  (нужно поле imei в TradeInDevice — миграция схемы).
 **Проверка:** ✅ 2 теста дашборда + 3 теста buildKpi (маржа/средний чек/топ, деление на 0);
 in-browser /erp: вкладка «Маржа·KPI» на реальных данных (маржа 16250/3.9%, средний чек 104063,
-топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад). HTTP+БД сверка.
+топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад), revenue trend
+badge на дашборде. HTTP+БД сверка.
 
 ## Phase 9 — Мультисклад, склад-операции, гарантия (v1) 🟡
 - ✅ **WarrantyCase** с SLA (14 дней): open по IMEI + машина статусов + консоль
@@ -352,11 +355,11 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 72 (231 тест зелёный, `jest`; при
+Backend-модулей ~30 · тест-сьютов 73 (237 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
-- **Лана Codex** (не трогаю): remaining Role Permission Matrix rollout, outbox/Novu-доставка,
+- **Лана Codex** (не трогаю): outbox/Novu-доставка,
   Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF,
   realtime (socket.io), observability (sentry), i18n, health, infra (Caddy/бэкапы).
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),
