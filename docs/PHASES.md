@@ -205,8 +205,9 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 Правило: при работе в фазе — если тронутый файл >~400 строк, разбить в рамках той же фазы.
 
 Текущие цели (на момент составления):
-- ☐ `apps/web/lib/api.ts` (292) → разнести по доменам: `lib/api/catalog.ts`, `orders.ts`,
-  `auth.ts`, `pos.ts`, `warehouse.ts`, `approvals.ts` (+ общий `http.ts`).
+- ✅ `apps/web/lib/api.ts` (366→9, баррель) → разнесён по доменам `lib/api/*`: `http.ts`
+  (API_BASE+postJson+getJson), `catalog.ts`, `orders.ts`, `auth.ts`, `pos.ts`, `warehouse.ts`,
+  `exchanges.ts`, `approvals.ts`; `lib/api.ts` ре-экспортирует всё — импортёры без изменений.
 - 🟡 `apps/web/app/pos/page.tsx` (419→316) → извлечён `components/pos/PosCheckout.tsx`
   (pay/pending/done + METHODS); под лимитом. Остаток: PosCatalog/PosTicket при след. касании.
 - ☐ `apps/api/src/orders/orders.service.ts` (240) → выделить `order-fulfillment.ts`
