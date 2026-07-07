@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CountDto {
@@ -27,6 +27,29 @@ export class TransferDto {
 
   @ApiPropertyOptional({ example: 'warehouse_lead' })
   @IsOptional() @IsString() requester?: string;
+}
+
+export class ReceiveDto {
+  @ApiProperty({ example: 'clx_product_001' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1', description: 'Receiving branch/location' })
+  @IsString() location!: string;
+
+  @ApiProperty({ type: [String], example: ['IPH-15-128-UNIT-3', 'IPH-15-128-UNIT-4'] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsString({ each: true })
+  imeis!: string[];
+
+  @ApiPropertyOptional({ enum: ['A', 'B', 'C'], example: 'A' })
+  @IsOptional()
+  @IsIn(['A', 'B', 'C'])
+  grade?: 'A' | 'B' | 'C';
+
+  @ApiPropertyOptional({ example: 'поставка #INV-001' })
+  @IsOptional() @IsString() reason?: string;
 }
 
 export class MovementDto {

@@ -1,10 +1,12 @@
 # BACKLOG
 
 ## Next
+- Add scanner-assisted inventory count UI.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Add warehouse batch receiving UI/API.
 - Add POS split payments.
 - Add purchased-product reviews.
 - Optimize product detail related products.

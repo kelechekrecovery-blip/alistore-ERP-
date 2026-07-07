@@ -54,6 +54,9 @@ p, owner, shift, close
 p, warehouse, inventory, movement
 p, admin, inventory, movement
 p, owner, inventory, movement
+p, warehouse, inventory, receive
+p, admin, inventory, receive
+p, owner, inventory, receive
 p, warehouse, inventory, transfer
 p, admin, inventory, transfer
 p, owner, inventory, transfer

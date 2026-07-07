@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchCatalog, inventoryCount, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, inventoryCount, receiveInventoryBatch, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
 
 /** Transfer + inventory-count operations for the warehouse console. */
@@ -12,6 +12,10 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [productId, setProductId] = useState('');
   const [location, setLocation] = useState('BISHKEK-1');
   const [counted, setCounted] = useState('');
+  const [receiveProductId, setReceiveProductId] = useState('');
+  const [receiveLocation, setReceiveLocation] = useState('BISHKEK-1');
+  const [receiveGrade, setReceiveGrade] = useState('A');
+  const [receiveImeis, setReceiveImeis] = useState('');
   const [transferFiles, setTransferFiles] = useState<File[]>([]);
   const [countFiles, setCountFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -20,7 +24,10 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   useEffect(() => {
     fetchCatalog({ limit: 100 }).then((c) => {
       setProducts(c.items);
-      if (c.items[0]) setProductId(c.items[0].id);
+      if (c.items[0]) {
+        setProductId(c.items[0].id);
+        setReceiveProductId(c.items[0].id);
+      }
     });
   }, []);
 
@@ -77,10 +84,55 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
     }
   }
 
+  async function doReceive() {
+    const imeis = parseImeis(receiveImeis);
+    if (!receiveProductId || !receiveLocation.trim() || imeis.length === 0) return;
+    setBusy('receive');
+    try {
+      const r = await receiveInventoryBatch(
+        receiveProductId,
+        receiveLocation.trim(),
+        imeis,
+        accessToken,
+        receiveGrade,
+      );
+      flash(`✓ Принято ${r.received} шт · ${r.location}`);
+      setReceiveImeis('');
+    } catch (e) {
+      flash(e instanceof Error ? errMsg(e) : 'Ошибка приёмки');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="mb-4 rounded-card border border-[#2E2822] bg-[#1A1611] p-4 ">
       <div className="mb-3 font-display text-sm font-bold text-white">Операции склада</div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* receive */}
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Приёмка партии</p>
+          <div className="flex flex-col gap-2">
+            <select value={receiveProductId} onChange={(e) => setReceiveProductId(e.target.value)} className="rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-2 text-sm outline-none focus:border-coral">
+              {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <div className="flex gap-2">
+              <input value={receiveLocation} onChange={(e) => setReceiveLocation(e.target.value)} placeholder="склад" className="min-w-0 flex-1 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+              <select value={receiveGrade} onChange={(e) => setReceiveGrade(e.target.value)} className="w-20 rounded-btn border border-[#2E2822] bg-[#1A1611] px-2 py-2 text-sm outline-none focus:border-coral">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+              </select>
+            </div>
+            <textarea
+              value={receiveImeis}
+              onChange={(e) => setReceiveImeis(e.target.value)}
+              placeholder="IMEI / SN, каждый с новой строки"
+              className="min-h-[86px] resize-none rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-[#6E645C] focus:border-coral"
+            />
+            <button type="button" disabled={busy === 'receive'} onClick={doReceive} className="rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-[#2E2822]">Принять</button>
+          </div>
+        </div>
         {/* transfer */}
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Перемещение по IMEI</p>
@@ -114,6 +166,11 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   );
 }
 
+function parseImeis(value: string): string[] {
+  return Array.from(new Set(value.split(/[\n,; ]+/).map((item) => item.trim()).filter(Boolean)));
+}
+
 function errMsg(e: Error): string {
+  if (e.message.includes('imei_already_exists')) return 'IMEI уже есть в базе';
   return e.message.includes('409') ? 'Единицу нельзя переместить (не в наличии)' : e.message.includes('422') ? 'Проверьте данные' : 'Ошибка';
 }

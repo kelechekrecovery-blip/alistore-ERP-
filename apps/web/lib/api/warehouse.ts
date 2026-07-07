@@ -25,6 +25,24 @@ export interface CountResult {
   movementId: string;
 }
 
+export interface ReceiveResult {
+  productId: string;
+  location: string;
+  received: number;
+  imeis: string[];
+  movementId: string;
+}
+
+export function receiveInventoryBatch(
+  productId: string,
+  location: string,
+  imeis: string[],
+  accessToken: string,
+  grade?: string,
+): Promise<ReceiveResult> {
+  return postAuthJson('/inventory/receive', { productId, location, imeis, grade }, accessToken);
+}
+
 export function inventoryCount(
   productId: string,
   location: string,

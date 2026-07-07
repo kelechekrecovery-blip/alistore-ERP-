@@ -9,7 +9,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import { CountDto, MovementDto, TransferDto } from './inventory.dto';
+import { CountDto, MovementDto, ReceiveDto, TransferDto } from './inventory.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -38,6 +38,16 @@ export class InventoryController {
   @RequirePermission('inventory', 'movement')
   async movement(@CurrentUser() user: AuthPrincipal, @Body() dto: MovementDto) {
     return this.inventory.movement(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'Receive a batch of IMEI units into stock (stock.received)' })
+  @ApiCreatedResponse({ description: 'Units created in stock; movement + ledger events written.' })
+  @ApiConflictResponse({ description: 'One or more IMEI values already exist.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown product or invalid IMEI batch.' })
+  @Post('receive')
+  @RequirePermission('inventory', 'receive')
+  async receive(@CurrentUser() user: AuthPrincipal, @Body() dto: ReceiveDto) {
+    return this.inventory.receive(dto, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({ summary: 'Transfer an in_stock unit to another branch (stock.moved)' })

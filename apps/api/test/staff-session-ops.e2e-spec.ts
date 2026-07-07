@@ -108,6 +108,19 @@ describe('Staff session rollout for operational endpoints', () => {
     return product;
   }
 
+  async function productOnly(prefix: string) {
+    return prisma.product.create({
+      data: {
+        sku: `${prefix}-${RUN}`,
+        name: 'iPhone',
+        price: 100000,
+        cost: 80000,
+        category: 'phones',
+        attrs: {},
+      },
+    });
+  }
+
   it('requires staff JWT for shifts and ignores body/query staffId spoofing', async () => {
     await request(app.getHttpServer())
       .post('/shifts/open')
@@ -220,6 +233,45 @@ describe('Staff session rollout for operational endpoints', () => {
 
     const event = await prisma.auditEvent.findFirst({ where: { type: 'stock.moved' } });
     expect(event?.actor).toBe(warehouseId);
+  });
+
+  it('receives inventory batches with warehouse RBAC and keeps actor from JWT', async () => {
+    const product = await productOnly('OPS-RCV');
+    const payload = {
+      productId: product.id,
+      location: 'BISHKEK-1',
+      grade: 'A',
+      imeis: [`OPS-RCV-${RUN}-1`, `OPS-RCV-${RUN}-2`],
+      requester: 'spoof',
+    };
+
+    await request(app.getHttpServer())
+      .post('/inventory/receive')
+      .send(payload)
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post('/inventory/receive')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send(payload)
+      .expect(403);
+
+    const received = await request(app.getHttpServer())
+      .post('/inventory/receive')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send(payload)
+      .expect(201);
+
+    expect(received.body.received).toBe(2);
+    expect(await prisma.deviceUnit.count({ where: { productId: product.id, status: 'in_stock' } })).toBe(2);
+    const movement = await prisma.inventoryMovement.findFirst({ where: { productId: product.id, type: 'received' } });
+    expect(movement?.qty).toBe(2);
+
+    const stockEvent = await prisma.auditEvent.findFirst({ where: { type: 'stock.received' } });
+    expect(stockEvent?.actor).toBe(warehouseId);
+    const unitEvents = await prisma.auditEvent.findMany({ where: { type: 'unit.received' } });
+    expect(unitEvents).toHaveLength(2);
+    expect(unitEvents.every((event) => event.actor === warehouseId)).toBe(true);
   });
 
   it('requires staff JWT for order queue and fulfillment operations', async () => {

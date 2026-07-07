@@ -27,7 +27,7 @@ POST  /shifts/open                    { staffId, point, openCash }
 POST  /shifts/:id/close               { closeCash, evidence }  diff≠0 → approval+Risk
 # Склад / IMEI
 GET   /units/:imei
-POST  /units                          приёмка (partию)
+POST  /inventory/receive              { productId, location, imeis[], grade? } → приёмка партии
 PATCH /units/:id/status               sold блокируется если уже sold (409)
 POST  /inventory/movements            write_off/adjust → approval+evidence
 POST  /inventory/count                инвентаризация

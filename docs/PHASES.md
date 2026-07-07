@@ -88,8 +88,12 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ `/warehouse` консоль; `POST /orders/:id/fulfill` (назначение IMEI web-заказам,
   нормализация qty>1), движение статусов, очередь `GET /orders?status=`.
 - ✅ Evidence Vault: фото к перемещениям/инвентаризации → WebP storage + `evidence.attached`.
-- ☐ Осталось: приёмка партий UI, инвентаризация со сканером.
-**Проверка:** ✅ in-browser fulfill web-заказа → reserved+IMEI; сверка в БД.
+- ✅ Приёмка партий: `POST /inventory/receive` (warehouse/admin/owner RBAC) создаёт IMEI units,
+  пишет `InventoryMovement(received)`, `stock.received` и `unit.received`; `/warehouse`
+  даёт форму batch receive с многострочным IMEI/SN вводом.
+- ☐ Осталось: инвентаризация со сканером.
+**Проверка:** ✅ in-browser fulfill web-заказа → reserved+IMEI; ✅ browser QA `/warehouse`
+batch receive → `POST /api/inventory/receive` 201, 2 IMEI in_stock, movement+ledger; сверка в БД.
 
 ## Phase 6 — Approval-цикл + Возвраты + Обмены ✅
 - ✅ **ApprovalsService** (park→202→decide исполняет действие), **Approval Inbox** UI.

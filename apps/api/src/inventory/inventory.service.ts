@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
-import { CountDto, MovementDto, TransferDto } from './inventory.dto';
+import { CountDto, MovementDto, ReceiveDto, TransferDto } from './inventory.dto';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -36,6 +36,79 @@ export class InventoryService {
       requester,
       reason: dto.reason,
       payload: { productId: dto.productId, qty: dto.qty, reason: dto.reason },
+    });
+  }
+
+  /** Receive a batch of physical IMEI units into stock. */
+  async receive(dto: ReceiveDto, actor: string) {
+    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+    if (!product) {
+      throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+    }
+
+    const imeis = dto.imeis.map((imei) => imei.trim()).filter(Boolean);
+    if (imeis.length === 0) {
+      throw new ValidationError('imei_required', 'Нужен хотя бы один IMEI');
+    }
+    if (new Set(imeis).size !== imeis.length) {
+      throw new ValidationError('duplicate_imei', 'IMEI в партии не должны повторяться');
+    }
+
+    const existing = await this.prisma.deviceUnit.findMany({
+      where: { imei: { in: imeis } },
+      select: { imei: true },
+    });
+    if (existing.length > 0) {
+      throw new ConflictError(
+        'imei_already_exists',
+        `IMEI уже есть в базе: ${existing.map((unit) => unit.imei).join(', ')}`,
+      );
+    }
+
+    return this.audit.transaction(async (tx) => {
+      const movement = await tx.inventoryMovement.create({
+        data: {
+          productId: dto.productId,
+          qty: imeis.length,
+          type: 'received',
+          to: dto.location,
+          reason: dto.reason ?? null,
+        },
+      });
+      for (const imei of imeis) {
+        await tx.deviceUnit.create({
+          data: {
+            imei,
+            productId: dto.productId,
+            status: 'in_stock',
+            location: dto.location,
+            grade: dto.grade,
+          },
+        });
+      }
+      return {
+        result: {
+          productId: dto.productId,
+          location: dto.location,
+          received: imeis.length,
+          imeis,
+          movementId: movement.id,
+        },
+        events: [
+          {
+            type: EventType.StockReceived,
+            actor,
+            payload: { productId: dto.productId, location: dto.location, qty: imeis.length, movementId: movement.id },
+            refs: [dto.productId, movement.id],
+          },
+          ...imeis.map((imei) => ({
+            type: EventType.UnitReceived,
+            actor,
+            payload: { productId: dto.productId, imei, location: dto.location, grade: dto.grade ?? null },
+            refs: [dto.productId, imei, movement.id],
+          })),
+        ],
+      };
     });
   }
 
