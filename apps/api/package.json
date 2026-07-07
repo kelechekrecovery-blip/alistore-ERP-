@@ -42,6 +42,7 @@
     "class-validator": "^0.14.1",
     "exceljs": "^4.4.0",
     "meilisearch": "^0.59.0",
+    "nestjs-i18n": "^10.8.4",
     "nodemailer": "^9.0.3",
     "otplib": "^12.0.1",
     "passport": "^0.7.0",
