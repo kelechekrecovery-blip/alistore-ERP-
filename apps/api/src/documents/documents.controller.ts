@@ -18,4 +18,10 @@ export class DocumentsController {
   warrantyTalon(@Param('imei') imei: string) {
     return this.documents.warrantyTalon(imei);
   }
+
+  /** Write-off act (акт списания) PDF for an InventoryMovement (base64). */
+  @Get('writeoff/:movementId/act')
+  writeOffAct(@Param('movementId') movementId: string) {
+    return this.documents.writeOffAct(movementId);
+  }
 }

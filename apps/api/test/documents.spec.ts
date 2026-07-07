@@ -91,4 +91,45 @@ describe('DocumentsService.tradeInContract (integration)', () => {
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('unit_not_found');
   });
+
+  it('renders a write-off act PDF for a write_off movement', async () => {
+    const product = await prisma.product.create({
+      data: {
+        sku: `SKU-WO-${RUN}`,
+        name: 'Xiaomi Redmi',
+        price: 20000,
+        cost: 15000,
+        category: 'phones',
+        attrs: {},
+      },
+    });
+    const movement = await prisma.inventoryMovement.create({
+      data: { productId: product.id, qty: -2, type: 'write_off', reason: 'брак' },
+    });
+
+    const out = await documents.writeOffAct(movement.id);
+    const pdf = Buffer.from(out.pdfBase64, 'base64');
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(out.bytes).toBeGreaterThan(1000);
+  });
+
+  it('rejects a non-write_off movement with 422', async () => {
+    const product = await prisma.product.create({
+      data: {
+        sku: `SKU-WO2-${RUN}`,
+        name: 'Кабель',
+        price: 500,
+        cost: 200,
+        category: 'accessories',
+        attrs: {},
+      },
+    });
+    const movement = await prisma.inventoryMovement.create({
+      data: { productId: product.id, qty: 10, type: 'received' },
+    });
+
+    const err = await documents.writeOffAct(movement.id).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('not_a_writeoff');
+  });
 });

@@ -129,6 +129,57 @@ export class DocumentsService {
     };
   }
 
+  /** Render a write-off act (акт списания) for an InventoryMovement. */
+  async writeOffAct(
+    movementId: string,
+  ): Promise<{ pdfBase64: string; bytes: number }> {
+    const movement = await this.prisma.inventoryMovement.findUnique({
+      where: { id: movementId },
+      include: { product: true },
+    });
+    if (!movement) {
+      throw new ValidationError(
+        'movement_not_found',
+        `Движение ${movementId} не найдено`,
+      );
+    }
+    if (movement.type !== 'write_off') {
+      throw new ValidationError(
+        'not_a_writeoff',
+        `Движение ${movementId} — не списание`,
+      );
+    }
+
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    const font = await doc.embedFont(this.fontBytes);
+    const page = doc.addPage([595.28, 841.89]); // A4
+
+    const writer = this.lineWriter(page, font);
+    writer('АКТ СПИСАНИЯ товара', 16, 28);
+    writer('AliStore · г. Бишкек, Кыргызстан', 11, 26);
+    writer(`№ ${movement.id}`, 10, 16);
+    writer(`Дата: ${movement.createdAt.toISOString().slice(0, 10)}`, 10, 24);
+
+    writer('Товар:', 12, 18);
+    writer(`  ${movement.product.name} (SKU ${movement.product.sku})`, 11, 16);
+    writer(`  Количество: ${Math.abs(movement.qty)} шт.`, 11, 16);
+    writer(`  Причина: ${movement.reason ?? '—'}`, 11, 24);
+
+    writer('Списание согласовано (approval) и зафиксировано в Event Ledger.', 10, 24);
+    writer(
+      'Ответственный: __________________     Владелец: __________________',
+      10,
+      16,
+    );
+
+    const bytes = await doc.save();
+    return {
+      pdfBase64: Buffer.from(bytes).toString('base64'),
+      bytes: bytes.length,
+    };
+  }
+
   /** A top-down line writer bound to a page + font. */
   private lineWriter(page: PDFPage, font: PDFFont) {
     let y = page.getSize().height - 60;
