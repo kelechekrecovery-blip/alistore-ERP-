@@ -55,3 +55,30 @@ export async function fetchPricing(): Promise<PricingReport> {
   if (!res.ok) throw new Error(`pricing ${res.status}`);
   return (await res.json()) as PricingReport;
 }
+
+export interface ReorderReview {
+  sku: string;
+  name: string;
+  category: string;
+  inStock: number;
+  reserved: number;
+  soldUnits: number;
+  needsReorder: boolean;
+  urgency: 'high' | 'medium' | 'low' | 'none';
+  suggestedQty: number;
+  reason: string;
+}
+
+export interface ReorderReport {
+  source: 'rules';
+  generatedForCount: number;
+  needsReorder: number;
+  reviews: ReorderReview[];
+}
+
+/** Restock review (Phase 11): understock mirror of pricing, keyless. */
+export async function fetchReorder(): Promise<ReorderReport> {
+  const res = await fetch(`${API_BASE}/ai/reorder`);
+  if (!res.ok) throw new Error(`reorder ${res.status}`);
+  return (await res.json()) as ReorderReport;
+}

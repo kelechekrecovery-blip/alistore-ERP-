@@ -20,13 +20,15 @@ import { som } from '@/lib/format';
 import { CrmView } from '@/components/erp/CrmView';
 import { AiView } from '@/components/erp/AiView';
 import { PricingView } from '@/components/erp/PricingView';
+import { ReorderView } from '@/components/erp/ReorderView';
 
-type Route = 'dash' | 'ai' | 'pricing' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
+type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
 
 const NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
   { id: 'ai', icon: '🧠', label: 'Ассистент' },
   { id: 'pricing', icon: '🏷️', label: 'Цены' },
+  { id: 'reorder', icon: '🛒', label: 'Закупки' },
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
   { id: 'stock', icon: '📦', label: 'Склад' },
@@ -38,6 +40,7 @@ const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор · всё из Event Ledger'],
   ai: ['AI-ассистент', 'Инсайты владельца из Event Ledger'],
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
+  reorder: ['Закупки', 'Что дозаказать по спросу/остатку'],
   finance: ['Финансы', 'Деньги · P&L'],
   kpi: ['Маржа · KPI', 'Валовая маржа, средний чек, топ-товары'],
   stock: ['Склад', 'Остатки по статусам'],
@@ -153,6 +156,7 @@ export default function ErpPage() {
           )}
           {route === 'ai' && <AiView insights={insights} />}
           {route === 'pricing' && <PricingView />}
+          {route === 'reorder' && <ReorderView />}
           {route === 'finance' && <FinanceView d={d} />}
           {route === 'kpi' && <KpiView kpi={kpi} />}
           {route === 'stock' && <StockView d={d} />}
