@@ -12,4 +12,10 @@ export class DocumentsController {
   tradeInContract(@Param('id') id: string) {
     return this.documents.tradeInContract(id);
   }
+
+  /** Warranty certificate (гарантийный талон) PDF for a device by IMEI (base64). */
+  @Get('warranty/:imei/talon')
+  warrantyTalon(@Param('imei') imei: string) {
+    return this.documents.warrantyTalon(imei);
+  }
 }

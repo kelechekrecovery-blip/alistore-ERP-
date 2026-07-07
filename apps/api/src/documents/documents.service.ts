@@ -69,6 +69,66 @@ export class DocumentsService {
     };
   }
 
+  /** Render a warranty certificate (гарантийный талон) for a sold device by IMEI. */
+  async warrantyTalon(
+    imei: string,
+  ): Promise<{ pdfBase64: string; bytes: number }> {
+    const unit = await this.prisma.deviceUnit.findUnique({
+      where: { imei },
+      include: { product: true },
+    });
+    if (!unit) {
+      throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+    }
+    const order = unit.orderId
+      ? await this.prisma.order.findUnique({
+          where: { id: unit.orderId },
+          include: { customer: true },
+        })
+      : null;
+
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    const font = await doc.embedFont(this.fontBytes);
+    const page = doc.addPage([595.28, 841.89]); // A4
+
+    const writer = this.lineWriter(page, font);
+    writer('ГАРАНТИЙНЫЙ ТАЛОН', 16, 28);
+    writer('AliStore · г. Бишкек, Кыргызстан', 11, 26);
+
+    writer('Устройство:', 12, 18);
+    writer(`  ${unit.product.name}`, 11, 16);
+    writer(`  IMEI / SN: ${unit.imei}`, 11, 16);
+    if (unit.grade) {
+      writer(`  Состояние (грейд): ${unit.grade}`, 11, 16);
+    }
+
+    if (order?.customer) {
+      writer('Покупатель:', 12, 18);
+      writer(`  ${order.customer.name} · тел. ${order.customer.phone}`, 11, 16);
+      writer(
+        `  Дата продажи: ${order.createdAt.toISOString().slice(0, 10)}`,
+        11,
+        20,
+      );
+    }
+
+    writer(`Дата выдачи: ${new Date().toISOString().slice(0, 10)}`, 11, 18);
+    writer('Гарантийный срок: 12 месяцев с даты продажи.', 11, 24);
+
+    writer('Условия:', 12, 16);
+    writer('— гарантия не покрывает механические повреждения, попадание', 10, 14);
+    writer('  влаги и следы вскрытия неавторизованным сервисом;', 10, 14);
+    writer('— при обращении предъявите талон и устройство.', 10, 28);
+    writer('Подпись продавца: __________________     Печать: ______', 10, 16);
+
+    const bytes = await doc.save();
+    return {
+      pdfBase64: Buffer.from(bytes).toString('base64'),
+      bytes: bytes.length,
+    };
+  }
+
   /** A top-down line writer bound to a page + font. */
   private lineWriter(page: PDFPage, font: PDFFont) {
     let y = page.getSize().height - 60;

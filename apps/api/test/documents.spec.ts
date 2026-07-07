@@ -46,4 +46,49 @@ describe('DocumentsService.tradeInContract (integration)', () => {
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('tradein_not_found');
   });
+
+  it('renders a warranty talon PDF for a sold device (with buyer)', async () => {
+    const customer = await prisma.customer.create({
+      data: { phone: `+996${RUN}02`, name: 'Нурлан Покупатель' },
+    });
+    const product = await prisma.product.create({
+      data: {
+        sku: `SKU-W-${RUN}`,
+        name: 'iPhone 15',
+        price: 100000,
+        cost: 80000,
+        category: 'phones',
+        attrs: {},
+      },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'pos',
+        total: 100000,
+        status: 'completed',
+      },
+    });
+    const imei = `IMEI-W-${RUN}`;
+    await prisma.deviceUnit.create({
+      data: {
+        imei,
+        productId: product.id,
+        location: 'BISHKEK-1',
+        status: 'sold',
+        orderId: order.id,
+      },
+    });
+
+    const out = await documents.warrantyTalon(imei);
+    const pdf = Buffer.from(out.pdfBase64, 'base64');
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(out.bytes).toBeGreaterThan(1000);
+  });
+
+  it('throws 422 for an unknown IMEI', async () => {
+    const err = await documents.warrantyTalon('nope-imei').catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('unit_not_found');
+  });
 });
