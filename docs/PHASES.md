@@ -96,7 +96,11 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ Продажа в долг>лимита → approval (action=debt): `debts/` модуль park'ит долг >50000
   сом до одобрения, исполнитель `debt` в ACTION_EXECUTORS бронирует его в той же
   транзакции (см. Phase 9).
-- ☐ Осталось: скидка>10% в POS (park продажу до одобрения), доступ к PII → 2FA.
+- ✅ Скидка>10% в POS → approval (action=discount): `POST /pos/sale` со скидкой сверх
+  порога (APPROVAL_THRESHOLDS.discountPct=10) park'ит approval и возвращает **202
+  {approvalId}** без проведения продажи; кассир повторяет с `approvalId` после одобрения
+  старшим (request→approve→retry); анти-подмена: одобренный % должен совпадать (discount_mismatch).
+- ☐ Осталось: доступ к PII → 2FA.
 - ☐ **Role Permission Matrix** (9 ролей) — серверная проверка прав/лимитов; 2FA на опасное
   (auth-связано, координировать с Codex).
 - ☐ PII-маскирование младшим ролям; margin-контроль (инв #6).

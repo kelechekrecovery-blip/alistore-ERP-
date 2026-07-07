@@ -6,6 +6,7 @@ import { ShiftsModule } from '../shifts/shifts.module';
 import { UnitsModule } from '../units/units.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { ApprovalsModule } from '../approvals/approvals.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { PaymentsModule } from '../payments/payments.module';
     UnitsModule,
     OrdersModule,
     PaymentsModule,
+    ApprovalsModule,
   ],
   providers: [PosService],
   controllers: [PosController],

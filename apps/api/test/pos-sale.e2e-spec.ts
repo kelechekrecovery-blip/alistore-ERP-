@@ -16,6 +16,7 @@ import { ConflictError } from '../src/common/errors';
 describe('POS sale (integration)', () => {
   let prisma: PrismaService;
   let pos: PosService;
+  let approvals: ApprovalsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -23,12 +24,14 @@ describe('POS sale (integration)', () => {
     await prisma.$connect();
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
+    approvals = new ApprovalsService(prisma, audit);
     pos = new PosService(
       new CustomersService(prisma, audit),
       new ShiftsService(prisma, audit),
       units,
       new OrdersService(prisma, audit, units),
-      new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit)),
+      new PaymentsService(prisma, audit, units, approvals),
+      approvals,
     );
   });
 
@@ -43,11 +46,19 @@ describe('POS sale (integration)', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.deviceUnit.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.product.deleteMany();
     await prisma.cashShift.deleteMany();
+    await prisma.approval.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
+
+  /** Narrow the sale() union to the completed variant, failing if it parked instead. */
+  function expectCompleted<T extends { pendingApproval: boolean }>(r: T): Extract<T, { pendingApproval: false }> {
+    if (r.pendingApproval) throw new Error('expected a completed sale, got pending approval');
+    return r as Extract<T, { pendingApproval: false }>;
+  }
 
   async function seedProduct(units: number) {
     seq += 1;
@@ -65,13 +76,13 @@ describe('POS sale (integration)', () => {
   it('completes a cash sale: order paid, unit sold, shift + ledger recorded', async () => {
     const product = await seedProduct(2);
 
-    const result = await pos.sale({
+    const result = expectCompleted(await pos.sale({
       staffId: 'staff_pos_1',
       point: 'BISHKEK-1',
       method: 'cash',
       discountPct: 10,
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
-    });
+    }));
 
     expect(result.status).toBe('paid');
     expect(result.total).toBe(90000); // 10% off
@@ -99,14 +110,14 @@ describe('POS sale (integration)', () => {
   it('reuses an already-open shift instead of opening a second', async () => {
     const p1 = await seedProduct(1);
     const p2 = await seedProduct(1);
-    const first = await pos.sale({
+    const first = expectCompleted(await pos.sale({
       staffId: 'staff_pos_2', point: 'BISHKEK-1', method: 'cash',
       lines: [{ productId: p1.id, sku: p1.sku, price: 100000, qty: 1 }],
-    });
-    const second = await pos.sale({
+    }));
+    const second = expectCompleted(await pos.sale({
       staffId: 'staff_pos_2', point: 'BISHKEK-1', method: 'card',
       lines: [{ productId: p2.id, sku: p2.sku, price: 100000, qty: 1 }],
-    });
+    }));
     expect(second.shiftId).toBe(first.shiftId);
     const shifts = await prisma.cashShift.count({ where: { staffId: 'staff_pos_2' } });
     expect(shifts).toBe(1);
@@ -123,5 +134,46 @@ describe('POS sale (integration)', () => {
     expect(err).toBeInstanceOf(ConflictError);
     expect(err.getStatus()).toBe(409);
     expect(err.code).toBe('insufficient_stock');
+  });
+
+  it('parks a discount over the limit for approval, then completes on the approved retry', async () => {
+    const product = await seedProduct(1);
+    const dto = {
+      staffId: 'staff_pos_4', point: 'BISHKEK-1', method: 'cash' as const, discountPct: 25,
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    };
+
+    // over the 10% limit → parked, sale NOT executed
+    const parked = await pos.sale(dto);
+    expect(parked.pendingApproval).toBe(true);
+    const approvalId = (parked as { approvalId: string }).approvalId;
+    expect(await prisma.order.count()).toBe(0);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
+
+    // senior approves, cashier retries with the approvalId → sale completes at 25% off
+    await approvals.decide(approvalId, { status: 'approved', approver: 'senior_1', approverRole: 'senior_seller' });
+    const done = expectCompleted(await pos.sale({ ...dto, approvalId }));
+    expect(done.total).toBe(75000);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
+  });
+
+  it('refuses to complete a discounted sale whose approval % does not match', async () => {
+    const product = await seedProduct(1);
+    const parked = await pos.sale({
+      staffId: 'staff_pos_5', point: 'BISHKEK-1', method: 'cash', discountPct: 20,
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    });
+    const approvalId = (parked as { approvalId: string }).approvalId;
+    await approvals.decide(approvalId, { status: 'approved', approver: 'owner', approverRole: 'owner' });
+
+    // tamper: approved for 20%, try to apply 50%
+    const err = await pos
+      .sale({
+        staffId: 'staff_pos_5', point: 'BISHKEK-1', method: 'cash', discountPct: 50, approvalId,
+        lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+      })
+      .catch((e) => e);
+    expect(err.code).toBe('discount_mismatch');
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
   });
 });
