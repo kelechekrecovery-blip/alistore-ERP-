@@ -26,6 +26,7 @@ p, senior_seller, debt, approve
 p, owner, stock_adjust, approve
 p, owner, delete, approve
 p, admin, pii, approve
+p, owner, staff, manage
 g, owner, admin
 g, admin, senior_seller
 `;

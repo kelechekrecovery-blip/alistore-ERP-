@@ -31,6 +31,18 @@ export class StaffAuthService {
     });
   }
 
+  /** Bootstrap the first owner (only when no staff exist yet — chicken-and-egg). */
+  async bootstrapOwner(username: string, password: string) {
+    const count = await this.prisma.staffUser.count();
+    if (count > 0) {
+      throw new ValidationError(
+        'staff_already_bootstrapped',
+        'Персонал уже создан — войдите владельцем и добавляйте через /staff-auth/staff',
+      );
+    }
+    return this.createStaff(username, password, 'owner');
+  }
+
   /** Staff login → JWT carrying the role (server-authoritative authorization). */
   async login(username: string, password: string): Promise<StaffTokens> {
     const staff = await this.prisma.staffUser.findUnique({ where: { username } });
