@@ -123,7 +123,9 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ **Command Center**: сигналы Risk-панели кликабельны → переход на экран-решение
   (pending_approval→/approvals, warranty→/warranty, rma→/warehouse, ticket/debt→CRM,
   касса/COD→Финансы, резерв→Склад) — `SIGNAL_ACTION` в `/erp`.
-- ☐ Осталось (v2): KPI по сотрудникам, периоды/фильтры, повтор IMEI (trade-in+продажа) как риск.
+- ✅ **KPI продавцов**: выручка+кол-во продаж по staffId (через shift.staffId), карточка
+  «KPI продавцов» в ERP (`reports/kpi.ts` sellers).
+- ☐ Осталось (v2): периоды/фильтры, повтор IMEI (trade-in+продажа) как риск.
 **Проверка:** ✅ 2 теста дашборда + 3 теста buildKpi (маржа/средний чек/топ, деление на 0);
 in-browser /erp: вкладка «Маржа·KPI» на реальных данных (маржа 16250/3.9%, средний чек 104063,
 топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад). HTTP+БД сверка.

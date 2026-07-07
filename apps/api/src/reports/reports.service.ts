@@ -92,7 +92,7 @@ export class ReportsService {
   /** Owner KPIs: gross margin (revenue − COGS), average check, top products. */
   async kpi() {
     const paid: OrderStatus[] = ['paid', 'completed', 'exchanged'];
-    const [rev, soldUnits, paidOrders, items, products] = await Promise.all([
+    const [rev, soldUnits, paidOrders, items, products, sellerPayments] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
         where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
@@ -104,11 +104,18 @@ export class ReportsService {
         select: { sku: true, qty: true, price: true },
       }),
       this.prisma.product.findMany({ select: { sku: true, name: true } }),
+      this.prisma.payment.findMany({
+        where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, shiftId: { not: null } },
+        select: { amount: true, shift: { select: { staffId: true } } },
+      }),
     ]);
     const revenue = rev._sum.amount ?? 0;
     const cogs = soldUnits.reduce((sum, u) => sum + (u.product?.cost ?? 0), 0);
     const names = Object.fromEntries(products.map((p) => [p.sku, p.name]));
-    return buildKpi({ revenue, cogs, paidOrders, items, names });
+    const sellerRows = sellerPayments
+      .filter((p) => p.shift)
+      .map((p) => ({ staffId: p.shift!.staffId, amount: p.amount }));
+    return buildKpi({ revenue, cogs, paidOrders, items, names, sellerRows });
   }
 
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */

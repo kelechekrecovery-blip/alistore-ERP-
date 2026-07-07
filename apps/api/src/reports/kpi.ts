@@ -5,6 +5,12 @@ export interface TopProduct {
   revenue: number;
 }
 
+export interface SellerKpi {
+  staffId: string;
+  revenue: number;
+  sales: number; // number of payments taken
+}
+
 export interface Kpi {
   revenue: number; // received/reconciled positive payments
   cogs: number; // cost of sold units
@@ -13,6 +19,7 @@ export interface Kpi {
   avgCheck: number; // revenue / paid orders
   paidOrders: number;
   topProducts: TopProduct[];
+  sellers: SellerKpi[]; // per-cashier performance (via shift.staffId)
 }
 
 interface KpiInput {
@@ -21,6 +28,7 @@ interface KpiInput {
   paidOrders: number;
   items: { sku: string; qty: number; price: number }[];
   names: Record<string, string>; // sku → product name
+  sellerRows: { staffId: string; amount: number }[]; // positive payments with a shift
 }
 
 /**
@@ -46,5 +54,17 @@ export function buildKpi(input: KpiInput): Kpi {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  return { revenue, cogs, grossMargin, marginPct, avgCheck, paidOrders, topProducts };
+  const bySeller = new Map<string, { revenue: number; sales: number }>();
+  for (const s of input.sellerRows) {
+    const cur = bySeller.get(s.staffId) ?? { revenue: 0, sales: 0 };
+    cur.revenue += s.amount;
+    cur.sales += 1;
+    bySeller.set(s.staffId, cur);
+  }
+  const sellers: SellerKpi[] = [...bySeller.entries()]
+    .map(([staffId, v]) => ({ staffId, revenue: v.revenue, sales: v.sales }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8);
+
+  return { revenue, cogs, grossMargin, marginPct, avgCheck, paidOrders, topProducts, sellers };
 }

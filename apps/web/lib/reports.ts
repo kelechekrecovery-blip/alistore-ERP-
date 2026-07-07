@@ -38,6 +38,7 @@ export interface Kpi {
   avgCheck: number;
   paidOrders: number;
   topProducts: { sku: string; name: string; units: number; revenue: number }[];
+  sellers: { staffId: string; revenue: number; sales: number }[];
 }
 
 export const fetchDashboard = () => get<Dashboard>('/reports/dashboard');

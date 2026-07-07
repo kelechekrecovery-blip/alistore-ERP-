@@ -311,6 +311,21 @@ function KpiView({ kpi }: { kpi: Kpi | null }) {
           </div>
         ))}
       </Card>
+
+      <div className="mt-3.5">
+        <Card>
+          <div className="mb-3.5 font-display text-[15px] font-bold">KPI продавцов</div>
+          {kpi.sellers.length === 0 && <p className="text-sm text-[#8A7F76]">Нет продаж по сменам.</p>}
+          {kpi.sellers.map((s, i) => (
+            <div key={s.staffId} className="flex items-center gap-3 border-b border-[#221E19] py-2.5 text-[13px] last:border-0">
+              <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-[#2A241F] font-mono text-[11px] text-[#8A7F76]">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-[#D8CFC6]">{s.staffId}</span>
+              <span className="text-[#8A7F76]">{s.sales} продаж</span>
+              <span className="font-mono tabular font-semibold text-white">{som(s.revenue)}</span>
+            </div>
+          ))}
+        </Card>
+      </div>
     </>
   );
 }
