@@ -9,11 +9,13 @@ import {
   fetchKpi,
   fetchLedger,
   fetchRevenue,
+  fetchRevenueTrend,
   fetchRisks,
   type Dashboard,
   type Insight,
   type Kpi,
   type LedgerEvent,
+  type RevenueTrend,
   type RiskSignal,
 } from '@/lib/reports';
 import { som } from '@/lib/format';
@@ -78,6 +80,7 @@ export default function ErpPage() {
   const [ledger, setLedger] = useState<LedgerEvent[]>([]);
   const [period, setPeriod] = useState(7);
   const [revenue, setRevenue] = useState<{ day: string; amount: number }[]>([]);
+  const [trend, setTrend] = useState<RevenueTrend | null>(null);
   const [insights, setInsights] = useState<Insight[] | null>(null);
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export default function ErpPage() {
 
   useEffect(() => {
     fetchRevenue(period).then(setRevenue).catch(() => setRevenue([]));
+    fetchRevenueTrend(period).then(setTrend).catch(() => setTrend(null));
   }, [period]);
 
   /** Command Center: jump from a risk signal to the screen that resolves it. */
@@ -153,7 +157,7 @@ export default function ErpPage() {
 
         <div className="p-7">
           {route === 'dash' && (
-            <DashboardView d={d} risks={risks} revenue={revenue} period={period} onPeriod={setPeriod} onSignal={actOnSignal} />
+            <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
           {route === 'ai' && <AiView insights={insights} />}
           {route === 'pricing' && <PricingView />}
@@ -183,12 +187,29 @@ function Kpi({ label, value, color = '#fff' }: { label: string; value: string; c
   );
 }
 
+function TrendBadge({ trend }: { trend: RevenueTrend | null }) {
+  if (!trend) return null;
+  const color = trend.direction === 'up' ? '#C6FF3D' : trend.direction === 'down' ? '#FF8A7A' : '#8A7F76';
+  const arrow = trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '▬';
+  const label = trend.deltaPct === null ? 'нов.' : `${trend.deltaPct > 0 ? '+' : ''}${trend.deltaPct}%`;
+  return (
+    <span
+      className="rounded-chip px-2 py-0.5 font-mono text-[11px] font-semibold"
+      style={{ color, background: `${color}1A` }}
+      title="к предыдущему периоду"
+    >
+      {arrow} {label}
+    </span>
+  );
+}
+
 function DashboardView({
-  d, risks, revenue, period, onPeriod, onSignal,
+  d, risks, revenue, trend, period, onPeriod, onSignal,
 }: {
   d: Dashboard | null;
   risks: RiskSignal[];
   revenue: { day: string; amount: number }[];
+  trend: RevenueTrend | null;
   period: number;
   onPeriod: (days: number) => void;
   onSignal: (kind: string) => void;
@@ -208,6 +229,7 @@ function DashboardView({
         <Card>
           <div className="mb-4 flex items-center gap-3">
             <span className="font-display text-[15px] font-bold">Выручка · {som(total)}</span>
+            <TrendBadge trend={trend} />
             <div className="ml-auto flex gap-1">
               {[7, 30].map((p) => (
                 <button

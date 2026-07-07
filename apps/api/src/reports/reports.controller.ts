@@ -29,6 +29,14 @@ export class ReportsController {
     return this.reports.revenue(days ? Number(days) : 7);
   }
 
+  @ApiOperation({ summary: 'Revenue trend — last N days vs the previous N days (default 7)' })
+  @ApiQuery({ name: 'days', required: false, example: 30 })
+  @ApiOkResponse({ description: '{ current, previous, deltaPct, direction }.' })
+  @Get('revenue-trend')
+  revenueTrend(@Query('days') days?: string) {
+    return this.reports.revenueTrend(days ? Number(days) : 7);
+  }
+
   @ApiOperation({ summary: 'Seller payroll — base + commission on turnover, per seller' })
   @ApiOkResponse({ description: 'Advisory pay per seller from ledger-backed payments.' })
   @Get('payroll')

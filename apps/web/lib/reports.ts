@@ -64,6 +64,16 @@ export const fetchPayroll = () => get<Payroll>('/reports/payroll');
 export const fetchRevenue = (days: number) =>
   get<{ day: string; amount: number }[]>(`/reports/revenue?days=${days}`);
 
+export interface RevenueTrend {
+  current: number;
+  previous: number;
+  deltaPct: number | null;
+  direction: 'up' | 'down' | 'flat';
+}
+/** Period-over-period revenue trend: last N days vs the N days before. */
+export const fetchRevenueTrend = (days: number) =>
+  get<RevenueTrend>(`/reports/revenue-trend?days=${days}`);
+
 export interface Insight {
   tone: 'positive' | 'warning' | 'info';
   title: string;

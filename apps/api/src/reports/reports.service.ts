@@ -4,7 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { buildRiskSignals } from './risk-signals';
 import { buildKpi } from './kpi';
 import { buildPayroll } from './payroll';
-import { buildRevenueBuckets, revenueWindowStartMs } from './revenue-buckets';
+import {
+  buildRevenueBuckets,
+  buildRevenueTrend,
+  previousWindowStartMs,
+  revenueWindowStartMs,
+} from './revenue-buckets';
 
 /** COD older than this without handover is a risk (Risk Center). */
 export const COD_STALE_MS = 24 * 60 * 60 * 1000;
@@ -33,6 +38,29 @@ export class ReportsService {
       select: { amount: true, createdAt: true },
     });
     return buildRevenueBuckets(payments, span, now);
+  }
+
+  /** Period-over-period revenue trend: last N days vs the N days before them. */
+  async revenueTrend(days = 7) {
+    const span = Math.min(90, Math.max(1, Math.round(days)));
+    const now = new Date();
+    const currentStart = new Date(revenueWindowStartMs(span, now));
+    const prevStart = new Date(previousWindowStartMs(span, now));
+    const [cur, prev] = await Promise.all([
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, createdAt: { gte: currentStart } },
+      }),
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          amount: { gt: 0 },
+          status: { in: ['received', 'reconciled'] },
+          createdAt: { gte: prevStart, lt: currentStart },
+        },
+      }),
+    ]);
+    return buildRevenueTrend(cur._sum.amount ?? 0, prev._sum.amount ?? 0);
   }
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
