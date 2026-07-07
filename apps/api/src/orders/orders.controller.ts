@@ -27,6 +27,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 /**
  * NOTE: `actor` is hardcoded to a system principal for the MVP core. Auth (JWT +
@@ -56,7 +58,8 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOkResponse({ description: 'Orders in the given status, newest first.' })
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'queue')
   async queue(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
     await requireActiveStaff(user, this.staffAuth);
     return this.orders.listByStatus((status ?? 'created') as OrderStatus);
@@ -91,7 +94,8 @@ export class OrdersController {
   @ApiConflictResponse({ description: 'IMEI is unavailable or already sold.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or illegal state.' })
   @Post(':id/reserve')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'reserve')
   async reserve(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     return this.orders.reserve(id, await requireActiveStaff(user, this.staffAuth));
   }
@@ -104,7 +108,8 @@ export class OrdersController {
   @ApiConflictResponse({ description: 'Insufficient stock for a line.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or illegal state.' })
   @Post(':id/fulfill')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'fulfill')
   async fulfill(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     return this.orders.fulfill(id, await requireActiveStaff(user, this.staffAuth));
   }
@@ -116,7 +121,8 @@ export class OrdersController {
   @ApiOkResponse({ description: 'Order status updated.' })
   @ApiUnprocessableEntityResponse({ description: 'Illegal transition.' })
   @Post(':id/transition')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'transition')
   async transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: TransitionDto) {
     return this.orders.transition(id, dto.to, await requireActiveStaff(user, this.staffAuth));
   }

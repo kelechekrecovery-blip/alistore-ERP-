@@ -18,6 +18,11 @@ describe('Staff session rollout for operational endpoints', () => {
   let staffAuth: StaffAuthService;
   let accessToken: string;
   let staffId: string;
+  let cashierToken: string;
+  let cashierId: string;
+  let sellerToken: string;
+  let warehouseToken: string;
+  let warehouseId: string;
   const RUN = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
@@ -40,9 +45,27 @@ describe('Staff session rollout for operational endpoints', () => {
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
 
-    const staff = await staffAuth.createStaff(`ops-${RUN}`, 'pass', 'admin');
-    staffId = staff.id;
-    accessToken = (await staffAuth.login(`ops-${RUN}`, 'pass')).accessToken;
+    const createSession = async (role: 'admin' | 'cashier' | 'seller' | 'warehouse') => {
+      const username = `${role}-ops-${RUN}`;
+      const staff = await staffAuth.createStaff(username, 'pass', role);
+      const token = (await staffAuth.login(username, 'pass')).accessToken;
+      return { id: staff.id, token };
+    };
+
+    const admin = await createSession('admin');
+    staffId = admin.id;
+    accessToken = admin.token;
+
+    const cashier = await createSession('cashier');
+    cashierId = cashier.id;
+    cashierToken = cashier.token;
+
+    const seller = await createSession('seller');
+    sellerToken = seller.token;
+
+    const warehouse = await createSession('warehouse');
+    warehouseId = warehouse.id;
+    warehouseToken = warehouse.token;
   });
 
   afterAll(async () => {
@@ -105,6 +128,21 @@ describe('Staff session rollout for operational endpoints', () => {
     expect(current.body.staffId).toBe(staffId);
   });
 
+  it('enforces shift role permissions after staff JWT auth', async () => {
+    await request(app.getHttpServer())
+      .post('/shifts/open')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ staffId: 'spoof', point: 'BISHKEK-1', openCash: 0 })
+      .expect(403);
+
+    const opened = await request(app.getHttpServer())
+      .post('/shifts/open')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send({ staffId: 'spoof', point: 'BISHKEK-1', openCash: 0 })
+      .expect(201);
+    expect(opened.body.staffId).toBe(cashierId);
+  });
+
   it('requires staff JWT for POS sale and books the shift under the JWT staff id', async () => {
     const product = await productWithUnit('OPS-POS');
     const payload = {
@@ -125,6 +163,30 @@ describe('Staff session rollout for operational endpoints', () => {
     expect(shift?.staffId).toBe(staffId);
   });
 
+  it('enforces POS sale role permissions before booking a sale', async () => {
+    const product = await productWithUnit('OPS-POS-RBAC');
+    const payload = {
+      staffId: 'spoof',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    };
+
+    await request(app.getHttpServer())
+      .post('/pos/sale')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send(payload)
+      .expect(403);
+
+    const sale = await request(app.getHttpServer())
+      .post('/pos/sale')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send(payload)
+      .expect(201);
+    const shift = await prisma.cashShift.findUnique({ where: { id: sale.body.shiftId } });
+    expect(shift?.staffId).toBe(cashierId);
+  });
+
   it('requires staff JWT for inventory transfer and writes actor from JWT', async () => {
     await request(app.getHttpServer())
       .post('/inventory/transfer')
@@ -140,6 +202,24 @@ describe('Staff session rollout for operational endpoints', () => {
 
     const event = await prisma.auditEvent.findFirst({ where: { type: 'stock.moved' } });
     expect(event?.actor).toBe(staffId);
+  });
+
+  it('enforces inventory role permissions and keeps actor from JWT', async () => {
+    await productWithUnit('OPS-INV-RBAC');
+    await request(app.getHttpServer())
+      .post('/inventory/transfer')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send({ imei: `OPS-INV-RBAC-IMEI-${RUN}`, to: 'BISHKEK-2', requester: 'spoof' })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/inventory/transfer')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ imei: `OPS-INV-RBAC-IMEI-${RUN}`, to: 'BISHKEK-2', requester: 'spoof' })
+      .expect(201);
+
+    const event = await prisma.auditEvent.findFirst({ where: { type: 'stock.moved' } });
+    expect(event?.actor).toBe(warehouseId);
   });
 
   it('requires staff JWT for order queue and fulfillment operations', async () => {
@@ -172,5 +252,44 @@ describe('Staff session rollout for operational endpoints', () => {
 
     const event = await prisma.auditEvent.findFirst({ where: { type: 'order.reserved' } });
     expect(event?.actor).toBe(staffId);
+  });
+
+  it('enforces order fulfillment role permissions', async () => {
+    const product = await productWithUnit('OPS-ORD-RBAC');
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967009${RUN}`, name: 'Ops RBAC' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        status: 'created',
+        channel: 'web',
+        total: 100000,
+        items: { create: [{ sku: product.sku, qty: 1, price: 100000 }] },
+      },
+    });
+
+    await request(app.getHttpServer())
+      .get('/orders?status=created')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/orders?status=created')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post(`/orders/${order.id}/fulfill`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({})
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/orders/${order.id}/fulfill`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({})
+      .expect(201);
+
+    const event = await prisma.auditEvent.findFirst({ where: { type: 'order.reserved' } });
+    expect(event?.actor).toBe(warehouseId);
   });
 });

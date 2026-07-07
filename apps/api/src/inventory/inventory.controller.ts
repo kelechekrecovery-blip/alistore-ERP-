@@ -15,11 +15,13 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 @ApiTags('inventory')
 @ApiBearerAuth()
 @Controller('inventory')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class InventoryController {
   constructor(
     private readonly inventory: InventoryService,
@@ -33,6 +35,7 @@ export class InventoryController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown product.' })
   @Post('movements')
   @HttpCode(202)
+  @RequirePermission('inventory', 'movement')
   async movement(@CurrentUser() user: AuthPrincipal, @Body() dto: MovementDto) {
     return this.inventory.movement(dto, await requireActiveStaff(user, this.staffAuth));
   }
@@ -42,6 +45,7 @@ export class InventoryController {
   @ApiConflictResponse({ description: 'Unit not in stock (sold/reserved).' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown unit or same location.' })
   @Post('transfer')
+  @RequirePermission('inventory', 'transfer')
   async transfer(@CurrentUser() user: AuthPrincipal, @Body() dto: TransferDto) {
     return this.inventory.transfer(dto, await requireActiveStaff(user, this.staffAuth));
   }
@@ -50,6 +54,7 @@ export class InventoryController {
   @ApiCreatedResponse({ description: 'Count recorded with counted/expected/diff.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown product.' })
   @Post('count')
+  @RequirePermission('inventory', 'count')
   async count(@CurrentUser() user: AuthPrincipal, @Body() dto: CountDto) {
     return this.inventory.count(dto, await requireActiveStaff(user, this.staffAuth));
   }

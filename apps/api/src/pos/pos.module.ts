@@ -8,6 +8,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { AuthzModule } from '../authz/authz.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { StaffAuthModule } from '../staff-auth/staff-auth.module';
     PaymentsModule,
     ApprovalsModule,
     StaffAuthModule,
+    AuthzModule,
   ],
   providers: [PosService],
   controllers: [PosController],

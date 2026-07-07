@@ -1,11 +1,12 @@
 # BACKLOG
 
 ## Next
-- Extend Role Permission Matrix enforcement across remaining operational endpoints.
+- Extend Role Permission Matrix to remaining non-staff-session endpoints: courier, warranty, support, suppliers, debts, trade-in intake, and admin documents.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Enforce Role Permission Matrix on POS/warehouse/staff-session operational endpoints.
 - Finish staff-session rollout for POS/warehouse/staff operational endpoints.
 - Add staff TOTP step-up 2FA for Approval Inbox approve decisions, with setup/enable/disable staff auth endpoints and UI enrollment.
 - Harden staff JWT authorization for Customer PII reads and Approval Inbox decisions; approval role now comes from JWT, not request body.

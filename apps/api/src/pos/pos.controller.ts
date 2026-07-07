@@ -16,6 +16,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 @ApiTags('pos')
 @Controller('pos')
@@ -34,7 +36,8 @@ export class PosController {
   @ApiConflictResponse({ description: 'Insufficient stock for a line.' })
   @ApiUnprocessableEntityResponse({ description: 'Invalid sale payload.' })
   @Post('sale')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('pos', 'sale')
   async sale(
     @CurrentUser() user: AuthPrincipal,
     @Body() dto: PosSaleDto,

@@ -26,11 +26,13 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 @ApiTags('shifts')
 @ApiBearerAuth()
 @Controller('shifts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class ShiftsController {
   constructor(
     private readonly shifts: ShiftsService,
@@ -40,6 +42,7 @@ export class ShiftsController {
   @ApiOperation({ summary: "Staff member's currently open shift (or null)" })
   @ApiOkResponse({ description: 'Open shift or null.' })
   @Get('current')
+  @RequirePermission('shift', 'read')
   async current(@CurrentUser() user: AuthPrincipal, @Query('staffId') _staffId?: string) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
     return this.shifts.currentOpen(staffId);
@@ -50,6 +53,7 @@ export class ShiftsController {
   @ApiOkResponse({ description: 'Shift found.' })
   @ApiNotFoundResponse({ description: 'Shift does not exist.' })
   @Get(':id')
+  @RequirePermission('shift', 'read')
   async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     await requireActiveStaff(user, this.staffAuth);
     const shift = await this.shifts.get(id);
@@ -61,6 +65,7 @@ export class ShiftsController {
   @ApiCreatedResponse({ description: 'Shift opened.' })
   @ApiConflictResponse({ description: 'Staff already has an open shift.' })
   @Post('open')
+  @RequirePermission('shift', 'open')
   async open(@CurrentUser() user: AuthPrincipal, @Body() dto: OpenShiftDto) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
     return this.shifts.open({ ...dto, staffId }, staffId);
@@ -76,6 +81,7 @@ export class ShiftsController {
     description: 'Unknown shift, or a discrepancy with no reason (invariant #3).',
   })
   @Post(':id/close')
+  @RequirePermission('shift', 'close')
   async close(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CloseShiftDto) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
     return this.shifts.close(id, dto, staffId);
