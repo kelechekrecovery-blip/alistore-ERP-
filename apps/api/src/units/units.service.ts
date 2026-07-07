@@ -24,6 +24,25 @@ export class UnitsService {
     });
   }
 
+  /** Look up a unit by IMEI with its product — powers the cashier exchange lookup. */
+  async getByImei(imei: string) {
+    const unit = await this.prisma.deviceUnit.findUnique({
+      where: { imei },
+      include: { product: { select: { name: true, sku: true, price: true } } },
+    });
+    if (!unit) {
+      throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+    }
+    return {
+      imei: unit.imei,
+      status: unit.status,
+      orderId: unit.orderId,
+      product: unit.product.name,
+      sku: unit.product.sku,
+      price: unit.product.price,
+    };
+  }
+
   /** Приёмка партии — register a new physical unit (status in_stock). */
   async receive(input: {
     imei: string;

@@ -82,10 +82,13 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 - ✅ **Returns** (return.requested + машина статусов).
 - ✅ **Обмен** (`ExchangesService`): атомарно возврат старого + продажа нового + доплата
   (≥0) + original→exchanged; дешевле → отказ (через возврат+refund). POST /exchanges.
-- ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI, новая гарантия при обмене,
-  exchange-UI для кассира (сейчас — API).
-**Проверка:** ✅ in-browser+БД рефанд (202→Inbox→одобрить→−платёж+order refunded); HTTP+БД
-обмен (APP-2→AW-9-45, доплата 19000, old→returned, order→exchanged, ledger).
+- ✅ **Exchange-UI кассира** (`/exchange` + `GET /units/:imei` lookup): найти проданный IMEI →
+  выбрать новый товар → доплата → способ → оформить. Тёмная консоль; guard'ы (не «продан»/
+  дешевле/терминальный заказ).
+- ☐ Осталось (мелочи): Refund Money Flow / Dispute Center UI, новая гарантия при обмене.
+**Проверка:** ✅ in-browser+БД рефанд (202→Inbox→одобрить→−платёж+order refunded); ✅ обмен-UI
+end-to-end (AW-9-45→MacBook: old→returned, new→sold, доплата 148000; refunded-заказ→корректный
+отказ «refunded→exchanged»). units-lookup: 2 теста.
 
 ## Phase 7 — Опасные действия полностью (v1) 🟡
 **Цель:** каждое опасное действие — через approval, с ролями и 2FA.
