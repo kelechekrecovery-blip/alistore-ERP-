@@ -274,8 +274,10 @@ no-token/warehouse denied, seller create/read, cashier pay, actor/requester spoo
 ledger `evidence.attached` x2. ✅ Import idempotency: repeat workbook → created 0 / updated 0 /
 unchanged 1, Product count stays 1.
 
-## Phase 10 — Уведомления + Support/CRM (v1→v2) 🟡
-- 🟡 Transactional outbox + relay (Codex начал); Novu-доставка (Codex).
+## Phase 10 — Уведомления + Support/CRM (v1→v2) ✅
+- ✅ Transactional outbox + relay: producers write outbox rows in the same transaction as
+  ledger changes; relay retries and parks failed messages; transport can be `log`, `novu`,
+  `email`, or `realtime`.
 - ✅ **Support Inbox** (`support/` модуль): тикеты из любого канала (web/app/whatsapp/
   telegram/call/store), SLA по приоритету (normal 72ч / high 24ч / urgent 4ч), машина
   статусов new→in_progress→waiting→resolved→closed (`ticket-state.ts`), эскалация на шаг
@@ -294,14 +296,20 @@ unchanged 1, Product count stays 1.
   тикетов с фильтрами по статусу + переходы + эскалация) и Customer 360 карточка (потрачено/
   заказы/долг/гарантии/обращения + consent-переключатель). Вкладка использует общий staff
   session; API-клиенты в `lib/crm.ts`.
-- ☐ Segment Builder + Campaign ROI (аудитория consent-filtered — лана Codex).
+- ✅ Segment Builder + Campaign ROI: `/campaigns/preview` строит аудиторию по level/city/tags/
+  spend/ltv и всегда фильтрует `Customer.consent`; `POST /campaigns` ставит outbox-сообщения
+  только consenting-клиентам; `campaign.converted` идемпотентно связывает заказ с кампанией,
+  а ROI считается из `Payment.status=received`. ERP-вкладка «Кампании» даёт preview, запуск
+  и ручную привязку orderId для ROI.
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;
 SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/list-by-customer,
 403 для no-token/seller CRM inbox, admin list/transition/escalate, actor spoof ignored.
 ✅ Customer 360: 3 теста + HTTP-смоук (реальный клиент: 3 заказа, spent 109900,
-1 гарантия; неизвестный → 422). Осталось (Codex-лана): доставка с retry; consent-фильтр
-рассылок.
+1 гарантия; неизвестный → 422). ✅ Campaigns: targeted e2e на RBAC, consent-filter,
+outbox queue и idempotent ROI; browser QA `/erp` → «Кампании» login→preview→launch→conversion
+(`POST /api/campaigns*` 200/201, ROI 700%, no failed requests/console errors) + БД-сверка:
+outbox recipients include consenting customer and exclude opted-out customer.
 
 ## Phase 11 — AI-слой (v2) 🟡
 Бесключевое ядро AI-мерчандайзинга — все фичи за единым **паттерном порта**: правила сейчас
@@ -382,11 +390,11 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
 - Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
-- Phase 9 🟡: WarrantyCase, мультисклад (перемещения+инвентаризация+UI), **Supplier RMA+scorecard**,
-  **долги/рассрочка**, **зарплаты продавцов**. Остаток — долг-напоминания (Codex-уведомления),
-  Evidence Vault (смены с фотоотчётом).
-- Phase 10 🟡: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**.
-  Остаток — Novu-доставка/Segment/Campaign = **лана Codex**.
+- Phase 9 ✅: WarrantyCase, мультисклад (перемещения+инвентаризация+UI), **Supplier RMA+scorecard**,
+  **долги/рассрочка**, **зарплаты продавцов**, debt reminders через outbox, Evidence Vault
+  фотоотчёт смены, Excel import idempotency.
+- Phase 10 ✅: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**,
+  transactional outbox transports, **Campaign Segment Builder + ROI**.
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
   присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
   `tradein.contracted` в Event Ledger; actor для customer self-service = customerId.
@@ -402,9 +410,8 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
 Backend-модулей ~30 · тест-сьютов 75 (242 теста зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
-**Осталось (не в моей лане):**
-- **Лана Codex** (не трогаю): outbox/Novu-доставка,
-  Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF,
-  realtime (socket.io), observability (sentry), i18n, health, infra (Caddy/бэкапы).
+**Осталось:**
+- **Unblocked polish:** восстановление доступа/соцвход, PDF/печать полировка, infra-runbook
+  (Caddy/бэкапы) если это требуется перед деплоем.
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),
   Phase 12 каналы (Telegram/WhatsApp-аккаунты), Phase 13 physical hardware certification.

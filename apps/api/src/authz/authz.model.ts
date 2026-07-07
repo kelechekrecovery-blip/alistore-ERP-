@@ -195,6 +195,15 @@ p, franchise, units, read
 p, warehouse, units, read
 p, admin, units, read
 p, owner, units, read
+p, marketer, campaigns, read
+p, marketer, campaigns, create
+p, marketer, campaigns, convert
+p, admin, campaigns, read
+p, admin, campaigns, create
+p, admin, campaigns, convert
+p, owner, campaigns, read
+p, owner, campaigns, create
+p, owner, campaigns, convert
 g, owner, admin
 g, admin, senior_seller
 `;

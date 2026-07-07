@@ -37,6 +37,7 @@ import { StaffAuthModule } from './staff-auth/staff-auth.module';
 import { TradeInsModule } from './tradeins/tradeins.module';
 import { AiModule } from './ai/ai.module';
 import { EvidenceModule } from './evidence/evidence.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { EvidenceModule } from './evidence/evidence.module';
     TradeInsModule,
     EvidenceModule,
     AiModule,
+    CampaignsModule,
   ],
 })
 export class AppModule {}

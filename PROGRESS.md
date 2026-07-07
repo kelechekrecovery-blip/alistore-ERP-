@@ -182,6 +182,16 @@
 
 ## 2026-07-07
 
+- Task: add consent-filtered Campaign Segment Builder and ROI.
+- Files changed: `apps/api/src/campaigns/*`, `apps/api/src/app.module.ts`, `apps/api/src/authz/authz.model.ts`, `apps/api/test/campaigns.e2e-spec.ts`, `apps/web/components/erp/CampaignsView.tsx`, `apps/web/app/erp/page.tsx`, `apps/web/lib/api/campaigns.ts`, `apps/web/lib/api.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: marketer/admin/owner staff can preview consent-filtered audience segments by level/city/tags/spend/ltv, create campaigns that enqueue outbox messages only for consenting customers, and attribute paid orders once for Campaign ROI from received payments. ERP now has a working “Кампании” cockpit tab for preview, launch, and ROI conversion.
+- Checks run: targeted Jest for `campaigns`; `npm run api:build`; `npm run build -w @alistore/web`; browser QA on `/erp` campaigns flow; DB verification query.
+- Outcome: campaigns e2e passed 1 suite / 1 test; API build passed; web build passed; browser QA passed with `POST /api/campaigns/preview` 200, `POST /api/campaigns` 201, `POST /api/campaigns/:id/conversions` 200, visible ROI 700%, no failed requests/console errors; DB verification showed outbox recipients include the consenting customer and exclude the opted-out customer, with one conversion event for the order.
+- Commit: included in the campaign feature commit for this iteration.
+- Next step: remaining bounded unblocked work is auth recovery/social login, PDF/print polish, or infra runbook; provider/hardware work still waits for accounts/devices.
+
+## 2026-07-07
+
 - Task: add purchased-product reviews.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260707191500_add_product_reviews/migration.sql`, `apps/api/src/products/*`, `apps/api/test/product-reviews.e2e-spec.ts`, `apps/web/app/product/[id]/ProductClient.tsx`, `apps/web/lib/api/catalog.ts`, `BACKLOG.md`, `PROGRESS.md`, `docs/PHASES.md`.
 - Result: product detail now reads live review summary/list from `GET /products/:id/reviews`; authenticated customers can post `POST /products/:id/reviews` only after buying that SKU in a paid/completed order; duplicate reviews for the same product/customer/order are blocked.

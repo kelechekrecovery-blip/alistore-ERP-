@@ -14,5 +14,6 @@ export * from './api/returns';
 export * from './api/evidence';
 export * from './api/payments';
 export * from './api/staff-auth';
+export * from './api/campaigns';
 export * from './pos-offline';
 export * from './pos-hardware';

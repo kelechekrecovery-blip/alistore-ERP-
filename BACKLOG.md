@@ -5,6 +5,7 @@
 - Add campaign delivery integrations after provider accounts are available.
 
 ## Done
+- Add consent-filtered Campaign Segment Builder and ROI.
 - Make Excel product import idempotent.
 - Add shift close photo report.
 - Add debt reminder notifications.

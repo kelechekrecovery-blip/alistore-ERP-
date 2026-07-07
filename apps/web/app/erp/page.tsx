@@ -25,8 +25,9 @@ import { PricingView } from '@/components/erp/PricingView';
 import { ReorderView } from '@/components/erp/ReorderView';
 import { KpiView } from '@/components/erp/KpiView';
 import { DashboardView } from '@/components/erp/DashboardView';
+import { CampaignsView } from '@/components/erp/CampaignsView';
 
-type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'risks' | 'ledger';
+type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'ledger';
 
 const NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
@@ -37,6 +38,7 @@ const NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
   { id: 'stock', icon: '📦', label: 'Склад' },
   { id: 'crm', icon: '💬', label: 'CRM · Инбокс' },
+  { id: 'campaigns', icon: '◌', label: 'Кампании' },
   { id: 'risks', icon: '⚠', label: 'Риски' },
   { id: 'ledger', icon: '📜', label: 'Event Ledger' },
 ];
@@ -49,6 +51,7 @@ const TITLES: Record<Route, [string, string]> = {
   kpi: ['Маржа · KPI', 'Валовая маржа, средний чек, топ-товары'],
   stock: ['Склад', 'Остатки по статусам'],
   crm: ['CRM · Поддержка', 'Инбокс обращений + Customer 360'],
+  campaigns: ['Кампании', 'Сегменты, consent-фильтр и ROI'],
   risks: ['Риски', 'Центр тревог'],
   ledger: ['Event Ledger', 'Единая книга событий'],
 };
@@ -169,6 +172,7 @@ export default function ErpPage() {
           {route === 'kpi' && <KpiView kpi={kpi} />}
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}
+          {route === 'campaigns' && <CampaignsView />}
           {route === 'risks' && <RisksView risks={risks} onSignal={actOnSignal} />}
           {route === 'ledger' && <LedgerView ledger={ledger} />}
         </div>

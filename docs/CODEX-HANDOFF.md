@@ -8,19 +8,14 @@
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-1. **Transactional outbox + доставка уведомлений (Novu)** — `outbox/`, relay с retry.
-   - Приёмка: событие ledger → запись в outbox → доставка через Novu с экспон. backoff;
-     повтор идемпотентен; сбой канала не роняет основную транзакцию.
-2. **Consent-фильтр рассылок** — аудитория уведомлений отфильтрована по `Customer.consent`.
-   - Приёмка: отозвавший согласие клиент не попадает ни в одну рассылку (тест).
-3. **Segment Builder + Campaign ROI** — сегменты аудитории (consent-filtered) + метрика ROI.
-   - Приёмка: сегмент по правилам (уровень/траты/город) → кампания → ROI из ledger-платежей.
-4. **Восстановление доступа / соцвход** — auth-лана.
+1. **Восстановление доступа / соцвход** — auth-лана.
    - Приёмка: сброс по OTP/e-mail; вход через соц-провайдера создаёт/связывает Customer.
-5. **PDF/печать полировка** — receipts/labels/documents.
+2. **PDF/печать полировка** — receipts/labels/documents.
    - Приёмка: чек/накладная/договор скупки печатаются с корректными полями и локалью.
-6. **Realtime / observability / i18n / health / infra** — socket.io, sentry, i18n, health-checks,
-   Caddy + бэкапы. Приёмка: по каждому — smoke + документированный запуск.
+
+Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
+debt reminders через outbox, consent-filtered Campaign Segment Builder + Campaign ROI,
+Excel import idempotency, realtime/socket.io, Sentry/GlitchTip hook, i18n, health-checks.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 
@@ -28,11 +23,9 @@
     (+ приём в `POST /tradeins/intake`). Затем Claude/или Codex добавит детектор в
     `reports/risk-signals.ts` (сопоставление `TradeInDevice.imei` ↔ проданный `DeviceUnit.imei`).
     - Приёмка: один IMEI и в скупке, и в продаже → high-риск в Risk Center.
-11. **Dispute Center UI + модель споров.** Нужна сущность `Dispute` (или переиспользовать
-    Return/Refund) + экран. Приёмка: открыть спор → машина статусов → решение пишет ledger.
-12. **Новая гарантия при обмене.** В `ExchangesService`: при продаже нового устройства в обмене
-    создавать `WarrantyCase` (12 мес) на новый IMEI в той же транзакции.
-    - Приёмка: обмен → у нового IMEI появляется активная гарантия; событие в ledger.
+11. **Споры v2 (если нужна отдельная модель).** MVP уже использует refund/return approval flow
+    и `/approvals` Refund Money Flow; отдельный `Dispute` нужен только для расширенной машины
+    статусов. Приёмка: открыть спор → машина статусов → решение пишет ledger.
 
 ## C. Внешние блокеры — ждут ключ/аккаунт/железо (действие пользователя)
 
