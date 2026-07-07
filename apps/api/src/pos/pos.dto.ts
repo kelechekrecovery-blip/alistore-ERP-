@@ -46,6 +46,12 @@ export class PosSaleDto {
   @ApiPropertyOptional({ example: 'постоянный клиент, акция' })
   @IsOptional() @IsString() reason?: string;
 
+  @ApiPropertyOptional({
+    description: 'Client-generated sale id for offline POS retry idempotency.',
+    example: 'pos_20260707_0001',
+  })
+  @IsOptional() @IsString() clientSaleId?: string;
+
   @ApiProperty({ type: () => [PosLineDto] })
   @IsArray()
   @ArrayMinSize(1)

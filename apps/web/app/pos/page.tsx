@@ -3,10 +3,25 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  checkPaymentTerminal,
+  clearSyncedOfflinePosQueue,
+  createLocalReceiptNo,
+  createPosClientSaleId,
+  createScannerKeyHandler,
+  enqueueOfflinePosSale,
   fetchCatalog,
+  findProductByScan,
+  isLikelyNetworkError,
+  loadOfflinePosQueue,
+  offlineQueueStats,
   posSale,
+  printPosReceipt,
+  syncOfflinePosQueue,
   type CatalogProduct,
+  type OfflinePosPayload,
+  type OfflinePosQueueItem,
   type PosPendingApproval,
+  type PosReceiptSnapshot,
   type PosSaleResult,
 } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -29,9 +44,29 @@ export default function PosPage() {
   const [toast, setToast] = useState('');
   const [result, setResult] = useState<PosSaleResult | null>(null);
   const [pending, setPending] = useState<PosPendingApproval | null>(null);
+  const [offlineResult, setOfflineResult] = useState<OfflinePosQueueItem | null>(null);
+  const [receiptSnapshot, setReceiptSnapshot] = useState<PosReceiptSnapshot | null>(null);
+  const [activeClientSaleId, setActiveClientSaleId] = useState('');
+  const [queue, setQueue] = useState<OfflinePosQueueItem[]>([]);
+  const [online, setOnline] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [scanCode, setScanCode] = useState('');
+  const [terminalMessage, setTerminalMessage] = useState('Терминал готов к проверке');
 
   useEffect(() => {
     fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items));
+  }, []);
+
+  useEffect(() => {
+    setQueue(loadOfflinePosQueue());
+    const refreshOnline = () => setOnline(window.navigator.onLine);
+    refreshOnline();
+    window.addEventListener('online', refreshOnline);
+    window.addEventListener('offline', refreshOnline);
+    return () => {
+      window.removeEventListener('online', refreshOnline);
+      window.removeEventListener('offline', refreshOnline);
+    };
   }, []);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
@@ -46,6 +81,7 @@ export default function PosPage() {
   const discPct = DISCOUNTS[discIdx];
   const total = Math.round(subtotal * (1 - discPct / 100));
   const count = lines.reduce((s, l) => s + l.qty, 0);
+  const queueSummary = offlineQueueStats(queue);
 
   function flash(m: string) {
     setToast(m);
@@ -74,35 +110,118 @@ export default function PosPage() {
     });
   }
 
+  function scanProduct(raw: string) {
+    const match = findProductByScan(products, raw);
+    setScanCode(match.code);
+    if (match.ok) {
+      add(match.product);
+      flash(`Скан: ${match.product.sku}`);
+      setScanCode('');
+    } else {
+      flash(match.reason);
+    }
+  }
+
+  useEffect(() => {
+    const handler = createScannerKeyHandler(scanProduct);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [products]);
+
+  function buildPayload(clientSaleId: string): OfflinePosPayload {
+    return {
+      staffId: STAFF_ID,
+      point: POINT,
+      method: method ?? 'cash',
+      discountPct: discPct,
+      approvalId: pending?.approvalId,
+      clientSaleId,
+      lines: lines.map((l) => ({
+        productId: l.product.id,
+        sku: l.product.sku,
+        price: l.product.price,
+        qty: l.qty,
+      })),
+    };
+  }
+
+  function buildSnapshot(clientSaleId: string): PosReceiptSnapshot {
+    return {
+      clientSaleId,
+      localReceiptNo: createLocalReceiptNo(clientSaleId),
+      cashier: CASHIER,
+      shop: SHOP,
+      point: POINT,
+      method: method ?? 'cash',
+      subtotal,
+      total,
+      discountPct: discPct,
+      createdAt: new Date().toISOString(),
+      lines: lines.map((l) => ({
+        productId: l.product.id,
+        sku: l.product.sku,
+        name: l.product.name,
+        price: l.product.price,
+        qty: l.qty,
+      })),
+    };
+  }
+
   async function finish() {
     if (!method) return;
+    const clientSaleId = activeClientSaleId || createPosClientSaleId();
+    setActiveClientSaleId(clientSaleId);
+    const payload = buildPayload(clientSaleId);
+    const snapshot = buildSnapshot(clientSaleId);
     setBusy(true);
     try {
-      const res = await posSale({
-        staffId: STAFF_ID,
-        point: POINT,
-        method,
-        discountPct: discPct,
-        approvalId: pending?.approvalId,
-        lines: lines.map((l) => ({
-          productId: l.product.id,
-          sku: l.product.sku,
-          price: l.product.price,
-          qty: l.qty,
-        })),
-      });
+      const terminal = await checkPaymentTerminal(method, online);
+      setTerminalMessage(terminal.message);
+      if (!terminal.ok) throw new Error(terminal.message);
+
+      const res = await posSale(payload);
       if (res.pendingApproval) {
         setPending(res);
         setRoute('pending');
       } else {
         setResult(res);
+        setReceiptSnapshot(snapshot);
+        setOfflineResult(null);
         setPending(null);
         setRoute('done');
       }
     } catch (e) {
-      flash(e instanceof Error ? e.message : 'Ошибка продажи');
+      if (isLikelyNetworkError(e, online)) {
+        const queued = enqueueOfflinePosSale(payload, snapshot);
+        setQueue(loadOfflinePosQueue());
+        setReceiptSnapshot(queued.snapshot);
+        setOfflineResult(queued);
+        setResult(null);
+        setPending(null);
+        setRoute('done');
+        flash('Сохранено в offline очередь');
+      } else {
+        flash(e instanceof Error ? e.message : 'Ошибка продажи');
+      }
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function syncQueue() {
+    setSyncing(true);
+    try {
+      const next = await syncOfflinePosQueue(posSale, setQueue);
+      setQueue(next);
+      const stats = offlineQueueStats(next);
+      if (stats.failed > 0) flash(`Конфликты синка: ${stats.failed}`);
+      else if (stats.approval > 0) flash(`Нужно одобрение: ${stats.approval}`);
+      else flash('Очередь синхронизирована');
+      fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items));
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка синхронизации');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -112,6 +231,9 @@ export default function PosPage() {
     setMethod(null);
     setResult(null);
     setPending(null);
+    setOfflineResult(null);
+    setReceiptSnapshot(null);
+    setActiveClientSaleId('');
     setRoute('sell');
     fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items)); // refresh stock
   }
@@ -138,9 +260,68 @@ export default function PosPage() {
                 Смена · {CASHIER} · {SHOP}
               </div>
             </div>
-            <span className="ml-auto rounded-chip bg-lime/10 px-3 py-1.5 text-xs text-lime">
-              ● онлайн
+            <span className={`ml-auto rounded-chip px-3 py-1.5 text-xs ${online ? 'bg-lime/10 text-lime' : 'bg-warn/15 text-warn'}`}>
+              {online ? '● онлайн' : '○ offline'} · {queueSummary.pending} в очереди
             </span>
+          </div>
+
+          <div className="flex flex-shrink-0 flex-col gap-2 border-b border-[#2E2822] px-5 py-3">
+            <div className="flex gap-2">
+              <input
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') scanProduct(scanCode);
+                }}
+                placeholder="SKU / штрихкод / IMEI"
+                className="min-w-0 flex-1 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime"
+              />
+              <button type="button" onClick={() => scanProduct(scanCode)} className="rounded-[10px] bg-lime px-4 py-2 text-sm font-bold text-lime-ink">
+                Скан
+              </button>
+              <button
+                type="button"
+                disabled={syncing || queueSummary.pending === 0}
+                onClick={syncQueue}
+                className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+              >
+                {syncing ? 'Синк…' : `Синк ${queueSummary.pending}`}
+              </button>
+              <button
+                type="button"
+                disabled={!receiptSnapshot}
+                onClick={() => receiptSnapshot && printPosReceipt(receiptSnapshot, result)}
+                className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+              >
+                Печать
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#8A7F76]">
+              <span>Сканер: keyboard-wedge</span>
+              <span>Принтер: browser/thermal print</span>
+              <span>{terminalMessage}</span>
+              {queueSummary.synced > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setQueue(clearSyncedOfflinePosQueue())}
+                  className="text-lime hover:text-white"
+                >
+                  очистить synced ({queueSummary.synced})
+                </button>
+              )}
+            </div>
+            {queue.length > 0 && (
+              <div className="max-h-[78px] overflow-y-auto rounded-[10px] border border-[#2E2822] bg-[#120F0C]">
+                {queue.slice(0, 4).map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 border-b border-[#221E19] px-3 py-2 text-xs last:border-0">
+                    <span className={`h-2 w-2 rounded-full ${item.status === 'synced' ? 'bg-lime' : item.status === 'failed' ? 'bg-danger' : item.status === 'approval_required' ? 'bg-warn' : 'bg-[#8A7F76]'}`} />
+                    <span className="font-mono text-[#D8CFC6]">{item.localReceiptNo}</span>
+                    <span className="text-[#8A7F76]">{queueStatus(item.status)}</span>
+                    <span className="ml-auto text-[#A79C92]">{som(item.snapshot.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-shrink-0 gap-2 overflow-x-auto px-5 pb-2 pt-4">
@@ -278,6 +459,7 @@ export default function PosPage() {
                 type="button"
                 onClick={() => {
                   setMethod(null);
+                  setActiveClientSaleId(createPosClientSaleId());
                   setRoute('pay');
                 }}
                 className="mt-3 w-full rounded-[12px] bg-lime py-3.5 text-center text-base font-bold text-lime-ink transition hover:brightness-95"
@@ -298,10 +480,12 @@ export default function PosPage() {
             busy={busy}
             pending={pending}
             result={result}
+            offlineResult={offlineResult}
             onSelectMethod={setMethod}
             onFinish={finish}
             onCancel={() => { setPending(null); setRoute('sell'); }}
             onNewSale={newSale}
+            onPrintReceipt={() => receiptSnapshot && printPosReceipt(receiptSnapshot, result)}
           />
         )}
 
@@ -313,4 +497,15 @@ export default function PosPage() {
       </div>
     </div>
   );
+}
+
+function queueStatus(status: OfflinePosQueueItem['status']) {
+  const labels: Record<OfflinePosQueueItem['status'], string> = {
+    queued: 'в очереди',
+    syncing: 'синхронизация',
+    synced: 'проведено',
+    failed: 'конфликт',
+    approval_required: 'одобрение',
+  };
+  return labels[status];
 }

@@ -26,3 +26,12 @@
 - Checks run: `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`.
 - Outcome: API build passed; web build passed; Jest passed 56 suites / 175 tests.
 - Next step: offline POS queue/sync and hardware adapters from `BACKLOG.md`.
+
+## 2026-07-07
+
+- Task: make POS resilient enough for store operations by adding offline queue/sync and browser hardware fallbacks.
+- Files changed: `apps/api/src/pos/*`, `apps/api/src/payments/payments.service.ts`, `apps/api/test/pos-sale.e2e-spec.ts`, `apps/web/app/pos/page.tsx`, `apps/web/lib/pos-offline.ts`, `apps/web/lib/pos-hardware.ts`, `apps/web/components/pos/PosCheckout.tsx`, `BACKLOG.md`, `docs/PHASES.md`.
+- Result: POS sales now carry a client-generated idempotency key, offline sales persist locally with conflict/approval states, `/pos` can sync queued sales safely, scan SKU/barcodes through keyboard-wedge/manual input, check terminal readiness, and print local or synced receipts.
+- Checks run: `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`.
+- Outcome: API build passed; web build passed; Jest passed 57 suites / 180 tests.
+- Next step: staff JWT role rollout for PII/2FA dangerous-action gates, then external campaign/provider integrations.

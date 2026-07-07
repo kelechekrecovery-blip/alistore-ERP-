@@ -72,7 +72,10 @@ timeline ✅** (`/account/orders/[id]/status` + `lib/order-status.ts`, шаги 
 
 ## Phase 4 — POS 2.0 ✅
 - ✅ `/pos` тёмный терминал; `POST /pos/sale` (клиент→смена→IMEI→заказ→резерв→оплата).
-- ☐ Осталось: сплит-оплата, скидка>лимита→approval, скан штрихкода, печать чека (receipts — Codex).
+- ✅ Скидка>лимита→approval; `clientSaleId` идемпотентность для offline retry; scanner
+  keyboard-wedge/manual SKU; печать локального/серверного чека через browser print; очередь
+  синхронизации с конфликтами/approval-required статусами.
+- ☐ Осталось: сплит-оплата и сертификация конкретного физического железа в точке.
 **Проверка:** ✅ in-browser продажа со скидкой→оплата; в БД order paid, unit sold, платёж в смене.
 
 ## Phase 5 — Склад / Fulfillment ✅
@@ -210,8 +213,12 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
 - 🟡 Self-hosted infra scaffolding (Codex).
-- ☐ **Offline POS** (очередь+синк+разрешение конфликтов), hardware (сканер/принтер/терминал),
-  graceful degradation сети/оборудования, сжатие фото (WebP/AVIF), дельта-синк.
+- ✅ **Offline POS software layer**: local queue, sync/retry, duplicate-safe `clientSaleId`,
+  manual conflict state, approval-required state, network degradation fallback.
+- ✅ Hardware browser fallback: scanner as keyboard-wedge/SKU input, receipt print dialog,
+  terminal readiness check before sale/queue.
+- ☐ Осталось: physical hardware certification (silent ESC/POS/QZ, bank terminal SDKs,
+  real scanner QA), дельта-синк.
 **Проверка:** продажа без сети → синк без потерь/дублей; ручной фолбэк при отсутствии железа.
 
 ---
@@ -256,12 +263,12 @@ SLA-breach ловится в Risk Center). ✅ Customer 360: 3 теста + HTTP
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 56 (175 тестов зелёные, `jest`; при
+Backend-модулей ~30 · тест-сьютов 57 (180 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось (не в моей лане):**
 - **Лана Codex** (не трогаю): authz/casbin/JWT-роли/PII/2FA, outbox/Novu-доставка,
-  Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF, media/Evidence Vault,
+  Segment/Campaign-рассылки, import (Excel), receipts/labels/documents-PDF,
   realtime (socket.io), observability (sentry), i18n, health, infra (Caddy/бэкапы).
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),
-  Phase 12 каналы (Telegram/WhatsApp-аккаунты), Phase 13 hardware (сканер/принтер/терминал) + Offline POS.
+  Phase 12 каналы (Telegram/WhatsApp-аккаунты), Phase 13 physical hardware certification.

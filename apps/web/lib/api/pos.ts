@@ -15,6 +15,7 @@ export interface PosSaleResult {
   status: string;
   shiftId: string;
   imeis: string[];
+  idempotent?: boolean;
 }
 
 /** Returned when the sale's discount exceeds the limit and must be approved first. */
@@ -32,6 +33,7 @@ export function posSale(input: {
   method: string;
   discountPct?: number;
   approvalId?: string;
+  clientSaleId?: string;
   lines: PosLine[];
 }): Promise<PosSaleOutcome> {
   return postJson('/pos/sale', input);

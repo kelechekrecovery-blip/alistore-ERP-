@@ -51,6 +51,10 @@ export class PaymentsService {
     return this.prisma.payment.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
 
+  findByTxnId(txnId: string) {
+    return this.prisma.payment.findUnique({ where: { txnId } });
+  }
+
   /**
    * Take payment for an order and move it to `paid`.
    *

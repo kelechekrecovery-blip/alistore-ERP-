@@ -2,6 +2,7 @@
 
 import { som } from '@/lib/format';
 import type { PosPendingApproval, PosSaleResult } from '@/lib/api';
+import type { OfflinePosQueueItem } from '@/lib/pos-offline';
 
 const METHODS: { id: string; icon: string; name: string }[] = [
   { id: 'cash', icon: '💵', name: 'Наличные' },
@@ -21,15 +22,17 @@ interface PosCheckoutProps {
   busy: boolean;
   pending: PosPendingApproval | null;
   result: PosSaleResult | null;
+  offlineResult?: OfflinePosQueueItem | null;
   onSelectMethod: (id: string) => void;
   onFinish: () => void;
   onCancel: () => void;
   onNewSale: () => void;
+  onPrintReceipt?: () => void;
 }
 
 /** POS checkout overlay: payment method → pending-approval (discount over limit) → done. */
 export function PosCheckout(props: PosCheckoutProps) {
-  const { route, total, discountLimit, method, busy, pending, result } = props;
+  const { route, total, discountLimit, method, busy, pending, result, offlineResult } = props;
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(10,8,6,0.82)] p-4">
       <div className="w-full max-w-[640px] rounded-[22px] border border-[#2E2822] bg-[#1A1611] p-7">
@@ -99,17 +102,39 @@ export function PosCheckout(props: PosCheckoutProps) {
           </>
         )}
 
-        {route === 'done' && result && (
+        {route === 'done' && (result || offlineResult) && (
           <div className="py-5 text-center">
-            <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-lime/15 text-4xl text-lime">✓</div>
-            <div className="mt-4 font-display text-2xl font-extrabold text-white">Продажа завершена</div>
-            <div className="mt-2 text-sm text-[#A79C92]">Чек {result.receiptNo} · {som(result.total)} · записано в Event Ledger</div>
-            {result.imeis.length > 0 && (
-              <div className="mt-2 font-mono text-xs text-[#6E645C]">IMEI: {result.imeis.join(', ')}</div>
+            <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-lime/15 text-4xl text-lime">
+              {result ? '✓' : '↻'}
+            </div>
+            <div className="mt-4 font-display text-2xl font-extrabold text-white">
+              {result ? 'Продажа завершена' : 'Продажа сохранена offline'}
+            </div>
+            {result ? (
+              <div className="mt-2 text-sm text-[#A79C92]">Чек {result.receiptNo} · {som(result.total)} · записано в Event Ledger</div>
+            ) : (
+              <div className="mt-2 text-sm text-[#A79C92]">
+                Локальный чек {offlineResult?.localReceiptNo} · {som(offlineResult?.snapshot.total ?? total)} · уйдёт в синхронизацию
+              </div>
             )}
-            <button type="button" onClick={props.onNewSale} className="mt-6 rounded-[11px] bg-lime px-6 py-3 font-bold text-lime-ink">
-              Новая продажа
-            </button>
+            {result?.imeis.length ? (
+              <div className="mt-2 font-mono text-xs text-[#6E645C]">IMEI: {result.imeis.join(', ')}</div>
+            ) : null}
+            <div className="mt-6 flex justify-center gap-2.5">
+              <button type="button" onClick={props.onNewSale} className="rounded-[11px] bg-lime px-6 py-3 font-bold text-lime-ink">
+                Новая продажа
+              </button>
+              {props.onPrintReceipt && (
+                <button type="button" onClick={props.onPrintReceipt} className="rounded-[11px] border border-[#2E2822] bg-[#221E19] px-6 py-3 font-bold text-[#D8CFC6]">
+                  Печать
+                </button>
+              )}
+            </div>
+            {!result && (
+              <div className="mx-auto mt-3 max-w-[420px] text-xs leading-relaxed text-[#6E645C]">
+                Это не резерв на сервере. Если при синхронизации товар уже продан, строка останется в очереди как конфликт.
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -41,6 +41,14 @@ export class PosService {
   async sale(dto: PosSaleDto) {
     const actor = dto.staffId;
     const pct = dto.discountPct ?? 0;
+    const txnId = dto.clientSaleId ? `pos:${dto.clientSaleId}` : undefined;
+
+    if (txnId) {
+      const existing = await this.payments.findByTxnId(txnId);
+      if (existing?.orderId) {
+        return this.completedFromExistingPayment(existing.orderId, existing.shiftId);
+      }
+    }
 
     // Discount over the limit (Approval Rules Matrix): park the sale for approval and
     // return the approvalId. The cashier re-submits with that id once a senior role
@@ -100,7 +108,7 @@ export class PosService {
     );
     await this.orders.reserve(order.id, actor);
     const paid = await this.payments.pay(
-      { orderId: order.id, method: dto.method, amount: total, shiftId: shift.id },
+      { orderId: order.id, method: dto.method, amount: total, shiftId: shift.id, txnId },
       actor,
     );
 
@@ -128,5 +136,22 @@ export class PosService {
     if (approvedPct !== pct) {
       throw new ForbiddenError('discount_mismatch', `Одобрено ${approvedPct}%, применяется ${pct}%`);
     }
+  }
+
+  private async completedFromExistingPayment(orderId: string, shiftId: string | null) {
+    const order = await this.orders.get(orderId);
+    if (!order) {
+      throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+    }
+    return {
+      pendingApproval: false as const,
+      orderId: order.id,
+      receiptNo: `POS-${order.id.slice(-6).toUpperCase()}`,
+      total: order.total,
+      status: order.status,
+      shiftId: shiftId ?? '',
+      imeis: order.items.filter((i) => i.imei).map((i) => i.imei as string),
+      idempotent: true,
+    };
   }
 }
