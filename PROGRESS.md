@@ -218,6 +218,15 @@
 
 ## 2026-07-07
 
+- Task: add shift close photo report.
+- Files changed: `apps/web/app/staff/page.tsx`, `apps/web/components/StaffSessionLogin.tsx`, `apps/api/test/evidence.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `PROGRESS.md`.
+- Result: Staff app can attach Evidence Vault photos when opening and closing a cash shift; uploads are linked to the shift with `shift_open_photo` / `shift_close_photo` labels. Shared staff login now includes browser autocomplete hints.
+- Checks run: targeted Jest for `evidence`; `npm run build -w @alistore/web`; browser QA on `/staff` open/close shift with image uploads; ledger verification query; `git diff --check`.
+- Outcome: evidence tests passed 1 suite / 3 tests; web build passed; browser QA passed with `POST /api/shifts/open` 201, two `POST /api/evidence/images` 201 responses, `POST /api/shifts/:id/close` 201, no failed requests/4xx, and ledger `evidence.attached` labels `shift_open_photo` + `shift_close_photo`. Screenshot: `/tmp/alistore-shift-photo-report.png`.
+- Next step: remaining unblocked software work is import idempotency/PDF polish; hardware certification and campaign delivery still need external devices/provider accounts.
+
+## 2026-07-07
+
 - Task: add debt reminder notifications.
 - Files changed: `apps/api/src/debts/*`, `apps/api/src/audit/event-types.ts`, `apps/api/src/outbox/outbox.relay.ts`, `apps/api/src/reservations/reservations.scheduler.ts`, `apps/api/test/debts.e2e-spec.ts`, `BACKLOG.md`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `PROGRESS.md`.
 - Result: open debts due within three days or already overdue can now enqueue idempotent SMS reminders through the transactional outbox, with matching `debt.reminder_queued` ledger events; a pg-boss scheduler can run the sweep daily when `DEBT_REMINDERS_ENABLED=true`. Queue owners now lazy-load `pg-boss`, so disabled schedulers no longer break Jest module imports.

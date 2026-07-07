@@ -19,11 +19,9 @@
    - Приёмка: повторный импорт того же файла не создаёт дублей (upsert по естественному ключу).
 5. **Восстановление доступа / соцвход** — auth-лана.
    - Приёмка: сброс по OTP/e-mail; вход через соц-провайдера создаёт/связывает Customer.
-6. **Смены с фотоотчётом (Evidence Vault)** — фото открытия/закрытия смены.
-   - Приёмка: открытие/закрытие CashShift принимает фото → `evidence.attached`.
-7. **PDF/печать полировка** — receipts/labels/documents.
+6. **PDF/печать полировка** — receipts/labels/documents.
    - Приёмка: чек/накладная/договор скупки печатаются с корректными полями и локалью.
-8. **Realtime / observability / i18n / health / infra** — socket.io, sentry, i18n, health-checks,
+7. **Realtime / observability / i18n / health / infra** — socket.io, sentry, i18n, health-checks,
    Caddy + бэкапы. Приёмка: по каждому — smoke + документированный запуск.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно

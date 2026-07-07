@@ -38,6 +38,7 @@ describe('Evidence Vault (integration)', () => {
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
+    await prisma.cashShift.deleteMany();
     await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
@@ -84,6 +85,28 @@ describe('Evidence Vault (integration)', () => {
       entityType: 'inventory',
       entityId: mv.id,
       label: 'shelf_photo',
+    });
+  });
+
+  it('stores shift photo evidence for open/close reports', async () => {
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'cashier-photo', point: 'BISHKEK-1', openCash: 0 },
+    });
+
+    const res = await evidence.attachImage(await pngBuffer(), {
+      entityType: 'shift',
+      entityId: shift.id,
+      label: 'shift_close_photo',
+      actor: 'cashier-photo',
+    });
+
+    expect(res.asset.key).toMatch(new RegExp(`^evidence/shift/${shift.id}/.+\\.webp$`));
+    const event = await prisma.auditEvent.findFirst({ where: { type: 'evidence.attached' } });
+    expect(event?.actor).toBe('cashier-photo');
+    expect(event?.payload).toMatchObject({
+      entityType: 'shift',
+      entityId: shift.id,
+      label: 'shift_close_photo',
     });
   });
 

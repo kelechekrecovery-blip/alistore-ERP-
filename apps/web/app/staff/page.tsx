@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { FormEvent, HTMLAttributes } from 'react';
+import type { ChangeEvent, FormEvent, HTMLAttributes } from 'react';
 import { closeShift, currentShift, fetchShift, openShift, type Shift } from '@/lib/staff';
 import {
   createCustomer,
@@ -10,6 +10,7 @@ import {
   fetchOrdersByStatus,
   fulfillOrder,
   transitionOrder,
+  uploadEvidenceImages,
   type QueueOrder,
   type TradeIn,
   type TradeInGrade,
@@ -53,6 +54,8 @@ export default function StaffPage() {
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [session, setSession] = useState<StaffSession | null>(null);
+  const [openShiftFiles, setOpenShiftFiles] = useState<File[]>([]);
+  const [closeShiftFiles, setCloseShiftFiles] = useState<File[]>([]);
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -77,18 +80,49 @@ export default function StaffPage() {
   useEffect(() => { if (tab === 'orders' && session) loadOrders(); }, [tab, loadOrders, session]);
 
   function flash(m: string) { setToast(m); window.setTimeout(() => setToast(''), 1600); }
+  function fileList(event: ChangeEvent<HTMLInputElement>) {
+    return Array.from(event.target.files ?? []);
+  }
 
   async function doOpenShift() {
     if (!session) return;
     setBusy('shift');
-    try { await openShift({ staffId: session.staffId, point: POINT, openCash: 0 }, session.accessToken); await loadShift(); flash('Смена открыта'); }
+    try {
+      const opened = await openShift({ staffId: session.staffId, point: POINT, openCash: 0 }, session.accessToken);
+      const evidence = openShiftFiles.length
+        ? await uploadEvidenceImages({
+          files: openShiftFiles,
+          entityType: 'shift',
+          entityId: opened.id,
+          label: 'shift_open_photo',
+          actor: session.staffId,
+        })
+        : [];
+      setOpenShiftFiles([]);
+      await loadShift();
+      flash(`Смена открыта · фото ${evidence.length}`);
+    }
     catch { flash('Ошибка'); } finally { setBusy(null); }
   }
   async function doCloseShift() {
     if (!shift || !session) return;
     const expected = shift.openCash + (shift.payments ?? []).filter((p) => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
     setBusy('shift');
-    try { await closeShift(shift.id, expected, session.accessToken); await loadShift(); flash('Смена закрыта'); }
+    try {
+      await closeShift(shift.id, expected, session.accessToken);
+      const evidence = closeShiftFiles.length
+        ? await uploadEvidenceImages({
+          files: closeShiftFiles,
+          entityType: 'shift',
+          entityId: shift.id,
+          label: 'shift_close_photo',
+          actor: session.staffId,
+        })
+        : [];
+      setCloseShiftFiles([]);
+      await loadShift();
+      flash(`Смена закрыта · фото ${evidence.length}`);
+    }
     catch { flash('Ошибка закрытия'); } finally { setBusy(null); }
   }
   async function orderAction(o: QueueOrder) {
@@ -189,11 +223,33 @@ export default function StaffPage() {
                     <Stat value={som(revenue)} label="выручка" />
                     <Stat value={som(shift.openCash)} label="в кассе" accent="#C6FF3D" />
                   </div>
+                  <label className="mt-3 block rounded-[12px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5">
+                    <span className="block text-[11px] font-semibold uppercase text-[#8A7F76]">Фото закрытия</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => setCloseShiftFiles(fileList(event))}
+                      className="mt-1 w-full text-xs text-[#D8CFC6] file:mr-3 file:rounded-[8px] file:border-0 file:bg-lime file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-lime-ink"
+                    />
+                    {closeShiftFiles.length > 0 && <span className="mt-1 block font-mono text-[11px] text-lime">{closeShiftFiles.length} фото</span>}
+                  </label>
                 </div>
               ) : (
                 <div className="mb-4 rounded-[18px] bg-gradient-to-br from-coral to-deep p-5">
                   <div className="font-display text-[17px] font-bold">Смена не открыта</div>
                   <div className="mt-1 text-[13px] leading-snug text-[#FFE0D5]">Откройте смену, чтобы принимать оплату и заказы.</div>
+                  <label className="mt-3 block rounded-[12px] border border-white/20 bg-white/10 px-3 py-2.5">
+                    <span className="block text-[11px] font-semibold uppercase text-[#FFE0D5]">Фото открытия</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => setOpenShiftFiles(fileList(event))}
+                      className="mt-1 w-full text-xs text-white file:mr-3 file:rounded-[8px] file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-deep"
+                    />
+                    {openShiftFiles.length > 0 && <span className="mt-1 block font-mono text-[11px] text-white">{openShiftFiles.length} фото</span>}
+                  </label>
                   <button type="button" disabled={busy === 'shift'} onClick={doOpenShift} className="mt-3.5 w-full rounded-[11px] bg-white py-3 text-center text-sm font-bold text-deep disabled:opacity-60">
                     {busy === 'shift' ? '…' : 'Открыть смену'}
                   </button>

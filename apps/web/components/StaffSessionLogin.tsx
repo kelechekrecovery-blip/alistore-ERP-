@@ -53,6 +53,7 @@ export function StaffSessionLogin({
         value={form.username}
         onChange={(e) => setForm((v) => ({ ...v, username: e.target.value }))}
         placeholder="username"
+        autoComplete="username"
         className={
           dark
             ? 'mt-5 w-full rounded-[11px] border border-[#2E2822] bg-[#16130F] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime'
@@ -64,6 +65,7 @@ export function StaffSessionLogin({
         onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))}
         placeholder="password"
         type="password"
+        autoComplete="current-password"
         className={
           dark
             ? 'mt-3 w-full rounded-[11px] border border-[#2E2822] bg-[#16130F] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime'
