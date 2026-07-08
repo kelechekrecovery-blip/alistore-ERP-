@@ -7,7 +7,8 @@
 - Result: orders now persist `fulfillmentType`, pickup point/address/slot, and pickup code. Web checkout, native checkout, and Telegram Mini App create pickup orders; account order detail/status, staff app, and warehouse queue show pickup metadata for click&collect execution.
 - Checks run: `npm exec -w @alistore/api -- prisma validate`; `npm run prisma:generate -w @alistore/api`; `npm run db:deploy -w @alistore/api`; test DB `prisma db push --skip-generate`; `npm run test -w @alistore/api -- orders-fulfillment fulfillment orders-account public-rate-limit --runInBand`; `npm run api:build`; `npm --prefix apps/mobile run typecheck`; `npm run build -w @alistore/web`; `npx playwright test e2e/web-checkout.spec.ts`; `npm run mvp:verify`; `npm audit`; `git diff --check`.
 - Outcome: Prisma schema/client/database sync passed; targeted API tests passed 4 suites / 10 tests; API build passed; mobile typecheck passed; web build passed; targeted Playwright checkout passed 1/1. Full MVP verification passed: API Jest 95 suites / 336 tests, Playwright 9/9, readiness report generated. `npm audit` reports 0 vulnerabilities and whitespace check passed.
-- Next step: run the full MVP/security gate, then continue with the next unblocked Phase 12 item: B2B/wholesale quote request scaffold.
+- Commit: `0492d30`.
+- Next step: continue with the next unblocked Phase 12 item: B2B/wholesale quote request scaffold.
 
 ## 2026-07-08
 
