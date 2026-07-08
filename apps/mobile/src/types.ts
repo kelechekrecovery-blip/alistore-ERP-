@@ -122,6 +122,16 @@ export interface CustomerSession extends CustomerAuthTokens {
   phone: string;
 }
 
+export interface CustomerProfile {
+  id: string;
+  phone: string;
+  name: string;
+  consent: boolean;
+  segments?: string[];
+  ltv?: number;
+  createdAt?: string;
+}
+
 export interface OtpRequestResult {
   challengeId: string;
   devCode?: string;

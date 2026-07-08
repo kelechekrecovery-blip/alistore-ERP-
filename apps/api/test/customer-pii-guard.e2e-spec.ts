@@ -92,4 +92,24 @@ describe('Customer PII read policy (optional JWT + masking)', () => {
       .set('Authorization', 'Bearer invalid')
       .expect(401);
   });
+
+  it('allows customer consent changes only for the authenticated owner', async () => {
+    const owner = await customer();
+    const other = await customer();
+
+    await request(app.getHttpServer())
+      .patch(`/customers/${owner.id}/consent`)
+      .set('Authorization', `Bearer ${customerToken(owner.id, owner.phone)}`)
+      .send({ consent: true, actor: 'spoof' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/customers/${owner.id}/consent`)
+      .set('Authorization', `Bearer ${customerToken(other.id, other.phone)}`)
+      .send({ consent: false })
+      .expect(403);
+
+    const saved = await prisma.customer.findUniqueOrThrow({ where: { id: owner.id } });
+    expect(saved.consent).toBe(true);
+  });
 });

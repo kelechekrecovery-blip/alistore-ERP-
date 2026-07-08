@@ -96,6 +96,9 @@ export function ClientScreen({
   const [supportBody, setSupportBody] = useState('');
   const [supportPriority, setSupportPriority] = useState<SupportPriority>('normal');
   const [supportBusy, setSupportBusy] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null);
+  const [consentBusy, setConsentBusy] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
   const [warrantyDraftImei, setWarrantyDraftImei] = useState<string | null>(null);
   const [warrantyProblem, setWarrantyProblem] = useState('');
   const [warrantyBusy, setWarrantyBusy] = useState(false);
@@ -162,6 +165,8 @@ export function ClientScreen({
       setDevicesError(null);
       setTickets([]);
       setTicketsError(null);
+      setMarketingConsent(null);
+      setConsentError(null);
       setWarrantyDraftImei(null);
       setWarrantyProblem('');
       setWarrantyError(null);
@@ -270,6 +275,8 @@ export function ClientScreen({
       setSupportSubject('');
       setSupportBody('');
       setSupportPriority('normal');
+      setMarketingConsent(null);
+      setConsentError(null);
       setWarrantyDraftImei(null);
       setWarrantyProblem('');
       setWarrantyError(null);
@@ -286,6 +293,7 @@ export function ClientScreen({
       setOrders([]);
       setDevices([]);
       setTickets([]);
+      setMarketingConsent(null);
       return null;
     }
     if (readySession.accessToken !== session.accessToken || readySession.refreshToken !== session.refreshToken) {
@@ -296,21 +304,25 @@ export function ClientScreen({
   }
 
   async function loadAccountData(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy || consentBusy) return;
     setOrdersBusy(true);
     setDevicesBusy(true);
     setTicketsBusy(true);
     setOrdersError(null);
     setDevicesError(null);
     setTicketsError(null);
+    setConsentError(null);
     try {
       const readySession = await prepareCustomerSession(session);
       if (!readySession) return;
-      const [ordersResult, devicesResult, ticketsResult] = await Promise.allSettled([
+      const [profileResult, ordersResult, devicesResult, ticketsResult] = await Promise.allSettled([
+        api.getCustomer(readySession.customerId, readySession.accessToken),
         api.fetchMyOrders(readySession.accessToken),
         api.fetchMyDevices(readySession.accessToken),
         api.fetchSupportTickets({ customerId: readySession.customerId }, readySession.accessToken),
       ]);
+      if (profileResult.status === 'fulfilled') setMarketingConsent(profileResult.value.consent);
+      else setConsentError(profileResult.reason instanceof Error ? profileResult.reason.message : 'Согласие не загружено.');
       if (ordersResult.status === 'fulfilled') setOrders(ordersResult.value);
       else setOrdersError(ordersResult.reason instanceof Error ? ordersResult.reason.message : 'Заказы не загружены.');
       if (devicesResult.status === 'fulfilled') setDevices(devicesResult.value);
@@ -325,7 +337,7 @@ export function ClientScreen({
   }
 
   async function loadCustomerOrders(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy || consentBusy) return;
     setOrdersBusy(true);
     setOrdersError(null);
     try {
@@ -341,7 +353,7 @@ export function ClientScreen({
   }
 
   async function loadCustomerDevices(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy || consentBusy) return;
     setDevicesBusy(true);
     setDevicesError(null);
     try {
@@ -357,7 +369,7 @@ export function ClientScreen({
   }
 
   async function loadSupportTickets(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy || consentBusy) return;
     setTicketsBusy(true);
     setTicketsError(null);
     try {
@@ -430,6 +442,28 @@ export function ClientScreen({
       setWarrantyError(cause instanceof Error ? cause.message : 'Гарантия не создана.');
     } finally {
       setWarrantyBusy(false);
+    }
+  }
+
+  async function toggleMarketingConsent() {
+    if (!customerSession || consentBusy || marketingConsent === null) return;
+    const next = !marketingConsent;
+    setConsentBusy(true);
+    setConsentError(null);
+    setMarketingConsent(next);
+    try {
+      const readySession = await prepareCustomerSession(customerSession);
+      if (!readySession) return;
+      const updated = await api.setCustomerConsent({
+        customerId: readySession.customerId,
+        consent: next,
+      }, readySession.accessToken);
+      setMarketingConsent(updated.consent);
+    } catch (cause) {
+      setMarketingConsent(!next);
+      setConsentError(cause instanceof Error ? cause.message : 'Согласие не сохранено.');
+    } finally {
+      setConsentBusy(false);
     }
   }
 
@@ -601,6 +635,9 @@ export function ClientScreen({
             tickets={tickets}
             ticketsBusy={ticketsBusy}
             ticketsError={ticketsError}
+            marketingConsent={marketingConsent}
+            consentBusy={consentBusy}
+            consentError={consentError}
             supportSubject={supportSubject}
             supportBody={supportBody}
             supportPriority={supportPriority}
@@ -629,6 +666,7 @@ export function ClientScreen({
             onSupportBody={setSupportBody}
             onSupportPriority={setSupportPriority}
             onOpenSupportTicket={openSupportTicket}
+            onToggleMarketingConsent={toggleMarketingConsent}
             onConfirmPayment={confirmSandboxPayment}
             onOpenCatalog={() => setTab('catalog')}
           />
@@ -933,6 +971,9 @@ function AccountTab({
   tickets,
   ticketsBusy,
   ticketsError,
+  marketingConsent,
+  consentBusy,
+  consentError,
   supportSubject,
   supportBody,
   supportPriority,
@@ -957,6 +998,7 @@ function AccountTab({
   onSupportBody,
   onSupportPriority,
   onOpenSupportTicket,
+  onToggleMarketingConsent,
   onConfirmPayment,
   onOpenCatalog,
 }: {
@@ -980,6 +1022,9 @@ function AccountTab({
   tickets: SupportTicket[];
   ticketsBusy: boolean;
   ticketsError: string | null;
+  marketingConsent: boolean | null;
+  consentBusy: boolean;
+  consentError: string | null;
   supportSubject: string;
   supportBody: string;
   supportPriority: SupportPriority;
@@ -1004,6 +1049,7 @@ function AccountTab({
   onSupportBody: (next: string) => void;
   onSupportPriority: (next: SupportPriority) => void;
   onOpenSupportTicket: () => void;
+  onToggleMarketingConsent: () => void;
   onConfirmPayment: () => void;
   onOpenCatalog: () => void;
 }) {
@@ -1088,6 +1134,31 @@ function AccountTab({
       ) : (
         <EmptyState icon="receipt-outline" title="Активных заказов нет" text="После checkout заказ появится здесь со статусом и оплатой." />
       )}
+
+      {session ? (
+        <View style={styles.historyPanel}>
+          <SectionTitle title="Уведомления" />
+          <View style={styles.preferenceRow}>
+            <View style={styles.preferenceCopy}>
+              <Text selectable style={styles.preferenceTitle}>Маркетинговое согласие</Text>
+              <Text selectable style={styles.mutedText}>Промо, подборки и персональные кампании.</Text>
+            </View>
+            <Pressable
+              onPress={marketingConsent === null || consentBusy ? undefined : onToggleMarketingConsent}
+              style={[
+                styles.toggleTrack,
+                { backgroundColor: marketingConsent ? theme.lime : theme.cardAlt, borderColor: marketingConsent ? theme.lime : theme.border },
+              ]}
+            >
+              <View style={[styles.toggleThumb, marketingConsent ? styles.toggleThumbOn : null]} />
+              <Text selectable style={[styles.toggleText, { color: marketingConsent ? theme.limeInk : theme.muted }]}>
+                {consentBusy ? '...' : marketingConsent ? 'ON' : 'OFF'}
+              </Text>
+            </Pressable>
+          </View>
+          {consentError ? <Text selectable style={styles.formError}>{consentError}</Text> : null}
+        </View>
+      ) : null}
 
       {session ? (
         <View style={styles.historyPanel}>
@@ -1909,6 +1980,51 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 12,
     padding: 15,
+  },
+  preferenceRow: {
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+  },
+  preferenceCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  preferenceTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  toggleTrack: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
+    minHeight: 34,
+    paddingHorizontal: 7,
+    width: 78,
+  },
+  toggleThumb: {
+    backgroundColor: theme.muted,
+    borderRadius: radius.pill,
+    height: 20,
+    width: 20,
+  },
+  toggleThumbOn: {
+    backgroundColor: theme.limeInk,
+  },
+  toggleText: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   orderHistoryCard: {
     backgroundColor: theme.card,

@@ -4,6 +4,7 @@ import type {
   CreatedOrder,
   CustomerAuthTokens,
   CustomerOrder,
+  CustomerProfile,
   MyDevice,
   OnlinePaymentMethod,
   OtpRequestResult,
@@ -112,6 +113,18 @@ export const api = {
 
   authMe(token: string) {
     return requestJson<AuthPrincipal>('/auth/me', { token });
+  },
+
+  getCustomer(id: string, token: string) {
+    return requestJson<CustomerProfile>(`/customers/${id}`, { token });
+  },
+
+  setCustomerConsent(input: { customerId: string; consent: boolean }, token: string) {
+    return requestJson<CustomerProfile>(`/customers/${input.customerId}/consent`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ consent: input.consent, actor: 'mobile_customer' }),
+    });
   },
 
   fetchMyOrders(token: string) {

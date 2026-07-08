@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -77,8 +78,12 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Consent updated.' })
   @ApiNotFoundResponse({ description: 'Customer does not exist.' })
   @Patch(':id/consent')
-  setConsent(@Param('id') id: string, @Body() dto: SetConsentDto) {
-    return this.customers.setConsent(id, dto.consent, dto.actor ?? 'customer');
+  @UseGuards(OptionalJwtAuthGuard)
+  setConsent(@Param('id') id: string, @Body() dto: SetConsentDto, @CurrentUser() user?: AuthPrincipal) {
+    if (user?.typ === 'customer' && user.customerId !== id) {
+      throw new ForbiddenException('Нельзя менять согласие другого клиента');
+    }
+    return this.customers.setConsent(id, dto.consent, user?.typ === 'customer' ? user.customerId : dto.actor ?? 'customer');
   }
 
   private maskOverview(overview: CustomerOverview, user?: AuthPrincipal): CustomerOverview {

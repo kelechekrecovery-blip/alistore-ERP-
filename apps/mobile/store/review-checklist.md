@@ -45,6 +45,7 @@
 - Customer account devices and warranty state load from `GET /customers/me/devices`.
 - Customer can open warranty case from a signed-in device card with owner-scoped JWT.
 - Customer support tickets list/open from the signed-in account with owner-scoped JWT.
+- Customer notification preferences show and toggle marketing consent with owner-scoped JWT.
 - Checkout with cash and sandbox online payment.
 - Checkout while signed in reuses the authenticated customer account.
 - Staff login/logout and SecureStore persistence.
