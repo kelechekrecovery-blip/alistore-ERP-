@@ -4,6 +4,7 @@ import type {
   CreatedOrder,
   CustomerAuthTokens,
   CustomerOrder,
+  MyDevice,
   OnlinePaymentMethod,
   OtpRequestResult,
   PaymentConfirmResult,
@@ -112,6 +113,10 @@ export const api = {
 
   fetchMyOrders(token: string) {
     return requestJson<CustomerOrder[]>('/orders/mine', { token });
+  },
+
+  fetchMyDevices(token: string) {
+    return requestJson<MyDevice[]>('/customers/me/devices', { token });
   },
 
   refreshCustomerSession(refreshToken: string) {

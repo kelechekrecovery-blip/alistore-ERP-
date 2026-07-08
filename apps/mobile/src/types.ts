@@ -38,6 +38,15 @@ export interface CustomerOrder {
   items: Array<{ sku: string; qty: number; price: number; imei?: string | null }>;
 }
 
+export interface MyDevice {
+  imei: string;
+  product: string;
+  status: string;
+  warrantyUntil: string | null;
+  daysLeft: number | null;
+  warranty: { id: string; status: string; sla: string } | null;
+}
+
 export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
 export type PaymentMethod = OnlinePaymentMethod | 'cash' | 'bakai_pos' | 'obank';
 

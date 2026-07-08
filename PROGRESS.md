@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native customer devices and warranty state.
+- Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: signed-in native customers now load purchased devices from `GET /customers/me/devices`, see product, IMEI, device status, warranty expiry, days-left state, and active warranty-case status in the account cabinet. Account data loading now refreshes the customer session once before fetching orders/devices, avoiding refresh-token reuse races.
+- Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `npm run test -w @alistore/api -- exchange --runInBand`; `git diff --check`.
+- Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; targeted exchange/device API tests passed 2 suites / 3 tests; whitespace check passed.
+- Next step: add the next native account surface backed by existing API or move to external TestFlight/Play Internal QA when credentials/devices are available.
+
+## 2026-07-08
+
 - Task: add native customer order history.
 - Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: signed-in native customers now load their own order history from `GET /orders/mine`, see status/channel/items/total in the account cabinet, can refresh the list manually, and the app refreshes expired customer access tokens before loading history.

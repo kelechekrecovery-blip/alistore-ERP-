@@ -16,7 +16,7 @@ import { formatSom, shortId } from '@mobile/format';
 import { clearCustomerSession, getStoredCustomerSession, saveCustomerSession } from '@mobile/secure-session';
 import { radius, theme } from '@mobile/theme';
 import { EmptyState, Field, GhostButton, MetricCard, Pill, PrimaryButton, ProductPoster, SectionTitle } from '@mobile/ui';
-import type { CatalogProduct, CreatedOrder, CustomerOrder, CustomerSession, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
+import type { CatalogProduct, CreatedOrder, CustomerOrder, CustomerSession, MyDevice, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
 
 type ClientTab = 'home' | 'catalog' | 'favorites' | 'cart' | 'account';
 type ClientPayment = 'cash' | OnlinePaymentMethod;
@@ -76,6 +76,9 @@ export function ClientScreen({
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [ordersBusy, setOrdersBusy] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [devices, setDevices] = useState<MyDevice[]>([]);
+  const [devicesBusy, setDevicesBusy] = useState(false);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -134,9 +137,11 @@ export function ClientScreen({
     if (!customerSession) {
       setOrders([]);
       setOrdersError(null);
+      setDevices([]);
+      setDevicesError(null);
       return;
     }
-    void loadCustomerOrders(customerSession);
+    void loadAccountData(customerSession);
   }, [customerSession?.accessToken]);
 
   function addToCart(product: CatalogProduct) {
@@ -232,33 +237,81 @@ export function ClientScreen({
       setOtpDevCode(null);
       setOrders([]);
       setOrdersError(null);
+      setDevices([]);
+      setDevicesError(null);
     } finally {
       setAuthBusy(false);
     }
   }
 
+  async function prepareCustomerSession(session: CustomerSession): Promise<CustomerSession | null> {
+    const readySession = await restoreCustomerSession(session);
+    if (!readySession) {
+      setCustomerSession(null);
+      onSessionChange?.(null);
+      setOrders([]);
+      setDevices([]);
+      return null;
+    }
+    if (readySession.accessToken !== session.accessToken || readySession.refreshToken !== session.refreshToken) {
+      setCustomerSession(readySession);
+      onSessionChange?.(readySession);
+    }
+    return readySession;
+  }
+
+  async function loadAccountData(session = customerSession) {
+    if (!session || ordersBusy || devicesBusy) return;
+    setOrdersBusy(true);
+    setDevicesBusy(true);
+    setOrdersError(null);
+    setDevicesError(null);
+    try {
+      const readySession = await prepareCustomerSession(session);
+      if (!readySession) return;
+      const [ordersResult, devicesResult] = await Promise.allSettled([
+        api.fetchMyOrders(readySession.accessToken),
+        api.fetchMyDevices(readySession.accessToken),
+      ]);
+      if (ordersResult.status === 'fulfilled') setOrders(ordersResult.value);
+      else setOrdersError(ordersResult.reason instanceof Error ? ordersResult.reason.message : 'Заказы не загружены.');
+      if (devicesResult.status === 'fulfilled') setDevices(devicesResult.value);
+      else setDevicesError(devicesResult.reason instanceof Error ? devicesResult.reason.message : 'Устройства не загружены.');
+    } finally {
+      setOrdersBusy(false);
+      setDevicesBusy(false);
+    }
+  }
+
   async function loadCustomerOrders(session = customerSession) {
-    if (!session || ordersBusy) return;
+    if (!session || ordersBusy || devicesBusy) return;
     setOrdersBusy(true);
     setOrdersError(null);
     try {
-      const readySession = await restoreCustomerSession(session);
-      if (!readySession) {
-        setCustomerSession(null);
-        onSessionChange?.(null);
-        setOrders([]);
-        return;
-      }
-      if (readySession.accessToken !== session.accessToken || readySession.refreshToken !== session.refreshToken) {
-        setCustomerSession(readySession);
-        onSessionChange?.(readySession);
-      }
+      const readySession = await prepareCustomerSession(session);
+      if (!readySession) return;
       const mine = await api.fetchMyOrders(readySession.accessToken);
       setOrders(mine);
     } catch (cause) {
       setOrdersError(cause instanceof Error ? cause.message : 'Заказы не загружены.');
     } finally {
       setOrdersBusy(false);
+    }
+  }
+
+  async function loadCustomerDevices(session = customerSession) {
+    if (!session || ordersBusy || devicesBusy) return;
+    setDevicesBusy(true);
+    setDevicesError(null);
+    try {
+      const readySession = await prepareCustomerSession(session);
+      if (!readySession) return;
+      const mine = await api.fetchMyDevices(readySession.accessToken);
+      setDevices(mine);
+    } catch (cause) {
+      setDevicesError(cause instanceof Error ? cause.message : 'Устройства не загружены.');
+    } finally {
+      setDevicesBusy(false);
     }
   }
 
@@ -420,6 +473,9 @@ export function ClientScreen({
             orders={orders}
             ordersBusy={ordersBusy}
             ordersError={ordersError}
+            devices={devices}
+            devicesBusy={devicesBusy}
+            devicesError={devicesError}
             phone={phone}
             otpCode={otpCode}
             otpSent={otpSent}
@@ -430,6 +486,7 @@ export function ClientScreen({
             onVerifyOtp={verifyCustomerOtp}
             onLogout={logoutCustomer}
             onReloadOrders={() => loadCustomerOrders()}
+            onReloadDevices={() => loadCustomerDevices()}
             onConfirmPayment={confirmSandboxPayment}
             onOpenCatalog={() => setTab('catalog')}
           />
@@ -724,6 +781,9 @@ function AccountTab({
   orders,
   ordersBusy,
   ordersError,
+  devices,
+  devicesBusy,
+  devicesError,
   phone,
   otpCode,
   otpSent,
@@ -734,6 +794,7 @@ function AccountTab({
   onVerifyOtp,
   onLogout,
   onReloadOrders,
+  onReloadDevices,
   onConfirmPayment,
   onOpenCatalog,
 }: {
@@ -747,6 +808,9 @@ function AccountTab({
   orders: CustomerOrder[];
   ordersBusy: boolean;
   ordersError: string | null;
+  devices: MyDevice[];
+  devicesBusy: boolean;
+  devicesError: string | null;
   phone: string;
   otpCode: string;
   otpSent: boolean;
@@ -757,6 +821,7 @@ function AccountTab({
   onVerifyOtp: () => void;
   onLogout: () => void;
   onReloadOrders: () => void;
+  onReloadDevices: () => void;
   onConfirmPayment: () => void;
   onOpenCatalog: () => void;
 }) {
@@ -863,6 +928,27 @@ function AccountTab({
         </View>
       ) : null}
 
+      {session ? (
+        <View style={styles.historyPanel}>
+          <SectionTitle
+            title="Мои устройства"
+            right={<GhostButton label="Обновить" icon="refresh-outline" onPress={devicesBusy ? undefined : onReloadDevices} />}
+          />
+          {devicesBusy ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={theme.lime} />
+              <Text selectable style={styles.mutedText}>Загружаем устройства...</Text>
+            </View>
+          ) : null}
+          {devicesError ? <Text selectable style={styles.formError}>{devicesError}</Text> : null}
+          {devices.length === 0 && !devicesBusy ? (
+            <EmptyState icon="phone-portrait-outline" title="Устройств пока нет" text="Купленная техника появится здесь с гарантией." />
+          ) : (
+            devices.slice(0, 8).map((device) => <DeviceCard key={device.imei} device={device} />)
+          )}
+        </View>
+      ) : null}
+
       {error ? <Text selectable style={styles.formError}>{error}</Text> : null}
       <View style={styles.accountMenu}>
         <GhostButton label="Бонусы" icon="gift-outline" />
@@ -894,6 +980,40 @@ function OrderHistoryCard({ order }: { order: CustomerOrder }) {
       <View style={styles.orderHistoryFooter}>
         <Text selectable style={styles.orderChannelText}>{order.channel}</Text>
         <Text selectable style={styles.orderHistoryTotal}>{formatSom(order.total)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function DeviceCard({ device }: { device: MyDevice }) {
+  const warrantyLabel = device.warranty
+    ? warrantyStatusLabel(device.warranty.status)
+    : device.daysLeft != null
+      ? `Гарантия · ${device.daysLeft} дн`
+      : 'Гарантия';
+  return (
+    <View style={styles.deviceCard}>
+      <View style={styles.deviceIcon}>
+        <Ionicons name="phone-portrait-outline" size={22} color={theme.lime} />
+      </View>
+      <View style={styles.deviceCopy}>
+        <Text selectable numberOfLines={2} style={styles.deviceTitle}>{device.product}</Text>
+        <Text selectable numberOfLines={1} style={styles.deviceMeta}>IMEI {device.imei}</Text>
+        <View style={styles.deviceFooter}>
+          <Text selectable style={styles.deviceStatus}>{device.status}</Text>
+          <Text selectable style={styles.deviceWarranty}>
+            {device.warranty
+              ? `SLA ${formatShortDate(device.warranty.sla)}`
+              : device.warrantyUntil
+                ? `до ${formatShortDate(device.warrantyUntil)}`
+                : 'срок не задан'}
+          </Text>
+        </View>
+      </View>
+      <View style={[styles.warrantyPill, { borderColor: device.warranty ? theme.warn : theme.lime }]}>
+        <Text selectable numberOfLines={1} style={[styles.warrantyPillText, { color: device.warranty ? theme.warn : theme.lime }]}>
+          {warrantyLabel}
+        </Text>
       </View>
     </View>
   );
@@ -1047,6 +1167,30 @@ function formatOrderDate(value: string): string {
     minute: '2-digit',
     month: 'short',
   });
+}
+
+function formatShortDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+function warrantyStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    approved: 'Ремонт одобрен',
+    closed: 'Закрыто',
+    created: 'Обращение',
+    diagnostics: 'Диагностика',
+    received: 'В сервисе',
+    rejected: 'Отклонено',
+    repaired: 'Отремонтировано',
+    replaced: 'Замена',
+    waiting_supplier: 'Ждём поставщика',
+  };
+  return labels[status] ?? status;
 }
 
 async function restoreCustomerSession(stored: CustomerSession): Promise<CustomerSession | null> {
@@ -1525,6 +1669,66 @@ const styles = StyleSheet.create({
     color: theme.text,
     fontSize: 15,
     fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  deviceCard: {
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 11,
+    padding: 12,
+  },
+  deviceIcon: {
+    alignItems: 'center',
+    backgroundColor: theme.cardAlt,
+    borderColor: theme.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    height: 50,
+    justifyContent: 'center',
+    width: 50,
+  },
+  deviceCopy: {
+    flex: 1,
+    gap: 5,
+    minWidth: 0,
+  },
+  deviceTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  deviceMeta: {
+    color: theme.muted,
+    fontSize: 11,
+  },
+  deviceFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  deviceStatus: {
+    color: theme.textSoft,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  deviceWarranty: {
+    color: theme.muted,
+    fontSize: 11,
+  },
+  warrantyPill: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    maxWidth: 108,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  warrantyPillText: {
+    fontSize: 10,
     fontWeight: '900',
   },
   accountMenu: {
