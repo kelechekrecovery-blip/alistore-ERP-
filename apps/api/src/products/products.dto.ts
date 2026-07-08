@@ -71,7 +71,11 @@ export class CreateProductDto {
   @MaxLength(80)
   category!: string;
 
-  @ApiPropertyOptional({ type: 'object', example: { storage: '128GB', color: 'black' } })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    example: { storage: '128GB', color: 'black' },
+  })
   @IsOptional()
   @IsObject()
   attrs?: Record<string, unknown>;
@@ -96,7 +100,11 @@ export class UpdateProductDto {
   @MaxLength(80)
   category?: string;
 
-  @ApiPropertyOptional({ type: 'object', example: { storage: '128GB', color: 'black' } })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    example: { storage: '128GB', color: 'black' },
+  })
   @IsOptional()
   @IsObject()
   attrs?: Record<string, unknown>;

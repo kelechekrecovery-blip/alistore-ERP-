@@ -56,5 +56,5 @@ missing/configured env-имён и ручные проверки. Значени
     нужны устройства и SDK. Софт-слой offline POS + catalog delta-sync + browser-fallback уже готов.
 
 ## Гейт приёмки (для КАЖДОГО пункта)
-`npm run api:test` зелёный (+ новый тест) · `nest build` + `next build` · живой прогон
+`npm run api:test` зелёный (+ новый тест) · `npm run api:build` + `next build` · живой прогон
 (браузер/HTTP) + сверка в БД · атомарный коммит явными путями.

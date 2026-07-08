@@ -5,7 +5,7 @@
 
 ## Стек
 - **apps/api** — NestJS 10 + Prisma 5 + PostgreSQL (порт 4000, префикс `/api`)
-- **apps/web** — Next.js 14 (App Router) + Tailwind (порт 3000)
+- **apps/web** — Next.js 16 (App Router) + Tailwind (порт 3000)
 - Монорепо на npm workspaces.
 
 ## Как запустить

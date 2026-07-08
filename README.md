@@ -9,7 +9,7 @@
 
 ## Стек
 - **Backend** (`apps/api`): NestJS + Prisma + PostgreSQL, REST.
-- **Frontend** (`apps/web`): Next.js 14 (App Router) + React + TS + Tailwind.
+- **Frontend** (`apps/web`): Next.js 16 (App Router) + React + TS + Tailwind.
 - **Native Mobile** (`apps/mobile`): Expo React Native for iOS/Android, no PWA/WebView.
 - **Тесты**: Jest + Playwright E2E; QA-сценарии из handoff = приёмочные тесты.
 

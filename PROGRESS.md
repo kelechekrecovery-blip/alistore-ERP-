@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: remediate dependency audit blockers after full release test.
+- Files changed: `apps/api/package.json`, `apps/api/src/catalog/catalog.dto.ts`, `apps/api/src/products/products.dto.ts`, `apps/web/next.config.mjs`, `apps/web/package.json`, `apps/web/tsconfig.json`, root `package.json`, `package-lock.json`, readiness/docs, `BACKLOG.md`, `PROGRESS.md`.
+- Result: upgraded the web stack from Next 14 to Next 16.2.10, upgraded NestJS runtime/testing/swagger/config packages to the 11.x/4.x compatible line, removed the vulnerable Nest CLI build chain from the API build path, switched API builds to deterministic `tsc`, added the required otplib presets, added audited transitive overrides for `postcss` and `uuid`, and allowed `127.0.0.1` as a Next 16 dev origin so Playwright hydration works.
+- Checks run: `npm audit`; `npm run api:build`; `npm run test -w @alistore/api -- dangerous-endpoint-rbac --runInBand`; `npm run api:test`; `npm run e2e`; `npm run mvp:verify`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `cd apps/mobile && EXPO_DOCTOR_WARN_ON_NETWORK_ERRORS=1 npx expo-doctor`; `npm --prefix apps/mobile run store:preflight:production` (expected failure without real store credentials); `npm run launch:check` (expected failure without `apps/api/.env.production`).
+- Outcome: dependency audit is clean with 0 vulnerabilities; API build passed; API Jest passed 92 suites / 326 tests; Playwright passed 9/9; full MVP verification passed end to end including readiness report; mobile store preflight passed with 0 failures and the expected 2 warnings; Expo config rendered; Expo Doctor passed 20/20. Strict production gates still fail only on missing real API/mobile production env, EAS, Apple, Google Play, provider credentials, and physical POS hardware certification.
+- Next step: provision real production/store credentials and complete physical-device/TestFlight/Play Internal/POS hardware QA.
+
+## 2026-07-08
+
 - Task: run full MVP, mobile, release, and security verification.
 - Files changed: `package-lock.json`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: recovered the web test environment from Next's accidental local `apps/web` pnpm install, removed the generated `apps/web/node_modules`/`pnpm-lock.yaml`, restored npm workspace resolution, and synced the root lockfile with the optional Next SWC packages needed for stable web builds.

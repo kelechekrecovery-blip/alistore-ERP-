@@ -55,4 +55,4 @@ npm run web    # Web  → http://localhost:3000
 
 ## Если на mac mini есть агент (Codex/Claude Code)
 Дай ему прочитать `docs/PARALLEL-LANES.md` + `docs/CODEX-NOW.md` — там его полоса задач.
-Гейт для обоих: `npm run api:test` зелёный · `nest build` + `next build` · атомарные коммиты.
+Гейт для обоих: `npm run api:test` зелёный · `npm run api:build` + `next build` · атомарные коммиты.
