@@ -7,13 +7,12 @@
 
 ## P0 — исправить по ревью (реальные дефекты, блокируют доверие к данным)
 
-### P0-1. Активировать `imei_reuse` (сейчас мёртвый детектор)
+### P0-1. ✅ Активировать `imei_reuse`
 Схема `TradeInDevice.imei` и детектор `imei_reuse` уже готовы (Claude, `f58344c`/`d658025`),
-но НИЧТО не пишет `imei` → детектор всегда пуст (100% false-negative на IMEI-подмену).
-- **Codex (owns tradeins):** добавить `imei?: string` в `CreateTradeInDto` и `POST /tradeins/intake`
-  DTO; в `TradeInsService.create()`/intake писать `imei` в `tx.tradeInDevice.create({ data })`.
+Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDevice.imei`, ledger refs включают
+номер, staff/customer trade-in UI передают optional IMEI.
 - Приёмка: intake с `imei` → колонка заполнена; тот же `imei` в скупке и среди проданных
-  `DeviceUnit(status=sold)` → high-сигнал `imei_reuse` в `GET /reports/risks`. Добавить тест.
+  `DeviceUnit(status=sold)` → high-сигнал `imei_reuse` в `GET /reports/risks`. Тест добавлен.
 
 ### P0-2. Закрыть `/reports/*` и `/ai/*` авторизацией (сейчас публичны)
 Ревью: owner-финансы (выручка/маржа/зарплаты/касса-расхождения) и AI-инсайты доступны
@@ -32,7 +31,7 @@
 - **A3. Rate limiting** (`@nestjs/throttler`) на `POST /checkout`, OTP-выдачу, `POST /support/tickets`,
   платёжные webhooks → 429 при превышении; тест.
 - **A4. PDF/печать полировка** (receipts вкл. split-tenders / labels / договор скупки), локаль ru-KG.
-- **A5. Infra runbook** — Caddy + бэкапы + restore-check.
+- ✅ **A5. Infra runbook** — Caddy + бэкапы + restore-check.
 
 ## P2 — полоса B, если mac mini недоступна (иначе оставить mac mini)
 См. `PARALLEL-LANES.md` полоса B: E2E+CI, gift cards (новый модуль), Admin Product UI

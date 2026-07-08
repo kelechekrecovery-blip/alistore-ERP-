@@ -6,6 +6,7 @@ export interface TradeIn {
   id: string;
   customerId: string;
   model: string;
+  imei: string | null;
   grade: TradeInGrade;
   price: number;
   contractId: string | null;
@@ -15,6 +16,7 @@ export interface TradeIn {
 export function createTradeIn(input: {
   customerId: string;
   model: string;
+  imei?: string;
   grade: TradeInGrade;
   price: number;
   sellerPassport: string;

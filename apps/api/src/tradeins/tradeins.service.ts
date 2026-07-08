@@ -27,12 +27,14 @@ export class TradeInsService {
     if (!customer) {
       throw new ValidationError('customer_not_found', `Клиент ${dto.customerId} не найден`);
     }
+    const imei = this.cleanOptional(dto.imei);
 
     return this.audit.transaction(async (tx) => {
       const tradeIn = await tx.tradeInDevice.create({
         data: {
           customerId: dto.customerId,
           model: dto.model,
+          imei,
           grade: dto.grade,
           price: dto.price,
           sellerPassport: dto.sellerPassport,
@@ -50,10 +52,11 @@ export class TradeInsService {
               tradeInId: tradeIn.id,
               customerId: dto.customerId,
               model: dto.model,
+              imei,
               grade: dto.grade,
               price: dto.price,
             },
-            refs: [tradeIn.id, dto.customerId],
+            refs: this.refs(tradeIn.id, dto.customerId, imei),
           },
           {
             type: EventType.TradeInContracted,
@@ -62,8 +65,9 @@ export class TradeInsService {
               tradeInId: tradeIn.id,
               customerId: dto.customerId,
               contractId: tradeIn.contractId,
+              imei,
             },
-            refs: [tradeIn.id, dto.customerId],
+            refs: this.refs(tradeIn.id, dto.customerId, imei),
           },
         ],
       };
@@ -81,6 +85,7 @@ export class TradeInsService {
       id: tradeIn.id,
       customerId: tradeIn.customerId,
       model: tradeIn.model,
+      imei: tradeIn.imei ?? null,
       grade: tradeIn.grade,
       price: tradeIn.price,
       contractId: tradeIn.contractId ?? null,
@@ -91,5 +96,14 @@ export class TradeInsService {
   private maskPassport(value: string): string {
     if (value.length <= 4) return '*'.repeat(value.length);
     return `${value.slice(0, 3)}***${value.slice(-2)}`;
+  }
+
+  private cleanOptional(value?: string): string | null {
+    const clean = value?.trim();
+    return clean ? clean : null;
+  }
+
+  private refs(...values: Array<string | null>): string[] {
+    return values.filter((value): value is string => Boolean(value));
   }
 }

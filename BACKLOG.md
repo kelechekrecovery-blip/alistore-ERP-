@@ -6,6 +6,7 @@
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Capture trade-in IMEI and activate `imei_reuse` risk detection.
 - Write infra runbook for Caddy/backups deployment.
 - Add printable order invoice / waybill PDF.
 - Add OTP access recovery with refresh-session revocation.

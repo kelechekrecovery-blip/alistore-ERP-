@@ -11,6 +11,11 @@ export class CreateTradeInDto {
   @IsString()
   model!: string;
 
+  @ApiPropertyOptional({ description: 'Device IMEI or serial captured during intake.', example: '359-DUP-1' })
+  @IsOptional()
+  @IsString()
+  imei?: string;
+
   @ApiProperty({ enum: Grade, example: Grade.B })
   @IsEnum(Grade)
   grade!: Grade;
@@ -42,6 +47,9 @@ export class TradeInViewDto {
 
   @ApiProperty()
   model!: string;
+
+  @ApiProperty({ nullable: true })
+  imei!: string | null;
 
   @ApiProperty({ enum: Grade })
   grade!: Grade;

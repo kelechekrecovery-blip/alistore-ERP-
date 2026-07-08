@@ -25,6 +25,7 @@ describe('Reports (integration)', () => {
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.cashShift.deleteMany();
@@ -80,5 +81,32 @@ describe('Reports (integration)', () => {
     expect(kinds).toContain('stale_reservations');
     // high-severity signals rank first
     expect(r.signals[0].severity).toBe('high');
+  });
+
+  it('surfaces a buyback IMEI reused by a sold device as high risk', async () => {
+    const customer = await prisma.customer.create({ data: { phone: '+996700900002', name: 'Reuse' } });
+    const product = await prisma.product.create({
+      data: { sku: 'RP-REUSE', name: 'Used iPhone', price: 100000, cost: 70000, category: 'phones', attrs: {} },
+    });
+    const imei = 'RP-REUSE-IMEI-1';
+    await prisma.deviceUnit.create({
+      data: { imei, productId: product.id, status: 'sold', location: 'BISHKEK-1', orderId: 'sold-order' },
+    });
+    await prisma.tradeInDevice.create({
+      data: {
+        customerId: customer.id,
+        model: 'iPhone 13 Pro',
+        imei,
+        grade: 'B',
+        price: 42000,
+        sellerPassport: 'ID1234567',
+        contractId: 'TI-RISK-1',
+      },
+    });
+
+    const r = await reports.risks();
+    const reuse = r.signals.find((signal) => signal.kind === 'imei_reuse');
+    expect(reuse?.severity).toBe('high');
+    expect(reuse?.ref).toBe(imei);
   });
 });

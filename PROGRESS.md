@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: activate trade-in IMEI capture for `imei_reuse` risk detection.
+- Files changed: `apps/api/src/tradeins/*`, `apps/api/test/tradein-rbac.e2e-spec.ts`, `apps/api/test/reports.e2e-spec.ts`, `apps/api/test/warranty-rbac.e2e-spec.ts`, `apps/web/lib/api/tradeins.ts`, `/staff`, `/trade-in`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: trade-in DTOs now accept optional IMEI, service stores it on `TradeInDevice.imei`, ledger refs include it, Staff app and customer Trade-in screen can capture it, and Risk Center acceptance proves a sold-device IMEI reused in buyback becomes high-risk `imei_reuse`.
+- Checks run: `npm run test -w @alistore/api -- tradein-rbac reports --runInBand`; `npm run api:build`; `npm run build -w @alistore/web`; Chrome/CDP smoke on `/trade-in` through isolated API `4102` + web `3102`; `npm run api:test`.
+- Outcome: targeted Jest passed 2 suites / 4 tests; API build passed; web build passed; browser smoke created a trade-in contract and showed the submitted IMEI on the success screen; full API Jest passed 81 suites / 285 tests after fixing stale FK cleanup order in reports/warranty RBAC tests.
+- Next step: P0-2 `/reports/*` + `/ai/*` guard remains blocked until the web-token handoff for `lib/reports.ts` and `lib/ai.ts` lands.
+
+## 2026-07-08
+
 - Task: write infra runbook for Caddy/backups deployment.
 - Files changed: `infra/RUNBOOK.md`, `infra/README.md`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: added a production operator checklist for host baseline, env values, build/deploy, self-hosted MinIO/Metabase, Caddy validation/reload, backup schedule, restore drill, release smoke and rollback.

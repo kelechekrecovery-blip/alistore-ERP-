@@ -47,6 +47,7 @@ export default function StaffPage() {
     phone: '+996',
     name: '',
     model: '',
+    imei: '',
     grade: 'B' as TradeInGrade,
     price: '',
     passport: '',
@@ -146,6 +147,7 @@ export default function StaffPage() {
       const result = await createTradeIn({
         customerId: customer.id,
         model: buybackForm.model.trim(),
+        imei: buybackForm.imei.trim() || undefined,
         grade: buybackForm.grade,
         price: Number(buybackForm.price),
         sellerPassport: buybackForm.passport.trim(),
@@ -332,6 +334,11 @@ export default function StaffPage() {
                   onChange={(model) => setBuybackForm((f) => ({ ...f, model }))}
                   required
                 />
+                <Field
+                  label="IMEI"
+                  value={buybackForm.imei}
+                  onChange={(imei) => setBuybackForm((f) => ({ ...f, imei }))}
+                />
                 <div className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
                   <span className="text-[12px] font-semibold text-[#8A7F76]">Грейд</span>
                   <select
@@ -370,6 +377,9 @@ export default function StaffPage() {
                     <div className="mt-1 text-[12px] text-[#D8CFC6]">
                       {tradeIn.model} · Grade {tradeIn.grade} · {som(tradeIn.price)}
                     </div>
+                    {tradeIn.imei && (
+                      <div className="mt-1 font-mono text-[11px] text-[#8A7F76]">IMEI {tradeIn.imei}</div>
+                    )}
                     <div className="mt-1 text-[11px] text-[#8A7F76]">
                       Паспорт {tradeIn.sellerPassportMasked}
                     </div>

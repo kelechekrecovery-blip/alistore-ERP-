@@ -82,10 +82,11 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     });
   }
 
-  function payload(customerId: string) {
+  function payload(customerId: string, imei?: string) {
     return {
       customerId,
       model: 'iPhone 13 Pro 256GB',
+      ...(imei ? { imei } : {}),
       grade: 'B',
       price: 42000,
       sellerPassport: 'ID1234567',
@@ -130,13 +131,20 @@ describe('Trade-in self-service and staff intake RBAC', () => {
       .send(payload(intakeCustomer.id))
       .expect(403);
 
+    const intakeImei = `TI-RBAC-${RUN}-${seq}`;
     await request(app.getHttpServer())
       .post('/tradeins/intake')
       .set('Authorization', `Bearer ${sellerToken}`)
-      .send(payload(intakeCustomer.id))
-      .expect(201);
+      .send(payload(intakeCustomer.id, intakeImei))
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.imei).toBe(intakeImei);
+      });
 
     const staffEvent = await prisma.auditEvent.findFirst({ where: { type: 'tradein.contracted' } });
     expect(staffEvent?.actor).toBe(sellerId);
+    expect(staffEvent?.refs).toContain(intakeImei);
+    const saved = await prisma.tradeInDevice.findFirst({ where: { imei: intakeImei } });
+    expect(saved?.customerId).toBe(intakeCustomer.id);
   });
 });

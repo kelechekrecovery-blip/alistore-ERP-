@@ -8,24 +8,22 @@
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-Открытых пунктов без внешних блокеров нет на 2026-07-08. Следующий software-пункт
-лежит в секции B, потому что затрагивает schema/trade-in контракт.
+Открытых пунктов без внешних блокеров нет на 2026-07-08.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
 debt reminders через outbox, consent-filtered Campaign Segment Builder + Campaign ROI,
 Excel import idempotency, OTP access recovery with refresh-session revocation,
 receipt split tenders, order invoice/waybill PDF, infra runbook for Caddy/backups/restore,
-realtime/socket.io, Sentry/GlitchTip hook, i18n, health-checks.
+trade-in IMEI intake + `imei_reuse` risk activation, realtime/socket.io, Sentry/GlitchTip hook,
+i18n, health-checks.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 
-10. **Повтор IMEI (скупка + продажа) как риск.** ✅ Схема (`TradeInDevice.imei`, миграция
-    `20260707173249_tradein_imei`) и детектор (`reports/risk-signals.ts` → `imei_reuse`,
-    сопоставление с проданными `DeviceUnit.imei`) — СДЕЛАНО Claude, работает вживую.
-    **Остаток для Codex (owns tradeins):** принимать `imei` в `POST /tradeins/intake` (DTO +
-    сервис) и писать в `TradeInDevice.imei`. Поле nullable — до этого детектор просто пуст.
-    - Приёмка: staff intake с imei → запись в БД; тот же imei и в скупке, и в продаже →
-      high-риск `imei_reuse` в Risk Center (детектор уже готов).
+10. **Повтор IMEI (скупка + продажа) как риск.** ✅ ЗАКРЫТО Codex.
+    `CreateTradeInDto` и `POST /tradeins/intake` принимают `imei`, `TradeInsService.create()`
+    пишет его в `TradeInDevice.imei`, ledger refs включают IMEI, `/staff` и `/trade-in`
+    умеют передать номер. Приёмка покрыта: intake с `imei` заполняет колонку; тот же `imei`
+    среди `DeviceUnit(status=sold)` даёт high-риск `imei_reuse` в Risk Center.
 11. **Споры v2 (если нужна отдельная модель).** MVP уже использует refund/return approval flow
     и `/approvals` Refund Money Flow; отдельный `Dispute` нужен только для расширенной машины
     статусов. Приёмка: открыть спор → машина статусов → решение пишет ledger.

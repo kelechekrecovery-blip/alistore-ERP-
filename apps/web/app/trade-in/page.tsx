@@ -29,6 +29,7 @@ function basePrice(model: string) {
 export default function TradeInPage() {
   const { user } = useAuth();
   const [model, setModel] = useState('iPhone 13 · 128 ГБ');
+  const [imei, setImei] = useState('');
   const [grade, setGrade] = useState<TradeInGrade>('B');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
@@ -54,6 +55,7 @@ export default function TradeInPage() {
       const tradeIn = await createTradeIn({
         customerId,
         model: note.trim() ? `${model.trim()} (${note.trim()})` : model.trim(),
+        imei: imei.trim() || undefined,
         grade,
         price,
         sellerPassport: passport.trim(),
@@ -83,6 +85,7 @@ export default function TradeInPage() {
           <div className="text-[13px] text-[#A79C92]">Предварительная оценка</div>
           <div className="mt-2 font-display text-[34px] font-extrabold leading-none text-lime">{som(done.tradeIn.price)}</div>
           <div className="mt-2 font-mono text-[12px] text-[#8A7F76]">{done.tradeIn.contractId}</div>
+          {done.tradeIn.imei && <div className="mt-2 font-mono text-[12px] text-[#8A7F76]">IMEI {done.tradeIn.imei}</div>}
           <div className="mt-2 text-[12px] leading-relaxed text-[#8A7F76]">Паспорт сохранён в защищённом виде: {done.tradeIn.sellerPassportMasked}</div>
           <div className="mt-2 text-[12px] text-lime">Evidence Vault: {done.evidenceCount} фото</div>
         </div>
@@ -102,6 +105,9 @@ export default function TradeInPage() {
 
       <div className="mt-4 text-[13px] text-[#A79C92]">Модель</div>
       <input value={model} onChange={(e) => setModel(e.target.value)} className="mt-2 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3 text-sm outline-none focus:border-lime" />
+
+      <div className="mt-3 text-[13px] text-[#A79C92]">IMEI / серийный номер</div>
+      <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="Можно оставить пустым до диагностики" className="mt-2 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
 
       <div className="mb-2 mt-4 text-[13px] text-[#A79C92]">Состояние</div>
       {grades.map((g) => (

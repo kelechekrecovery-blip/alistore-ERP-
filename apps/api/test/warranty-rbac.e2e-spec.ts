@@ -61,6 +61,7 @@ describe('Warranty console RBAC', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.warrantyCase.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
