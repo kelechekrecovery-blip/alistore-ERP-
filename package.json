@@ -11,6 +11,7 @@
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api",
     "e2e": "playwright test",
+    "mvp:verify": "node scripts/mvp-verify.mjs",
     "web": "npm run dev -w @alistore/web",
     "db:migrate": "npm run db:migrate -w @alistore/api",
     "db:seed": "npm run db:seed -w @alistore/api",

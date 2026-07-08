@@ -37,11 +37,15 @@ cd apps/web && npm run build && npx next start -p 3000
 
 ## Проверка
 ```bash
-npm run api:test                       # 53 сьюта / 167 тестов (jest)
-cd apps/api && npx jest --runInBand    # надёжнее при общей test-БД
-cd apps/api && npx nest build          # прод-сборка API
-cd apps/web && npx next build          # прод-сборка веб (20 роутов)
+npm run mvp:verify                     # schema + API/web build + Jest + Playwright + readiness
+npm run mvp:verify -- --skip-e2e       # быстрый gate без Playwright
+npm run api:test                       # 89 сьютов / 316 тестов (jest)
+npm run api:build                      # прод-сборка API
+npm run build -w @alistore/web         # прод-сборка веб (32 роута)
 ```
+
+`mvp:verify` печатает внешний readiness без раскрытия секретов. Добавьте `--strict-external`,
+если production gate должен падать на отсутствующих provider credentials или POS hardware marker.
 
 ## Экраны (маршруты веб)
 | Маршрут | Назначение |

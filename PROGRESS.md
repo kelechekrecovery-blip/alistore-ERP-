@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add one-command MVP verification gate.
+- Files changed: `scripts/mvp-verify.mjs`, `apps/api/scripts/print-readiness.ts`, root/API `package.json`, `README.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `PROGRESS.md`.
+- Result: `npm run mvp:verify` now runs Prisma schema validation, Prisma Client generation, API build, web build, full API Jest, Playwright E2E, and secret-safe external readiness reporting. `--skip-e2e` gives a faster local gate; `--strict-external` turns missing production credentials/hardware markers into a failing release gate.
+- Checks run: `npm run mvp:verify`; `git diff --check`.
+- Outcome: full gate passed: Prisma schema valid; Prisma Client generated; API build passed; web build passed; API Jest passed 89 suites / 316 tests; Playwright passed 9/9; external readiness report executed and reported `ready=0, missing=6, manual=1, optional=2, blocking=7` without secret values.
+- Next step: MVP software gate is complete; production launch still needs external provider credentials and physical POS hardware certification.
+
+## 2026-07-08
+
 - Task: add POS catalog delta-sync.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708133000_add_catalog_delta_timestamps/migration.sql`, `apps/api/src/catalog/*`, `apps/api/test/catalog-search.e2e-spec.ts`, `apps/web/lib/api/catalog.ts`, `apps/web/app/pos/page.tsx`, `e2e/pos-ui.spec.ts`, `e2e/helpers.ts`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
 - Result: Product and DeviceUnit now carry `updatedAt`; `GET /catalog/products/delta` returns changed active catalog items plus archived removals, including stock-count changes from DeviceUnit updates. `/pos` keeps a local catalog cache and refreshes via delta on reload/new sale/offline queue sync.
