@@ -1,7 +1,13 @@
 import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RefreshDto, RequestOtpDto, VerifyOtpDto } from './auth.dto';
+import {
+  AppleSocialLoginDto,
+  RefreshDto,
+  RequestOtpDto,
+  TelegramSocialLoginDto,
+  VerifyOtpDto,
+} from './auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthPrincipal } from './jwt.strategy';
@@ -37,6 +43,20 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   verifyRecovery(@Body() dto: VerifyOtpDto) {
     return this.auth.verifyRecoveryOtp(dto.phone, dto.code);
+  }
+
+  /** Telegram Mini App/Login Widget auth → access + refresh tokens. */
+  @Post('social/telegram')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  telegramSocialLogin(@Body() dto: TelegramSocialLoginDto) {
+    return this.auth.loginWithTelegram(dto);
+  }
+
+  /** Sign in with Apple identity token → access + refresh tokens. */
+  @Post('social/apple')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  appleSocialLogin(@Body() dto: AppleSocialLoginDto) {
+    return this.auth.loginWithApple(dto);
   }
 
   /** Rotate the refresh token → a fresh access + refresh pair. */

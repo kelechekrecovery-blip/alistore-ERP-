@@ -29,6 +29,20 @@ export function authVerifyRecoveryOtp(phone: string, code: string): Promise<Auth
   return postJson('/auth/recovery/verify', { phone, code });
 }
 
+export function authTelegramLogin(
+  initData: string,
+  source: 'mini_app' | 'login_widget' = 'mini_app',
+): Promise<AuthTokens> {
+  return postJson('/auth/social/telegram', { initData, source });
+}
+
+export function authAppleLogin(
+  identityToken: string,
+  options: { nonce?: string; name?: string } = {},
+): Promise<AuthTokens> {
+  return postJson('/auth/social/apple', { identityToken, ...options });
+}
+
 export function authRefresh(refreshToken: string): Promise<AuthTokens> {
   return postJson('/auth/refresh', { refreshToken });
 }

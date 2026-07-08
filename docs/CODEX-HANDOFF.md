@@ -24,7 +24,9 @@ shell (`/tg`) with shared catalog/checkout API and `channel=telegram` order flow
 plus `GET /health/integrations` external-readiness report for provider keys/manual hardware
 gates without exposing secret values, and P0 owner data hardening: `/reports/*` + `/ai/*`
 are staff-RBAC protected with shared staff-session web token handoff; customer order timeline
-uses scoped `GET /orders/:id/ledger` instead of the owner ledger feed.
+uses scoped `GET /orders/:id/ledger` instead of the owner ledger feed. Social auth backend is
+provider-ready: `CustomerIdentity`, Telegram signed initData verifier, Apple identityToken JWKS
+verifier, and `/login` Telegram Mini App session handoff.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 
@@ -48,7 +50,8 @@ missing/configured env-имён и ручные проверки. Значени
 14. **Каналы (Phase 12)** — Telegram Mini App / WhatsApp-магазин: campaign delivery code
     готов (`NOTIFICATION_TRANSPORT=channels` + Novu/SMTP/Telegram/WhatsApp env); для production
     нужны аккаунты/токены, webhook/callback QA и WhatsApp storefront activation.
-15. **Соцвход через реальные провайдеры** — нужны Apple/Telegram app credentials и callback URLs.
+15. **Соцвход через реальные провайдеры** — backend готов; нужны Apple/Telegram app credentials,
+    callback/client SDK QA и production rollout.
 16. **Физическое железо (Phase 13)** — ESC/POS/QZ печать, банковские терминалы, реальный сканер:
     нужны устройства и SDK. Софт-слой offline POS + browser-fallback уже готов.
 

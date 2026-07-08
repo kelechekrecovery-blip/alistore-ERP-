@@ -1,4 +1,5 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
+import type { TelegramAuthSource } from './social-login';
 
 const PHONE = /^\+?\d{9,15}$/;
 
@@ -21,4 +22,26 @@ export class VerifyOtpDto {
 export class RefreshDto {
   @IsString()
   refreshToken!: string;
+}
+
+export class TelegramSocialLoginDto {
+  @IsString()
+  initData!: string;
+
+  @IsOptional()
+  @IsIn(['mini_app', 'login_widget'])
+  source?: TelegramAuthSource;
+}
+
+export class AppleSocialLoginDto {
+  @IsString()
+  identityToken!: string;
+
+  @IsOptional()
+  @IsString()
+  nonce?: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
 }

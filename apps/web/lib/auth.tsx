@@ -16,6 +16,7 @@ import {
   authRefresh,
   authRequestRecoveryOtp,
   authRequestOtp,
+  authTelegramLogin,
   authVerifyRecoveryOtp,
   authVerifyOtp,
   type AuthTokens,
@@ -29,6 +30,7 @@ interface AuthContextValue {
   verifyOtp: (phone: string, code: string) => Promise<void>;
   requestRecoveryOtp: (phone: string) => Promise<{ devCode?: string }>;
   verifyRecoveryOtp: (phone: string, code: string) => Promise<void>;
+  telegramLogin: (initData: string, source?: 'mini_app' | 'login_widget') => Promise<void>;
   logout: () => Promise<void>;
   /** Run an authed request with the access token, refreshing once on failure. */
   authed: <T>(fn: (accessToken: string) => Promise<T>) => Promise<T>;
@@ -123,6 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const telegramLogin = useCallback(
+    async (initData: string, source: 'mini_app' | 'login_widget' = 'mini_app') => {
+      const t = await authTelegramLogin(initData, source);
+      persist(t);
+      setUser(await authMe(t.accessToken));
+    },
+    [persist],
+  );
+
   const logout = useCallback(async () => {
     const stored = tokens.current;
     if (stored) await authLogout(stored.refreshToken);
@@ -151,8 +162,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, hydrated, requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp, logout, authed }),
-    [user, hydrated, requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp, logout, authed],
+    () => ({
+      user,
+      hydrated,
+      requestOtp,
+      verifyOtp,
+      requestRecoveryOtp,
+      verifyRecoveryOtp,
+      telegramLogin,
+      logout,
+      authed,
+    }),
+    [
+      user,
+      hydrated,
+      requestOtp,
+      verifyOtp,
+      requestRecoveryOtp,
+      verifyRecoveryOtp,
+      telegramLogin,
+      logout,
+      authed,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

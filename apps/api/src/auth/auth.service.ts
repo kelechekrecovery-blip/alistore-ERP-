@@ -3,8 +3,15 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import * as argon2 from 'argon2';
+import type { Customer } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationError } from '../common/errors';
+import { AppleSocialLoginDto, TelegramSocialLoginDto } from './auth.dto';
+import {
+  SocialProfile,
+  verifyAppleIdentityToken,
+  verifyTelegramLogin,
+} from './social-login';
 
 export interface AuthTokens {
   accessToken: string;
@@ -90,6 +97,48 @@ export class AuthService {
     return this.issueTokens(customer.id, customer.phone);
   }
 
+  async loginWithTelegram(dto: TelegramSocialLoginDto): Promise<AuthTokens> {
+    const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN');
+    if (!botToken) {
+      throw new ValidationError(
+        'social_provider_not_configured',
+        'Telegram login is not configured',
+      );
+    }
+    const maxAge = Number(
+      this.config.get<string>('TELEGRAM_AUTH_MAX_AGE_SECONDS') ?? 24 * 60 * 60,
+    );
+    const profile = verifyTelegramLogin(
+      {
+        initData: dto.initData,
+        source: dto.source,
+        maxAgeSeconds: Number.isFinite(maxAge) ? maxAge : undefined,
+      },
+      botToken,
+    );
+    const customer = await this.customerForSocialProfile(profile);
+    return this.issueTokens(customer.id, customer.phone);
+  }
+
+  async loginWithApple(dto: AppleSocialLoginDto): Promise<AuthTokens> {
+    const clientId = this.config.get<string>('APPLE_CLIENT_ID');
+    if (!clientId) {
+      throw new ValidationError(
+        'social_provider_not_configured',
+        'Apple login is not configured',
+      );
+    }
+    const profile = await verifyAppleIdentityToken({
+      identityToken: dto.identityToken,
+      clientId,
+      nonce: dto.nonce,
+      name: dto.name,
+      jwksUrl: this.config.get<string>('APPLE_JWKS_URL'),
+    });
+    const customer = await this.customerForSocialProfile(profile);
+    return this.issueTokens(customer.id, customer.phone);
+  }
+
   private async consumeOtp(phone: string, code: string): Promise<void> {
     const challenge = await this.prisma.otpChallenge.findFirst({
       where: { phone, consumedAt: null, expiresAt: { gt: new Date() } },
@@ -151,6 +200,52 @@ export class AuthService {
     });
   }
 
+  private async customerForSocialProfile(profile: SocialProfile): Promise<Customer> {
+    const existing = await this.prisma.customerIdentity.findUnique({
+      where: {
+        provider_subject: {
+          provider: profile.provider,
+          subject: profile.subject,
+        },
+      },
+      include: { customer: true },
+    });
+    if (existing) {
+      await this.prisma.customerIdentity.update({
+        where: { id: existing.id },
+        data: {
+          email: profile.email,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+        },
+      });
+      if (!existing.customer.name && profile.displayName) {
+        return this.prisma.customer.update({
+          where: { id: existing.customerId },
+          data: { name: profile.displayName },
+        });
+      }
+      return existing.customer;
+    }
+
+    return this.prisma.customer.create({
+      data: {
+        phone: socialPhone(profile.provider, profile.subject),
+        name: profile.displayName ?? profile.email ?? `${profile.provider}:${profile.subject}`,
+        segments: [`auth:${profile.provider}`],
+        identities: {
+          create: {
+            provider: profile.provider,
+            subject: profile.subject,
+            email: profile.email,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+          },
+        },
+      },
+    });
+  }
+
   private async issueTokens(
     customerId: string,
     phone: string,
@@ -173,4 +268,10 @@ export class AuthService {
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
+}
+
+function socialPhone(provider: string, subject: string): string {
+  const hex = createHash('sha256').update(`${provider}:${subject}`).digest('hex');
+  const value = BigInt(`0x${hex.slice(0, 14)}`) % 10_000_000_000n;
+  return `+999${value.toString().padStart(10, '0')}`;
 }

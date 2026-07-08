@@ -3,9 +3,10 @@
 ## Next
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Activate production channel accounts after provider credentials are available: set `NOTIFICATION_TRANSPORT=channels`, verify real Telegram/WhatsApp/Novu sends, and confirm webhooks/callbacks.
-- Connect real social login providers after Apple/Telegram credentials are available.
+- Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add provider-ready Apple/Telegram social login endpoints with CustomerIdentity linking.
 - Add channel-aware campaign delivery transports for Novu, SMTP email, Telegram Bot API, and WhatsApp Cloud API.
 - Protect owner Reports and AI endpoints with staff RBAC and web token handoff.
 - Add external integration readiness report at `GET /health/integrations`.

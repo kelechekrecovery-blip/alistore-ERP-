@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add provider-ready Apple/Telegram social login.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708130500_add_customer_identities/migration.sql`, `apps/api/src/auth/*`, `apps/api/src/health/external-readiness.ts`, `apps/api/test/social-auth.spec.ts`, `apps/web/lib/auth.tsx`, `apps/web/lib/api/auth.ts`, `apps/web/lib/api/campaigns.ts`, `apps/web/app/login/page.tsx`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
+- Result: added `CustomerIdentity` for stable provider subject linking, `POST /auth/social/telegram` with Telegram Mini App/Login Widget signed initData verification, `POST /auth/social/apple` with Apple identityToken JWKS/RS256 verification, deterministic customer creation for social-only accounts, and Telegram Mini App login handoff in `/login`.
+- Checks run: `npm run prisma:generate -w @alistore/api`; `npm run db:deploy -w @alistore/api`; test DB `prisma db push --skip-generate`; `npm run test -w @alistore/api -- social-auth auth external-readiness --runInBand`; `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`; `git diff --check`.
+- Outcome: targeted social/auth/readiness tests passed 8 suites / 28 tests; API build passed; web build passed; full API Jest passed 89 suites / 315 tests.
+- Next step: production social login activation still needs Apple/Telegram credentials, callback configuration, and live client SDK QA.
+
+## 2026-07-08
+
 - Task: add channel-aware campaign delivery transports.
 - Files changed: `apps/api/src/outbox/*`, `apps/api/src/campaigns/*`, `apps/api/src/health/external-readiness.ts`, `apps/api/test/channel-transport.spec.ts`, `apps/api/test/campaigns.e2e-spec.ts`, `apps/api/test/external-readiness.spec.ts`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
 - Result: `NOTIFICATION_TRANSPORT=channels`/`providers` now routes outbox messages by channel: Novu for `sms`/`push`/`webhook`, SMTP/json email for `email`, Telegram Bot API for `telegram`, WhatsApp Cloud API for `whatsapp`, with log fallback when credentials are absent. Campaigns now accept `whatsapp`, and Telegram campaigns can target `telegram:<chat_id>`/`tg:<chat_id>` customer segment values.

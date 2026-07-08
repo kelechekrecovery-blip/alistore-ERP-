@@ -153,11 +153,28 @@ model Customer {
   consent   Boolean         @default(false) // маркетинг только при true
   segments  String[]
   ltv       Int             @default(0)
+  identities CustomerIdentity[]
   orders    Order[]
   tradeIns  TradeInDevice[]
   createdAt DateTime        @default(now())
   // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
   // без @relation, чтобы очистка в тестах не каскадила через FK.
+}
+
+model CustomerIdentity {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider    String
+  subject     String
+  email       String?
+  displayName String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, subject])
+  @@index([customerId])
 }
 
 model Product {

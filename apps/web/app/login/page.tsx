@@ -1,11 +1,22 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 
+interface TelegramWebApp {
+  initData?: string;
+  ready?: () => void;
+}
+
+declare global {
+  interface Window {
+    Telegram?: { WebApp?: TelegramWebApp };
+  }
+}
+
 function LoginForm() {
-  const { requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp } = useAuth();
+  const { requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp, telegramLogin } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') || '/account';
@@ -17,7 +28,16 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  const [telegramInitData, setTelegramInitData] = useState('');
   const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
+
+  useEffect(() => {
+    const webApp = window.Telegram?.WebApp;
+    if (webApp?.initData) {
+      webApp.ready?.();
+      setTelegramInitData(webApp.initData);
+    }
+  }, []);
 
   async function send(e: React.FormEvent) {
     e.preventDefault(); setError(null);
@@ -41,6 +61,20 @@ function LoginForm() {
       router.push(next);
     }
     catch { setError(recovery ? 'Аккаунт не найден или код просрочен.' : 'Неверный или просроченный код.'); } finally { setBusy(false); }
+  }
+
+  async function loginTelegram() {
+    if (!telegramInitData) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await telegramLogin(telegramInitData, 'mini_app');
+      router.push(next);
+    } catch {
+      setError('Не удалось войти через Telegram.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   function switchMode(nextRecovery: boolean) {
@@ -89,7 +123,14 @@ function LoginForm() {
             <button type="submit" disabled={busy} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Отправляем…' : recovery ? 'Получить код восстановления' : 'Получить код по SMS'}</button>
             <div className="mt-3 flex gap-2.5">
               <button type="button" disabled className="flex-1 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3 text-center text-sm text-[#6E645C] opacity-70">Apple</button>
-              <button type="button" disabled className="flex-1 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3 text-center text-sm text-[#6E645C] opacity-70">Telegram</button>
+              <button
+                type="button"
+                onClick={loginTelegram}
+                disabled={busy || !telegramInitData}
+                className="flex-1 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3 text-center text-sm font-semibold text-white disabled:text-[#6E645C] disabled:opacity-70"
+              >
+                Telegram
+              </button>
             </div>
             <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-[#A79C92]">Продолжить как гость →</button>
           </form>

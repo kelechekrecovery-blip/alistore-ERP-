@@ -45,7 +45,7 @@ export interface CampaignRoi {
 }
 
 export interface CreateCampaignInput extends SegmentRules {
-  channel: 'sms' | 'push' | 'telegram';
+  channel: 'sms' | 'push' | 'telegram' | 'whatsapp';
   budget: number;
   message?: string;
 }
