@@ -6,6 +6,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add production core preflight for unsafe env and launch checks.
 - Add production activation pack with env template, strict readiness commands, and launch runbook.
 - Expose external production readiness inside the ERP owner console.
 - Add POS catalog delta-sync for offline cashier cache and stock refresh.

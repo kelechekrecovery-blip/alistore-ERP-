@@ -39,7 +39,9 @@ cd apps/web && npm run build && npx next start -p 3000
 ```bash
 npm run mvp:verify                     # schema + API/web build + Jest + Playwright + readiness
 npm run mvp:verify -- --skip-e2e       # быстрый gate без Playwright
+npm run launch:preflight               # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness               # secret-safe отчёт по apps/api/.env.production
+npm run launch:check                   # strict preflight + strict external readiness
 npm run launch:readiness:strict        # падает, пока production-блокеры не закрыты
 npm run api:test                       # 89 сьютов / 316 тестов (jest)
 npm run api:build                      # прод-сборка API

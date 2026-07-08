@@ -13,6 +13,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "ts-node prisma/seed.ts",
     "db:studio": "prisma studio",
+    "preflight": "ts-node scripts/print-production-preflight.ts",
     "readiness": "ts-node scripts/print-readiness.ts",
     "test": "jest",
     "test:watch": "jest --watch"

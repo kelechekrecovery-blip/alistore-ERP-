@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add production core preflight.
+- Files changed: `apps/api/src/health/production-preflight.ts`, `apps/api/scripts/print-production-preflight.ts`, `apps/api/test/production-preflight.spec.ts`, API/root `package.json`, `apps/api/.env.production.example`, `README.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `docs/PRODUCTION-ACTIVATION.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: added a secret-safe production core preflight that checks `NODE_ENV=production`, `DATABASE_URL`, a non-placeholder 32+ char `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and required background jobs before external provider readiness runs. Root launch commands now include `launch:preflight`, `launch:preflight:strict`, and `launch:check`.
+- Checks run: `npm run test -w @alistore/api -- production-preflight external-readiness --runInBand`; `npm run preflight -w @alistore/api -- --env-file .env.production.example`; `npm run preflight -w @alistore/api -- --env-file .env.production.example --json`; `npm run preflight -w @alistore/api -- --env-file .env.production.example --strict` (expected exit 1 on empty template); `npm run api:build`; `npm run readiness -w @alistore/api -- --env-file .env.production.example`; `npm run mvp:verify -- --skip-e2e`; `git diff --check`.
+- Outcome: targeted tests passed 2 suites / 6 tests; preflight example reports `ready=4, missing=2, unsafe=0, blocking=2`; strict mode fails as intended until production DB/JWT are filled; API build passed; fast MVP gate passed with Prisma schema validation, Prisma Client generation, API build, web build, API Jest 90 suites / 319 tests, and default readiness reporting.
+- Next step: fill `apps/api/.env.production`, run `npm run launch:check`, then close external provider/hardware QA.
+
+## 2026-07-08
+
 - Task: add production activation pack.
 - Files changed: `.gitignore`, `apps/api/.env.production.example`, `apps/api/scripts/print-readiness.ts`, root `package.json`, `docs/PRODUCTION-ACTIVATION.md`, `README.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: added a production env template ignored by git, launch readiness npm commands, a `--env-file`/`--json` readiness CLI mode, and a production activation runbook that separates software verification from external provider/hardware activation.

@@ -1,0 +1,165 @@
+export type ProductionPreflightStatus = 'ready' | 'missing' | 'unsafe';
+
+export interface ProductionPreflightCheck {
+  id: string;
+  area: string;
+  title: string;
+  status: ProductionPreflightStatus;
+  blocking: boolean;
+  requiredEnv: string[];
+  configuredEnv: string[];
+  missingEnv: string[];
+  note: string;
+}
+
+export interface ProductionPreflightReport {
+  status: 'ready' | 'blocked';
+  generatedAt: string;
+  summary: {
+    ready: number;
+    missing: number;
+    unsafe: number;
+    blockingRemaining: number;
+  };
+  checks: ProductionPreflightCheck[];
+  nextActions: string[];
+}
+
+type EnvReader = (name: string) => string | undefined;
+
+interface CheckDefinition {
+  id: string;
+  area: string;
+  title: string;
+  requiredEnv: string[];
+  note: string;
+  evaluate?: (env: EnvReader) => ProductionPreflightStatus;
+}
+
+const WEAK_JWT_SECRETS = new Set([
+  'dev-insecure-change-me',
+  'change-me',
+  'change-me-please',
+  'changeme',
+  'secret',
+  'jwt-secret',
+  'real-secret',
+  'password',
+]);
+
+const CHECKS: CheckDefinition[] = [
+  {
+    id: 'node_env',
+    area: 'runtime',
+    title: 'Production runtime mode',
+    requiredEnv: ['NODE_ENV'],
+    note: 'Set NODE_ENV=production for optimized Nest/Node behavior and production guards.',
+    evaluate: (env) => (env('NODE_ENV') === 'production' ? 'ready' : 'unsafe'),
+  },
+  {
+    id: 'database_url',
+    area: 'database',
+    title: 'Production database URL',
+    requiredEnv: ['DATABASE_URL'],
+    note: 'DATABASE_URL must point at the production PostgreSQL database.',
+  },
+  {
+    id: 'jwt_secret',
+    area: 'auth',
+    title: 'Strong JWT secret',
+    requiredEnv: ['JWT_SECRET'],
+    note: 'JWT_SECRET must be a non-placeholder secret of at least 32 characters.',
+    evaluate: (env) => {
+      const secret = env('JWT_SECRET')?.trim() ?? '';
+      if (!secret) return 'missing';
+      if (secret.length < 32 || WEAK_JWT_SECRETS.has(secret)) return 'unsafe';
+      return 'ready';
+    },
+  },
+  {
+    id: 'otp_dev_echo',
+    area: 'auth',
+    title: 'OTP dev echo disabled',
+    requiredEnv: ['AUTH_OTP_DEV_ECHO'],
+    note: 'AUTH_OTP_DEV_ECHO must be false so OTP codes are never returned in API responses.',
+    evaluate: (env) => {
+      const value = env('AUTH_OTP_DEV_ECHO')?.trim().toLowerCase();
+      if (!value) return 'missing';
+      return value === 'false' ? 'ready' : 'unsafe';
+    },
+  },
+  {
+    id: 'reservation_sweep',
+    area: 'jobs',
+    title: 'Reservation expiry sweep enabled',
+    requiredEnv: ['RESERVATION_SWEEP_ENABLED'],
+    note: 'RESERVATION_SWEEP_ENABLED=true keeps expired holds from locking stock.',
+    evaluate: (env) => boolReady(env, 'RESERVATION_SWEEP_ENABLED'),
+  },
+  {
+    id: 'outbox_relay',
+    area: 'jobs',
+    title: 'Outbox relay enabled',
+    requiredEnv: ['OUTBOX_RELAY_ENABLED'],
+    note: 'OUTBOX_RELAY_ENABLED=true lets transactional notifications and webhooks leave the durable outbox.',
+    evaluate: (env) => boolReady(env, 'OUTBOX_RELAY_ENABLED'),
+  },
+];
+
+export function buildProductionPreflightReport(
+  env: EnvReader,
+  now = new Date(),
+): ProductionPreflightReport {
+  const checks = CHECKS.map((definition) => evaluateCheck(definition, env));
+  const blockingRemaining = checks.filter((check) => check.status !== 'ready').length;
+
+  return {
+    status: blockingRemaining === 0 ? 'ready' : 'blocked',
+    generatedAt: now.toISOString(),
+    summary: {
+      ready: checks.filter((check) => check.status === 'ready').length,
+      missing: checks.filter((check) => check.status === 'missing').length,
+      unsafe: checks.filter((check) => check.status === 'unsafe').length,
+      blockingRemaining,
+    },
+    checks,
+    nextActions: checks
+      .filter((check) => check.status !== 'ready')
+      .map((check) => `${check.title}: ${check.note}`),
+  };
+}
+
+function evaluateCheck(
+  definition: CheckDefinition,
+  env: EnvReader,
+): ProductionPreflightCheck {
+  const configuredEnv = definition.requiredEnv.filter((name) => hasEnv(env, name));
+  const missingEnv = definition.requiredEnv.filter((name) => !hasEnv(env, name));
+  const status =
+    missingEnv.length > 0
+      ? 'missing'
+      : definition.evaluate?.(env) ?? 'ready';
+
+  return {
+    id: definition.id,
+    area: definition.area,
+    title: definition.title,
+    status,
+    blocking: true,
+    requiredEnv: definition.requiredEnv,
+    configuredEnv,
+    missingEnv,
+    note: definition.note,
+  };
+}
+
+function boolReady(env: EnvReader, name: string): ProductionPreflightStatus {
+  const value = env(name)?.trim().toLowerCase();
+  if (!value) return 'missing';
+  return value === 'true' ? 'ready' : 'unsafe';
+}
+
+function hasEnv(env: EnvReader, name: string): boolean {
+  const value = env(name);
+  return typeof value === 'string' && value.trim().length > 0;
+}

@@ -68,7 +68,9 @@ DATABASE_URL="postgresql://alistore@localhost:5432/alistore_test?schema=public" 
 npm run api:test
 npm run mvp:verify              # полный release gate: schema, builds, Jest, E2E, readiness
 npm run mvp:verify -- --skip-e2e # быстрый gate без Playwright
+npm run launch:preflight        # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness        # отчёт по apps/api/.env.production
+npm run launch:check            # strict preflight + strict external readiness
 npm run launch:readiness:strict # strict gate для внешних production-блокеров
 ```
 

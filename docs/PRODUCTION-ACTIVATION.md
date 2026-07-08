@@ -35,16 +35,21 @@ Required for a production-ready report:
 ## 3. Check external readiness
 
 ```bash
+npm run launch:preflight
 npm run launch:readiness
+npm run launch:check
 npm run launch:readiness:strict
 ```
 
-`launch:readiness` prints a secret-safe report. `launch:readiness:strict` exits non-zero
-until every blocking provider/hardware check is ready.
+`launch:preflight` checks the core production env: `NODE_ENV=production`,
+`DATABASE_URL`, strong `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and enabled background
+jobs. `launch:readiness` prints a secret-safe external report. `launch:check` runs the
+strict core preflight and strict external readiness gates together.
 
 For machine-readable automation:
 
 ```bash
+npm run preflight -w @alistore/api -- --env-file .env.production --json
 npm run readiness -w @alistore/api -- --env-file .env.production --json
 ```
 
@@ -70,7 +75,7 @@ Set `POS_HARDWARE_CERTIFIED=true` only after all checks pass in the store:
 
 ```bash
 npm run mvp:verify -- --skip-e2e
-npm run launch:readiness:strict
+npm run launch:check
 ```
 
 If both pass in the deployment environment and the ERP `/erp` → `Готовность` tab shows
