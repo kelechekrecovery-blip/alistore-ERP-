@@ -7,6 +7,7 @@
 - Result: signed-in native customers can now choose an eligible order from account history, select or type a return reason, and open a return request through the existing customer-JWT protected `POST /returns` flow.
 - Checks run: `npm run mobile:typecheck`; `npm run test -w @alistore/api -- returns-exchanges-rbac --runInBand`; `npm run api:build`; `npm run test -w @alistore/api -- returns exchange returns-exchanges-rbac --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
 - Outcome: mobile typecheck passed; targeted returns/exchanges RBAC test passed 1/1; API build passed; return/exchange regressions passed 2 suites / 3 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Commit: `5e1891b`.
 - Next step: continue native customer account surfaces or move to physical TestFlight/Play Internal QA when credentials/devices are available.
 
 ## 2026-07-08
@@ -16,6 +17,7 @@
 - Result: the signed-in native account cabinet now reads the customer profile, shows marketing consent, and toggles it with the customer JWT. The customer consent endpoint now rejects a customer JWT trying to change another customer's consent while preserving existing staff/ERP compatibility.
 - Checks run: `npm run test -w @alistore/api -- customer-pii-guard --runInBand`; `npm run mobile:typecheck`; `npm run api:build`; `npm run test -w @alistore/api -- customers customer-pii-guard transactional-notifications campaigns --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
 - Outcome: customer PII/consent guard test passed 3/3; mobile typecheck passed; API build passed; customer/consent/campaign regressions passed 4 suites / 10 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Commit: `480386c`.
 - Next step: continue native account surfaces or move to physical TestFlight/Play Internal QA when credentials/devices are available.
 
 ## 2026-07-08
@@ -25,6 +27,7 @@
 - Result: signed-in native customers can now open a warranty case directly from a purchased device card. The mobile app sends the customer JWT, updates the device warranty state after creation, and the warranty open endpoint now rejects a customer JWT trying to submit another customer's id.
 - Checks run: `npm run test -w @alistore/api -- warranty-rbac --runInBand`; `npm run mobile:typecheck`; `npm run api:build`; `npm run test -w @alistore/api -- warranty --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
 - Outcome: targeted warranty RBAC test passed 1/1; mobile typecheck passed; API build passed; warranty regression passed 3 suites / 8 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Commit: `13025f0`.
 - Next step: continue native account surfaces or move to physical TestFlight/Play Internal QA when credentials/devices are available.
 
 ## 2026-07-08
@@ -34,6 +37,7 @@
 - Result: native signed-in customers can now list and open support tickets from the account cabinet with priority/SLA/status visibility. The support ticket list endpoint no longer exposes `customerId` filtered reads anonymously; customer JWTs can read only their own tickets, while staff still need `support/read`.
 - Checks run: `npm run test -w @alistore/api -- support-rbac --runInBand`; `npm run mobile:typecheck`; `npm run api:build`; `npm run test -w @alistore/api -- support public-rate-limit --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
 - Outcome: targeted support RBAC test passed 1/1; mobile typecheck passed; API build passed; support/rate-limit regression passed 3 suites / 11 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Commit: `c4eab0b`.
 - Next step: continue native account surfaces or move to external TestFlight/Play Internal QA when credentials/devices are available.
 
 ## 2026-07-08
@@ -43,6 +47,7 @@
 - Result: signed-in native customers now load purchased devices from `GET /customers/me/devices`, see product, IMEI, device status, warranty expiry, days-left state, and active warranty-case status in the account cabinet. Account data loading now refreshes the customer session once before fetching orders/devices, avoiding refresh-token reuse races.
 - Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `npm run test -w @alistore/api -- exchange --runInBand`; `git diff --check`.
 - Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; targeted exchange/device API tests passed 2 suites / 3 tests; whitespace check passed.
+- Commit: `96364a4`.
 - Next step: add the next native account surface backed by existing API or move to external TestFlight/Play Internal QA when credentials/devices are available.
 
 ## 2026-07-08
@@ -52,6 +57,7 @@
 - Result: signed-in native customers now load their own order history from `GET /orders/mine`, see status/channel/items/total in the account cabinet, can refresh the list manually, and the app refreshes expired customer access tokens before loading history.
 - Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `npm run test -w @alistore/api -- orders-account --runInBand`; `git diff --check`.
 - Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; targeted API account-order test passed 1/1; whitespace check passed.
+- Commit: `3d01597`.
 - Next step: add the next native account surface that is already backed by existing API, then verify on physical TestFlight/Play Internal builds once credentials/devices are available.
 
 ## 2026-07-08
@@ -61,6 +67,7 @@
 - Result: the native client cabinet now restores a SecureStore customer session, refreshes expired access tokens on app start, supports phone OTP login/logout, creates signed-in checkout orders with the authenticated `customerId`, and registers client push tokens as `scope=customer` with the customer JWT instead of anonymous tokens.
 - Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
 - Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Commit: `b07ed48`.
 - Next step: verify the OTP/push flow on real TestFlight/Play Internal builds once EAS project id, push credentials, SMS provider, and store test devices are available.
 
 ## 2026-07-08
