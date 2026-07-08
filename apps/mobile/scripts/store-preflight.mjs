@@ -34,10 +34,13 @@ check(Boolean(metroConfig), 'metro.config.js exists');
 if (appJson?.expo) {
   const expo = appJson.expo;
   const splash = getPluginConfig(expo.plugins, 'expo-splash-screen');
+  const notifications = getPluginConfig(expo.plugins, 'expo-notifications');
   check(expo.name === 'AliStore Native', 'Expo app name is set');
   check(expo.slug === 'alistore-native', 'Expo slug is stable');
   check(Boolean(expo.icon), 'Expo icon is configured');
   check(Boolean(splash?.image), 'Expo splash image is configured');
+  check(Boolean(notifications), 'Expo Notifications plugin is configured');
+  check(notifications?.defaultChannel === 'orders', 'Expo Notifications default channel is orders');
   check(Boolean(expo.ios?.bundleIdentifier), 'iOS bundleIdentifier is configured');
   check(Boolean(expo.ios?.buildNumber), 'iOS buildNumber is configured');
   check(expo.ios?.config?.usesNonExemptEncryption === false, 'iOS non-exempt encryption flag is false');
@@ -62,8 +65,12 @@ check(
   'Expo autolinking scans only direct mobile native dependencies'
 );
 check(packageJson?.dependencies?.['react-dom'] === '19.2.3', 'Mobile react-dom peer is pinned to React 19');
+check(packageJson?.dependencies?.['expo-notifications'] === '~57.0.3', 'Expo Notifications dependency is pinned');
+check(packageJson?.dependencies?.['expo-device'] === '~57.0.0', 'Expo Device dependency is pinned');
 check(packageLock?.packages?.['node_modules/react']?.version === '19.2.3', 'Mobile lock pins React 19');
 check(packageLock?.packages?.['node_modules/react-dom']?.version === '19.2.3', 'Mobile lock pins React DOM 19');
+check(packageLock?.packages?.['node_modules/expo-notifications']?.version === '57.0.3', 'Mobile lock pins Expo Notifications');
+check(packageLock?.packages?.['node_modules/expo-device']?.version === '57.0.0', 'Mobile lock pins Expo Device');
 
 if (metroConfig) {
   check(metroConfig.includes('getDefaultConfig'), 'Metro config extends Expo defaults');
@@ -107,6 +114,8 @@ for (const path of [
 
 const apiBase = process.env.EXPO_PUBLIC_API_BASE;
 const apiReady = Boolean(apiBase && /^https:\/\//.test(apiBase) && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(apiBase));
+const easProjectId = appJson?.expo?.extra?.eas?.projectId ?? process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+const pushProjectReady = typeof easProjectId === 'string' && easProjectId.trim().length > 0;
 const ascKeyFileReady = process.env.EXPO_ASC_API_KEY_PATH
   ? existsSync(resolveLocalPath(process.env.EXPO_ASC_API_KEY_PATH))
   : false;
@@ -125,11 +134,13 @@ const googleReady = Boolean(
 );
 if (strict) {
   check(apiReady, 'strict: EXPO_PUBLIC_API_BASE is a production HTTPS API URL');
+  check(pushProjectReady, 'strict: EAS project id is configured for Expo push tokens');
   check(Boolean(process.env.EXPO_TOKEN), 'strict: EXPO_TOKEN is configured for EAS automation');
   check(appleReady, 'strict: Apple team/API credentials are configured');
   check(googleReady, 'strict: Google Play service account is configured');
 } else {
   warn(apiReady, 'EXPO_PUBLIC_API_BASE is not a production HTTPS URL; strict store preflight will require it');
+  warn(pushProjectReady, 'EAS project id is not configured; native push token registration will be unavailable');
 }
 
 const failed = results.filter((result) => result.level === 'fail');

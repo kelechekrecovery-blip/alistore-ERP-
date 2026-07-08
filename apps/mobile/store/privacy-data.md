@@ -13,6 +13,8 @@ Data safety. It is not a legal policy; publish the final policy at
   when those flows are enabled.
 - Identifiers: customer id, staff id, order id, device/unit identifiers such as IMEI
   for warranty, stock, and fraud prevention.
+- Device data: Expo push token and local installation id when the user enables native
+  notifications.
 - Diagnostics: crash and error events if observability is enabled.
 
 ## Data Use

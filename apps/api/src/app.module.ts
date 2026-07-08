@@ -39,6 +39,7 @@ import { AiModule } from './ai/ai.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { GiftcardsModule } from './giftcards/giftcards.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { GiftcardsModule } from './giftcards/giftcards.module';
     AiModule,
     CampaignsModule,
     GiftcardsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -12,6 +12,7 @@
 ## Required Production Values
 
 - `EXPO_PUBLIC_API_BASE=https://.../api` in the EAS production environment.
+- `EXPO_PUBLIC_EAS_PROJECT_ID` from the linked EAS project.
 - Production API must pass `npm run launch:check` at the repository root.
 - Demo customer account and staff account for reviewers.
 - Published privacy policy: `https://alistore.kg/privacy`.
@@ -44,3 +45,4 @@
 - Staff order queue.
 - POS sale with cash/card/QR methods.
 - Discount above approval threshold returns approval state.
+- Push permission prompt and `POST /notifications/push-tokens` registration.

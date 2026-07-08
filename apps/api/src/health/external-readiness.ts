@@ -126,6 +126,20 @@ const CHECKS: CheckDefinition[] = [
     note: 'Segment Builder and ROI are ready; set NOTIFICATION_TRANSPORT=channels/providers or a single transport with Novu, SMTP, Telegram, or WhatsApp credentials.',
   },
   {
+    id: 'native_push',
+    area: 'mobile',
+    title: 'Native push notification credentials',
+    requiredEnv: ['EXPO_PUBLIC_EAS_PROJECT_ID', 'EXPO_TOKEN'],
+    optionalEnv: [
+      'EXPO_PUSH_ACCESS_TOKEN',
+      'FCM_SERVICE_ACCOUNT_KEY_PATH',
+      'APNS_KEY_ID',
+      'APNS_TEAM_ID',
+    ],
+    blocking: true,
+    note: 'Native iOS/Android app can register Expo push tokens; EAS project and push credentials must be configured before store QA.',
+  },
+  {
     id: 'pos_hardware',
     area: 'hardware',
     title: 'Physical POS certification',

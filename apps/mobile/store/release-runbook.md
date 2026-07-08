@@ -8,7 +8,7 @@ Run all commands from the repository root unless stated otherwise.
 2. Create App Store Connect app `kg.alistore.mobile`.
 3. Create Google Play app `kg.alistore.mobile`.
 4. Copy `apps/mobile/.env.production.example` to `apps/mobile/.env.production`.
-5. Fill `EXPO_PUBLIC_API_BASE`, `EXPO_TOKEN`, Apple credentials, and Google Play credentials.
+5. Fill `EXPO_PUBLIC_API_BASE`, `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_TOKEN`, Apple credentials, and Google Play credentials.
 6. Put ignored local credential files in `apps/mobile` when using file paths:
    - `AuthKey_*.p8`
    - `google-service-account.json`
@@ -54,3 +54,4 @@ status. Promote manually after review of the Play pre-launch report.
 - Offline/slow-network states.
 - iPhone small/large screen and Android small/large screen.
 - App Store privacy labels and Google Play data safety match `store/privacy-data.md`.
+- Native push permission prompt appears only after tapping the in-app push control, and `POST /notifications/push-tokens` succeeds.

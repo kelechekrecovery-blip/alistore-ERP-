@@ -154,6 +154,7 @@ model Customer {
   segments  String[]
   ltv       Int             @default(0)
   identities CustomerIdentity[]
+  pushTokens PushToken[]
   orders    Order[]
   tradeIns  TradeInDevice[]
   createdAt DateTime        @default(now())
@@ -175,6 +176,26 @@ model CustomerIdentity {
 
   @@unique([provider, subject])
   @@index([customerId])
+}
+
+model PushToken {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  platform   String
+  deviceId   String
+  appScope   String    @default("anonymous") // anonymous | customer | staff
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffId    String?
+  staff      StaffUser? @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  enabled    Boolean   @default(true)
+  lastSeenAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([customerId, enabled])
+  @@index([staffId, enabled])
+  @@index([platform])
 }
 
 model Product {
@@ -550,6 +571,7 @@ model StaffUser {
   active       Boolean  @default(true)
   totpSecret   String?
   totpEnabled  Boolean  @default(false)
+  pushTokens   PushToken[]
   createdAt    DateTime @default(now())
 
   @@index([role])

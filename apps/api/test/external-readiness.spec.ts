@@ -36,6 +36,8 @@ describe('External readiness report', () => {
       APPLE_PRIVATE_KEY: 'set',
       NOTIFICATION_TRANSPORT: 'channels',
       NOVU_API_KEY: 'set',
+      EXPO_PUBLIC_EAS_PROJECT_ID: 'set',
+      EXPO_TOKEN: 'set',
       POS_HARDWARE_CERTIFIED: 'true',
     };
 

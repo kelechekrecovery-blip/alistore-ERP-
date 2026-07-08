@@ -9,6 +9,7 @@ import type {
   PosSaleOutcome,
   PosPayment,
   QueueOrder,
+  RegisteredPushToken,
   StaffLoginResult,
 } from '@mobile/types';
 
@@ -128,6 +129,19 @@ export const api = {
     return requestJson<StaffLoginResult>('/staff-auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+    });
+  },
+
+  registerPushToken(input: {
+    token: string;
+    platform: 'ios' | 'android' | 'web' | 'unknown';
+    deviceId: string;
+    scope?: 'anonymous' | 'customer' | 'staff';
+  }, accessToken?: string) {
+    return requestJson<RegisteredPushToken>('/notifications/push-tokens', {
+      method: 'POST',
+      token: accessToken,
+      body: JSON.stringify(input),
     });
   },
 

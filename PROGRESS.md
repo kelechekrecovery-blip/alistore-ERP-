@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native push token readiness for App Store / Google Play builds.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708152000_add_push_tokens/migration.sql`, `apps/api/src/notifications/*`, `apps/api/src/health/external-readiness.ts`, `apps/api/.env.production.example`, `apps/api/test/notifications-push-tokens.spec.ts`, `apps/api/test/external-readiness.spec.ts`, `apps/mobile/*`, `apps/mobile/store/*`, `docs/READINESS.md`, `docs/PRODUCTION-ACTIVATION.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: native app now uses `expo-notifications`/`expo-device` to request push permission from an in-app control, create the Android notification channel, fetch an Expo push token from the EAS project id, and register it through `POST /notifications/push-tokens`. Backend stores tokens as anonymous/customer/staff-bound records without trusting owner ids from the request body, and readiness/preflight now exposes the `native_push` production blocker.
+- Checks run: `npm run prisma:generate -w @alistore/api`; `npm run db:deploy -w @alistore/api`; test DB `prisma db push --skip-generate`; `npm run test -w @alistore/api -- notifications-push-tokens external-readiness --runInBand`; `npm run api:build`; `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run store:preflight:production` (expected failure without real ignored `apps/mobile/.env.production`); dummy strict mobile store preflight with temporary Apple/Google credentials and EAS project id; `npm exec -w @alistore/api -- prisma validate`; `npm run readiness -w @alistore/api -- --env-file .env.production.example`; `npm run readiness -w @alistore/api -- --env-file .env.production.example --json`; `cd apps/mobile && npx expo config --json`; `git diff --check`.
+- Outcome: targeted API tests passed 2 suites / 6 tests; API build, mobile typecheck, Prisma validation, store preflight, dummy strict store preflight, readiness text/json, and whitespace check passed. Production templates now report `native_push` as blocked until real `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_TOKEN`, and EAS/APNs/FCM credentials are configured.
+- Next step: account-bound native release still needs real Apple/Google/EAS accounts, production env files, physical-device push QA, and TestFlight/Play Internal submissions.
+
+## 2026-07-08
+
 - Task: add native production release credential gate.
 - Files changed: `.gitignore`, `apps/mobile/.env.production.example`, `apps/mobile/eas.json`, `apps/mobile/package.json`, `apps/mobile/scripts/store-preflight.mjs`, `apps/mobile/store/release-runbook.md`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: mobile release now has an ignored production env template, a release runbook, a strict `store:preflight:production` gate that loads local release env values, validates Apple/App Store Connect and Google Play credential paths or base64 secrets, and verifies the Android submit profile points at the expected service account JSON.

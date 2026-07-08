@@ -44,6 +44,14 @@
       "expo-secure-store",
       "expo-font",
       [
+        "expo-notifications",
+        {
+          "color": "#C7F464",
+          "defaultChannel": "orders",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",

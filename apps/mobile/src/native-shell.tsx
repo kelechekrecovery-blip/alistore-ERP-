@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { API_BASE, api } from '@mobile/api-client';
+import { registerNativePush, type NativePushRegistration } from '@mobile/push-notifications';
 import { ClientScreen } from '@mobile/screens/client-screen';
 import { StaffScreen } from '@mobile/screens/staff-screen';
 import { BrandMark, GhostButton } from '@mobile/ui';
@@ -11,6 +12,7 @@ import { radius, theme } from '@mobile/theme';
 import type { CatalogProduct } from '@mobile/types';
 
 type Mode = 'client' | 'staff';
+type PushUiState = 'idle' | 'loading' | NativePushRegistration['status'];
 
 export function NativeShell() {
   const insets = useSafeAreaInsets();
@@ -19,6 +21,8 @@ export function NativeShell() {
   const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [pushState, setPushState] = useState<PushUiState>('idle');
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   const stats = useMemo(() => {
     const available = products.reduce((sum, product) => sum + product.availableUnits, 0);
@@ -44,6 +48,32 @@ export function NativeShell() {
   useEffect(() => {
     void loadCatalog();
   }, []);
+
+  async function enablePush() {
+    if (pushState === 'loading') return;
+    setPushState('loading');
+    setPushMessage(null);
+    const registration = await registerNativePush();
+    if (registration.status !== 'registered' || !registration.token) {
+      setPushState(registration.status);
+      setPushMessage(registration.message ?? null);
+      return;
+    }
+
+    try {
+      const saved = await api.registerPushToken({
+        token: registration.token,
+        platform: registration.platform,
+        deviceId: registration.deviceId,
+        scope: mode === 'staff' ? 'staff' : 'customer',
+      });
+      setPushState('registered');
+      setPushMessage(saved.scope === 'anonymous' ? 'Push token сохранён' : 'Push привязан к аккаунту');
+    } catch (cause) {
+      setPushState('error');
+      setPushMessage(cause instanceof Error ? cause.message : 'Push token не сохранён');
+    }
+  }
 
   const activeScreen = mode === 'client'
     ? (
@@ -118,11 +148,38 @@ export function NativeShell() {
         <GhostButton label={`${stats.categories || 0} категорий`} icon="grid-outline" />
         <GhostButton label="Native fetch" icon="cloud-done-outline" />
         <GhostButton label="Secure staff token" icon="shield-checkmark-outline" />
+        <GhostButton
+          label={pushLabel(pushState)}
+          icon={pushState === 'registered' ? 'notifications' : 'notifications-outline'}
+          active={pushState === 'registered'}
+          onPress={enablePush}
+        />
       </ScrollView>
+
+      {pushMessage ? (
+        <Text selectable numberOfLines={1} style={styles.pushMessage}>{pushMessage}</Text>
+      ) : null}
 
       <View style={styles.screenWrap}>{activeScreen}</View>
     </View>
   );
+}
+
+function pushLabel(state: PushUiState): string {
+  switch (state) {
+    case 'loading':
+      return 'Push...';
+    case 'registered':
+      return 'Push on';
+    case 'denied':
+      return 'Push off';
+    case 'unavailable':
+      return 'Push setup';
+    case 'error':
+      return 'Push error';
+    default:
+      return 'Push';
+  }
 }
 
 function ModeButton({
@@ -228,6 +285,12 @@ const styles = StyleSheet.create({
   signalRailContent: {
     gap: 8,
     paddingHorizontal: 16,
+  },
+  pushMessage: {
+    color: theme.muted,
+    fontSize: 11,
+    paddingHorizontal: 18,
+    paddingTop: 6,
   },
   screenWrap: {
     flex: 1,

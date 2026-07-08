@@ -28,6 +28,7 @@ Required for a production-ready report:
 - WhatsApp: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, webhook verify token.
 - Apple login: `APPLE_CLIENT_ID` plus Apple callback/client configuration.
 - Campaign delivery: `NOTIFICATION_TRANSPORT=channels` with Novu, SMTP, Telegram, or WhatsApp credentials.
+- Native mobile push: `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_TOKEN`, and EAS/APNs/FCM push credentials.
 - Media: S3/MinIO values for production Evidence Vault storage.
 - Observability: `SENTRY_DSN` or compatible GlitchTip/Sentry DSN.
 - `POS_HARDWARE_CERTIFIED=true` only after the on-site hardware checks below pass.
@@ -61,6 +62,7 @@ Before setting the strict gate to green, verify live callbacks:
 - WhatsApp Cloud API can send a template/test message and validate the webhook token.
 - Apple Sign in returns an identity token accepted by `POST /auth/social/apple`.
 - Campaign delivery sends through the selected channel transport without fallback logs.
+- Native iOS/Android app obtains an Expo push token and `POST /notifications/push-tokens` stores it.
 - Sentry/GlitchTip receives a controlled test error from the production API.
 
 ## 5. POS hardware certification

@@ -60,6 +60,18 @@ export interface StaffLoginResult {
   totpEnabled: boolean;
 }
 
+export interface RegisteredPushToken {
+  id: string;
+  token: string;
+  platform: 'ios' | 'android' | 'web' | 'unknown';
+  deviceId: string;
+  scope: 'anonymous' | 'customer' | 'staff';
+  customerId: string | null;
+  staffId: string | null;
+  enabled: boolean;
+  lastSeenAt: string;
+}
+
 export interface PosLine {
   productId: string;
   sku: string;
