@@ -16,6 +16,8 @@ import type {
   QueueOrder,
   RegisteredPushToken,
   StaffLoginResult,
+  SupportPriority,
+  SupportTicket,
 } from '@mobile/types';
 
 const configuredBase = process.env.EXPO_PUBLIC_API_BASE?.trim();
@@ -117,6 +119,23 @@ export const api = {
 
   fetchMyDevices(token: string) {
     return requestJson<MyDevice[]>('/customers/me/devices', { token });
+  },
+
+  fetchSupportTickets(input: { customerId: string }, token: string) {
+    return requestJson<SupportTicket[]>(`/support/tickets${query({ customerId: input.customerId })}`, { token });
+  },
+
+  openSupportTicket(input: {
+    customerId: string;
+    subject: string;
+    body?: string;
+    priority?: SupportPriority;
+  }, token: string) {
+    return requestJson<SupportTicket>('/support/tickets', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ ...input, channel: 'app' }),
+    });
   },
 
   refreshCustomerSession(refreshToken: string) {

@@ -47,6 +47,21 @@ export interface MyDevice {
   warranty: { id: string; status: string; sla: string } | null;
 }
 
+export type SupportPriority = 'normal' | 'high' | 'urgent';
+
+export interface SupportTicket {
+  id: string;
+  customerId: string;
+  channel: string;
+  subject: string;
+  body: string | null;
+  priority: SupportPriority;
+  status: string;
+  sla: string;
+  assignee: string | null;
+  createdAt: string;
+}
+
 export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
 export type PaymentMethod = OnlinePaymentMethod | 'cash' | 'bakai_pos' | 'obank';
 

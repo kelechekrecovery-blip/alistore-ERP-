@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuditModule } from '../src/audit/audit.module';
@@ -13,6 +14,7 @@ describe('Support CRM RBAC split', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let staffAuth: StaffAuthService;
+  let jwt: JwtService;
   let adminToken: string;
   let adminId: string;
   let sellerToken: string;
@@ -22,6 +24,7 @@ describe('Support CRM RBAC split', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
+        JwtModule.register({ secret: process.env.JWT_SECRET ?? 'dev-insecure-change-me' }),
         PrismaModule,
         AuditModule,
         StaffAuthModule,
@@ -34,6 +37,7 @@ describe('Support CRM RBAC split', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
+    jwt = moduleRef.get(JwtService);
 
     const createSession = async (role: 'admin' | 'seller') => {
       const username = `${role}-support-${RUN}`;
@@ -73,8 +77,15 @@ describe('Support CRM RBAC split', () => {
     });
   }
 
-  it('keeps customer ticket open/list public but guards CRM inbox actions', async () => {
+  function customerToken(customerId: string, phone: string) {
+    return jwt.sign({ sub: customerId, typ: 'customer', phone });
+  }
+
+  it('keeps customer ticket open public but scopes ticket reads to owner/staff', async () => {
     const customer = await customerFixture();
+    const otherCustomer = await prisma.customer.create({
+      data: { phone: `+996705${RUN}`, name: 'Other Support RBAC' },
+    });
 
     const opened = await request(app.getHttpServer())
       .post('/support/tickets')
@@ -91,7 +102,15 @@ describe('Support CRM RBAC split', () => {
 
     await request(app.getHttpServer())
       .get(`/support/tickets?customerId=${customer.id}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/support/tickets?customerId=${customer.id}`)
+      .set('Authorization', `Bearer ${customerToken(customer.id, customer.phone)}`)
       .expect(200);
+    await request(app.getHttpServer())
+      .get(`/support/tickets?customerId=${customer.id}`)
+      .set('Authorization', `Bearer ${customerToken(otherCustomer.id, otherCustomer.phone)}`)
+      .expect(403);
 
     await request(app.getHttpServer()).get('/support/tickets').expect(403);
     await request(app.getHttpServer())

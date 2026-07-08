@@ -34,10 +34,14 @@ export class SupportController {
   @ApiCreatedResponse({ description: 'Ticket opened.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown customer.' })
   @Post()
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  open(@Body() dto: OpenTicketDto) {
-    return this.support.open(dto, dto.customerId);
+  open(@Body() dto: OpenTicketDto, @CurrentUser() user?: AuthPrincipal) {
+    if (user?.typ === 'customer' && dto.customerId !== user.customerId) {
+      throw new ForbiddenException('Нельзя открыть тикет от имени другого клиента');
+    }
+    const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
+    return this.support.open({ ...dto, customerId }, customerId);
   }
 
   @ApiOperation({ summary: 'List tickets (filter by customerId/status), SLA-first' })
@@ -48,7 +52,17 @@ export class SupportController {
     @Query('customerId') customerId?: string,
     @Query('status') status?: string,
   ) {
-    if (!customerId) await this.requireStaffPermission(user, 'read');
+    if (customerId) {
+      if (user?.typ === 'customer') {
+        if (user.customerId !== customerId) {
+          throw new ForbiddenException('Нельзя читать тикеты другого клиента');
+        }
+      } else {
+        await this.requireStaffPermission(user, 'read');
+      }
+    } else {
+      await this.requireStaffPermission(user, 'read');
+    }
     return this.support.list({ customerId, status });
   }
 

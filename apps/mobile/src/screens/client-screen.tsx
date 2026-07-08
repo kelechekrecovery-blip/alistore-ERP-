@@ -16,7 +16,17 @@ import { formatSom, shortId } from '@mobile/format';
 import { clearCustomerSession, getStoredCustomerSession, saveCustomerSession } from '@mobile/secure-session';
 import { radius, theme } from '@mobile/theme';
 import { EmptyState, Field, GhostButton, MetricCard, Pill, PrimaryButton, ProductPoster, SectionTitle } from '@mobile/ui';
-import type { CatalogProduct, CreatedOrder, CustomerOrder, CustomerSession, MyDevice, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
+import type {
+  CatalogProduct,
+  CreatedOrder,
+  CustomerOrder,
+  CustomerSession,
+  MyDevice,
+  OnlinePaymentMethod,
+  PaymentIntent,
+  SupportPriority,
+  SupportTicket,
+} from '@mobile/types';
 
 type ClientTab = 'home' | 'catalog' | 'favorites' | 'cart' | 'account';
 type ClientPayment = 'cash' | OnlinePaymentMethod;
@@ -79,6 +89,13 @@ export function ClientScreen({
   const [devices, setDevices] = useState<MyDevice[]>([]);
   const [devicesBusy, setDevicesBusy] = useState(false);
   const [devicesError, setDevicesError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketsBusy, setTicketsBusy] = useState(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [supportSubject, setSupportSubject] = useState('');
+  const [supportBody, setSupportBody] = useState('');
+  const [supportPriority, setSupportPriority] = useState<SupportPriority>('normal');
+  const [supportBusy, setSupportBusy] = useState(false);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -139,6 +156,8 @@ export function ClientScreen({
       setOrdersError(null);
       setDevices([]);
       setDevicesError(null);
+      setTickets([]);
+      setTicketsError(null);
       return;
     }
     void loadAccountData(customerSession);
@@ -239,6 +258,11 @@ export function ClientScreen({
       setOrdersError(null);
       setDevices([]);
       setDevicesError(null);
+      setTickets([]);
+      setTicketsError(null);
+      setSupportSubject('');
+      setSupportBody('');
+      setSupportPriority('normal');
     } finally {
       setAuthBusy(false);
     }
@@ -251,6 +275,7 @@ export function ClientScreen({
       onSessionChange?.(null);
       setOrders([]);
       setDevices([]);
+      setTickets([]);
       return null;
     }
     if (readySession.accessToken !== session.accessToken || readySession.refreshToken !== session.refreshToken) {
@@ -261,30 +286,36 @@ export function ClientScreen({
   }
 
   async function loadAccountData(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
     setOrdersBusy(true);
     setDevicesBusy(true);
+    setTicketsBusy(true);
     setOrdersError(null);
     setDevicesError(null);
+    setTicketsError(null);
     try {
       const readySession = await prepareCustomerSession(session);
       if (!readySession) return;
-      const [ordersResult, devicesResult] = await Promise.allSettled([
+      const [ordersResult, devicesResult, ticketsResult] = await Promise.allSettled([
         api.fetchMyOrders(readySession.accessToken),
         api.fetchMyDevices(readySession.accessToken),
+        api.fetchSupportTickets({ customerId: readySession.customerId }, readySession.accessToken),
       ]);
       if (ordersResult.status === 'fulfilled') setOrders(ordersResult.value);
       else setOrdersError(ordersResult.reason instanceof Error ? ordersResult.reason.message : 'Заказы не загружены.');
       if (devicesResult.status === 'fulfilled') setDevices(devicesResult.value);
       else setDevicesError(devicesResult.reason instanceof Error ? devicesResult.reason.message : 'Устройства не загружены.');
+      if (ticketsResult.status === 'fulfilled') setTickets(ticketsResult.value);
+      else setTicketsError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : 'Тикеты не загружены.');
     } finally {
       setOrdersBusy(false);
       setDevicesBusy(false);
+      setTicketsBusy(false);
     }
   }
 
   async function loadCustomerOrders(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
     setOrdersBusy(true);
     setOrdersError(null);
     try {
@@ -300,7 +331,7 @@ export function ClientScreen({
   }
 
   async function loadCustomerDevices(session = customerSession) {
-    if (!session || ordersBusy || devicesBusy) return;
+    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
     setDevicesBusy(true);
     setDevicesError(null);
     try {
@@ -312,6 +343,51 @@ export function ClientScreen({
       setDevicesError(cause instanceof Error ? cause.message : 'Устройства не загружены.');
     } finally {
       setDevicesBusy(false);
+    }
+  }
+
+  async function loadSupportTickets(session = customerSession) {
+    if (!session || ordersBusy || devicesBusy || ticketsBusy) return;
+    setTicketsBusy(true);
+    setTicketsError(null);
+    try {
+      const readySession = await prepareCustomerSession(session);
+      if (!readySession) return;
+      const mine = await api.fetchSupportTickets({ customerId: readySession.customerId }, readySession.accessToken);
+      setTickets(mine);
+    } catch (cause) {
+      setTicketsError(cause instanceof Error ? cause.message : 'Тикеты не загружены.');
+    } finally {
+      setTicketsBusy(false);
+    }
+  }
+
+  async function openSupportTicket() {
+    if (!customerSession || supportBusy) return;
+    const subject = supportSubject.trim();
+    if (subject.length < 3) {
+      setTicketsError('Коротко опишите вопрос.');
+      return;
+    }
+    setSupportBusy(true);
+    setTicketsError(null);
+    try {
+      const readySession = await prepareCustomerSession(customerSession);
+      if (!readySession) return;
+      const ticket = await api.openSupportTicket({
+        customerId: readySession.customerId,
+        subject,
+        body: supportBody.trim() || undefined,
+        priority: supportPriority,
+      }, readySession.accessToken);
+      setTickets((current) => [ticket, ...current.filter((item) => item.id !== ticket.id)]);
+      setSupportSubject('');
+      setSupportBody('');
+      setSupportPriority('normal');
+    } catch (cause) {
+      setTicketsError(cause instanceof Error ? cause.message : 'Тикет не создан.');
+    } finally {
+      setSupportBusy(false);
     }
   }
 
@@ -476,6 +552,13 @@ export function ClientScreen({
             devices={devices}
             devicesBusy={devicesBusy}
             devicesError={devicesError}
+            tickets={tickets}
+            ticketsBusy={ticketsBusy}
+            ticketsError={ticketsError}
+            supportSubject={supportSubject}
+            supportBody={supportBody}
+            supportPriority={supportPriority}
+            supportBusy={supportBusy}
             phone={phone}
             otpCode={otpCode}
             otpSent={otpSent}
@@ -487,6 +570,11 @@ export function ClientScreen({
             onLogout={logoutCustomer}
             onReloadOrders={() => loadCustomerOrders()}
             onReloadDevices={() => loadCustomerDevices()}
+            onReloadTickets={() => loadSupportTickets()}
+            onSupportSubject={setSupportSubject}
+            onSupportBody={setSupportBody}
+            onSupportPriority={setSupportPriority}
+            onOpenSupportTicket={openSupportTicket}
             onConfirmPayment={confirmSandboxPayment}
             onOpenCatalog={() => setTab('catalog')}
           />
@@ -784,6 +872,13 @@ function AccountTab({
   devices,
   devicesBusy,
   devicesError,
+  tickets,
+  ticketsBusy,
+  ticketsError,
+  supportSubject,
+  supportBody,
+  supportPriority,
+  supportBusy,
   phone,
   otpCode,
   otpSent,
@@ -795,6 +890,11 @@ function AccountTab({
   onLogout,
   onReloadOrders,
   onReloadDevices,
+  onReloadTickets,
+  onSupportSubject,
+  onSupportBody,
+  onSupportPriority,
+  onOpenSupportTicket,
   onConfirmPayment,
   onOpenCatalog,
 }: {
@@ -811,6 +911,13 @@ function AccountTab({
   devices: MyDevice[];
   devicesBusy: boolean;
   devicesError: string | null;
+  tickets: SupportTicket[];
+  ticketsBusy: boolean;
+  ticketsError: string | null;
+  supportSubject: string;
+  supportBody: string;
+  supportPriority: SupportPriority;
+  supportBusy: boolean;
   phone: string;
   otpCode: string;
   otpSent: boolean;
@@ -822,6 +929,11 @@ function AccountTab({
   onLogout: () => void;
   onReloadOrders: () => void;
   onReloadDevices: () => void;
+  onReloadTickets: () => void;
+  onSupportSubject: (next: string) => void;
+  onSupportBody: (next: string) => void;
+  onSupportPriority: (next: SupportPriority) => void;
+  onOpenSupportTicket: () => void;
   onConfirmPayment: () => void;
   onOpenCatalog: () => void;
 }) {
@@ -949,6 +1061,40 @@ function AccountTab({
         </View>
       ) : null}
 
+      {session ? (
+        <View style={styles.historyPanel}>
+          <SectionTitle
+            title="Поддержка"
+            right={<GhostButton label="Обновить" icon="refresh-outline" onPress={ticketsBusy ? undefined : onReloadTickets} />}
+          />
+          <Field label="Тема" value={supportSubject} onChangeText={onSupportSubject} placeholder="Например: вопрос по заказу" />
+          <Field label="Описание" value={supportBody} onChangeText={onSupportBody} placeholder="Детали обращения" />
+          <View style={styles.priorityRail}>
+            <GhostButton label="Обычный" icon="ellipse-outline" active={supportPriority === 'normal'} onPress={() => onSupportPriority('normal')} />
+            <GhostButton label="Высокий" icon="alert-circle-outline" active={supportPriority === 'high'} onPress={() => onSupportPriority('high')} />
+            <GhostButton label="Срочный" icon="flash-outline" active={supportPriority === 'urgent'} onPress={() => onSupportPriority('urgent')} />
+          </View>
+          {ticketsError ? <Text selectable style={styles.formError}>{ticketsError}</Text> : null}
+          <PrimaryButton
+            label={supportBusy ? 'Создаём...' : 'Создать тикет'}
+            icon="chatbubble-ellipses-outline"
+            disabled={supportBusy}
+            onPress={onOpenSupportTicket}
+          />
+          {ticketsBusy ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={theme.lime} />
+              <Text selectable style={styles.mutedText}>Загружаем тикеты...</Text>
+            </View>
+          ) : null}
+          {tickets.length === 0 && !ticketsBusy ? (
+            <EmptyState icon="chatbubbles-outline" title="Обращений нет" text="Создайте тикет, и он появится здесь со SLA." />
+          ) : (
+            tickets.slice(0, 8).map((ticket) => <SupportTicketCard key={ticket.id} ticket={ticket} />)
+          )}
+        </View>
+      ) : null}
+
       {error ? <Text selectable style={styles.formError}>{error}</Text> : null}
       <View style={styles.accountMenu}>
         <GhostButton label="Бонусы" icon="gift-outline" />
@@ -1014,6 +1160,29 @@ function DeviceCard({ device }: { device: MyDevice }) {
         <Text selectable numberOfLines={1} style={[styles.warrantyPillText, { color: device.warranty ? theme.warn : theme.lime }]}>
           {warrantyLabel}
         </Text>
+      </View>
+    </View>
+  );
+}
+
+function SupportTicketCard({ ticket }: { ticket: SupportTicket }) {
+  return (
+    <View style={styles.ticketCard}>
+      <View style={styles.orderHistoryHeader}>
+        <View style={styles.orderHistoryTitleWrap}>
+          <Text selectable numberOfLines={2} style={styles.ticketTitle}>{ticket.subject}</Text>
+          <Text selectable style={styles.orderHistoryDate}>#{shortId(ticket.id)} · {formatShortDate(ticket.createdAt)}</Text>
+        </View>
+        <View style={[styles.warrantyPill, { borderColor: priorityColor(ticket.priority) }]}>
+          <Text selectable numberOfLines={1} style={[styles.warrantyPillText, { color: priorityColor(ticket.priority) }]}>
+            {priorityLabel(ticket.priority)}
+          </Text>
+        </View>
+      </View>
+      {ticket.body ? <Text selectable numberOfLines={2} style={styles.ticketBody}>{ticket.body}</Text> : null}
+      <View style={styles.orderHistoryFooter}>
+        <Text selectable style={styles.orderChannelText}>{ticket.status}</Text>
+        <Text selectable style={styles.deviceWarranty}>SLA {formatShortDate(ticket.sla)}</Text>
       </View>
     </View>
   );
@@ -1191,6 +1360,18 @@ function warrantyStatusLabel(status: string): string {
     waiting_supplier: 'Ждём поставщика',
   };
   return labels[status] ?? status;
+}
+
+function priorityLabel(priority: SupportPriority): string {
+  if (priority === 'urgent') return 'Срочный';
+  if (priority === 'high') return 'Высокий';
+  return 'Обычный';
+}
+
+function priorityColor(priority: SupportPriority): string {
+  if (priority === 'urgent') return theme.danger;
+  if (priority === 'high') return theme.warn;
+  return theme.lime;
 }
 
 async function restoreCustomerSession(stored: CustomerSession): Promise<CustomerSession | null> {
@@ -1730,6 +1911,30 @@ const styles = StyleSheet.create({
   warrantyPillText: {
     fontSize: 10,
     fontWeight: '900',
+  },
+  priorityRail: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  ticketCard: {
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 9,
+    padding: 12,
+  },
+  ticketTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  ticketBody: {
+    color: theme.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
   },
   accountMenu: {
     flexDirection: 'row',

@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native customer support tickets and secure owner-scoped support reads.
+- Files changed: `apps/api/src/support/support.controller.ts`, `apps/api/test/support-rbac.e2e-spec.ts`, `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: native signed-in customers can now list and open support tickets from the account cabinet with priority/SLA/status visibility. The support ticket list endpoint no longer exposes `customerId` filtered reads anonymously; customer JWTs can read only their own tickets, while staff still need `support/read`.
+- Checks run: `npm run test -w @alistore/api -- support-rbac --runInBand`; `npm run mobile:typecheck`; `npm run api:build`; `npm run test -w @alistore/api -- support public-rate-limit --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
+- Outcome: targeted support RBAC test passed 1/1; mobile typecheck passed; API build passed; support/rate-limit regression passed 3 suites / 11 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Next step: continue native account surfaces or move to external TestFlight/Play Internal QA when credentials/devices are available.
+
+## 2026-07-08
+
 - Task: add native customer devices and warranty state.
 - Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: signed-in native customers now load purchased devices from `GET /customers/me/devices`, see product, IMEI, device status, warranty expiry, days-left state, and active warranty-case status in the account cabinet. Account data loading now refreshes the customer session once before fetching orders/devices, avoiding refresh-token reuse races.
