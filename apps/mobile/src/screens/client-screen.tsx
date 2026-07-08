@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 
-import { api } from '@mobile/api-client';
+import { ApiError, api } from '@mobile/api-client';
 import { formatSom, shortId } from '@mobile/format';
+import { clearCustomerSession, getStoredCustomerSession, saveCustomerSession } from '@mobile/secure-session';
 import { radius, theme } from '@mobile/theme';
 import { EmptyState, Field, GhostButton, MetricCard, Pill, PrimaryButton, ProductPoster, SectionTitle } from '@mobile/ui';
-import type { CatalogProduct, CreatedOrder, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
+import type { CatalogProduct, CreatedOrder, CustomerSession, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
 
 type ClientTab = 'home' | 'catalog' | 'favorites' | 'cart' | 'account';
 type ClientPayment = 'cash' | OnlinePaymentMethod;
@@ -26,6 +27,7 @@ interface ClientScreenProps {
   catalogError: string | null;
   refreshing: boolean;
   onRefresh: () => void;
+  onSessionChange?: (session: CustomerSession | null) => void;
 }
 
 interface CheckoutResult {
@@ -48,6 +50,7 @@ export function ClientScreen({
   catalogError,
   refreshing,
   onRefresh,
+  onSessionChange,
 }: ClientScreenProps) {
   const [tab, setTab] = useState<ClientTab>('home');
   const [query, setQuery] = useState('');
@@ -63,6 +66,13 @@ export function ClientScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
+  const [customerSession, setCustomerSession] = useState<CustomerSession | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -95,6 +105,28 @@ export function ClientScreen({
   const favoriteProducts = products.filter((product) => favorites[product.id]);
   const hits = products.slice(0, 6);
 
+  useEffect(() => {
+    let alive = true;
+    getStoredCustomerSession()
+      .then((stored) => (stored ? restoreCustomerSession(stored) : null))
+      .then((stored) => {
+        if (!alive) return;
+        setCustomerSession(stored);
+        onSessionChange?.(stored);
+        if (stored?.phone) setPhone(stored.phone);
+      })
+      .catch(() => {
+        if (!alive) return;
+        onSessionChange?.(null);
+      })
+      .finally(() => {
+        if (alive) setSessionLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [onSessionChange]);
+
   function addToCart(product: CatalogProduct) {
     setCart((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }));
     setTab('cart');
@@ -119,18 +151,92 @@ export function ClientScreen({
     });
   }
 
+  async function requestCustomerOtp() {
+    if (authBusy) return;
+    const nextPhone = normalizePhone(phone);
+    if (phoneDigitCount(nextPhone) < 9) {
+      setAuthError('Укажите телефон в международном формате.');
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const challenge = await api.requestOtp(nextPhone);
+      setPhone(nextPhone);
+      setOtpSent(true);
+      setOtpDevCode(challenge.devCode ?? null);
+    } catch (cause) {
+      setAuthError(cause instanceof Error ? cause.message : 'Код не отправлен.');
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function verifyCustomerOtp() {
+    if (authBusy) return;
+    const nextPhone = normalizePhone(phone);
+    const code = otpCode.replace(/\D/g, '');
+    if (code.length !== 6) {
+      setAuthError('Введите 6 цифр из SMS.');
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const tokens = await api.verifyOtp({ phone: nextPhone, code });
+      const principal = await api.authMe(tokens.accessToken);
+      const session: CustomerSession = {
+        ...tokens,
+        customerId: principal.customerId,
+        phone: principal.phone ?? nextPhone,
+      };
+      await saveCustomerSession(session);
+      setCustomerSession(session);
+      onSessionChange?.(session);
+      setPhone(session.phone);
+      setOtpCode('');
+      setOtpSent(false);
+      setOtpDevCode(null);
+    } catch (cause) {
+      setAuthError(cause instanceof Error ? cause.message : 'Вход не выполнен.');
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function logoutCustomer() {
+    if (authBusy) return;
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      if (customerSession?.refreshToken) {
+        await api.logoutCustomer(customerSession.refreshToken).catch(() => undefined);
+      }
+      await clearCustomerSession();
+      setCustomerSession(null);
+      onSessionChange?.(null);
+      setOtpCode('');
+      setOtpSent(false);
+      setOtpDevCode(null);
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
   async function placeOrder() {
     if (cartLines.length === 0 || busy) return;
-    if (phone.trim().length < 8) {
+    const checkoutPhone = normalizePhone(customerSession?.phone ?? phone);
+    if (!customerSession && phoneDigitCount(checkoutPhone) < 9) {
       setError('Укажите телефон для оформления заказа.');
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const customer = await api.createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
+      const customerId = customerSession?.customerId
+        ?? (await api.createCustomer({ phone: checkoutPhone, name: name.trim() || undefined })).id;
       const order = await api.createOrder({
-        customerId: customer.id,
+        customerId,
         channel: 'mobile',
         total,
         items: cartLines.map((line) => ({ sku: line.product.sku, qty: line.qty, price: line.product.price })),
@@ -265,7 +371,20 @@ export function ClientScreen({
           <AccountTab
             result={checkoutResult}
             busy={busy}
+            authBusy={authBusy}
+            sessionLoading={sessionLoading}
+            session={customerSession}
             error={error}
+            authError={authError}
+            phone={phone}
+            otpCode={otpCode}
+            otpSent={otpSent}
+            otpDevCode={otpDevCode}
+            onPhone={setPhone}
+            onOtpCode={setOtpCode}
+            onRequestOtp={requestCustomerOtp}
+            onVerifyOtp={verifyCustomerOtp}
+            onLogout={logoutCustomer}
             onConfirmPayment={confirmSandboxPayment}
             onOpenCatalog={() => setTab('catalog')}
           />
@@ -552,13 +671,39 @@ function CartTab({
 function AccountTab({
   result,
   busy,
+  authBusy,
+  sessionLoading,
+  session,
   error,
+  authError,
+  phone,
+  otpCode,
+  otpSent,
+  otpDevCode,
+  onPhone,
+  onOtpCode,
+  onRequestOtp,
+  onVerifyOtp,
+  onLogout,
   onConfirmPayment,
   onOpenCatalog,
 }: {
   result: CheckoutResult | null;
   busy: boolean;
+  authBusy: boolean;
+  sessionLoading: boolean;
+  session: CustomerSession | null;
   error: string | null;
+  authError: string | null;
+  phone: string;
+  otpCode: string;
+  otpSent: boolean;
+  otpDevCode: string | null;
+  onPhone: (next: string) => void;
+  onOtpCode: (next: string) => void;
+  onRequestOtp: () => void;
+  onVerifyOtp: () => void;
+  onLogout: () => void;
   onConfirmPayment: () => void;
   onOpenCatalog: () => void;
 }) {
@@ -566,11 +711,59 @@ function AccountTab({
     <View style={styles.block}>
       <SectionTitle title="Кабинет" />
       <View style={styles.accountCard}>
-        <Ionicons name="person-circle-outline" size={32} color={theme.lime} />
+        <Ionicons name={session ? 'person-circle' : 'person-circle-outline'} size={32} color={theme.lime} />
         <View style={styles.accountCopy}>
-          <Text selectable style={styles.accountTitle}>Гость AliStore</Text>
-          <Text selectable style={styles.mutedText}>Заказы, бонусы, адреса и уведомления в native shell.</Text>
+          <Text selectable style={styles.accountTitle}>{session ? 'Аккаунт AliStore' : 'Гость AliStore'}</Text>
+          <Text selectable style={styles.mutedText}>
+            {session ? `${session.phone} · ${shortId(session.customerId)}` : 'Войдите по OTP для заказов, бонусов и push.'}
+          </Text>
         </View>
+        {session ? <Pill label="Активен" active /> : null}
+      </View>
+
+      <View style={styles.authPanel}>
+        {sessionLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color={theme.lime} />
+            <Text selectable style={styles.mutedText}>Проверяем сессию...</Text>
+          </View>
+        ) : session ? (
+          <>
+            <View style={styles.profileGrid}>
+              <ProfileValue label="Телефон" value={session.phone} />
+              <ProfileValue label="Customer ID" value={shortId(session.customerId)} />
+              <ProfileValue label="Access TTL" value={session.expiresIn} />
+            </View>
+            {authError ? <Text selectable style={styles.formError}>{authError}</Text> : null}
+            <PrimaryButton
+              label={authBusy ? 'Выходим...' : 'Выйти'}
+              icon="log-out-outline"
+              danger
+              disabled={authBusy}
+              onPress={onLogout}
+            />
+          </>
+        ) : (
+          <>
+            <Field label="Телефон" value={phone} onChangeText={onPhone} keyboardType="phone-pad" placeholder="+996700123456" />
+            {otpSent ? (
+              <Field label="Код из SMS" value={otpCode} onChangeText={onOtpCode} keyboardType="number-pad" placeholder="000000" />
+            ) : null}
+            {otpDevCode ? <Text selectable style={styles.devCodeText}>DEV OTP: {otpDevCode}</Text> : null}
+            {authError ? <Text selectable style={styles.formError}>{authError}</Text> : null}
+            <View style={styles.duo}>
+              <PrimaryButton
+                label={authBusy ? 'Подождите...' : otpSent ? 'Войти' : 'Получить код'}
+                icon={otpSent ? 'checkmark-circle-outline' : 'chatbubble-ellipses-outline'}
+                disabled={authBusy}
+                onPress={otpSent ? onVerifyOtp : onRequestOtp}
+              />
+              {otpSent ? (
+                <GhostButton label="Заново" icon="refresh-outline" onPress={authBusy ? undefined : onRequestOtp} />
+              ) : null}
+            </View>
+          </>
+        )}
       </View>
 
       {result ? (
@@ -603,6 +796,15 @@ function AccountTab({
         <GhostButton label="Поддержка" icon="chatbubbles-outline" />
       </View>
       <PrimaryButton label="Продолжить покупки" icon="grid-outline" onPress={onOpenCatalog} />
+    </View>
+  );
+}
+
+function ProfileValue({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.profileValue}>
+      <Text selectable style={styles.profileLabel}>{label}</Text>
+      <Text selectable numberOfLines={1} style={styles.profileText}>{value}</Text>
     </View>
   );
 }
@@ -725,6 +927,47 @@ function TotalRow({ label, value, strong, accent }: { label: string; value: stri
       </Text>
     </View>
   );
+}
+
+function normalizePhone(input: string): string {
+  const trimmed = input.trim();
+  const digits = trimmed.replace(/\D/g, '');
+  return trimmed.startsWith('+') ? `+${digits}` : digits;
+}
+
+function phoneDigitCount(input: string): number {
+  return input.replace(/\D/g, '').length;
+}
+
+async function restoreCustomerSession(stored: CustomerSession): Promise<CustomerSession | null> {
+  try {
+    const principal = await api.authMe(stored.accessToken);
+    return {
+      ...stored,
+      customerId: principal.customerId,
+      phone: principal.phone ?? stored.phone,
+    };
+  } catch (cause) {
+    if (!(cause instanceof ApiError) || cause.status !== 401) return stored;
+  }
+
+  try {
+    const tokens = await api.refreshCustomerSession(stored.refreshToken);
+    const principal = await api.authMe(tokens.accessToken);
+    const refreshed: CustomerSession = {
+      ...tokens,
+      customerId: principal.customerId,
+      phone: principal.phone ?? stored.phone,
+    };
+    await saveCustomerSession(refreshed);
+    return refreshed;
+  } catch (cause) {
+    if (cause instanceof ApiError && (cause.status === 400 || cause.status === 401)) {
+      await clearCustomerSession();
+      return null;
+    }
+    return stored;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -1027,6 +1270,45 @@ const styles = StyleSheet.create({
     color: theme.text,
     fontSize: 17,
     fontWeight: '900',
+  },
+  authPanel: {
+    backgroundColor: theme.panel,
+    borderColor: theme.border,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: 13,
+    padding: 15,
+  },
+  profileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+  profileValue: {
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 4,
+    minWidth: '30%',
+    padding: 11,
+  },
+  profileLabel: {
+    color: theme.muted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  profileText: {
+    color: theme.text,
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  devCodeText: {
+    color: theme.warn,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
   },
   orderCard: {
     backgroundColor: theme.panel,

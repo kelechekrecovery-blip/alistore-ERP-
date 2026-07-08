@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native customer OTP account session.
+- Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/native-shell.tsx`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/secure-session.ts`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: the native client cabinet now restores a SecureStore customer session, refreshes expired access tokens on app start, supports phone OTP login/logout, creates signed-in checkout orders with the authenticated `customerId`, and registers client push tokens as `scope=customer` with the customer JWT instead of anonymous tokens.
+- Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
+- Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Next step: verify the OTP/push flow on real TestFlight/Play Internal builds once EAS project id, push credentials, SMS provider, and store test devices are available.
+
+## 2026-07-08
+
 - Task: bind native staff push registration to staff JWT.
 - Files changed: `apps/mobile/src/native-shell.tsx`, `apps/mobile/src/screens/staff-screen.tsx`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: `StaffScreen` now reports restored/login/logout staff sessions to the native shell, and the Push control sends the staff access token when the app is in staff/POS mode. Staff-mode push registration no longer saves an anonymous token; it waits for staff login and then binds to `scope=staff` on `POST /notifications/push-tokens`.

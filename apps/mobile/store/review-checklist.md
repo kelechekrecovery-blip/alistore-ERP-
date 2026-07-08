@@ -40,10 +40,13 @@
 - Android small screen and large screen.
 - Slow network and no-network states.
 - Customer catalog/search/favorites/cart.
+- Customer OTP login/logout and SecureStore persistence.
 - Checkout with cash and sandbox online payment.
+- Checkout while signed in reuses the authenticated customer account.
 - Staff login/logout and SecureStore persistence.
 - Staff order queue.
 - POS sale with cash/card/QR methods.
 - Discount above approval threshold returns approval state.
 - Push permission prompt and `POST /notifications/push-tokens` registration.
+- Client-mode push registration after OTP login returns `scope=customer`.
 - Staff-mode push registration after login returns `scope=staff`.

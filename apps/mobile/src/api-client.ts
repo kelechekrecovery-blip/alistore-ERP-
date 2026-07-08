@@ -1,7 +1,10 @@
 import type {
+  AuthPrincipal,
   CatalogResponse,
   CreatedOrder,
+  CustomerAuthTokens,
   OnlinePaymentMethod,
+  OtpRequestResult,
   PaymentConfirmResult,
   PaymentIntent,
   PaymentMethod,
@@ -85,6 +88,38 @@ export const api = {
     return requestJson<{ id: string }>('/customers', {
       method: 'POST',
       body: JSON.stringify(input),
+    });
+  },
+
+  requestOtp(phone: string) {
+    return requestJson<OtpRequestResult>('/auth/otp/request', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  },
+
+  verifyOtp(input: { phone: string; code: string }) {
+    return requestJson<CustomerAuthTokens>('/auth/otp/verify', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  authMe(token: string) {
+    return requestJson<AuthPrincipal>('/auth/me', { token });
+  },
+
+  refreshCustomerSession(refreshToken: string) {
+    return requestJson<CustomerAuthTokens>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  },
+
+  logoutCustomer(refreshToken: string) {
+    return requestJson<void>('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
     });
   },
 

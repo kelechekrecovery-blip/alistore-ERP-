@@ -60,6 +60,30 @@ export interface StaffLoginResult {
   totpEnabled: boolean;
 }
 
+export interface CustomerAuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: string;
+}
+
+export interface AuthPrincipal {
+  customerId: string;
+  phone?: string;
+  typ: string;
+  role?: string;
+}
+
+export interface CustomerSession extends CustomerAuthTokens {
+  customerId: string;
+  phone: string;
+}
+
+export interface OtpRequestResult {
+  challengeId: string;
+  devCode?: string;
+}
+
 export interface RegisteredPushToken {
   id: string;
   token: string;

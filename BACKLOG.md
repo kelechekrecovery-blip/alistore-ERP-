@@ -7,6 +7,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native customer OTP account session for App Store / Google Play app: SecureStore persistence, refresh-on-restore, signed-in checkout, and customer-bound push registration.
 - Bind native staff push registration to the stored staff JWT in the POS app.
 - Add direct Expo Push delivery transport for outbox push messages and campaigns.
 - Add native push token readiness: Expo Notifications client setup, backend token registry, readiness/preflight checks, and store QA docs.

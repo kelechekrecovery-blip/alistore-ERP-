@@ -9,7 +9,7 @@ import { ClientScreen } from '@mobile/screens/client-screen';
 import { StaffScreen } from '@mobile/screens/staff-screen';
 import { BrandMark, GhostButton } from '@mobile/ui';
 import { radius, theme } from '@mobile/theme';
-import type { CatalogProduct, RegisteredPushToken, StaffLoginResult } from '@mobile/types';
+import type { CatalogProduct, CustomerSession, RegisteredPushToken, StaffLoginResult } from '@mobile/types';
 
 type Mode = 'client' | 'staff';
 type PushUiState = 'idle' | 'loading' | NativePushRegistration['status'];
@@ -23,6 +23,7 @@ export function NativeShell() {
   const [refreshing, setRefreshing] = useState(false);
   const [pushState, setPushState] = useState<PushUiState>('idle');
   const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [customerSession, setCustomerSession] = useState<CustomerSession | null>(null);
   const [staffSession, setStaffSession] = useState<StaffLoginResult | null>(null);
 
   const stats = useMemo(() => {
@@ -56,6 +57,10 @@ export function NativeShell() {
       setPushMessage('Войдите сотрудником, чтобы привязать Push к POS');
       return;
     }
+    if (mode === 'client' && !customerSession) {
+      setPushMessage('Войдите в кабинет, чтобы привязать Push к аккаунту');
+      return;
+    }
     setPushState('loading');
     setPushMessage(null);
     const registration = await registerNativePush();
@@ -70,8 +75,8 @@ export function NativeShell() {
         token: registration.token,
         platform: registration.platform,
         deviceId: registration.deviceId,
-        scope: mode === 'staff' ? 'staff' : 'anonymous',
-      }, mode === 'staff' ? staffSession?.accessToken : undefined);
+        scope: mode === 'staff' ? 'staff' : 'customer',
+      }, mode === 'staff' ? staffSession?.accessToken : customerSession?.accessToken);
       setPushState('registered');
       setPushMessage(pushSuccessMessage(saved));
     } catch (cause) {
@@ -88,6 +93,7 @@ export function NativeShell() {
         catalogError={catalogError}
         refreshing={refreshing}
         onRefresh={() => loadCatalog(true)}
+        onSessionChange={setCustomerSession}
       />
     )
     : (
