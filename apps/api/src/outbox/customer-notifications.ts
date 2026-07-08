@@ -26,7 +26,7 @@ export async function enqueueConsentedCustomerNotice(
 
   await outbox.enqueueOnTx(tx, {
     channel: input.channel ?? 'sms',
-    recipient: customer.phone,
+    recipient: input.channel === 'push' ? input.customerId : customer.phone,
     template: input.template,
     payload: { customerId: input.customerId, ...(input.payload ?? {}) },
   });

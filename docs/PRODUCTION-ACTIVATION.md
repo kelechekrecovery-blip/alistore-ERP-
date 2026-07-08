@@ -27,7 +27,7 @@ Required for a production-ready report:
 - Telegram: `TELEGRAM_BOT_TOKEN`, webhook URL/secret, callback QA.
 - WhatsApp: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, webhook verify token.
 - Apple login: `APPLE_CLIENT_ID` plus Apple callback/client configuration.
-- Campaign delivery: `NOTIFICATION_TRANSPORT=channels` with Novu, SMTP, Telegram, or WhatsApp credentials.
+- Campaign delivery: `NOTIFICATION_TRANSPORT=channels` with Novu, SMTP, Expo Push, Telegram, or WhatsApp credentials.
 - Native mobile push: `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_TOKEN`, and EAS/APNs/FCM push credentials.
 - Media: S3/MinIO values for production Evidence Vault storage.
 - Observability: `SENTRY_DSN` or compatible GlitchTip/Sentry DSN.

@@ -111,6 +111,7 @@ const CHECKS: CheckDefinition[] = [
         'WHATSAPP_ACCESS_TOKEN',
         'WHATSAPP_PHONE_NUMBER_ID',
       ],
+      ['NOTIFICATION_TRANSPORT', 'EXPO_PUBLIC_EAS_PROJECT_ID'],
     ],
     optionalEnv: [
       'NOVU_API_URL',
@@ -123,7 +124,7 @@ const CHECKS: CheckDefinition[] = [
       'WHATSAPP_API_VERSION',
     ],
     blocking: true,
-    note: 'Segment Builder and ROI are ready; set NOTIFICATION_TRANSPORT=channels/providers or a single transport with Novu, SMTP, Telegram, or WhatsApp credentials.',
+    note: 'Segment Builder and ROI are ready; set NOTIFICATION_TRANSPORT=channels/providers or a single transport with Novu, SMTP, Expo Push, Telegram, or WhatsApp credentials.',
   },
   {
     id: 'native_push',
@@ -131,6 +132,7 @@ const CHECKS: CheckDefinition[] = [
     title: 'Native push notification credentials',
     requiredEnv: ['EXPO_PUBLIC_EAS_PROJECT_ID', 'EXPO_TOKEN'],
     optionalEnv: [
+      'EXPO_PUSH_API_URL',
       'EXPO_PUSH_ACCESS_TOKEN',
       'FCM_SERVICE_ACCOUNT_KEY_PATH',
       'APNS_KEY_ID',

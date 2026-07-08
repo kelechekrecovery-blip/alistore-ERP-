@@ -7,6 +7,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add direct Expo Push delivery transport for outbox push messages and campaigns.
 - Add native push token readiness: Expo Notifications client setup, backend token registry, readiness/preflight checks, and store QA docs.
 - Add native production release credential gate with ignored env template, runbook, and strict Apple/Google/EAS preflight.
 - Add native App Store / Google Play release package: isolated mobile lockfile, store assets, EAS build/submit profiles, validated workflow, metadata, review checklist, and release preflight gates.

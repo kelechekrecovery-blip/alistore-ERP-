@@ -10,6 +10,7 @@ import { ChannelNotificationTransport } from './transports/channel.transport';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Guaranteed-delivery outbox for notifications/webhooks. Producers inject
@@ -26,14 +27,15 @@ import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
     // Transport by NOTIFICATION_TRANSPORT: channels | novu (+NOVU_API_KEY) | email | realtime | log.
     {
       provide: NOTIFICATION_TRANSPORT,
-      inject: [ConfigService, RealtimeGateway],
+      inject: [ConfigService, RealtimeGateway, PrismaService],
       useFactory: (
         config: ConfigService,
         gateway: RealtimeGateway,
+        prisma: PrismaService,
       ): NotificationTransport => {
         const mode = config.get<string>('NOTIFICATION_TRANSPORT');
         if (mode === 'channels' || mode === 'providers') {
-          return new ChannelNotificationTransport(config);
+          return new ChannelNotificationTransport(config, prisma);
         }
         if (mode === 'novu' && config.get<string>('NOVU_API_KEY')) {
           return new NovuHttpTransport(config);

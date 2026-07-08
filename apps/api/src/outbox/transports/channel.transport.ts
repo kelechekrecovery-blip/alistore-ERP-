@@ -2,21 +2,27 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DeliverableMessage, NotificationTransport } from '../outbox.types';
 import { EmailNotificationTransport } from './email.transport';
+import { ExpoPushTransport } from './expo-push.transport';
 import { LogNotificationTransport } from './log.transport';
 import { NovuHttpTransport } from './novu.transport';
 import { TelegramBotTransport } from './telegram-bot.transport';
 import { WhatsAppCloudTransport } from './whatsapp-cloud.transport';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class ChannelNotificationTransport implements NotificationTransport {
   private readonly email: EmailNotificationTransport;
   private readonly log = new LogNotificationTransport();
+  private readonly expoPush?: ExpoPushTransport;
   private readonly novu?: NovuHttpTransport;
   private readonly telegram?: TelegramBotTransport;
   private readonly whatsapp?: WhatsAppCloudTransport;
 
-  constructor(config: ConfigService) {
+  constructor(config: ConfigService, prisma?: PrismaService) {
     this.email = new EmailNotificationTransport(config);
+    if (prisma && hasConfig(config, 'EXPO_PUBLIC_EAS_PROJECT_ID')) {
+      this.expoPush = new ExpoPushTransport(config, prisma);
+    }
     if (hasConfig(config, 'NOVU_API_KEY')) {
       this.novu = new NovuHttpTransport(config);
     }
@@ -40,6 +46,7 @@ export class ChannelNotificationTransport implements NotificationTransport {
       case 'whatsapp':
         return (this.whatsapp ?? this.log).deliver(message);
       case 'push':
+        return (this.expoPush ?? this.novu ?? this.log).deliver(message);
       case 'sms':
       case 'webhook':
         return (this.novu ?? this.log).deliver(message);

@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add direct Expo Push delivery for outbox notifications.
+- Files changed: `apps/api/src/outbox/transports/expo-push.transport.ts`, `apps/api/src/outbox/transports/channel.transport.ts`, `apps/api/src/outbox/outbox.module.ts`, `apps/api/src/outbox/customer-notifications.ts`, `apps/api/src/health/external-readiness.ts`, `apps/api/.env.production.example`, `apps/api/test/expo-push-transport.spec.ts`, `docs/PRODUCTION-ACTIVATION.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: `NOTIFICATION_TRANSPORT=channels` can now route `channel=push` outbox messages directly to Expo Push Service using registered `PushToken` rows. Customer/staff ids resolve to enabled Expo tokens, direct Expo token recipients still work, immediate `DeviceNotRegistered` tickets disable dead tokens, and HTTP/provider failures still throw so the durable outbox retries.
+- Checks run: `npm run test -w @alistore/api -- expo-push-transport channel-transport notifications-push-tokens external-readiness --runInBand`; `npm run api:build`; `npm exec -w @alistore/api -- prisma validate`; `npm run readiness -w @alistore/api -- --env-file .env.production.example`; `npm run test -w @alistore/api -- external-readiness --runInBand`.
+- Outcome: targeted transport/readiness/token tests passed 4 suites / 13 tests; API build and Prisma validation passed; readiness reports Expo Push as a valid campaign delivery provider while `native_push` remains blocked until real EAS/push credentials are configured.
+- Next step: live physical-device push QA after real `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_TOKEN`, EAS push credentials, and store test builds are available.
+
+## 2026-07-08
+
 - Task: add native push token readiness for App Store / Google Play builds.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708152000_add_push_tokens/migration.sql`, `apps/api/src/notifications/*`, `apps/api/src/health/external-readiness.ts`, `apps/api/.env.production.example`, `apps/api/test/notifications-push-tokens.spec.ts`, `apps/api/test/external-readiness.spec.ts`, `apps/mobile/*`, `apps/mobile/store/*`, `docs/READINESS.md`, `docs/PRODUCTION-ACTIVATION.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: native app now uses `expo-notifications`/`expo-device` to request push permission from an in-app control, create the Android notification channel, fetch an Expo push token from the EAS project id, and register it through `POST /notifications/push-tokens`. Backend stores tokens as anonymous/customer/staff-bound records without trusting owner ids from the request body, and readiness/preflight now exposes the `native_push` production blocker.
