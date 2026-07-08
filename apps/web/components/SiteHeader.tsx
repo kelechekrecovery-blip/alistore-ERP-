@@ -17,7 +17,7 @@ export function SiteHeader() {
           <span className="grid h-8 w-8 place-items-center rounded-btn bg-coral font-display text-lg font-extrabold text-white shadow-soft">
             A
           </span>
-          <span className="font-display text-lg font-extrabold tracking-tight text-ink">
+          <span className="font-display text-lg font-extrabold text-ink">
             Ali<span className="text-coral">Store</span>
           </span>
         </Link>

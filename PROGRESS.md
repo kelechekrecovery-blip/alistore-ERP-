@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: run prototype visual audit and remove negative letter spacing.
+- Files changed: `apps/web/app/globals.css`, `apps/web/components/SiteHeader.tsx`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: audited the live UI against the `.dc.html` visual references for Client App 2.0, POS 2.0, Staff App 2.0, and ERP 2.0; removed the remaining negative letter spacing from global headings and the site header so typography follows the project rule that letter spacing stays at 0 unless explicitly positive.
+- Checks run: live Playwright visual audit on `/`, `/search`, `/product/[id]`, `/cart`, `/checkout`, `/account`, `/favorites`, `/compare`, `/pos`, `/staff`, `/erp`; `rg -n "letter-spacing:\s*-|tracking-tight|tracking-\[-" apps/web/app apps/web/components apps/web/lib`; `npm run build -w @alistore/web`; post-fix browser smoke on `/`, `/staff`, `/erp` readiness; `git diff --check`.
+- Outcome: visual audit found no console errors, request failures, or 4xx/5xx on the full route set; horizontal rail signals on home/compare matched intentional scrollable mobile UI; post-fix smoke passed with no console/network failures and viewport-width layouts on home/staff/ERP.
+- Next step: keep future frontend changes under the same browser visual smoke before shipping.
+
+## 2026-07-08
+
 - Task: add production core preflight.
 - Files changed: `apps/api/src/health/production-preflight.ts`, `apps/api/scripts/print-production-preflight.ts`, `apps/api/test/production-preflight.spec.ts`, API/root `package.json`, `apps/api/.env.production.example`, `README.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `docs/PRODUCTION-ACTIVATION.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: added a secret-safe production core preflight that checks `NODE_ENV=production`, `DATABASE_URL`, a non-placeholder 32+ char `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and required background jobs before external provider readiness runs. Root launch commands now include `launch:preflight`, `launch:preflight:strict`, and `launch:check`.

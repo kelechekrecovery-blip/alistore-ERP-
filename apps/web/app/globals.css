@@ -26,7 +26,7 @@
   h3,
   h4 {
     font-family: 'Sora', system-ui, sans-serif;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
   ::selection {
     background: var(--coral);
