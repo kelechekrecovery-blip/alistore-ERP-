@@ -68,10 +68,13 @@ DATABASE_URL="postgresql://alistore@localhost:5432/alistore_test?schema=public" 
 npm run api:test
 npm run mvp:verify              # полный release gate: schema, builds, Jest, E2E, readiness
 npm run mvp:verify -- --skip-e2e # быстрый gate без Playwright
+npm run launch:readiness        # отчёт по apps/api/.env.production
+npm run launch:readiness:strict # strict gate для внешних production-блокеров
 ```
 
 `npm run mvp:verify` не падает из-за отсутствующих production-ключей/железа: внешний статус
 печатается отдельно. Для строгой production-проверки используйте `npm run mvp:verify -- --strict-external`.
+Финальная активация описана в [`docs/PRODUCTION-ACTIVATION.md`](docs/PRODUCTION-ACTIVATION.md).
 
 ## Структура
 ```

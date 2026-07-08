@@ -39,6 +39,8 @@ cd apps/web && npm run build && npx next start -p 3000
 ```bash
 npm run mvp:verify                     # schema + API/web build + Jest + Playwright + readiness
 npm run mvp:verify -- --skip-e2e       # быстрый gate без Playwright
+npm run launch:readiness               # secret-safe отчёт по apps/api/.env.production
+npm run launch:readiness:strict        # падает, пока production-блокеры не закрыты
 npm run api:test                       # 89 сьютов / 316 тестов (jest)
 npm run api:build                      # прод-сборка API
 npm run build -w @alistore/web         # прод-сборка веб (32 роута)
@@ -46,6 +48,7 @@ npm run build -w @alistore/web         # прод-сборка веб (32 роу
 
 `mvp:verify` печатает внешний readiness без раскрытия секретов. Добавьте `--strict-external`,
 если production gate должен падать на отсутствующих provider credentials или POS hardware marker.
+Финальный runbook: [`PRODUCTION-ACTIVATION.md`](./PRODUCTION-ACTIVATION.md).
 
 ## Экраны (маршруты веб)
 | Маршрут | Назначение |

@@ -11,6 +11,8 @@
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api",
     "e2e": "playwright test",
+    "launch:readiness": "npm run readiness -w @alistore/api -- --env-file .env.production",
+    "launch:readiness:strict": "npm run readiness -w @alistore/api -- --env-file .env.production --strict-external",
     "mvp:verify": "node scripts/mvp-verify.mjs",
     "web": "npm run dev -w @alistore/web",
     "db:migrate": "npm run db:migrate -w @alistore/api",

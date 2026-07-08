@@ -9,6 +9,8 @@ out/
 .env
 .env.local
 .env.*.local
+apps/api/.env.production
+apps/web/.env.production
 # prisma
 apps/api/prisma/*.db
 # logs / os

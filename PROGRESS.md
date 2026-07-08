@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add production activation pack.
+- Files changed: `.gitignore`, `apps/api/.env.production.example`, `apps/api/scripts/print-readiness.ts`, root `package.json`, `docs/PRODUCTION-ACTIVATION.md`, `README.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: added a production env template ignored by git, launch readiness npm commands, a `--env-file`/`--json` readiness CLI mode, and a production activation runbook that separates software verification from external provider/hardware activation.
+- Checks run: `npm run readiness -w @alistore/api -- --env-file .env.production.example`; `npm run readiness -w @alistore/api -- --env-file .env.production.example --json`; `npm run mvp:verify -- --skip-e2e`; `git diff --check`.
+- Outcome: production example reports the expected blocked state without secrets (`ready=0, missing=6, manual=1, optional=2, blocking=7`); JSON output is valid; fast MVP gate passed with Prisma schema validation, Prisma Client generation, API build, web build, API Jest 89 suites / 316 tests, and default readiness reporting.
+- Next step: copy `apps/api/.env.production.example` to `apps/api/.env.production`, fill real external credentials, complete physical POS QA, then run `npm run launch:readiness:strict`.
+
+## 2026-07-08
+
 - Task: expose production readiness in ERP.
 - Files changed: `apps/web/lib/api/readiness.ts`, `apps/web/lib/api.ts`, `apps/web/app/erp/page.tsx`, `e2e/erp-secure.spec.ts`, `BACKLOG.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `PROGRESS.md`.
 - Result: ERP now has a `Готовность` owner-console tab backed by `GET /health/integrations`, showing blocking provider credentials, manual POS hardware checks, optional production services, and the strict release gate command without exposing secret values.
