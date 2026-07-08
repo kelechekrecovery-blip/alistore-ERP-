@@ -1,5 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -12,6 +13,15 @@ import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
+
+function defaultFulfillment(channel: string): string {
+  if (channel === 'pos' || channel === 'staff_mobile') return 'store';
+  return 'pickup';
+}
+
+function pickupCode(): string {
+  return `PU-${randomBytes(3).toString('hex').toUpperCase()}`;
+}
 
 @Injectable()
 export class OrdersService {
@@ -54,6 +64,11 @@ export class OrdersService {
         data: {
           customerId: dto.customerId,
           channel: dto.channel,
+          fulfillmentType: dto.fulfillmentType ?? defaultFulfillment(dto.channel),
+          pickupPoint: dto.pickupPoint,
+          deliveryAddress: dto.deliveryAddress,
+          deliverySlot: dto.deliverySlot,
+          pickupCode: pickupCode(),
           total: dto.total,
           status: 'created',
           items: {
@@ -80,7 +95,16 @@ export class OrdersService {
           {
             type: EventType.OrderCreated,
             actor,
-            payload: { orderId: order.id, channel: order.channel, total: order.total },
+            payload: {
+              orderId: order.id,
+              channel: order.channel,
+              fulfillmentType: order.fulfillmentType,
+              pickupPoint: order.pickupPoint,
+              deliveryAddress: order.deliveryAddress,
+              deliverySlot: order.deliverySlot,
+              pickupCode: order.pickupCode,
+              total: order.total,
+            },
             refs: [order.id],
           },
         ],

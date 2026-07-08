@@ -525,6 +525,9 @@ export function ClientScreen({
       const order = await api.createOrder({
         customerId,
         channel: 'mobile',
+        fulfillmentType: 'pickup',
+        pickupPoint: 'alistore-center',
+        deliverySlot: 'AliStore Центр · сегодня',
         total,
         items: cartLines.map((line) => ({ sku: line.product.sku, qty: line.qty, price: line.product.price })),
       });
@@ -1393,9 +1396,15 @@ function OrderHistoryCard({ order }: { order: CustomerOrder }) {
         {items || 'Без товарных строк'} · {itemCount} шт.
       </Text>
       <View style={styles.orderHistoryFooter}>
-        <Text selectable style={styles.orderChannelText}>{order.channel}</Text>
+        <Text selectable style={styles.orderChannelText}>{order.fulfillmentType ?? order.channel}</Text>
         <Text selectable style={styles.orderHistoryTotal}>{formatSom(order.total)}</Text>
       </View>
+      {(order.pickupPoint || order.deliveryAddress || order.pickupCode) ? (
+        <Text selectable numberOfLines={2} style={styles.orderItemsText}>
+          {order.pickupPoint ?? order.deliveryAddress}
+          {order.pickupCode ? ` · ${order.pickupCode}` : ''}
+        </Text>
+      ) : null}
     </View>
   );
 }

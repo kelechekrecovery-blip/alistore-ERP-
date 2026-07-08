@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- Add B2B/wholesale quote request scaffold: business buyer profile fields, invoice/wholesale checkout intent, staff queue visibility, and Event Ledger coverage.
 - Activate production AI vision/market scout after provider key and reference datasets are available: configure `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY`, validate real photo/listing outputs, and add offline eval thresholds.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Complete account-bound native store release after Apple/Google accounts and test devices are available: configure signing credentials, production API URL, EAS token, App Store Connect API key/team, Google Play service account, TestFlight/Play Internal QA, and push credentials.
@@ -8,6 +9,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add click-and-collect fulfillment metadata across API, web checkout, native checkout, Telegram Mini App, account order details, staff, and warehouse queues.
 - Add AI photo grading and market price scout scaffolding behind staff-only `/ai` endpoints with keyless rules, OpenRouter activation path, and safe fallback.
 - Remediate production dependency audit blockers with Next 16, NestJS 11, patched transitive overrides, tsc-based API build, and full MVP/browser/mobile/security verification.
 - Add native return request opening from eligible signed-in order history.

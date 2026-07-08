@@ -387,17 +387,22 @@ reminders, and reservation expiry without an opted-out notice.
   `sms`/`push`/`webhook` через Novu, `telegram` через Bot API, `whatsapp` через WhatsApp Cloud API,
   `email` через SMTP/jsonTransport. Campaign API принимает `whatsapp`; Telegram-recipient берётся
   из `Customer.segments` (`telegram:<chat_id>`/`tg:<chat_id>`) с fallback на телефон.
+- ✅ Омниканальность / click&collect: `Order.fulfillmentType`, `pickupPoint`, `deliveryAddress`,
+  `deliverySlot`, `pickupCode`; web/native/Telegram checkout создают pickup-заказы, а кабинет,
+  staff app и warehouse queue показывают точку/код выдачи.
 - ☐ WhatsApp-магазин; франшиза + аудит партнёрских точек;
-  омниканальность (click&collect), страховка, B2B/опт, рекламный кабинет.
+  страховка, B2B/опт, рекламный кабинет.
 **Проверка:** ✅ gift-card e2e: выпуск → split tender gift_card+cash, web-flow gift-card→online
 остаток, retry без двойного списания, over-balance rejection; browser/CDP smoke checkout:
 gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `giftcard.redeemed`.
 ✅ Telegram Mini App e2e: `/tg` add-to-cart → checkout → Order(channel=telegram) в БД.
 ✅ Campaign delivery: provider routing unit tests + campaigns e2e queue WhatsApp and Telegram chat-id recipients.
+✅ Click&collect: API tests сохраняют fulfilment metadata + ledger payload; Playwright checkout
+создаёт paid pickup-order с `pickupPoint=alistore-center` и `pickupCode`.
 Остальное: e2e заказа через будущие каналы в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
-- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 8 smoke flows
+- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 9 smoke flows
   (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake,
   admin product management, protected ERP reports/AI, Telegram Mini App) and
   `.github/workflows/ci.yml` with Postgres service, install, Prisma migrate, API build/test,

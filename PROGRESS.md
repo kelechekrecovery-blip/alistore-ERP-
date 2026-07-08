@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add click-and-collect fulfillment metadata across the ecosystem.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708232000_add_order_fulfillment/`, `apps/api/prisma/migrations/20260708233000_drop_order_pickup_code_unique/`, `apps/api/src/orders/*`, `apps/api/test/orders-fulfillment.e2e-spec.ts`, web checkout/account/staff/warehouse/Telegram order surfaces, mobile order client/account history, `e2e/web-checkout.spec.ts`, readiness/docs, `BACKLOG.md`, `PROGRESS.md`.
+- Result: orders now persist `fulfillmentType`, pickup point/address/slot, and pickup code. Web checkout, native checkout, and Telegram Mini App create pickup orders; account order detail/status, staff app, and warehouse queue show pickup metadata for click&collect execution.
+- Checks run: `npm exec -w @alistore/api -- prisma validate`; `npm run prisma:generate -w @alistore/api`; `npm run db:deploy -w @alistore/api`; test DB `prisma db push --skip-generate`; `npm run test -w @alistore/api -- orders-fulfillment fulfillment orders-account public-rate-limit --runInBand`; `npm run api:build`; `npm --prefix apps/mobile run typecheck`; `npm run build -w @alistore/web`; `npx playwright test e2e/web-checkout.spec.ts`; `npm run mvp:verify`; `npm audit`; `git diff --check`.
+- Outcome: Prisma schema/client/database sync passed; targeted API tests passed 4 suites / 10 tests; API build passed; mobile typecheck passed; web build passed; targeted Playwright checkout passed 1/1. Full MVP verification passed: API Jest 95 suites / 336 tests, Playwright 9/9, readiness report generated. `npm audit` reports 0 vulnerabilities and whitespace check passed.
+- Next step: run the full MVP/security gate, then continue with the next unblocked Phase 12 item: B2B/wholesale quote request scaffold.
+
+## 2026-07-08
+
 - Task: add AI photo grading and market price scout scaffolding.
 - Files changed: `apps/api/src/ai/grading.*`, `apps/api/src/ai/price-scout.*`, `apps/api/src/ai/ai.module.ts`, `apps/api/test/ai-grading.spec.ts`, `apps/api/test/price-scout.spec.ts`, `apps/api/test/reports-ai-rbac.e2e-spec.ts`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `docs/READINESS.md`, `docs/CODEX-BACKLOG-V2.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: added staff-only `POST /ai/grade-photos` and `POST /ai/price-scout`. Both endpoints work without keys via deterministic rules, try OpenRouter when `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` is configured, and fall back safely to rules on provider failure. RBAC coverage now includes the new `/ai/*` endpoints.

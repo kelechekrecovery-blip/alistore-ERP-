@@ -186,6 +186,10 @@ export const api = {
   createOrder(input: {
     customerId: string;
     channel: 'mobile' | 'staff_mobile';
+    fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
+    pickupPoint?: string;
+    deliveryAddress?: string;
+    deliverySlot?: string;
     total: number;
     items: Array<{ sku: string; qty: number; price: number }>;
   }) {

@@ -285,7 +285,15 @@ export default function StaffPage() {
                       {o.status === 'created' ? 'Новый' : 'Сборка'}
                     </span>
                   </div>
-                  <div className="mt-1.5 text-[13px] text-[#A79C92]">{o.items.reduce((s, i) => s + i.qty, 0)} тов. · {som(o.total)} · {o.channel}</div>
+                  <div className="mt-1.5 text-[13px] text-[#A79C92]">
+                    {o.items.reduce((s, i) => s + i.qty, 0)} тов. · {som(o.total)} · {o.channel} · {o.fulfillmentType ?? 'pickup'}
+                  </div>
+                  {(o.pickupPoint || o.deliveryAddress || o.pickupCode) && (
+                    <div className="mt-2 rounded-[10px] bg-[#16130F] px-3 py-2 text-[12px] text-[#A79C92]">
+                      <span>{o.pickupPoint ?? o.deliveryAddress}</span>
+                      {o.pickupCode && <span className="ml-2 font-mono text-lime">{o.pickupCode}</span>}
+                    </div>
+                  )}
                   <button type="button" disabled={busy === o.id} onClick={() => orderAction(o)} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
                     {busy === o.id ? '…' : o.status === 'created' ? 'Собрать · назначить IMEI' : 'В сборку'}
                   </button>

@@ -23,6 +23,11 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await expect(page.getByText('Заказ оформлен!')).toBeVisible();
 
   const order = await prisma.order.findFirst({ orderBy: { createdAt: 'desc' } });
-  expect(order?.status).toBe('paid');
+  expect(order).toMatchObject({
+    status: 'paid',
+    fulfillmentType: 'pickup',
+    pickupPoint: 'alistore-center',
+  });
+  expect(order?.pickupCode).toMatch(/^PU-/);
   expect(await prisma.payment.count({ where: { orderId: order?.id, method: 'card' } })).toBe(1);
 });

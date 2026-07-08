@@ -13,7 +13,8 @@ import { Type } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-const CHANNELS = ['web', 'app', 'pos', 'telegram'] as const;
+const CHANNELS = ['web', 'app', 'mobile', 'staff_mobile', 'pos', 'telegram'] as const;
+const FULFILLMENT_TYPES = ['pickup', 'courier', 'express', 'store'] as const;
 
 export class OrderItemDto {
   @ApiProperty({ example: 'IPHONE-15-128-BLK' })
@@ -39,6 +40,26 @@ export class CreateOrderDto {
 
   @ApiProperty({ enum: CHANNELS, example: 'web' })
   @IsIn(CHANNELS) channel!: (typeof CHANNELS)[number];
+
+  @ApiPropertyOptional({ enum: FULFILLMENT_TYPES, example: 'pickup' })
+  @IsOptional()
+  @IsIn(FULFILLMENT_TYPES)
+  fulfillmentType?: (typeof FULFILLMENT_TYPES)[number];
+
+  @ApiPropertyOptional({ example: 'alistore-center' })
+  @IsOptional()
+  @IsString()
+  pickupPoint?: string;
+
+  @ApiPropertyOptional({ example: 'Бишкек, ул. Киевская 95' })
+  @IsOptional()
+  @IsString()
+  deliveryAddress?: string;
+
+  @ApiPropertyOptional({ example: 'today 16:00-18:00' })
+  @IsOptional()
+  @IsString()
+  deliverySlot?: string;
 
   @ApiProperty({ minimum: 0, example: 109900 })
   @IsInt() @Min(0) total!: number;

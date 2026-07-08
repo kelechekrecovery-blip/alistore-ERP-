@@ -24,6 +24,10 @@ const DELIVERY = [
   { id: 'courier', icon: '🚚', name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с', fee: 200 },
   { id: 'express', icon: '⚡', name: 'Экспресс', meta: 'в течение часа', price: '400 с', fee: 400 },
 ];
+const PICKUP_POINTS = [
+  { id: 'alistore-center', name: 'AliStore Центр', meta: 'Киевская 95 · сегодня до 21:00' },
+  { id: 'alistore-asia-mall', name: 'AliStore Asia Mall', meta: 'просп. Чынгыза Айтматова · завтра с 11:00' },
+];
 const PAYMENT = [
   { id: 'cash', icon: '💵', name: 'Наличными при получении' },
   { id: 'card', icon: '💳', name: 'Картой' },
@@ -41,6 +45,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState('pickup');
+  const [pickupPoint, setPickupPoint] = useState(PICKUP_POINTS[0].id);
   const [payment, setPayment] = useState<PaymentChoice>('cash');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
@@ -57,6 +62,7 @@ export default function CheckoutPage() {
   useEffect(() => { setAddress(mainAddress(loadAddresses())); }, []);
   const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
   const deliveryFee = DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
+  const selectedPickupPoint = PICKUP_POINTS.find((p) => p.id === pickupPoint) ?? PICKUP_POINTS[0];
   const payable = total + deliveryFee;
   const giftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, payable) : 0;
   const dueAfterGift = Math.max(payable - giftAmount, 0);
@@ -86,7 +92,16 @@ export default function CheckoutPage() {
     setBusy(true); setError(null);
     try {
       const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
-      const order = await createOrder({ customerId: customer.id, channel: 'web', total: payable, items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })) });
+      const order = await createOrder({
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
+        pickupPoint: delivery === 'pickup' ? pickupPoint : undefined,
+        deliveryAddress: delivery !== 'pickup' ? address?.text : undefined,
+        deliverySlot: delivery === 'pickup' ? selectedPickupPoint.meta : DELIVERY.find((d) => d.id === delivery)?.meta,
+        total: payable,
+        items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })),
+      });
       let currentOrder: CreatedOrder = order;
       if (giftCard && giftAmount > 0) {
         const paid = await payOrder({
@@ -148,6 +163,12 @@ export default function CheckoutPage() {
         <div className="grid h-20 w-20 place-items-center rounded-full bg-lime/15 text-4xl">✓</div>
         <div className="mt-5 font-display text-2xl font-extrabold">{done.intent && !done.paid ? 'Ожидаем оплату' : 'Заказ оформлен!'}</div>
         <div className="mt-2.5 text-sm text-[#A79C92]">№ <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · {done.order.status}. Мы свяжемся для подтверждения.</div>
+        {done.order.pickupCode && (
+          <div className="mt-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] px-5 py-3">
+            <div className="text-[12px] text-[#A79C92]">Код выдачи</div>
+            <div className="mt-1 font-display text-xl font-extrabold text-lime">{done.order.pickupCode}</div>
+          </div>
+        )}
         {done.intent && !done.paid && (
           <div className="mt-5 w-full rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
             <div className="text-[13px] font-semibold text-white">{PAYMENT.find((p) => p.id === done.intent?.method)?.name}</div>
@@ -189,6 +210,25 @@ export default function CheckoutPage() {
                 <span className="text-[13px] text-[#D8CFC6]">{d.price}</span>
               </button>
             ))}
+            {delivery === 'pickup' && (
+              <div className="mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                <div className="mb-2 text-[13px] font-semibold">Точка самовывоза</div>
+                {PICKUP_POINTS.map((point) => (
+                  <button
+                    key={point.id}
+                    type="button"
+                    onClick={() => setPickupPoint(point.id)}
+                    className={`mb-2 flex w-full items-start gap-3 rounded-[11px] border p-3 text-left last:mb-0 ${pickupPoint === point.id ? 'border-lime bg-lime/5' : 'border-[#3A342E] bg-[#16130F]'}`}
+                  >
+                    <span className={`mt-0.5 h-4 w-4 rounded-full border-2 ${pickupPoint === point.id ? 'border-lime bg-lime' : 'border-[#3A342E]'}`} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-white">{point.name}</span>
+                      <span className="mt-0.5 block text-xs text-[#A79C92]">{point.meta}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             {delivery !== 'pickup' && (
               <Link href="/account/addresses" className="mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
                 <div className="flex items-center justify-between text-[13px] font-semibold">
@@ -237,6 +277,7 @@ export default function CheckoutPage() {
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
             <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
+              {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint.name} />}
               {delivery !== 'pickup' && <Row k="Адрес" v={address?.text ?? 'не указан'} />}
               <Row k="Оплата" v={PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
               <Row k="Телефон" v={phone} />

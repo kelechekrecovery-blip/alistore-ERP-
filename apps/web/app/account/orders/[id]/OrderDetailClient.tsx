@@ -54,7 +54,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         <button type="button" onClick={() => router.back()} className="text-xl">←</button>
         <span className="font-display text-xl font-bold">Заказ #{order.id.slice(-8)}</span>
       </div>
-      <div className="mb-3 ml-8 text-[13px] text-[#A79C92]">{order.channel} · {som(order.total)}</div>
+      <div className="mb-3 ml-8 text-[13px] text-[#A79C92]">{order.channel} · {order.fulfillmentType ?? 'pickup'} · {som(order.total)}</div>
 
       {!bad && (
         <Link href={`/account/orders/${order.id}/status`} className="mb-4 flex items-center justify-between rounded-[13px] bg-lime px-4 py-3 text-[13px] font-bold text-lime-ink">
@@ -83,6 +83,38 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           })}
         </div>
       )}
+
+      <div className="mb-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <div className="mb-2 text-xs uppercase tracking-wide text-[#8A7F76]">Получение</div>
+        <div className="flex justify-between gap-3 py-1 text-[13px]">
+          <span className="text-[#A79C92]">Тип</span>
+          <span className="text-right text-[#D8CFC6]">{order.fulfillmentType ?? 'pickup'}</span>
+        </div>
+        {order.pickupPoint && (
+          <div className="flex justify-between gap-3 py-1 text-[13px]">
+            <span className="text-[#A79C92]">Точка</span>
+            <span className="text-right text-[#D8CFC6]">{order.pickupPoint}</span>
+          </div>
+        )}
+        {order.deliveryAddress && (
+          <div className="flex justify-between gap-3 py-1 text-[13px]">
+            <span className="text-[#A79C92]">Адрес</span>
+            <span className="text-right text-[#D8CFC6]">{order.deliveryAddress}</span>
+          </div>
+        )}
+        {order.deliverySlot && (
+          <div className="flex justify-between gap-3 py-1 text-[13px]">
+            <span className="text-[#A79C92]">Слот</span>
+            <span className="text-right text-[#D8CFC6]">{order.deliverySlot}</span>
+          </div>
+        )}
+        {order.pickupCode && (
+          <div className="mt-2 rounded-[11px] bg-lime/10 px-3 py-2">
+            <div className="text-[11px] text-[#A79C92]">Код выдачи</div>
+            <div className="mt-0.5 font-display text-lg font-extrabold text-lime">{order.pickupCode}</div>
+          </div>
+        )}
+      </div>
 
       <div className="mb-2 font-display text-base font-bold">Состав</div>
       {order.items.map((i, idx) => (

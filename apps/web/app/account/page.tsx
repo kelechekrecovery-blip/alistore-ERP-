@@ -84,7 +84,7 @@ export default function AccountPage() {
               <Link key={o.id} href={`/account/orders/${o.id}`} className="mb-2.5 flex items-center gap-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
                 <span className="font-mono text-sm font-bold">#{o.id.slice(-6)}</span>
                 <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>
-                <span className="text-[13px] text-[#A79C92]">{o.channel}</span>
+                <span className="text-[13px] text-[#A79C92]">{o.fulfillmentType ?? o.channel}</span>
                 <span className="ml-auto font-display font-extrabold text-lime">{som(o.total)}</span>
               </Link>
             );

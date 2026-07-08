@@ -143,6 +143,9 @@ export default function TelegramMiniAppPage() {
       const order = await createOrder({
         customerId: customer.id,
         channel: 'telegram',
+        fulfillmentType: 'pickup',
+        pickupPoint: 'alistore-center',
+        deliverySlot: 'AliStore Центр · сегодня',
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
       });

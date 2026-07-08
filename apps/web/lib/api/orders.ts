@@ -11,6 +11,11 @@ export interface CreatedOrder {
   id: string;
   status: string;
   total: number;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
 }
 
 /** Find-or-create a customer by phone (guest checkout). Throws on API error. */
@@ -28,6 +33,10 @@ export async function createCustomer(input: { phone: string; name?: string }): P
 export async function createOrder(input: {
   customerId: string;
   channel: string;
+  fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
+  pickupPoint?: string;
+  deliveryAddress?: string;
+  deliverySlot?: string;
   total: number;
   items: OrderLine[];
 }): Promise<CreatedOrder> {
@@ -43,6 +52,11 @@ export async function createOrder(input: {
 export interface MyOrder {
   id: string;
   channel: string;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
   status: string;
   total: number;
   createdAt: string;
@@ -56,6 +70,11 @@ export function fetchMyOrders(accessToken: string): Promise<MyOrder[]> {
 export interface QueueOrder {
   id: string;
   channel: string;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
   status: string;
   total: number;
   createdAt: string;
@@ -86,6 +105,11 @@ export function transitionOrder(id: string, to: string, accessToken: string): Pr
 export interface OrderDetail {
   id: string;
   channel: string;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
   status: string;
   total: number;
   createdAt: string;

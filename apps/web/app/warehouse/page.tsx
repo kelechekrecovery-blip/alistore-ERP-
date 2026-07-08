@@ -166,6 +166,9 @@ export default function WarehousePage() {
                       <span className="rounded-chip bg-[#221E19] px-2.5 py-0.5 text-xs font-semibold text-lime">
                         {o.channel}
                       </span>
+                      <span className="rounded-chip bg-[#221E19] px-2.5 py-0.5 text-xs font-semibold text-[#D8CFC6]">
+                        {o.fulfillmentType ?? 'pickup'}
+                      </span>
                       {o.customer && (
                         <span className="font-mono text-xs text-[#8A7F76]">{o.customer.phone}</span>
                       )}
@@ -176,6 +179,14 @@ export default function WarehousePage() {
                         {som(o.total)}
                       </span>
                     </div>
+
+                    {(o.pickupPoint || o.deliveryAddress || o.pickupCode) && (
+                      <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#16130F] px-3 py-2 text-xs text-[#A79C92]">
+                        <span className="font-semibold text-[#D8CFC6]">{o.pickupPoint ?? o.deliveryAddress}</span>
+                        {o.deliverySlot && <span> · {o.deliverySlot}</span>}
+                        {o.pickupCode && <span className="ml-2 font-mono text-lime">{o.pickupCode}</span>}
+                      </div>
+                    )}
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {o.items.map((i, idx) => (

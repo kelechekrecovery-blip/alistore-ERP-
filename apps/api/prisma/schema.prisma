@@ -252,19 +252,26 @@ model DeviceUnit {
 }
 
 model Order {
-  id         String      @id @default(cuid())
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  customerId String
-  status     OrderStatus @default(draft)
-  channel    String // web | app | pos | telegram
-  total      Int
-  items      OrderItem[]
-  payments   Payment[]
-  createdAt  DateTime    @default(now())
+  id              String      @id @default(cuid())
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  customerId      String
+  status          OrderStatus @default(draft)
+  channel         String // web | app | mobile | pos | telegram
+  fulfillmentType String      @default("pickup") // pickup | courier | express | store
+  pickupPoint     String?
+  deliveryAddress String?
+  deliverySlot    String?
+  pickupCode      String?
+  total           Int
+  items           OrderItem[]
+  payments        Payment[]
+  createdAt       DateTime    @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
   @@index([customerId])
   @@index([status])
+  @@index([fulfillmentType, status])
+  @@index([pickupPoint, status])
 }
 
 model OrderItem {

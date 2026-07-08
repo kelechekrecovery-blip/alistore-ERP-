@@ -21,6 +21,8 @@ gift cards/store credit with checkout redemption, Playwright E2E smoke pack + CI
 Admin Product Management UI (`/admin/products`) with staff-only product CRUD, keyless AI
 category/description enrichment, approval-gated price/archive actions, and Telegram Mini App
 shell (`/tg`) with shared catalog/checkout API and `channel=telegram` order flow,
+click&collect fulfillment metadata (`fulfillmentType`, pickup point/address/slot, pickup code)
+surfaced through checkout/account/staff/warehouse queues,
 plus `GET /health/integrations` external-readiness report for provider keys/manual hardware
 gates without exposing secret values, and P0 owner data hardening: `/reports/*` + `/ai/*`
 are staff-RBAC protected with shared staff-session web token handoff; customer order timeline

@@ -27,11 +27,21 @@ export interface CreatedOrder {
   id: string;
   status: string;
   total: number;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
 }
 
 export interface CustomerOrder {
   id: string;
   channel: string;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
   status: string;
   total: number;
   createdAt: string;
@@ -197,6 +207,11 @@ export type PosSaleOutcome = PosSaleResult | PosPendingApproval;
 export interface QueueOrder {
   id: string;
   channel: string;
+  fulfillmentType?: string;
+  pickupPoint?: string | null;
+  deliveryAddress?: string | null;
+  deliverySlot?: string | null;
+  pickupCode?: string | null;
   status: string;
   total: number;
   createdAt: string;

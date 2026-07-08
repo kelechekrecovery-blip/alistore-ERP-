@@ -57,6 +57,17 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
         <div className="mb-3 rounded-[14px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-4 text-sm font-semibold text-[#FF8A7A]">{bad}</div>
       )}
 
+      {(order.pickupPoint || order.deliveryAddress || order.pickupCode) && (
+        <div className="mb-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+          <div className="mb-1 text-xs uppercase tracking-wide text-[#8A7F76]">Получение</div>
+          <div className="text-sm font-semibold text-white">
+            {order.pickupPoint ?? order.deliveryAddress ?? order.fulfillmentType}
+          </div>
+          {order.deliverySlot && <div className="mt-1 text-xs text-[#A79C92]">{order.deliverySlot}</div>}
+          {order.pickupCode && <div className="mt-2 font-display text-lg font-extrabold text-lime">{order.pickupCode}</div>}
+        </div>
+      )}
+
       <div className="rounded-[16px] border border-[#2E2822] bg-[#221E19] p-[18px]">
         {steps.map((s, i) => {
           const last = i === steps.length - 1;
