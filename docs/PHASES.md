@@ -374,12 +374,17 @@ reminders, and reservation expiry without an opted-out notice.
 - ✅ Telegram Mini App shell: `/tg` даёт mobile storefront + checkout поверх общего
   catalog/orders/payments API, создаёт заказы с `channel=telegram`; `/tg/webhook` — безопасная
   stub-точка до выдачи bot token.
+- ✅ Campaign delivery transports: `NOTIFICATION_TRANSPORT=channels`/`providers` маршрутизирует
+  `sms`/`push`/`webhook` через Novu, `telegram` через Bot API, `whatsapp` через WhatsApp Cloud API,
+  `email` через SMTP/jsonTransport. Campaign API принимает `whatsapp`; Telegram-recipient берётся
+  из `Customer.segments` (`telegram:<chat_id>`/`tg:<chat_id>`) с fallback на телефон.
 - ☐ WhatsApp-магазин; франшиза + аудит партнёрских точек;
   омниканальность (click&collect), страховка, B2B/опт, рекламный кабинет.
 **Проверка:** ✅ gift-card e2e: выпуск → split tender gift_card+cash, web-flow gift-card→online
 остаток, retry без двойного списания, over-balance rejection; browser/CDP smoke checkout:
 gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `giftcard.redeemed`.
 ✅ Telegram Mini App e2e: `/tg` add-to-cart → checkout → Order(channel=telegram) в БД.
+✅ Campaign delivery: provider routing unit tests + campaigns e2e queue WhatsApp and Telegram chat-id recipients.
 Остальное: e2e заказа через будущие каналы в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡

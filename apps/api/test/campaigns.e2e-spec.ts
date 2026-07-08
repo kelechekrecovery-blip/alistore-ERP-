@@ -84,7 +84,7 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
     const eligible = await customerWithSpend('001', {
       consent: true,
       spent: 80000,
-      segments: ['gold', 'city:Бишкек'],
+      segments: ['gold', 'city:Бишкек', 'telegram:777001'],
     });
     const optedOut = await customerWithSpend('002', {
       consent: false,
@@ -129,7 +129,7 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
         level: 'gold',
         city: 'Бишкек',
         minSpent: 50000,
-        channel: 'sms',
+        channel: 'whatsapp',
         budget: 10000,
         message: 'VIP аксессуары −10%',
       })
@@ -140,7 +140,7 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
     const outbox = await prisma.outboxMessage.findMany({ orderBy: { createdAt: 'asc' } });
     expect(outbox).toHaveLength(1);
     expect(outbox[0]).toMatchObject({
-      channel: 'sms',
+      channel: 'whatsapp',
       recipient: eligible.customer.phone,
       template: 'campaign_offer',
       status: 'pending',
@@ -177,5 +177,32 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
 
     const conversions = await prisma.auditEvent.findMany({ where: { type: 'campaign.converted' } });
     expect(conversions).toHaveLength(1);
+  });
+
+  it('queues Telegram campaigns to chat ids stored in customer segments', async () => {
+    await customerWithSpend('004', {
+      consent: true,
+      spent: 50000,
+      segments: ['vip', 'telegram:777004'],
+    });
+
+    await request(app.getHttpServer())
+      .post('/campaigns')
+      .set('Authorization', `Bearer ${marketerToken}`)
+      .send({
+        level: 'vip',
+        channel: 'telegram',
+        budget: 1000,
+        message: 'Telegram VIP offer',
+      })
+      .expect(201);
+
+    const outbox = await prisma.outboxMessage.findMany();
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      channel: 'telegram',
+      recipient: '777004',
+      template: 'campaign_offer',
+    });
   });
 });

@@ -23,7 +23,8 @@
   - Приёмка: intake с imei → запись в БД; тот же imei в скупке и среди проданных → high-риск
     `imei_reuse` в Risk Center (детектор уже ловит).
 - **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён / готов к выдаче /
-  гарантия обновлена / напоминание о долге) через outbox/Novu, consent-filtered.
+  гарантия обновлена / напоминание о долге) через outbox + Novu/SMTP/channel transports,
+  consent-filtered.
   - Приёмка: каждое событие рендерит шаблон с корректными полями; отозвавший consent исключён.
 - **A3. Rate limiting** (`@nestjs/throttler`) на `POST /checkout`, OTP-выдачу,
   `POST /support/tickets`, платёжные webhooks.

@@ -27,7 +27,7 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 
 ## P1 — доделать полосу A (после P0)
 - ✅ **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён/готов к выдаче/
-  гарантия/долг-напоминание) через outbox/Novu, consent-filtered.
+  гарантия/долг-напоминание) через outbox + Novu/SMTP/channel transports, consent-filtered.
 - ✅ **A3. Rate limiting** (`@nestjs/throttler`) на checkout-chain (`POST /customers`,
   `POST /orders`, `POST /payments/intents`), OTP-выдачу, `POST /support/tickets`,
   платёжные webhooks → 429 при превышении; тест.
@@ -42,6 +42,7 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 без раскрытия значений секретов.
 
 ## Статус синхронизации (обновляет Claude)
-- P0 закрыт. Текущий локальный гейт: API Jest 87/87 (305 тестов), Playwright 8/8,
+- P0 закрыт. Текущий локальный гейт: API Jest 88/88 (311 тестов), Playwright 8/8,
   `api:build` и `next build` зелёные.
-- Открытых unblocked задач нет; остались только внешние provider/social/hardware доступы.
+- Campaign delivery code закрыт; открытых unblocked задач нет. Остались только внешние
+  provider/social/hardware доступы и production-активация каналов.

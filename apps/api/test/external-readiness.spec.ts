@@ -34,6 +34,7 @@ describe('External readiness report', () => {
       APPLE_TEAM_ID: 'set',
       APPLE_KEY_ID: 'set',
       APPLE_PRIVATE_KEY: 'set',
+      NOTIFICATION_TRANSPORT: 'channels',
       NOVU_API_KEY: 'set',
       POS_HARDWARE_CERTIFIED: 'true',
     };
@@ -43,5 +44,29 @@ describe('External readiness report', () => {
     expect(report.status).toBe('ready');
     expect(report.summary.blockingRemaining).toBe(0);
     expect(report.nextActions).toEqual([]);
+  });
+
+  it('accepts direct channel provider credentials for campaign delivery', () => {
+    const telegramReport = buildExternalReadinessReport(
+      (name) =>
+        ({ NOTIFICATION_TRANSPORT: 'channels', TELEGRAM_BOT_TOKEN: 'set' })[
+          name
+        ],
+    );
+    expect(
+      telegramReport.checks.find((check) => check.id === 'campaign_delivery')?.status,
+    ).toBe('ready');
+
+    const whatsappReport = buildExternalReadinessReport(
+      (name) =>
+        ({
+          NOTIFICATION_TRANSPORT: 'channels',
+          WHATSAPP_ACCESS_TOKEN: 'set',
+          WHATSAPP_PHONE_NUMBER_ID: 'set',
+        })[name],
+    );
+    expect(
+      whatsappReport.checks.find((check) => check.id === 'campaign_delivery')?.status,
+    ).toBe('ready');
   });
 });

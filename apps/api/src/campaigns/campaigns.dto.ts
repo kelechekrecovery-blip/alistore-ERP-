@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export const CAMPAIGN_CHANNELS = ['sms', 'push', 'telegram'] as const;
+export const CAMPAIGN_CHANNELS = ['sms', 'push', 'telegram', 'whatsapp'] as const;
 
 export class SegmentRulesDto {
   @ApiPropertyOptional({ example: 'gold', description: 'Customer.segments tag for loyalty level' })

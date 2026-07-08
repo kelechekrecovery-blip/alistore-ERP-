@@ -2,10 +2,11 @@
 
 ## Next
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
-- Add campaign delivery integrations after provider accounts are available.
+- Activate production channel accounts after provider credentials are available: set `NOTIFICATION_TRANSPORT=channels`, verify real Telegram/WhatsApp/Novu sends, and confirm webhooks/callbacks.
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Add channel-aware campaign delivery transports for Novu, SMTP email, Telegram Bot API, and WhatsApp Cloud API.
 - Protect owner Reports and AI endpoints with staff RBAC and web token handoff.
 - Add external integration readiness report at `GET /health/integrations`.
 - Add Telegram Mini App shell route using the existing catalog/checkout API with `channel=telegram`.

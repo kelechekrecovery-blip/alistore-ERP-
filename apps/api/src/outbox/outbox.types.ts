@@ -4,7 +4,13 @@ import { Prisma } from '@prisma/client';
  * Channels the outbox can deliver to. Kept as string literals (not a DB enum) so
  * adding a channel never needs a migration.
  */
-export type OutboxChannel = 'sms' | 'email' | 'push' | 'telegram' | 'webhook';
+export type OutboxChannel =
+  | 'sms'
+  | 'email'
+  | 'push'
+  | 'telegram'
+  | 'whatsapp'
+  | 'webhook';
 
 export interface OutboxInput {
   channel: OutboxChannel;

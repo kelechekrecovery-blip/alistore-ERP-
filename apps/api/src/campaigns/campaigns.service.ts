@@ -219,7 +219,28 @@ export class CampaignsService {
   }
 
   private recipientFor(channel: string, customer: AudienceCustomer): string {
-    return channel === 'push' ? customer.id : customer.phone;
+    if (channel === 'push') return customer.id;
+    if (channel === 'telegram') {
+      return this.segmentValue(customer, ['telegram:', 'tg:']) ?? customer.phone;
+    }
+    return customer.phone;
+  }
+
+  private segmentValue(
+    customer: AudienceCustomer,
+    prefixes: string[],
+  ): string | undefined {
+    for (const segment of customer.segments) {
+      const trimmed = segment.trim();
+      const normalized = trimmed.toLowerCase();
+      const prefix = prefixes.find((candidate) =>
+        normalized.startsWith(candidate),
+      );
+      if (!prefix) continue;
+      const value = trimmed.slice(prefix.length).trim();
+      if (value) return value;
+    }
+    return undefined;
   }
 
   private customerView(customer: AudienceCustomer) {

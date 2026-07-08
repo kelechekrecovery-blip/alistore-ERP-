@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add channel-aware campaign delivery transports.
+- Files changed: `apps/api/src/outbox/*`, `apps/api/src/campaigns/*`, `apps/api/src/health/external-readiness.ts`, `apps/api/test/channel-transport.spec.ts`, `apps/api/test/campaigns.e2e-spec.ts`, `apps/api/test/external-readiness.spec.ts`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
+- Result: `NOTIFICATION_TRANSPORT=channels`/`providers` now routes outbox messages by channel: Novu for `sms`/`push`/`webhook`, SMTP/json email for `email`, Telegram Bot API for `telegram`, WhatsApp Cloud API for `whatsapp`, with log fallback when credentials are absent. Campaigns now accept `whatsapp`, and Telegram campaigns can target `telegram:<chat_id>`/`tg:<chat_id>` customer segment values.
+- Checks run: `npm run test -w @alistore/api -- channel-transport campaigns external-readiness --runInBand`; `npm run api:build`; `npm run api:test`.
+- Outcome: targeted campaign/transport/readiness tests passed 3 suites / 9 tests; API build passed; full API Jest passed 88 suites / 311 tests.
+- Next step: production activation still requires provider accounts/keys/webhook QA; code-side campaign delivery is complete.
+
+## 2026-07-08
+
 - Task: close P0-2 by protecting Reports and AI endpoints.
 - Files changed: `apps/api/src/reports/*`, `apps/api/src/ai/*`, `apps/api/src/authz/authz.model.ts`, `apps/api/src/orders/*`, `apps/api/test/reports-ai-rbac.e2e-spec.ts`, `apps/web/lib/reports.ts`, `apps/web/lib/ai.ts`, `apps/web/lib/api/orders.ts`, ERP/admin/AI/order-status web clients, `e2e/erp-secure.spec.ts`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
 - Result: `/reports/*` and `/ai/*` now require staff JWT + active staff + casbin permission (`reports.read` / `ai.read`, admin/owner only). ERP, AI tools, used-device assessment, and admin product AI enrichment send the shared staff-session token. Customer order status uses `GET /orders/:id/ledger`, scoped to the owning customer or staff queue readers, instead of public owner ledger.

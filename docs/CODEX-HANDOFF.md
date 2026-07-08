@@ -10,7 +10,7 @@
 
 Открытых пунктов без внешних блокеров в старой лане A и greenfield-полосе B нет на 2026-07-08.
 
-Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
+Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime/channel transport switch,
 consent-filtered transactional templates for orders/warranty/reservations/debt reminders,
 consent-filtered Campaign Segment Builder + Campaign ROI,
 Excel import idempotency, OTP access recovery with refresh-session revocation,
@@ -45,7 +45,9 @@ missing/configured env-имён и ручные проверки. Значени
 13. **AI vision-грейдинг Б/У по фото / разведка рыночных цен / оффлайн-eval** — нужен AI-ключ.
     Плуминг LLM готов (`ai/openrouter-provider.ts`, порт `InsightProvider`); vision/scout —
     расширение того же паттерна. Активация: `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` (+`AI_MODEL`).
-14. **Каналы (Phase 12)** — Telegram Mini App / WhatsApp-магазин: нужны аккаунты/токены ботов.
+14. **Каналы (Phase 12)** — Telegram Mini App / WhatsApp-магазин: campaign delivery code
+    готов (`NOTIFICATION_TRANSPORT=channels` + Novu/SMTP/Telegram/WhatsApp env); для production
+    нужны аккаунты/токены, webhook/callback QA и WhatsApp storefront activation.
 15. **Соцвход через реальные провайдеры** — нужны Apple/Telegram app credentials и callback URLs.
 16. **Физическое железо (Phase 13)** — ESC/POS/QZ печать, банковские терминалы, реальный сканер:
     нужны устройства и SDK. Софт-слой offline POS + browser-fallback уже готов.

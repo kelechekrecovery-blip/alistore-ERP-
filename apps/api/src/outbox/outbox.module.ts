@@ -6,6 +6,7 @@ import { LogNotificationTransport } from './transports/log.transport';
 import { NovuHttpTransport } from './transports/novu.transport';
 import { EmailNotificationTransport } from './transports/email.transport';
 import { RealtimeNotificationTransport } from './transports/realtime.transport';
+import { ChannelNotificationTransport } from './transports/channel.transport';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
@@ -22,7 +23,7 @@ import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
   providers: [
     OutboxService,
     OutboxRelay,
-    // Transport by NOTIFICATION_TRANSPORT: novu (+NOVU_API_KEY) | email | realtime | log.
+    // Transport by NOTIFICATION_TRANSPORT: channels | novu (+NOVU_API_KEY) | email | realtime | log.
     {
       provide: NOTIFICATION_TRANSPORT,
       inject: [ConfigService, RealtimeGateway],
@@ -31,6 +32,9 @@ import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
         gateway: RealtimeGateway,
       ): NotificationTransport => {
         const mode = config.get<string>('NOTIFICATION_TRANSPORT');
+        if (mode === 'channels' || mode === 'providers') {
+          return new ChannelNotificationTransport(config);
+        }
         if (mode === 'novu' && config.get<string>('NOVU_API_KEY')) {
           return new NovuHttpTransport(config);
         }
