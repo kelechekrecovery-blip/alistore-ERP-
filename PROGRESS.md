@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add rate limiting to public checkout, OTP, support, and webhook endpoints.
+- Files changed: `apps/api/src/rate-limit/*`, auth/customers/orders/payments/support modules/controllers, `apps/api/test/public-rate-limit.e2e-spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: shared `RateLimitModule` now backs per-route caps on checkout-chain writes (`POST /customers`, `POST /orders`, `POST /payments/intents`), public support ticket creation, sandbox/provider payment webhooks, and existing OTP throttling.
+- Checks run: `npm run test -w @alistore/api -- public-rate-limit auth-throttle --runInBand`; `npm run api:build`; `npm run api:test`; `git diff --check`.
+- Outcome: targeted rate-limit/auth-throttle tests passed 2 suites / 5 tests; API build passed; full API Jest passed 82 suites / 289 tests; whitespace check passed.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands.
+
+## 2026-07-08
+
 - Task: activate trade-in IMEI capture for `imei_reuse` risk detection.
 - Files changed: `apps/api/src/tradeins/*`, `apps/api/test/tradein-rbac.e2e-spec.ts`, `apps/api/test/reports.e2e-spec.ts`, `apps/api/test/warranty-rbac.e2e-spec.ts`, `apps/web/lib/api/tradeins.ts`, `/staff`, `/trade-in`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: trade-in DTOs now accept optional IMEI, service stores it on `TradeInDevice.imei`, ledger refs include it, Staff app and customer Trade-in screen can capture it, and Risk Center acceptance proves a sold-device IMEI reused in buyback becomes high-risk `imei_reuse`.

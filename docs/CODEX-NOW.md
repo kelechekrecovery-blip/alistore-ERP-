@@ -28,7 +28,8 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 ## P1 — доделать полосу A (после P0)
 - **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён/готов к выдаче/
   гарантия/долг-напоминание) через outbox/Novu, consent-filtered.
-- **A3. Rate limiting** (`@nestjs/throttler`) на `POST /checkout`, OTP-выдачу, `POST /support/tickets`,
+- ✅ **A3. Rate limiting** (`@nestjs/throttler`) на checkout-chain (`POST /customers`,
+  `POST /orders`, `POST /payments/intents`), OTP-выдачу, `POST /support/tickets`,
   платёжные webhooks → 429 при превышении; тест.
 - **A4. PDF/печать полировка** (receipts вкл. split-tenders / labels / договор скупки), локаль ru-KG.
 - ✅ **A5. Infra runbook** — Caddy + бэкапы + restore-check.

@@ -7,9 +7,10 @@ import { OrdersModule } from '../orders/orders.module';
 import { PaymentIntentsService } from './payment-intents.service';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
 
 @Module({
-  imports: [UnitsModule, ApprovalsModule, OrdersModule, StaffAuthModule, AuthzModule],
+  imports: [UnitsModule, ApprovalsModule, OrdersModule, StaffAuthModule, AuthzModule, RateLimitModule],
   providers: [PaymentsService, PaymentIntentsService],
   controllers: [PaymentsController],
   exports: [PaymentsService],

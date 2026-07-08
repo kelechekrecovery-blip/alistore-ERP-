@@ -11,6 +11,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { PaymentsService } from './payments.service';
 import { PayDto, RefundDto } from './payments.dto';
 import { PaymentIntentsService } from './payment-intents.service';
@@ -59,6 +60,8 @@ export class PaymentsController {
   @ApiConflictResponse({ description: 'Order cannot be reserved or paid.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or amount mismatch.' })
   @Post('intents')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   intent(@Body() dto: CreatePaymentIntentDto) {
     return this.intents.create(dto);
   }
@@ -71,6 +74,8 @@ export class PaymentsController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
   @Post('webhooks/sandbox')
   @HttpCode(200)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   webhook(@Body() dto: PaymentWebhookDto) {
     return this.intents.webhook(dto);
   }

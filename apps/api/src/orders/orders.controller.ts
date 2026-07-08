@@ -20,6 +20,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, TransitionDto } from './orders.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -82,6 +83,8 @@ export class OrdersController {
   @ApiCreatedResponse({ description: 'Order created.' })
   @ApiUnprocessableEntityResponse({ description: 'Invalid order payload.' })
   @Post()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   create(@Body() dto: CreateOrderDto) {
     return this.orders.create(dto, SYSTEM_ACTOR);
   }

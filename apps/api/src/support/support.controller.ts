@@ -8,6 +8,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SupportService } from './support.service';
 import { EscalateTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -33,6 +34,8 @@ export class SupportController {
   @ApiCreatedResponse({ description: 'Ticket opened.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown customer.' })
   @Post()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   open(@Body() dto: OpenTicketDto) {
     return this.support.open(dto, dto.customerId);
   }

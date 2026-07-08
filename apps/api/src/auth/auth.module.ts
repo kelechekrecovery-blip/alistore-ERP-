@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { TotpService } from './totp.service';
@@ -9,6 +8,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { resolveJwtSecret } from './jwt-secret';
 import { AuthController } from './auth.controller';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
 
 /**
  * Phone+OTP authentication. AuditService and PrismaService are provided globally;
@@ -18,7 +18,7 @@ import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
   imports: [
     PassportModule,
     // Rate-limit auth endpoints (anti OTP/SMS abuse); per-route caps in the controller.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
+    RateLimitModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       // Access-token TTL is applied per-sign in AuthService (a literal that

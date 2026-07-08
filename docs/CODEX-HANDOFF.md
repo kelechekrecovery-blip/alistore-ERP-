@@ -15,7 +15,7 @@ debt reminders через outbox, consent-filtered Campaign Segment Builder + Ca
 Excel import idempotency, OTP access recovery with refresh-session revocation,
 receipt split tenders, order invoice/waybill PDF, infra runbook for Caddy/backups/restore,
 trade-in IMEI intake + `imei_reuse` risk activation, realtime/socket.io, Sentry/GlitchTip hook,
-i18n, health-checks.
+i18n, health-checks, public endpoint rate limits.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 

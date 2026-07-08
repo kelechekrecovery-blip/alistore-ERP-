@@ -4,9 +4,10 @@ import { SupportController } from './support.controller';
 import { AuthModule } from '../auth/auth.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
 
 @Module({
-  imports: [AuthModule, StaffAuthModule, AuthzModule],
+  imports: [AuthModule, StaffAuthModule, AuthzModule, RateLimitModule],
   providers: [SupportService],
   controllers: [SupportController],
   exports: [SupportService],

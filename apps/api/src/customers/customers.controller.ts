@@ -17,6 +17,7 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CustomersService } from './customers.service';
 import { SetConsentDto, UpsertCustomerDto } from './customers.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -65,6 +66,8 @@ export class CustomersController {
   @ApiOperation({ summary: 'Find-or-create a customer by phone (guest checkout)' })
   @ApiCreatedResponse({ description: 'Customer created or matched by phone.' })
   @Post()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   upsert(@Body() dto: UpsertCustomerDto) {
     return this.customers.upsert(dto);
   }

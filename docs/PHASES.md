@@ -355,6 +355,9 @@ outbox recipients include consenting customer and exclude opted-out customer.
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
 - ✅ Self-hosted infra scaffolding + production runbook (Caddy, backups, restore drill,
   release smoke, rollback).
+- ✅ Public write endpoint rate limits: OTP, checkout chain (`/customers`, `/orders`,
+  `/payments/intents`), support ticket creation and sandbox/provider payment webhooks
+  return 429 after per-route caps.
 - ✅ **Offline POS software layer**: local queue, sync/retry, duplicate-safe `clientSaleId`,
   manual conflict state, approval-required state, network degradation fallback.
 - ✅ Hardware browser fallback: scanner as keyboard-wedge/SKU input, receipt print dialog,
@@ -402,6 +405,8 @@ outbox recipients include consenting customer and exclude opted-out customer.
   фотоотчёт смены, Excel import idempotency.
 - Phase 10 ✅: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**,
   transactional outbox transports, **Campaign Segment Builder + ROI**.
+- Cross-cutting security ✅: public write endpoint rate limits for OTP, checkout chain,
+  support tickets and payment webhooks.
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
   присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
   `tradein.contracted` в Event Ledger; actor для customer self-service = customerId.

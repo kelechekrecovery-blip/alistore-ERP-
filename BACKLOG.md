@@ -6,6 +6,7 @@
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Add rate limiting to public checkout, OTP, support, and webhook endpoints.
 - Capture trade-in IMEI and activate `imei_reuse` risk detection.
 - Write infra runbook for Caddy/backups deployment.
 - Add printable order invoice / waybill PDF.
