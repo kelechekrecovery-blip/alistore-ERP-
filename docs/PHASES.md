@@ -366,17 +366,21 @@ reminders, and reservation expiry without an opted-out notice.
   `giftcard:<code>:<orderId>`, ledger `giftcard.issued` / `giftcard.redeemed`. Checkout
   показывает поле подарочной карты, списывает баланс как отдельный tender и создает sandbox
   intent только на остаток.
-- ☐ Telegram Mini App / WhatsApp-магазин; франшиза + аудит партнёрских точек;
+- ✅ Telegram Mini App shell: `/tg` даёт mobile storefront + checkout поверх общего
+  catalog/orders/payments API, создаёт заказы с `channel=telegram`; `/tg/webhook` — безопасная
+  stub-точка до выдачи bot token.
+- ☐ WhatsApp-магазин; франшиза + аудит партнёрских точек;
   омниканальность (click&collect), страховка, B2B/опт, рекламный кабинет.
 **Проверка:** ✅ gift-card e2e: выпуск → split tender gift_card+cash, web-flow gift-card→online
 остаток, retry без двойного списания, over-balance rejection; browser/CDP smoke checkout:
 gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `giftcard.redeemed`.
-Остальное: e2e заказа через каждый канал в общий бэкенд; аудит франшизы читает из ledger.
+✅ Telegram Mini App e2e: `/tg` add-to-cart → checkout → Order(channel=telegram) в БД.
+Остальное: e2e заказа через будущие каналы в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
-- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 6 smoke flows
+- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 7 smoke flows
   (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake,
-  admin product management) and
+  admin product management, Telegram Mini App) and
   `.github/workflows/ci.yml` with Postgres service, install, Prisma migrate, API build/test,
   web build, browser install and E2E artifacts on failure.
 - ✅ Self-hosted infra scaffolding + production runbook (Caddy, backups, restore drill,
@@ -434,7 +438,8 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 - Cross-cutting security ✅: public write endpoint rate limits for OTP, checkout chain,
   support tickets and payment webhooks.
 - Cross-cutting quality ✅: Playwright E2E smoke pack + GitHub Actions CI for core customer,
-  POS approval, return/refund, exchange, trade-in, and admin product-management paths.
+  POS approval, return/refund, exchange, trade-in, admin product-management, and Telegram Mini
+  App paths.
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
   присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
   `tradein.contracted` в Event Ledger; actor для customer self-service = customerId.

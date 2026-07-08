@@ -51,9 +51,9 @@
   (`POST /ai/describe`) — это UI-дом для готовых keyless-AI эндпоинтов Claude.
   - Приёмка: CRUD товара из UI; авто-категория и описание подставляются одним кликом; опасные
     правки паркуются в Approval Inbox. ✅
-- **B4. Telegram Mini App — оболочка.** НОВЫЙ роут `apps/web/app/tg/`: витрина+checkout против
+- ✅ **B4. Telegram Mini App — оболочка.** НОВЫЙ роут `apps/web/app/tg/`: витрина+checkout против
   существующего API (`channel=telegram`) + webhook-заглушка. Активация позже = токен бота.
-  - Приёмка: Mini App проходит заказ в общий бэкенд (channel=telegram) в dev.
+  - Приёмка: Mini App проходит заказ в общий бэкенд (channel=telegram) в dev. ✅
 
 ---
 

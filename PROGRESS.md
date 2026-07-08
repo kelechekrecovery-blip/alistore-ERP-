@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add Telegram Mini App shell route.
+- Files changed: `apps/web/app/tg/page.tsx`, `apps/web/app/tg/webhook/route.ts`, `e2e/tg-mini-app.spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: added `/tg` as a Telegram-style mobile storefront and checkout over the shared catalog/customer/order/payment APIs, with optional Telegram WebApp expand/prefill support, `channel=telegram` order creation, MBank QR sandbox intent option, and `/tg/webhook` stub for future bot activation.
+- Checks run: `npx playwright test e2e/tg-mini-app.spec.ts`; `npm run build -w @alistore/web`; live API+Next+Chrome screenshots for `/tg` catalog and checkout; `npm run api:build`; `npm run api:test`; `npm run e2e`; `git diff --check`. A first parallel `next build` collided with Playwright `next dev` over `.next`, then passed when rerun alone.
+- Outcome: targeted Telegram Mini App Playwright smoke passed and verified an Order with `channel=telegram` in Prisma; API build passed; full API Jest passed 85 suites / 300 tests; full Playwright passed 7/7; web build passed; visual mobile QA passed for catalog and checkout; whitespace check passed.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands; remaining backlog is external/provider/hardware gated.
+
+## 2026-07-08
+
 - Task: build Admin Product Management UI with AI enrichment and approval-gated dangerous actions.
 - Files changed: `apps/api/src/products/*`, `apps/api/src/authz/authz.model.ts`, `apps/api/src/audit/event-types.ts`, `apps/api/test/product-management.e2e-spec.ts`, `apps/web/app/admin/products/page.tsx`, `apps/web/lib/api/*`, `e2e/admin-products.spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: added staff-only product list/create/update for ordinary product fields with ledger events; `/admin/products` now supports search, create/edit, AI auto-category, AI description into `attrs`, price-change requests, archive requests, and Approval Inbox handoff. Price/archive remain approval-gated through existing product endpoints.
