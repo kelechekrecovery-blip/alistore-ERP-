@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "AliStore Native",
+    "slug": "alistore-native",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "alistore",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "kg.alistore.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "kg.alistore.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E0C0A"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

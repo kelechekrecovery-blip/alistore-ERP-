@@ -10,6 +10,7 @@
 ## Стек
 - **Backend** (`apps/api`): NestJS + Prisma + PostgreSQL, REST.
 - **Frontend** (`apps/web`): Next.js 14 (App Router) + React + TS + Tailwind.
+- **Native Mobile** (`apps/mobile`): Expo React Native for iOS/Android, no PWA/WebView.
 - **Тесты**: Jest + Playwright E2E; QA-сценарии из handoff = приёмочные тесты.
 
 ## Что уже реализовано (MVP)
@@ -23,6 +24,8 @@
   Postgres fallback; reindex endpoint закрыт maintenance-token по умолчанию.
 - **Customer app / Site 2.0**: каталог, поиск, карточка товара, корзина, checkout,
   избранное, сравнение, аккаунт, бонусы, адреса, уведомления, support, returns, trade-in.
+- **Native iOS/Android app**: отдельный Expo React Native workspace с клиентским каталогом,
+  избранным, корзиной, checkout/payment intent и staff POS поверх текущего API.
 - **Staff ecosystem**: POS, warehouse, approvals, refund/dispute center, exchange, warranty,
   ERP reports, AI tools, admin product management, campaign/notification delivery.
 - **Telegram Mini App shell** и provider-ready Apple/Telegram social login.
@@ -46,6 +49,9 @@ npm run db:seed
 
 # API (http://localhost:4000/api)
 npm run api
+
+# Native iOS/Android app via Expo Go (не PWA)
+EXPO_PUBLIC_API_BASE=http://127.0.0.1:4000/api npm run mobile
 
 # API contract
 # Swagger UI:   http://localhost:4000/api/docs
@@ -92,6 +98,7 @@ apps/
       prisma/  common/
     test/              unit/e2e acceptance tests
   web/                 Next.js customer app, POS, ERP, staff/admin screens
+  mobile/              Expo React Native native app: client checkout + staff POS
 design_handoff_alistore/   источник правды: спека, прототипы, reference
 ```
 

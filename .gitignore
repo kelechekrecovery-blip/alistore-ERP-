@@ -11,6 +11,8 @@ out/
 .env.*.local
 apps/api/.env.production
 apps/web/.env.production
+apps/mobile/.expo/
+apps/mobile/.expo-shared/
 # prisma
 apps/api/prisma/*.db
 # logs / os

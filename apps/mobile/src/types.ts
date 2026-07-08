@@ -1,0 +1,108 @@
+export interface CatalogProduct {
+  id: string;
+  sku: string;
+  name: string;
+  price: number;
+  category: string;
+  attrs: Record<string, unknown> | null;
+  availableUnits: number;
+  updatedAt?: string;
+}
+
+export interface CatalogResponse {
+  source: string;
+  warning?: string;
+  total: number;
+  limit: number;
+  offset: number;
+  items: CatalogProduct[];
+}
+
+export interface CartLine {
+  product: CatalogProduct;
+  qty: number;
+}
+
+export interface CreatedOrder {
+  id: string;
+  status: string;
+  total: number;
+}
+
+export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
+export type PaymentMethod = OnlinePaymentMethod | 'cash' | 'bakai_pos' | 'obank';
+
+export interface PaymentIntent {
+  intentId: string;
+  provider: 'card' | 'mbank' | 'odengi' | 'installment';
+  orderId: string;
+  orderStatus: string;
+  method: OnlinePaymentMethod;
+  amount: number;
+  txnId: string;
+  status: 'requires_action';
+  expiresAt: string;
+  paymentUrl: string;
+  qrPayload: string | null;
+}
+
+export interface PaymentConfirmResult {
+  order: { id: string; status: string; total: number } | null;
+  payment: { id: string; amount: number; method: string; status: string; txnId?: string | null };
+  idempotent: boolean;
+}
+
+export interface StaffLoginResult {
+  accessToken: string;
+  staffId: string;
+  username: string;
+  role: string;
+  totpEnabled: boolean;
+}
+
+export interface PosLine {
+  productId: string;
+  sku: string;
+  price: number;
+  qty: number;
+}
+
+export interface PosPayment {
+  method: PaymentMethod;
+  amount: number;
+}
+
+export interface PosSaleResult {
+  pendingApproval?: false;
+  orderId: string;
+  receiptNo: string;
+  total: number;
+  status: string;
+  shiftId: string;
+  imeis: string[];
+  idempotent?: boolean;
+}
+
+export interface PosPendingApproval {
+  pendingApproval: true;
+  approvalId: string;
+  discountPct: number;
+  reason?: 'discount' | 'margin' | 'discount_and_margin';
+  margin?: {
+    minMargin: number;
+    worstMargin: number;
+    breaches: Array<{ sku: string; margin: number; minMargin: number }>;
+  };
+}
+
+export type PosSaleOutcome = PosSaleResult | PosPendingApproval;
+
+export interface QueueOrder {
+  id: string;
+  channel: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  customer?: { phone: string; name: string };
+  items: { sku: string; qty: number; price: number; imei?: string | null }[];
+}

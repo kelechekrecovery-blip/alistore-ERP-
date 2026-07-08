@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native iOS/Android app workspace instead of a PWA shell.
+- Files changed: `apps/mobile/*`, root `package.json`, `package-lock.json`, `.gitignore`, `scripts/mvp-verify.mjs`, `README.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: added `@alistore/mobile` as an Expo React Native app with native Client and Staff/POS modes, secure staff-token storage, shared catalog fetch, mobile cart/favorites/checkout, online payment intents with sandbox confirmation, staff order queue, POS ticketing, discount/payment selection, and `POST /pos/sale` integration. Codex Run is wired to `apps/mobile/script/build_and_run.sh`.
+- Checks run: `npm run typecheck -w @alistore/mobile`; `npm run expo:config -w @alistore/mobile`; `bash -n apps/mobile/script/build_and_run.sh`; `apps/mobile/script/build_and_run.sh --help`; `npm exec -w @alistore/mobile -- expo-doctor`; `npm run mvp:verify -- --skip-e2e`; `git diff --check`.
+- Outcome: mobile typecheck passed; Expo config renders; run script syntax/help passed; fast MVP gate passed with Prisma schema validation, Prisma Client generation, API build, web build, mobile typecheck, API Jest 90 suites / 319 tests, and readiness reporting. Expo Doctor is 19/20: the remaining warning is the known monorepo React split (`apps/web` on React 18 for Next 14, `apps/mobile` on React 19 for Expo SDK 57), so store packaging remains a dedicated follow-up rather than forcing an unsafe web React upgrade.
+- Next step: use real devices/provider accounts for store signing, TestFlight/Play Internal QA, push credentials, and physical POS hardware certification.
+
+## 2026-07-08
+
 - Task: run prototype visual audit and remove negative letter spacing.
 - Files changed: `apps/web/app/globals.css`, `apps/web/components/SiteHeader.tsx`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: audited the live UI against the `.dc.html` visual references for Client App 2.0, POS 2.0, Staff App 2.0, and ERP 2.0; removed the remaining negative letter spacing from global headings and the site header so typography follows the project rule that letter spacing stays at 0 unless explicitly positive.

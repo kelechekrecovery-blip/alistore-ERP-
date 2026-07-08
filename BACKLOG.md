@@ -2,10 +2,12 @@
 
 ## Next
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
+- Prepare native app store delivery after Apple/Google accounts and test devices are available: split customer/staff bundle identifiers if required, configure signing, TestFlight/Play Internal QA, push credentials, and store metadata.
 - Activate production channel accounts after provider credentials are available: set `NOTIFICATION_TRANSPORT=channels`, verify real Telegram/WhatsApp/Novu sends, and confirm webhooks/callbacks.
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native Expo React Native app workspace for iOS/Android with client checkout and staff POS over the shared API.
 - Run prototype visual audit and remove negative letter spacing.
 - Add production core preflight for unsafe env and launch checks.
 - Add production activation pack with env template, strict readiness commands, and launch runbook.
