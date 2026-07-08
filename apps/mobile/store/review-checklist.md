@@ -46,6 +46,7 @@
 - Customer can open warranty case from a signed-in device card with owner-scoped JWT.
 - Customer support tickets list/open from the signed-in account with owner-scoped JWT.
 - Customer notification preferences show and toggle marketing consent with owner-scoped JWT.
+- Customer can open a return request from eligible signed-in order history.
 - Checkout with cash and sandbox online payment.
 - Checkout while signed in reuses the authenticated customer account.
 - Staff login/logout and SecureStore persistence.

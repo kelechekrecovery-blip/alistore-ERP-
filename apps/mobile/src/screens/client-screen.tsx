@@ -54,6 +54,9 @@ const paymentOptions: Array<{ method: ClientPayment; label: string; icon: keyof 
   { method: 'installment', label: 'Рассрочка', icon: 'calendar-outline' },
 ];
 
+const blockedReturnStatuses = new Set(['cancelled', 'returned', 'refunded']);
+const returnReasons = ['Не подошёл', 'Брак', 'Не тот товар', 'Другое'];
+
 export function ClientScreen({
   products,
   catalogState,
@@ -103,6 +106,11 @@ export function ClientScreen({
   const [warrantyProblem, setWarrantyProblem] = useState('');
   const [warrantyBusy, setWarrantyBusy] = useState(false);
   const [warrantyError, setWarrantyError] = useState<string | null>(null);
+  const [returnOrderId, setReturnOrderId] = useState('');
+  const [returnReason, setReturnReason] = useState('');
+  const [returnBusy, setReturnBusy] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [returnResult, setReturnResult] = useState<{ id: string; status: string } | null>(null);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -170,6 +178,10 @@ export function ClientScreen({
       setWarrantyDraftImei(null);
       setWarrantyProblem('');
       setWarrantyError(null);
+      setReturnOrderId('');
+      setReturnReason('');
+      setReturnError(null);
+      setReturnResult(null);
       return;
     }
     void loadAccountData(customerSession);
@@ -280,6 +292,10 @@ export function ClientScreen({
       setWarrantyDraftImei(null);
       setWarrantyProblem('');
       setWarrantyError(null);
+      setReturnOrderId('');
+      setReturnReason('');
+      setReturnError(null);
+      setReturnResult(null);
     } finally {
       setAuthBusy(false);
     }
@@ -467,6 +483,33 @@ export function ClientScreen({
     }
   }
 
+  async function openReturnRequest() {
+    if (!customerSession || returnBusy) return;
+    if (!returnOrderId) {
+      setReturnError('Выберите заказ для возврата.');
+      return;
+    }
+    const reason = returnReason.trim();
+    if (reason.length < 3) {
+      setReturnError('Укажите причину возврата.');
+      return;
+    }
+    setReturnBusy(true);
+    setReturnError(null);
+    setReturnResult(null);
+    try {
+      const readySession = await prepareCustomerSession(customerSession);
+      if (!readySession) return;
+      const ret = await api.openReturnRequest({ orderId: returnOrderId, reason }, readySession.accessToken);
+      setReturnResult({ id: ret.id, status: ret.status });
+      setReturnReason('');
+    } catch (cause) {
+      setReturnError(cause instanceof Error ? cause.message : 'Заявка на возврат не создана.');
+    } finally {
+      setReturnBusy(false);
+    }
+  }
+
   async function placeOrder() {
     if (cartLines.length === 0 || busy) return;
     const checkoutPhone = normalizePhone(customerSession?.phone ?? phone);
@@ -638,6 +681,11 @@ export function ClientScreen({
             marketingConsent={marketingConsent}
             consentBusy={consentBusy}
             consentError={consentError}
+            returnOrderId={returnOrderId}
+            returnReason={returnReason}
+            returnBusy={returnBusy}
+            returnError={returnError}
+            returnResult={returnResult}
             supportSubject={supportSubject}
             supportBody={supportBody}
             supportPriority={supportPriority}
@@ -667,6 +715,9 @@ export function ClientScreen({
             onSupportPriority={setSupportPriority}
             onOpenSupportTicket={openSupportTicket}
             onToggleMarketingConsent={toggleMarketingConsent}
+            onReturnOrder={setReturnOrderId}
+            onReturnReason={setReturnReason}
+            onOpenReturn={openReturnRequest}
             onConfirmPayment={confirmSandboxPayment}
             onOpenCatalog={() => setTab('catalog')}
           />
@@ -974,6 +1025,11 @@ function AccountTab({
   marketingConsent,
   consentBusy,
   consentError,
+  returnOrderId,
+  returnReason,
+  returnBusy,
+  returnError,
+  returnResult,
   supportSubject,
   supportBody,
   supportPriority,
@@ -999,6 +1055,9 @@ function AccountTab({
   onSupportPriority,
   onOpenSupportTicket,
   onToggleMarketingConsent,
+  onReturnOrder,
+  onReturnReason,
+  onOpenReturn,
   onConfirmPayment,
   onOpenCatalog,
 }: {
@@ -1025,6 +1084,11 @@ function AccountTab({
   marketingConsent: boolean | null;
   consentBusy: boolean;
   consentError: string | null;
+  returnOrderId: string;
+  returnReason: string;
+  returnBusy: boolean;
+  returnError: string | null;
+  returnResult: { id: string; status: string } | null;
   supportSubject: string;
   supportBody: string;
   supportPriority: SupportPriority;
@@ -1050,9 +1114,13 @@ function AccountTab({
   onSupportPriority: (next: SupportPriority) => void;
   onOpenSupportTicket: () => void;
   onToggleMarketingConsent: () => void;
+  onReturnOrder: (next: string) => void;
+  onReturnReason: (next: string) => void;
+  onOpenReturn: () => void;
   onConfirmPayment: () => void;
   onOpenCatalog: () => void;
 }) {
+  const returnableOrders = orders.filter((order) => !blockedReturnStatuses.has(order.status));
   return (
     <View style={styles.block}>
       <SectionTitle title="Кабинет" />
@@ -1211,6 +1279,53 @@ function AccountTab({
                 onOpenWarranty={() => onOpenWarranty(device.imei)}
               />
             ))
+          )}
+        </View>
+      ) : null}
+
+      {session ? (
+        <View style={styles.historyPanel}>
+          <SectionTitle title="Возврат товара" />
+          {returnableOrders.length === 0 ? (
+            <EmptyState icon="return-up-back-outline" title="Нет заказов для возврата" text="После оплаченных заказов заявка появится здесь." />
+          ) : (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.returnRail}>
+                {returnableOrders.slice(0, 8).map((order) => (
+                  <Pressable
+                    key={order.id}
+                    onPress={() => onReturnOrder(order.id)}
+                    style={[styles.returnOrderChip, { borderColor: returnOrderId === order.id ? theme.lime : theme.border }]}
+                  >
+                    <Text selectable style={styles.orderHistoryTitle}>#{shortId(order.id)}</Text>
+                    <Text selectable style={styles.orderHistoryDate}>{order.status} · {order.items.length} поз.</Text>
+                    <Text selectable style={styles.orderHistoryTotal}>{formatSom(order.total)}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <View style={styles.priorityRail}>
+                {returnReasons.map((reason) => (
+                  <GhostButton
+                    key={reason}
+                    label={reason}
+                    icon="return-up-back-outline"
+                    active={returnReason === reason}
+                    onPress={() => onReturnReason(reason)}
+                  />
+                ))}
+              </View>
+              <Field label="Комментарий" value={returnReason} onChangeText={onReturnReason} placeholder="Причина или детали возврата" />
+              {returnError ? <Text selectable style={styles.formError}>{returnError}</Text> : null}
+              {returnResult ? (
+                <Text selectable style={styles.devCodeText}>Заявка #{shortId(returnResult.id)} · {returnResult.status}</Text>
+              ) : null}
+              <PrimaryButton
+                label={returnBusy ? 'Отправляем...' : 'Отправить заявку'}
+                icon="send-outline"
+                disabled={returnBusy}
+                onPress={onOpenReturn}
+              />
+            </>
           )}
         </View>
       ) : null}
@@ -2087,6 +2202,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontVariant: ['tabular-nums'],
     fontWeight: '900',
+  },
+  returnRail: {
+    gap: 9,
+    paddingRight: 16,
+  },
+  returnOrderChip: {
+    backgroundColor: theme.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 5,
+    minWidth: 148,
+    padding: 12,
   },
   deviceCard: {
     backgroundColor: theme.card,

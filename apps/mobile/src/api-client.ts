@@ -16,6 +16,7 @@ import type {
   PosPayment,
   QueueOrder,
   RegisteredPushToken,
+  ReturnRequest,
   StaffLoginResult,
   SupportPriority,
   SupportTicket,
@@ -154,6 +155,14 @@ export const api = {
 
   openWarranty(input: { imei: string; customerId: string; problem: string }, token: string) {
     return requestJson<WarrantyCase>('/warranty', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(input),
+    });
+  },
+
+  openReturnRequest(input: { orderId: string; reason: string }, token: string) {
+    return requestJson<ReturnRequest>('/returns', {
       method: 'POST',
       token,
       body: JSON.stringify(input),

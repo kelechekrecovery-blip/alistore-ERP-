@@ -57,6 +57,14 @@ export interface WarrantyCase {
   assignee?: string | null;
 }
 
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+}
+
 export type SupportPriority = 'normal' | 'high' | 'urgent';
 
 export interface SupportTicket {

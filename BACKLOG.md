@@ -7,6 +7,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native return request opening from eligible signed-in order history.
 - Add native notification preferences consent toggle and JWT-aware customer consent owner guard.
 - Add native warranty case opening from signed-in device cards and JWT-aware warranty owner guard.
 - Add native customer support tickets and close the support ticket list owner-scope gap.

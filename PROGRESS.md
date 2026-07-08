@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native customer return request opening.
+- Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: signed-in native customers can now choose an eligible order from account history, select or type a return reason, and open a return request through the existing customer-JWT protected `POST /returns` flow.
+- Checks run: `npm run mobile:typecheck`; `npm run test -w @alistore/api -- returns-exchanges-rbac --runInBand`; `npm run api:build`; `npm run test -w @alistore/api -- returns exchange returns-exchanges-rbac --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
+- Outcome: mobile typecheck passed; targeted returns/exchanges RBAC test passed 1/1; API build passed; return/exchange regressions passed 2 suites / 3 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Next step: continue native customer account surfaces or move to physical TestFlight/Play Internal QA when credentials/devices are available.
+
+## 2026-07-08
+
 - Task: add native notification preference consent toggle.
 - Files changed: `apps/api/src/customers/customers.controller.ts`, `apps/api/test/customer-pii-guard.e2e-spec.ts`, `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: the signed-in native account cabinet now reads the customer profile, shows marketing consent, and toggles it with the customer JWT. The customer consent endpoint now rejects a customer JWT trying to change another customer's consent while preserving existing staff/ERP compatibility.
