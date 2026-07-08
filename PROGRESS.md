@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add Playwright E2E smoke pack and CI workflow.
+- Files changed: `package.json`, `package-lock.json`, `.github/workflows/ci.yml`, `playwright.config.ts`, `e2e/*`, `.gitignore`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: added `npm run e2e` with five smoke flows (web checkout, POS discount→approval, customer return→refund approval request, staff exchange, staff trade-in intake), shared Prisma/API helpers pinned to the E2E/test DB, Playwright report/video/screenshot artifacts on failure, and GitHub Actions CI with Postgres, Prisma migrate, API build/test, web build, browser install, and E2E.
+- Checks run: `npm run e2e`; `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`.
+- Outcome: Playwright passed 5/5 locally using system Chrome; API build passed; web build passed; full API Jest passed 84 suites / 298 tests.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands; next unblocked P2 items are Admin Product Management UI and Telegram Mini App shell.
+
+## 2026-07-08
+
 - Task: add gift cards / store credit to checkout and payments.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708090000_add_gift_cards/migration.sql`, `apps/api/src/giftcards/*`, payment service/DTO/module/intents, authz/app module, checkout gift-card UI/API clients, gift-card/payment/cleanup tests, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: new `GiftCard` store-credit balance supports staff issue, public balance check, atomic checkout/POS redemption as `PaymentMethod.gift_card`, generated idempotency txn per card+order, partial online-payment due, and checkout applies a gift card before creating a sandbox intent for the remaining amount.

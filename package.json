@@ -10,6 +10,7 @@
     "api": "npm run start:dev -w @alistore/api",
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api",
+    "e2e": "playwright test",
     "web": "npm run dev -w @alistore/web",
     "db:migrate": "npm run db:migrate -w @alistore/api",
     "db:seed": "npm run db:seed -w @alistore/api",
@@ -17,5 +18,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }

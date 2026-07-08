@@ -36,10 +36,10 @@
 Пути (все НОВЫЕ): `apps/api/src/giftcards/`, `apps/web/app/admin/`, `apps/web/app/tg/`,
 `e2e/` (или `apps/web/e2e/`), `.github/workflows/`. Общий `schema.prisma` — только новые таблицы.
 
-- **B1. E2E-набор (Playwright) + CI.** Новый `e2e/` с 5 потоками (покупка web, POS-скидка→approval,
+- ✅ **B1. E2E-набор (Playwright) + CI.** Новый `e2e/` с 5 потоками (покупка web, POS-скидка→approval,
   возврат→refund, обмен, скупка Б/У) + `.github/workflows/ci.yml` (install→lint→typecheck→
   `api:test`→`next build`).
-  - Приёмка: `playwright test` зелёный локально; CI краснеет на сломанном PR; артефакты на падении.
+  - Приёмка: `playwright test` зелёный локально; CI краснеет на сломанном PR; артефакты на падении. ✅
 - ✅ **B2. Gift cards / стор-кредит** — НОВЫЙ модуль `apps/api/src/giftcards/` + новая таблица
   `GiftCard` (аддитивно): выпуск, баланс, списание в checkout/POS, ledger-события
   (`giftcard.issued` / `giftcard.redeemed`). Веб: поле «промо/подарочная карта» в checkout.

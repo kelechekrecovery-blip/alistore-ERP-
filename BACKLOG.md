@@ -1,7 +1,6 @@
 # BACKLOG
 
 ## Next
-- Add Playwright E2E smoke pack and CI workflow for core purchase/approval/return/exchange/trade-in flows.
 - Build Admin Product Management UI with existing product, approval, and keyless AI endpoints.
 - Add Telegram Mini App shell route using the existing catalog/checkout API with `channel=telegram`.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
@@ -9,6 +8,7 @@
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Add Playwright E2E smoke pack and CI workflow for core purchase/approval/return/exchange/trade-in flows.
 - Add gift cards / store credit with checkout redemption and ledger events.
 - Add consent-filtered transactional notification templates for orders, warranty, reservations, and debt reminders.
 - Polish trade-in contract print locale, IMEI, and price formatting.
