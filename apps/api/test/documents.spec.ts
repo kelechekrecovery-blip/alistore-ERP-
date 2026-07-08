@@ -2,6 +2,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { DocumentsService } from '../src/documents/documents.service';
 import { ValidationError } from '../src/common/errors';
 import { buildOrderInvoiceLines } from '../src/documents/order-invoice';
+import { buildTradeInContractLines } from '../src/documents/trade-in-contract';
 
 /**
  * Trade-in contract PDF (pdf-lib + bundled Cyrillic font) against a real DB row.
@@ -46,6 +47,24 @@ describe('DocumentsService.tradeInContract (integration)', () => {
     expect(lines.join('\n')).toContain('Итого: 100 000 сом');
     expect(lines.join('\n')).toContain('cash: 30 000 сом');
     expect(lines.join('\n')).toContain('card: 70 000 сом');
+  });
+
+  it('builds trade-in contract lines with ru-KG date, IMEI and formatted price', () => {
+    const lines = buildTradeInContractLines({
+      id: 'trade-1',
+      contractId: 'TI-20260708-ABC123',
+      issuedAt: new Date('2026-07-08T10:30:00.000Z'),
+      customer: { name: 'Айбек Продавец', phone: '+996700000000' },
+      sellerPassport: 'AN1234567',
+      model: 'iPhone 13 128GB',
+      imei: '359-DUP-1',
+      grade: 'B',
+      price: 35000,
+    }).join('\n');
+
+    expect(lines).toContain('Дата: 08.07.2026');
+    expect(lines).toContain('IMEI / SN: 359-DUP-1');
+    expect(lines).toContain('Оценочная стоимость: 35 000 сом');
   });
 
   it('renders an order invoice PDF for a paid order', async () => {
@@ -101,6 +120,7 @@ describe('DocumentsService.tradeInContract (integration)', () => {
         grade: 'B',
         price: 35000,
         sellerPassport: 'AN1234567',
+        imei: `TI-PDF-${RUN}`,
       },
     });
 

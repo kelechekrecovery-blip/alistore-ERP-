@@ -159,6 +159,9 @@ warrantyUntil и daysLeft > 300.
   (`/courier/runs`, `/courier/handover`, `/deliveries/:id/fail`) и print/export
   (`/documents`, `/labels`, `/receipts`). Actor берётся из staff JWT; customer/неверная
   staff role не проходит.
+- ✅ Print/PDF polish: receipts print split tenders, order invoice/waybill includes item IMEI
+  and payments, labels stay SVG/barcode-backed, trade-in contract prints optional IMEI plus
+  ru-KG date and formatted сом.
 - ✅ **Role Permission Matrix** phase 3: staff RBAC на опасные admin endpoints:
   `PATCH /products/:id/price`, `DELETE /products/:id`, `POST /payments/:id/refund`.
   `requester` игнорируется; Approval/Audit actor берётся из staff JWT. Public checkout

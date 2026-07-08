@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: polish trade-in contract print locale, IMEI, and price formatting.
+- Files changed: `apps/api/src/documents/trade-in-contract.ts`, `apps/api/src/documents/documents.service.ts`, `apps/api/test/documents.spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: trade-in contract content now has a pure line builder, prints optional IMEI/SN, uses `dd.mm.yyyy` issue date, and formats the buyback price with thousands separators in сом.
+- Checks run: `npm run test -w @alistore/api -- documents --runInBand`; `npm run api:build`; `npm run api:test`; `git diff --check`.
+- Outcome: documents tests passed 1 suite / 12 tests; API build passed; full API Jest passed 82 suites / 290 tests; whitespace check passed.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands.
+
+## 2026-07-08
+
 - Task: add rate limiting to public checkout, OTP, support, and webhook endpoints.
 - Files changed: `apps/api/src/rate-limit/*`, auth/customers/orders/payments/support modules/controllers, `apps/api/test/public-rate-limit.e2e-spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: shared `RateLimitModule` now backs per-route caps on checkout-chain writes (`POST /customers`, `POST /orders`, `POST /payments/intents`), public support ticket creation, sandbox/provider payment webhooks, and existing OTP throttling.

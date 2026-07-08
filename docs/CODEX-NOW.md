@@ -31,7 +31,8 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 - ✅ **A3. Rate limiting** (`@nestjs/throttler`) на checkout-chain (`POST /customers`,
   `POST /orders`, `POST /payments/intents`), OTP-выдачу, `POST /support/tickets`,
   платёжные webhooks → 429 при превышении; тест.
-- **A4. PDF/печать полировка** (receipts вкл. split-tenders / labels / договор скупки), локаль ru-KG.
+- ✅ **A4. PDF/печать полировка**: receipts split-tenders, labels, order invoice and договор
+  скупки с IMEI/ru-KG date/price formatting covered.
 - ✅ **A5. Infra runbook** — Caddy + бэкапы + restore-check.
 
 ## P2 — полоса B, если mac mini недоступна (иначе оставить mac mini)
