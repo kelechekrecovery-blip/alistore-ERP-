@@ -16,5 +16,6 @@ export * from './api/payments';
 export * from './api/giftcards';
 export * from './api/staff-auth';
 export * from './api/campaigns';
+export * from './api/products-admin';
 export * from './pos-offline';
 export * from './pos-hardware';

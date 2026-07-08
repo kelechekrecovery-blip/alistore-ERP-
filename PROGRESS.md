@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: build Admin Product Management UI with AI enrichment and approval-gated dangerous actions.
+- Files changed: `apps/api/src/products/*`, `apps/api/src/authz/authz.model.ts`, `apps/api/src/audit/event-types.ts`, `apps/api/test/product-management.e2e-spec.ts`, `apps/web/app/admin/products/page.tsx`, `apps/web/lib/api/*`, `e2e/admin-products.spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: added staff-only product list/create/update for ordinary product fields with ledger events; `/admin/products` now supports search, create/edit, AI auto-category, AI description into `attrs`, price-change requests, archive requests, and Approval Inbox handoff. Price/archive remain approval-gated through existing product endpoints.
+- Checks run: `npm run test -w @alistore/api -- product-management.e2e-spec.ts`; `npm run api:build`; `npm run build -w @alistore/web`; `npx playwright test e2e/admin-products.spec.ts`; live API+Next+Chrome screenshots on desktop/mobile; `npm run api:test`; `npm run e2e`; `git diff --check`.
+- Outcome: targeted product-management API test passed; API build passed; web build passed; admin-products Playwright smoke passed including mobile viewport; full API Jest passed 85 suites / 300 tests; full Playwright passed 6/6; whitespace check passed.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands; next unblocked greenfield item is Telegram Mini App shell.
+
+## 2026-07-08
+
 - Task: add Playwright E2E smoke pack and CI workflow.
 - Files changed: `package.json`, `package-lock.json`, `.github/workflows/ci.yml`, `playwright.config.ts`, `e2e/*`, `.gitignore`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: added `npm run e2e` with five smoke flows (web checkout, POS discount→approval, customer return→refund approval request, staff exchange, staff trade-in intake), shared Prisma/API helpers pinned to the E2E/test DB, Playwright report/video/screenshot artifacts on failure, and GitHub Actions CI with Postgres, Prisma migrate, API build/test, web build, browser install, and E2E.

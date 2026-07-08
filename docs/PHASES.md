@@ -351,6 +351,9 @@ reminders, and reservation expiry without an opted-out notice.
 - ✅ **Обогащение карточек** (`POST /ai/describe`): продающее описание товара — keyless-шаблон
   (name+category+топ-атрибуты+обещание магазина) или LLM через OpenRouter при ключе, с откатом
   на шаблон. По sku или inline; 422 на unknown sku. Общий транспорт `openRouterChat()`. 6 тестов.
+- ✅ **UI-дом для обогащения товара** (`/admin/products`): staff-only product CRUD обычных полей,
+  кнопки «Авто-категория» и «Сгенерировать описание» заполняют `category`/`attrs.description`,
+  а цена и архивирование уходят через Approval Inbox.
 - ☐ **Требуют ключа/vision:** оценка Б/У по фото (vision-грейдинг), разведка рыночных цен,
   оффлайн-eval на референс-датасете — плагины за тем же паттерном порта (см. `CODEX-HANDOFF.md`).
 **Проверка:** ✅ все 5 бесключевых фич работают end-to-end (браузер + curl на реальных данных);
@@ -371,8 +374,9 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 Остальное: e2e заказа через каждый канал в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
-- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 5 smoke flows
-  (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake) and
+- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 6 smoke flows
+  (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake,
+  admin product management) and
   `.github/workflows/ci.yml` with Postgres service, install, Prisma migrate, API build/test,
   web build, browser install and E2E artifacts on failure.
 - ✅ Self-hosted infra scaffolding + production runbook (Caddy, backups, restore drill,
@@ -430,7 +434,7 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 - Cross-cutting security ✅: public write endpoint rate limits for OTP, checkout chain,
   support tickets and payment webhooks.
 - Cross-cutting quality ✅: Playwright E2E smoke pack + GitHub Actions CI for core customer,
-  POS approval, return/refund, exchange, and trade-in paths.
+  POS approval, return/refund, exchange, trade-in, and admin product-management paths.
 - **Скупка Б/У backend** ✅: `tradeins/` модуль — `POST /tradeins` создаёт TradeInDevice,
   присваивает `contractId`, маскирует паспорт в response и пишет `tradein.assessed` +
   `tradein.contracted` в Event Ledger; actor для customer self-service = customerId.

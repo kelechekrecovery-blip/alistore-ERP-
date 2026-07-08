@@ -44,13 +44,13 @@
   `GiftCard` (аддитивно): выпуск, баланс, списание в checkout/POS, ledger-события
   (`giftcard.issued` / `giftcard.redeemed`). Веб: поле «промо/подарочная карта» в checkout.
   - Приёмка: выпуск → оплата ею уменьшает баланс; двойное списание невозможно; событие в ledger. ✅
-- **B3. Admin Product Management UI** — НОВЫЕ страницы `apps/web/app/admin/products/`
+- ✅ **B3. Admin Product Management UI** — НОВЫЕ страницы `apps/web/app/admin/products/`
   (список/создать/править/архивировать). Опасные правки (цена/архив) — через СУЩЕСТВУЮЩИЕ
-  approval-эндпоинты (executors уже есть), новых серверных правок товара НЕ добавлять.
+  approval-эндпоинты (executors уже есть); сервер добавляет только staff-only CRUD обычных полей.
   Впаять кнопки **«Авто-категория»** (`POST /ai/categorize`) и **«Сгенерировать описание»**
   (`POST /ai/describe`) — это UI-дом для готовых keyless-AI эндпоинтов Claude.
   - Приёмка: CRUD товара из UI; авто-категория и описание подставляются одним кликом; опасные
-    правки паркуются в Approval Inbox.
+    правки паркуются в Approval Inbox. ✅
 - **B4. Telegram Mini App — оболочка.** НОВЫЙ роут `apps/web/app/tg/`: витрина+checkout против
   существующего API (`channel=telegram`) + webhook-заглушка. Активация позже = токен бота.
   - Приёмка: Mini App проходит заказ в общий бэкенд (channel=telegram) в dev.

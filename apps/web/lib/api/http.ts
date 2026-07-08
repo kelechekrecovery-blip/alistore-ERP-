@@ -36,6 +36,48 @@ export async function postAuthJson<T>(
   return (await res.json()) as T;
 }
 
+/** Authenticated PATCH JSON (Bearer token). */
+export async function patchAuthJson<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
+/** Authenticated DELETE JSON (Bearer token). */
+export async function deleteAuthJson<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
 /** Authenticated GET (Bearer token). Throws on non-2xx. */
 export async function getJson<T>(path: string, accessToken: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

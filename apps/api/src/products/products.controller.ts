@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -20,7 +21,14 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
-import { ChangePriceDto, CreateProductReviewDto, DeleteProductDto } from './products.dto';
+import {
+  ChangePriceDto,
+  CreateProductDto,
+  CreateProductReviewDto,
+  DeleteProductDto,
+  ProductListQueryDto,
+  UpdateProductDto,
+} from './products.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -32,6 +40,24 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
+
+  @ApiOperation({ summary: 'List products for staff management' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'read')
+  @Get()
+  list(@Query() query: ProductListQueryDto) {
+    return this.products.list(query);
+  }
+
+  @ApiOperation({ summary: 'Create a product for the catalog' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'create')
+  @Post()
+  create(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateProductDto) {
+    return this.products.create(dto, user.customerId);
+  }
 
   @ApiOperation({ summary: 'Get a product' })
   @ApiNotFoundResponse({ description: 'Product does not exist.' })
@@ -57,6 +83,16 @@ export class ProductsController {
   @Post(':id/reviews')
   createReview(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CreateProductReviewDto) {
     return this.products.createReview(id, user, dto);
+  }
+
+  @ApiOperation({ summary: 'Update non-dangerous product fields (price uses /price)' })
+  @ApiParam({ name: 'id', description: 'Product id' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'update')
+  @Patch(':id')
+  update(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: UpdateProductDto) {
+    return this.products.update(id, dto, user.customerId);
   }
 
   @ApiOperation({

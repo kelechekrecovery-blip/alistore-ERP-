@@ -62,6 +62,8 @@ export const EventType = {
   ApprovalApproved: 'approval.approved',
   ApprovalRejected: 'approval.rejected',
   // misc
+  ProductCreated: 'product.created',
+  ProductUpdated: 'product.updated',
   PriceChanged: 'price.changed',
   ProductArchived: 'product.archived',
   DebtCreated: 'debt.created',

@@ -1,13 +1,13 @@
 # BACKLOG
 
 ## Next
-- Build Admin Product Management UI with existing product, approval, and keyless AI endpoints.
 - Add Telegram Mini App shell route using the existing catalog/checkout API with `channel=telegram`.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Build Admin Product Management UI with product CRUD, keyless AI enrichment, and approval-gated price/archive actions.
 - Add Playwright E2E smoke pack and CI workflow for core purchase/approval/return/exchange/trade-in flows.
 - Add gift cards / store credit with checkout redemption and ledger events.
 - Add consent-filtered transactional notification templates for orders, warranty, reservations, and debt reminders.

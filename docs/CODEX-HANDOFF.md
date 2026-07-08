@@ -8,7 +8,8 @@
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-Открытых пунктов без внешних блокеров нет на 2026-07-08.
+Открытых пунктов без внешних блокеров в старой лане A нет на 2026-07-08. Из greenfield-полосы B
+следующим остаётся Telegram Mini App shell (`apps/web/app/tg/`) поверх существующего catalog/checkout API.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
 consent-filtered transactional templates for orders/warranty/reservations/debt reminders,
@@ -17,7 +18,9 @@ Excel import idempotency, OTP access recovery with refresh-session revocation,
 receipt split tenders, order invoice/waybill PDF, infra runbook for Caddy/backups/restore,
 trade-in IMEI intake + `imei_reuse` risk activation, realtime/socket.io, Sentry/GlitchTip hook,
 i18n, health-checks, public endpoint rate limits, print/PDF polish for receipts/labels/contracts,
-gift cards/store credit with checkout redemption, Playwright E2E smoke pack + CI workflow.
+gift cards/store credit with checkout redemption, Playwright E2E smoke pack + CI workflow,
+Admin Product Management UI (`/admin/products`) with staff-only product CRUD, keyless AI
+category/description enrichment, and approval-gated price/archive actions.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 

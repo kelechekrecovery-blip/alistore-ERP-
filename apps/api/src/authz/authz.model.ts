@@ -106,6 +106,12 @@ p, senior_seller, receipts, print
 p, franchise, receipts, print
 p, admin, receipts, print
 p, owner, receipts, print
+p, admin, products, read
+p, owner, products, read
+p, admin, products, create
+p, owner, products, create
+p, admin, products, update
+p, owner, products, update
 p, admin, products, price
 p, owner, products, price
 p, admin, products, archive
