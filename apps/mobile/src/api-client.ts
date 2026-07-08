@@ -18,6 +18,7 @@ import type {
   StaffLoginResult,
   SupportPriority,
   SupportTicket,
+  WarrantyCase,
 } from '@mobile/types';
 
 const configuredBase = process.env.EXPO_PUBLIC_API_BASE?.trim();
@@ -135,6 +136,14 @@ export const api = {
       method: 'POST',
       token,
       body: JSON.stringify({ ...input, channel: 'app' }),
+    });
+  },
+
+  openWarranty(input: { imei: string; customerId: string; problem: string }, token: string) {
+    return requestJson<WarrantyCase>('/warranty', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(input),
     });
   },
 

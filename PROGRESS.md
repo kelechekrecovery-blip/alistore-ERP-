@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native warranty case opening from device cards.
+- Files changed: `apps/api/src/warranty/warranty.controller.ts`, `apps/api/src/warranty/warranty.module.ts`, `apps/api/test/warranty-rbac.e2e-spec.ts`, `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: signed-in native customers can now open a warranty case directly from a purchased device card. The mobile app sends the customer JWT, updates the device warranty state after creation, and the warranty open endpoint now rejects a customer JWT trying to submit another customer's id.
+- Checks run: `npm run test -w @alistore/api -- warranty-rbac --runInBand`; `npm run mobile:typecheck`; `npm run api:build`; `npm run test -w @alistore/api -- warranty --runInBand`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `git diff --check`.
+- Outcome: targeted warranty RBAC test passed 1/1; mobile typecheck passed; API build passed; warranty regression passed 3 suites / 8 tests; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; whitespace check passed.
+- Next step: continue native account surfaces or move to physical TestFlight/Play Internal QA when credentials/devices are available.
+
+## 2026-07-08
+
 - Task: add native customer support tickets and secure owner-scoped support reads.
 - Files changed: `apps/api/src/support/support.controller.ts`, `apps/api/test/support-rbac.e2e-spec.ts`, `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: native signed-in customers can now list and open support tickets from the account cabinet with priority/SLA/status visibility. The support ticket list endpoint no longer exposes `customerId` filtered reads anonymously; customer JWTs can read only their own tickets, while staff still need `support/read`.

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -23,6 +24,7 @@ import { WarrantyService } from './warranty.service';
 import { OpenWarrantyDto, WarrantyStatusDto } from './warranty.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -68,8 +70,13 @@ export class WarrantyController {
   @ApiCreatedResponse({ description: 'Case opened.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown device.' })
   @Post()
-  open(@Body() dto: OpenWarrantyDto) {
-    return this.warranty.open(dto, SYSTEM_ACTOR);
+  @UseGuards(OptionalJwtAuthGuard)
+  open(@Body() dto: OpenWarrantyDto, @CurrentUser() user?: AuthPrincipal) {
+    if (user?.typ === 'customer' && dto.customerId !== user.customerId) {
+      throw new ForbiddenException('Нельзя открыть гарантию от имени другого клиента');
+    }
+    const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
+    return this.warranty.open({ ...dto, customerId }, user?.typ === 'customer' ? user.customerId : SYSTEM_ACTOR);
   }
 
   @ApiOperation({ summary: 'Advance a warranty case through its status machine' })

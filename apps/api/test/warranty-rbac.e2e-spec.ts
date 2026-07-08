@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuditModule } from '../src/audit/audit.module';
@@ -13,6 +14,7 @@ describe('Warranty console RBAC', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let staffAuth: StaffAuthService;
+  let jwt: JwtService;
   let sellerToken: string;
   let warehouseToken: string;
   let warehouseId: string;
@@ -22,6 +24,7 @@ describe('Warranty console RBAC', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
+        JwtModule.register({ secret: process.env.JWT_SECRET ?? 'dev-insecure-change-me' }),
         PrismaModule,
         AuditModule,
         StaffAuthModule,
@@ -34,6 +37,7 @@ describe('Warranty console RBAC', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
+    jwt = moduleRef.get(JwtService);
 
     const createSession = async (role: 'seller' | 'warehouse') => {
       const username = `${role}-warranty-${RUN}`;
@@ -89,13 +93,32 @@ describe('Warranty console RBAC', () => {
     return { customer, imei };
   }
 
+  function customerToken(customerId: string, phone: string) {
+    return jwt.sign({ sub: customerId, typ: 'customer', phone });
+  }
+
   it('keeps customer warranty opening public but guards console list/get/transition', async () => {
     const { customer, imei } = await warrantyFixture();
+    const otherCustomer = await prisma.customer.create({
+      data: { phone: `+996704${RUN}`, name: 'Other Warranty RBAC' },
+    });
 
     const opened = await request(app.getHttpServer())
       .post('/warranty')
       .send({ customerId: customer.id, imei, problem: 'battery' })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/warranty')
+      .set('Authorization', `Bearer ${customerToken(customer.id, customer.phone)}`)
+      .send({ customerId: customer.id, imei, problem: 'screen' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/warranty')
+      .set('Authorization', `Bearer ${customerToken(otherCustomer.id, otherCustomer.phone)}`)
+      .send({ customerId: customer.id, imei, problem: 'spoof' })
+      .expect(403);
 
     await request(app.getHttpServer()).get('/warranty?status=created').expect(401);
     await request(app.getHttpServer())

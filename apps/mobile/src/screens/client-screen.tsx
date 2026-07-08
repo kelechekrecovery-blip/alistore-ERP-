@@ -96,6 +96,10 @@ export function ClientScreen({
   const [supportBody, setSupportBody] = useState('');
   const [supportPriority, setSupportPriority] = useState<SupportPriority>('normal');
   const [supportBusy, setSupportBusy] = useState(false);
+  const [warrantyDraftImei, setWarrantyDraftImei] = useState<string | null>(null);
+  const [warrantyProblem, setWarrantyProblem] = useState('');
+  const [warrantyBusy, setWarrantyBusy] = useState(false);
+  const [warrantyError, setWarrantyError] = useState<string | null>(null);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -158,6 +162,9 @@ export function ClientScreen({
       setDevicesError(null);
       setTickets([]);
       setTicketsError(null);
+      setWarrantyDraftImei(null);
+      setWarrantyProblem('');
+      setWarrantyError(null);
       return;
     }
     void loadAccountData(customerSession);
@@ -263,6 +270,9 @@ export function ClientScreen({
       setSupportSubject('');
       setSupportBody('');
       setSupportPriority('normal');
+      setWarrantyDraftImei(null);
+      setWarrantyProblem('');
+      setWarrantyError(null);
     } finally {
       setAuthBusy(false);
     }
@@ -388,6 +398,38 @@ export function ClientScreen({
       setTicketsError(cause instanceof Error ? cause.message : 'Тикет не создан.');
     } finally {
       setSupportBusy(false);
+    }
+  }
+
+  async function openWarrantyCase(imei: string) {
+    if (!customerSession || warrantyBusy) return;
+    const problem = warrantyProblem.trim();
+    if (problem.length < 3) {
+      setWarrantyError('Опишите проблему устройства.');
+      return;
+    }
+    setWarrantyBusy(true);
+    setWarrantyError(null);
+    try {
+      const readySession = await prepareCustomerSession(customerSession);
+      if (!readySession) return;
+      const warranty = await api.openWarranty({
+        imei,
+        customerId: readySession.customerId,
+        problem,
+      }, readySession.accessToken);
+      setDevices((current) => current.map((device) => (
+        device.imei === imei
+          ? { ...device, warranty: { id: warranty.id, status: warranty.status, sla: warranty.sla } }
+          : device
+      )));
+      setWarrantyDraftImei(null);
+      setWarrantyProblem('');
+      void loadCustomerDevices(readySession);
+    } catch (cause) {
+      setWarrantyError(cause instanceof Error ? cause.message : 'Гарантия не создана.');
+    } finally {
+      setWarrantyBusy(false);
     }
   }
 
@@ -552,6 +594,10 @@ export function ClientScreen({
             devices={devices}
             devicesBusy={devicesBusy}
             devicesError={devicesError}
+            warrantyDraftImei={warrantyDraftImei}
+            warrantyProblem={warrantyProblem}
+            warrantyBusy={warrantyBusy}
+            warrantyError={warrantyError}
             tickets={tickets}
             ticketsBusy={ticketsBusy}
             ticketsError={ticketsError}
@@ -570,6 +616,14 @@ export function ClientScreen({
             onLogout={logoutCustomer}
             onReloadOrders={() => loadCustomerOrders()}
             onReloadDevices={() => loadCustomerDevices()}
+            onStartWarranty={setWarrantyDraftImei}
+            onWarrantyProblem={setWarrantyProblem}
+            onCancelWarranty={() => {
+              setWarrantyDraftImei(null);
+              setWarrantyProblem('');
+              setWarrantyError(null);
+            }}
+            onOpenWarranty={openWarrantyCase}
             onReloadTickets={() => loadSupportTickets()}
             onSupportSubject={setSupportSubject}
             onSupportBody={setSupportBody}
@@ -872,6 +926,10 @@ function AccountTab({
   devices,
   devicesBusy,
   devicesError,
+  warrantyDraftImei,
+  warrantyProblem,
+  warrantyBusy,
+  warrantyError,
   tickets,
   ticketsBusy,
   ticketsError,
@@ -890,6 +948,10 @@ function AccountTab({
   onLogout,
   onReloadOrders,
   onReloadDevices,
+  onStartWarranty,
+  onWarrantyProblem,
+  onCancelWarranty,
+  onOpenWarranty,
   onReloadTickets,
   onSupportSubject,
   onSupportBody,
@@ -911,6 +973,10 @@ function AccountTab({
   devices: MyDevice[];
   devicesBusy: boolean;
   devicesError: string | null;
+  warrantyDraftImei: string | null;
+  warrantyProblem: string;
+  warrantyBusy: boolean;
+  warrantyError: string | null;
   tickets: SupportTicket[];
   ticketsBusy: boolean;
   ticketsError: string | null;
@@ -929,6 +995,10 @@ function AccountTab({
   onLogout: () => void;
   onReloadOrders: () => void;
   onReloadDevices: () => void;
+  onStartWarranty: (imei: string) => void;
+  onWarrantyProblem: (next: string) => void;
+  onCancelWarranty: () => void;
+  onOpenWarranty: (imei: string) => void;
   onReloadTickets: () => void;
   onSupportSubject: (next: string) => void;
   onSupportBody: (next: string) => void;
@@ -1053,10 +1123,23 @@ function AccountTab({
             </View>
           ) : null}
           {devicesError ? <Text selectable style={styles.formError}>{devicesError}</Text> : null}
+          {warrantyError ? <Text selectable style={styles.formError}>{warrantyError}</Text> : null}
           {devices.length === 0 && !devicesBusy ? (
             <EmptyState icon="phone-portrait-outline" title="Устройств пока нет" text="Купленная техника появится здесь с гарантией." />
           ) : (
-            devices.slice(0, 8).map((device) => <DeviceCard key={device.imei} device={device} />)
+            devices.slice(0, 8).map((device) => (
+              <DeviceCard
+                key={device.imei}
+                device={device}
+                warrantyDraftActive={warrantyDraftImei === device.imei}
+                warrantyProblem={warrantyProblem}
+                warrantyBusy={warrantyBusy}
+                onStartWarranty={() => onStartWarranty(device.imei)}
+                onWarrantyProblem={onWarrantyProblem}
+                onCancelWarranty={onCancelWarranty}
+                onOpenWarranty={() => onOpenWarranty(device.imei)}
+              />
+            ))
           )}
         </View>
       ) : null}
@@ -1131,7 +1214,25 @@ function OrderHistoryCard({ order }: { order: CustomerOrder }) {
   );
 }
 
-function DeviceCard({ device }: { device: MyDevice }) {
+function DeviceCard({
+  device,
+  warrantyDraftActive,
+  warrantyProblem,
+  warrantyBusy,
+  onStartWarranty,
+  onWarrantyProblem,
+  onCancelWarranty,
+  onOpenWarranty,
+}: {
+  device: MyDevice;
+  warrantyDraftActive: boolean;
+  warrantyProblem: string;
+  warrantyBusy: boolean;
+  onStartWarranty: () => void;
+  onWarrantyProblem: (next: string) => void;
+  onCancelWarranty: () => void;
+  onOpenWarranty: () => void;
+}) {
   const warrantyLabel = device.warranty
     ? warrantyStatusLabel(device.warranty.status)
     : device.daysLeft != null
@@ -1139,28 +1240,47 @@ function DeviceCard({ device }: { device: MyDevice }) {
       : 'Гарантия';
   return (
     <View style={styles.deviceCard}>
-      <View style={styles.deviceIcon}>
-        <Ionicons name="phone-portrait-outline" size={22} color={theme.lime} />
-      </View>
-      <View style={styles.deviceCopy}>
-        <Text selectable numberOfLines={2} style={styles.deviceTitle}>{device.product}</Text>
-        <Text selectable numberOfLines={1} style={styles.deviceMeta}>IMEI {device.imei}</Text>
-        <View style={styles.deviceFooter}>
-          <Text selectable style={styles.deviceStatus}>{device.status}</Text>
-          <Text selectable style={styles.deviceWarranty}>
-            {device.warranty
-              ? `SLA ${formatShortDate(device.warranty.sla)}`
-              : device.warrantyUntil
-                ? `до ${formatShortDate(device.warrantyUntil)}`
-                : 'срок не задан'}
+      <View style={styles.deviceRow}>
+        <View style={styles.deviceIcon}>
+          <Ionicons name="phone-portrait-outline" size={22} color={theme.lime} />
+        </View>
+        <View style={styles.deviceCopy}>
+          <Text selectable numberOfLines={2} style={styles.deviceTitle}>{device.product}</Text>
+          <Text selectable numberOfLines={1} style={styles.deviceMeta}>IMEI {device.imei}</Text>
+          <View style={styles.deviceFooter}>
+            <Text selectable style={styles.deviceStatus}>{device.status}</Text>
+            <Text selectable style={styles.deviceWarranty}>
+              {device.warranty
+                ? `SLA ${formatShortDate(device.warranty.sla)}`
+                : device.warrantyUntil
+                  ? `до ${formatShortDate(device.warrantyUntil)}`
+                  : 'срок не задан'}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.warrantyPill, { borderColor: device.warranty ? theme.warn : theme.lime }]}>
+          <Text selectable numberOfLines={1} style={[styles.warrantyPillText, { color: device.warranty ? theme.warn : theme.lime }]}>
+            {warrantyLabel}
           </Text>
         </View>
       </View>
-      <View style={[styles.warrantyPill, { borderColor: device.warranty ? theme.warn : theme.lime }]}>
-        <Text selectable numberOfLines={1} style={[styles.warrantyPillText, { color: device.warranty ? theme.warn : theme.lime }]}>
-          {warrantyLabel}
-        </Text>
-      </View>
+      {!device.warranty && !warrantyDraftActive ? (
+        <GhostButton label="Заявить гарантию" icon="shield-checkmark-outline" onPress={onStartWarranty} />
+      ) : null}
+      {!device.warranty && warrantyDraftActive ? (
+        <View style={styles.warrantyForm}>
+          <Field label="Проблема" value={warrantyProblem} onChangeText={onWarrantyProblem} placeholder="Например: не держит зарядку" />
+          <View style={styles.duo}>
+            <PrimaryButton
+              label={warrantyBusy ? 'Отправляем...' : 'Отправить'}
+              icon="send-outline"
+              disabled={warrantyBusy}
+              onPress={onOpenWarranty}
+            />
+            <GhostButton label="Отмена" icon="close-outline" onPress={warrantyBusy ? undefined : onCancelWarranty} />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1853,14 +1973,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   deviceCard: {
-    alignItems: 'center',
     backgroundColor: theme.card,
     borderColor: theme.border,
     borderRadius: radius.lg,
     borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  deviceRow: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 11,
-    padding: 12,
   },
   deviceIcon: {
     alignItems: 'center',
@@ -1911,6 +2034,9 @@ const styles = StyleSheet.create({
   warrantyPillText: {
     fontSize: 10,
     fontWeight: '900',
+  },
+  warrantyForm: {
+    gap: 10,
   },
   priorityRail: {
     flexDirection: 'row',

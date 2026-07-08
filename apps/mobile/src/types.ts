@@ -47,6 +47,16 @@ export interface MyDevice {
   warranty: { id: string; status: string; sla: string } | null;
 }
 
+export interface WarrantyCase {
+  id: string;
+  imei: string;
+  customerId: string;
+  problem: string;
+  status: string;
+  sla: string;
+  assignee?: string | null;
+}
+
 export type SupportPriority = 'normal' | 'high' | 'urgent';
 
 export interface SupportTicket {
