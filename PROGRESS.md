@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native customer order history.
+- Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: signed-in native customers now load their own order history from `GET /orders/mine`, see status/channel/items/total in the account cabinet, can refresh the list manually, and the app refreshes expired customer access tokens before loading history.
+- Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`; `npm --prefix apps/mobile run expo:config`; `npm run test -w @alistore/api -- orders-account --runInBand`; `git diff --check`.
+- Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env; Expo config rendered; targeted API account-order test passed 1/1; whitespace check passed.
+- Next step: add the next native account surface that is already backed by existing API, then verify on physical TestFlight/Play Internal builds once credentials/devices are available.
+
+## 2026-07-08
+
 - Task: add native customer OTP account session.
 - Files changed: `apps/mobile/src/api-client.ts`, `apps/mobile/src/native-shell.tsx`, `apps/mobile/src/screens/client-screen.tsx`, `apps/mobile/src/secure-session.ts`, `apps/mobile/src/types.ts`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: the native client cabinet now restores a SecureStore customer session, refreshes expired access tokens on app start, supports phone OTP login/logout, creates signed-in checkout orders with the authenticated `customerId`, and registers client push tokens as `scope=customer` with the customer JWT instead of anonymous tokens.

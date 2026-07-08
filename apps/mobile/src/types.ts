@@ -29,6 +29,15 @@ export interface CreatedOrder {
   total: number;
 }
 
+export interface CustomerOrder {
+  id: string;
+  channel: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  items: Array<{ sku: string; qty: number; price: number; imei?: string | null }>;
+}
+
 export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
 export type PaymentMethod = OnlinePaymentMethod | 'cash' | 'bakai_pos' | 'obank';
 

@@ -16,7 +16,7 @@ import { formatSom, shortId } from '@mobile/format';
 import { clearCustomerSession, getStoredCustomerSession, saveCustomerSession } from '@mobile/secure-session';
 import { radius, theme } from '@mobile/theme';
 import { EmptyState, Field, GhostButton, MetricCard, Pill, PrimaryButton, ProductPoster, SectionTitle } from '@mobile/ui';
-import type { CatalogProduct, CreatedOrder, CustomerSession, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
+import type { CatalogProduct, CreatedOrder, CustomerOrder, CustomerSession, OnlinePaymentMethod, PaymentIntent } from '@mobile/types';
 
 type ClientTab = 'home' | 'catalog' | 'favorites' | 'cart' | 'account';
 type ClientPayment = 'cash' | OnlinePaymentMethod;
@@ -73,6 +73,9 @@ export function ClientScreen({
   const [otpCode, setOtpCode] = useState('');
   const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [ordersBusy, setOrdersBusy] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -126,6 +129,15 @@ export function ClientScreen({
       alive = false;
     };
   }, [onSessionChange]);
+
+  useEffect(() => {
+    if (!customerSession) {
+      setOrders([]);
+      setOrdersError(null);
+      return;
+    }
+    void loadCustomerOrders(customerSession);
+  }, [customerSession?.accessToken]);
 
   function addToCart(product: CatalogProduct) {
     setCart((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }));
@@ -218,8 +230,35 @@ export function ClientScreen({
       setOtpCode('');
       setOtpSent(false);
       setOtpDevCode(null);
+      setOrders([]);
+      setOrdersError(null);
     } finally {
       setAuthBusy(false);
+    }
+  }
+
+  async function loadCustomerOrders(session = customerSession) {
+    if (!session || ordersBusy) return;
+    setOrdersBusy(true);
+    setOrdersError(null);
+    try {
+      const readySession = await restoreCustomerSession(session);
+      if (!readySession) {
+        setCustomerSession(null);
+        onSessionChange?.(null);
+        setOrders([]);
+        return;
+      }
+      if (readySession.accessToken !== session.accessToken || readySession.refreshToken !== session.refreshToken) {
+        setCustomerSession(readySession);
+        onSessionChange?.(readySession);
+      }
+      const mine = await api.fetchMyOrders(readySession.accessToken);
+      setOrders(mine);
+    } catch (cause) {
+      setOrdersError(cause instanceof Error ? cause.message : 'Заказы не загружены.');
+    } finally {
+      setOrdersBusy(false);
     }
   }
 
@@ -245,6 +284,7 @@ export function ClientScreen({
       if (payment === 'cash') {
         setCheckoutResult({ order });
         setCart({});
+        if (customerSession) void loadCustomerOrders(customerSession);
         setTab('account');
         return;
       }
@@ -257,6 +297,7 @@ export function ClientScreen({
       });
       setCheckoutResult({ order: { ...order, status: intent.orderStatus }, intent });
       setCart({});
+      if (customerSession) void loadCustomerOrders(customerSession);
       setTab('account');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось оформить заказ.');
@@ -376,6 +417,9 @@ export function ClientScreen({
             session={customerSession}
             error={error}
             authError={authError}
+            orders={orders}
+            ordersBusy={ordersBusy}
+            ordersError={ordersError}
             phone={phone}
             otpCode={otpCode}
             otpSent={otpSent}
@@ -385,6 +429,7 @@ export function ClientScreen({
             onRequestOtp={requestCustomerOtp}
             onVerifyOtp={verifyCustomerOtp}
             onLogout={logoutCustomer}
+            onReloadOrders={() => loadCustomerOrders()}
             onConfirmPayment={confirmSandboxPayment}
             onOpenCatalog={() => setTab('catalog')}
           />
@@ -676,6 +721,9 @@ function AccountTab({
   session,
   error,
   authError,
+  orders,
+  ordersBusy,
+  ordersError,
   phone,
   otpCode,
   otpSent,
@@ -685,6 +733,7 @@ function AccountTab({
   onRequestOtp,
   onVerifyOtp,
   onLogout,
+  onReloadOrders,
   onConfirmPayment,
   onOpenCatalog,
 }: {
@@ -695,6 +744,9 @@ function AccountTab({
   session: CustomerSession | null;
   error: string | null;
   authError: string | null;
+  orders: CustomerOrder[];
+  ordersBusy: boolean;
+  ordersError: string | null;
   phone: string;
   otpCode: string;
   otpSent: boolean;
@@ -704,6 +756,7 @@ function AccountTab({
   onRequestOtp: () => void;
   onVerifyOtp: () => void;
   onLogout: () => void;
+  onReloadOrders: () => void;
   onConfirmPayment: () => void;
   onOpenCatalog: () => void;
 }) {
@@ -789,6 +842,27 @@ function AccountTab({
         <EmptyState icon="receipt-outline" title="Активных заказов нет" text="После checkout заказ появится здесь со статусом и оплатой." />
       )}
 
+      {session ? (
+        <View style={styles.historyPanel}>
+          <SectionTitle
+            title="Мои заказы"
+            right={<GhostButton label="Обновить" icon="refresh-outline" onPress={ordersBusy ? undefined : onReloadOrders} />}
+          />
+          {ordersBusy ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={theme.lime} />
+              <Text selectable style={styles.mutedText}>Загружаем заказы...</Text>
+            </View>
+          ) : null}
+          {ordersError ? <Text selectable style={styles.formError}>{ordersError}</Text> : null}
+          {orders.length === 0 && !ordersBusy ? (
+            <EmptyState icon="bag-check-outline" title="История пустая" text="Оформленные из аккаунта заказы появятся здесь." />
+          ) : (
+            orders.slice(0, 8).map((order) => <OrderHistoryCard key={order.id} order={order} />)
+          )}
+        </View>
+      ) : null}
+
       {error ? <Text selectable style={styles.formError}>{error}</Text> : null}
       <View style={styles.accountMenu}>
         <GhostButton label="Бонусы" icon="gift-outline" />
@@ -796,6 +870,31 @@ function AccountTab({
         <GhostButton label="Поддержка" icon="chatbubbles-outline" />
       </View>
       <PrimaryButton label="Продолжить покупки" icon="grid-outline" onPress={onOpenCatalog} />
+    </View>
+  );
+}
+
+function OrderHistoryCard({ order }: { order: CustomerOrder }) {
+  const itemCount = order.items.reduce((sum, item) => sum + item.qty, 0);
+  const items = order.items.slice(0, 3).map((item) => item.sku).join(', ');
+  return (
+    <View style={styles.orderHistoryCard}>
+      <View style={styles.orderHistoryHeader}>
+        <View style={styles.orderHistoryTitleWrap}>
+          <Text selectable style={styles.orderHistoryTitle}>#{shortId(order.id)}</Text>
+          <Text selectable style={styles.orderHistoryDate}>{formatOrderDate(order.createdAt)}</Text>
+        </View>
+        <View style={styles.orderStatusPill}>
+          <Text selectable numberOfLines={1} style={styles.orderStatusText}>{order.status}</Text>
+        </View>
+      </View>
+      <Text selectable numberOfLines={2} style={styles.orderItemsText}>
+        {items || 'Без товарных строк'} · {itemCount} шт.
+      </Text>
+      <View style={styles.orderHistoryFooter}>
+        <Text selectable style={styles.orderChannelText}>{order.channel}</Text>
+        <Text selectable style={styles.orderHistoryTotal}>{formatSom(order.total)}</Text>
+      </View>
     </View>
   );
 }
@@ -937,6 +1036,17 @@ function normalizePhone(input: string): string {
 
 function phoneDigitCount(input: string): number {
   return input.replace(/\D/g, '').length;
+}
+
+function formatOrderDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+  });
 }
 
 async function restoreCustomerSession(stored: CustomerSession): Promise<CustomerSession | null> {
@@ -1346,6 +1456,76 @@ const styles = StyleSheet.create({
     color: theme.blue,
     fontSize: 11,
     lineHeight: 16,
+  },
+  historyPanel: {
+    backgroundColor: theme.panel,
+    borderColor: theme.border,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: 12,
+    padding: 15,
+  },
+  orderHistoryCard: {
+    backgroundColor: theme.card,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 9,
+    padding: 12,
+  },
+  orderHistoryHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  orderHistoryTitleWrap: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  orderHistoryTitle: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  orderHistoryDate: {
+    color: theme.muted,
+    fontSize: 11,
+  },
+  orderStatusPill: {
+    backgroundColor: theme.cardAlt,
+    borderColor: theme.lime,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    maxWidth: 120,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  orderStatusText: {
+    color: theme.lime,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  orderItemsText: {
+    color: theme.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  orderHistoryFooter: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  orderChannelText: {
+    color: theme.muted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  orderHistoryTotal: {
+    color: theme.text,
+    fontSize: 15,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
   },
   accountMenu: {
     flexDirection: 'row',

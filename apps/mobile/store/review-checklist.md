@@ -41,6 +41,7 @@
 - Slow network and no-network states.
 - Customer catalog/search/favorites/cart.
 - Customer OTP login/logout and SecureStore persistence.
+- Customer account order history loads from `GET /orders/mine`.
 - Checkout with cash and sandbox online payment.
 - Checkout while signed in reuses the authenticated customer account.
 - Staff login/logout and SecureStore persistence.

@@ -3,6 +3,7 @@ import type {
   CatalogResponse,
   CreatedOrder,
   CustomerAuthTokens,
+  CustomerOrder,
   OnlinePaymentMethod,
   OtpRequestResult,
   PaymentConfirmResult,
@@ -107,6 +108,10 @@ export const api = {
 
   authMe(token: string) {
     return requestJson<AuthPrincipal>('/auth/me', { token });
+  },
+
+  fetchMyOrders(token: string) {
+    return requestJson<CustomerOrder[]>('/orders/mine', { token });
   },
 
   refreshCustomerSession(refreshToken: string) {
