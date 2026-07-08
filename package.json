@@ -4,15 +4,17 @@
   "private": true,
   "description": "AliStore — операционная система для розничной торговли электроникой (КР)",
   "workspaces": [
-    "apps/*"
+    "apps/api",
+    "apps/web"
   ],
   "scripts": {
     "api": "npm run start:dev -w @alistore/api",
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api",
     "e2e": "playwright test",
-    "mobile": "npm run start -w @alistore/mobile",
-    "mobile:typecheck": "npm run typecheck -w @alistore/mobile",
+    "mobile": "npm --prefix apps/mobile run start",
+    "mobile:typecheck": "npm --prefix apps/mobile run typecheck",
+    "mobile:store-preflight": "npm --prefix apps/mobile run store:preflight",
     "launch:check": "npm run launch:preflight:strict && npm run launch:readiness:strict",
     "launch:preflight": "npm run preflight -w @alistore/api -- --env-file .env.production",
     "launch:preflight:strict": "npm run preflight -w @alistore/api -- --env-file .env.production --strict",

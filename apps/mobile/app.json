@@ -4,22 +4,54 @@
     "slug": "alistore-native",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "alistore",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "bundleIdentifier": "kg.alistore.mobile",
-      "supportsTablet": true
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "kg.alistore.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E0C0A"
-      }
+      },
+      "permissions": [
+        "INTERNET"
+      ]
     },
+    "assetBundlePatterns": [
+      "assets/*"
+    ],
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0E0C0A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

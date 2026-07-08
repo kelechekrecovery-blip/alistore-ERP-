@@ -10,7 +10,20 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "expo:config": "expo config --json"
+    "expo:config": "expo config --json",
+    "store:assets": "node scripts/generate-store-assets.mjs",
+    "store:preflight": "node scripts/store-preflight.mjs",
+    "store:preflight:strict": "node scripts/store-preflight.mjs --strict",
+    "eas:build": "npx eas-cli@20.5.1 build --profile production",
+    "eas:build:ios": "npx eas-cli@20.5.1 build -p ios --profile production",
+    "eas:build:android": "npx eas-cli@20.5.1 build -p android --profile production",
+    "eas:submit:ios": "npx eas-cli@20.5.1 submit -p ios --latest --profile production",
+    "eas:submit:android": "npx eas-cli@20.5.1 submit -p android --latest --profile production"
+  },
+  "expo": {
+    "autolinking": {
+      "legacy_shallowReactNativeLinking": true
+    }
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -21,8 +34,10 @@
     "expo-linking": "~57.0.2",
     "expo-router": "~57.0.4",
     "expo-secure-store": "~57.0.0",
+    "expo-splash-screen": "~57.0.2",
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.0",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-reanimated": "4.5.0",

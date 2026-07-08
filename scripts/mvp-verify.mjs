@@ -16,7 +16,7 @@ const steps = [
   ['Prisma client generate', 'npm', ['run', 'prisma:generate', '-w', '@alistore/api']],
   ['API build', 'npm', ['run', 'api:build']],
   ['Web build', 'npm', ['run', 'build', '-w', '@alistore/web']],
-  ['Mobile typecheck', 'npm', ['run', 'typecheck', '-w', '@alistore/mobile']],
+  ['Mobile typecheck', 'npm', ['--prefix', 'apps/mobile', 'run', 'typecheck']],
   ['API Jest', 'npm', ['run', 'api:test']],
 ];
 

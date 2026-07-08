@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 20.5.1",
+    "appVersionSource": "remote",
+    "metadataPath": "./store.config.json"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "preview"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {},
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
+}

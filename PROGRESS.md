@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: package the native mobile app for App Store and Google Play readiness.
+- Files changed: `apps/mobile/*`, `apps/mobile/.eas/workflows/release.yml`, `apps/mobile/store/*`, `apps/mobile/package-lock.json`, `.gitignore`, `package.json`, `package-lock.json`, `scripts/mvp-verify.mjs`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: native mobile is now isolated from the root web/API workspace with its own lockfile, Metro resolution, store assets, splash/icon config, EAS production build/submit profiles, validated EAS workflow, App Store metadata, Google Play listing draft, privacy/review checklist, and automated store preflight.
+- Checks run: `npm run mobile:store-preflight`; `npm run mobile:typecheck`; `cd apps/mobile && EXPO_DOCTOR_WARN_ON_NETWORK_ERRORS=1 npx expo-doctor`; EAS workflow schema validator; `bash -n apps/mobile/script/build_and_run.sh`; `apps/mobile/script/build_and_run.sh --help`; `git diff --check`; expected-fail `npm --prefix apps/mobile run store:preflight:strict`.
+- Outcome: mobile store preflight passed with 0 failures and 1 production API warning; typecheck passed; EAS workflow validation passed. Strict store preflight fails only on external release inputs: `EXPO_PUBLIC_API_BASE`, `EXPO_TOKEN`, Apple credentials, and Google Play service account. Local Expo Doctor is 19/20 when root web dependencies are installed because it sees the parent Next 14 React 18 tree; the mobile package now has its own lockfile so clean EAS builds should install from `apps/mobile` without the root web tree.
+- Next step: provision production API URL and Apple/Google/EAS credentials, then run strict preflight and EAS internal builds/submits from `apps/mobile`.
+
+## 2026-07-08
+
 - Task: add native iOS/Android app workspace instead of a PWA shell.
 - Files changed: `apps/mobile/*`, root `package.json`, `package-lock.json`, `.gitignore`, `scripts/mvp-verify.mjs`, `README.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: added `@alistore/mobile` as an Expo React Native app with native Client and Staff/POS modes, secure staff-token storage, shared catalog fetch, mobile cart/favorites/checkout, online payment intents with sandbox confirmation, staff order queue, POS ticketing, discount/payment selection, and `POST /pos/sale` integration. Codex Run is wired to `apps/mobile/script/build_and_run.sh`.

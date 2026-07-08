@@ -1,0 +1,66 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 AliStore",
+    "categories": [
+      "SHOPPING",
+      "BUSINESS"
+    ],
+    "info": {
+      "ru": {
+        "title": "AliStore",
+        "subtitle": "Электроника и POS",
+        "description": "AliStore объединяет покупку электроники, оформление заказов и работу розничной команды в одном нативном приложении.\n\nДля клиентов:\n- каталог смартфонов, аксессуаров и техники;\n- поиск, избранное и корзина;\n- оформление заказа с самовывозом или доставкой;\n- оплата наличными, картой, QR или рассрочкой;\n- кабинет с заказами, бонусами и поддержкой.\n\nДля сотрудников:\n- защищённый вход;\n- очередь заказов;\n- POS-чек, скидки и способы оплаты;\n- серверные проверки прав, остатков, approval и аудита.\n\nAliStore создан для магазинов электроники в Кыргызстане: меньше ручной работы, прозрачные остатки, понятная история заказа и единая операционная система поверх реального backend.",
+        "keywords": [
+          "alistore,электроника,смартфоны,pos,магазин,заказы,бишкек,доставка,касса"
+        ],
+        "releaseNotes": "Первый нативный релиз AliStore: клиентский каталог, корзина, checkout, staff login, очередь заказов и POS-продажа поверх единого API.",
+        "promoText": "Нативное приложение AliStore для покупок, заказов и POS-работы магазина.",
+        "privacyPolicyUrl": "https://alistore.kg/privacy",
+        "supportUrl": "https://alistore.kg/support",
+        "marketingUrl": "https://alistore.kg"
+      },
+      "en-US": {
+        "title": "AliStore",
+        "subtitle": "Electronics and POS",
+        "description": "AliStore brings electronics shopping, order checkout, and retail staff operations into one native mobile app.\n\nFor customers:\n- product catalog and search;\n- favorites and cart;\n- pickup or delivery checkout;\n- cash, card, QR, and installment payment flows;\n- account area for orders, rewards, and support.\n\nFor staff:\n- secure staff login;\n- order queue;\n- POS ticket, discounts, and payment methods;\n- server-side permission, stock, approval, and audit checks.\n\nAliStore is built for electronics retail teams that need transparent inventory, reliable order state, and one operational system connected to a real backend.",
+        "keywords": [
+          "alistore,electronics,shopping,pos,orders,retail,checkout,delivery,staff"
+        ],
+        "releaseNotes": "First native AliStore release with customer catalog, cart, checkout, staff login, order queue, and POS sale flow over the shared API.",
+        "promoText": "Native AliStore app for electronics shopping, orders, and POS operations.",
+        "privacyPolicyUrl": "https://alistore.kg/privacy",
+        "supportUrl": "https://alistore.kg/support",
+        "marketingUrl": "https://alistore.kg"
+      }
+    },
+    "advisory": {
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "seventeenPlus": false
+    },
+    "release": {
+      "automaticRelease": false,
+      "phasedRelease": true
+    },
+    "review": {
+      "firstName": "AliStore",
+      "lastName": "Review",
+      "email": "review@alistore.kg",
+      "phone": "+996700000000",
+      "notes": "Demo credentials must be provisioned in the production API before App Review. The app needs network access to the AliStore API. Staff/POS features are role-gated; customer catalog and checkout can be reviewed without staff permissions."
+    }
+  }
+}
