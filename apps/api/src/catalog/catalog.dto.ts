@@ -63,6 +63,7 @@ export class CatalogProductDto {
   @ApiProperty({ example: 'phones' }) category!: string;
   @ApiProperty({ type: 'object' }) attrs!: Prisma.JsonValue;
   @ApiProperty({ example: 3 }) availableUnits!: number;
+  @ApiProperty({ example: '2026-07-08T09:30:00.000Z' }) updatedAt!: string;
 }
 
 export class CatalogSearchResponseDto {
@@ -85,4 +86,32 @@ export class CatalogReindexResponseDto {
   @ApiProperty({ example: 'products' }) index!: string;
   @ApiProperty({ example: 42 }) indexed!: number;
   @ApiPropertyOptional({ example: 123 }) taskUid?: number | string;
+}
+
+export class CatalogDeltaQueryDto {
+  @ApiPropertyOptional({
+    description: 'ISO cursor returned by a previous delta response.',
+    example: '2026-07-08T09:30:00.000Z',
+  })
+  @IsOptional()
+  @IsString()
+  since?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 500, default: 500 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  @Type(() => Number)
+  limit = 500;
+}
+
+export class CatalogDeltaResponseDto {
+  @ApiProperty({ example: '2026-07-08T09:31:00.000Z' }) cursor!: string;
+  @ApiPropertyOptional({ example: '2026-07-08T09:30:00.000Z' }) since?: string;
+  @ApiProperty({ type: () => [CatalogProductDto] }) changed!: CatalogProductDto[];
+  @ApiProperty({ type: () => [String], example: ['clx_archived_product'] }) removed!: string[];
+  @ApiProperty({ example: 2 }) totalChanged!: number;
+  @ApiProperty({ example: 1 }) totalRemoved!: number;
+  @ApiProperty({ example: false }) truncated!: boolean;
 }

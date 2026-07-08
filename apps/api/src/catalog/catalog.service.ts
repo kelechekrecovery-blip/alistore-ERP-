@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import { ForbiddenError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  CatalogDeltaQueryDto,
+  CatalogDeltaResponseDto,
   CatalogProductDto,
   CatalogReindexResponseDto,
   CatalogSearchQueryDto,
@@ -96,6 +98,41 @@ export class CatalogService {
     }
 
     return this.searchPostgres(normalized, 'postgres');
+  }
+
+  async delta(query: CatalogDeltaQueryDto): Promise<CatalogDeltaResponseDto> {
+    const limit = Math.min(Math.max(query.limit ?? 500, 1), 500);
+    const since = parseSince(query.since);
+    const where: Prisma.ProductWhereInput = since
+      ? {
+          OR: [
+            { updatedAt: { gt: since } },
+            { units: { some: { updatedAt: { gt: since } } } },
+          ],
+        }
+      : {};
+
+    const products = await this.prisma.product.findMany({
+      where,
+      take: limit + 1,
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      include: this.stockCountInclude(),
+    });
+    const window = products.slice(0, limit);
+    const active = window.filter((product) => !product.archived);
+    const removed = window
+      .filter((product) => product.archived)
+      .map((product) => product.id);
+
+    return {
+      cursor: new Date().toISOString(),
+      since: query.since?.trim() || undefined,
+      changed: active.map((product) => this.toCatalogProduct(product)),
+      removed,
+      totalChanged: active.length,
+      totalRemoved: removed.length,
+      truncated: products.length > limit,
+    };
   }
 
   async reindex(maintenanceToken?: string): Promise<CatalogReindexResponseDto> {
@@ -255,6 +292,7 @@ export class CatalogService {
       category: product.category,
       attrs: product.attrs,
       availableUnits: product._count.units,
+      updatedAt: product.updatedAt.toISOString(),
     };
   }
 
@@ -320,4 +358,14 @@ export class CatalogService {
   private quoteMeiliFilterValue(value: string): string {
     return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   }
+}
+
+function parseSince(value: string | undefined): Date | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ValidationError('catalog_delta_cursor_invalid', 'Invalid catalog delta cursor');
+  }
+  return parsed;
 }

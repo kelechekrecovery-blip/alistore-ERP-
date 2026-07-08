@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add POS catalog delta-sync.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708133000_add_catalog_delta_timestamps/migration.sql`, `apps/api/src/catalog/*`, `apps/api/test/catalog-search.e2e-spec.ts`, `apps/web/lib/api/catalog.ts`, `apps/web/app/pos/page.tsx`, `e2e/pos-ui.spec.ts`, `e2e/helpers.ts`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
+- Result: Product and DeviceUnit now carry `updatedAt`; `GET /catalog/products/delta` returns changed active catalog items plus archived removals, including stock-count changes from DeviceUnit updates. `/pos` keeps a local catalog cache and refreshes via delta on reload/new sale/offline queue sync.
+- Checks run: `npm run prisma:generate -w @alistore/api`; `npm run db:deploy -w @alistore/api`; test DB `prisma db push --skip-generate`; `npm run test -w @alistore/api -- catalog-search --runInBand`; `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`; `npx playwright test e2e/pos-ui.spec.ts`; `npm run e2e`; `git diff --check`.
+- Outcome: targeted catalog delta test passed 1 suite / 4 tests; API build passed; web build passed; full API Jest passed 89 suites / 316 tests; targeted POS UI browser smoke passed; full Playwright passed 9/9.
+- Next step: no unblocked MVP software tasks remain; production closeout requires external provider credentials and physical POS hardware certification.
+
+## 2026-07-08
+
 - Task: add provider-ready Apple/Telegram social login.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708130500_add_customer_identities/migration.sql`, `apps/api/src/auth/*`, `apps/api/src/health/external-readiness.ts`, `apps/api/test/social-auth.spec.ts`, `apps/web/lib/auth.tsx`, `apps/web/lib/api/auth.ts`, `apps/web/lib/api/campaigns.ts`, `apps/web/app/login/page.tsx`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
 - Result: added `CustomerIdentity` for stable provider subject linking, `POST /auth/social/telegram` with Telegram Mini App/Login Widget signed initData verification, `POST /auth/social/apple` with Apple identityToken JWKS/RS256 verification, deterministic customer creation for social-only accounts, and Telegram Mini App login handoff in `/login`.

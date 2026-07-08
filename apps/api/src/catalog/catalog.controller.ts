@@ -7,6 +7,8 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import {
+  CatalogDeltaQueryDto,
+  CatalogDeltaResponseDto,
   CatalogReindexResponseDto,
   CatalogSearchQueryDto,
   CatalogSearchResponseDto,
@@ -27,6 +29,17 @@ export class CatalogController {
   @Get('products')
   search(@Query() query: CatalogSearchQueryDto) {
     return this.catalog.search(query);
+  }
+
+  @ApiOperation({
+    summary: 'Delta-sync storefront/POS catalog changes since a previous cursor',
+    description:
+      'Returns changed active products and removed archived products. Stock-count changes are included via DeviceUnit.updatedAt.',
+  })
+  @ApiOkResponse({ type: CatalogDeltaResponseDto })
+  @Get('products/delta')
+  delta(@Query() query: CatalogDeltaQueryDto) {
+    return this.catalog.delta(query);
   }
 
   @ApiOperation({

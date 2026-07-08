@@ -9,7 +9,6 @@ import {
   createPosClientSaleId,
   createScannerKeyHandler,
   enqueueOfflinePosSale,
-  fetchCatalog,
   findProductByScan,
   isLikelyNetworkError,
   loadOfflinePosQueue,
@@ -17,6 +16,7 @@ import {
   posSale,
   printPosReceipt,
   syncOfflinePosQueue,
+  syncPosCatalogCache,
   type CatalogProduct,
   type OfflinePosPayload,
   type PosPayment,
@@ -57,6 +57,7 @@ export default function PosPage() {
   const [syncing, setSyncing] = useState(false);
   const [scanCode, setScanCode] = useState('');
   const [terminalMessage, setTerminalMessage] = useState('Терминал готов к проверке');
+  const [catalogSync, setCatalogSync] = useState('Каталог готов к delta sync');
   const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function PosPage() {
   }, []);
 
   useEffect(() => {
-    fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items));
+    void refreshCatalog();
   }, []);
 
   useEffect(() => {
@@ -97,6 +98,20 @@ export default function PosPage() {
   function flash(m: string) {
     setToast(m);
     window.setTimeout(() => setToast(''), 1600);
+  }
+
+  async function refreshCatalog() {
+    const next = await syncPosCatalogCache({ limit: 100 });
+    setProducts(next.catalog.items);
+    const label =
+      next.source === 'network_delta'
+        ? `Каталог delta: +${next.changed} / -${next.removed}`
+        : next.source === 'network_full'
+          ? `Каталог full: ${next.catalog.items.length}`
+          : next.source === 'cache'
+            ? 'Каталог из offline cache'
+            : 'Каталог недоступен';
+    setCatalogSync(next.warning ? `${label} · ${next.warning}` : label);
   }
 
   function add(p: CatalogProduct) {
@@ -251,7 +266,7 @@ export default function PosPage() {
       if (stats.failed > 0) flash(`Конфликты синка: ${stats.failed}`);
       else if (stats.approval > 0) flash(`Нужно одобрение: ${stats.approval}`);
       else flash('Очередь синхронизирована');
-      fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items));
+      await refreshCatalog();
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка синхронизации');
     } finally {
@@ -269,7 +284,7 @@ export default function PosPage() {
     setReceiptSnapshot(null);
     setActiveClientSaleId('');
     setRoute('sell');
-    fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items)); // refresh stock
+    void refreshCatalog();
   }
 
   if (!session) {
@@ -361,6 +376,7 @@ export default function PosPage() {
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#8A7F76]">
               <span>Сканер: keyboard-wedge</span>
               <span>Принтер: browser/thermal print</span>
+              <span>{catalogSync}</span>
               <span>{terminalMessage}</span>
               {queueSummary.synced > 0 && (
                 <button

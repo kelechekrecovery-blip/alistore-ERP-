@@ -8,6 +8,7 @@ export interface CatalogProduct {
   category: string;
   attrs: Record<string, unknown> | null;
   availableUnits: number;
+  updatedAt?: string;
 }
 
 export interface CatalogResponse {
@@ -17,6 +18,16 @@ export interface CatalogResponse {
   limit: number;
   offset: number;
   items: CatalogProduct[];
+}
+
+export interface CatalogDeltaResponse {
+  cursor: string;
+  since?: string;
+  changed: CatalogProduct[];
+  removed: string[];
+  totalChanged: number;
+  totalRemoved: number;
+  truncated: boolean;
 }
 
 export interface CatalogQuery {
@@ -48,6 +59,126 @@ export async function fetchCatalog(query: CatalogQuery = {}): Promise<CatalogRes
   } catch {
     return { source: 'unavailable', total: 0, limit: 0, offset: 0, items: [] };
   }
+}
+
+export async function fetchCatalogDelta(
+  since?: string,
+  limit = 500,
+): Promise<CatalogDeltaResponse | null> {
+  const params = new URLSearchParams();
+  if (since) params.set('since', since);
+  params.set('limit', String(limit));
+
+  try {
+    const res = await fetch(`${API_BASE}/catalog/products/delta?${params.toString()}`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`catalog delta responded ${res.status}`);
+    return (await res.json()) as CatalogDeltaResponse;
+  } catch {
+    return null;
+  }
+}
+
+const POS_CATALOG_CACHE_KEY = 'alistore.pos.catalogCache.v1';
+
+export interface PosCatalogCache {
+  cursor: string;
+  updatedAt: string;
+  items: CatalogProduct[];
+}
+
+export interface PosCatalogSyncResult {
+  catalog: CatalogResponse;
+  source: 'network_full' | 'network_delta' | 'cache' | 'unavailable';
+  changed: number;
+  removed: number;
+  cursor?: string;
+  warning?: string;
+}
+
+export function loadPosCatalogCache(): PosCatalogCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(POS_CATALOG_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as PosCatalogCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePosCatalogCache(cache: PosCatalogCache): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(POS_CATALOG_CACHE_KEY, JSON.stringify(cache));
+}
+
+export async function syncPosCatalogCache(
+  query: CatalogQuery = { limit: 100 },
+): Promise<PosCatalogSyncResult> {
+  const cached = loadPosCatalogCache();
+  if (cached?.cursor) {
+    const delta = await fetchCatalogDelta(cached.cursor);
+    if (delta) {
+      const items = mergeCatalogDelta(cached.items, delta);
+      const next = { cursor: delta.cursor, updatedAt: new Date().toISOString(), items };
+      savePosCatalogCache(next);
+      return {
+        catalog: {
+          source: 'pos_cache_delta',
+          total: items.length,
+          limit: items.length,
+          offset: 0,
+          items,
+        },
+        source: 'network_delta',
+        changed: delta.totalChanged,
+        removed: delta.totalRemoved,
+        cursor: delta.cursor,
+        warning: delta.truncated ? 'catalog_delta_truncated' : undefined,
+      };
+    }
+    return {
+      catalog: {
+        source: 'pos_cache',
+        total: cached.items.length,
+        limit: cached.items.length,
+        offset: 0,
+        items: cached.items,
+      },
+      source: 'cache',
+      changed: 0,
+      removed: 0,
+      cursor: cached.cursor,
+      warning: 'catalog_delta_unavailable',
+    };
+  }
+
+  const catalog = await fetchCatalog(query);
+  if (catalog.items.length > 0) {
+    const cursor = new Date().toISOString();
+    savePosCatalogCache({ cursor, updatedAt: cursor, items: catalog.items });
+    return { catalog, source: 'network_full', changed: catalog.items.length, removed: 0, cursor };
+  }
+  return { catalog, source: 'unavailable', changed: 0, removed: 0 };
+}
+
+function mergeCatalogDelta(
+  current: CatalogProduct[],
+  delta: CatalogDeltaResponse,
+): CatalogProduct[] {
+  const removed = new Set(delta.removed);
+  const byId = new Map(
+    current
+      .filter((item) => !removed.has(item.id))
+      .map((item) => [item.id, item]),
+  );
+  for (const item of delta.changed) {
+    byId.set(item.id, item);
+  }
+  return [...byId.values()].sort((a, b) => {
+    const category = a.category.localeCompare(b.category, 'ru');
+    return category || a.name.localeCompare(b.name, 'ru');
+  });
 }
 
 /**

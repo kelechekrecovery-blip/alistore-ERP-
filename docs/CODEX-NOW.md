@@ -42,7 +42,7 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 без раскрытия значений секретов.
 
 ## Статус синхронизации (обновляет Claude)
-- P0 закрыт. Текущий локальный гейт: API Jest 89/89 (315 тестов), Playwright 8/8,
+- P0 закрыт. Текущий локальный гейт: API Jest 89/89 (316 тестов), Playwright 9/9,
   `api:build` и `next build` зелёные.
-- Campaign delivery и social-login backend закрыты; открытых unblocked задач нет. Остались
-  provider/hardware доступы, production-активация каналов и live client SDK/callback QA.
+- Campaign delivery, social-login backend и POS catalog delta-sync закрыты; открытых unblocked
+  задач нет. Остались provider/hardware доступы, production-активация каналов и live client SDK/callback QA.

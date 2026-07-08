@@ -186,11 +186,13 @@ model Product {
   category  String
   attrs     Json
   archived  Boolean             @default(false) // soft-delete: НЕ удалять физически
+  updatedAt DateTime            @default(now()) @updatedAt
   units     DeviceUnit[]
   movements InventoryMovement[]
 
   @@index([category])
   @@index([archived])
+  @@index([updatedAt])
 }
 
 model ProductReview {
@@ -219,11 +221,13 @@ model DeviceUnit {
   grade     Grade?
   location  String
   orderId   String?
+  updatedAt DateTime   @default(now()) @updatedAt
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
   @@index([status])
   @@index([orderId])
+  @@index([updatedAt])
 }
 
 model Order {

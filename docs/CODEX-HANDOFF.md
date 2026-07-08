@@ -53,7 +53,7 @@ missing/configured env-имён и ручные проверки. Значени
 15. **Соцвход через реальные провайдеры** — backend готов; нужны Apple/Telegram app credentials,
     callback/client SDK QA и production rollout.
 16. **Физическое железо (Phase 13)** — ESC/POS/QZ печать, банковские терминалы, реальный сканер:
-    нужны устройства и SDK. Софт-слой offline POS + browser-fallback уже готов.
+    нужны устройства и SDK. Софт-слой offline POS + catalog delta-sync + browser-fallback уже готов.
 
 ## Гейт приёмки (для КАЖДОГО пункта)
 `npm run api:test` зелёный (+ новый тест) · `nest build` + `next build` · живой прогон

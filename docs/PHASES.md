@@ -407,11 +407,14 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
   checks, and never returns secret values.
 - ✅ **Offline POS software layer**: local queue, sync/retry, duplicate-safe `clientSaleId`,
   manual conflict state, approval-required state, network degradation fallback.
+- ✅ POS catalog delta-sync: `GET /catalog/products/delta` returns changed active products and
+  archived removals; `/pos` keeps a local catalog cache and refreshes stock via delta after sync/reload.
 - ✅ Hardware browser fallback: scanner as keyboard-wedge/SKU input, receipt print dialog,
   terminal readiness check before sale/queue.
 - ☐ Осталось: physical hardware certification (silent ESC/POS/QZ, bank terminal SDKs,
-  real scanner QA), дельта-синк.
-**Проверка:** продажа без сети → синк без потерь/дублей; ручной фолбэк при отсутствии железа.
+  real scanner QA).
+**Проверка:** продажа без сети → синк без потерь/дублей; POS UI browser smoke проверяет
+catalog delta-sync; ручной фолбэк при отсутствии железа.
 
 ---
 
@@ -470,7 +473,7 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · API тест-сьютов 89 (315 тестов зелёные, `jest`; при
+Backend-модулей ~30 · API тест-сьютов 89 (316 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось:**
