@@ -11,13 +11,13 @@ const ACTION_META: Record<PricingReview['action'], { color: string; arrow: strin
 };
 
 /** Dynamic-pricing recommendations — stock-vs-demand rule engine (Phase 11, keyless). */
-export function PricingView() {
+export function PricingView({ accessToken }: { accessToken: string }) {
   const [report, setReport] = useState<PricingReport | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetchPricing().then(setReport).catch(() => setFailed(true));
-  }, []);
+    fetchPricing(accessToken).then(setReport).catch(() => setFailed(true));
+  }, [accessToken]);
 
   if (failed) return <p className="font-mono text-sm text-[#FF8A7A]">Не удалось загрузить рекомендации.</p>;
   if (report === null) return <p className="font-mono text-sm text-[#6E645C]">Считаю рекомендации…</p>;

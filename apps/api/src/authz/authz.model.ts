@@ -214,6 +214,10 @@ p, admin, campaigns, convert
 p, owner, campaigns, read
 p, owner, campaigns, create
 p, owner, campaigns, convert
+p, admin, reports, read
+p, owner, reports, read
+p, admin, ai, read
+p, owner, ai, read
 g, owner, admin
 g, admin, senior_seller
 `;

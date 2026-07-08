@@ -16,10 +16,10 @@ export async function assessUsed(input: {
   grade: string;
   ageMonths: number;
   defects: string[];
-}): Promise<Valuation> {
+}, accessToken: string): Promise<Valuation> {
   const res = await fetch(`${API_BASE}/ai/assess`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(input),
   });
   if (!res.ok) {
@@ -50,8 +50,10 @@ export interface PricingReport {
 }
 
 /** Dynamic-pricing review (Phase 11): stock-vs-demand recommendations, keyless. */
-export async function fetchPricing(): Promise<PricingReport> {
-  const res = await fetch(`${API_BASE}/ai/pricing`);
+export async function fetchPricing(accessToken: string): Promise<PricingReport> {
+  const res = await fetch(`${API_BASE}/ai/pricing`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error(`pricing ${res.status}`);
   return (await res.json()) as PricingReport;
 }
@@ -77,8 +79,10 @@ export interface ReorderReport {
 }
 
 /** Restock review (Phase 11): understock mirror of pricing, keyless. */
-export async function fetchReorder(): Promise<ReorderReport> {
-  const res = await fetch(`${API_BASE}/ai/reorder`);
+export async function fetchReorder(accessToken: string): Promise<ReorderReport> {
+  const res = await fetch(`${API_BASE}/ai/reorder`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error(`reorder ${res.status}`);
   return (await res.json()) as ReorderReport;
 }
@@ -94,10 +98,10 @@ export interface CategorySuggestion {
 export async function suggestCategory(input: {
   name: string;
   attrs?: Record<string, unknown>;
-}): Promise<CategorySuggestion> {
+}, accessToken: string): Promise<CategorySuggestion> {
   const res = await fetch(`${API_BASE}/ai/categorize`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(input),
   });
   if (!res.ok) {
@@ -118,10 +122,10 @@ export async function generateDescription(input: {
   name: string;
   category?: string;
   attrs?: Record<string, unknown>;
-}): Promise<ProductDescription> {
+}, accessToken: string): Promise<ProductDescription> {
   const res = await fetch(`${API_BASE}/ai/describe`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(input),
   });
   if (!res.ok) {

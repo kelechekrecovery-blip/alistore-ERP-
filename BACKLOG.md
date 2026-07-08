@@ -6,6 +6,7 @@
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Protect owner Reports and AI endpoints with staff RBAC and web token handoff.
 - Add external integration readiness report at `GET /health/integrations`.
 - Add Telegram Mini App shell route using the existing catalog/checkout API with `channel=telegram`.
 - Build Admin Product Management UI with product CRUD, keyless AI enrichment, and approval-gated price/archive actions.

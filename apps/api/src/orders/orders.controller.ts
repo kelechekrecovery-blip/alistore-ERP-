@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -30,6 +31,7 @@ import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
+import { AuthzService } from '../authz/authz.service';
 
 /**
  * NOTE: `actor` is hardcoded to a system principal for the MVP core. Auth (JWT +
@@ -44,6 +46,7 @@ export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly staffAuth: StaffAuthService,
+    private readonly authz: AuthzService,
   ) {}
 
   @ApiOperation({ summary: 'Orders of the authenticated customer (personal account)' })
@@ -64,6 +67,29 @@ export class OrdersController {
   async queue(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
     await requireActiveStaff(user, this.staffAuth);
     return this.orders.listByStatus((status ?? 'created') as OrderStatus);
+  }
+
+  @ApiOperation({ summary: 'Order Event Ledger timeline — customer owner or staff queue read' })
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Order id' })
+  @ApiOkResponse({ description: 'Ledger events for the order, newest first.' })
+  @ApiNotFoundResponse({ description: 'Order does not exist or is not visible to this user.' })
+  @Get(':id/ledger')
+  @UseGuards(JwtAuthGuard)
+  async ledger(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    const order = await this.orders.get(id);
+    if (!order) throw new NotFoundException(`Заказ ${id} не найден`);
+    if (user.typ === 'customer') {
+      if (order.customerId !== user.customerId) {
+        throw new NotFoundException(`Заказ ${id} не найден`);
+      }
+    } else {
+      await requireActiveStaff(user, this.staffAuth);
+      if (!user.role || !(await this.authz.can(user.role, 'orders', 'queue'))) {
+        throw new ForbiddenException('Недостаточно прав для просмотра заказа');
+      }
+    }
+    return this.orders.ledger(id);
   }
 
   @ApiOperation({ summary: 'Get an order with items and payments' })

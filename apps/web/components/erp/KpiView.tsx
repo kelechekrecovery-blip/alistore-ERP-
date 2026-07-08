@@ -18,11 +18,11 @@ function Metric({ label, value, color = '#fff' }: { label: string; value: string
 }
 
 /** Owner margin/KPI tab: gross margin, top products, seller KPIs + advisory payroll. */
-export function KpiView({ kpi }: { kpi: Kpi | null }) {
+export function KpiView({ kpi, accessToken }: { kpi: Kpi | null; accessToken: string }) {
   const [payroll, setPayroll] = useState<Payroll | null>(null);
   useEffect(() => {
-    fetchPayroll().then(setPayroll).catch(() => setPayroll(null));
-  }, []);
+    fetchPayroll(accessToken).then(setPayroll).catch(() => setPayroll(null));
+  }, [accessToken]);
 
   if (!kpi) return <p className="font-mono text-sm text-[#6E645C]">Загрузка…</p>;
   const maxRev = Math.max(1, ...kpi.topProducts.map((p) => p.revenue));

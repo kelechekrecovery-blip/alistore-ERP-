@@ -1,8 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AiReadGuard } from './ai-read.decorator';
 import { PricingService } from './pricing.service';
 
 @ApiTags('ai')
+@AiReadGuard()
 @Controller('ai')
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}

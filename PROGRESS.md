@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: close P0-2 by protecting Reports and AI endpoints.
+- Files changed: `apps/api/src/reports/*`, `apps/api/src/ai/*`, `apps/api/src/authz/authz.model.ts`, `apps/api/src/orders/*`, `apps/api/test/reports-ai-rbac.e2e-spec.ts`, `apps/web/lib/reports.ts`, `apps/web/lib/ai.ts`, `apps/web/lib/api/orders.ts`, ERP/admin/AI/order-status web clients, `e2e/erp-secure.spec.ts`, `BACKLOG.md`, `docs/*`, `PROGRESS.md`.
+- Result: `/reports/*` and `/ai/*` now require staff JWT + active staff + casbin permission (`reports.read` / `ai.read`, admin/owner only). ERP, AI tools, used-device assessment, and admin product AI enrichment send the shared staff-session token. Customer order status uses `GET /orders/:id/ledger`, scoped to the owning customer or staff queue readers, instead of public owner ledger.
+- Checks run: `npm run test -w @alistore/api -- reports-ai-rbac --runInBand`; `npm run api:build`; `npm run build -w @alistore/web`; `npx playwright test e2e/erp-secure.spec.ts e2e/admin-products.spec.ts`; `npm run api:test`; `npm run e2e`; `git diff --check`.
+- Outcome: targeted reports/AI RBAC tests passed 1 suite / 2 tests; API build passed; web build passed; targeted browser smoke passed 2/2; full API Jest passed 87 suites / 305 tests; full Playwright passed 8/8.
+- Next step: code-side MVP is closed; remaining Next backlog requires external provider accounts/social credentials or physical POS hardware.
+
+## 2026-07-08
+
 - Task: add external integration readiness health report.
 - Files changed: `apps/api/src/health/external-readiness.ts`, `apps/api/src/health/health.controller.ts`, `apps/api/src/health/health.module.ts`, `apps/api/test/external-readiness.spec.ts`, `apps/api/test/health.e2e-spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `docs/READINESS.md`, `PROGRESS.md`.
 - Result: added `GET /health/integrations` with a secret-safe provider/account/hardware readiness report: AI, Telegram bot/login, WhatsApp, Apple login, campaign delivery, physical POS certification, S3 media storage, and observability checks. `requiredAny` alternatives no longer show false missing envs when one valid option is configured.

@@ -1,9 +1,11 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags, ApiUnprocessableEntityResponse } from '@nestjs/swagger';
+import { AiReadGuard } from './ai-read.decorator';
 import { ValuationService } from './valuation.service';
 import { AssessDto } from './valuation.dto';
 
 @ApiTags('ai')
+@AiReadGuard()
 @Controller('ai')
 export class ValuationController {
   constructor(private readonly valuation: ValuationService) {}

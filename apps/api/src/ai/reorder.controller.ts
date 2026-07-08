@@ -1,8 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AiReadGuard } from './ai-read.decorator';
 import { ReorderService } from './reorder.service';
 
 @ApiTags('ai')
+@AiReadGuard()
 @Controller('ai')
 export class ReorderController {
   constructor(private readonly reorder: ReorderService) {}

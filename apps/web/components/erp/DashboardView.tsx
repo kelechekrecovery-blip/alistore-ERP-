@@ -41,12 +41,13 @@ interface DashboardViewProps {
   revenue: { day: string; amount: number }[];
   trend: RevenueTrend | null;
   period: number;
+  accessToken: string;
   onPeriod: (days: number) => void;
   onSignal: (kind: string) => void;
 }
 
 /** Owner overview: KPIs, revenue chart (7/30/custom range) with trend, and the risk feed. */
-export function DashboardView({ d, risks, revenue, trend, period, onPeriod, onSignal }: DashboardViewProps) {
+export function DashboardView({ d, risks, revenue, trend, period, accessToken, onPeriod, onSignal }: DashboardViewProps) {
   const [range, setRange] = useState<RevenueRange | null>(null);
   const [picker, setPicker] = useState(false);
   const [from, setFrom] = useState('');
@@ -72,7 +73,7 @@ export function DashboardView({ d, risks, revenue, trend, period, onPeriod, onSi
     }
     try {
       setErr(null);
-      const r = await fetchRevenueRange(from, to);
+      const r = await fetchRevenueRange(from, to, accessToken);
       setRange(r);
       setPicker(false);
     } catch {

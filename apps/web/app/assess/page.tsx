@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 import { assessUsed, type Valuation } from '@/lib/ai';
 import { som } from '@/lib/format';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const GRADES: { id: 'A' | 'B' | 'C'; label: string }[] = [
   { id: 'A', label: 'A · как новый' },
@@ -28,13 +30,19 @@ export default function AssessPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Valuation | null>(null);
   const [err, setErr] = useState('');
+  const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
+    setSession(loadStaffSession());
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
     fetchCatalog({ limit: 100 }).then((c) => {
       setProducts(c.items);
       if (c.items[0]) setSku(c.items[0].sku);
     });
-  }, []);
+  }, [session]);
 
   function toggleDefect(id: string) {
     setDefects((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
@@ -44,12 +52,31 @@ export default function AssessPage() {
     if (!sku) return;
     setBusy(true); setErr('');
     try {
-      setResult(await assessUsed({ sku, grade, ageMonths: Number(ageMonths) || 0, defects }));
+      if (!session) throw new Error('Нужен вход сотрудника');
+      setResult(await assessUsed({ sku, grade, ageMonths: Number(ageMonths) || 0, defects }, session.accessToken));
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка оценки');
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+        <Link
+          href="/staff"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          ⌂ Сотрудник
+        </Link>
+        <StaffSessionLogin
+          title="Оценка Б/У · вход"
+          caption="Войдите staff-аккаунтом, чтобы запускать AI-оценку."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
   }
 
   return (
@@ -60,7 +87,16 @@ export default function AssessPage() {
           <div className="font-display text-lg font-bold">Оценка Б/У</div>
           <div className="text-xs text-[#8A7F76]">AI-рекомендация выкупа и перепродажи · правила депрециации</div>
         </div>
-        <Link href="/staff" className="ml-auto rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">⌂ Сотрудник</Link>
+        <button
+          type="button"
+          onClick={() => {
+            clearStaffSession();
+            setSession(null);
+          }}
+          className="ml-auto rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          Выйти staff
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">

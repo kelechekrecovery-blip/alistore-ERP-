@@ -22,7 +22,9 @@ Admin Product Management UI (`/admin/products`) with staff-only product CRUD, ke
 category/description enrichment, approval-gated price/archive actions, and Telegram Mini App
 shell (`/tg`) with shared catalog/checkout API and `channel=telegram` order flow,
 plus `GET /health/integrations` external-readiness report for provider keys/manual hardware
-gates without exposing secret values.
+gates without exposing secret values, and P0 owner data hardening: `/reports/*` + `/ai/*`
+are staff-RBAC protected with shared staff-session web token handoff; customer order timeline
+uses scoped `GET /orders/:id/ledger` instead of the owner ledger feed.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 

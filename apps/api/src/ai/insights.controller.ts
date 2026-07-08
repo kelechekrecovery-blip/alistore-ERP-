@@ -1,8 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AiReadGuard } from './ai-read.decorator';
 import { InsightsService } from './insights.service';
 
 @ApiTags('ai')
+@AiReadGuard()
 @Controller('ai')
 export class InsightsController {
   constructor(private readonly insights: InsightsService) {}

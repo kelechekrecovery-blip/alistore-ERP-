@@ -1,14 +1,22 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 import { ReportsService } from './reports.service';
 
 @ApiTags('reports')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@RequirePermission('reports', 'read')
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}

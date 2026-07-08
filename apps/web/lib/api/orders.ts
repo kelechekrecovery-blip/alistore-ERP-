@@ -1,4 +1,5 @@
 import { API_BASE, getJson, postAuthJson } from './http';
+import type { LedgerEvent } from '../reports';
 
 export interface OrderLine {
   sku: string;
@@ -97,4 +98,8 @@ export async function fetchOrder(id: string): Promise<OrderDetail | null> {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`order ${res.status}`);
   return (await res.json()) as OrderDetail;
+}
+
+export function fetchOrderLedger(id: string, accessToken: string): Promise<LedgerEvent[]> {
+  return getJson(`/orders/${encodeURIComponent(id)}/ledger`, accessToken);
 }

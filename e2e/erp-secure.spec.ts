@@ -1,0 +1,33 @@
+import { expect, test } from '@playwright/test';
+import { postJson, resetDb } from './helpers';
+
+test('ERP loads protected reports and AI with a staff session', async ({ page, request }) => {
+  await resetDb();
+  const username = `e2e-erp-${Date.now().toString(36)}`;
+  const password = 'pass-e2e';
+  await postJson(request, '/staff-auth/bootstrap', { username, password });
+
+  const protectedResponses: { url: string; status: number }[] = [];
+  page.on('response', (response) => {
+    const url = response.url();
+    if (url.includes('/api/reports') || url.includes('/api/ai')) {
+      protectedResponses.push({ url, status: response.status() });
+    }
+  });
+
+  await page.goto('/erp');
+  await expect(page.getByText('AliStore ERP · вход')).toBeVisible();
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+
+  await expect(page.getByText('AliStore ERP').first()).toBeVisible();
+  await expect(page.getByText('Дашборд').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /Ассистент/ }).click();
+  await expect(page.getByText('AI-ассистент').first()).toBeVisible();
+  await page.getByRole('button', { name: /Цены/ }).click();
+  await expect(page.getByText('Ценовые рекомендации').first()).toBeVisible();
+
+  expect(protectedResponses.filter((r) => r.status === 401 || r.status === 403)).toEqual([]);
+});

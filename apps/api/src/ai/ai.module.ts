@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { AuthzModule } from '../authz/authz.module';
 import { ReportsModule } from '../reports/reports.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { InsightsService } from './insights.service';
 import { InsightsController } from './insights.controller';
 import { ValuationService } from './valuation.service';
@@ -13,7 +15,7 @@ import { DescribeService } from './describe.service';
 import { DescribeController } from './describe.controller';
 
 @Module({
-  imports: [ReportsModule],
+  imports: [ReportsModule, StaffAuthModule, AuthzModule],
   providers: [InsightsService, ValuationService, PricingService, ReorderService, DescribeService],
   controllers: [
     InsightsController,

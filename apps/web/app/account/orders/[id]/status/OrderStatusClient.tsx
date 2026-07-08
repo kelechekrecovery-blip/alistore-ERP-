@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { fetchOrder, type OrderDetail } from '@/lib/api';
-import { fetchLedgerByRef } from '@/lib/reports';
+import { fetchOrder, fetchOrderLedger, type OrderDetail } from '@/lib/api';
 import { buildOrderTimeline, TERMINAL_BAD, type TimelineStep } from '@/lib/order-status';
 import { som } from '@/lib/format';
+import { useAuth } from '@/lib/auth';
 
 function fmt(iso: string): string {
   const d = new Date(iso);
@@ -15,13 +15,24 @@ function fmt(iso: string): string {
 
 export default function OrderStatusPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { user, hydrated, authed } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
   const [steps, setSteps] = useState<TimelineStep[]>([]);
 
   useEffect(() => {
     fetchOrder(params.id).then((o) => setOrder(o ?? 'missing'));
-    fetchLedgerByRef(params.id).then((l) => setSteps(buildOrderTimeline(l))).catch(() => setSteps([]));
   }, [params.id]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!user) {
+      setSteps([]);
+      return;
+    }
+    authed((token) => fetchOrderLedger(params.id, token))
+      .then((l) => setSteps(buildOrderTimeline(l)))
+      .catch(() => setSteps([]));
+  }, [authed, hydrated, params.id, user]);
 
   const frame = (children: React.ReactNode) => (
     <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">

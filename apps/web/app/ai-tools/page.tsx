@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   suggestCategory,
   generateDescription,
   type CategorySuggestion,
   type ProductDescription,
 } from '@/lib/ai';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 interface AttrRow {
   key: string;
@@ -46,6 +48,11 @@ export default function AiToolsPage() {
   const [descBusy, setDescBusy] = useState(false);
   const [descErr, setDescErr] = useState('');
   const [desc, setDesc] = useState<ProductDescription | null>(null);
+  const [session, setSession] = useState<StaffSession | null>(null);
+
+  useEffect(() => {
+    setSession(loadStaffSession());
+  }, []);
 
   function setRow(i: number, patch: Partial<AttrRow>) {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -55,7 +62,8 @@ export default function AiToolsPage() {
     if (!name.trim()) return;
     setCatBusy(true); setCatErr(''); setCat(null);
     try {
-      setCat(await suggestCategory({ name: name.trim(), attrs: toAttrs(rows) }));
+      if (!session) throw new Error('Нужен вход сотрудника');
+      setCat(await suggestCategory({ name: name.trim(), attrs: toAttrs(rows) }, session.accessToken));
     } catch (e) {
       setCatErr(e instanceof Error ? e.message : 'Ошибка категоризации');
     } finally {
@@ -67,11 +75,12 @@ export default function AiToolsPage() {
     if (!name.trim()) return;
     setDescBusy(true); setDescErr(''); setDesc(null);
     try {
+      if (!session) throw new Error('Нужен вход сотрудника');
       setDesc(await generateDescription({
         name: name.trim(),
         category: category.trim() || undefined,
         attrs: toAttrs(rows),
-      }));
+      }, session.accessToken));
     } catch (e) {
       setDescErr(e instanceof Error ? e.message : 'Ошибка генерации');
     } finally {
@@ -81,6 +90,24 @@ export default function AiToolsPage() {
 
   const isLlm = desc ? desc.source !== 'template' : false;
 
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+        <Link
+          href="/staff"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          ⌂ Сотрудник
+        </Link>
+        <StaffSessionLogin
+          title="AI-инструменты · вход"
+          caption="Войдите staff-аккаунтом, чтобы запускать AI-инструменты каталога."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A] font-sans text-white">
       <header className="flex items-center gap-4 border-b border-[#2E2822] bg-[#16130F] px-6 py-4">
@@ -89,7 +116,16 @@ export default function AiToolsPage() {
           <div className="font-display text-lg font-bold">AI-инструменты</div>
           <div className="text-xs text-[#8A7F76]">Категоризация и описание карточки · правила без ключа, LLM при ключе</div>
         </div>
-        <Link href="/staff" className="ml-auto rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">⌂ Сотрудник</Link>
+        <button
+          type="button"
+          onClick={() => {
+            clearStaffSession();
+            setSession(null);
+          }}
+          className="ml-auto rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          Выйти staff
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">

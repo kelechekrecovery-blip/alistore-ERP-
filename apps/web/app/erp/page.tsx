@@ -26,6 +26,8 @@ import { ReorderView } from '@/components/erp/ReorderView';
 import { KpiView } from '@/components/erp/KpiView';
 import { DashboardView } from '@/components/erp/DashboardView';
 import { CampaignsView } from '@/components/erp/CampaignsView';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'ledger';
 
@@ -89,25 +91,50 @@ export default function ErpPage() {
   const [revenue, setRevenue] = useState<{ day: string; amount: number }[]>([]);
   const [trend, setTrend] = useState<RevenueTrend | null>(null);
   const [insights, setInsights] = useState<Insight[] | null>(null);
+  const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
-    fetchDashboard().then(setD).catch(() => setD(null));
-    fetchKpi().then(setKpi).catch(() => setKpi(null));
-    fetchRisks().then((r) => setRisks(r.signals)).catch(() => setRisks([]));
-    fetchLedger().then(setLedger).catch(() => setLedger([]));
-    fetchInsights().then((r) => setInsights(r.insights)).catch(() => setInsights([]));
+    setSession(loadStaffSession());
   }, []);
 
   useEffect(() => {
-    fetchRevenue(period).then(setRevenue).catch(() => setRevenue([]));
-    fetchRevenueTrend(period).then(setTrend).catch(() => setTrend(null));
-  }, [period]);
+    if (!session) return;
+    fetchDashboard(session.accessToken).then(setD).catch(() => setD(null));
+    fetchKpi(session.accessToken).then(setKpi).catch(() => setKpi(null));
+    fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks([]));
+    fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
+    fetchInsights(session.accessToken).then((r) => setInsights(r.insights)).catch(() => setInsights([]));
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchRevenue(period, session.accessToken).then(setRevenue).catch(() => setRevenue([]));
+    fetchRevenueTrend(period, session.accessToken).then(setTrend).catch(() => setTrend(null));
+  }, [period, session]);
 
   /** Command Center: jump from a risk signal to the screen that resolves it. */
   function actOnSignal(kind: string) {
     const a = SIGNAL_ACTION[kind];
     if (a?.href) router.push(a.href);
     else if (a?.tab) setRoute(a.tab);
+  }
+
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+        <Link
+          href="/"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+        >
+          ⌂ Выйти
+        </Link>
+        <StaffSessionLogin
+          title="AliStore ERP · вход"
+          caption="Войдите как admin или owner, чтобы открыть финансы, отчёты и AI."
+          onAuthenticated={setSession}
+        />
+      </div>
+    );
   }
 
   return (
@@ -155,22 +182,29 @@ export default function ErpPage() {
             <div className="text-xs text-[#8A7F76]">{TITLES[route][1]}</div>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <Link href="/" className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">
-              ⌂ Выйти
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                clearStaffSession();
+                setSession(null);
+              }}
+              className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+            >
+              Выйти staff
+            </button>
             <span className="grid h-9 w-9 place-items-center rounded-full bg-[#2A241F] text-sm">В</span>
           </div>
         </div>
 
         <div className="p-7">
           {route === 'dash' && (
-            <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} onPeriod={setPeriod} onSignal={actOnSignal} />
+            <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
           {route === 'ai' && <AiView insights={insights} />}
-          {route === 'pricing' && <PricingView />}
-          {route === 'reorder' && <ReorderView />}
+          {route === 'pricing' && <PricingView accessToken={session.accessToken} />}
+          {route === 'reorder' && <ReorderView accessToken={session.accessToken} />}
           {route === 'finance' && <FinanceView d={d} />}
-          {route === 'kpi' && <KpiView kpi={kpi} />}
+          {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}
           {route === 'campaigns' && <CampaignsView />}

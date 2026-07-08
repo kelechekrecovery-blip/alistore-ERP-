@@ -38,6 +38,15 @@ export class OrdersService {
     });
   }
 
+  /** Ledger events for one order, scoped by the controller before this is called. */
+  ledger(orderId: string) {
+    return this.prisma.auditEvent.findMany({
+      where: { refs: { has: orderId } },
+      orderBy: { ts: 'desc' },
+      take: 50,
+    });
+  }
+
   /** Create an order (status `created`) and write order.created to the ledger. */
   async create(dto: CreateOrderDto, actor: string) {
     return this.audit.transaction(async (tx) => {

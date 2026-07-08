@@ -210,22 +210,26 @@ export default function AdminProductsPage() {
   }
 
   async function autoCategory() {
+    const token = session?.accessToken;
+    if (!token) return;
     await withBusy('category', async () => {
       const attrs = parseAttrs(form.attrsText);
-      const result = await suggestCategory({ name: form.name.trim(), attrs });
+      const result = await suggestCategory({ name: form.name.trim(), attrs }, token);
       updateForm({ category: result.category });
       flash(`Категория: ${result.category} · ${Math.round(result.confidence * 100)}%`);
     });
   }
 
   async function autoDescription() {
+    const token = session?.accessToken;
+    if (!token) return;
     await withBusy('description', async () => {
       const attrs = parseAttrs(form.attrsText);
       const result = await generateDescription({
         name: form.name.trim(),
         category: form.category.trim() || undefined,
         attrs,
-      });
+      }, token);
       updateForm({
         attrsText: JSON.stringify(
           { ...attrs, description: result.description, highlights: result.highlights },

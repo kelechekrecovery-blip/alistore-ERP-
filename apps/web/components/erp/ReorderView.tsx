@@ -11,13 +11,13 @@ const URGENCY_META: Record<ReorderReview['urgency'], { color: string; dot: strin
 };
 
 /** Restock recommendations — understock mirror of pricing (Phase 11, keyless). */
-export function ReorderView() {
+export function ReorderView({ accessToken }: { accessToken: string }) {
   const [report, setReport] = useState<ReorderReport | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetchReorder().then(setReport).catch(() => setFailed(true));
-  }, []);
+    fetchReorder(accessToken).then(setReport).catch(() => setFailed(true));
+  }, [accessToken]);
 
   if (failed) return <p className="font-mono text-sm text-[#FF8A7A]">Не удалось загрузить закупки.</p>;
   if (report === null) return <p className="font-mono text-sm text-[#6E645C]">Считаю потребность…</p>;

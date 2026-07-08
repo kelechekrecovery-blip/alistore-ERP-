@@ -24,8 +24,11 @@ export interface LedgerEvent {
   refs: string[];
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
+async function get<T>(path: string, accessToken: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
   if (!res.ok) throw new Error(`${path} → ${res.status}`);
   return (await res.json()) as T;
 }
@@ -56,13 +59,13 @@ export interface Payroll {
   totalPayout: number;
 }
 
-export const fetchDashboard = () => get<Dashboard>('/reports/dashboard');
-export const fetchKpi = () => get<Kpi>('/reports/kpi');
+export const fetchDashboard = (accessToken: string) => get<Dashboard>('/reports/dashboard', accessToken);
+export const fetchKpi = (accessToken: string) => get<Kpi>('/reports/kpi', accessToken);
 /** Seller payroll — base + commission on turnover (Phase 9). */
-export const fetchPayroll = () => get<Payroll>('/reports/payroll');
+export const fetchPayroll = (accessToken: string) => get<Payroll>('/reports/payroll', accessToken);
 /** Daily revenue buckets for the last N days (dashboard period filter). */
-export const fetchRevenue = (days: number) =>
-  get<{ day: string; amount: number }[]>(`/reports/revenue?days=${days}`);
+export const fetchRevenue = (days: number, accessToken: string) =>
+  get<{ day: string; amount: number }[]>(`/reports/revenue?days=${days}`, accessToken);
 
 export interface RevenueTrend {
   current: number;
@@ -71,8 +74,8 @@ export interface RevenueTrend {
   direction: 'up' | 'down' | 'flat';
 }
 /** Period-over-period revenue trend: last N days vs the N days before. */
-export const fetchRevenueTrend = (days: number) =>
-  get<RevenueTrend>(`/reports/revenue-trend?days=${days}`);
+export const fetchRevenueTrend = (days: number, accessToken: string) =>
+  get<RevenueTrend>(`/reports/revenue-trend?days=${days}`, accessToken);
 
 export interface RevenueRange {
   from: string;
@@ -83,8 +86,8 @@ export interface RevenueRange {
   trend: RevenueTrend;
 }
 /** Revenue for an arbitrary [from, to] date range (YYYY-MM-DD, inclusive). */
-export const fetchRevenueRange = (from: string, to: string) =>
-  get<RevenueRange>(`/reports/revenue-range?from=${from}&to=${to}`);
+export const fetchRevenueRange = (from: string, to: string, accessToken: string) =>
+  get<RevenueRange>(`/reports/revenue-range?from=${from}&to=${to}`, accessToken);
 
 export interface Insight {
   tone: 'positive' | 'warning' | 'info';
@@ -92,9 +95,11 @@ export interface Insight {
   detail: string;
 }
 /** Owner AI assistant — ledger-derived insights (keyless rules; LLM when a key is set). */
-export const fetchInsights = () => get<{ source: string; insights: Insight[] }>('/ai/insights');
-export const fetchRisks = () => get<{ count: number; signals: RiskSignal[] }>('/reports/risks');
-export const fetchLedger = () => get<LedgerEvent[]>('/reports/ledger');
+export const fetchInsights = (accessToken: string) =>
+  get<{ source: string; insights: Insight[] }>('/ai/insights', accessToken);
+export const fetchRisks = (accessToken: string) =>
+  get<{ count: number; signals: RiskSignal[] }>('/reports/risks', accessToken);
+export const fetchLedger = (accessToken: string) => get<LedgerEvent[]>('/reports/ledger', accessToken);
 /** Ledger events referencing a specific id (e.g. an orderId) — powers order tracking. */
-export const fetchLedgerByRef = (ref: string) =>
-  get<LedgerEvent[]>(`/reports/ledger?ref=${encodeURIComponent(ref)}`);
+export const fetchLedgerByRef = (ref: string, accessToken: string) =>
+  get<LedgerEvent[]>(`/reports/ledger?ref=${encodeURIComponent(ref)}`, accessToken);

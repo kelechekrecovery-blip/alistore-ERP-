@@ -34,6 +34,9 @@
 - ✅ **A6. External integration readiness report** — `GET /health/integrations` показывает
   provider/account/hardware blockers, missing/configured env names and manual POS checks without
   returning secret values. ✅
+- ✅ **A7. P0 reports/AI hardening** — `/reports/*` and `/ai/*` now require active staff JWT
+  plus admin/owner read permission; ERP/AI web clients send shared staff-session tokens, and
+  customer order tracking uses scoped `GET /orders/:id/ledger`. ✅
 
 ## ПОЛОСА B — MAC MINI (гринфилд: новые модули/области, ноль пересечения с Codex)
 Пути (все НОВЫЕ): `apps/api/src/giftcards/`, `apps/web/app/admin/`, `apps/web/app/tg/`,

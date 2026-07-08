@@ -211,6 +211,9 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
 - ✅ ERP-дашборд `/erp`: деньги (продажи/возвраты/net, по способам), заказы/склад по
   статусам, ops (смены, на одобрении). `reports/` модуль, `GET /reports/dashboard`.
+- ✅ Owner reports hardening: `/reports/*` требует staff JWT + active staff + `reports.read`
+  (admin/owner); ERP отправляет shared staff-session token. Customer order status читает
+  scoped `GET /orders/:id/ledger`, а не owner ledger.
 - ✅ **Risk Center**: касса≠, COD не сдан >24ч, зависший резерв, ожидающие approval,
   SLA-брейчи (гарантия/RMA/тикет), просроченный долг — ранжировано по severity
   (`reports/risk-signals.ts`). `GET /reports/risks`.
@@ -331,6 +334,8 @@ reminders, and reservation expiry without an opted-out notice.
 Бесключевое ядро AI-мерчандайзинга — все фичи за единым **паттерном порта**: правила сейчас
 (работают офлайн, детерминированные, покрыты тестами), LLM/vision подключаются при `AI_PROVIDER_KEY`
 без переписывания, с откатом на правила при сбое провайдера; **ключей в клиенте нет**.
+- ✅ **AI endpoint hardening:** `/ai/*` требует staff JWT + active staff + `ai.read`
+  (admin/owner); ERP, `/assess`, `/ai-tools` и `/admin/products` отправляют shared staff token.
 - ✅ **AI-ассистент владельца** (`GET /ai/insights`): инсайты из Event Ledger + rule engines
   мерчандайзинга (маржа/лидер-товар/лучший продавец/возвраты/тревоги/дефицит/затоварка)
   через порт `InsightProvider` + `RuleInsightProvider`. Вкладка «🧠 Ассистент». 8 тестов.
@@ -378,9 +383,9 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 Остальное: e2e заказа через будущие каналы в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
-- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 7 smoke flows
+- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 8 smoke flows
   (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake,
-  admin product management, Telegram Mini App) and
+  admin product management, protected ERP reports/AI, Telegram Mini App) and
   `.github/workflows/ci.yml` with Postgres service, install, Prisma migrate, API build/test,
   web build, browser install and E2E artifacts on failure.
 - ✅ Self-hosted infra scaffolding + production runbook (Caddy, backups, restore drill,
@@ -439,7 +444,8 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 - Phase 10 ✅: **Support Inbox**, **Customer 360**, **Notification Preferences (consent)**, **CRM UI**,
   transactional outbox transports and customer templates, **Campaign Segment Builder + ROI**.
 - Cross-cutting security ✅: public write endpoint rate limits for OTP, checkout chain,
-  support tickets and payment webhooks.
+  support tickets and payment webhooks; owner `/reports/*` and `/ai/*` are staff-RBAC
+  protected with admin/owner read permissions.
 - Cross-cutting quality ✅: Playwright E2E smoke pack + GitHub Actions CI for core customer,
   POS approval, return/refund, exchange, trade-in, admin product-management, and Telegram Mini
   App paths.
@@ -455,13 +461,13 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · тест-сьютов 75 (242 теста зелёные, `jest`; при
+Backend-модулей ~30 · API тест-сьютов 87 (305 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось:**
 - **Unblocked polish:** открытых пунктов без внешних блокеров нет.
-- **Coordination blocker:** P0-2 guard на `/reports/*` и `/ai/*` ждёт web-token handoff в
-  `lib/reports.ts`/`lib/ai.ts`; до этого backend guard'ы не включать, чтобы не сломать ERP.
+- **P0 security:** закрыт. `/reports/*` и `/ai/*` требуют staff-RBAC; ERP/AI web-клиенты
+  отправляют shared staff token; customer order timeline имеет scoped order-ledger endpoint.
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),
   Phase 12 каналы (Telegram/WhatsApp-аккаунты), real social provider credentials,
   Phase 13 physical hardware certification. Текущий machine-readable статус: `GET /health/integrations`.

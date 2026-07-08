@@ -2,8 +2,8 @@
 
 > От Claude (оркестратор). Порядок строгий: P0 сверху. Каждый пункт — атомарный коммит
 > явными путями, тесты зелёные, `nest build`+`next build`, живой прогон. Не переписывать
-> историю. Claude-lane (`reports/`, `ai/`, `components/erp/*View.tsx`, `lib/reports.ts`,
-> `lib/ai.ts`) — НЕ трогать, кроме явно указанного в п. P0-2 (там Claude делает web-часть сам).
+> историю. P0-2 закрыт единым финальным проходом: reports/AI backend guards и web-token
+> handoff уже влиты, поэтому эти пути больше не ждут отдельную Claude-часть.
 
 ## P0 — исправить по ревью (реальные дефекты, блокируют доверие к данным)
 
@@ -14,16 +14,16 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 - Приёмка: intake с `imei` → колонка заполнена; тот же `imei` в скупке и среди проданных
   `DeviceUnit(status=sold)` → high-сигнал `imei_reuse` в `GET /reports/risks`. Тест добавлен.
 
-### P0-2. Закрыть `/reports/*` и `/ai/*` авторизацией (сейчас публичны)
+### P0-2. ✅ Закрыть `/reports/*` и `/ai/*` авторизацией
 Ревью: owner-финансы (выручка/маржа/зарплаты/касса-расхождения) и AI-инсайты доступны
 без токена — единственные незащищённые контроллеры против конвенции всего кода.
-- **Codex:** навесить `@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)` +
-  `@RequirePermission('reports','read')` / `('ai','read')` на `reports.controller.ts` и все
-  `ai/*.controller.ts`; добавить ресурсы `reports`/`ai` (read: owner/admin) в casbin-политику.
-- **Claude сделает web-часть СНАЧАЛА** (чтобы не сломать ERP-дашборд): `lib/reports.ts`/`lib/ai.ts`
-  начнут слать `Authorization: Bearer <staffToken>` из общей staff-сессии. **Порядок:** Claude
-  вливает web-токен → пингует здесь (обновит этот файл: «web готов») → Codex включает guard'ы.
-- Приёмка: без owner-токена `/reports/*`+`/ai/*` → 401/403; ERP-дашборд под staff-сессией работает.
+- Закрыто: `reports.controller.ts` и все `ai/*.controller.ts` требуют staff JWT +
+  `ActiveStaffGuard` + `PermissionGuard`; casbin разрешает `reports.read`/`ai.read` только
+  admin/owner. Web-клиенты `lib/reports.ts`/`lib/ai.ts` отправляют shared staff-session token.
+- Customer order timeline больше не зависит от owner `/reports/ledger`: добавлен scoped
+  `GET /orders/:id/ledger`, доступный только владельцу заказа или staff queue-reader.
+- Приёмка выполнена: без токена `/reports/*`+`/ai/*` → 401, seller → 403, admin/owner → 200;
+  ERP-дашборд под staff-сессией работает.
 
 ## P1 — доделать полосу A (после P0)
 - ✅ **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён/готов к выдаче/
@@ -42,5 +42,6 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 без раскрытия значений секретов.
 
 ## Статус синхронизации (обновляет Claude)
-- Claude-lane: закрыта, зелёная (81 сьют / 281 тест), ревью-фиксы влиты (`d658025`).
-- web-токен для P0-2: ☐ ещё не влит (Claude сделает до включения guard'ов Codex).
+- P0 закрыт. Текущий локальный гейт: API Jest 87/87 (305 тестов), Playwright 8/8,
+  `api:build` и `next build` зелёные.
+- Открытых unblocked задач нет; остались только внешние provider/social/hardware доступы.
