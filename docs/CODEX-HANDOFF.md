@@ -44,9 +44,11 @@ verifier, and `/login` Telegram Mini App session handoff.
 Проверка текущего статуса: `GET /health/integrations` возвращает `ready|blocked`, список
 missing/configured env-имён и ручные проверки. Значения секретов endpoint не отдаёт.
 
-13. **AI vision-грейдинг Б/У по фото / разведка рыночных цен / оффлайн-eval** — нужен AI-ключ.
-    Плуминг LLM готов (`ai/openrouter-provider.ts`, порт `InsightProvider`); vision/scout —
-    расширение того же паттерна. Активация: `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` (+`AI_MODEL`).
+13. **AI vision-грейдинг Б/У по фото / разведка рыночных цен / оффлайн-eval** — scaffold готов:
+    `POST /ai/grade-photos` и `POST /ai/price-scout` закрыты staff RBAC, без ключа отвечают
+    детерминированными правилами, а при `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` (+`AI_MODEL`)
+    пробуют OpenRouter и откатываются на правила при сбое. Production activation всё ещё требует
+    реальный provider key, reference photo/listing dataset и offline-eval пороги.
 14. **Каналы (Phase 12)** — Telegram Mini App / WhatsApp-магазин: campaign delivery code
     готов (`NOTIFICATION_TRANSPORT=channels` + Novu/SMTP/Telegram/WhatsApp env); для production
     нужны аккаунты/токены, webhook/callback QA и WhatsApp storefront activation.

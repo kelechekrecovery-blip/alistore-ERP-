@@ -13,10 +13,22 @@ import { ReorderService } from './reorder.service';
 import { ReorderController } from './reorder.controller';
 import { DescribeService } from './describe.service';
 import { DescribeController } from './describe.controller';
+import { GradingService } from './grading.service';
+import { GradingController } from './grading.controller';
+import { PriceScoutService } from './price-scout.service';
+import { PriceScoutController } from './price-scout.controller';
 
 @Module({
   imports: [ReportsModule, StaffAuthModule, AuthzModule],
-  providers: [InsightsService, ValuationService, PricingService, ReorderService, DescribeService],
+  providers: [
+    InsightsService,
+    ValuationService,
+    PricingService,
+    ReorderService,
+    DescribeService,
+    GradingService,
+    PriceScoutService,
+  ],
   controllers: [
     InsightsController,
     ValuationController,
@@ -24,6 +36,8 @@ import { DescribeController } from './describe.controller';
     PricingController,
     ReorderController,
     DescribeController,
+    GradingController,
+    PriceScoutController,
   ],
 })
 export class AiModule {}

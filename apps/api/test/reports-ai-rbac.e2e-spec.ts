@@ -100,6 +100,34 @@ describe('Reports and AI RBAC', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: 'iPhone 15 128GB' })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/ai/grade-photos')
+      .send({ photos: [{ label: 'front' }] })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/ai/grade-photos')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ photos: [{ label: 'front' }, { label: 'back' }, { label: 'screen-on' }] })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.source).toBe('rules');
+        expect(res.body.grade).toBe('A');
+      });
+
+    await request(app.getHttpServer())
+      .post('/ai/price-scout')
+      .send({ name: 'iPhone 15', basePrice: 109900 })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/ai/price-scout')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'iPhone 15', basePrice: 109900, observedListings: [{ price: 101000 }, { price: 103000 }] })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.source).toBe('rules');
+        expect(res.body.recommendedPrice).toBeGreaterThan(0);
+      });
   });
 
   it('keeps order timeline ledger scoped to the owning customer or staff queue readers', async () => {

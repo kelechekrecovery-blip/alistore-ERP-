@@ -364,11 +364,15 @@ reminders, and reservation expiry without an opted-out notice.
 - ✅ **UI-дом для обогащения товара** (`/admin/products`): staff-only product CRUD обычных полей,
   кнопки «Авто-категория» и «Сгенерировать описание» заполняют `category`/`attrs.description`,
   а цена и архивирование уходят через Approval Inbox.
-- ☐ **Требуют ключа/vision:** оценка Б/У по фото (vision-грейдинг), разведка рыночных цен,
-  оффлайн-eval на референс-датасете — плагины за тем же паттерном порта (см. `CODEX-HANDOFF.md`).
+- ✅ **AI vision/market-scout scaffold:** `POST /ai/grade-photos` и `POST /ai/price-scout`
+  работают как staff-only endpoints: без ключа дают детерминированные rule-ответы, при
+  `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` пробуют OpenRouter и безопасно откатываются на правила.
+  Production-качество vision/scout всё ещё требует реальный provider key, reference photo/listing
+  dataset и offline-eval пороги.
 **Проверка:** ✅ все 5 бесключевых фич работают end-to-end (браузер + curl на реальных данных);
 ✅ юнит-тесты rule-движков зелёные; AI-assistant service wiring проверяет, что pricing/reorder
-сигналы попадают в `/ai/insights`. Осталось только то, что требует внешнего ключа/провайдера.
+сигналы попадают в `/ai/insights`; targeted tests покрывают `grade-photos`, `price-scout`
+и `/ai/*` RBAC. Осталось только production activation с внешним ключом/датасетом.
 
 ## Phase 12 — Каналы и рост (v2) 🟡
 - ✅ Подарочные карты / стор-кредит: `GiftCard` + `PaymentMethod.gift_card`, выпуск через staff

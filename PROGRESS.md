@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add AI photo grading and market price scout scaffolding.
+- Files changed: `apps/api/src/ai/grading.*`, `apps/api/src/ai/price-scout.*`, `apps/api/src/ai/ai.module.ts`, `apps/api/test/ai-grading.spec.ts`, `apps/api/test/price-scout.spec.ts`, `apps/api/test/reports-ai-rbac.e2e-spec.ts`, `docs/PHASES.md`, `docs/CODEX-HANDOFF.md`, `docs/READINESS.md`, `docs/CODEX-BACKLOG-V2.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: added staff-only `POST /ai/grade-photos` and `POST /ai/price-scout`. Both endpoints work without keys via deterministic rules, try OpenRouter when `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` is configured, and fall back safely to rules on provider failure. RBAC coverage now includes the new `/ai/*` endpoints.
+- Checks run: `npm run mvp:verify`; `npm audit`; `git diff --check`.
+- Outcome: full MVP verification passed: Prisma validate/generate, API build, web build, mobile typecheck, API Jest 94 suites / 334 tests, Playwright 9/9, and external readiness report. `npm audit` reports 0 vulnerabilities. Strict production readiness still waits on real AI/provider/store/push credentials and physical POS hardware.
+- Next step: activate real AI provider with reference photo/listing datasets and offline eval thresholds when credentials/data are available; otherwise continue external production/store/hardware readiness.
+
+## 2026-07-08
+
 - Task: remediate dependency audit blockers after full release test.
 - Files changed: `apps/api/package.json`, `apps/api/src/catalog/catalog.dto.ts`, `apps/api/src/products/products.dto.ts`, `apps/web/next.config.mjs`, `apps/web/package.json`, `apps/web/tsconfig.json`, root `package.json`, `package-lock.json`, readiness/docs, `BACKLOG.md`, `PROGRESS.md`.
 - Result: upgraded the web stack from Next 14 to Next 16.2.10, upgraded NestJS runtime/testing/swagger/config packages to the 11.x/4.x compatible line, removed the vulnerable Nest CLI build chain from the API build path, switched API builds to deterministic `tsc`, added the required otplib presets, added audited transitive overrides for `postcss` and `uuid`, and allowed `127.0.0.1` as a Next 16 dev origin so Playwright hydration works.

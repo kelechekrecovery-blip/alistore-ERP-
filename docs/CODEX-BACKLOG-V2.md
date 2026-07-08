@@ -44,11 +44,12 @@
 9. **Telegram Mini App — оболочка.** UI витрины+checkout против существующего API можно
    построить уже сейчас; блокирует только токен бота. Собрать Mini App shell + webhook-заглушку.
    - Приёмка: Mini App проходит заказ в общий бэкенд (channel=telegram) в dev; активация = токен.
-10. **AI vision-грейдинг + разведка цен — стабы за портом.** По образцу `ai/openrouter-provider.ts`:
+10. ✅ **AI vision-грейдинг + разведка цен — стабы за портом.** По образцу `ai/openrouter-provider.ts`:
     интерфейс `GradingProvider` (вход — фото, выход — grade/дефекты) + `PriceScoutProvider`,
     keyless-заглушки + OpenRouter/vision-путь под `AI_PROVIDER_KEY`.
-    - Приёмка: keyless-заглушка отвечает детерминированно; при ключе идёт реальный вызов,
-      при ошибке — откат (как у insights). Эндпоинт загрузки фото готов.
+    - Готово: `POST /ai/grade-photos` и `POST /ai/price-scout` отвечают детерминированно без
+      ключа, пробуют OpenRouter при `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY`, при ошибке откатываются
+      на rules, и покрыты targeted tests + `/ai/*` RBAC.
 
 ## Координация
 - Схему править **аддитивно** (nullable-колонки), миграции — по одной, коммитить сразу.
