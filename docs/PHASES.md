@@ -357,10 +357,18 @@ reminders, and reservation expiry without an opted-out notice.
 ✅ юнит-тесты rule-движков зелёные; AI-assistant service wiring проверяет, что pricing/reorder
 сигналы попадают в `/ai/insights`. Осталось только то, что требует внешнего ключа/провайдера.
 
-## Phase 12 — Каналы и рост (v2) ☐
+## Phase 12 — Каналы и рост (v2) 🟡
+- ✅ Подарочные карты / стор-кредит: `GiftCard` + `PaymentMethod.gift_card`, выпуск через staff
+  endpoint, проверка баланса, атомарное списание в checkout/POS, idempotent retry по
+  `giftcard:<code>:<orderId>`, ledger `giftcard.issued` / `giftcard.redeemed`. Checkout
+  показывает поле подарочной карты, списывает баланс как отдельный tender и создает sandbox
+  intent только на остаток.
 - ☐ Telegram Mini App / WhatsApp-магазин; франшиза + аудит партнёрских точек;
-  омниканальность (click&collect), подарочные карты, страховка, B2B/опт, рекламный кабинет.
-**Проверка:** e2e заказа через каждый канал в общий бэкенд; аудит франшизы читает из ledger.
+  омниканальность (click&collect), страховка, B2B/опт, рекламный кабинет.
+**Проверка:** ✅ gift-card e2e: выпуск → split tender gift_card+cash, web-flow gift-card→online
+остаток, retry без двойного списания, over-balance rejection; browser/CDP smoke checkout:
+gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `giftcard.redeemed`.
+Остальное: e2e заказа через каждый канал в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
 - ✅ Self-hosted infra scaffolding + production runbook (Caddy, backups, restore drill,

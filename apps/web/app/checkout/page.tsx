@@ -11,7 +11,10 @@ import {
   createCustomer,
   createOrder,
   createPaymentIntent,
+  fetchGiftCard,
+  payOrder,
   type CreatedOrder,
+  type GiftCardView,
   type PaymentIntent,
 } from '@/lib/api';
 import { loadAddresses, mainAddress, type SavedAddress } from '@/lib/account-local';
@@ -43,6 +46,10 @@ export default function CheckoutPage() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState<SavedAddress | null>(null);
   const [busy, setBusy] = useState(false);
+  const [giftBusy, setGiftBusy] = useState(false);
+  const [giftCode, setGiftCode] = useState('');
+  const [giftCard, setGiftCard] = useState<GiftCardView | null>(null);
+  const [giftError, setGiftError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<DoneState | null>(null);
 
@@ -51,24 +58,62 @@ export default function CheckoutPage() {
   const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
   const deliveryFee = DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
   const payable = total + deliveryFee;
+  const giftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, payable) : 0;
+  const dueAfterGift = Math.max(payable - giftAmount, 0);
+
+  async function applyGiftCard() {
+    const code = giftCode.trim();
+    if (!code) return;
+    setGiftBusy(true); setGiftError(null);
+    try {
+      const card = await fetchGiftCard(code);
+      if (!card.redeemable || card.balance <= 0) {
+        setGiftCard(null);
+        setGiftError('Карта недоступна.');
+        return;
+      }
+      setGiftCard(card);
+      setGiftCode(card.code);
+    } catch {
+      setGiftCard(null);
+      setGiftError('Карта не найдена.');
+    } finally {
+      setGiftBusy(false);
+    }
+  }
 
   async function place() {
     setBusy(true); setError(null);
     try {
       const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
       const order = await createOrder({ customerId: customer.id, channel: 'web', total: payable, items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })) });
+      let currentOrder: CreatedOrder = order;
+      if (giftCard && giftAmount > 0) {
+        const paid = await payOrder({
+          orderId: order.id,
+          method: 'gift_card',
+          amount: giftAmount,
+          giftCardCode: giftCard.code,
+        });
+        currentOrder = { ...order, status: paid.order?.status ?? order.status };
+      }
+      if (dueAfterGift === 0) {
+        setDone({ order: currentOrder, paid: true });
+        clear();
+        return;
+      }
       if (payment === 'cash') {
-        setDone({ order });
+        setDone({ order: currentOrder });
         clear();
         return;
       }
       const intent = await createPaymentIntent({
         orderId: order.id,
         method: payment,
-        amount: payable,
+        amount: dueAfterGift,
         actor: 'web_checkout',
       });
-      setDone({ order: { ...order, status: intent.orderStatus }, intent });
+      setDone({ order: { ...currentOrder, status: intent.orderStatus }, intent });
     } catch { setError('Не удалось оформить заказ.'); } finally { setBusy(false); }
   }
 
@@ -175,6 +220,15 @@ export default function CheckoutPage() {
                 <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-[#3A342E]'}`} style={{ height: 18, width: 18 }} />
               </button>
             ))}
+            <div className="mt-3 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <div className="mb-2 text-sm font-semibold">Подарочная карта</div>
+              <div className="flex gap-2">
+                <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="min-w-0 flex-1 rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
+                <button type="button" disabled={giftBusy} onClick={applyGiftCard} className="rounded-[10px] bg-lime px-3 text-sm font-bold text-lime-ink disabled:opacity-60">{giftBusy ? '...' : 'OK'}</button>
+              </div>
+              {giftCard && <div className="mt-2 text-[12px] text-lime">Баланс {som(giftCard.balance)} · спишем {som(giftAmount)}</div>}
+              {giftError && <div className="mt-2 text-[12px] text-[#FF8A7A]">{giftError}</div>}
+            </div>
             <button type="button" onClick={() => setStep(3)} className="mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">К подтверждению</button>
           </>
         )}
@@ -192,7 +246,8 @@ export default function CheckoutPage() {
               {promoDiscount > 0 && <Row k={`Промокод ${promoCode ?? ''}`} v={`−${som(promoDiscount)}`} />}
               {bonusDiscount > 0 && <Row k="Бонусы" v={`−${som(bonusDiscount)}`} />}
               <Row k="Доставка" v={deliveryFee ? som(deliveryFee) : 'бесплатно'} />
-              <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(payable)}</span></div>
+              {giftAmount > 0 && <Row k={`Подарочная ${giftCard?.code ?? ''}`} v={`−${som(giftAmount)}`} />}
+              <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span></div>
             </div>
             {error && <p className="mt-3 text-sm text-[#FF8A7A]">{error}</p>}
             <button type="button" disabled={busy} onClick={place} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>

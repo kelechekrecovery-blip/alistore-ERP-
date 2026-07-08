@@ -25,6 +25,13 @@ export class PayDto {
     example: 'clx_shift_001',
   })
   @IsOptional() @IsString() shiftId?: string;
+
+  /** Required when method=gift_card; code is normalized server-side. */
+  @ApiPropertyOptional({
+    description: 'Gift-card/store-credit code required for method=gift_card.',
+    example: 'GC-ALISTORE-2026',
+  })
+  @IsOptional() @IsString() giftCardCode?: string;
 }
 
 export class RefundDto {

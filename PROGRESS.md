@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add gift cards / store credit to checkout and payments.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708090000_add_gift_cards/migration.sql`, `apps/api/src/giftcards/*`, payment service/DTO/module/intents, authz/app module, checkout gift-card UI/API clients, gift-card/payment/cleanup tests, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: new `GiftCard` store-credit balance supports staff issue, public balance check, atomic checkout/POS redemption as `PaymentMethod.gift_card`, generated idempotency txn per card+order, partial online-payment due, and checkout applies a gift card before creating a sandbox intent for the remaining amount.
+- Checks run: `npm run prisma:generate -w @alistore/api`; `npm run db:deploy -w @alistore/api`; test DB `prisma db push --skip-generate`; `npm run test -w @alistore/api -- giftcards payment-intents --runInBand`; `npm run test -w @alistore/api -- fulfillment giftcards --runInBand`; `npm run test -w @alistore/api -- product-reviews --runInBand`; `npm run api:build`; `npm run build -w @alistore/web`; `npm run api:test`; live API+Next+Chrome/CDP checkout smoke on ports 4105/3105.
+- Outcome: targeted Jest passed; API build passed; web build passed; full API Jest passed 84 suites / 298 tests; browser smoke completed gift card 25 000 + card 75 000 checkout and DB showed order paid, card redeemed, and `giftcard.redeemed` ledger event. Also fixed stale `InventoryMovement` cleanup in fulfillment/product-review tests.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands; next unblocked P2 items are E2E+CI, Admin Product Management UI, or Telegram Mini App shell.
+
+## 2026-07-08
+
 - Task: add consent-filtered transactional notification templates.
 - Files changed: `apps/api/src/outbox/customer-notifications.ts`, orders/warranty/debts/reservations services and modules, `apps/api/test/transactional-notifications.e2e-spec.ts`, debt/reservation notification tests, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: orders now enqueue `order_confirmed` and `order_ready`, warranty cases enqueue `warranty_created` and `warranty_closed`, reservation expiry and debt reminders reuse a shared consent-aware customer notification helper, and opted-out customers are skipped without blocking the underlying business transaction.

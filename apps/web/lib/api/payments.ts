@@ -1,6 +1,7 @@
 import { postAuthJson, postJson } from './http';
 
 export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
+export type PaymentMethod = OnlinePaymentMethod | 'cash' | 'gift_card';
 
 export interface PaymentIntent {
   intentId: string;
@@ -39,6 +40,16 @@ export function confirmSandboxPayment(input: {
   txnId: string;
 }): Promise<PaymentConfirmResult> {
   return postJson('/payments/webhooks/sandbox', { ...input, status: 'succeeded', actor: 'sandbox' });
+}
+
+export function payOrder(input: {
+  orderId: string;
+  method: PaymentMethod;
+  amount: number;
+  txnId?: string;
+  giftCardCode?: string;
+}): Promise<PaymentConfirmResult> {
+  return postJson('/payments', input);
 }
 
 export function requestPaymentRefund(

@@ -16,7 +16,8 @@ consent-filtered Campaign Segment Builder + Campaign ROI,
 Excel import idempotency, OTP access recovery with refresh-session revocation,
 receipt split tenders, order invoice/waybill PDF, infra runbook for Caddy/backups/restore,
 trade-in IMEI intake + `imei_reuse` risk activation, realtime/socket.io, Sentry/GlitchTip hook,
-i18n, health-checks, public endpoint rate limits, print/PDF polish for receipts/labels/contracts.
+i18n, health-checks, public endpoint rate limits, print/PDF polish for receipts/labels/contracts,
+gift cards/store credit with checkout redemption.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 

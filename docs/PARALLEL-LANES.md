@@ -40,10 +40,10 @@
   возврат→refund, обмен, скупка Б/У) + `.github/workflows/ci.yml` (install→lint→typecheck→
   `api:test`→`next build`).
   - Приёмка: `playwright test` зелёный локально; CI краснеет на сломанном PR; артефакты на падении.
-- **B2. Gift cards / стор-кредит** — НОВЫЙ модуль `apps/api/src/giftcards/` + новая таблица
+- ✅ **B2. Gift cards / стор-кредит** — НОВЫЙ модуль `apps/api/src/giftcards/` + новая таблица
   `GiftCard` (аддитивно): выпуск, баланс, списание в checkout/POS, ledger-события
   (`giftcard.issued` / `giftcard.redeemed`). Веб: поле «промо/подарочная карта» в checkout.
-  - Приёмка: выпуск → оплата ею уменьшает баланс; двойное списание невозможно; событие в ledger.
+  - Приёмка: выпуск → оплата ею уменьшает баланс; двойное списание невозможно; событие в ledger. ✅
 - **B3. Admin Product Management UI** — НОВЫЕ страницы `apps/web/app/admin/products/`
   (список/создать/править/архивировать). Опасные правки (цена/архив) — через СУЩЕСТВУЮЩИЕ
   approval-эндпоинты (executors уже есть), новых серверных правок товара НЕ добавлять.

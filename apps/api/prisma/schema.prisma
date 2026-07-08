@@ -59,6 +59,7 @@ enum PaymentMethod {
   bakai_pos
   obank
   installment
+  gift_card
 }
 
 enum PaymentStatus {
@@ -135,6 +136,13 @@ enum DebtStatus {
   open
   settled
   written_off
+}
+
+enum GiftCardStatus {
+  active
+  redeemed
+  cancelled
+  expired
 }
 
 // ---------- CORE ----------
@@ -243,6 +251,24 @@ model Payment {
 
   @@index([orderId])
   @@index([shiftId])
+}
+
+model GiftCard {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  initialBalance Int
+  balance        Int
+  currency       String         @default("KGS")
+  status         GiftCardStatus @default(active)
+  customerId     String?
+  issuedBy       String
+  note           String?
+  expiresAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([customerId])
+  @@index([status])
 }
 
 model CashShift {

@@ -40,11 +40,16 @@ export class PaymentIntentsService {
     if (!order) {
       throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
     }
-    if (order.total !== dto.amount) {
-      throw new ValidationError('payment_amount_mismatch', `К оплате ${order.total}, передано ${dto.amount}`);
-    }
     if (order.status === 'paid') {
       throw new ConflictError('order_already_paid', `Заказ ${order.id} уже оплачен`);
+    }
+    const received = await this.prisma.payment.aggregate({
+      where: { orderId: order.id, amount: { gt: 0 } },
+      _sum: { amount: true },
+    });
+    const due = order.total - (received._sum.amount ?? 0);
+    if (due !== dto.amount) {
+      throw new ValidationError('payment_amount_mismatch', `К оплате ${due}, передано ${dto.amount}`);
     }
 
     let status: OrderStatus = order.status;

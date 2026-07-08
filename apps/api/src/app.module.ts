@@ -38,6 +38,7 @@ import { TradeInsModule } from './tradeins/tradeins.module';
 import { AiModule } from './ai/ai.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { GiftcardsModule } from './giftcards/giftcards.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
     EvidenceModule,
     AiModule,
     CampaignsModule,
+    GiftcardsModule,
   ],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { type Payment } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
@@ -6,7 +6,9 @@ import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
 import { ConflictError, ValidationError } from '../common/errors';
 import { assertTransition } from '../orders/order-state-machine';
+import { OrdersService } from '../orders/orders.service';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
 import { PayDto } from './payments.dto';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
@@ -16,6 +18,7 @@ interface PaymentTender {
   method: PayDto['method'];
   amount: number;
   txnId?: string;
+  giftCardCode?: string;
 }
 
 @Injectable()
@@ -25,6 +28,8 @@ export class PaymentsService {
     private readonly audit: AuditService,
     private readonly units: UnitsService,
     private readonly approvals: ApprovalsService,
+    @Optional() private readonly giftcards?: GiftcardsService,
+    @Optional() private readonly orders?: OrdersService,
   ) {}
 
   /**
@@ -80,7 +85,14 @@ export class PaymentsService {
       {
         orderId: dto.orderId,
         shiftId: dto.shiftId,
-        payments: [{ method: dto.method, amount: dto.amount, txnId: dto.txnId }],
+        payments: [
+          {
+            method: dto.method,
+            amount: dto.amount,
+            txnId: dto.txnId,
+            giftCardCode: dto.giftCardCode,
+          },
+        ],
       },
       actor,
     );
@@ -96,14 +108,19 @@ export class PaymentsService {
     dto: { orderId: string; shiftId?: string; payments: PaymentTender[] },
     actor: string,
   ) {
-    if (dto.payments.length === 0) {
+    const tenders = dto.payments.map((payment) => this.normalizeTender(payment, dto.orderId));
+    if (tenders.length === 0) {
       throw new ValidationError('payment_required', 'Нужен хотя бы один платёж');
     }
-    const invalid = dto.payments.find((payment) => payment.amount <= 0);
+    const invalid = tenders.find((payment) => payment.amount <= 0);
     if (invalid) {
       throw new ValidationError('invalid_payment_amount', 'Сумма платежа должна быть больше 0');
     }
-    const txnIds = dto.payments.map((payment) => payment.txnId).filter((id): id is string => Boolean(id));
+    const missingGiftCard = tenders.find((payment) => payment.method === 'gift_card' && !payment.giftCardCode);
+    if (missingGiftCard) {
+      throw new ValidationError('giftcard_code_required', 'Для оплаты подарочной картой нужен код');
+    }
+    const txnIds = tenders.map((payment) => payment.txnId).filter((id): id is string => Boolean(id));
     if (new Set(txnIds).size !== txnIds.length) {
       throw new ValidationError('duplicate_payment_txn', 'txnId платежей не должны повторяться');
     }
@@ -122,6 +139,13 @@ export class PaymentsService {
           }),
         ]);
         return { order, payment: existing, payments, idempotent: true };
+      }
+    }
+
+    if (tenders.some((payment) => payment.method === 'gift_card') && this.orders) {
+      const order = await this.prisma.order.findUnique({ where: { id: dto.orderId } });
+      if (order?.status === 'created' || order?.status === 'confirmed') {
+        await this.orders.fulfill(order.id, actor);
       }
     }
 
@@ -147,10 +171,23 @@ export class PaymentsService {
         _sum: { amount: true },
       });
       const alreadyReceived = received._sum.amount ?? 0;
-      const batchTotal = dto.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const batchTotal = tenders.reduce((sum, payment) => sum + payment.amount, 0);
       const events: AuditInput[] = [];
       const payments: Payment[] = [];
-      for (const tender of dto.payments) {
+      for (const tender of tenders) {
+        if (tender.method === 'gift_card') {
+          if (!this.giftcards || !tender.giftCardCode) {
+            throw new ValidationError('giftcard_unavailable', 'Gift-card сервис недоступен');
+          }
+          await this.giftcards.redeemOnTx(
+            tx,
+            tender.giftCardCode,
+            order.id,
+            tender.amount,
+            actor,
+            events,
+          );
+        }
         const payment = await tx.payment.create({
           data: {
             orderId: order.id,
@@ -205,5 +242,13 @@ export class PaymentsService {
 
       return { result: { order: paid, payment: payments[0], payments, idempotent: false }, events };
     });
+  }
+
+  private normalizeTender(payment: PaymentTender, orderId: string): PaymentTender {
+    if (payment.method !== 'gift_card' || !payment.giftCardCode || payment.txnId) {
+      return payment;
+    }
+    const code = normalizeCode(payment.giftCardCode);
+    return { ...payment, giftCardCode: code, txnId: `giftcard:${code}:${orderId}` };
   }
 }

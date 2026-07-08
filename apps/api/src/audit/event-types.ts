@@ -68,6 +68,8 @@ export const EventType = {
   DebtPaid: 'debt.payment',
   DebtSettled: 'debt.settled',
   DebtReminderQueued: 'debt.reminder_queued',
+  GiftCardIssued: 'giftcard.issued',
+  GiftCardRedeemed: 'giftcard.redeemed',
   TradeInAssessed: 'tradein.assessed',
   TradeInContracted: 'tradein.contracted',
   EvidenceAttached: 'evidence.attached',

@@ -114,6 +114,10 @@ p, cashier, payments, refund
 p, senior_seller, payments, refund
 p, admin, payments, refund
 p, owner, payments, refund
+p, cashier, giftcards, issue
+p, senior_seller, giftcards, issue
+p, admin, giftcards, issue
+p, owner, giftcards, issue
 p, warehouse, warranty, read
 p, admin, warranty, read
 p, owner, warranty, read
