@@ -11,6 +11,7 @@ out/
 .env.*.local
 apps/api/.env.production
 apps/web/.env.production
+apps/mobile/.env.production
 apps/mobile/.expo/
 apps/mobile/.expo-shared/
 apps/mobile/AuthKey_*.p8

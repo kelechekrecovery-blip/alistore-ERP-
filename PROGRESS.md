@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add native production release credential gate.
+- Files changed: `.gitignore`, `apps/mobile/.env.production.example`, `apps/mobile/eas.json`, `apps/mobile/package.json`, `apps/mobile/scripts/store-preflight.mjs`, `apps/mobile/store/release-runbook.md`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: mobile release now has an ignored production env template, a release runbook, a strict `store:preflight:production` gate that loads local release env values, validates Apple/App Store Connect and Google Play credential paths or base64 secrets, and verifies the Android submit profile points at the expected service account JSON.
+- Checks run: `npm run mobile:store-preflight`; `npm --prefix apps/mobile run store:preflight:production` (expected failure without real ignored `apps/mobile/.env.production` and store credentials); dummy strict env-file store preflight with temporary Apple/Google credential files; `npm run mobile:typecheck`; EAS workflow schema validator; `git diff --check`.
+- Outcome: normal store preflight passed with 0 failures and 1 production API warning; dummy strict production preflight passed with 0 failures and 0 warnings; typecheck, workflow validation, and whitespace check passed. Real production preflight correctly fails until `apps/mobile/.env.production` and Apple/Google/EAS credentials are filled.
+- Next step: fill real mobile production secrets, run `npm --prefix apps/mobile run store:preflight:production`, then build and submit TestFlight/Play Internal releases on account-bound credentials.
+
+## 2026-07-08
+
 - Task: package the native mobile app for App Store and Google Play readiness.
 - Files changed: `apps/mobile/*`, `apps/mobile/.eas/workflows/release.yml`, `apps/mobile/store/*`, `apps/mobile/package-lock.json`, `.gitignore`, `package.json`, `package-lock.json`, `scripts/mvp-verify.mjs`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: native mobile is now isolated from the root web/API workspace with its own lockfile, Metro resolution, store assets, splash/icon config, EAS production build/submit profiles, validated EAS workflow, App Store metadata, Google Play listing draft, privacy/review checklist, and automated store preflight.

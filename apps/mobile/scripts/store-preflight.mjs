@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(import.meta.url), '../..');
-const strict = process.argv.includes('--strict');
+const args = process.argv.slice(2);
+const strict = args.includes('--strict');
+const deprecatedEnvFile = readArg('--env-file');
+const envFile = readArg('--store-env-file') ?? deprecatedEnvFile;
 const results = [];
+const loadedEnvFile = envFile ? loadEnvFile(envFile) : null;
 
 const packageJson = readJson('package.json');
 const packageLock = readJson('package-lock.json');
@@ -15,6 +19,12 @@ const storeConfig = readJson('store.config.json');
 const metroConfig = readText('metro.config.js');
 
 check(Boolean(packageJson), 'package.json parses');
+if (deprecatedEnvFile) {
+  warn(false, 'Use --store-env-file instead of --env-file for mobile release preflight');
+}
+if (envFile) {
+  check(Boolean(loadedEnvFile?.exists), `${strict ? 'strict: ' : ''}env file ${envFile} exists`);
+}
 check(Boolean(packageLock?.packages?.['']?.dependencies?.expo), 'package-lock.json is scoped to mobile app');
 check(Boolean(appJson?.expo), 'app.json expo config parses');
 check(Boolean(easJson?.build?.production), 'eas.json production build profile exists');
@@ -42,7 +52,7 @@ if (appJson?.expo) {
 }
 
 if (packageJson?.scripts) {
-  for (const script of ['store:assets', 'store:preflight', 'eas:build:ios', 'eas:build:android', 'eas:submit:ios', 'eas:submit:android']) {
+  for (const script of ['store:assets', 'store:preflight', 'store:preflight:production', 'eas:build:ios', 'eas:build:android', 'eas:submit:ios', 'eas:submit:android']) {
     check(Boolean(packageJson.scripts[script]), `package script ${script} exists`);
   }
 }
@@ -69,6 +79,7 @@ if (easJson?.build?.production) {
   check(prod.android?.buildType === 'app-bundle', 'Android production buildType is app-bundle');
   check(Boolean(prod.ios?.resourceClass), 'iOS production resourceClass is configured');
   check(easJson.submit?.production?.android?.track === 'internal', 'Google Play starts on internal track');
+  check(easJson.submit?.production?.android?.serviceAccountKeyPath === './google-service-account.json', 'Google Play submit service account path is configured');
 }
 
 if (storeConfig?.apple?.info) {
@@ -87,18 +98,36 @@ for (const path of [
   '.eas/workflows/release.yml',
   'store/google-play-listing.md',
   'store/privacy-data.md',
+  'store/release-runbook.md',
   'store/review-checklist.md',
+  '.env.production.example',
 ]) {
   check(existsSync(join(root, path)), `${path} exists`);
 }
 
 const apiBase = process.env.EXPO_PUBLIC_API_BASE;
 const apiReady = Boolean(apiBase && /^https:\/\//.test(apiBase) && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(apiBase));
+const ascKeyFileReady = process.env.EXPO_ASC_API_KEY_PATH
+  ? existsSync(resolveLocalPath(process.env.EXPO_ASC_API_KEY_PATH))
+  : false;
+const appleReady = Boolean(
+  process.env.EXPO_APPLE_TEAM_ID ||
+    (process.env.EXPO_ASC_API_KEY_ID &&
+      process.env.EXPO_ASC_API_KEY_ISSUER_ID &&
+      (ascKeyFileReady || process.env.EXPO_ASC_API_KEY_P8_BASE64))
+);
+const googleServiceAccountFileReady = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH
+  ? existsSync(resolveLocalPath(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH))
+  : existsSync(join(root, 'google-service-account.json'));
+const googleReady = Boolean(
+  process.env.EXPO_ANDROID_SERVICE_ACCOUNT_KEY_BASE64 ||
+    googleServiceAccountFileReady
+);
 if (strict) {
   check(apiReady, 'strict: EXPO_PUBLIC_API_BASE is a production HTTPS API URL');
   check(Boolean(process.env.EXPO_TOKEN), 'strict: EXPO_TOKEN is configured for EAS automation');
-  check(Boolean(process.env.EXPO_APPLE_TEAM_ID || process.env.EXPO_ASC_API_KEY_ID), 'strict: Apple team/API credentials are configured');
-  check(Boolean(process.env.EXPO_ANDROID_SERVICE_ACCOUNT_KEY_BASE64 || existsSync(join(root, 'google-service-account.json'))), 'strict: Google Play service account is configured');
+  check(appleReady, 'strict: Apple team/API credentials are configured');
+  check(googleReady, 'strict: Google Play service account is configured');
 } else {
   warn(apiReady, 'EXPO_PUBLIC_API_BASE is not a production HTTPS URL; strict store preflight will require it');
 }
@@ -111,6 +140,13 @@ for (const result of results) {
 }
 console.log(`Store preflight: ${failed.length ? 'failed' : 'passed'} (${failed.length} failed, ${warnings.length} warnings)`);
 if (failed.length) process.exit(1);
+
+function readArg(name) {
+  const index = args.indexOf(name);
+  if (index === -1) return null;
+  const value = args[index + 1];
+  return value && !value.startsWith('--') ? value : null;
+}
 
 function readJson(path) {
   try {
@@ -126,6 +162,35 @@ function readText(path) {
   } catch {
     return '';
   }
+}
+
+function loadEnvFile(path) {
+  const fullPath = resolveLocalPath(path);
+  if (!existsSync(fullPath)) return { exists: false };
+  for (const line of readFileSync(fullPath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match) continue;
+    const [, key, rawValue] = match;
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = unquote(rawValue.trim());
+  }
+  return { exists: true };
+}
+
+function resolveLocalPath(path) {
+  return isAbsolute(path) ? path : join(root, path);
+}
+
+function unquote(value) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
 }
 
 function checkAsset(path, expectedWidth, expectedHeight, message) {

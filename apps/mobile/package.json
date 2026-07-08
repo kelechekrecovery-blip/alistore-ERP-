@@ -14,6 +14,7 @@
     "store:assets": "node scripts/generate-store-assets.mjs",
     "store:preflight": "node scripts/store-preflight.mjs",
     "store:preflight:strict": "node scripts/store-preflight.mjs --strict",
+    "store:preflight:production": "node scripts/store-preflight.mjs --strict --store-env-file .env.production",
     "eas:build": "npx eas-cli@20.5.1 build --profile production",
     "eas:build:ios": "npx eas-cli@20.5.1 build -p ios --profile production",
     "eas:build:android": "npx eas-cli@20.5.1 build -p android --profile production",
