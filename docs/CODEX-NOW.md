@@ -38,6 +38,8 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 ## P2 — полоса B, если mac mini недоступна (иначе оставить mac mini)
 См. `PARALLEL-LANES.md` полоса B: ✅ E2E+CI, ✅ gift cards (новый модуль), ✅ Admin Product UI
 (дом для `/ai/categorize`+`/ai/describe`), ✅ Telegram Mini App shell. Greenfield-полоса B закрыта.
+Внешние/provider/hardware блокеры теперь диагностируются через `GET /health/integrations`
+без раскрытия значений секретов.
 
 ## Статус синхронизации (обновляет Claude)
 - Claude-lane: закрыта, зелёная (81 сьют / 281 тест), ревью-фиксы влиты (`d658025`).

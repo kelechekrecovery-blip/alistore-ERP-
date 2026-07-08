@@ -31,6 +31,9 @@
 - **A4. PDF/печать полировка** — receipts/labels/documents: корректные поля + локаль (ru-KG).
   - Приёмка: чек (в т.ч. split-tenders), накладная, договор скупки печатаются верно.
 - **A5. Infra runbook** — Caddy + бэкапы + запуск self-hosted + restore-check (документ + скрипты).
+- ✅ **A6. External integration readiness report** — `GET /health/integrations` показывает
+  provider/account/hardware blockers, missing/configured env names and manual POS checks without
+  returning secret values. ✅
 
 ## ПОЛОСА B — MAC MINI (гринфилд: новые модули/области, ноль пересечения с Codex)
 Пути (все НОВЫЕ): `apps/api/src/giftcards/`, `apps/web/app/admin/`, `apps/web/app/tg/`,

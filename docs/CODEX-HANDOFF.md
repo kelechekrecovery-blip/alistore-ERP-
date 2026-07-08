@@ -20,7 +20,9 @@ i18n, health-checks, public endpoint rate limits, print/PDF polish for receipts/
 gift cards/store credit with checkout redemption, Playwright E2E smoke pack + CI workflow,
 Admin Product Management UI (`/admin/products`) with staff-only product CRUD, keyless AI
 category/description enrichment, approval-gated price/archive actions, and Telegram Mini App
-shell (`/tg`) with shared catalog/checkout API and `channel=telegram` order flow.
+shell (`/tg`) with shared catalog/checkout API and `channel=telegram` order flow,
+plus `GET /health/integrations` external-readiness report for provider keys/manual hardware
+gates without exposing secret values.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 
@@ -34,6 +36,9 @@ shell (`/tg`) with shared catalog/checkout API and `channel=telegram` order flow
     статусов. Приёмка: открыть спор → машина статусов → решение пишет ledger.
 
 ## C. Внешние блокеры — ждут ключ/аккаунт/железо (действие пользователя)
+
+Проверка текущего статуса: `GET /health/integrations` возвращает `ready|blocked`, список
+missing/configured env-имён и ручные проверки. Значения секретов endpoint не отдаёт.
 
 13. **AI vision-грейдинг Б/У по фото / разведка рыночных цен / оффлайн-eval** — нужен AI-ключ.
     Плуминг LLM готов (`ai/openrouter-provider.ts`, порт `InsightProvider`); vision/scout —

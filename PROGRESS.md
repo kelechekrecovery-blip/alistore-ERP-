@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add external integration readiness health report.
+- Files changed: `apps/api/src/health/external-readiness.ts`, `apps/api/src/health/health.controller.ts`, `apps/api/src/health/health.module.ts`, `apps/api/test/external-readiness.spec.ts`, `apps/api/test/health.e2e-spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `docs/READINESS.md`, `PROGRESS.md`.
+- Result: added `GET /health/integrations` with a secret-safe provider/account/hardware readiness report: AI, Telegram bot/login, WhatsApp, Apple login, campaign delivery, physical POS certification, S3 media storage, and observability checks. `requiredAny` alternatives no longer show false missing envs when one valid option is configured.
+- Checks run: `npm run test -w @alistore/api -- external-readiness health --runInBand`; `npm run api:build`; `npm run api:test`; `git diff --check`.
+- Outcome: targeted health/readiness tests passed 2 suites / 5 tests; API build passed; full API Jest passed 86 suites / 303 tests; whitespace check passed.
+- Next step: remaining unblocked product backlog is empty; P0-2 reports/AI guard remains blocked until web-token handoff lands; provider/social/hardware tasks wait for external accounts/devices.
+
+## 2026-07-08
+
 - Task: add Telegram Mini App shell route.
 - Files changed: `apps/web/app/tg/page.tsx`, `apps/web/app/tg/webhook/route.ts`, `e2e/tg-mini-app.spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PARALLEL-LANES.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: added `/tg` as a Telegram-style mobile storefront and checkout over the shared catalog/customer/order/payment APIs, with optional Telegram WebApp expand/prefill support, `channel=telegram` order creation, MBank QR sandbox intent option, and `/tg/webhook` stub for future bot activation.

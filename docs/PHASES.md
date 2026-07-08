@@ -388,6 +388,9 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 - ✅ Public write endpoint rate limits: OTP, checkout chain (`/customers`, `/orders`,
   `/payments/intents`), support ticket creation and sandbox/provider payment webhooks
   return 429 after per-route caps.
+- ✅ External integration readiness report: `GET /health/integrations` shows blocking
+  provider/account/hardware gates, configured/missing env names, manual POS certification
+  checks, and never returns secret values.
 - ✅ **Offline POS software layer**: local queue, sync/retry, duplicate-safe `clientSaleId`,
   manual conflict state, approval-required state, network degradation fallback.
 - ✅ Hardware browser fallback: scanner as keyboard-wedge/SKU input, receipt print dialog,
@@ -461,4 +464,4 @@ Backend-модулей ~30 · тест-сьютов 75 (242 теста зелё�
   `lib/reports.ts`/`lib/ai.ts`; до этого backend guard'ы не включать, чтобы не сломать ERP.
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),
   Phase 12 каналы (Telegram/WhatsApp-аккаунты), real social provider credentials,
-  Phase 13 physical hardware certification.
+  Phase 13 physical hardware certification. Текущий machine-readable статус: `GET /health/integrations`.
