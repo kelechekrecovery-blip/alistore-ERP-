@@ -1,12 +1,12 @@
 # BACKLOG
 
 ## Next
-- Write infra runbook for Caddy/backups deployment.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Add campaign delivery integrations after provider accounts are available.
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Write infra runbook for Caddy/backups deployment.
 - Add printable order invoice / waybill PDF.
 - Add OTP access recovery with refresh-session revocation.
 - Print split payment tenders on receipts.

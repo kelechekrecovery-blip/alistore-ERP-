@@ -8,14 +8,14 @@
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-1. **Infra runbook** — Caddy + бэкапы + запуск self-hosted окружения.
-   - Приёмка: документированный запуск и restore-check.
+Открытых пунктов без внешних блокеров нет на 2026-07-08. Следующий software-пункт
+лежит в секции B, потому что затрагивает schema/trade-in контракт.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
 debt reminders через outbox, consent-filtered Campaign Segment Builder + Campaign ROI,
 Excel import idempotency, OTP access recovery with refresh-session revocation,
-receipt split tenders, order invoice/waybill PDF, realtime/socket.io, Sentry/GlitchTip hook,
-i18n, health-checks.
+receipt split tenders, order invoice/waybill PDF, infra runbook for Caddy/backups/restore,
+realtime/socket.io, Sentry/GlitchTip hook, i18n, health-checks.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 

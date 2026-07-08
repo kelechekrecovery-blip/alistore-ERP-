@@ -20,6 +20,9 @@ cp apps/api/.env.example .env        # fill MINIO_/METABASE_/NOVU_ values
 docker compose -f infra/docker-compose.yml --env-file .env up -d
 ```
 
+For production deployment, backup, restore drill and rollback steps, use
+[`RUNBOOK.md`](./RUNBOOK.md).
+
 - **MinIO console** — http://localhost:9001 (login: `MINIO_ROOT_USER` /
   `MINIO_ROOT_PASSWORD`). S3 endpoint for the app: `http://localhost:9000`.
 - **Metabase** — http://localhost:3001. On first boot, connect it to the AliStore

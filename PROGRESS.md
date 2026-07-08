@@ -1,5 +1,14 @@
 # PROGRESS
 
+## 2026-07-08
+
+- Task: write infra runbook for Caddy/backups deployment.
+- Files changed: `infra/RUNBOOK.md`, `infra/README.md`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: added a production operator checklist for host baseline, env values, build/deploy, self-hosted MinIO/Metabase, Caddy validation/reload, backup schedule, restore drill, release smoke and rollback.
+- Checks run: `bash -n infra/backup.sh`; `rg "Restore Drill|caddy validate|pg_restore|docker compose" infra/RUNBOOK.md`; `git diff --check -- infra/RUNBOOK.md infra/README.md BACKLOG.md docs/CODEX-HANDOFF.md docs/PHASES.md PROGRESS.md`.
+- Outcome: runbook docs are present and parse/check cleanly; Docker/Caddy were not executed on this dev machine.
+- Next step: remaining MVP work is external/provider/hardware gated, with the trade-in IMEI intake noted separately for schema-coordinated follow-up.
+
 ## 2026-07-07
 
 - Task: complete the customer-facing app to match the AliStore ecosystem/client prototype.
