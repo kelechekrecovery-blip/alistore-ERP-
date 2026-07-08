@@ -1,4 +1,4 @@
-import { buildRiskSignals } from '../src/reports/risk-signals';
+import { buildRiskSignals, computeMarginLeaks } from '../src/reports/risk-signals';
 
 /** Loss-prevention risk detectors (Phase 8, schema-free). */
 const base = {
@@ -62,5 +62,30 @@ describe('buildRiskSignals', () => {
     );
     expect(s[0].kind).toBe('stock_money_mismatch');
     expect(s[0].severity).toBe('high');
+  });
+});
+
+describe('computeMarginLeaks', () => {
+  const products = [
+    { sku: 'A', name: 'Phone A', cost: 100 },
+    { sku: 'B', name: 'Phone B', cost: 200 },
+  ];
+
+  it('flags only paid lines priced below cost', () => {
+    const leaks = computeMarginLeaks([{ sku: 'A', price: 90 }, { sku: 'B', price: 250 }], products);
+    expect(leaks).toEqual([{ sku: 'A', name: 'Phone A', price: 90, cost: 100 }]);
+  });
+
+  it('keeps the worst (lowest) price per SKU', () => {
+    const leaks = computeMarginLeaks([{ sku: 'A', price: 95 }, { sku: 'A', price: 80 }], products);
+    expect(leaks).toHaveLength(1);
+    expect(leaks[0].price).toBe(80);
+  });
+
+  it('ignores items with no matching product and honours the cap', () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({ sku: `S${i}`, price: 1 }));
+    const manyProducts = many.map((m) => ({ sku: m.sku, name: m.sku, cost: 100 }));
+    expect(computeMarginLeaks([{ sku: 'GHOST', price: 1 }], products)).toEqual([]);
+    expect(computeMarginLeaks(many, manyProducts, 10)).toHaveLength(10);
   });
 });

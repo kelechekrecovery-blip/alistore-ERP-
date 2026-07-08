@@ -88,8 +88,10 @@ export function buildInsights(input: InsightInput): Insight[] {
     });
   }
 
-  // refunds pressure
-  if (input.net > 0 && input.refunds > input.net * 0.15) {
+  // refunds pressure — measured against gross sales (net + refunds) so the worst case
+  // (refunds ≥ net revenue) is not silently suppressed.
+  const grossSales = input.net + input.refunds;
+  if (grossSales > 0 && input.refunds > grossSales * 0.15) {
     out.push({
       tone: 'warning',
       title: 'Высокая доля возвратов',

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildRiskSignals, MarginLeak } from './risk-signals';
+import { buildRiskSignals, computeMarginLeaks } from './risk-signals';
 import { buildKpi } from './kpi';
 import { buildPayroll } from './payroll';
 import {
@@ -18,6 +18,29 @@ import { ValidationError } from '../common/errors';
 /** Widest custom revenue window a single query will bucket. */
 const MAX_RANGE_DAYS = 366;
 
+/**
+ * Order statuses at or after payment — «the money is in». Covers the whole
+ * fulfillment chain (paid → picking → … → delivered → completed) plus exchanged,
+ * so revenue/KPI/margin-leak reads don't drop paid orders still in transit.
+ * Excludes reversals (return_requested/returned/refunded/cancelled).
+ */
+const REVENUE_STATUSES: OrderStatus[] = [
+  'paid',
+  'picking',
+  'packed',
+  'ready_for_pickup',
+  'courier_assigned',
+  'out_for_delivery',
+  'delivered',
+  'completed',
+  'exchanged',
+];
+
+/** Clamp a days query param to 1..90, defaulting non-finite input to 7 (avoids NaN→500). */
+function clampDays(days: number): number {
+  return Number.isFinite(days) ? Math.min(90, Math.max(1, Math.round(days))) : 7;
+}
+
 /** COD older than this without handover is a risk (Risk Center). */
 export const COD_STALE_MS = 24 * 60 * 60 * 1000;
 
@@ -33,7 +56,7 @@ export class ReportsService {
   /** Sales per day for the last 7 days (revenue chart). UTC-consistent bucketing. */
   /** Daily revenue buckets for the last N days (UTC-consistent). Powers the dashboard chart. */
   async revenue(days = 7): Promise<{ day: string; amount: number }[]> {
-    const span = Math.min(90, Math.max(1, Math.round(days))); // clamp 1..90
+    const span = clampDays(days);
     const now = new Date();
     const startMs = revenueWindowStartMs(span, now);
     const payments = await this.prisma.payment.findMany({
@@ -49,7 +72,7 @@ export class ReportsService {
 
   /** Period-over-period revenue trend: last N days vs the N days before them. */
   async revenueTrend(days = 7) {
-    const span = Math.min(90, Math.max(1, Math.round(days)));
+    const span = clampDays(days);
     const now = new Date();
     const currentStart = new Date(revenueWindowStartMs(span, now));
     const prevStart = new Date(previousWindowStartMs(span, now));
@@ -156,7 +179,7 @@ export class ReportsService {
 
   /** Owner KPIs: gross margin (revenue − COGS), average check, top products. */
   async kpi() {
-    const paid: OrderStatus[] = ['paid', 'completed', 'exchanged'];
+    const paid = REVENUE_STATUSES;
     const [rev, soldUnits, paidOrders, items, products, sellerPayments] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
@@ -204,7 +227,7 @@ export class ReportsService {
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */
   async risks() {
     const now = new Date();
-    const paid: OrderStatus[] = ['paid', 'completed', 'exchanged'];
+    const paid = REVENUE_STATUSES;
     const [
       cashDiscrepancies,
       codOutstanding,
@@ -287,18 +310,7 @@ export class ReportsService {
         ).map((u) => u.imei)
       : [];
 
-    // A paid line priced under its product cost is a margin leak; keep the worst per SKU.
-    const costBySku = new Map(productCosts.map((p) => [p.sku, p]));
-    const leakBySku = new Map<string, MarginLeak>();
-    for (const it of paidItems) {
-      const p = costBySku.get(it.sku);
-      if (!p || it.price >= p.cost) continue;
-      const prev = leakBySku.get(it.sku);
-      if (!prev || it.price < prev.price) {
-        leakBySku.set(it.sku, { sku: it.sku, name: p.name, price: it.price, cost: p.cost });
-      }
-    }
-    const marginLeaks = [...leakBySku.values()].slice(0, 10);
+    const marginLeaks = computeMarginLeaks(paidItems, productCosts);
 
     const signals = buildRiskSignals(
       { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrderImeis, imeiReuse },

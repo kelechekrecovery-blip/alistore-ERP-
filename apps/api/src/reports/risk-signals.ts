@@ -37,6 +37,28 @@ export interface MarginLeak {
   cost: number;
 }
 
+/**
+ * Paid lines priced under their product cost, worst example per SKU, capped. Pure —
+ * the caller supplies the paid items and the product cost table.
+ */
+export function computeMarginLeaks(
+  paidItems: { sku: string; price: number }[],
+  products: { sku: string; name: string; cost: number }[],
+  cap = 10,
+): MarginLeak[] {
+  const costBySku = new Map(products.map((p) => [p.sku, p]));
+  const worstBySku = new Map<string, MarginLeak>();
+  for (const item of paidItems) {
+    const product = costBySku.get(item.sku);
+    if (!product || item.price >= product.cost) continue;
+    const prev = worstBySku.get(item.sku);
+    if (!prev || item.price < prev.price) {
+      worstBySku.set(item.sku, { sku: item.sku, name: product.name, price: item.price, cost: product.cost });
+    }
+  }
+  return [...worstBySku.values()].slice(0, cap);
+}
+
 interface RiskInputs {
   cashDiscrepancies: CashShift[];
   codOutstanding: CourierRun[];
