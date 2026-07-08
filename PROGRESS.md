@@ -7,6 +7,7 @@
 - Result: added staff-only `POST /ai/grade-photos` and `POST /ai/price-scout`. Both endpoints work without keys via deterministic rules, try OpenRouter when `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY` is configured, and fall back safely to rules on provider failure. RBAC coverage now includes the new `/ai/*` endpoints.
 - Checks run: `npm run mvp:verify`; `npm audit`; `git diff --check`.
 - Outcome: full MVP verification passed: Prisma validate/generate, API build, web build, mobile typecheck, API Jest 94 suites / 334 tests, Playwright 9/9, and external readiness report. `npm audit` reports 0 vulnerabilities. Strict production readiness still waits on real AI/provider/store/push credentials and physical POS hardware.
+- Commit: `aac3059`.
 - Next step: activate real AI provider with reference photo/listing datasets and offline eval thresholds when credentials/data are available; otherwise continue external production/store/hardware readiness.
 
 ## 2026-07-08
