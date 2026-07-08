@@ -54,9 +54,11 @@ describe('Debts (integration)', () => {
     await prisma.approval.deleteMany();
   });
 
-  async function order() {
+  async function order(consent = true) {
     seq += 1;
-    const customer = await prisma.customer.create({ data: { phone: `+9967005${seq.toString().padStart(4, '0')}`, name: 'D' } });
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967005${seq.toString().padStart(4, '0')}`, name: 'D', consent },
+    });
     const o = await prisma.order.create({
       data: { customerId: customer.id, channel: 'pos', total: 100000, status: 'paid' },
     });
@@ -202,5 +204,25 @@ describe('Debts (integration)', () => {
     expect(events.flatMap((event) => event.refs)).toEqual(
       expect.arrayContaining(['debt_due_soon', 'debt_overdue']),
     );
+  });
+
+  it('does not queue debt reminders for opted-out customers', async () => {
+    const now = new Date('2026-07-07T08:00:00.000Z');
+    const optedOut = await order(false);
+    await prisma.debtPlan.create({
+      data: {
+        orderId: optedOut.orderId,
+        customerId: optedOut.customer.id,
+        principal: 10000,
+        balance: 7000,
+        installments: 1,
+        dueDate: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        status: 'open',
+      },
+    });
+
+    expect(await debts.enqueueReminders({ now, dueSoonDays: 3 })).toEqual({ considered: 1, queued: 0 });
+    expect(await prisma.outboxMessage.count()).toBe(0);
+    expect(await prisma.auditEvent.count({ where: { type: 'debt.reminder_queued' } })).toBe(0);
   });
 });

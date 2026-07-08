@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { WarrantyStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { assertWarrantyTransition } from './warranty-state';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 
 /** SLA window for a warranty case (Risk Center flags overdue open cases). */
 export const WARRANTY_SLA_DAYS = 14;
@@ -20,6 +22,7 @@ export class WarrantyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -55,6 +58,13 @@ export class WarrantyService {
           sla,
         },
       });
+      if (this.outbox) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: wc.customerId,
+          template: 'warranty_created',
+          payload: { warrantyId: wc.id, imei: input.imei, sla: sla.toISOString() },
+        });
+      }
       return {
         result: wc,
         events: [
@@ -79,6 +89,13 @@ export class WarrantyService {
       assertWarrantyTransition(wc.status, to);
       const updated = await tx.warrantyCase.update({ where: { id }, data: { status: to } });
       const type = CLOSED_STATUSES.includes(to) ? EventType.WarrantyClosed : `warranty.${to}`;
+      if (this.outbox && CLOSED_STATUSES.includes(to)) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: wc.customerId,
+          template: 'warranty_closed',
+          payload: { warrantyId: id, imei: wc.imei, from: wc.status, to },
+        });
+      }
       return {
         result: updated,
         events: [

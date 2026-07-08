@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: add consent-filtered transactional notification templates.
+- Files changed: `apps/api/src/outbox/customer-notifications.ts`, orders/warranty/debts/reservations services and modules, `apps/api/test/transactional-notifications.e2e-spec.ts`, debt/reservation notification tests, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: orders now enqueue `order_confirmed` and `order_ready`, warranty cases enqueue `warranty_created` and `warranty_closed`, reservation expiry and debt reminders reuse a shared consent-aware customer notification helper, and opted-out customers are skipped without blocking the underlying business transaction.
+- Checks run: `npm run test -w @alistore/api -- transactional-notifications debts reservation-expiry --runInBand`; `npm run api:build`; `npm run api:test`; `npm run build -w @alistore/web`; `git diff --check`.
+- Outcome: targeted Jest passed 3 suites / 14 tests; API build passed; full API Jest passed 83 suites / 294 tests; web build passed; whitespace check passed.
+- Next step: P0-2 reports/AI guard remains blocked until web-token handoff lands; then continue with P2/E2E+CI or provider/hardware-gated work.
+
+## 2026-07-08
+
 - Task: polish trade-in contract print locale, IMEI, and price formatting.
 - Files changed: `apps/api/src/documents/trade-in-contract.ts`, `apps/api/src/documents/documents.service.ts`, `apps/api/test/documents.spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/CODEX-NOW.md`, `docs/PHASES.md`, `PROGRESS.md`.
 - Result: trade-in contract content now has a pure line builder, prints optional IMEI/SN, uses `dd.mm.yyyy` issue date, and formats the buyback price with thousands separators in сом.

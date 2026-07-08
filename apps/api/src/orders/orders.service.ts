@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
@@ -7,6 +7,8 @@ import { UnitsService } from '../units/units.service';
 import { ConflictError, ValidationError } from '../common/errors';
 import { assertTransition } from './order-state-machine';
 import { CreateOrderDto } from './orders.dto';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -17,6 +19,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly units: UnitsService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -55,6 +58,13 @@ export class OrdersService {
         },
         include: { items: true },
       });
+      if (this.outbox) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: order.customerId,
+          template: 'order_confirmed',
+          payload: { orderId: order.id, channel: order.channel, total: order.total },
+        });
+      }
       return {
         result: order,
         events: [
@@ -128,6 +138,13 @@ export class OrdersService {
         where: { id: orderId },
         data: { status: to },
       });
+      if (this.outbox && (to === 'confirmed' || to === 'ready_for_pickup')) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: order.customerId,
+          template: to === 'confirmed' ? 'order_confirmed' : 'order_ready',
+          payload: { orderId, from: order.status, to },
+        });
+      }
       return {
         result: updated,
         events: [

@@ -26,7 +26,7 @@ Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDe
 - Приёмка: без owner-токена `/reports/*`+`/ai/*` → 401/403; ERP-дашборд под staff-сессией работает.
 
 ## P1 — доделать полосу A (после P0)
-- **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён/готов к выдаче/
+- ✅ **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён/готов к выдаче/
   гарантия/долг-напоминание) через outbox/Novu, consent-filtered.
 - ✅ **A3. Rate limiting** (`@nestjs/throttler`) на checkout-chain (`POST /customers`,
   `POST /orders`, `POST /payments/intents`), OTP-выдачу, `POST /support/tickets`,

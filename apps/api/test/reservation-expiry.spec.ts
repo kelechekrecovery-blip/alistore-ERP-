@@ -46,11 +46,11 @@ describe('Reservation expiry sweep (invariant #7)', () => {
     await prisma.customer.deleteMany();
   });
 
-  async function seedReservedOrder(imei: string) {
+  async function seedReservedOrder(imei: string, consent = true) {
     seq += 1;
     const suffix = seq.toString().padStart(3, '0');
     const customer = await prisma.customer.create({
-      data: { phone: `+9967100${suffix}`, name: 'Тест Клиент' },
+      data: { phone: `+9967100${suffix}`, name: 'Тест Клиент', consent },
     });
     const product = await prisma.product.create({
       data: {
@@ -124,6 +124,21 @@ describe('Reservation expiry sweep (invariant #7)', () => {
       'reserved',
     );
     expect(await prisma.outboxMessage.count()).toBe(0); // no release → no notice
+  });
+
+  it('releases opted-out reservations without queuing a customer notice', async () => {
+    const imei = `IMEI-OPTOUT-${seq + 1}`;
+    const order = await seedReservedOrder(imei, false);
+    await prisma.reservation.updateMany({
+      where: { orderId: order.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    expect((await reservations.releaseExpired()).released).toBe(1);
+    expect((await prisma.deviceUnit.findUnique({ where: { imei } }))?.status).toBe(
+      'in_stock',
+    );
+    expect(await prisma.outboxMessage.count()).toBe(0);
   });
 
   it('is idempotent — a second sweep releases nothing more', async () => {

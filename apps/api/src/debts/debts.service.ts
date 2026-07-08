@@ -5,6 +5,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { insertDebt } from './debt-insert';
 import { CreateDebtDto, DebtPaymentDto } from './debts.dto';
 
@@ -142,10 +143,6 @@ export class DebtsService {
         orderBy: { dueDate: 'asc' },
         take: limit,
       });
-      const customers = await tx.customer.findMany({
-        where: { id: { in: [...new Set(debts.map((d) => d.customerId))] } },
-      });
-      const customerById = new Map(customers.map((customer) => [customer.id, customer]));
       const events: AuditInput[] = [];
       let queued = 0;
 
@@ -159,13 +156,9 @@ export class DebtsService {
         });
         if (alreadyQueued) continue;
 
-        const customer = customerById.get(debt.customerId);
-        if (!customer?.phone) continue;
-
         const daysUntilDue = Math.ceil((debt.dueDate.getTime() - now.getTime()) / DAY_MS);
-        await this.outbox.enqueueOnTx(tx, {
-          channel: 'sms',
-          recipient: customer.phone,
+        const queuedNotice = await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: debt.customerId,
           template: kind,
           payload: {
             debtId: debt.id,
@@ -176,6 +169,7 @@ export class DebtsService {
             daysUntilDue,
           },
         });
+        if (!queuedNotice) continue;
         events.push({
           type: EventType.DebtReminderQueued,
           actor,

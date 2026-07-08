@@ -11,7 +11,8 @@
 Открытых пунктов без внешних блокеров нет на 2026-07-08.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
-debt reminders через outbox, consent-filtered Campaign Segment Builder + Campaign ROI,
+consent-filtered transactional templates for orders/warranty/reservations/debt reminders,
+consent-filtered Campaign Segment Builder + Campaign ROI,
 Excel import idempotency, OTP access recovery with refresh-session revocation,
 receipt split tenders, order invoice/waybill PDF, infra runbook for Caddy/backups/restore,
 trade-in IMEI intake + `imei_reuse` risk activation, realtime/socket.io, Sentry/GlitchTip hook,

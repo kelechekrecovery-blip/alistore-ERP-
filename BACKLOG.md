@@ -6,6 +6,7 @@
 - Connect real social login providers after Apple/Telegram credentials are available.
 
 ## Done
+- Add consent-filtered transactional notification templates for orders, warranty, reservations, and debt reminders.
 - Polish trade-in contract print locale, IMEI, and price formatting.
 - Add rate limiting to public checkout, OTP, support, and webhook endpoints.
 - Capture trade-in IMEI and activate `imei_reuse` risk detection.
@@ -16,7 +17,6 @@
 - Add consent-filtered Campaign Segment Builder and ROI.
 - Make Excel product import idempotent.
 - Add shift close photo report.
-- Add debt reminder notifications.
 - Build Refund Money Flow / Dispute Center staff UI.
 - Ensure exchanges create visible warranty coverage for the new device.
 - Add scanner-assisted inventory count UI.
