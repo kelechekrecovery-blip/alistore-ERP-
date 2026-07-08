@@ -1,6 +1,7 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { DocumentsService } from '../src/documents/documents.service';
 import { ValidationError } from '../src/common/errors';
+import { buildOrderInvoiceLines } from '../src/documents/order-invoice';
 
 /**
  * Trade-in contract PDF (pdf-lib + bundled Cyrillic font) against a real DB row.
@@ -19,6 +20,74 @@ describe('DocumentsService.tradeInContract (integration)', () => {
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+  it('builds order invoice lines with customer, SKU, IMEI, totals and split payments', () => {
+    const lines = buildOrderInvoiceLines({
+      id: 'order-1',
+      status: 'paid',
+      channel: 'pos',
+      total: 100000,
+      createdAt: new Date('2026-07-08T10:30:00.000Z'),
+      customer: { name: 'Нурлан', phone: '+996700000000' },
+      items: [
+        { sku: 'SKU-1', name: 'iPhone 15', qty: 1, price: 100000, imei: 'IMEI-123' },
+      ],
+      payments: [
+        { method: 'cash', amount: 30000, status: 'received' },
+        { method: 'card', amount: 70000, status: 'received' },
+      ],
+    });
+
+    expect(lines.join('\n')).toContain('НАКЛАДНАЯ');
+    expect(lines.join('\n')).toContain('Нурлан · тел. +996700000000');
+    expect(lines.join('\n')).toContain('iPhone 15 (SKU SKU-1)');
+    expect(lines.join('\n')).toContain('IMEI / SN: IMEI-123');
+    expect(lines.join('\n')).toContain('Итого: 100 000 сом');
+    expect(lines.join('\n')).toContain('cash: 30 000 сом');
+    expect(lines.join('\n')).toContain('card: 70 000 сом');
+  });
+
+  it('renders an order invoice PDF for a paid order', async () => {
+    const customer = await prisma.customer.create({
+      data: { phone: `+996${RUN}04`, name: 'Накладная Клиент' },
+    });
+    const product = await prisma.product.create({
+      data: {
+        sku: `SKU-INV-${RUN}`,
+        name: 'iPhone 15 Pro',
+        price: 120000,
+        cost: 90000,
+        category: 'phones',
+        attrs: {},
+      },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'pos',
+        total: 120000,
+        status: 'paid',
+        items: { create: [{ sku: product.sku, qty: 1, price: 120000, imei: `INV-IMEI-${RUN}` }] },
+      },
+    });
+    await prisma.payment.createMany({
+      data: [
+        { orderId: order.id, amount: 50000, method: 'cash', status: 'received' },
+        { orderId: order.id, amount: 70000, method: 'card', status: 'received' },
+      ],
+    });
+
+    const out = await documents.orderInvoice(order.id);
+    const pdf = Buffer.from(out.pdfBase64, 'base64');
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(out.bytes).toBeGreaterThan(1000);
+  });
+
+  it('throws 422 for an unknown order invoice id', async () => {
+    const err = await documents.orderInvoice('does-not-exist').catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('order_not_found');
   });
 
   it('renders a valid PDF for a trade-in record', async () => {

@@ -180,6 +180,15 @@
 - Outcome: web build passed; browser QA passed with one `GET /api/catalog/products?limit=100&offset=0` 200, visible related-products section, no failed requests, no console errors, and no horizontal overflow.
 - Next step: finish storefront reviews or move to another unblocked backlog item.
 
+## 2026-07-08
+
+- Task: add printable order invoice / waybill PDF.
+- Files changed: `apps/api/src/documents/*`, `apps/api/test/documents.spec.ts`, `apps/api/test/courier-print-rbac.e2e-spec.ts`, `BACKLOG.md`, `docs/CODEX-HANDOFF.md`, `docs/PHASES.md`, `PROGRESS.md`.
+- Result: staff print/export can now render `GET /documents/order/:id/invoice` as an A4 накладная PDF with customer, channel/status, SKU, product name, qty, IMEI/SN, total and received/reconciled payment lines. The invoice line builder is pure-tested so the required fields are locked, not just PDF bytes.
+- Checks run: targeted Jest for `documents` and `courier-print-rbac`; `npm run api:build`; `git diff --check`.
+- Outcome: targeted tests passed 2 suites / 14 tests; API build passed; RBAC guard smoke confirms courier is denied and seller reaches domain validation.
+- Next step: infra runbook for Caddy/backups is the remaining unblocked MVP polish; social/campaign/hardware/AI provider work still waits for external credentials/devices.
+
 ## 2026-07-07
 
 - Task: add OTP access recovery with refresh-session revocation.

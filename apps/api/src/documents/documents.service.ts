@@ -4,6 +4,7 @@ import fontkit from '@pdf-lib/fontkit';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationError } from '../common/errors';
 import { ROBOTO_REGULAR_BASE64 } from './roboto-font';
+import { buildOrderInvoiceLines } from './order-invoice';
 
 /**
  * A4 documents with Cyrillic text (pdf-lib + a bundled Roboto TTF — the standard
@@ -15,6 +16,47 @@ export class DocumentsService {
   private readonly fontBytes = Buffer.from(ROBOTO_REGULAR_BASE64, 'base64');
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Render an order invoice / waybill (накладная) with customer, items, IMEI and payments. */
+  async orderInvoice(orderId: string): Promise<{ pdfBase64: string; bytes: number }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { customer: true, items: true, payments: true },
+    });
+    if (!order) {
+      throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+    }
+
+    const skus = order.items.map((item) => item.sku);
+    const products = await this.prisma.product.findMany({
+      where: { sku: { in: skus } },
+      select: { sku: true, name: true },
+    });
+    const nameBySku = new Map(products.map((product) => [product.sku, product.name]));
+
+    const lines = buildOrderInvoiceLines({
+      id: order.id,
+      status: order.status,
+      channel: order.channel,
+      total: order.total,
+      createdAt: order.createdAt,
+      customer: { name: order.customer.name, phone: order.customer.phone },
+      items: order.items.map((item) => ({
+        sku: item.sku,
+        name: nameBySku.get(item.sku) ?? item.sku,
+        qty: item.qty,
+        price: item.price,
+        imei: item.imei,
+      })),
+      payments: order.payments.map((payment) => ({
+        method: payment.method,
+        amount: payment.amount,
+        status: payment.status,
+      })),
+    });
+
+    return this.renderLines(lines);
+  }
 
   /** Render the trade-in contract PDF for a TradeInDevice; base64 for printing. */
   async tradeInContract(
@@ -218,6 +260,22 @@ export class DocumentsService {
     writer('Возврат денег — по approval, тем же способом оплаты.', 10, 24);
     writer('Принял: __________________     Клиент: __________________', 10, 16);
 
+    const bytes = await doc.save();
+    return {
+      pdfBase64: Buffer.from(bytes).toString('base64'),
+      bytes: bytes.length,
+    };
+  }
+
+  private async renderLines(lines: string[]): Promise<{ pdfBase64: string; bytes: number }> {
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    const font = await doc.embedFont(this.fontBytes);
+    const page = doc.addPage([595.28, 841.89]); // A4
+    const writer = this.lineWriter(page, font);
+    for (const line of lines) {
+      writer(line || ' ', line ? 10.5 : 8, line ? 15 : 8);
+    }
     const bytes = await doc.save();
     return {
       pdfBase64: Buffer.from(bytes).toString('base64'),

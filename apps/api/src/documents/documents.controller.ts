@@ -11,6 +11,12 @@ import { RequirePermission } from '../authz/require-permission.decorator';
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
+  /** Order invoice / waybill (накладная) PDF for a sold or fulfilled order. */
+  @Get('order/:id/invoice')
+  orderInvoice(@Param('id') id: string) {
+    return this.documents.orderInvoice(id);
+  }
+
   /** Trade-in (скупка Б/У) contract PDF for a TradeInDevice (base64). */
   @Get('tradein/:id/contract')
   tradeInContract(@Param('id') id: string) {

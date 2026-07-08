@@ -8,15 +8,14 @@
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-1. **PDF/печать полировка** — receipts/labels/documents.
-   - Приёмка: чек/накладная/договор скупки печатаются с корректными полями и локалью.
-2. **Infra runbook** — Caddy + бэкапы + запуск self-hosted окружения.
+1. **Infra runbook** — Caddy + бэкапы + запуск self-hosted окружения.
    - Приёмка: документированный запуск и restore-check.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime transport switch,
 debt reminders через outbox, consent-filtered Campaign Segment Builder + Campaign ROI,
 Excel import idempotency, OTP access recovery with refresh-session revocation,
-realtime/socket.io, Sentry/GlitchTip hook, i18n, health-checks.
+receipt split tenders, order invoice/waybill PDF, realtime/socket.io, Sentry/GlitchTip hook,
+i18n, health-checks.
 
 ## B. Требуют миграции схемы (Prisma) — координировать аддитивно
 

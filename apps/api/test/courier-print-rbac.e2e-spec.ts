@@ -191,5 +191,15 @@ describe('Courier and print/export RBAC', () => {
       .get('/documents/tradein/nope/contract')
       .set('Authorization', `Bearer ${sellerToken}`)
       .expect(422);
+
+    await request(app.getHttpServer())
+      .get('/documents/order/nope/invoice')
+      .set('Authorization', `Bearer ${courierToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get('/documents/order/nope/invoice')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(422);
   });
 });
