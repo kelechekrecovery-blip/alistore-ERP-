@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- Remediate production dependency audit blockers before store/production release: critical Next advisory plus high/moderate NestJS, multer, lodash, glob, tmp, picomatch, webpack, and related chains; prefer semver-safe upgrades first and run the full MVP/browser/mobile gate after any major upgrades.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Complete account-bound native store release after Apple/Google accounts and test devices are available: configure signing credentials, production API URL, EAS token, App Store Connect API key/team, Google Play service account, TestFlight/Play Internal QA, and push credentials.
 - Activate production channel accounts after provider credentials are available: set `NOTIFICATION_TRANSPORT=channels`, verify real Telegram/WhatsApp/Novu sends, and confirm webhooks/callbacks.
