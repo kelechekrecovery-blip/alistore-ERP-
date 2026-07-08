@@ -46,3 +46,4 @@
 - POS sale with cash/card/QR methods.
 - Discount above approval threshold returns approval state.
 - Push permission prompt and `POST /notifications/push-tokens` registration.
+- Staff-mode push registration after login returns `scope=staff`.

@@ -25,6 +25,7 @@ interface StaffScreenProps {
   catalogError: string | null;
   refreshing: boolean;
   onRefresh: () => void;
+  onSessionChange?: (session: StaffLoginResult | null) => void;
 }
 
 const paymentOptions: Array<{ method: PaymentMethod; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
@@ -44,6 +45,7 @@ export function StaffScreen({
   catalogError,
   refreshing,
   onRefresh,
+  onSessionChange,
 }: StaffScreenProps) {
   const [session, setSession] = useState<StaffLoginResult | null>(null);
   const [booting, setBooting] = useState(true);
@@ -64,7 +66,10 @@ export function StaffScreen({
     let mounted = true;
     getStoredStaffSession()
       .then((stored) => {
-        if (mounted) setSession(stored);
+        if (mounted) {
+          setSession(stored);
+          onSessionChange?.(stored);
+        }
       })
       .finally(() => {
         if (mounted) setBooting(false);
@@ -99,6 +104,7 @@ export function StaffScreen({
       const next = await api.staffLogin(username.trim(), password);
       await saveStaffSession(next);
       setSession(next);
+      onSessionChange?.(next);
       setPassword('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось войти.');
@@ -110,6 +116,7 @@ export function StaffScreen({
   async function logout() {
     await clearStaffSession();
     setSession(null);
+    onSessionChange?.(null);
     setOrders([]);
     setSaleResult(null);
   }

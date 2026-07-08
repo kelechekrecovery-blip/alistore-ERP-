@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: bind native staff push registration to staff JWT.
+- Files changed: `apps/mobile/src/native-shell.tsx`, `apps/mobile/src/screens/staff-screen.tsx`, `apps/mobile/store/review-checklist.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: `StaffScreen` now reports restored/login/logout staff sessions to the native shell, and the Push control sends the staff access token when the app is in staff/POS mode. Staff-mode push registration no longer saves an anonymous token; it waits for staff login and then binds to `scope=staff` on `POST /notifications/push-tokens`.
+- Checks run: `npm run mobile:typecheck`; `npm run mobile:store-preflight`.
+- Outcome: mobile typecheck passed; store preflight passed with 0 failures and the expected 2 production warnings for missing local API/EAS project env.
+- Next step: verify staff push binding on a physical TestFlight/Play Internal build once EAS project id, push credentials, and staff demo account are available.
+
+## 2026-07-08
+
 - Task: add direct Expo Push delivery for outbox notifications.
 - Files changed: `apps/api/src/outbox/transports/expo-push.transport.ts`, `apps/api/src/outbox/transports/channel.transport.ts`, `apps/api/src/outbox/outbox.module.ts`, `apps/api/src/outbox/customer-notifications.ts`, `apps/api/src/health/external-readiness.ts`, `apps/api/.env.production.example`, `apps/api/test/expo-push-transport.spec.ts`, `docs/PRODUCTION-ACTIVATION.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: `NOTIFICATION_TRANSPORT=channels` can now route `channel=push` outbox messages directly to Expo Push Service using registered `PushToken` rows. Customer/staff ids resolve to enabled Expo tokens, direct Expo token recipients still work, immediate `DeviceNotRegistered` tickets disable dead tokens, and HTTP/provider failures still throw so the durable outbox retries.

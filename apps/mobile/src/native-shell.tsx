@@ -9,7 +9,7 @@ import { ClientScreen } from '@mobile/screens/client-screen';
 import { StaffScreen } from '@mobile/screens/staff-screen';
 import { BrandMark, GhostButton } from '@mobile/ui';
 import { radius, theme } from '@mobile/theme';
-import type { CatalogProduct } from '@mobile/types';
+import type { CatalogProduct, RegisteredPushToken, StaffLoginResult } from '@mobile/types';
 
 type Mode = 'client' | 'staff';
 type PushUiState = 'idle' | 'loading' | NativePushRegistration['status'];
@@ -23,6 +23,7 @@ export function NativeShell() {
   const [refreshing, setRefreshing] = useState(false);
   const [pushState, setPushState] = useState<PushUiState>('idle');
   const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [staffSession, setStaffSession] = useState<StaffLoginResult | null>(null);
 
   const stats = useMemo(() => {
     const available = products.reduce((sum, product) => sum + product.availableUnits, 0);
@@ -51,6 +52,10 @@ export function NativeShell() {
 
   async function enablePush() {
     if (pushState === 'loading') return;
+    if (mode === 'staff' && !staffSession) {
+      setPushMessage('Войдите сотрудником, чтобы привязать Push к POS');
+      return;
+    }
     setPushState('loading');
     setPushMessage(null);
     const registration = await registerNativePush();
@@ -65,10 +70,10 @@ export function NativeShell() {
         token: registration.token,
         platform: registration.platform,
         deviceId: registration.deviceId,
-        scope: mode === 'staff' ? 'staff' : 'customer',
-      });
+        scope: mode === 'staff' ? 'staff' : 'anonymous',
+      }, mode === 'staff' ? staffSession?.accessToken : undefined);
       setPushState('registered');
-      setPushMessage(saved.scope === 'anonymous' ? 'Push token сохранён' : 'Push привязан к аккаунту');
+      setPushMessage(pushSuccessMessage(saved));
     } catch (cause) {
       setPushState('error');
       setPushMessage(cause instanceof Error ? cause.message : 'Push token не сохранён');
@@ -92,6 +97,7 @@ export function NativeShell() {
         catalogError={catalogError}
         refreshing={refreshing}
         onRefresh={() => loadCatalog(true)}
+        onSessionChange={setStaffSession}
       />
     );
 
@@ -163,6 +169,12 @@ export function NativeShell() {
       <View style={styles.screenWrap}>{activeScreen}</View>
     </View>
   );
+}
+
+function pushSuccessMessage(saved: RegisteredPushToken): string {
+  if (saved.scope === 'staff') return 'Push привязан к сотруднику';
+  if (saved.scope === 'customer') return 'Push привязан к аккаунту';
+  return 'Push token сохранён';
 }
 
 function pushLabel(state: PushUiState): string {
