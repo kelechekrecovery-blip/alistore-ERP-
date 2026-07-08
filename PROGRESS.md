@@ -2,6 +2,15 @@
 
 ## 2026-07-08
 
+- Task: expose production readiness in ERP.
+- Files changed: `apps/web/lib/api/readiness.ts`, `apps/web/lib/api.ts`, `apps/web/app/erp/page.tsx`, `e2e/erp-secure.spec.ts`, `BACKLOG.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `PROGRESS.md`.
+- Result: ERP now has a `Готовность` owner-console tab backed by `GET /health/integrations`, showing blocking provider credentials, manual POS hardware checks, optional production services, and the strict release gate command without exposing secret values.
+- Checks run: `npm run build -w @alistore/web`; `npx playwright test e2e/erp-secure.spec.ts`; `npm run mvp:verify`; `git diff --check`.
+- Outcome: web build passed; targeted ERP browser smoke passed 1/1; full MVP gate passed with API Jest 89 suites / 316 tests and Playwright 9/9; external readiness report still correctly shows `ready=0, missing=6, manual=1, optional=2, blocking=7`.
+- Next step: production launch remains external-only: provider credentials, callback/webhook QA, and physical POS hardware certification.
+
+## 2026-07-08
+
 - Task: add one-command MVP verification gate.
 - Files changed: `scripts/mvp-verify.mjs`, `apps/api/scripts/print-readiness.ts`, root/API `package.json`, `README.md`, `docs/HANDOFF.md`, `docs/READINESS.md`, `PROGRESS.md`.
 - Result: `npm run mvp:verify` now runs Prisma schema validation, Prisma Client generation, API build, web build, full API Jest, Playwright E2E, and secret-safe external readiness reporting. `--skip-e2e` gives a faster local gate; `--strict-external` turns missing production credentials/hardware markers into a failing release gate.

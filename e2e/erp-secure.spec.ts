@@ -28,6 +28,10 @@ test('ERP loads protected reports and AI with a staff session', async ({ page, r
   await expect(page.getByText('AI-ассистент').first()).toBeVisible();
   await page.getByRole('button', { name: /Цены/ }).click();
   await expect(page.getByText('Ценовые рекомендации').first()).toBeVisible();
+  await page.getByRole('button', { name: /Готовность/ }).click();
+  await expect(page.getByText('Готовность запуска').first()).toBeVisible();
+  await expect(page.getByText('Production readiness').first()).toBeVisible();
+  await expect(page.getByText(/strict gate:/).first()).toBeVisible();
 
   expect(protectedResponses.filter((r) => r.status === 401 || r.status === 403)).toEqual([]);
 });

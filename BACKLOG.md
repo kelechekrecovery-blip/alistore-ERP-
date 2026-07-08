@@ -6,6 +6,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Expose external production readiness inside the ERP owner console.
 - Add POS catalog delta-sync for offline cashier cache and stock refresh.
 - Add provider-ready Apple/Telegram social login endpoints with CustomerIdentity linking.
 - Add channel-aware campaign delivery transports for Novu, SMTP email, Telegram Bot API, and WhatsApp Cloud API.
