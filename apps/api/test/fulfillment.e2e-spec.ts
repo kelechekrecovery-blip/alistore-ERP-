@@ -98,4 +98,25 @@ describe('Warehouse fulfillment (integration)', () => {
     expect(err.getStatus()).toBe(409);
     expect(err.code).toBe('insufficient_stock');
   });
+
+  it('is race-safe: two fulfillments cannot double-reserve the same unit', async () => {
+    const { customer, product } = await seed(1); // exactly one in-stock unit
+    const mk = async () =>
+      orders.create(
+        { customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] },
+        'system',
+      );
+    const [o1, o2] = [await mk(), await mk()];
+    // Both warehouse staff fulfill at once — only one may claim the single unit.
+    const results = await Promise.allSettled([
+      orders.fulfill(o1.id, 'warehouse'),
+      orders.fulfill(o2.id, 'warehouse'),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    expect(ok).toHaveLength(1); // exactly one wins, the other 409s (no double-reserve)
+    const reserved = await prisma.deviceUnit.findMany({ where: { status: 'reserved' } });
+    expect(reserved).toHaveLength(1);
+    // the unit is reserved to exactly one of the two orders, not overwritten
+    expect([o1.id, o2.id]).toContain(reserved[0].orderId);
+  });
 });

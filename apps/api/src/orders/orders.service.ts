@@ -224,10 +224,16 @@ export class OrdersService {
       const assigned: string[] = [];
 
       const reserveUnit = async (imei: string, sku: string) => {
-        await tx.deviceUnit.update({
-          where: { imei },
+        // Conditional claim — a findUnique→update would let two concurrent fulfills both
+        // pass the in-stock check and double-reserve one device to two orders. Gate the
+        // write on status:'in_stock' (mirror units.reserveOnTx); 0 rows → unit already taken.
+        const claimed = await tx.deviceUnit.updateMany({
+          where: { imei, status: 'in_stock' },
           data: { status: 'reserved', orderId },
         });
+        if (claimed.count === 0) {
+          throw new ConflictError('unit_already_taken', `Единица ${imei} уже занята — повторите`);
+        }
         await tx.reservation.create({ data: { orderId, imei, expiresAt, active: true } });
         assigned.push(imei);
         events.push({
