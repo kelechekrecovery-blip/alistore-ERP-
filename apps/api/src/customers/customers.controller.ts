@@ -47,8 +47,9 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Aggregated customer overview.' })
   @ApiNotFoundResponse({ description: 'Customer does not exist.' })
   @Get(':id/overview')
-  @UseGuards(OptionalJwtAuthGuard)
-  async overview(@Param('id') id: string, @CurrentUser() user?: AuthPrincipal) {
+  @UseGuards(JwtAuthGuard)
+  async overview(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    this.assertCanReadCustomer(user, id);
     return this.maskOverview(await this.customers.overview(id), user);
   }
 
@@ -57,8 +58,9 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Customer found.' })
   @ApiNotFoundResponse({ description: 'Customer does not exist.' })
   @Get(':id')
-  @UseGuards(OptionalJwtAuthGuard)
-  async get(@Param('id') id: string, @CurrentUser() user?: AuthPrincipal) {
+  @UseGuards(JwtAuthGuard)
+  async get(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    this.assertCanReadCustomer(user, id);
     const customer = await this.customers.get(id);
     if (!customer) throw new NotFoundException(`Клиент ${id} не найден`);
     return this.maskCustomer(customer, user);
@@ -84,6 +86,13 @@ export class CustomersController {
       throw new ForbiddenException('Нельзя менять согласие другого клиента');
     }
     return this.customers.setConsent(id, dto.consent, user?.typ === 'customer' ? user.customerId : dto.actor ?? 'customer');
+  }
+
+  /** A customer may read only their own profile; any authenticated staff may read any. */
+  private assertCanReadCustomer(user: AuthPrincipal, id: string): void {
+    if (user.typ === 'customer' && user.customerId !== id) {
+      throw new ForbiddenException('Нельзя смотреть профиль другого клиента');
+    }
   }
 
   private maskOverview(overview: CustomerOverview, user?: AuthPrincipal): CustomerOverview {

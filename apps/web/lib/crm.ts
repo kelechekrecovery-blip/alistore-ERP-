@@ -69,8 +69,11 @@ export interface CustomerOverview {
   tickets: { open: number; items: { id: string; subject: string; status: string; priority: string; sla: string }[] };
 }
 
-export async function fetchCustomerOverview(id: string): Promise<CustomerOverview> {
-  const res = await fetch(`${API_BASE}/customers/${id}/overview`, { cache: 'no-store' });
+export async function fetchCustomerOverview(id: string, accessToken: string): Promise<CustomerOverview> {
+  const res = await fetch(`${API_BASE}/customers/${id}/overview`, {
+    cache: 'no-store',
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error(`overview ${res.status}`);
   return (await res.json()) as CustomerOverview;
 }

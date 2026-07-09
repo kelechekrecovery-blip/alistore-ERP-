@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -17,13 +27,12 @@ import { PayDto, RefundDto } from './payments.dto';
 import { PaymentIntentsService } from './payment-intents.service';
 import { CreatePaymentIntentDto, PaymentWebhookDto } from './payment-intents.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
-
-const SYSTEM_ACTOR = 'system';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -38,6 +47,9 @@ export class PaymentsController {
   @ApiQuery({ name: 'shiftId', required: false })
   @ApiOkResponse({ description: 'Payments ordered by newest first.' })
   @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'read')
   find(@Query('orderId') orderId?: string, @Query('shiftId') shiftId?: string) {
     return this.payments.find({ orderId, shiftId });
   }
@@ -49,8 +61,17 @@ export class PaymentsController {
   @ApiConflictResponse({ description: 'Order is not reserved or IMEI cannot be sold.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
   @Post()
-  pay(@Body() dto: PayDto) {
-    return this.payments.pay(dto, SYSTEM_ACTOR);
+  @UseGuards(OptionalJwtAuthGuard)
+  pay(@CurrentUser() user: AuthPrincipal | undefined, @Body() dto: PayDto) {
+    // Cash/card/installment must be taken by staff (counter/POS) or confirmed by the
+    // provider webhook — an unauthenticated caller may only pay by gift card, which is
+    // self-validating (redeemOnTx checks the code + balance). Closes the "mark any order
+    // paid for free" hole while keeping guest gift-card checkout working.
+    if (!user && dto.method !== 'gift_card') {
+      throw new UnauthorizedException('payment_requires_auth');
+    }
+    const actor = user ? (user.typ === 'staff' ? `staff:${user.customerId}` : user.customerId) : 'guest';
+    return this.payments.pay(dto, actor);
   }
 
   @ApiOperation({

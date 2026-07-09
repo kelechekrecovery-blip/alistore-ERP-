@@ -182,7 +182,7 @@ export function CrmView() {
       {/* Customer 360 panel */}
       <div>
         {selected ? (
-          <CustomerCard customerId={selected.customerId} />
+          <CustomerCard customerId={selected.customerId} accessToken={session.accessToken} />
         ) : (
           <div className="rounded-[16px] border border-dashed border-[#2E2822] bg-[#1A1611] px-5 py-14 text-center text-sm text-[#8A7F76]">
             Выберите обращение — откроется карточка клиента (Customer 360).

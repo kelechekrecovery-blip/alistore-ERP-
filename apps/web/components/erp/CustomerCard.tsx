@@ -7,13 +7,13 @@ import { som } from '@/lib/format';
 const PRIORITY_COLOR: Record<string, string> = { urgent: '#FF5B2E', high: '#E5B23C', normal: '#8A7F76' };
 
 /** Customer 360 — folds orders, spend, debts, warranties and tickets for one customer. */
-export function CustomerCard({ customerId }: { customerId: string }) {
+export function CustomerCard({ customerId, accessToken }: { customerId: string; accessToken: string }) {
   const [ov, setOv] = useState<CustomerOverview | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
-    fetchCustomerOverview(customerId).then(setOv).catch(() => setOv(null));
-  }, [customerId]);
+    fetchCustomerOverview(customerId, accessToken).then(setOv).catch(() => setOv(null));
+  }, [customerId, accessToken]);
 
   useEffect(() => {
     setOv(null);

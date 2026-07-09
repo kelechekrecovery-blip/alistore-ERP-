@@ -18,7 +18,7 @@ const notifications = [
 ];
 
 export default function NotificationsPage() {
-  const { user } = useAuth();
+  const { user, authed } = useAuth();
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
   const [consentState, setConsentState] = useState<'unknown' | 'on' | 'off' | 'saving'>('unknown');
 
@@ -26,10 +26,10 @@ export default function NotificationsPage() {
   useEffect(() => { if (prefs) saveNotificationPrefs(prefs); }, [prefs]);
   useEffect(() => {
     if (!user?.customerId) return;
-    fetchCustomerOverview(user.customerId)
+    authed((t) => fetchCustomerOverview(user.customerId, t))
       .then((ov) => setConsentState(ov.customer.consent ? 'on' : 'off'))
       .catch(() => setConsentState('unknown'));
-  }, [user?.customerId]);
+  }, [user?.customerId, authed]);
 
   function togglePref(key: keyof NotificationPrefs) {
     setPrefs((p) => (p ? { ...p, [key]: !p[key] } : p));
