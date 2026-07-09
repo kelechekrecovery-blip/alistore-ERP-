@@ -1,9 +1,17 @@
 # 🚨 EMERGENCY P0 (перед любым запуском/деплоем)
 
-> ⛔ **CLAUDE ИСПОЛНЯЕТ Блоки 1–3 сам (по прямому указанию пользователя).**
-> **Codex: НЕ ТРОГАТЬ** до отметки ✅: `payments/`, `customers/`, `tradeins/`, `evidence/`,
-> `warranty/`, `orders/`, `debts/`, `shifts/`, `inventory/`, `main.ts`, `schema.prisma`,
-> `staff-auth/`, `documents/`. Веди свою обычную полосу (features/каналы) в стороне от этих путей.
+> ✅ **CLAUDE ЗАКРЫЛ Блоки 1–3** (кроме E8). Коммиты: M-3 `b49dc63`, M-2 `f599137`,
+> M-1 `cc7d880`, индексы `6c745bd`, E1/E-a/E2 `e321fc5`, E3-E7 `e65dd1b`. Все с тестами/проверкой.
+> **Остаток для Codex (можно трогать эти пути снова):**
+> - **E8** — паспорт в PDF-договоре открыт всем staff-ролям (`documents.service.ts:80`,
+>   casbin `documents:read` = seller/cashier/…). Сузить грант до admin/owner ИЛИ маскировать +
+>   `pii:approve`. (delicate casbin — оставлено Codex намеренно.)
+> - **M-4** — catch P2002 → идемпотентный 200 (payMany уже под `FOR UPDATE`, но общий catch полезен).
+> - **M-5** — POS-идемпотентность: генерить серверный ключ если `clientSaleId` не пришёл.
+> - **Auth-hardening тесты** (из test-аудита): TOTP-replay, refresh-reuse-detection, OTP-lockout,
+>   giftcard double-redeem race, webhook race idempotency.
+
+## Сделано Claude (детали ниже помечены ✅)
 
 
 
