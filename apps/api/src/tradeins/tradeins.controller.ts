@@ -1,4 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -31,6 +32,8 @@ export class TradeInsController {
   @ApiCreatedResponse({ type: TradeInViewDto })
   @ApiUnprocessableEntityResponse({ description: 'Customer does not exist or payload is invalid.' })
   @Post()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // anti-abuse: public KYC/passport endpoint
   create(@Body() dto: CreateTradeInDto) {
     return this.tradeIns.create(dto, dto.customerId);
   }

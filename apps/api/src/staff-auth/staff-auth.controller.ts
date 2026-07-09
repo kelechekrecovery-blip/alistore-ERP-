@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
 import { CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
@@ -14,6 +15,8 @@ export class StaffAuthController {
 
   /** One-time bootstrap of the first owner (only when no staff exist yet). */
   @Post('bootstrap')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async bootstrap(@Body() dto: StaffLoginDto) {
     return this.publicView(
       await this.staffAuth.bootstrapOwner(dto.username, dto.password),
@@ -22,6 +25,8 @@ export class StaffAuthController {
 
   /** Staff login → { accessToken, role }. */
   @Post('login')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // anti brute-force on staff passwords
   login(@Body() dto: StaffLoginDto) {
     return this.staffAuth.login(dto.username, dto.password);
   }

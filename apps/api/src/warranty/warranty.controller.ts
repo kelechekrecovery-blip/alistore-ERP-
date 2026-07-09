@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -70,7 +71,8 @@ export class WarrantyController {
   @ApiCreatedResponse({ description: 'Case opened.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown device.' })
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // anti-spam on anonymous case creation
   open(@Body() dto: OpenWarrantyDto, @CurrentUser() user?: AuthPrincipal) {
     if (user?.typ === 'customer' && dto.customerId !== user.customerId) {
       throw new ForbiddenException('Нельзя открыть гарантию от имени другого клиента');
