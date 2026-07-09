@@ -94,12 +94,21 @@ export class DebtsService {
           `Сумма должна быть в пределах остатка (${debt.balance})`,
         );
       }
-      const balance = debt.balance - dto.amount;
-      const settled = balance === 0;
-      const updated = await tx.debtPlan.update({
-        where: { id },
-        data: { balance, status: settled ? 'settled' : 'open' },
+      // Atomic conditional decrement — guards against the lost-update race when two
+      // payments for the same debt run concurrently (mirror giftcards.redeemOnTx).
+      const dec = await tx.debtPlan.updateMany({
+        where: { id, status: 'open', balance: { gte: dto.amount } },
+        data: { balance: { decrement: dto.amount } },
       });
+      if (dec.count === 0) {
+        throw new ConflictError('debt_payment_conflict', `Долг ${id} изменился — повторите`);
+      }
+      const decremented = await tx.debtPlan.findUniqueOrThrow({ where: { id } });
+      const balance = decremented.balance;
+      const settled = balance === 0;
+      const updated = settled
+        ? await tx.debtPlan.update({ where: { id }, data: { status: 'settled' } })
+        : decremented;
       const payment = await tx.payment.create({
         data: { orderId: debt.orderId, amount: dto.amount, method: 'installment', status: 'received' },
       });

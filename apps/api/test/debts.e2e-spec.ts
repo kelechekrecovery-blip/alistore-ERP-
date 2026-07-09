@@ -101,6 +101,35 @@ describe('Debts (integration)', () => {
     expect(err.code).toBe('invalid_debt_payment');
   });
 
+  it('is race-safe: concurrent payments never lose an update', async () => {
+    const { orderId } = await order();
+    const debt = (await debts.create({ orderId, principal: 30000, installments: 2 }, 'seller')) as DebtPlan;
+    // Two 15000 payments fired together must both land → balance 0, not 15000 (lost update).
+    const results = await Promise.allSettled([
+      debts.pay(debt.id, { amount: 15000 }, 'cashier'),
+      debts.pay(debt.id, { amount: 15000 }, 'cashier'),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    expect(ok).toHaveLength(2);
+    const after = await prisma.debtPlan.findUniqueOrThrow({ where: { id: debt.id } });
+    expect(after.balance).toBe(0);
+    expect(after.status).toBe('settled');
+  });
+
+  it('is race-safe: concurrent over-payments cannot over-decrement', async () => {
+    const { orderId } = await order();
+    const debt = (await debts.create({ orderId, principal: 30000 }, 'seller')) as DebtPlan;
+    // Two 20000 payments together: only one fits (20000 ≤ 30000); the second must be rejected.
+    const results = await Promise.allSettled([
+      debts.pay(debt.id, { amount: 20000 }, 'cashier'),
+      debts.pay(debt.id, { amount: 20000 }, 'cashier'),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    expect(ok).toHaveLength(1);
+    const after = await prisma.debtPlan.findUniqueOrThrow({ where: { id: debt.id } });
+    expect(after.balance).toBe(10000);
+  });
+
   it('rejects paying a settled debt', async () => {
     const { orderId } = await order();
     const debt = (await debts.create({ orderId, principal: 4000 }, 'seller')) as DebtPlan;
