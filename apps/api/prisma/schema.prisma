@@ -300,6 +300,7 @@ model Payment {
 
   @@index([orderId])
   @@index([shiftId])
+  @@index([status, createdAt]) // dashboards/KPI/payroll filter by status + date window
 }
 
 model GiftCard {
@@ -330,6 +331,9 @@ model CashShift {
   openedAt  DateTime  @default(now())
   closedAt  DateTime?
   payments  Payment[]
+
+  @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
+  @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy
 }
 
 model InventoryMovement {
@@ -480,7 +484,7 @@ model AuditEvent {
 
   @@index([type])
   @@index([actor])
-  @@index([refs])
+  @@index([refs], type: Gin) // array-containment (has/hasEvery) needs GIN, not B-tree
 }
 
 model Campaign {
