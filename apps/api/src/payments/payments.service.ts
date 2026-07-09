@@ -150,6 +150,12 @@ export class PaymentsService {
     }
 
     return this.audit.transaction(async (tx) => {
+      // Serialize concurrent payments on the same order — accessory-only orders have no
+      // IMEI unit for sellOnTx to lock, so without this two full payments could race,
+      // both create Payment rows and both flip the order to paid. Row-lock first (mirror
+      // the refund executor); the loser re-reads status=paid and hits the guard below.
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${dto.orderId} FOR UPDATE`;
+
       const order = await tx.order.findUnique({
         where: { id: dto.orderId },
         include: { items: true },
