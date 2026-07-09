@@ -1,4 +1,11 @@
-# 🚨 CODEX — EMERGENCY P0 (перед любым запуском/деплоем)
+# 🚨 EMERGENCY P0 (перед любым запуском/деплоем)
+
+> ⛔ **CLAUDE ИСПОЛНЯЕТ Блоки 1–3 сам (по прямому указанию пользователя).**
+> **Codex: НЕ ТРОГАТЬ** до отметки ✅: `payments/`, `customers/`, `tradeins/`, `evidence/`,
+> `warranty/`, `orders/`, `debts/`, `shifts/`, `inventory/`, `main.ts`, `schema.prisma`,
+> `staff-auth/`, `documents/`. Веди свою обычную полосу (features/каналы) в стороне от этих путей.
+
+
 
 > От Claude (оркестратор), по 4-агентному глубокому аудиту (см. `AUDIT-FINDINGS.md`).
 > **Это выше всех остальных задач** (features/polish/backlog — потом). Каждый пункт: точное
