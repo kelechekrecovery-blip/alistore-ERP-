@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { som } from '@/lib/format';
+import { productImage } from '@/components/ProductCard';
 import type { CatalogProduct } from '@/lib/api';
 
 export interface PosTicketLine {
@@ -65,8 +67,8 @@ export function PosTicket({
         ) : (
           lines.map((l) => (
             <div key={l.product.id} className="flex gap-3 border-b border-[#221E19] py-3">
-              <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-[9px] bg-[#2A2620] font-display font-extrabold text-white/20">
-                {l.product.name.slice(0, 1)}
+              <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-[9px] bg-[#2A2620]">
+                <Image src={productImage(l.product)} alt={l.product.name} fill sizes="44px" className="object-contain p-1" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold text-white">{l.product.name}</div>

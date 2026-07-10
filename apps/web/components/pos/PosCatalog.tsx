@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { som } from '@/lib/format';
+import { productImage } from '@/components/ProductCard';
 import type { CatalogProduct, OfflinePosQueueItem } from '@/lib/api';
 
 interface PosQueueSummary {
@@ -176,10 +178,8 @@ export function PosCatalog({
               onClick={() => onAdd(p)}
               className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3 text-left transition hover:border-lime/40"
             >
-              <div className="relative mb-2.5 grid h-20 place-items-center rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-                <span className="font-display text-3xl font-extrabold text-white/15">
-                  {p.name.slice(0, 1)}
-                </span>
+              <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
+                <Image src={productImage(p)} alt={p.name} fill sizes="120px" className="object-contain p-2" />
                 {p.availableUnits < 5 && (
                   <span className="absolute right-1.5 top-1.5 rounded bg-warn px-1.5 py-0.5 text-[9px] font-bold text-lime-ink">
                     {p.availableUnits} шт
