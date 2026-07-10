@@ -153,6 +153,15 @@ enum B2BQuoteStatus {
   rejected
 }
 
+enum ProtectionStatus {
+  requested
+  reviewing
+  offered
+  active
+  rejected
+  cancelled
+}
+
 // ---------- CORE ----------
 model Customer {
   id        String          @id @default(cuid())
@@ -570,6 +579,28 @@ model B2BQuoteItem {
 
   @@index([quoteId])
   @@index([sku])
+}
+
+model DeviceProtectionPolicy {
+  id             String           @id @default(cuid())
+  customerId     String
+  orderId        String
+  imei           String
+  productName    String
+  planType       String // accidental_damage | extended_warranty | full_protection
+  status         ProtectionStatus @default(requested)
+  deviceValue    Int
+  premium        Int?
+  coverageMonths Int
+  staffNote      String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+  @@index([imei])
 }
 
 // ---------- AUTH ----------

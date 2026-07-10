@@ -41,6 +41,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { GiftcardsModule } from './giftcards/giftcards.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { B2BModule } from './b2b/b2b.module';
+import { ProtectionModule } from './protection/protection.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { B2BModule } from './b2b/b2b.module';
     GiftcardsModule,
     NotificationsModule,
     B2BModule,
+    ProtectionModule,
   ],
 })
 export class AppModule {}

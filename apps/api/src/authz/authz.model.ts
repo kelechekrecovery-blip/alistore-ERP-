@@ -221,6 +221,13 @@ p, owner, b2b, read
 p, senior_seller, b2b, update
 p, admin, b2b, update
 p, owner, b2b, update
+p, seller, protection, read
+p, senior_seller, protection, read
+p, admin, protection, read
+p, owner, protection, read
+p, senior_seller, protection, update
+p, admin, protection, update
+p, owner, protection, update
 p, admin, reports, read
 p, owner, reports, read
 p, admin, ai, read

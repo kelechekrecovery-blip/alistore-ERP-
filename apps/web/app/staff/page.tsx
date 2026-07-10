@@ -14,6 +14,9 @@ import {
   fetchB2BQuotes,
   updateB2BQuote,
   type StaffB2BQuote,
+  fetchProtectionQueue,
+  updateProtection,
+  type DeviceProtectionPolicy,
   type QueueOrder,
   type TradeIn,
   type TradeInGrade,
@@ -29,11 +32,12 @@ import {
 const POINT = 'BISHKEK-1';
 const SHOP = 'AliStore Центр';
 
-type Tab = 'home' | 'orders' | 'b2b' | 'tasks' | 'buyback';
+type Tab = 'home' | 'orders' | 'b2b' | 'protection' | 'tasks' | 'buyback';
 const NAV: { id: Tab; icon: string; label: string }[] = [
   { id: 'home', icon: '⌂', label: 'Главная' },
   { id: 'orders', icon: '📦', label: 'Заказы' },
   { id: 'b2b', icon: '▦', label: 'Опт' },
+  { id: 'protection', icon: '◇', label: 'Защита' },
   { id: 'tasks', icon: '📊', label: 'KPI' },
   { id: 'buyback', icon: '♻️', label: 'Скупка' },
 ];
@@ -46,6 +50,8 @@ export default function StaffPage() {
   const [orders, setOrders] = useState<QueueOrder[] | null>(null);
   const [b2bQuotes, setB2BQuotes] = useState<StaffB2BQuote[] | null>(null);
   const [quoteTotals, setQuoteTotals] = useState<Record<string, string>>({});
+  const [protection, setProtection] = useState<DeviceProtectionPolicy[] | null>(null);
+  const [protectionPremiums, setProtectionPremiums] = useState<Record<string, string>>({});
   const [tasks, setTasks] = useState<boolean[]>(TASKS.map(() => false));
   const [buyback, setBuyback] = useState<boolean[]>(BUYBACK.map(() => false));
   const [tradeIn, setTradeIn] = useState<TradeIn | null>(null);
@@ -97,6 +103,18 @@ export default function StaffPage() {
     ])));
   }, [session]);
   useEffect(() => { if (tab === 'b2b' && session) loadB2B(); }, [tab, loadB2B, session]);
+
+  const loadProtection = useCallback(async () => {
+    if (!session) return;
+    setProtection(null);
+    const rows = await fetchProtectionQueue(session.accessToken);
+    setProtection(rows);
+    setProtectionPremiums((current) => Object.fromEntries(rows.map((policy) => [
+      policy.id,
+      current[policy.id] ?? String(policy.premium ?? ''),
+    ])));
+  }, [session]);
+  useEffect(() => { if (tab === 'protection' && session) loadProtection(); }, [tab, loadProtection, session]);
 
   function flash(m: string) { setToast(m); window.setTimeout(() => setToast(''), 1600); }
   function fileList(event: ChangeEvent<HTMLInputElement>) {
@@ -170,6 +188,22 @@ export default function StaffPage() {
       setBusy(null);
     }
   }
+  async function protectionAction(policy: DeviceProtectionPolicy, status: 'reviewing' | 'offered' | 'rejected') {
+    if (!session) return;
+    setBusy(policy.id);
+    try {
+      await updateProtection(policy.id, {
+        status,
+        premium: status === 'offered' ? Number(protectionPremiums[policy.id]) : undefined,
+      }, session.accessToken);
+      await loadProtection();
+      flash(status === 'offered' ? 'Предложение отправлено' : status === 'reviewing' ? 'Заявка в работе' : 'Заявка отклонена');
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка защиты');
+    } finally {
+      setBusy(null);
+    }
+  }
   async function submitBuyback(e: FormEvent) {
     e.preventDefault();
     if (!session) return;
@@ -238,6 +272,7 @@ export default function StaffPage() {
               setShift(null);
               setOrders(null);
               setB2BQuotes(null);
+              setProtection(null);
             }}
             className="text-[#8A7F76]"
           >
@@ -297,6 +332,7 @@ export default function StaffPage() {
               <div className="mb-4 grid grid-cols-2 gap-2.5">
                 <Action icon="📦" label="Заказы" onClick={() => setTab('orders')} />
                 <Action icon="▦" label="B2B · Опт" onClick={() => setTab('b2b')} />
+                <Action icon="◇" label="Защита устройств" onClick={() => setTab('protection')} />
                 <Action icon="📊" label="Задачи и KPI" onClick={() => setTab('tasks')} />
                 <Action icon="♻️" label="Скупка Б/У" onClick={() => setTab('buyback')} />
                 <ActionLink icon="🖥" label="POS · Касса" href="/pos" />
@@ -382,6 +418,40 @@ export default function StaffPage() {
                       </div>
                     )}
                     {quote.quotedTotal !== null && <div className="mt-2 text-xs text-lime">КП {som(quote.quotedTotal)}</div>}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {tab === 'protection' && (
+            <div className="pt-1">
+              <h2 className="mb-3 font-display text-lg font-bold">Защита устройств</h2>
+              {protection === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+              {protection && protection.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Заявок пока нет</p>}
+              {(protection ?? []).map((policy) => {
+                const canManage = ['senior_seller', 'admin', 'owner'].includes(session.role);
+                return (
+                  <article key={policy.id} className="mb-2.5 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold">{policy.productName}</span>
+                      <span className="rounded-md bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">{policy.status}</span>
+                    </div>
+                    <div className="mt-1 font-mono text-[11px] text-[#8A7F76]">{policy.imei}</div>
+                    <div className="mt-2 text-[12px] text-[#A79C92]">{policy.planType} · {policy.coverageMonths} мес. · устройство {som(policy.deviceValue)}</div>
+                    {canManage && policy.status === 'requested' && (
+                      <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                        <button type="button" disabled={busy === policy.id} onClick={() => protectionAction(policy, 'reviewing')} className="rounded-[9px] bg-lime py-2 text-xs font-bold text-lime-ink">В работу</button>
+                        <button type="button" disabled={busy === policy.id} onClick={() => protectionAction(policy, 'rejected')} className="rounded-[9px] border border-[#49342D] px-3 text-xs text-[#FF8A7A]">Отклонить</button>
+                      </div>
+                    )}
+                    {canManage && policy.status === 'reviewing' && (
+                      <div className="mt-3 flex gap-2">
+                        <input aria-label="Страховая премия" type="number" value={protectionPremiums[policy.id] ?? ''} onChange={(event) => setProtectionPremiums((current) => ({ ...current, [policy.id]: event.target.value }))} className="min-w-0 flex-1 rounded-[9px] border border-[#2E2822] bg-[#16130F] px-3 py-2 font-mono text-xs outline-none focus:border-lime" />
+                        <button type="button" disabled={busy === policy.id || !Number(protectionPremiums[policy.id])} onClick={() => protectionAction(policy, 'offered')} className="rounded-[9px] bg-lime px-3 text-xs font-bold text-lime-ink disabled:opacity-50">Предложить</button>
+                      </div>
+                    )}
+                    {policy.premium !== null && <div className="mt-2 text-xs text-lime">Премия {som(policy.premium)}</div>}
                   </article>
                 );
               })}
