@@ -179,4 +179,20 @@ describe('Gift cards / store credit (integration)', () => {
     expect((await prisma.giftCard.findUnique({ where: { code: card.code } }))?.balance).toBe(10000);
     expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('reserved');
   });
+
+  it('is race-safe: two concurrent redemptions cannot over-draw one card', async () => {
+    const a = await reservedOrder(30000);
+    const b = await reservedOrder(30000);
+    const card = await giftcards.issue({ code: 'gc-race', amount: 30000 }, 'cashier'); // covers only one
+
+    const results = await Promise.allSettled([
+      payments.pay({ orderId: a.order.id, method: 'gift_card', amount: 30000, giftCardCode: card.code }, 'cashier'),
+      payments.pay({ orderId: b.order.id, method: 'gift_card', amount: 30000, giftCardCode: card.code }, 'cashier'),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1); // exactly one wins
+    const after = await prisma.giftCard.findUniqueOrThrow({ where: { code: card.code } });
+    expect(after.balance).toBe(0); // never negative
+    expect(after.status).toBe('redeemed');
+    expect(await prisma.auditEvent.count({ where: { type: 'giftcard.redeemed' } })).toBe(1);
+  });
 });
