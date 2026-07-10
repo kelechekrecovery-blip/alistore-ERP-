@@ -57,6 +57,27 @@ export async function patchAuthJson<T>(
   return (await res.json()) as T;
 }
 
+/** Authenticated PUT JSON (Bearer token). */
+export async function putAuthJson<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
 /** Authenticated DELETE JSON (Bearer token). */
 export async function deleteAuthJson<T>(
   path: string,

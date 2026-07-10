@@ -214,6 +214,13 @@ p, admin, campaigns, convert
 p, owner, campaigns, read
 p, owner, campaigns, create
 p, owner, campaigns, convert
+p, seller, b2b, read
+p, senior_seller, b2b, read
+p, admin, b2b, read
+p, owner, b2b, read
+p, senior_seller, b2b, update
+p, admin, b2b, update
+p, owner, b2b, update
 p, admin, reports, read
 p, owner, reports, read
 p, admin, ai, read

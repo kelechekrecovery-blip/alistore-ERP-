@@ -7,6 +7,7 @@ const NAV = [
   { href: '/trade-in', label: 'Скупка Б/У' },
   { href: '/#warranty', label: 'Гарантия' },
   { href: '/support', label: 'Поддержка' },
+  { href: '/b2b', label: 'Для бизнеса' },
 ];
 
 export function SiteHeader() {

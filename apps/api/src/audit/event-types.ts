@@ -80,6 +80,8 @@ export const EventType = {
   CampaignConverted: 'campaign.converted',
   TicketCreated: 'ticket.created',
   TicketEscalated: 'ticket.escalated',
+  B2BQuoteRequested: 'b2b.quote_requested',
+  B2BQuoteUpdated: 'b2b.quote_updated',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

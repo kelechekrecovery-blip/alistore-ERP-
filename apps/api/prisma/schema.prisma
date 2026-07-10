@@ -145,6 +145,14 @@ enum GiftCardStatus {
   expired
 }
 
+enum B2BQuoteStatus {
+  requested
+  reviewing
+  quoted
+  accepted
+  rejected
+}
+
 // ---------- CORE ----------
 model Customer {
   id        String          @id @default(cuid())
@@ -511,6 +519,57 @@ model SupportTicket {
 
   @@index([customerId])
   @@index([status])
+}
+
+// Business buyer profile is customer-owned but intentionally stores customerId
+// without a foreign key, matching SupportTicket/WarrantyCase test isolation.
+model BusinessBuyerProfile {
+  id             String   @id @default(cuid())
+  customerId     String   @unique
+  companyName    String
+  taxId          String
+  contactName    String
+  email          String?
+  billingAddress String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([companyName])
+}
+
+model B2BQuote {
+  id               String         @id @default(cuid())
+  customerId       String
+  status           B2BQuoteStatus @default(requested)
+  paymentIntent    String         @default("invoice") // invoice | bank_transfer
+  fulfillmentType  String         @default("delivery") // delivery | pickup
+  deliveryAddress  String?
+  pickupPoint      String?
+  comment          String?
+  staffNote        String?
+  listTotal        Int
+  quotedTotal      Int?
+  validUntil       DateTime?
+  items            B2BQuoteItem[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model B2BQuoteItem {
+  id          String   @id @default(cuid())
+  quote       B2BQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteId     String
+  sku         String
+  name        String
+  qty         Int
+  listPrice   Int
+  targetPrice Int?
+
+  @@index([quoteId])
+  @@index([sku])
 }
 
 // ---------- AUTH ----------

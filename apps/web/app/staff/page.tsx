@@ -11,6 +11,9 @@ import {
   fulfillOrder,
   transitionOrder,
   uploadEvidenceImages,
+  fetchB2BQuotes,
+  updateB2BQuote,
+  type StaffB2BQuote,
   type QueueOrder,
   type TradeIn,
   type TradeInGrade,
@@ -26,10 +29,11 @@ import {
 const POINT = 'BISHKEK-1';
 const SHOP = 'AliStore Центр';
 
-type Tab = 'home' | 'orders' | 'tasks' | 'buyback';
+type Tab = 'home' | 'orders' | 'b2b' | 'tasks' | 'buyback';
 const NAV: { id: Tab; icon: string; label: string }[] = [
   { id: 'home', icon: '⌂', label: 'Главная' },
   { id: 'orders', icon: '📦', label: 'Заказы' },
+  { id: 'b2b', icon: '▦', label: 'Опт' },
   { id: 'tasks', icon: '📊', label: 'KPI' },
   { id: 'buyback', icon: '♻️', label: 'Скупка' },
 ];
@@ -40,6 +44,8 @@ export default function StaffPage() {
   const [tab, setTab] = useState<Tab>('home');
   const [shift, setShift] = useState<Shift | null | undefined>(undefined);
   const [orders, setOrders] = useState<QueueOrder[] | null>(null);
+  const [b2bQuotes, setB2BQuotes] = useState<StaffB2BQuote[] | null>(null);
+  const [quoteTotals, setQuoteTotals] = useState<Record<string, string>>({});
   const [tasks, setTasks] = useState<boolean[]>(TASKS.map(() => false));
   const [buyback, setBuyback] = useState<boolean[]>(BUYBACK.map(() => false));
   const [tradeIn, setTradeIn] = useState<TradeIn | null>(null);
@@ -79,6 +85,18 @@ export default function StaffPage() {
     setOrders([...a, ...b]);
   }, [session]);
   useEffect(() => { if (tab === 'orders' && session) loadOrders(); }, [tab, loadOrders, session]);
+
+  const loadB2B = useCallback(async () => {
+    if (!session) return;
+    setB2BQuotes(null);
+    const rows = await fetchB2BQuotes(session.accessToken);
+    setB2BQuotes(rows);
+    setQuoteTotals((current) => Object.fromEntries(rows.map((quote) => [
+      quote.id,
+      current[quote.id] ?? String(quote.quotedTotal ?? quote.listTotal),
+    ])));
+  }, [session]);
+  useEffect(() => { if (tab === 'b2b' && session) loadB2B(); }, [tab, loadB2B, session]);
 
   function flash(m: string) { setToast(m); window.setTimeout(() => setToast(''), 1600); }
   function fileList(event: ChangeEvent<HTMLInputElement>) {
@@ -134,6 +152,23 @@ export default function StaffPage() {
       else { await transitionOrder(o.id, 'picking', session.accessToken); flash('В сборке'); }
       loadOrders();
     } catch (e) { flash(e instanceof Error ? e.message : 'Ошибка'); } finally { setBusy(null); }
+  }
+  async function quoteAction(quote: StaffB2BQuote, status: 'reviewing' | 'quoted' | 'rejected') {
+    if (!session) return;
+    setBusy(quote.id);
+    try {
+      await updateB2BQuote(quote.id, {
+        status,
+        quotedTotal: status === 'quoted' ? Number(quoteTotals[quote.id]) : undefined,
+        validUntil: status === 'quoted' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : undefined,
+      }, session.accessToken);
+      await loadB2B();
+      flash(status === 'quoted' ? 'КП отправлено' : status === 'reviewing' ? 'Заявка в работе' : 'Заявка отклонена');
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка B2B');
+    } finally {
+      setBusy(null);
+    }
   }
   async function submitBuyback(e: FormEvent) {
     e.preventDefault();
@@ -202,6 +237,7 @@ export default function StaffPage() {
               setSession(null);
               setShift(null);
               setOrders(null);
+              setB2BQuotes(null);
             }}
             className="text-[#8A7F76]"
           >
@@ -260,6 +296,7 @@ export default function StaffPage() {
 
               <div className="mb-4 grid grid-cols-2 gap-2.5">
                 <Action icon="📦" label="Заказы" onClick={() => setTab('orders')} />
+                <Action icon="▦" label="B2B · Опт" onClick={() => setTab('b2b')} />
                 <Action icon="📊" label="Задачи и KPI" onClick={() => setTab('tasks')} />
                 <Action icon="♻️" label="Скупка Б/У" onClick={() => setTab('buyback')} />
                 <ActionLink icon="🖥" label="POS · Касса" href="/pos" />
@@ -313,6 +350,41 @@ export default function StaffPage() {
               {TASKS.map((t, i) => (
                 <Check key={i} label={t} done={tasks[i]} onClick={() => setTasks((a) => a.map((v, j) => (j === i ? !v : v)))} />
               ))}
+            </div>
+          )}
+
+          {tab === 'b2b' && (
+            <div className="pt-1">
+              <h2 className="mb-3 font-display text-lg font-bold">B2B · Оптовые заявки</h2>
+              {b2bQuotes === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+              {b2bQuotes && b2bQuotes.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Заявок пока нет</p>}
+              {(b2bQuotes ?? []).map((quote) => {
+                const canManage = ['senior_seller', 'admin', 'owner'].includes(session.role);
+                return (
+                  <article key={quote.id} className="mb-2.5 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold">{quote.profile?.companyName ?? `Клиент ${quote.customerId.slice(-6)}`}</span>
+                      <span className="rounded-md bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">{quote.status}</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-[#8A7F76]">ИНН {quote.profile?.taxId ?? '—'} · {quote.profile?.contactName ?? '—'}</div>
+                    <div className="mt-2 text-[13px] text-[#D8CFC6]">{quote.items.map((item) => `${item.name} × ${item.qty}`).join(', ')}</div>
+                    <div className="mt-1 font-display text-base font-extrabold">{som(quote.listTotal)}</div>
+                    {canManage && quote.status === 'requested' && (
+                      <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                        <button type="button" disabled={busy === quote.id} onClick={() => quoteAction(quote, 'reviewing')} className="rounded-[9px] bg-lime py-2 text-xs font-bold text-lime-ink">В работу</button>
+                        <button type="button" disabled={busy === quote.id} onClick={() => quoteAction(quote, 'rejected')} className="rounded-[9px] border border-[#49342D] px-3 text-xs text-[#FF8A7A]">Отклонить</button>
+                      </div>
+                    )}
+                    {canManage && quote.status === 'reviewing' && (
+                      <div className="mt-3 flex gap-2">
+                        <input aria-label="Сумма КП" type="number" value={quoteTotals[quote.id] ?? ''} onChange={(event) => setQuoteTotals((current) => ({ ...current, [quote.id]: event.target.value }))} className="min-w-0 flex-1 rounded-[9px] border border-[#2E2822] bg-[#16130F] px-3 py-2 font-mono text-xs outline-none focus:border-lime" />
+                        <button type="button" disabled={busy === quote.id || !Number(quoteTotals[quote.id])} onClick={() => quoteAction(quote, 'quoted')} className="rounded-[9px] bg-lime px-3 text-xs font-bold text-lime-ink disabled:opacity-50">Отправить КП</button>
+                      </div>
+                    )}
+                    {quote.quotedTotal !== null && <div className="mt-2 text-xs text-lime">КП {som(quote.quotedTotal)}</div>}
+                  </article>
+                );
+              })}
             </div>
           )}
 

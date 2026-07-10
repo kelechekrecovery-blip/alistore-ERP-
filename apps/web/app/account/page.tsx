@@ -26,6 +26,7 @@ const MENU = [
   { href: '/account/notifications', icon: '🔔', label: 'Уведомления', badge: '' },
   { href: '/support', icon: '💬', label: 'Поддержка', badge: '' },
   { href: '/trade-in', icon: '♻', label: 'Trade-in', badge: 'оценка' },
+  { href: '/b2b', icon: '▦', label: 'Для бизнеса', badge: 'опт' },
   { href: '/account/settings', icon: '⚙', label: 'Настройки', badge: '' },
 ];
 
