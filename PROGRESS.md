@@ -692,3 +692,13 @@
 - Checks run: targeted Jest for `exchange`; `npm run api:build`.
 - Outcome: exchange-targeted tests passed 2 suites / 3 tests; API build passed.
 - Next step: build Refund Money Flow / Dispute Center staff UI, then debt reminders and shift close photo report.
+
+## 2026-07-10
+
+- Task: align the owner Risk Center with the latest 95-page Claude Design project.
+- Files changed: `apps/api/src/reports/{risk-signals,reports.service}.ts`, `apps/api/test/{risk-signals,reports.e2e-spec}.ts`, `apps/web/components/erp/RiskCenterView.tsx`, `apps/web/app/erp/page.tsx`, `BACKLOG.md`, `docs/PHASES.md`.
+- Result: Risk Center now derives `repeat_returns` (>3 customer returns in 30 days), `discount_frequency` (>30% discounted POS receipts per staff member), and `write_off_spike` (latest seven-day write-off quantity above the preceding window, minimum 3 units) directly from operational Prisma rows. Command Center routes the signals to CRM, Margin/KPI, and Stock.
+- Checks run: targeted Jest `risk-signals` + `reports` (17/17); full API Jest (98 suites / 355 tests); API TypeScript build; Next production build (35 pages); `git diff --check`; live authenticated `GET /api/reports/risks`; browser QA in `/erp` with isolated temporary data and cleanup.
+- Outcome: live API returned all three new signals; ERP displayed 2 high + 1 medium with the expected labels/details; clicking repeat returns opened `CRM · Inbox`; temporary owner/customer/orders/returns/write-offs were deleted afterward. Local API was restarted on port 4000 because `start:dev` is a non-watch `ts-node` process.
+- Commit: `e2491fc` (`feat(risk): align owner signals with design`).
+- Next step: implement the first unblocked extended-module gap from Claude Design, starting with Purchase Order procurement and PO receiving on top of the existing supplier/inventory services.
