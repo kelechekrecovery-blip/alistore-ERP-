@@ -187,10 +187,12 @@ describe('Courier and print/export RBAC', () => {
       .set('Authorization', `Bearer ${courierToken}`)
       .expect(403);
 
+    // E8: the trade-in contract exposes the raw passport → restricted to PII-cleared
+    // roles (admin/owner via pii:approve); a seller is now forbidden, not merely 422.
     await request(app.getHttpServer())
       .get('/documents/tradein/nope/contract')
       .set('Authorization', `Bearer ${sellerToken}`)
-      .expect(422);
+      .expect(403);
 
     await request(app.getHttpServer())
       .get('/documents/order/nope/invoice')

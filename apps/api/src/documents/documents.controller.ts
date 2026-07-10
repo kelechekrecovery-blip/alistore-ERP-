@@ -19,6 +19,9 @@ export class DocumentsController {
 
   /** Trade-in (скупка Б/У) contract PDF for a TradeInDevice (base64). */
   @Get('tradein/:id/contract')
+  // Contract carries the seller's raw national id — restrict to PII-cleared roles
+  // (admin/owner via pii:approve), overriding the class-level documents:read.
+  @RequirePermission('pii', 'approve')
   tradeInContract(@Param('id') id: string) {
     return this.documents.tradeInContract(id);
   }
