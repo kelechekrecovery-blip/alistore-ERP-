@@ -32,6 +32,7 @@ import { DashboardView } from '@/components/erp/DashboardView';
 import { CampaignsView } from '@/components/erp/CampaignsView';
 import { Card } from '@/components/erp/Card';
 import { ReadinessView } from '@/components/erp/ReadinessView';
+import { RiskCenterView } from '@/components/erp/RiskCenterView';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
@@ -86,7 +87,6 @@ const STATUS_RU: Record<string, string> = {
   sold: 'Продан', written_off: 'Списан', returned: 'Возвращён', in_repair: 'В ремонте',
 };
 const ru = (s: string) => STATUS_RU[s] ?? s;
-const SEV_COLOR: Record<string, string> = { high: '#FF8A7A', medium: '#E5B23C', low: '#8A7F76' };
 
 export default function ErpPage() {
   const router = useRouter();
@@ -230,7 +230,7 @@ export default function ErpPage() {
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}
           {route === 'campaigns' && <CampaignsView />}
-          {route === 'risks' && <RisksView risks={risks} onSignal={actOnSignal} />}
+          {route === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
           {route === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}
           {route === 'ledger' && <LedgerView ledger={ledger} />}
         </div>
@@ -289,29 +289,6 @@ function StockView({ d }: { d: Dashboard | null }) {
         ))}
       </Card>
     </div>
-  );
-}
-
-function RisksView({ risks, onSignal }: { risks: RiskSignal[]; onSignal: (kind: string) => void }) {
-  return (
-    <Card>
-      {risks.length === 0 && <p className="text-sm text-[#8A7F76]">✓ Тревог нет — всё сходится.</p>}
-      <ul className="flex flex-col gap-2">
-        {risks.map((r, i) => (
-          <li key={i}>
-            <button
-              type="button"
-              onClick={() => onSignal(r.kind)}
-              className="flex w-full items-center gap-3 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2.5 text-left text-sm transition hover:border-[#3A342E]"
-            >
-              <span className="font-mono text-[10px] font-bold uppercase" style={{ color: SEV_COLOR[r.severity] }}>{r.severity}</span>
-              <span className="text-[#D8CFC6]">{r.detail}</span>
-              <span className="ml-auto text-[#6E645C]">→</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </Card>
   );
 }
 
