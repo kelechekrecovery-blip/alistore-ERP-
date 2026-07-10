@@ -8,8 +8,9 @@
 >   `pii:approve`. (delicate casbin — оставлено Codex намеренно.)
 > - **M-4** — catch P2002 → идемпотентный 200 (payMany уже под `FOR UPDATE`, но общий catch полезен).
 > - **M-5** — POS-идемпотентность: генерить серверный ключ если `clientSaleId` не пришёл.
-> - **Auth-hardening тесты** (из test-аудита): TOTP-replay, refresh-reuse-detection, OTP-lockout,
->   giftcard double-redeem race, webhook race idempotency.
+> - **Auth-hardening тесты:** ✅ TOTP-replay (включая concurrent single-use),
+>   ✅ refresh-reuse-detection с отзывом всей семьи и row lock, ✅ OTP-lockout.
+> - **Race-тесты:** ✅ giftcard double-redeem; остался webhook idempotency.
 
 ## Сделано Claude (детали ниже помечены ✅)
 

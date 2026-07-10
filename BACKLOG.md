@@ -1,6 +1,10 @@
 # BACKLOG
 
 ## Next
+- Restrict raw passport data in trade-in PDF documents to admin/owner or an explicit PII approval path (Emergency P0 E8).
+- Return the existing payment on concurrent `txnId` P2002 collisions instead of surfacing a 500 (M-4), with a webhook race test.
+- Make POS retries idempotent when `clientSaleId` is omitted (M-5), with a duplicate-order regression test.
+- Add the remaining provider webhook race-idempotency test.
 - Add B2B/wholesale quote request scaffold: business buyer profile fields, invoice/wholesale checkout intent, staff queue visibility, and Event Ledger coverage.
 - Activate production AI vision/market scout after provider key and reference datasets are available: configure `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY`, validate real photo/listing outputs, and add offline eval thresholds.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
@@ -9,6 +13,8 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Prove gift-card double-redemption safety with a concurrent race regression test.
+- Harden customer/staff authentication against refresh-token family replay, concurrent refresh races, repeated TOTP step-up codes, and OTP brute-force attempts; align Customer 360 security regression coverage.
 - Add click-and-collect fulfillment metadata across API, web checkout, native checkout, Telegram Mini App, account order details, staff, and warehouse queues.
 - Add AI photo grading and market price scout scaffolding behind staff-only `/ai` endpoints with keyless rules, OpenRouter activation path, and safe fallback.
 - Remediate production dependency audit blockers with Next 16, NestJS 11, patched transitive overrides, tsc-based API build, and full MVP/browser/mobile/security verification.

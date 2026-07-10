@@ -1,5 +1,6 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import { PrismaClient, Role } from '@prisma/client';
+import * as argon2 from 'argon2';
 
 const databaseUrl =
   process.env.E2E_DATABASE_URL ??
@@ -56,25 +57,13 @@ export async function bootstrapStaff(
   role: Role = 'owner',
 ): Promise<string> {
   const username = `e2e-${role}-${Date.now().toString(36)}`;
-  await postJson(request, '/staff-auth/bootstrap', { username, password: 'pass-e2e' });
-  if (role !== 'owner') {
-    const ownerLogin = await postJson<{ accessToken: string }>(request, '/staff-auth/login', {
+  await prisma.staffUser.create({
+    data: {
       username,
-      password: 'pass-e2e',
-    });
-    const staffUsername = `e2e-${role}-${Date.now().toString(36)}-staff`;
-    await postJson(
-      request,
-      '/staff-auth/staff',
-      { username: staffUsername, password: 'pass-e2e', role },
-      ownerLogin.accessToken,
-    );
-    const staffLogin = await postJson<{ accessToken: string }>(request, '/staff-auth/login', {
-      username: staffUsername,
-      password: 'pass-e2e',
-    });
-    return staffLogin.accessToken;
-  }
+      passwordHash: await argon2.hash('pass-e2e'),
+      role,
+    },
+  });
   const login = await postJson<{ accessToken: string }>(request, '/staff-auth/login', {
     username,
     password: 'pass-e2e',

@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-10
+
+- Task: close the auth-hardening portion of the Emergency P0 handoff.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260710063722_staff_totp_last_token/`, `apps/api/src/auth/auth.service.ts`, `apps/api/src/staff-auth/staff-auth.service.ts`, `apps/api/test/auth.e2e-spec.ts`, `apps/api/test/staff-auth.e2e-spec.ts`, `apps/api/test/customer-pii-guard.e2e-spec.ts`, `apps/api/test/debts.e2e-spec.ts`, `e2e/helpers.ts`, `docs/CODEX-EMERGENCY-P0.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: refresh rotation now locks the presented token row, detects sequential and concurrent reuse, commits revocation of every live customer refresh token before returning `refresh_reused`, and cannot leave a replacement session alive after a replay. Staff TOTP step-up codes are consumed with an atomic conditional update, so the same code cannot authorize two concurrent dangerous actions. OTP lockout and the tightened authenticated Customer 360 policy now have explicit regression coverage.
+- Checks run: Prisma validate/generate; dev migration deploy; test DB schema sync; targeted auth/staff/approval/throttle tests; API build; full API Jest sequentially; web production build; native TypeScript check; Playwright E2E; `npm audit`; `git diff --check`.
+- Outcome: targeted auth gate passed 4 suites / 18 tests. Full API regression passed 96 suites / 343 tests; web/API builds and native typecheck passed; Playwright passed 9/9; dependency audit reports 0 vulnerabilities. The first full runs exposed one stale Customer 360 expectation, one shared-test cleanup ordering issue, and E2E bootstrap throttling; all three test-harness regressions were corrected before the green final gate.
+- Commits: `973830a` (auth core, committed concurrently); validation/docs commit pending.
+- Next step: close Emergency P0 E8 (passport visibility in trade-in PDF), then M-4/M-5 and the remaining webhook race test before returning to the B2B/wholesale feature scaffold.
+
 ## 2026-07-08
 
 - Task: add click-and-collect fulfillment metadata across the ecosystem.

@@ -10,7 +10,7 @@ import { CustomersModule } from '../src/customers/customers.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
-describe('Customer PII read policy (optional JWT + masking)', () => {
+describe('Customer PII read policy (required JWT + masking)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwt: JwtService;
@@ -58,19 +58,23 @@ describe('Customer PII read policy (optional JWT + masking)', () => {
     return jwt.sign({ sub: customerId, typ: 'customer', phone });
   }
 
-  it('masks phone for anonymous and seller reads, but reveals it to admin and self', async () => {
+  it('rejects anonymous/foreign customers, masks staff reads, and reveals PII to admin/self', async () => {
     const c = await customer();
+    const other = await customer();
     const server = app.getHttpServer();
 
-    const anonymous = await request(server).get(`/customers/${c.id}/overview`).expect(200);
-    expect(anonymous.body.customer.phone).not.toBe(c.phone);
-    expect(anonymous.body.customer.phone).toMatch(/^\+996\*+\d{2}$/);
+    await request(server).get(`/customers/${c.id}/overview`).expect(401);
+    await request(server)
+      .get(`/customers/${c.id}/overview`)
+      .set('Authorization', `Bearer ${customerToken(other.id, other.phone)}`)
+      .expect(403);
 
     const seller = await request(server)
       .get(`/customers/${c.id}/overview`)
       .set('Authorization', `Bearer ${staffToken('seller')}`)
       .expect(200);
-    expect(seller.body.customer.phone).toBe(anonymous.body.customer.phone);
+    expect(seller.body.customer.phone).not.toBe(c.phone);
+    expect(seller.body.customer.phone).toMatch(/^\+996\*+\d{2}$/);
 
     const admin = await request(server)
       .get(`/customers/${c.id}/overview`)
