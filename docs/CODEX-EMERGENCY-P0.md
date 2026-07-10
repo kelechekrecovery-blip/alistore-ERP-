@@ -1,16 +1,20 @@
 # 🚨 EMERGENCY P0 (перед любым запуском/деплоем)
 
-> ✅ **CLAUDE ЗАКРЫЛ Блоки 1–3** (кроме E8). Коммиты: M-3 `b49dc63`, M-2 `f599137`,
-> M-1 `cc7d880`, индексы `6c745bd`, E1/E-a/E2 `e321fc5`, E3-E7 `e65dd1b`. Все с тестами/проверкой.
-> **Остаток для Codex (можно трогать эти пути снова):**
-> - **E8** — паспорт в PDF-договоре открыт всем staff-ролям (`documents.service.ts:80`,
->   casbin `documents:read` = seller/cashier/…). Сузить грант до admin/owner ИЛИ маскировать +
->   `pii:approve`. (delicate casbin — оставлено Codex намеренно.)
-> - **M-4** — catch P2002 → идемпотентный 200 (payMany уже под `FOR UPDATE`, но общий catch полезен).
-> - **M-5** — POS-идемпотентность: генерить серверный ключ если `clientSaleId` не пришёл.
+> ✅✅ **CLAUDE ЗАКРЫЛ ВСЕ Блоки 1–3.** Коммиты: M-3 `b49dc63`, M-2 `f599137`,
+> M-1 `cc7d880`, индексы `6c745bd`, E1/E-a/E2 `e321fc5`, E3-E7 `e65dd1b`,
+> E8 `91aecb4`, M-5 `dd71bd1`. Все с тестами/проверкой.
+> **Остаток — ничего блокирующего:**
+> - **E8** ✅ — trade-in контракт (raw паспорт) сужен до PII-ролей через method-level
+>   `@RequirePermission('pii','approve')` поверх class-level `documents:read`. seller→403.
+> - **M-5** ✅ — POS-идемпотентность: `clientSaleId` остаётся optional (web/mobile всегда шлют),
+>   а при отсутствии сервер деривит `pos:auto:<hash>` из cart-fingerprint в 60-сек окне →
+>   ретрай не создаёт 2-й заказ. e2e есть.
+> - **M-4** ⚪ — необязателен: конкурентный webhook уже graceful через `FOR UPDATE` из M-1
+>   (доказано `payment-intents` webhook-race тестом — оба 200, один Payment). Отдельный
+>   catch P2002 → belt-and-suspenders, не блокер. Можно добавить позже.
 > - **Auth-hardening тесты:** ✅ TOTP-replay (включая concurrent single-use),
 >   ✅ refresh-reuse-detection с отзывом всей семьи и row lock, ✅ OTP-lockout.
-> - **Race-тесты:** ✅ giftcard double-redeem; остался webhook idempotency.
+> - **Race-тесты:** ✅ giftcard double-redeem, ✅ webhook idempotency.
 
 ## Сделано Claude (детали ниже помечены ✅)
 
@@ -79,12 +83,14 @@
   Эталон: `giftcards/giftcards.service.ts:88-99`. Добавить idempotency-ключ в `DebtPaymentDto`.
   **Тест:** гонка двух оплат одного долга → баланс верный, не двойное списание.
 
-- **M-4. P2002 → идемпотентный 200 (не 500).** `payments/payments.service.ts:70-82,128-143`
-  Обернуть create в catch P2002 → вернуть существующий платёж как идемпотентный. **Тест:** конкурентный
-  webhook с одним `txnId` → оба 200, один Payment.
+- **M-4. ⚪ P2002 → идемпотентный 200 (не 500).** `payments/payments.service.ts:70-82,128-143`
+  Не блокер: M-1 `FOR UPDATE` уже делает конкурентный webhook graceful (доказано webhook-race
+  тестом — оба 200, один Payment). Отдельный catch P2002 — опциональная перестраховка на потом.
 
-- **M-5. POS-идемпотентность обязательна.** `pos/pos.dto.ts` — генерить серверный ключ, если `clientSaleId`
-  не пришёл, ИЛИ дедуп по (staffId, cart-hash, окно). **Тест:** ретрай без clientSaleId не создаёт 2-й заказ.
+- **M-5. ✅ POS-идемпотентность.** `pos/pos.service.ts` + `pos/pos.dto.ts` (коммит `dd71bd1`).
+  `clientSaleId` остаётся optional (web/mobile всегда шлют), при отсутствии сервер деривит
+  `pos:auto:<sha256(staff+point+lines+tenders+discount+60s-bucket)>` → ретрай не создаёт 2-й заказ.
+  **Тест:** `pos-sale.e2e-spec.ts` — no-key ретрай продаёт 1 юнит, не 2. ✅
 
 ## БЛОК 3 — Индексы (тривиальные аддитивные миграции; можно отдать Claude — скажи)
 - **I-1.** `AuditEvent`: `@@index([refs], type: Gin)` (сейчас B-tree — не обслуживает `has`).
