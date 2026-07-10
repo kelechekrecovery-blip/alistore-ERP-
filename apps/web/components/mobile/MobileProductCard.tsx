@@ -8,15 +8,26 @@ import type { CatalogProduct } from '@/lib/api';
 import { som } from '@/lib/format';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
+import { useCompare } from '@/lib/compare';
 import { productImage } from '@/components/ProductCard';
+
+interface MobileProductCardProps {
+  product: CatalogProduct;
+  badge?: string;
+  priority?: boolean;
+  /** Show the ⇄ compare toggle beside the add button (catalog grid). */
+  showCompare?: boolean;
+}
 
 /**
  * Mobile hits/catalog product card (Клиент App 2.0): real product thumbnail with an
- * optional badge + favourite toggle, name, Sora price, stock line and a lime add button.
+ * optional badge + favourite toggle, name, Sora price, stock line, a lime add button and
+ * an optional compare toggle.
  */
-export function MobileProductCard({ product, badge, priority = false }: { product: CatalogProduct; badge?: string; priority?: boolean }) {
+export function MobileProductCard({ product, badge, priority = false, showCompare = false }: MobileProductCardProps) {
   const { add } = useCart();
   const { has, toggle } = useFavorites();
+  const compare = useCompare();
   const [added, setAdded] = useState(false);
   const inStock = product.availableUnits > 0;
   const href = `/product/${product.id}`;
@@ -62,20 +73,34 @@ export function MobileProductCard({ product, badge, priority = false }: { produc
         <div className="mt-0.5 text-[10px] text-[#8A7F76]">
           {inStock ? `${product.availableUnits} в наличии` : 'под заказ'}
         </div>
-        <button
-          type="button"
-          onClick={addToCart}
-          disabled={!inStock}
-          className={`mt-2.5 w-full rounded-[9px] py-2 text-center text-[12px] font-bold transition ${
-            added
-              ? 'bg-success text-white'
-              : inStock
-                ? 'bg-lime text-lime-ink'
-                : 'bg-[#2E2822] text-[#6E645C]'
-          }`}
-        >
-          {added ? 'Добавлено ✓' : inStock ? 'В корзину' : 'Под заказ'}
-        </button>
+        <div className="mt-2.5 flex gap-1.5">
+          <button
+            type="button"
+            onClick={addToCart}
+            disabled={!inStock}
+            className={`flex-1 rounded-[9px] py-2 text-center text-[12px] font-bold transition ${
+              added
+                ? 'bg-success text-white'
+                : inStock
+                  ? 'bg-lime text-lime-ink'
+                  : 'bg-[#2E2822] text-[#6E645C]'
+            }`}
+          >
+            {added ? 'Добавлено ✓' : inStock ? 'В корзину' : 'Под заказ'}
+          </button>
+          {showCompare && (
+            <button
+              type="button"
+              onClick={() => compare.toggle(product.id)}
+              aria-label={compare.has(product.id) ? 'Убрать из сравнения' : 'Сравнить'}
+              className={`grid w-[34px] place-items-center rounded-[9px] text-sm transition ${
+                compare.has(product.id) ? 'bg-lime text-lime-ink' : 'bg-[#2E2822] text-[#8A7F76]'
+              }`}
+            >
+              ⇄
+            </button>
+          )}
+        </div>
       </div>
     </motion.div>
   );

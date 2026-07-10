@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
+import MobileCatalog from '@/components/mobile/MobileCatalog';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 
 const CONDITIONS = ['Все', 'Новое', 'Б/У'];
@@ -40,7 +41,9 @@ export default function CatalogPage() {
 
   const reset = () => { setQuery(''); setCategory('Все'); setCondition('Все'); setStockOnly(false); setSort('popular'); };
 
-  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+  return <>
+    <div className="lg:hidden"><MobileCatalog /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-10">
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -68,7 +71,8 @@ export default function CatalogPage() {
       </div>
     </main>
     <SiteFooter />
-  </div>;
+    </div>
+  </>;
 }
 
 function FilterTitle({ children }: { children: React.ReactNode }) { return <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-[0.1em] text-[#6c7080]">{children}</h3>; }
