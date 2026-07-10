@@ -198,6 +198,26 @@ describe('POS sale (integration)', () => {
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
   });
 
+  it('deduplicates a retry with no clientSaleId via the windowed cart fingerprint (M-5)', async () => {
+    const product = await seedProduct(2); // two units: a dedup miss would sell the second
+    const dto = {
+      staffId: 'staff_pos_nokey',
+      point: 'BISHKEK-1',
+      method: 'cash' as const,
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    };
+
+    const first = expectCompleted(await pos.sale(dto));
+    const retry = expectCompleted(await pos.sale(dto)); // same cart, same window → same key
+
+    expect(retry.orderId).toBe(first.orderId);
+    expect((retry as { idempotent?: boolean }).idempotent).toBe(true);
+    expect(await prisma.order.count()).toBe(1);
+    expect(await prisma.payment.count()).toBe(1);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
+    expect(await prisma.deviceUnit.count({ where: { status: 'in_stock' } })).toBe(1);
+  });
+
   it('rejects a sale that exceeds available stock (409)', async () => {
     const product = await seedProduct(1);
     const err = await pos

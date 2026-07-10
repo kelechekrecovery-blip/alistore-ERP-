@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { CustomersService } from '../customers/customers.service';
 import { ShiftsService } from '../shifts/shifts.service';
 import { UnitsService } from '../units/units.service';
@@ -13,6 +14,15 @@ import { evaluateMarginControl, MarginControlResult } from './margin-control';
 
 /** Walk-in retail customer — POS sales without a named buyer attach here. */
 const WALKIN_PHONE = '+000000000000';
+
+/**
+ * Fallback POS idempotency window (M-5). Real clients (web/mobile) always send a
+ * `clientSaleId`, which is the precise idempotency key. If one is missing, we derive a
+ * deterministic key from the cart fingerprint bucketed into this window, so an accidental
+ * network re-submit within the window collapses to one sale while a deliberate identical
+ * re-ring in a later window is still processed as a new sale.
+ */
+const POS_AUTO_DEDUP_WINDOW_MS = 60_000;
 
 interface OrderLine {
   sku: string;
@@ -49,7 +59,7 @@ export class PosService {
   async sale(dto: PosSaleDto) {
     const actor = dto.staffId;
     const pct = dto.discountPct ?? 0;
-    const txnId = dto.clientSaleId ? `pos:${dto.clientSaleId}` : undefined;
+    const txnId = this.deriveTxnId(dto);
 
     if (txnId) {
       const existing = await this.payments.findByTxnId(txnId);
@@ -161,6 +171,35 @@ export class PosService {
       shiftId: shift.id,
       imeis: items.filter((i) => i.imei).map((i) => i.imei as string),
     };
+  }
+
+  /**
+   * Resolve the idempotency key for a sale (M-5). A client-supplied `clientSaleId` is the
+   * precise key; when absent, fall back to a windowed cart fingerprint so a retried
+   * submission does not create a second order. Always returns a key so dedup never no-ops.
+   */
+  private deriveTxnId(dto: PosSaleDto): string {
+    if (dto.clientSaleId) return `pos:${dto.clientSaleId}`;
+    return `pos:auto:${this.saleFingerprint(dto)}`;
+  }
+
+  /**
+   * Deterministic fingerprint of a cart for fallback idempotency: staff + point + the
+   * normalized lines/tenders/discount, bucketed into a time window. Lines and tenders are
+   * sorted so field order never changes the hash.
+   */
+  private saleFingerprint(dto: PosSaleDto): string {
+    const bucket = Math.floor(Date.now() / POS_AUTO_DEDUP_WINDOW_MS);
+    const lines = dto.lines
+      .map((line) => `${line.sku}:${line.qty}:${line.price}`)
+      .sort()
+      .join('|');
+    const tenders = (dto.payments ?? (dto.method ? [{ method: dto.method, amount: 0 }] : []))
+      .map((payment) => `${payment.method}:${payment.amount}`)
+      .sort()
+      .join('|');
+    const material = [dto.staffId, dto.point, dto.discountPct ?? 0, lines, tenders, bucket].join('#');
+    return createHash('sha256').update(material).digest('hex').slice(0, 32);
   }
 
   private normalizePayments(dto: PosSaleDto, total: number): NormalizedPosPayment[] {

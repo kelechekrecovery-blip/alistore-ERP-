@@ -72,7 +72,10 @@ export class PosSaleDto {
   @IsOptional() @IsString() reason?: string;
 
   @ApiPropertyOptional({
-    description: 'Client-generated sale id for offline POS retry idempotency.',
+    description:
+      'Client-generated sale id for retry idempotency. Web/mobile always send one; if ' +
+      'omitted, the server derives a windowed cart fingerprint so a retry still cannot ' +
+      'create a second order.',
     example: 'pos_20260707_0001',
   })
   @IsOptional() @IsString() clientSaleId?: string;
