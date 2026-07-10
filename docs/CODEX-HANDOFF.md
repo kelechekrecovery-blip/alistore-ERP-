@@ -54,6 +54,8 @@ missing/configured env-имён и ручные проверки. Значени
 14. **Каналы (Phase 12)** — Telegram Mini App / WhatsApp-магазин: campaign delivery code
     готов (`NOTIFICATION_TRANSPORT=channels` + Novu/SMTP/Telegram/WhatsApp env); для production
     нужны аккаунты/токены, webhook/callback QA и WhatsApp storefront activation.
+    B2B/опт уже закрыт: customer profile + invoice quote request, staff queue/КП, acceptance
+    и Event Ledger доступны через `/b2b` и `/api/b2b/*`.
 15. **Соцвход через реальные провайдеры** — backend готов; нужны Apple/Telegram app credentials,
     callback/client SDK QA и production rollout.
 16. **Физическое железо (Phase 13)** — ESC/POS/QZ печать, банковские терминалы, реальный сканер:

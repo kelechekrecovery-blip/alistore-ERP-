@@ -29,6 +29,7 @@
 - **Staff ecosystem**: POS, warehouse, approvals, refund/dispute center, exchange, warranty,
   ERP reports, AI tools, admin product management, campaign/notification delivery.
 - **Telegram Mini App shell** и provider-ready Apple/Telegram social login.
+- **B2B/опт**: кабинет компании, заявка на безналичный счёт из каталога, staff-очередь и КП.
 - **MVP release gate**: `npm run mvp:verify` проверяет schema, сборки, Jest, Playwright и
   readiness внешних провайдеров без раскрытия секретов.
 

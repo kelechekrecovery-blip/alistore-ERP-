@@ -2,6 +2,16 @@
 
 ## 2026-07-10
 
+- Task: implement the Phase 12 B2B/wholesale quote request flow end to end.
+- Files changed: Prisma schema/migration, new `apps/api/src/b2b/` module and API test, Event Ledger/RBAC/AppModule wiring, new web B2B API client and `/b2b` cabinet, account/header navigation, Staff App B2B queue, Playwright B2B flow, E2E reset, roadmap/readiness/backlog docs.
+- Result: authenticated customers can save company requisites, request an invoice or bank-transfer wholesale quote using trusted current catalog prices, track the request, and accept a quoted offer. Sales staff can read the queue; senior/admin/owner roles can move requests to review, issue a priced proposal, or reject it. Every creation and transition is written to the append-only Event Ledger.
+- Checks run: Prisma validate/generate; dev migration deploy; test DB schema sync; targeted B2B API test; API/web production builds; native typecheck; targeted Playwright B2B flow; full API Jest sequentially; full Playwright suite; root/mobile audits; `git diff --check`.
+- Outcome: targeted B2B API passed 1 suite / 2 tests; full API passed 97 suites / 348 tests; Playwright passed 10/10 including OTP→B2B invoice quote; API/web builds and mobile typecheck passed; root and mobile audits report 0 vulnerabilities; whitespace check passed.
+- Commit: `a6ba4e7`.
+- Next step: implement the next unblocked Phase 12 block — device protection / insurance policy scaffold.
+
+## 2026-07-10
+
 - Task: launch the complete local AliStore stack and repair native Metro startup.
 - Files changed: `apps/mobile/package.json`, `apps/mobile/package-lock.json`, `apps/mobile/tsconfig.json`, `apps/mobile/.gitignore`, `PROGRESS.md`.
 - Result: PostgreSQL, the current Nest API, Next Site 2.0, and Expo Metro now run together locally. Added the missing SDK-compatible `babel-preset-expo`, accepted Expo's typed-route TypeScript includes, and applied the existing patched `uuid@11.1.1` override to the isolated mobile lockfile.

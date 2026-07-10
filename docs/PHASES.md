@@ -211,7 +211,7 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
 `/erp` CRM staff login, `/staff` buyback intake, `/exchange` staff login→unit lookup→exchange
 без overflow.
 
-## Phase 8 — ERP владельца + Risk/Command Center (v1) 🟡
+## Phase 8 — ERP владельца + Risk/Command Center (v1) ✅
 **Цель:** владелец видит всё в одном окне; всё читается из Event Ledger.
 - ✅ ERP-дашборд `/erp`: деньги (продажи/возвраты/net, по способам), заказы/склад по
   статусам, ops (смены, на одобрении). `reports/` модуль, `GET /reports/dashboard`.
@@ -250,7 +250,7 @@ in-browser /erp: вкладка «Маржа·KPI» на реальных дан
 топ-товары), Command Center (клик по «зависший резерв» → вкладка Склад), revenue trend
 badge на дашборде. HTTP+БД сверка.
 
-## Phase 9 — Мультисклад, склад-операции, гарантия (v1) 🟡
+## Phase 9 — Мультисклад, склад-операции, гарантия (v1) ✅
 - ✅ **WarrantyCase** с SLA (14 дней): open по IMEI + машина статусов + консоль
   сотрудника `/warranty` + запрос клиента из деталей заказа; SLA-breach → Risk Center.
 - ✅ Мультифилиал: перемещения (POST /inventory/transfer, stock.moved) + инвентаризация
@@ -390,8 +390,11 @@ reminders, and reservation expiry without an opted-out notice.
 - ✅ Омниканальность / click&collect: `Order.fulfillmentType`, `pickupPoint`, `deliveryAddress`,
   `deliverySlot`, `pickupCode`; web/native/Telegram checkout создают pickup-заказы, а кабинет,
   staff app и warehouse queue показывают точку/код выдачи.
+- ✅ B2B/опт: `BusinessBuyerProfile` + `B2BQuote/B2BQuoteItem`, customer-owned `/b2b`
+  кабинет с реквизитами и заявкой на счёт/банковский перевод по серверным ценам каталога,
+  staff RBAC очередь с выпуском КП, customer acceptance и ledger `b2b.quote_*`.
 - ☐ WhatsApp-магазин; франшиза + аудит партнёрских точек;
-  страховка, B2B/опт, рекламный кабинет.
+  страховка, рекламный кабинет.
 **Проверка:** ✅ gift-card e2e: выпуск → split tender gift_card+cash, web-flow gift-card→online
 остаток, retry без двойного списания, over-balance rejection; browser/CDP smoke checkout:
 gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `giftcard.redeemed`.
@@ -399,10 +402,12 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 ✅ Campaign delivery: provider routing unit tests + campaigns e2e queue WhatsApp and Telegram chat-id recipients.
 ✅ Click&collect: API tests сохраняют fulfilment metadata + ledger payload; Playwright checkout
 создаёт paid pickup-order с `pickupPoint=alistore-center` и `pickupCode`.
+✅ B2B: API ownership/RBAC/transition tests + browser flow OTP→реквизиты→каталог→invoice quote;
+заявка и `b2b.quote_requested` сверены в PostgreSQL.
 Остальное: e2e заказа через будущие каналы в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
-- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 9 smoke flows
+- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 10 smoke flows
   (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake,
   admin product management, protected ERP reports/AI, Telegram Mini App) and
   `.github/workflows/ci.yml` with Postgres service, install, Prisma migrate, API build/test,
@@ -458,7 +463,7 @@ catalog delta-sync; ручной фолбэк при отсутствии жел
   phase 7 на debt/installment split, phase 8 на trade-in split, phase 9 на returns/exchanges
   split, плюс margin-control по себестоимости.
 - Phase 6 ✅: возвраты/обмены + **exchange-UI кассира** (`/exchange` + `GET /units/:imei`).
-- Phase 8 🟡: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
+- Phase 8 ✅: ERP-дашборд + Risk Center + Event Ledger + **Маржа/KPI** + **KPI продавцов** +
   **Command Center** (кликабельные тревоги) + **период-фильтр выручки (7/30 дн)** ✅.
 - Phase 9 ✅: WarrantyCase, мультисклад (перемещения+инвентаризация+UI), **Supplier RMA+scorecard**,
   **долги/рассрочка**, **зарплаты продавцов**, debt reminders через outbox, Evidence Vault
@@ -483,11 +488,12 @@ catalog delta-sync; ручной фолбэк при отсутствии жел
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей ~30 · API тест-сьютов 89 (316 тестов зелёные, `jest`; при
+Backend-модулей 41 · API тест-сьютов 97 (348 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось:**
-- **Unblocked polish:** открытых пунктов без внешних блокеров нет.
+- **Unblocked Phase 12:** страховка устройств, аудит франшизных точек, WhatsApp storefront
+  shell и рекламный кабинет.
 - **P0 security:** закрыт. `/reports/*` и `/ai/*` требуют staff-RBAC; ERP/AI web-клиенты
   отправляют shared staff token; customer order timeline имеет scoped order-ledger endpoint.
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),

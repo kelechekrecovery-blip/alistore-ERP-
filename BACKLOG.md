@@ -1,11 +1,11 @@
 # BACKLOG
 
 ## Next
-- Restrict raw passport data in trade-in PDF documents to admin/owner or an explicit PII approval path (Emergency P0 E8).
-- Return the existing payment on concurrent `txnId` P2002 collisions instead of surfacing a 500 (M-4), with a webhook race test.
-- Make POS retries idempotent when `clientSaleId` is omitted (M-5), with a duplicate-order regression test.
-- Add the remaining provider webhook race-idempotency test.
-- Add B2B/wholesale quote request scaffold: business buyer profile fields, invoice/wholesale checkout intent, staff queue visibility, and Event Ledger coverage.
+- Add device protection / insurance policy scaffold: customer quote intent, device/warranty link, staff queue, lifecycle states, and Event Ledger coverage.
+- Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
+- Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
+- Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
+- Add a defensive P2002 existing-payment fallback as optional belt-and-suspenders idempotency beyond the proven webhook row lock.
 - Activate production AI vision/market scout after provider key and reference datasets are available: configure `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY`, validate real photo/listing outputs, and add offline eval thresholds.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
 - Complete account-bound native store release after Apple/Google accounts and test devices are available: configure signing credentials, production API URL, EAS token, App Store Connect API key/team, Google Play service account, TestFlight/Play Internal QA, and push credentials.
@@ -13,6 +13,8 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add B2B/wholesale quote requests with customer business profiles, catalog-priced invoice intents, staff RBAC queue/quoting, customer acceptance, and Event Ledger coverage.
+- Close Emergency P0 blocks E8/M-5 and concurrency/auth race coverage; webhook idempotency is proven by a concurrent acceptance test.
 - Prove gift-card double-redemption safety with a concurrent race regression test.
 - Harden customer/staff authentication against refresh-token family replay, concurrent refresh races, repeated TOTP step-up codes, and OTP brute-force attempts; align Customer 360 security regression coverage.
 - Add click-and-collect fulfillment metadata across API, web checkout, native checkout, Telegram Mini App, account order details, staff, and warehouse queues.
