@@ -209,6 +209,13 @@ export default function ErpPage() {
           <div className="ml-auto flex items-center gap-3">
             <button
               type="button"
+              onClick={() => setRoute('ai')}
+              className="rounded-[10px] bg-gradient-to-br from-coral to-deep px-4 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+            >
+              🤖 AI-ассистент
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 clearStaffSession();
                 setSession(null);
