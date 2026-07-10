@@ -6,6 +6,7 @@ import { Bell, Building2, Gift, LogOut, MapPin, MessageCircle, Package, Recycle,
 import { useEffect, useState } from 'react';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
+import MobileProfile from '@/components/mobile/MobileProfile';
 import { useAuth } from '@/lib/auth';
 import { fetchMyOrders, type MyOrder } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -42,7 +43,9 @@ export default function AccountPage() {
 
   if (!hydrated || !user) return <div className="min-h-screen bg-[#0c0c17] text-[#a2a6b6]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
-  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+  return <>
+    <div className="lg:hidden"><MobileProfile phone={user.phone} orders={orders} onLogout={async () => { await logout(); router.push('/'); }} /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-10 sm:py-14">
       <div className="text-xs text-[#6c7080]">Главная / Кабинет</div>
@@ -58,5 +61,6 @@ export default function AccountPage() {
       <section className="pt-14"><div className="flex items-center justify-between"><h2 className="font-display text-2xl font-bold">Мои заказы</h2><span className="text-sm text-[#6c7080]">{orders?.length ?? 0}</span></div><div className="mt-6 overflow-hidden rounded-[18px] border border-white/[0.09] bg-white/[0.025]">{orders === null ? <div className="p-8 text-center text-[#6c7080]">Загрузка заказов...</div> : orders.length === 0 ? <div className="grid min-h-[230px] place-items-center p-8 text-center"><div><Package className="mx-auto text-[#6c7080]" size={34} /><h3 className="mt-4 font-display text-lg font-semibold">Заказов пока нет</h3><Link href="/catalog" className="mt-3 inline-block text-sm text-[#fb9a4b]">Перейти в каталог</Link></div></div> : orders.map((order) => { const status = STATUS[order.status] ?? { label: order.status, cls: 'border-white/10 bg-white/5 text-[#a2a6b6]' }; return <Link key={order.id} href={`/account/orders/${order.id}`} className="grid gap-3 border-b border-white/[0.07] px-5 py-4 last:border-0 hover:bg-white/[0.035] sm:grid-cols-[150px_130px_1fr_auto] sm:items-center"><strong className="font-mono text-sm">#{order.id.slice(-8)}</strong><span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] ${status.cls}`}>{status.label}</span><span className="text-sm text-[#a2a6b6]">{order.fulfillmentType ?? order.channel}</span><strong className="font-display text-lg">{som(order.total)}</strong></Link>; })}</div></section>
     </main>
     <SiteFooter />
-  </div>;
+    </div>
+  </>;
 }
