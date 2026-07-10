@@ -228,6 +228,11 @@ tests; полный committed-scope Jest 75 suites / 242 tests; browser QA `/app
   Center + Command Center (margin_leak→Маржа·KPI, mismatch→Склад, imei_reuse→/warehouse).
   Проверено вживую: mismatch ловит реальную аномалию, imei_reuse — коллизию. Staff/customer
   trade-in capture now stores optional IMEI, so the detector is no longer a dead path.
+- ✅ **Risk Center по актуальному Claude Design**: `repeat_returns` (>3 возвратов клиента за
+  30 дней), `discount_frequency` (>30% POS-чеков сотрудника со скидкой) и
+  `write_off_spike` (списания за 7 дней выше предыдущих 7 дней, минимум 3 единицы).
+  Сигналы считаются из `Return→Order`, POS-заказов/смен и `InventoryMovement`, ведут
+  соответственно в CRM, Маржа·KPI и Склад; отдельного теневого хранилища рисков нет.
 - ✅ **Event Ledger** просмотр (feed) в дашборде. `GET /reports/ledger`.
 - ✅ **Маржа/KPI** (`reports.kpi()` + `reports/kpi.ts`, `GET /reports/kpi`): валовая маржа
   = выручка(received-платежи) − себестоимость(cost проданных единиц), маржа %, средний чек,

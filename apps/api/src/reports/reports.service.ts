@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildRiskSignals, computeMarginLeaks } from './risk-signals';
+import {
+  buildRiskSignals,
+  computeDiscountFrequency,
+  computeMarginLeaks,
+  computeRepeatReturns,
+  computeWriteOffSpike,
+} from './risk-signals';
 import { buildKpi } from './kpi';
 import { buildPayroll } from './payroll';
 import {
@@ -228,6 +234,8 @@ export class ReportsService {
   async risks() {
     const now = new Date();
     const paid = REVENUE_STATUSES;
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * DAY_MS);
     const [
       cashDiscrepancies,
       codOutstanding,
@@ -241,6 +249,9 @@ export class ReportsService {
       productCosts,
       soldWithoutOrder,
       tradeins,
+      recentReturns,
+      recentPosOrders,
+      writeOffMovements,
     ] = await Promise.all([
         this.prisma.cashShift.findMany({
           where: { diff: { not: 0 }, closedAt: { not: null } },
@@ -296,6 +307,29 @@ export class ReportsService {
           select: { imei: true },
           take: 200,
         }),
+        this.prisma.return.findMany({
+          where: { createdAt: { gte: thirtyDaysAgo } },
+          select: { orderId: true },
+          take: 500,
+        }),
+        this.prisma.order.findMany({
+          where: { channel: 'pos', status: { in: paid }, createdAt: { gte: thirtyDaysAgo } },
+          select: {
+            total: true,
+            items: { select: { qty: true, price: true } },
+            payments: {
+              where: { amount: { gt: 0 }, shiftId: { not: null } },
+              select: { shift: { select: { staffId: true } } },
+              take: 1,
+            },
+          },
+          take: 2000,
+        }),
+        this.prisma.inventoryMovement.findMany({
+          where: { type: 'write_off', createdAt: { gte: fourteenDaysAgo } },
+          select: { qty: true, createdAt: true },
+          take: 500,
+        }),
       ]);
     const soldWithoutOrderImeis = soldWithoutOrder.map((u) => u.imei);
 
@@ -311,9 +345,42 @@ export class ReportsService {
       : [];
 
     const marginLeaks = computeMarginLeaks(paidItems, productCosts);
+    const returnOrders = recentReturns.length
+      ? await this.prisma.order.findMany({
+          where: { id: { in: recentReturns.map((row) => row.orderId) } },
+          select: { customerId: true, customer: { select: { name: true } } },
+        })
+      : [];
+    const repeatReturns = computeRepeatReturns(
+      returnOrders.map((order) => ({ customerId: order.customerId, customerName: order.customer.name })),
+    );
+    const discountFrequency = computeDiscountFrequency(
+      recentPosOrders.flatMap((order) => {
+        const staffId = order.payments[0]?.shift?.staffId;
+        if (!staffId) return [];
+        const gross = order.items.reduce((sum, item) => sum + item.price * item.qty, 0);
+        return [{ staffId, gross, total: order.total }];
+      }),
+    );
+    const writeOffSpike = computeWriteOffSpike(writeOffMovements, now);
 
     const signals = buildRiskSignals(
-      { cashDiscrepancies, codOutstanding, staleReservations, pendingApprovals, warrantyOverdue, rmaOverdue, debtsOverdue, ticketsOverdue, marginLeaks, soldWithoutOrderImeis, imeiReuse },
+      {
+        cashDiscrepancies,
+        codOutstanding,
+        staleReservations,
+        pendingApprovals,
+        warrantyOverdue,
+        rmaOverdue,
+        debtsOverdue,
+        ticketsOverdue,
+        marginLeaks,
+        soldWithoutOrderImeis,
+        imeiReuse,
+        repeatReturns,
+        discountFrequency,
+        writeOffSpike,
+      },
       now,
     );
     return { count: signals.length, signals };

@@ -80,6 +80,9 @@ const SIGNAL_ACTION: Record<string, { tab?: Route; href?: string }> = {
   margin_leak: { tab: 'kpi' },
   stock_money_mismatch: { tab: 'stock' },
   imei_reuse: { href: '/warehouse' },
+  repeat_returns: { tab: 'crm' },
+  discount_frequency: { tab: 'kpi' },
+  write_off_spike: { tab: 'stock' },
 };
 const STATUS_RU: Record<string, string> = {
   created: 'Оформлен', reserved: 'Зарезервирован', paid: 'Оплачен', completed: 'Завершён',

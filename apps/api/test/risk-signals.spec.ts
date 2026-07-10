@@ -1,4 +1,10 @@
-import { buildRiskSignals, computeMarginLeaks } from '../src/reports/risk-signals';
+import {
+  buildRiskSignals,
+  computeDiscountFrequency,
+  computeMarginLeaks,
+  computeRepeatReturns,
+  computeWriteOffSpike,
+} from '../src/reports/risk-signals';
 
 /** Loss-prevention risk detectors (Phase 8, schema-free). */
 const base = {
@@ -13,6 +19,9 @@ const base = {
   marginLeaks: [],
   soldWithoutOrderImeis: [],
   imeiReuse: [],
+  repeatReturns: [],
+  discountFrequency: [],
+  writeOffSpike: null,
 };
 const now = new Date('2026-07-07T00:00:00Z');
 
@@ -62,6 +71,54 @@ describe('buildRiskSignals', () => {
     );
     expect(s[0].kind).toBe('stock_money_mismatch');
     expect(s[0].severity).toBe('high');
+  });
+
+  it('surfaces repeat returns, frequent discounts and a write-off spike', () => {
+    const s = buildRiskSignals(
+      {
+        ...base,
+        repeatReturns: [{ customerId: 'c1', customerName: 'Мээрим', count: 4 }],
+        discountFrequency: [{ staffId: 'staff-1', discountedSales: 4, totalSales: 9, sharePct: 44 }],
+        writeOffSpike: { currentQty: 6, previousQty: 2, currentCount: 3 },
+      },
+      now,
+    );
+    expect(s.find((x) => x.kind === 'repeat_returns')).toMatchObject({ severity: 'high', ref: 'c1' });
+    expect(s.find((x) => x.kind === 'discount_frequency')?.detail).toContain('44%');
+    expect(s.find((x) => x.kind === 'write_off_spike')).toMatchObject({ severity: 'medium' });
+  });
+});
+
+describe('prototype-aligned risk aggregators', () => {
+  it('flags only customers above three returns', () => {
+    const risks = computeRepeatReturns([
+      ...Array.from({ length: 4 }, () => ({ customerId: 'c1', customerName: 'Мээрим' })),
+      ...Array.from({ length: 3 }, () => ({ customerId: 'c2', customerName: 'Азиз' })),
+    ]);
+    expect(risks).toEqual([{ customerId: 'c1', customerName: 'Мээрим', count: 4 }]);
+  });
+
+  it('flags a staff discount share above 30 percent', () => {
+    const risks = computeDiscountFrequency([
+      { staffId: 's1', gross: 100, total: 90 },
+      { staffId: 's1', gross: 100, total: 100 },
+      { staffId: 's1', gross: 100, total: 100 },
+      { staffId: 's2', gross: 100, total: 90 },
+      { staffId: 's2', gross: 100, total: 100 },
+      { staffId: 's2', gross: 100, total: 100 },
+      { staffId: 's2', gross: 100, total: 100 },
+    ]);
+    expect(risks).toEqual([{ staffId: 's1', discountedSales: 1, totalSales: 3, sharePct: 33 }]);
+  });
+
+  it('compares write-offs over two rolling seven-day windows', () => {
+    const movements = [
+      { qty: -2, createdAt: new Date('2026-07-06T00:00:00Z') },
+      { qty: -4, createdAt: new Date('2026-07-03T00:00:00Z') },
+      { qty: -2, createdAt: new Date('2026-06-25T00:00:00Z') },
+    ];
+    expect(computeWriteOffSpike(movements, now)).toEqual({ currentQty: 6, previousQty: 2, currentCount: 2 });
+    expect(computeWriteOffSpike([{ qty: -1, createdAt: now }], now)).toBeNull();
   });
 });
 

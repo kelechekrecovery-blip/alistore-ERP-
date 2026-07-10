@@ -23,7 +23,10 @@ export interface RiskSignal {
     | 'ticket_sla_breach'
     | 'margin_leak'
     | 'stock_money_mismatch'
-    | 'imei_reuse';
+    | 'imei_reuse'
+    | 'repeat_returns'
+    | 'discount_frequency'
+    | 'write_off_spike';
   severity: RiskSeverity;
   ref: string;
   detail: string;
@@ -35,6 +38,91 @@ export interface MarginLeak {
   name: string;
   price: number;
   cost: number;
+}
+
+export interface RepeatReturnRisk {
+  customerId: string;
+  customerName: string;
+  count: number;
+}
+
+export interface DiscountFrequencyRisk {
+  staffId: string;
+  discountedSales: number;
+  totalSales: number;
+  sharePct: number;
+}
+
+export interface WriteOffSpike {
+  currentQty: number;
+  previousQty: number;
+  currentCount: number;
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Customers with more than three return requests in the rolling 30-day input window. */
+export function computeRepeatReturns(
+  orders: { customerId: string; customerName?: string | null }[],
+  threshold = 3,
+): RepeatReturnRisk[] {
+  const grouped = new Map<string, RepeatReturnRisk>();
+  for (const order of orders) {
+    const current = grouped.get(order.customerId) ?? {
+      customerId: order.customerId,
+      customerName: order.customerName?.trim() || order.customerId,
+      count: 0,
+    };
+    current.count += 1;
+    grouped.set(order.customerId, current);
+  }
+  return [...grouped.values()].filter((row) => row.count > threshold).sort((a, b) => b.count - a.count);
+}
+
+/** Staff whose discounted POS receipt share is above the Risk Center's 30% rule. */
+export function computeDiscountFrequency(
+  sales: { staffId: string; gross: number; total: number }[],
+  thresholdPct = 30,
+): DiscountFrequencyRisk[] {
+  const grouped = new Map<string, { discountedSales: number; totalSales: number }>();
+  for (const sale of sales) {
+    const current = grouped.get(sale.staffId) ?? { discountedSales: 0, totalSales: 0 };
+    current.totalSales += 1;
+    if (sale.gross > 0 && sale.total < sale.gross) current.discountedSales += 1;
+    grouped.set(sale.staffId, current);
+  }
+  return [...grouped.entries()]
+    .map(([staffId, row]) => ({
+      staffId,
+      ...row,
+      sharePct: Math.round((row.discountedSales / row.totalSales) * 100),
+    }))
+    .filter((row) => row.sharePct > thresholdPct)
+    .sort((a, b) => b.sharePct - a.sharePct);
+}
+
+/** Compare approved write-offs in the latest seven days with the preceding seven days. */
+export function computeWriteOffSpike(
+  movements: { qty: number; createdAt: Date }[],
+  now: Date,
+  minimumCurrentQty = 3,
+): WriteOffSpike | null {
+  let currentQty = 0;
+  let previousQty = 0;
+  let currentCount = 0;
+  for (const movement of movements) {
+    const age = now.getTime() - movement.createdAt.getTime();
+    if (age < 0 || age >= WEEK_MS * 2) continue;
+    const qty = Math.abs(movement.qty);
+    if (age < WEEK_MS) {
+      currentQty += qty;
+      currentCount += 1;
+    } else {
+      previousQty += qty;
+    }
+  }
+  if (currentQty < minimumCurrentQty || currentQty <= previousQty) return null;
+  return { currentQty, previousQty, currentCount };
 }
 
 /**
@@ -71,6 +159,9 @@ interface RiskInputs {
   marginLeaks: MarginLeak[]; // paid items sold under cost
   soldWithoutOrderImeis: string[]; // IMEIs of units marked sold with no order (stock≠money)
   imeiReuse: string[]; // IMEIs that appear both in a trade-in and among sold units (fraud)
+  repeatReturns: RepeatReturnRisk[];
+  discountFrequency: DiscountFrequencyRisk[];
+  writeOffSpike: WriteOffSpike | null;
 }
 
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
@@ -147,6 +238,33 @@ export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
       severity: t.priority === 'urgent' ? 'high' : 'medium',
       ref: t.id,
       detail: `Тикет «${t.subject}» просрочил SLA (${t.priority}/${t.status})`,
+    });
+  }
+
+  for (const row of input.repeatReturns) {
+    signals.push({
+      kind: 'repeat_returns',
+      severity: 'high',
+      ref: row.customerId,
+      detail: `Клиент ${row.customerName}: ${row.count} возврата за 30 дней`,
+    });
+  }
+
+  for (const row of input.discountFrequency) {
+    signals.push({
+      kind: 'discount_frequency',
+      severity: 'high',
+      ref: row.staffId,
+      detail: `Сотрудник ${row.staffId}: ${row.discountedSales}/${row.totalSales} чеков со скидкой (${row.sharePct}%)`,
+    });
+  }
+
+  if (input.writeOffSpike) {
+    signals.push({
+      kind: 'write_off_spike',
+      severity: 'medium',
+      ref: 'inventory',
+      detail: `Списания выросли: ${input.writeOffSpike.currentQty} шт. за 7 дней против ${input.writeOffSpike.previousQty} ранее`,
     });
   }
 

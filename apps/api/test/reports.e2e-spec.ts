@@ -23,6 +23,7 @@ describe('Reports (integration)', () => {
   beforeEach(async () => {
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.return.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.inventoryMovement.deleteMany();
@@ -108,5 +109,60 @@ describe('Reports (integration)', () => {
     const reuse = r.signals.find((signal) => signal.kind === 'imei_reuse');
     expect(reuse?.severity).toBe('high');
     expect(reuse?.ref).toBe(imei);
+  });
+
+  it('derives repeat returns, discount frequency and write-off growth from operational rows', async () => {
+    const customer = await prisma.customer.create({
+      data: { phone: '+996700900003', name: 'Мээрим' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: 'RP-ANOMALY', name: 'Risk phone', price: 100000, cost: 70000, category: 'phones', attrs: {} },
+    });
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'staff-risk', point: 'BISHKEK-1', openCash: 0 },
+    });
+
+    for (let index = 0; index < 4; index += 1) {
+      const order = await prisma.order.create({
+        data: {
+          customerId: customer.id,
+          channel: 'pos',
+          total: 90000,
+          status: 'paid',
+          items: { create: { sku: product.sku, qty: 1, price: 100000 } },
+          payments: {
+            create: { amount: 90000, method: 'cash', status: 'received', shiftId: shift.id },
+          },
+        },
+      });
+      await prisma.return.create({ data: { orderId: order.id, reason: `risk-${index}` } });
+    }
+
+    await prisma.inventoryMovement.createMany({
+      data: [
+        { productId: product.id, qty: -6, type: 'write_off', reason: 'current spike' },
+        {
+          productId: product.id,
+          qty: -2,
+          type: 'write_off',
+          reason: 'previous baseline',
+          createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+        },
+      ],
+    });
+
+    const r = await reports.risks();
+    expect(r.signals.find((signal) => signal.kind === 'repeat_returns')).toMatchObject({
+      severity: 'high',
+      ref: customer.id,
+    });
+    expect(r.signals.find((signal) => signal.kind === 'discount_frequency')).toMatchObject({
+      severity: 'high',
+      ref: 'staff-risk',
+    });
+    expect(r.signals.find((signal) => signal.kind === 'write_off_spike')).toMatchObject({
+      severity: 'medium',
+      ref: 'inventory',
+    });
   });
 });
