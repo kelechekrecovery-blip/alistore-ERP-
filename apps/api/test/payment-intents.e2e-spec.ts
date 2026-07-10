@@ -91,6 +91,21 @@ describe('Online payment intents (integration)', () => {
     expect(await prisma.deviceUnit.count({ where: { status: 'sold', orderId: order.id } })).toBe(1);
   });
 
+  it('is race-safe: two concurrent webhooks with the same txnId apply the payment once', async () => {
+    const order = await webOrder();
+    const intent = await intents.create({ orderId: order.id, method: 'qr_mbank', amount: 100000, actor: 'web_checkout' });
+    const hook = () =>
+      intents.webhook({ orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank' });
+
+    // Providers commonly re-deliver a webhook on timeout; both land simultaneously here.
+    const results = await Promise.allSettled([hook(), hook()]);
+    expect(results.some((r) => r.status === 'fulfilled')).toBe(true); // no unhandled 500 for both
+    // Applied exactly once regardless of the race — one payment, one sold unit, order paid.
+    expect(await prisma.payment.count({ where: { txnId: intent.txnId } })).toBe(1);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold', orderId: order.id } })).toBe(1);
+    expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('paid');
+  });
+
   it('rejects an amount mismatch and already-paid orders', async () => {
     const order = await webOrder();
     const mismatch = await intents.create({ orderId: order.id, method: 'card', amount: 999 }).catch((e) => e);
