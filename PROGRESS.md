@@ -7,6 +7,7 @@
 - Result: the desktop storefront at `/` now has a staged hero, finite product float, animated promo hierarchy, native scroll-progress indicator, card lift/tap feedback, and safe section motion. The parallel mobile prototype work was preserved at `/app` instead of being overwritten. All motion starts from a fully visible frame because the embedded browser can suspend `requestAnimationFrame` and lacks `IntersectionObserver`; reduced-motion disables all decorative animation.
 - Checks run: skill `quick_validate.py`; web production build; dependency audit; browser DOM/computed-style QA; targeted storefront motion Playwright; full Playwright suite; `git diff --check`.
 - Outcome: skill validation passed; web build passed; audit reports 0 vulnerabilities; browser QA confirmed visible animated elements and no horizontal overflow; targeted motion test passed 1/1; full Playwright passed 12/12 including reduced-motion and `/app` preservation.
+- Commit: `3c59e8d`.
 - Next step: extend the same motion language to product gallery transitions and account/order state changes while keeping POS/ERP motion restrained and task-focused.
 
 ## 2026-07-10
