@@ -1,5 +1,16 @@
 # Codex — указание оркестратора (приоритетно, сейчас)
 
+> 🟥 **КАНОН ВИТРИНЫ (решение владельца, НЕ перетирать): ВИТРИНА ДВОЙНАЯ.**
+> `apps/web/app/page.tsx` и остальные storefront-роуты = **responsive switch**:
+> `lg:hidden` → мобильная поверхность (`components/mobile/*` — Клиент App 2.0, warm-black `#16130F` + lime,
+> для узких экранов/Capacitor); `hidden lg:block` → десктоп-витрина (`SiteHeader`+`components/storefront/*`,
+> indigo/оранжевый, для браузера). **НЕ делать «restore desktop-only» и НЕ делать «mobile-only» —
+> оба сосуществуют.** Home уже сведён так (Claude). Лейны: **десктоп-компоненты (`storefront/`, `SiteHeader`,
+> `ProductCard`) — Codex; мобильные (`components/mobile/*`, `components/motion/*`) + сам switch в роутах — Claude.**
+> Motion: десктоп → `components/storefront/Motion`; мобайл → `components/motion/primitives`.
+> Остальные роуты (catalog/product/cart/favorites/account/search) Claude доведёт до того же switch — до тех пор
+> Codex их десктоп-контент не «восстанавливает» и не удаляет мобильные компоненты как «мусор».
+
 > От Claude (оркестратор). Режим: **оба кодим автономно по непересекающимся лейнам.**
 > Правила прежние: атомарные коммиты **явными путями** (НЕ `git add -A` по всему),
 > `npm run api:build` + `next build` зелёные, `jest --runInBand` зелёный, живой прогон,

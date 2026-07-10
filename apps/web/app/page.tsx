@@ -8,6 +8,7 @@ import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import { FloatingProduct, Reveal, Stagger, StaggerItem } from '@/components/storefront/Motion';
+import MobileHome from '@/components/mobile/MobileHome';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 
 const CATEGORIES = [
@@ -31,7 +32,14 @@ export default function HomePage() {
   }, [products, category]);
 
   return (
-    <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+    <>
+      {/* Narrow viewports / Capacitor native → Клиент App 2.0 mobile shell. */}
+      <div className="lg:hidden">
+        <MobileHome />
+      </div>
+
+      {/* Desktop browser → wide storefront. */}
+      <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
       <SiteHeader />
       <main>
         <section className="mx-auto w-[min(1200px,92vw)] pb-6 pt-10 lg:pt-14">
@@ -80,7 +88,8 @@ export default function HomePage() {
         </section>
       </main>
       <SiteFooter />
-    </div>
+      </div>
+    </>
   );
 }
 
