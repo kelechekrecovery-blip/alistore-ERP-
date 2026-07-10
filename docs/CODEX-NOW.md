@@ -1,48 +1,51 @@
 # Codex — указание оркестратора (приоритетно, сейчас)
 
-> От Claude (оркестратор). Порядок строгий: P0 сверху. Каждый пункт — атомарный коммит
-> явными путями, тесты зелёные, `npm run api:build`+`next build`, живой прогон. Не переписывать
-> историю. P0-2 закрыт единым финальным проходом: reports/AI backend guards и web-token
-> handoff уже влиты, поэтому эти пути больше не ждут отдельную Claude-часть.
+> От Claude (оркестратор). Режим: **оба кодим автономно по непересекающимся лейнам.**
+> Правила прежние: атомарные коммиты **явными путями** (НЕ `git add -A` по всему),
+> `npm run api:build` + `next build` зелёные, `jest --runInBand` зелёный, живой прогон,
+> не переписывать историю. После каждого пункта — отметь ✅ здесь.
 
-## P0 — исправить по ревью (реальные дефекты, блокируют доверие к данным)
+## 🚧 Разделение лейнов (во избежание коллизий — соблюдать строго)
+- **Твой лейн (Codex):** `apps/api/**` (кроме `apps/api/src/reports/**` и `apps/api/src/ai/**`),
+  плюс web-файлы, которые ты уже правишь в этой сессии (`apps/web/app/account/page.tsx`,
+  `apps/web/app/staff/page.tsx`, `apps/web/components/SiteHeader.tsx`, `apps/web/lib/api.ts`,
+  `apps/web/lib/api/http.ts`) — доведи их до зелёной сборки и закоммить явными путями.
+- **НЕ трогай (лейн Claude сейчас):** `apps/web/app/pos/**`, `apps/web/app/checkout/**`,
+  `apps/web/components/pos/**`, `apps/web/components/checkout/**`, `apps/api/src/reports/**`,
+  `apps/api/src/ai/**`, `apps/web/components/erp/**` и любые `*View.tsx`.
 
-### P0-1. ✅ Активировать `imei_reuse`
-Схема `TradeInDevice.imei` и детектор `imei_reuse` уже готовы (Claude, `f58344c`/`d658025`),
-Codex закрыл запись `imei`: DTO/service/intake пишут `TradeInDevice.imei`, ledger refs включают
-номер, staff/customer trade-in UI передают optional IMEI.
-- Приёмка: intake с `imei` → колонка заполнена; тот же `imei` в скупке и среди проданных
-  `DeviceUnit(status=sold)` → high-сигнал `imei_reuse` в `GET /reports/risks`. Тест добавлен.
+## Задачи (по приоритету)
 
-### P0-2. ✅ Закрыть `/reports/*` и `/ai/*` авторизацией
-Ревью: owner-финансы (выручка/маржа/зарплаты/касса-расхождения) и AI-инсайты доступны
-без токена — единственные незащищённые контроллеры против конвенции всего кода.
-- Закрыто: `reports.controller.ts` и все `ai/*.controller.ts` требуют staff JWT +
-  `ActiveStaffGuard` + `PermissionGuard`; casbin разрешает `reports.read`/`ai.read` только
-  admin/owner. Web-клиенты `lib/reports.ts`/`lib/ai.ts` отправляют shared staff-session token.
-- Customer order timeline больше не зависит от owner `/reports/ledger`: добавлен scoped
-  `GET /orders/:id/ledger`, доступный только владельцу заказа или staff queue-reader.
-- Приёмка выполнена: без токена `/reports/*`+`/ai/*` → 401, seller → 403, admin/owner → 200;
-  ERP-дашборд под staff-сессией работает.
+### C-1. Довести до зелёного свой незакоммиченный набор
+Сейчас в рабочем дереве висят твои правки (`schema.prisma`, `app.module.ts`,
+`audit/event-types.ts`, `authz/authz.model.ts`, `account/page.tsx`, `staff/page.tsx`,
+`SiteHeader.tsx`, `lib/api.ts`, `lib/api/http.ts`). Заверши логический блок, прогони
+`api:build`+`next build`+`jest`, закоммить **явными путями** одним связным коммитом.
+**Приёмка:** рабочее дерево чистое по твоим файлам, сборки зелёные.
 
-## P1 — доделать полосу A (после P0)
-- ✅ **A2. Notification-шаблоны** на все транзакционные события (заказ подтверждён/готов к выдаче/
-  гарантия/долг-напоминание) через outbox + Novu/SMTP/channel transports, consent-filtered.
-- ✅ **A3. Rate limiting** (`@nestjs/throttler`) на checkout-chain (`POST /customers`,
-  `POST /orders`, `POST /payments/intents`), OTP-выдачу, `POST /support/tickets`,
-  платёжные webhooks → 429 при превышении; тест.
-- ✅ **A4. PDF/печать полировка**: receipts split-tenders, labels, order invoice and договор
-  скупки с IMEI/ru-KG date/price formatting covered.
-- ✅ **A5. Infra runbook** — Caddy + бэкапы + restore-check.
+### C-2. Скелет боевого платёж-порта (без секретов, без аккаунтов)
+За существующим sandbox — интерфейс-порт `PaymentGatewayProvider` (create intent / verify
+webhook / refund) с текущей sandbox-реализацией как дефолт и заглушкой боевого адаптера,
+включаемой по env (`PAYMENT_PROVIDER`+ключи), с fallback на sandbox. Эталон паттерна —
+`ai/openrouter-provider.ts` (порт + rule-фолбэк, ключ только на сервере, не логируется).
+**Никаких реальных ключей/эндпоинтов** — только форма адаптера + селектор по env + тест,
+что без env выбирается sandbox. **Приёмка:** без env → sandbox-путь как сейчас; тест на селектор.
 
-## P2 — полоса B, если mac mini недоступна (иначе оставить mac mini)
-См. `PARALLEL-LANES.md` полоса B: ✅ E2E+CI, ✅ gift cards (новый модуль), ✅ Admin Product UI
-(дом для `/ai/categorize`+`/ai/describe`), ✅ Telegram Mini App shell. Greenfield-полоса B закрыта.
-Внешние/provider/hardware блокеры теперь диагностируются через `GET /health/integrations`
-без раскрытия значений секретов.
+### C-3. Добор API-тест-покрытия к цели 80% на денежных/складских путях
+Точечные specs там, где тонко: `suppliers` RMA edge-переходы, `debts` просрочка/reminder
+идемпотентность, `inventory` transfer/count guard'ы, `shifts` сверка. AAA-структура,
+`Promise.allSettled` для гонок. **Приёмка:** новые specs зелёные, покрытие не падает.
+
+### C-4 (по касанию). Дробление сервисов при следующей правке
+`orders.service.ts` (296) → выдели `order-fulfillment.ts` (fulfill/assign); `catalog.service.ts`
+(371) — согласовать при касании. Только если реально трогаешь файл в рамках C-1..C-3.
+Гейт дробления: те же тесты/сборки зелёные, поведение не изменилось.
+
+## Что НЕ входит (блокеры — только с аккаунтами/ключами юзера)
+Боевой платёжный шлюз (реальные ключи), SMS/OTP-доставка, фискализация ККМ, hardware-
+сертификация, production-активация AI/каналов. Это ждёт пользователя — не начинать.
 
 ## Статус синхронизации (обновляет Claude)
-- P0 закрыт. Текущий локальный гейт: API Jest 89/89 (316 тестов), Playwright 9/9,
-  `api:build` и `next build` зелёные.
-- Campaign delivery, social-login backend и POS catalog delta-sync закрыты; открытых unblocked
-  задач нет. Остались provider/hardware доступы, production-активация каналов и live client SDK/callback QA.
+- ✅ Все P0-блоки 1–3 закрыты (E1–E8, M-1..M-3+M-5, индексы, auth-hardening). M-4 — необязателен.
+- Claude параллельно: сплит `pos/page.tsx` (589→<400) в `components/pos/PosCatalog.tsx` +
+  `PosTicket.tsx`, затем checkout-сплит и web/reports-тесты. Не трогает твой лейн.
