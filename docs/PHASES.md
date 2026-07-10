@@ -445,12 +445,14 @@ catalog delta-sync; ручной фолбэк при отсутствии жел
 - ✅ `apps/web/lib/api.ts` (366→9, баррель) → разнесён по доменам `lib/api/*`: `http.ts`
   (API_BASE+postJson+getJson), `catalog.ts`, `orders.ts`, `auth.ts`, `pos.ts`, `warehouse.ts`,
   `exchanges.ts`, `approvals.ts`; `lib/api.ts` ре-экспортирует всё — импортёры без изменений.
-- 🟡 `apps/web/app/pos/page.tsx` (419→316) → извлечён `components/pos/PosCheckout.tsx`
-  (pay/pending/done + METHODS); под лимитом. Остаток: PosCatalog/PosTicket при след. касании.
-- ☐ `apps/api/src/orders/orders.service.ts` (240) → выделить `order-fulfillment.ts`
-  (fulfill/assign) из основного сервиса при следующем касании.
-- ☐ `apps/web/app/checkout/page.tsx` (239) → вынести `CheckoutForm`/`OrderSummary`.
-- (watch) `apps/api/src/catalog/catalog.service.ts` (323, Codex) — согласовать при касании.
+- ✅ `apps/web/app/pos/page.tsx` (589→391) → `components/pos/{PosCatalog,PosTicket,PosCheckout}` (`5c34195`).
+- ✅ `apps/web/app/erp/page.tsx` (533→332) → `components/erp/{ReadinessView,Card}` + прежние *View (`f0a926d`).
+- ✅ `apps/web/app/admin/products/page.tsx` (608→315) → `components/admin/{ProductList,ProductEditor}`
+  + `lib/admin-product-form.ts` (`3766376`).
+- ✅ `apps/web/app/approvals/page.tsx` (422→365) → `components/approvals/ApprovalList.tsx` (`7a9e15c`).
+- 🔜 `apps/web/app/staff/page.tsx` (618) и `apps/web/app/tg/page.tsx` (444) — в лейне Codex (см. `CODEX-NOW.md` C-4).
+- (под лимитом, по касанию) `apps/web/app/checkout/page.tsx` (309), `apps/api/src/orders/orders.service.ts` (296),
+  `apps/api/src/catalog/catalog.service.ts` (371, Codex).
 
 Гейт дробления: после разбиения — те же тесты/сборки зелёные, поведение не изменилось.
 
