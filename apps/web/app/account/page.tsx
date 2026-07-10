@@ -2,33 +2,34 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Bell, Building2, Gift, LogOut, MapPin, MessageCircle, Package, Recycle, RotateCcw, Settings, ShieldCheck, Smartphone, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { SiteFooter } from '@/components/SiteFooter';
+import { SiteHeader } from '@/components/SiteHeader';
 import { useAuth } from '@/lib/auth';
 import { fetchMyOrders, type MyOrder } from '@/lib/api';
 import { som } from '@/lib/format';
-import { MobileTabBar } from '@/components/MobileTabBar';
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  created: { label: 'Оформлен', cls: 'bg-lime/15 text-lime' },
-  reserved: { label: 'Собран', cls: 'bg-info/15 text-info' },
-  paid: { label: 'Оплачен', cls: 'bg-lime/15 text-lime' },
-  completed: { label: 'Завершён', cls: 'bg-lime/15 text-lime' },
-  cancelled: { label: 'Отменён', cls: 'bg-danger/10 text-[#FF8A7A]' },
-  refunded: { label: 'Возврат', cls: 'bg-danger/10 text-[#FF8A7A]' },
-  exchanged: { label: 'Обмен', cls: 'bg-warn/15 text-warn' },
+  created: { label: 'Оформлен', cls: 'border-[#60a5fa]/25 bg-[#60a5fa]/10 text-[#a9cbfb]' },
+  reserved: { label: 'Собран', cls: 'border-[#60a5fa]/25 bg-[#60a5fa]/10 text-[#a9cbfb]' },
+  paid: { label: 'Оплачен', cls: 'border-[#22c55e]/25 bg-[#22c55e]/10 text-[#7ee2a0]' },
+  completed: { label: 'Завершён', cls: 'border-[#22c55e]/25 bg-[#22c55e]/10 text-[#7ee2a0]' },
+  cancelled: { label: 'Отменён', cls: 'border-[#ef4444]/25 bg-[#ef4444]/10 text-[#ff9a9a]' },
+  refunded: { label: 'Возврат', cls: 'border-[#ef4444]/25 bg-[#ef4444]/10 text-[#ff9a9a]' },
 };
-const st = (s: string) => STATUS[s] ?? { label: s, cls: 'bg-[#2E2822] text-[#8A7F76]' };
-const MENU = [
-  { href: '/account/devices', icon: '📱', label: 'Мои устройства', badge: '' },
-  { href: '/account/returns', icon: '↩', label: 'Возвраты', badge: '' },
-  { href: '/account/bonuses', icon: '🎁', label: 'Бонусы', badge: '4 820' },
-  { href: '/account/addresses', icon: '📍', label: 'Адреса', badge: '' },
-  { href: '/account/notifications', icon: '🔔', label: 'Уведомления', badge: '' },
-  { href: '/support', icon: '💬', label: 'Поддержка', badge: '' },
-  { href: '/trade-in', icon: '♻', label: 'Trade-in', badge: 'оценка' },
-  { href: '/b2b', icon: '▦', label: 'Для бизнеса', badge: 'опт' },
-  { href: '/account/protection', icon: '◇', label: 'Защита устройства', badge: '' },
-  { href: '/account/settings', icon: '⚙', label: 'Настройки', badge: '' },
+
+const MENU: Array<{ href: string; icon: LucideIcon; label: string; meta: string }> = [
+  { href: '/account/devices', icon: Smartphone, label: 'Мои устройства', meta: 'Гарантии и сервис' },
+  { href: '/account/returns', icon: RotateCcw, label: 'Возвраты', meta: 'Заявки и статусы' },
+  { href: '/account/bonuses', icon: Gift, label: 'Бонусы', meta: '4 820 доступно' },
+  { href: '/account/addresses', icon: MapPin, label: 'Адреса', meta: 'Доставка и самовывоз' },
+  { href: '/account/notifications', icon: Bell, label: 'Уведомления', meta: 'Заказы и акции' },
+  { href: '/support', icon: MessageCircle, label: 'Поддержка', meta: 'Чат с AliStore' },
+  { href: '/trade-in', icon: Recycle, label: 'Trade-in', meta: 'Оценить устройство' },
+  { href: '/b2b', icon: Building2, label: 'Для бизнеса', meta: 'Оптовые заказы' },
+  { href: '/account/protection', icon: ShieldCheck, label: 'Защита устройства', meta: 'Планы покрытия' },
+  { href: '/account/settings', icon: Settings, label: 'Настройки', meta: 'Профиль и безопасность' },
 ];
 
 export default function AccountPage() {
@@ -39,63 +40,23 @@ export default function AccountPage() {
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account'); }, [hydrated, user, router]);
   useEffect(() => { if (user) authed(fetchMyOrders).then(setOrders).catch(() => setOrders([])); }, [user, authed]);
 
-  if (!hydrated || !user) {
-    return <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
-  }
+  if (!hydrated || !user) return <div className="min-h-screen bg-[#0c0c17] text-[#a2a6b6]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
-  return (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">
-        <div className="flex-1 overflow-y-auto px-4 pb-24 pt-5">
-          {/* profile card */}
-          <div className="mb-2 flex items-center gap-3.5 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
-            <span className="grid h-13 w-13 place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-xl font-extrabold" style={{ height: 52, width: 52 }}>{user.phone.slice(-2)}</span>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-display text-base font-bold">Клиент</span>
-                <span className="rounded-chip bg-warn px-2 py-0.5 text-[10px] font-bold text-lime-ink">GOLD</span>
-              </div>
-              <div className="font-mono text-xs text-[#A79C92]">{user.phone}</div>
-            </div>
-          </div>
+  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+    <SiteHeader />
+    <main className="mx-auto w-[min(1200px,92vw)] py-10 sm:py-14">
+      <div className="text-xs text-[#6c7080]">Главная / Кабинет</div>
+      <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><h1 className="font-display text-4xl font-bold sm:text-5xl">Личный кабинет</h1><p className="mt-3 text-[#a2a6b6]">Заказы, устройства, гарантия и бонусы в одном месте.</p></div><button type="button" onClick={async () => { await logout(); router.push('/'); }} className="flex items-center gap-2 self-start rounded-full border border-white/[0.12] px-4 py-2.5 text-sm text-[#a2a6b6] hover:border-[#ef4444]/40 hover:text-[#ff9a9a]"><LogOut size={16} /> Выйти</button></div>
 
-          {/* level */}
-          <div className="mb-3.5 rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
-            <div className="mb-2 flex justify-between text-[13px]"><span className="text-[#D8CFC6]">Уровень Gold</span><span className="font-mono text-lime">4 820 бонусов</span></div>
-            <div className="h-[7px] overflow-hidden rounded-chip bg-[#16130F]"><div className="h-full w-[72%] bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" /></div>
-            <div className="mt-1.5 text-[11px] text-[#8A7F76]">До Platinum осталось 51 000 сом покупок</div>
-          </div>
+      <section className="mt-9 grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
+        <div className="flex items-center gap-5 rounded-[22px] border border-white/[0.11] bg-[radial-gradient(circle_at_95%_0%,rgba(249,115,22,.18),transparent_50%),rgba(255,255,255,.045)] p-6 sm:p-8"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#fb9a4b] to-[#ea580c] font-display text-xl font-bold text-[#180f02]">{user.phone.slice(-2)}</span><div><div className="flex flex-wrap items-center gap-3"><h2 className="font-display text-2xl font-bold">Клиент AliStore</h2><span className="rounded-full border border-[#f97316]/30 bg-[#f97316]/15 px-2.5 py-1 text-[11px] font-semibold text-[#fb9a4b]">GOLD</span></div><p className="mt-1 font-mono text-sm text-[#a2a6b6]">{user.phone}</p></div></div>
+        <div className="rounded-[22px] border border-white/[0.11] bg-white/[0.045] p-6 sm:p-8"><div className="flex items-center justify-between"><span className="text-sm text-[#a2a6b6]">Уровень Gold</span><strong className="font-display text-xl text-[#fb9a4b]">4 820 бонусов</strong></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full w-[72%] rounded-full bg-gradient-to-r from-[#f97316] to-[#fb9a4b]" /></div><p className="mt-3 text-xs text-[#6c7080]">До Platinum осталось 51 000 сом покупок</p></div>
+      </section>
 
-          {/* menu */}
-          <div className="mb-4 grid grid-cols-2 gap-2.5">
-            {MENU.map((m) => (
-              <Link key={m.href} href={m.href} className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
-                <div className="text-2xl">{m.icon}</div>
-                <div className="mt-2 text-[13px] font-semibold">{m.label}</div>
-                {m.badge && <div className="mt-1 text-[11px] text-lime">{m.badge}</div>}
-              </Link>
-            ))}
-          </div>
+      <section className="pt-14"><h2 className="font-display text-2xl font-bold">Сервисы кабинета</h2><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{MENU.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className="group rounded-[18px] border border-white/[0.09] bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-white/[0.18] hover:bg-white/[0.055]"><span className="grid h-11 w-11 place-items-center rounded-[12px] border border-[#f97316]/20 bg-[#f97316]/10 text-[#fb9a4b]"><Icon size={20} /></span><h3 className="mt-4 font-display font-semibold group-hover:text-[#fb9a4b]">{item.label}</h3><p className="mt-1 text-xs text-[#6c7080]">{item.meta}</p></Link>; })}</div></section>
 
-          <h2 className="mb-2.5 font-display text-base font-bold">Мои заказы</h2>
-          {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
-          {orders && orders.length === 0 && <p className="py-6 text-center text-sm text-[#8A7F76]">Заказов пока нет</p>}
-          {(orders ?? []).map((o) => {
-            const s = st(o.status);
-            return (
-              <Link key={o.id} href={`/account/orders/${o.id}`} className="mb-2.5 flex items-center gap-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
-                <span className="font-mono text-sm font-bold">#{o.id.slice(-6)}</span>
-                <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>
-                <span className="text-[13px] text-[#A79C92]">{o.fulfillmentType ?? o.channel}</span>
-                <span className="ml-auto font-display font-extrabold text-lime">{som(o.total)}</span>
-              </Link>
-            );
-          })}
-
-          <button type="button" onClick={async () => { await logout(); router.push('/'); }} className="mt-4 w-full text-center text-[13px] text-[#FF8A7A]">Выйти из аккаунта</button>
-        </div>
-        <MobileTabBar active="account" />
-      </div>
-    </div>
-  );
+      <section className="pt-14"><div className="flex items-center justify-between"><h2 className="font-display text-2xl font-bold">Мои заказы</h2><span className="text-sm text-[#6c7080]">{orders?.length ?? 0}</span></div><div className="mt-6 overflow-hidden rounded-[18px] border border-white/[0.09] bg-white/[0.025]">{orders === null ? <div className="p-8 text-center text-[#6c7080]">Загрузка заказов...</div> : orders.length === 0 ? <div className="grid min-h-[230px] place-items-center p-8 text-center"><div><Package className="mx-auto text-[#6c7080]" size={34} /><h3 className="mt-4 font-display text-lg font-semibold">Заказов пока нет</h3><Link href="/catalog" className="mt-3 inline-block text-sm text-[#fb9a4b]">Перейти в каталог</Link></div></div> : orders.map((order) => { const status = STATUS[order.status] ?? { label: order.status, cls: 'border-white/10 bg-white/5 text-[#a2a6b6]' }; return <Link key={order.id} href={`/account/orders/${order.id}`} className="grid gap-3 border-b border-white/[0.07] px-5 py-4 last:border-0 hover:bg-white/[0.035] sm:grid-cols-[150px_130px_1fr_auto] sm:items-center"><strong className="font-mono text-sm">#{order.id.slice(-8)}</strong><span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] ${status.cls}`}>{status.label}</span><span className="text-sm text-[#a2a6b6]">{order.fulfillmentType ?? order.channel}</span><strong className="font-display text-lg">{som(order.total)}</strong></Link>; })}</div></section>
+    </main>
+    <SiteFooter />
+  </div>;
 }

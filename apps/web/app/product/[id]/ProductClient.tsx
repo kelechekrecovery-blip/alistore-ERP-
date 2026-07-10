@@ -1,30 +1,22 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import {
-  createProductReview,
-  fetchProductReviews,
-  fetchProductWithRelated,
-  type CatalogProduct,
-  type ProductReviews,
-} from '@/lib/api';
-import { useCart } from '@/lib/cart';
-import { useFavorites } from '@/lib/favorites';
-import { useCompare } from '@/lib/compare';
+import { BadgeCheck, GitCompareArrows, Heart, MapPin, RotateCcw, ShieldCheck, ShoppingBag, Star, Truck } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { ProductCard, productImage } from '@/components/ProductCard';
+import { SiteFooter } from '@/components/SiteFooter';
+import { SiteHeader } from '@/components/SiteHeader';
+import { createProductReview, fetchProductReviews, fetchProductWithRelated, type CatalogProduct, type ProductReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useCart } from '@/lib/cart';
+import { useCompare } from '@/lib/compare';
+import { useFavorites } from '@/lib/favorites';
 import { conditionLabel, som } from '@/lib/format';
 
-const TRUST = [
-  '🛡 Гарантия 12 мес', '⚡ Доставка 1–2 ч', '🏬 Самовывоз сегодня', '↩️ Возврат 14 дней',
-];
-
 export default function ProductPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
   const { add } = useCart();
-  const { has, toggle } = useFavorites();
+  const favorites = useFavorites();
   const compare = useCompare();
   const { user, hydrated, authed } = useAuth();
   const [product, setProduct] = useState<CatalogProduct | null | 'missing'>(null);
@@ -33,232 +25,102 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [reviewForm, setReviewForm] = useState({ rating: 5, text: '' });
   const [reviewMsg, setReviewMsg] = useState('');
   const [added, setAdded] = useState(false);
+  const [qty, setQty] = useState(1);
 
   useEffect(() => {
     let active = true;
-    setProduct(null);
-    setSimilar([]);
-    setReviews(null);
-    setReviewMsg('');
-    fetchProductWithRelated(params.id)
-      .then(({ product: nextProduct, related }) => {
-        if (!active) return;
-        setProduct(nextProduct ?? 'missing');
-        setSimilar(related);
-      })
-      .catch(() => {
-        if (!active) return;
-        setProduct('missing');
-        setSimilar([]);
-      });
-    return () => {
-      active = false;
-    };
+    Promise.all([fetchProductWithRelated(params.id), fetchProductReviews(params.id).catch(() => null)]).then(([detail, nextReviews]) => {
+      if (!active) return;
+      setProduct(detail.product ?? 'missing');
+      setSimilar(detail.related);
+      setReviews(nextReviews);
+    }).catch(() => active && setProduct('missing'));
+    return () => { active = false; };
   }, [params.id]);
 
-  useEffect(() => {
-    let active = true;
-    fetchProductReviews(params.id)
-      .then((nextReviews) => {
-        if (active) setReviews(nextReviews);
-      })
-      .catch(() => {
-        if (active) setReviews(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [params.id]);
-
-  if (product === null) {
-    return <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
-  }
-  if (product === 'missing') {
-    return (
-      <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] text-white">
-        <div className="text-center">
-          <p className="font-display text-lg font-bold">Товар не найден</p>
-          <Link href="/" className="mt-3 inline-block text-sm text-lime">← На главную</Link>
-        </div>
-      </div>
-    );
-  }
+  if (product === null) return <StoreMessage>Загрузка товара...</StoreMessage>;
+  if (product === 'missing') return <StoreMessage><div className="text-center"><h1 className="font-display text-2xl font-bold text-white">Товар не найден</h1><Link href="/catalog" className="mt-4 inline-block text-[#fb9a4b]">Вернуться в каталог</Link></div></StoreMessage>;
 
   const inStock = product.availableUnits > 0;
-  const used = conditionLabel(product.attrs) === 'Б/У';
-  const specs = Object.entries(product.attrs ?? {}).filter(([, v]) => typeof v === 'string' || typeof v === 'number');
-  const related = similar;
+  const condition = conditionLabel(product.attrs);
+  const specs = Object.entries(product.attrs ?? {}).filter(([, value]) => typeof value === 'string' || typeof value === 'number');
+  const reviewLabel = reviews?.count ? `${(reviews.avgRating ?? 0).toFixed(1)} · ${reviews.count} отзывов` : 'Отзывов пока нет';
 
   function addToCart() {
     if (!product || product === 'missing') return;
-    add({ id: product.id, sku: product.sku, name: product.name, price: product.price });
+    add({ id: product.id, sku: product.sku, name: product.name, price: product.price }, qty);
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
   }
 
-  async function submitReview(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function submitReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!product || product === 'missing') return;
-    setReviewMsg('Сохраняем…');
+    setReviewMsg('Сохраняем...');
     try {
-      await authed((token) =>
-        createProductReview(product.id, { rating: reviewForm.rating, text: reviewForm.text }, token),
-      );
+      await authed((token) => createProductReview(product.id, reviewForm, token));
       setReviewForm({ rating: 5, text: '' });
       setReviews(await fetchProductReviews(product.id));
       setReviewMsg('Спасибо, отзыв опубликован.');
-    } catch (err) {
-      setReviewMsg(err instanceof Error ? err.message : 'Не удалось сохранить отзыв');
+    } catch (error) {
+      setReviewMsg(error instanceof Error ? error.message : 'Не удалось сохранить отзыв');
     }
   }
 
-  const reviewLabel = reviews && reviews.count > 0
-    ? `★ ${(reviews.avgRating ?? 0).toFixed(1)} · ${reviews.count}`
-    : 'Нет отзывов';
-
-  return (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="relative flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">
-        <div className="flex-1 overflow-y-auto pb-24">
-          {/* image */}
-          <div className="relative h-[260px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-            <span className="absolute inset-0 grid place-items-center font-display text-[7rem] font-extrabold text-white/10">{product.name.slice(0, 1)}</span>
-            <button type="button" onClick={() => router.back()} className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white">←</button>
-            <div className="absolute right-3 top-3 flex gap-2">
-              <button type="button" onClick={() => toggle(product.id)} className="grid h-9 w-9 place-items-center rounded-full bg-black/55">{has(product.id) ? '❤️' : '🤍'}</button>
-              <button
-                type="button"
-                onClick={() => compare.toggle(product.id)}
-                className={`grid h-9 w-9 place-items-center rounded-full text-[15px] ${compare.has(product.id) ? 'bg-lime text-lime-ink' : 'bg-black/55 text-white'}`}
-                title="Сравнить"
-              >
-                ⇄
-              </button>
-              <Link href="/compare" className="grid h-9 w-9 place-items-center rounded-full bg-black/55 text-sm">↗</Link>
-            </div>
-            <span className={`absolute bottom-3 left-4 rounded-md px-2 py-0.5 text-[11px] font-bold ${used ? 'bg-ink text-lime' : 'bg-lime text-lime-ink'}`}>{used ? 'Б/У' : 'Новое'}</span>
+  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+    <SiteHeader />
+    <main className="mx-auto w-[min(1200px,92vw)] py-8 sm:py-12">
+      <nav className="mb-7 flex flex-wrap items-center gap-2 text-xs text-[#6c7080]" aria-label="Хлебные крошки"><Link href="/">Главная</Link><span>/</span><Link href="/catalog">Каталог</Link><span>/</span><span className="text-[#a2a6b6]">{product.name}</span></nav>
+      <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
+        <div>
+          <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[24px] border border-white/[0.11] bg-[radial-gradient(circle_at_70%_12%,rgba(249,115,22,.16),transparent_42%),linear-gradient(150deg,#191932,#101021)]">
+            <Image src={productImage(product)} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" />
+            <span className="absolute left-5 top-5 rounded-full border border-[#f97316]/30 bg-[#f97316]/15 px-3 py-1.5 text-xs font-semibold text-[#fb9a4b]">{condition}</span>
           </div>
-
-          <div className="px-4 py-4">
-            <div className="font-display text-[22px] font-extrabold leading-tight">{product.name}</div>
-            <div className="mt-2.5 font-display text-[26px] font-extrabold">{som(product.price)}</div>
-            <div className="mt-1.5 text-[13px] text-lime">рассрочка 0-0-12 · от {som(Math.round(product.price / 12))}/мес</div>
-
-            {/* trust row */}
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {TRUST.map((t) => (
-                <div key={t} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3 text-xs text-[#D8CFC6]">{t}</div>
-              ))}
-            </div>
-
-            {/* availability */}
-            <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5">
-              <div className="mb-2 text-[13px] font-semibold">Наличие</div>
-              <div className="flex justify-between py-1 text-xs text-[#A79C92]">
-                AliStore Центр <span className={inStock ? 'text-lime' : 'text-[#E5B23C]'}>{inStock ? `● ${product.availableUnits} шт` : '○ под заказ'}</span>
-              </div>
-            </div>
-
-            {/* specs */}
-            {specs.length > 0 && (
-              <>
-                <div className="mt-5 mb-2 font-display text-[15px] font-bold">Характеристики</div>
-                {specs.map(([k, v]) => (
-                  <div key={k} className="flex justify-between border-b border-[#221E19] py-2.5 text-[13px]">
-                    <span className="text-[#8A7F76]">{k}</span>
-                    <span className="text-[#D8CFC6]">{String(v)}</span>
-                  </div>
-                ))}
-              </>
-            )}
-
-            {/* reviews summary */}
-            <div className="mt-5 flex items-center">
-              <span className="font-display text-[15px] font-bold">Отзывы</span>
-              <span className="ml-auto text-[13px] text-[#E5B23C]">{reviewLabel}</span>
-            </div>
-            {reviews?.items.length ? (
-              <div className="mt-2 space-y-2">
-                {reviews.items.slice(0, 3).map((r) => (
-                  <div key={r.id} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="font-semibold text-[#D8CFC6]">{r.customerName}</span>
-                      <span className="ml-auto text-[#E5B23C]">{'★'.repeat(r.rating)}</span>
-                    </div>
-                    {r.text && <p className="mt-1.5 text-[12px] leading-snug text-[#A79C92]">{r.text}</p>}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <div className="mt-2.5 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
-              {hydrated && user ? (
-                <form onSubmit={submitReview} className="space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-[#A79C92]">Ваша оценка</span>
-                    <select
-                      value={reviewForm.rating}
-                      onChange={(e) => setReviewForm((f) => ({ ...f, rating: Number(e.target.value) }))}
-                      className="ml-auto rounded-[9px] border border-[#2E2822] bg-[#16130F] px-2 py-1 text-xs text-white"
-                    >
-                      {[5, 4, 3, 2, 1].map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <textarea
-                    value={reviewForm.text}
-                    onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))}
-                    maxLength={500}
-                    rows={3}
-                    className="w-full resize-none rounded-[10px] border border-[#2E2822] bg-[#16130F] p-2.5 text-sm text-white outline-none focus:border-lime"
-                    placeholder="Что понравилось?"
-                  />
-                  <button type="submit" className="rounded-[10px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink">
-                    Опубликовать
-                  </button>
-                  {reviewMsg && <span className="ml-2 text-[11px] text-[#A79C92]">{reviewMsg}</span>}
-                </form>
-              ) : (
-                <Link href={`/login?next=/product/${product.id}`} className="text-xs font-semibold text-lime">
-                  Войти, чтобы оставить отзыв
-                </Link>
-              )}
-            </div>
-
-            {/* similar */}
-            {related.length > 0 && (
-              <>
-                <div className="mt-5 mb-2.5 font-display text-[15px] font-bold">Похожие товары</div>
-                <div className="flex gap-2.5 overflow-x-auto pb-1.5" aria-label="Похожие товары">
-                  {related.map((r) => (
-                    <Link key={r.id} href={`/product/${r.id}`} className="w-[120px] flex-shrink-0">
-                      <div className="grid h-[92px] place-items-center rounded-[12px] bg-gradient-to-br from-[#2A2620] to-[#16130F] font-display text-3xl font-extrabold text-white/10">{r.name.slice(0, 1)}</div>
-                      <div className="mt-1.5 text-[11px] leading-tight text-[#D8CFC6]">{r.name}</div>
-                      <div className="text-xs font-bold">{som(r.price)}</div>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          <div className="mt-3 grid grid-cols-4 gap-3">{[productImage(product), '/products/p-iphone.png', '/products/p-samsung.png', productImage(product)].map((src, index) => <button key={`${src}-${index}`} type="button" className={`relative aspect-square overflow-hidden rounded-[13px] border bg-[#111120] ${index === 0 ? 'border-[#f97316]' : 'border-white/[0.09]'}`} aria-label={`Фото товара ${index + 1}`}><Image src={src} alt="" fill sizes="120px" className="object-contain p-3 opacity-80" /></button>)}</div>
         </div>
 
-        {/* sticky add-to-cart bar */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 border-t border-[#2E2822] bg-[#1A1611] px-4 pb-6 pt-3">
-          <div>
-            <div className="font-display text-lg font-extrabold">{som(product.price)}</div>
-            <div className="text-[10px] text-[#8A7F76]">{inStock ? 'в наличии' : 'под заказ'}</div>
+        <div className="pt-1">
+          <div className="flex items-center gap-2"><span className="rounded-full border border-[#f97316]/30 bg-[#f97316]/15 px-3 py-1 text-xs text-[#fb9a4b]">Хит продаж</span><span className="text-xs text-[#6c7080]">{product.sku}</span></div>
+          <h1 className="mt-5 font-display text-3xl font-bold leading-tight sm:text-4xl">{product.name}</h1>
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#a2a6b6]"><span className="flex items-center gap-1 text-[#fb9a4b]"><Star size={16} fill="currentColor" /> {reviewLabel}</span><span>·</span><span>{product.category}</span></div>
+          <div className="mt-7 font-display text-4xl font-bold text-white">{som(product.price)}</div>
+          <div className="mt-2 text-sm text-[#fb9a4b]">Рассрочка 0-0-12 · от {som(Math.round(product.price / 12))} в месяц</div>
+          <div className={`mt-5 flex items-center gap-2 text-sm ${inStock ? 'text-[#7ee2a0]' : 'text-[#f4c27d]'}`}><span className={`h-2 w-2 rounded-full ${inStock ? 'bg-[#22c55e] shadow-[0_0_10px_#22c55e]' : 'bg-[#e5b23c]'}`} />{inStock ? `В наличии · ${product.availableUnits} шт.` : 'Доступен под заказ'}</div>
+
+          <div className="mt-7 grid grid-cols-[auto_1fr] gap-3">
+            <div className="flex items-center rounded-full border border-white/[0.1] bg-white/[0.055] p-1"><button type="button" onClick={() => setQty((value) => Math.max(1, value - 1))} className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/[0.07]" aria-label="Уменьшить количество">−</button><span className="min-w-8 text-center font-display font-semibold">{qty}</span><button type="button" onClick={() => setQty((value) => Math.min(99, value + 1))} className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/[0.07]" aria-label="Увеличить количество">+</button></div>
+            <button type="button" onClick={addToCart} disabled={!inStock} className={`flex items-center justify-center gap-2 rounded-full px-5 font-semibold transition disabled:bg-white/[0.07] disabled:text-[#5f6372] ${added ? 'bg-[#22c55e] text-white' : 'bg-gradient-to-br from-[#f97316] to-[#ea580c] text-[#180f02] hover:brightness-110'}`}><ShoppingBag size={18} />{added ? 'Добавлено' : 'В корзину'}</button>
           </div>
-          <button
-            type="button"
-            disabled={!inStock}
-            onClick={addToCart}
-            className={`ml-auto rounded-[12px] px-8 py-3.5 text-[15px] font-bold transition ${added ? 'bg-success text-white' : 'bg-lime text-lime-ink'} disabled:bg-[#3A342E] disabled:text-[#6E645C]`}
-          >
-            {added ? 'Добавлено ✓' : 'В корзину'}
-          </button>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => favorites.toggle(product.id)} className={`flex items-center justify-center gap-2 rounded-full border py-3 text-sm ${favorites.has(product.id) ? 'border-[#f97316] text-[#fb9a4b]' : 'border-white/[0.12] text-[#a2a6b6]'}`}><Heart size={17} fill={favorites.has(product.id) ? 'currentColor' : 'none'} />Избранное</button>
+            <button type="button" onClick={() => compare.toggle(product.id)} className={`flex items-center justify-center gap-2 rounded-full border py-3 text-sm ${compare.has(product.id) ? 'border-[#f97316] text-[#fb9a4b]' : 'border-white/[0.12] text-[#a2a6b6]'}`}><GitCompareArrows size={17} />Сравнить</button>
+          </div>
+
+          <div className="mt-7 grid gap-1 border-t border-white/[0.09] pt-5">
+            <Perk icon={<ShieldCheck />}><b>Гарантия 12 месяцев</b> · цифровой талон в кабинете</Perk>
+            <Perk icon={<Truck />}><b>Доставка 1–2 часа</b> по Бишкеку</Perk>
+            <Perk icon={<MapPin />}><b>Самовывоз сегодня</b> из магазина AliStore</Perk>
+            <Perk icon={<RotateCcw />}><b>Возврат 14 дней</b> по правилам магазина</Perk>
+          </div>
         </div>
-      </div>
-    </div>
-  );
+      </section>
+
+      <section className="pt-24">
+        <div className="text-xs uppercase tracking-[0.16em] text-[#fb9a4b]">Технические детали</div><h2 className="mt-2 font-display text-3xl font-bold">Характеристики</h2>
+        <div className="mt-7 overflow-hidden rounded-[18px] border border-white/[0.09]">{specs.length ? specs.map(([key, value]) => <div key={key} className="grid gap-2 border-b border-white/[0.07] px-5 py-4 text-sm last:border-0 sm:grid-cols-[220px_1fr]"><span className="text-[#6c7080]">{key}</span><span className="text-[#d7d9e2]">{String(value)}</span></div>) : <div className="px-5 py-10 text-center text-[#6c7080]">Подробные характеристики уточняются</div>}</div>
+      </section>
+
+      <section className="grid gap-8 pt-24 lg:grid-cols-[1fr_420px]">
+        <div><div className="text-xs uppercase tracking-[0.16em] text-[#fb9a4b]">Опыт покупателей</div><h2 className="mt-2 font-display text-3xl font-bold">Отзывы</h2><div className="mt-7 grid gap-3">{reviews?.items.length ? reviews.items.map((review) => <article key={review.id} className="rounded-[18px] border border-white/[0.09] bg-white/[0.035] p-5"><div className="flex items-center gap-3"><strong>{review.customerName}</strong><span className="ml-auto text-[#fb9a4b]">{'★'.repeat(review.rating)}</span></div>{review.text && <p className="mt-3 text-sm leading-6 text-[#a2a6b6]">{review.text}</p>}</article>) : <div className="rounded-[18px] border border-white/[0.09] bg-white/[0.035] p-7 text-[#a2a6b6]">Будьте первым, кто оставит отзыв об этом товаре.</div>}</div></div>
+        <div className="h-fit rounded-[18px] border border-white/[0.09] bg-white/[0.035] p-6"><h3 className="font-display text-lg font-semibold">Оставить отзыв</h3>{hydrated && user ? <form onSubmit={submitReview} className="mt-5 grid gap-3"><select value={reviewForm.rating} onChange={(event) => setReviewForm((form) => ({ ...form, rating: Number(event.target.value) }))} className="rounded-[11px] border border-white/[0.1] bg-[#111120] px-3 py-3 text-sm outline-none">{[5,4,3,2,1].map((rating) => <option key={rating} value={rating}>{rating} из 5</option>)}</select><textarea value={reviewForm.text} onChange={(event) => setReviewForm((form) => ({ ...form, text: event.target.value }))} rows={4} maxLength={500} placeholder="Расскажите о покупке" className="resize-none rounded-[11px] border border-white/[0.1] bg-[#111120] p-3 text-sm outline-none focus:border-[#f97316]" /><button className="rounded-full bg-[#f97316] py-3 text-sm font-bold text-[#180f02]">Опубликовать</button>{reviewMsg && <p className="text-xs text-[#a2a6b6]">{reviewMsg}</p>}</form> : <Link href={`/login?next=/product/${product.id}`} className="mt-5 inline-flex rounded-full bg-[#f97316] px-5 py-3 text-sm font-bold text-[#180f02]">Войти и оставить отзыв</Link>}</div>
+      </section>
+
+      {similar.length > 0 && <section className="pt-24"><div className="flex items-end justify-between"><div><div className="text-xs uppercase tracking-[0.16em] text-[#fb9a4b]">Вам может подойти</div><h2 className="mt-2 font-display text-3xl font-bold">Похожие товары</h2></div><Link href="/catalog" className="text-sm text-[#fb9a4b]">Весь каталог</Link></div><div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">{similar.slice(0,4).map((item) => <ProductCard key={item.id} product={item} />)}</div></section>}
+    </main>
+    <SiteFooter />
+  </div>;
 }
+
+function Perk({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) { return <div className="flex items-center gap-3 py-2 text-sm text-[#a2a6b6]"><span className="text-[#fb9a4b]">{icon}</span><span>{children}</span></div>; }
+function StoreMessage({ children }: { children: React.ReactNode }) { return <div className="min-h-screen bg-[#0c0c17] text-[#a2a6b6]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">{children}</div></div>; }

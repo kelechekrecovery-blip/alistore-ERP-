@@ -2,6 +2,15 @@
 
 ## 2026-07-10
 
+- Task: restore the full desktop customer storefront from the archived `AliStore-Экосистема.zip` prototype instead of serving the mobile app shell at `/`.
+- Files changed: customer home/catalog/product/favorites/compare/cart/checkout/login/account routes, shared customer frame, storefront header/footer/product card, product visual assets, web dependencies, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: `/` now matches the prototype's dark wide marketplace composition with desktop navigation, search hero, category promos, real catalog cards and product imagery. The real API powers catalog/product/reviews; favorites, comparison, cart quantities, promo/bonus pricing, checkout, account and customer service flows remain functional. The Next.js 16 dynamic product route was also fixed by awaiting `params`, eliminating false “Товар не найден” screens.
+- Checks run: two production web builds; browser QA on `/`, `/catalog`, a real `/product/:id`, `/cart`, `/checkout`, and `/login`; live add-to-cart navigation; full Playwright suite on isolated ports after the final shared-frame change.
+- Outcome: web production build passed; Playwright passed 11/11; browser QA confirmed loaded product images, no horizontal overflow, desktop main widths, and a working catalog → product → cart → checkout flow. Local web was restarted on `http://127.0.0.1:3000/` with the desktop storefront open.
+- Next step: replace the two remaining test catalog rows with the production assortment and real product media supplied by the owner.
+
+## 2026-07-10
+
 - Task: implement the Phase 12 device protection / insurance policy flow.
 - Files changed: Prisma schema/migration, new `apps/api/src/protection/` module and API test, Event Ledger/RBAC/AppModule wiring, web protection API, `/account/protection`, account navigation, Staff App protection queue, Playwright protection flow, E2E reset, roadmap/readiness/backlog docs.
 - Result: authenticated customers can request 12/24-month accidental damage, extended warranty, or full protection only for an IMEI bought on their own AliStore order. The server calculates a baseline premium from the trusted product price. Sales staff can read the queue; senior/admin/owner roles review, offer or reject; the customer activates an offer into dated coverage. All lifecycle moves are ledgered.

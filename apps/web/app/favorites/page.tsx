@@ -1,59 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Heart } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ProductCard } from '@/components/ProductCard';
+import { SiteFooter } from '@/components/SiteFooter';
+import { SiteHeader } from '@/components/SiteHeader';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
-import { useCart } from '@/lib/cart';
-import { som } from '@/lib/format';
-import { MobileTabBar } from '@/components/MobileTabBar';
 
 export default function FavoritesPage() {
-  const { ids, has, remove, hydrated } = useFavorites();
-  const { add } = useCart();
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const favorites = useFavorites();
+  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  useEffect(() => { fetchCatalog({ limit: 100 }).then((response) => setProducts(response.items)).catch(() => setProducts([])); }, []);
+  const items = useMemo(() => (products ?? []).filter((product) => favorites.has(product.id)), [products, favorites]);
 
-  useEffect(() => {
-    fetchCatalog({ limit: 100 }).then((c) => setProducts(c.items)).catch(() => setProducts([]));
-  }, []);
-
-  const list = products.filter((p) => has(p.id));
-
-  return (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">
-        <div className="flex-1 overflow-y-auto px-4 pb-24 pt-5">
-          <h1 className="mb-3.5 font-display text-xl font-bold">Избранное</h1>
-
-          {hydrated && ids.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="text-5xl">🤍</div>
-              <div className="mt-3.5 font-display text-[17px] font-bold">Пока пусто</div>
-              <div className="mt-2 text-[13px] text-[#A79C92]">Сохраняйте товары, чтобы следить за ценой</div>
-              <Link href="/" className="mt-4 inline-block rounded-[11px] bg-lime px-5 py-3 text-[13px] font-bold text-lime-ink">В каталог</Link>
-            </div>
-          ) : (
-            list.map((p) => {
-              const inStock = p.availableUnits > 0;
-              return (
-                <div key={p.id} className="mb-2.5 flex gap-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3">
-                  <Link href={`/product/${p.id}`} className="grid h-[74px] w-[74px] flex-shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F] font-display text-2xl font-extrabold text-white/15">{p.name.slice(0, 1)}</Link>
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/product/${p.id}`} className="block text-[13px] font-semibold">{p.name}</Link>
-                    <div className="mt-1 font-display text-[15px] font-extrabold">{som(p.price)}</div>
-                    <div className={`text-[11px] ${inStock ? 'text-[#8A7F76]' : 'text-[#FF8A7A]'}`}>{inStock ? `${p.availableUnits} в наличии` : 'под заказ'}</div>
-                    <div className="mt-2 flex gap-1.5">
-                      <button type="button" disabled={!inStock} onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price })} className="rounded-[8px] bg-lime px-3 py-1.5 text-xs font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">В корзину</button>
-                      <button type="button" onClick={() => remove(p.id)} className="rounded-[8px] bg-[#2E2822] px-3 py-1.5 text-xs text-[#A79C92]">Убрать</button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-        <MobileTabBar active="home" />
-      </div>
-    </div>
-  );
+  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]"><SiteHeader /><main className="mx-auto min-h-[620px] w-[min(1200px,92vw)] py-10 sm:py-14"><div className="text-xs text-[#6c7080]">Главная / Избранное</div><h1 className="mt-3 font-display text-4xl font-bold sm:text-5xl">Избранное</h1><p className="mt-3 text-[#a2a6b6]">Сохранённые товары и актуальные цены.</p>{products === null ? <div className="mt-10 text-[#6c7080]">Загрузка...</div> : items.length ? <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">{items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="mt-10 grid min-h-[330px] place-items-center rounded-[22px] border border-white/[0.09] bg-white/[0.035] text-center"><div><Heart className="mx-auto text-[#6c7080]" size={38} /><h2 className="mt-5 font-display text-2xl font-bold">Пока пусто</h2><p className="mt-2 text-[#a2a6b6]">Сохраняйте товары, чтобы быстро вернуться к ним.</p><Link href="/catalog" className="mt-6 inline-flex rounded-full bg-[#f97316] px-6 py-3 text-sm font-bold text-[#180f02]">Открыть каталог</Link></div></div>}</main><SiteFooter /></div>;
 }

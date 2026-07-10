@@ -2,6 +2,6 @@ import ProductPage from './ProductClient';
 
 export const dynamic = 'force-dynamic';
 
-export default function Page({ params }: { params: { id: string } }) {
-  return <ProductPage params={params} />;
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  return <ProductPage params={await params} />;
 }

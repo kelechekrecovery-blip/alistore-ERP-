@@ -18,6 +18,8 @@ import {
   type PaymentIntent,
 } from '@/lib/api';
 import { loadAddresses, mainAddress, type SavedAddress } from '@/lib/account-local';
+import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
 
 const DELIVERY = [
   { id: 'pickup', icon: '🏬', name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
@@ -152,8 +154,14 @@ export default function CheckoutPage() {
   }
 
   const wrap = (children: React.ReactNode) => (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">{children}</div>
+    <div className="min-h-screen bg-[#0c0c17] font-sans text-white">
+      <SiteHeader />
+      <main className="mx-auto w-[min(900px,92vw)] py-10 sm:py-14">
+        <div className="overflow-hidden rounded-[22px] border border-white/[0.1] bg-[#111120] shadow-[0_28px_90px_-55px_rgba(249,115,22,.55)]">
+          {children}
+        </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 
@@ -191,15 +199,15 @@ export default function CheckoutPage() {
 
   return wrap(
     <>
-      <div className="flex items-center gap-3 px-4 pb-3 pt-5">
+      <div className="flex items-center gap-3 px-5 pb-3 pt-5 sm:px-7 sm:pt-7">
         <button type="button" onClick={() => (step > 0 ? setStep(step - 1) : router.back())} className="text-xl">←</button>
         <span className="font-display text-xl font-bold">Оформление</span>
       </div>
-      <div className="flex gap-1.5 px-4 pb-4">
+      <div className="flex gap-1.5 px-5 pb-5 sm:px-7">
         {STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-chip ${i <= step ? 'bg-lime' : 'bg-[#2E2822]'}`} />)}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="px-5 pb-7 sm:px-7">
         {step === 0 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Способ получения</div>
