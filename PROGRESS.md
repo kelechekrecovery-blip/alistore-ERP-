@@ -2,6 +2,16 @@
 
 ## 2026-07-10
 
+- Task: implement the Phase 12 device protection / insurance policy flow.
+- Files changed: Prisma schema/migration, new `apps/api/src/protection/` module and API test, Event Ledger/RBAC/AppModule wiring, web protection API, `/account/protection`, account navigation, Staff App protection queue, Playwright protection flow, E2E reset, roadmap/readiness/backlog docs.
+- Result: authenticated customers can request 12/24-month accidental damage, extended warranty, or full protection only for an IMEI bought on their own AliStore order. The server calculates a baseline premium from the trusted product price. Sales staff can read the queue; senior/admin/owner roles review, offer or reject; the customer activates an offer into dated coverage. All lifecycle moves are ledgered.
+- Checks run: Prisma validate/generate; dev migration deploy; test DB schema sync; targeted protection API test; API/web production builds; native typecheck; targeted Playwright protection flow; full API Jest sequentially; full Playwright suite; audits and whitespace check.
+- Outcome: targeted protection API passed 1 suite / 2 tests; full API passed 98 suites / 350 tests; Playwright passed 11/11 including purchased-IMEI protection; API/web builds and native typecheck passed; root/mobile audits report 0 vulnerabilities and whitespace check passed.
+- Commit: `9ff131f`.
+- Next step: implement the next unblocked Phase 12 block — franchise partner point audit and scorecards.
+
+## 2026-07-10
+
 - Task: implement the Phase 12 B2B/wholesale quote request flow end to end.
 - Files changed: Prisma schema/migration, new `apps/api/src/b2b/` module and API test, Event Ledger/RBAC/AppModule wiring, new web B2B API client and `/b2b` cabinet, account/header navigation, Staff App B2B queue, Playwright B2B flow, E2E reset, roadmap/readiness/backlog docs.
 - Result: authenticated customers can save company requisites, request an invoice or bank-transfer wholesale quote using trusted current catalog prices, track the request, and accept a quoted offer. Sales staff can read the queue; senior/admin/owner roles can move requests to review, issue a priced proposal, or reject it. Every creation and transition is written to the append-only Event Ledger.

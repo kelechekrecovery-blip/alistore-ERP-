@@ -30,6 +30,7 @@
   ERP reports, AI tools, admin product management, campaign/notification delivery.
 - **Telegram Mini App shell** и provider-ready Apple/Telegram social login.
 - **B2B/опт**: кабинет компании, заявка на безналичный счёт из каталога, staff-очередь и КП.
+- **Защита устройств**: полис для купленного IMEI, staff-предложение и customer activation.
 - **MVP release gate**: `npm run mvp:verify` проверяет schema, сборки, Jest, Playwright и
   readiness внешних провайдеров без раскрытия секретов.
 

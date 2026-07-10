@@ -393,8 +393,11 @@ reminders, and reservation expiry without an opted-out notice.
 - ✅ B2B/опт: `BusinessBuyerProfile` + `B2BQuote/B2BQuoteItem`, customer-owned `/b2b`
   кабинет с реквизитами и заявкой на счёт/банковский перевод по серверным ценам каталога,
   staff RBAC очередь с выпуском КП, customer acceptance и ledger `b2b.quote_*`.
+- ✅ Страхование/защита: `DeviceProtectionPolicy` только для купленного customer-owned IMEI,
+  планы accident/extended/full на 12/24 месяца, server suggested premium, staff RBAC
+  review/offer/reject, customer activation с датами покрытия и ledger `protection.*`.
 - ☐ WhatsApp-магазин; франшиза + аудит партнёрских точек;
-  страховка, рекламный кабинет.
+  рекламный кабинет.
 **Проверка:** ✅ gift-card e2e: выпуск → split tender gift_card+cash, web-flow gift-card→online
 остаток, retry без двойного списания, over-balance rejection; browser/CDP smoke checkout:
 gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `giftcard.redeemed`.
@@ -404,10 +407,12 @@ gift card 25 000 + card 75 000 → order paid, карта redeemed, ledger `gift
 создаёт paid pickup-order с `pickupPoint=alistore-center` и `pickupCode`.
 ✅ B2B: API ownership/RBAC/transition tests + browser flow OTP→реквизиты→каталог→invoice quote;
 заявка и `b2b.quote_requested` сверены в PostgreSQL.
+✅ Protection: API owner/RBAC/lifecycle tests + browser flow OTP→купленный IMEI→full protection;
+premium и `protection.requested` сверены в PostgreSQL.
 Остальное: e2e заказа через будущие каналы в общий бэкенд; аудит франшизы читает из ledger.
 
 ## Phase 13 — Инфраструктура и отказоустойчивость (сквозная) 🟡
-- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 10 smoke flows
+- ✅ Playwright E2E + CI: root `npm run e2e`, `playwright.config.ts`, 11 smoke flows
   (web checkout, POS discount→approval, return→refund request, exchange, trade-in intake,
   admin product management, protected ERP reports/AI, Telegram Mini App) and
   `.github/workflows/ci.yml` with Postgres service, install, Prisma migrate, API build/test,
@@ -488,12 +493,11 @@ catalog delta-sync; ручной фолбэк при отсутствии жел
   **бонусы**/**адреса**/**уведомления**). POS 2.0/ERP 2.0/Сотрудник App 2.0 ✅.
 - Качество кода: `lib/api.ts` разнесён по доменам (баррель), `pos/page.tsx` разбит (PosCheckout).
 
-Backend-модулей 41 · API тест-сьютов 97 (348 тестов зелёные, `jest`; при
+Backend-модулей 45 · API тест-сьютов 98 (350 тестов зелёные, `jest`; при
 конкурентной работе Codex на общей test-БД возможен флейк — лечится перезапуском).
 
 **Осталось:**
-- **Unblocked Phase 12:** страховка устройств, аудит франшизных точек, WhatsApp storefront
-  shell и рекламный кабинет.
+- **Unblocked Phase 12:** аудит франшизных точек, WhatsApp storefront shell и рекламный кабинет.
 - **P0 security:** закрыт. `/reports/*` и `/ai/*` требуют staff-RBAC; ERP/AI web-клиенты
   отправляют shared staff token; customer order timeline имеет scoped order-ledger endpoint.
 - **Внешние блокеры** (нужны ключи/аккаунты/железо/деньги): Phase 11 AI-слой (ключи AI-провайдера),

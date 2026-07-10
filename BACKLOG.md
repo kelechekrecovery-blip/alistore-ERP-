@@ -1,7 +1,6 @@
 # BACKLOG
 
 ## Next
-- Add device protection / insurance policy scaffold: customer quote intent, device/warranty link, staff queue, lifecycle states, and Event Ledger coverage.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
 - Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
 - Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
@@ -13,6 +12,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add device protection policies for purchased IMEIs with customer request/activation, server-priced staff offers, RBAC queue, lifecycle dates, and Event Ledger coverage.
 - Add B2B/wholesale quote requests with customer business profiles, catalog-priced invoice intents, staff RBAC queue/quoting, customer acceptance, and Event Ledger coverage.
 - Close Emergency P0 blocks E8/M-5 and concurrency/auth race coverage; webhook idempotency is proven by a concurrent acceptance test.
 - Prove gift-card double-redemption safety with a concurrent race regression test.
