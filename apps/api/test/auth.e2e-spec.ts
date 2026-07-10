@@ -72,7 +72,7 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     expect(challenge?.attempts).toBe(1);
   });
 
-  it('rotates the refresh token — the old one stops working', async () => {
+  it('detects refresh-token reuse and revokes the replacement session', async () => {
     const phone = nextPhone();
     const { devCode } = await auth.requestOtp(phone);
     const first = await auth.verifyOtp(phone, devCode as string);
@@ -82,7 +82,31 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
 
     const reused = await auth.refresh(first.refreshToken).catch((e) => e);
     expect(reused).toBeInstanceOf(ValidationError);
-    expect((reused as ValidationError).code).toBe('refresh_invalid');
+    expect((reused as ValidationError).code).toBe('refresh_reused');
+
+    const replacement = await auth.refresh(rotated.refreshToken).catch((e) => e);
+    expect(replacement).toBeInstanceOf(ValidationError);
+    expect((replacement as ValidationError).code).toBe('refresh_reused');
+  });
+
+  it('serializes concurrent refresh retries and leaves no live stolen session', async () => {
+    const phone = nextPhone();
+    const { devCode } = await auth.requestOtp(phone);
+    const first = await auth.verifyOtp(phone, devCode as string);
+
+    const attempts = await Promise.allSettled([
+      auth.refresh(first.refreshToken),
+      auth.refresh(first.refreshToken),
+    ]);
+    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(1);
+
+    const customer = await prisma.customer.findUniqueOrThrow({ where: { phone } });
+    await expect(
+      prisma.refreshToken.count({
+        where: { customerId: customer.id, revokedAt: null },
+      }),
+    ).resolves.toBe(0);
   });
 
   it('recovers access and revokes previous refresh sessions', async () => {
@@ -96,12 +120,12 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     const recovered = await auth.verifyRecoveryOtp(phone, recoveryOtp.devCode as string);
     expect(recovered.refreshToken).not.toBe(first.refreshToken);
 
-    const oldRefresh = await auth.refresh(first.refreshToken).catch((e) => e);
-    expect(oldRefresh).toBeInstanceOf(ValidationError);
-    expect((oldRefresh as ValidationError).code).toBe('refresh_invalid');
-
     const rotated = await auth.refresh(recovered.refreshToken);
     expect(rotated.accessToken.split('.')).toHaveLength(3);
+
+    const oldRefresh = await auth.refresh(first.refreshToken).catch((e) => e);
+    expect(oldRefresh).toBeInstanceOf(ValidationError);
+    expect((oldRefresh as ValidationError).code).toBe('refresh_reused');
   });
 
   it('does not create an account during recovery verify', async () => {
@@ -125,5 +149,21 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     const err = await auth.verifyOtp(phone, '123456').catch((e) => e);
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('otp_not_found');
+  });
+
+  it('locks an OTP challenge after five wrong attempts', async () => {
+    const phone = nextPhone();
+    const { devCode } = await auth.requestOtp(phone);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const err = await auth.verifyOtp(phone, wrong).catch((e) => e);
+      expect(err).toBeInstanceOf(ValidationError);
+      expect((err as ValidationError).code).toBe('otp_invalid');
+    }
+
+    const locked = await auth.verifyOtp(phone, devCode as string).catch((e) => e);
+    expect(locked).toBeInstanceOf(ValidationError);
+    expect((locked as ValidationError).code).toBe('otp_locked');
   });
 });

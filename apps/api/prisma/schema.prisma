@@ -582,6 +582,7 @@ model StaffUser {
   active       Boolean  @default(true)
   totpSecret   String?
   totpEnabled  Boolean  @default(false)
+  totpLastToken String? // last used TOTP code — single-use guard (anti-replay)
   pushTokens   PushToken[]
   createdAt    DateTime @default(now())
 

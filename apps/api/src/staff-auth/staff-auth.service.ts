@@ -88,7 +88,7 @@ export class StaffAuthService {
     const secret = this.totp.generateSecret();
     await this.prisma.staffUser.update({
       where: { id: staff.id },
-      data: { totpSecret: secret, totpEnabled: false },
+      data: { totpSecret: secret, totpEnabled: false, totpLastToken: null },
     });
     return {
       secret,
@@ -127,7 +127,7 @@ export class StaffAuthService {
     }
     const updated = await this.prisma.staffUser.update({
       where: { id: staff.id },
-      data: { totpEnabled: false, totpSecret: null },
+      data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
     });
     return this.publicView(updated);
   }
@@ -146,6 +146,18 @@ export class StaffAuthService {
     }
     if (!this.totp.verify(token, staff.totpSecret)) {
       throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
+    }
+    // Consume atomically: two concurrent approval requests carrying the same current code
+    // cannot both pass after reading the same previous value.
+    const consumed = await this.prisma.staffUser.updateMany({
+      where: {
+        id: staffId,
+        OR: [{ totpLastToken: null }, { totpLastToken: { not: token } }],
+      },
+      data: { totpLastToken: token },
+    });
+    if (consumed.count === 0) {
+      throw new ForbiddenError('staff_2fa_token_reused', 'Код уже использован — дождитесь нового');
     }
   }
 

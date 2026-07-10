@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import * as argon2 from 'argon2';
-import type { Customer } from '@prisma/client';
+import type { Customer, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationError } from '../common/errors';
 import { AppleSocialLoginDto, TelegramSocialLoginDto } from './auth.dto';
@@ -172,23 +172,49 @@ export class AuthService {
   /** Rotate a refresh token: the presented token is revoked and a new pair issued. */
   async refresh(refreshToken: string): Promise<AuthTokens> {
     const tokenHash = this.hashToken(refreshToken);
-    const record = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash },
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash} FOR UPDATE
+      `;
+      if (locked.length === 0) {
+        throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
+      }
+
+      const record = await tx.refreshToken.findUnique({ where: { tokenHash } });
+      if (!record || record.expiresAt < new Date()) {
+        throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
+      }
+      if (record.revokedAt) {
+        // The row lock serializes concurrent rotations. A replay only runs after the first
+        // rotation committed, so it also revokes the replacement token created by that rotation.
+        await tx.refreshToken.updateMany({
+          where: { customerId: record.customerId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        return { kind: 'reused' as const };
+      }
+      await tx.refreshToken.update({
+        where: { id: record.id },
+        data: { revokedAt: new Date() },
+      });
+      const customer = await tx.customer.findUnique({
+        where: { id: record.customerId },
+      });
+      if (!customer) {
+        throw new ValidationError('customer_not_found', 'Клиент не найден');
+      }
+      return {
+        kind: 'rotated' as const,
+        tokens: await this.issueTokens(customer.id, customer.phone, tx),
+      };
     });
-    if (!record || record.revokedAt || record.expiresAt < new Date()) {
-      throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
+    if (outcome.kind === 'reused') {
+      throw new ValidationError(
+        'refresh_reused',
+        'Повторное использование токена — все сессии сброшены',
+      );
     }
-    await this.prisma.refreshToken.update({
-      where: { id: record.id },
-      data: { revokedAt: new Date() },
-    });
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: record.customerId },
-    });
-    if (!customer) {
-      throw new ValidationError('customer_not_found', 'Клиент не найден');
-    }
-    return this.issueTokens(customer.id, customer.phone);
+    return outcome.tokens;
   }
 
   /** Revoke a refresh token (logout). Idempotent. */
@@ -249,13 +275,14 @@ export class AuthService {
   private async issueTokens(
     customerId: string,
     phone: string,
+    db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
   ): Promise<AuthTokens> {
     const accessToken = await this.jwt.signAsync(
       { sub: customerId, phone, typ: 'customer' },
       { expiresIn: ACCESS_TTL },
     );
     const refreshToken = randomBytes(32).toString('base64url');
-    await this.prisma.refreshToken.create({
+    await db.refreshToken.create({
       data: {
         customerId,
         tokenHash: this.hashToken(refreshToken),

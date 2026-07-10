@@ -68,6 +68,28 @@ describe('StaffAuth (login → role in JWT)', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('consumes a TOTP step-up token only once, including concurrent requests', async () => {
+    const username = `replay-${RUN}`;
+    const staff = await service.createStaff(username, 'strong-pass', 'owner');
+    const setup = await service.setupTotp(staff.id);
+    await service.enableTotp(staff.id, authenticator.generate(setup.secret));
+    const token = authenticator.generate(setup.secret);
+
+    const attempts = await Promise.allSettled([
+      service.verifyStepUp(staff.id, token),
+      service.verifyStepUp(staff.id, token),
+    ]);
+    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
+    const rejected = attempts.find((attempt) => attempt.status === 'rejected');
+    expect(rejected).toMatchObject({
+      reason: { code: 'staff_2fa_token_reused' },
+    });
+
+    await expect(service.verifyStepUp(staff.id, token)).rejects.toMatchObject({
+      code: 'staff_2fa_token_reused',
+    });
+  });
+
   it('rejects a wrong password', async () => {
     const username = `owner-${RUN}`;
     await service.createStaff(username, 'right-pass', 'owner');
