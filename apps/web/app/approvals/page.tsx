@@ -13,7 +13,7 @@ import {
   type Approval,
   type StaffTotpSetupResult,
 } from '@/lib/api';
-import { som } from '@/lib/format';
+import { ApprovalList } from '@/components/approvals/ApprovalList';
 import {
   clearStaffSession,
   loadStaffSession,
@@ -26,17 +26,6 @@ const TABS = [
   { status: 'approved', label: 'Одобрено' },
   { status: 'rejected', label: 'Отклонено' },
 ];
-
-const ACTION_LABEL: Record<string, string> = {
-  refund: 'Возврат денег',
-  discount: 'Скидка сверх лимита',
-  write_off: 'Списание',
-  price: 'Изменение цены',
-  stock_adjust: 'Изменение остатка',
-  debt: 'Продажа в долг',
-  delete: 'Удаление товара',
-  pii: 'Доступ к PII',
-};
 
 export default function ApprovalsPage() {
   const [tab, setTab] = useState(TABS[0]);
@@ -359,53 +348,7 @@ export default function ApprovalsPage() {
                 </div>
               )}
               {items && items.length > 0 && (
-                <ul className="flex flex-col gap-3">
-                  {items.map((a) => {
-                    const amount = a.evidence?.payload?.amount;
-                    return (
-                      <li key={a.id} className="rounded-card border border-ink/10 bg-white p-5 shadow-soft">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="rounded-chip bg-danger/10 px-3 py-1 text-xs font-bold text-danger">
-                            {ACTION_LABEL[a.action] ?? a.action}
-                          </span>
-                          <span className="font-mono text-xs text-ink/45">#{a.id.slice(-8)}</span>
-                          <span className="text-sm text-ink/60">от {a.requester}</span>
-                          {typeof amount === 'number' && (
-                            <span className="ml-auto font-mono text-lg font-bold tabular text-ink">
-                              {som(amount)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-2 text-sm text-ink/70">Причина: {a.reason}</p>
-
-                        {tab.status === 'requested' ? (
-                          <div className="mt-4 flex gap-2">
-                            <button
-                              type="button"
-                              disabled={busy === a.id}
-                              onClick={() => decide(a, 'approved')}
-                              className="rounded-btn bg-success px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-50"
-                            >
-                              {busy === a.id ? '…' : 'Одобрить'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy === a.id}
-                              onClick={() => decide(a, 'rejected')}
-                              className="rounded-btn border border-danger/30 px-4 py-2 text-sm font-semibold text-danger transition hover:bg-danger/5 disabled:opacity-50"
-                            >
-                              Отклонить
-                            </button>
-                          </div>
-                        ) : (
-                          <p className="mt-3 font-mono text-xs text-ink/40">
-                            {a.status} · {a.approver ?? '—'}
-                          </p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                <ApprovalList items={items} tabStatus={tab.status} busy={busy} onDecide={decide} />
               )}
             </>
           )}
