@@ -7,6 +7,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ProductCard, productImage } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
+import MobileProduct from '@/components/mobile/MobileProduct';
 import { createProductReview, fetchProductReviews, fetchProductWithRelated, type CatalogProduct, type ProductReviews } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
@@ -67,7 +68,9 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     }
   }
 
-  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+  return <>
+    <div className="lg:hidden"><MobileProduct product={product} similar={similar} reviews={reviews} /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-8 sm:py-12">
       <nav className="mb-7 flex flex-wrap items-center gap-2 text-xs text-[#6c7080]" aria-label="Хлебные крошки"><Link href="/">Главная</Link><span>/</span><Link href="/catalog">Каталог</Link><span>/</span><span className="text-[#a2a6b6]">{product.name}</span></nav>
@@ -119,7 +122,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       {similar.length > 0 && <section className="pt-24"><div className="flex items-end justify-between"><div><div className="text-xs uppercase tracking-[0.16em] text-[#fb9a4b]">Вам может подойти</div><h2 className="mt-2 font-display text-3xl font-bold">Похожие товары</h2></div><Link href="/catalog" className="text-sm text-[#fb9a4b]">Весь каталог</Link></div><div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">{similar.slice(0,4).map((item) => <ProductCard key={item.id} product={item} />)}</div></section>}
     </main>
     <SiteFooter />
-  </div>;
+    </div>
+  </>;
 }
 
 function Perk({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) { return <div className="flex items-center gap-3 py-2 text-sm text-[#a2a6b6]"><span className="text-[#fb9a4b]">{icon}</span><span>{children}</span></div>; }
