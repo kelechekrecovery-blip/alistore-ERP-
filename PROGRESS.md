@@ -2,6 +2,16 @@
 
 ## 2026-07-10
 
+- Task: launch the complete local AliStore stack and repair native Metro startup.
+- Files changed: `apps/mobile/package.json`, `apps/mobile/package-lock.json`, `apps/mobile/tsconfig.json`, `apps/mobile/.gitignore`, `PROGRESS.md`.
+- Result: PostgreSQL, the current Nest API, Next Site 2.0, and Expo Metro now run together locally. Added the missing SDK-compatible `babel-preset-expo`, accepted Expo's typed-route TypeScript includes, and applied the existing patched `uuid@11.1.1` override to the isolated mobile lockfile.
+- Checks run: API health and Swagger HTTP checks; Site 2.0 home/ERP HTTP checks; Expo iOS and Android Hermes bundle compilation; mobile typecheck; mobile store preflight; mobile dependency audit; listening-port verification; `git diff --check`.
+- Outcome: API and web return HTTP 200, Expo manifest and both platform bundles return HTTP 200, mobile typecheck passed, store preflight passed with 0 failures and 2 expected production-credential warnings, and mobile audit reports 0 vulnerabilities. Expo Go is available on LAN; local iOS Simulator launch still requires a working full Xcode `simctl` installation.
+- Commit: pending.
+- Next step: keep the local stack available for hands-on QA, then continue with the B2B/wholesale quote scaffold after the completed Emergency P0 work.
+
+## 2026-07-10
+
 - Task: close the auth-hardening portion of the Emergency P0 handoff.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260710063722_staff_totp_last_token/`, `apps/api/src/auth/auth.service.ts`, `apps/api/src/staff-auth/staff-auth.service.ts`, `apps/api/test/auth.e2e-spec.ts`, `apps/api/test/staff-auth.e2e-spec.ts`, `apps/api/test/customer-pii-guard.e2e-spec.ts`, `apps/api/test/debts.e2e-spec.ts`, `e2e/helpers.ts`, `docs/CODEX-EMERGENCY-P0.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: refresh rotation now locks the presented token row, detects sequential and concurrent reuse, commits revocation of every live customer refresh token before returning `refresh_reused`, and cannot leave a replacement session alive after a replay. Staff TOTP step-up codes are consumed with an atomic conditional update, so the same code cannot authorize two concurrent dangerous actions. OTP lockout and the tightened authenticated Customer 360 policy now have explicit regression coverage.

@@ -50,6 +50,10 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "babel-preset-expo": "~57.0.0",
     "typescript": "~6.0.3"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }
