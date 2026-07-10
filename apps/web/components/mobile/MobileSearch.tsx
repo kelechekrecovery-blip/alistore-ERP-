@@ -1,0 +1,99 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { MobileFrame } from '@/components/mobile/MobileFrame';
+import { MobileProductCard } from '@/components/mobile/MobileProductCard';
+import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+
+const POPULAR = ['iPhone', 'Samsung', 'AirPods', 'MacBook', 'iPad', 'Часы'];
+
+export default function MobileSearch() {
+  const router = useRouter();
+  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    setQ(new URLSearchParams(window.location.search).get('q') ?? '');
+    fetchCatalog({ limit: 100 })
+      .then((response) => setProducts(response.items))
+      .catch(() => setProducts([]));
+  }, []);
+
+  const results = useMemo(() => {
+    const query = q.trim().toLocaleLowerCase('ru');
+    if (!query) return [];
+    return (products ?? []).filter((p) =>
+      `${p.name} ${p.sku} ${p.category}`.toLocaleLowerCase('ru').includes(query),
+    );
+  }, [products, q]);
+
+  const trimmed = q.trim();
+
+  return (
+    <MobileFrame active="catalog" header={false}>
+      <div className="px-4 pb-6 pt-2">
+        {/* search bar */}
+        <div className="mb-4 flex items-center gap-2">
+          <button type="button" onClick={() => router.back()} aria-label="Назад" className="text-[20px] text-white">
+            ←
+          </button>
+          <div className="flex flex-1 items-center gap-2 rounded-[13px] border border-[#2E2822] bg-[#221E19] px-3.5 py-2.5">
+            <span className="text-[#6E645C]">🔍</span>
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Поиск техники, брендов…"
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#6E645C]"
+            />
+            {q && (
+              <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="text-[#6E645C]">
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {!trimmed ? (
+          <>
+            <div className="mb-2.5 text-[13px] text-[#8A7F76]">Популярные запросы</div>
+            <div className="flex flex-wrap gap-2">
+              {POPULAR.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => setQ(term)}
+                  className="rounded-full border border-[#2E2822] bg-[#221E19] px-3.5 py-2 text-xs text-[#D8CFC6]"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : results.length > 0 ? (
+          <>
+            <div className="mb-2.5 text-[13px] text-[#8A7F76]">Найдено: {results.length}</div>
+            <div className="grid grid-cols-2 gap-3">
+              {results.slice(0, 20).map((p, i) => (
+                <MobileProductCard key={p.id} product={p} priority={i === 0} />
+              ))}
+            </div>
+          </>
+        ) : products === null ? (
+          <div className="py-10 text-center text-sm text-[#8A7F76]">Поиск…</div>
+        ) : (
+          <div className="py-12 text-center">
+            <div className="text-5xl">🔍</div>
+            <div className="mt-3.5 font-display text-[17px] font-bold text-white">Ничего не найдено</div>
+            <div className="mt-2 text-[13px] text-[#A79C92]">Попробуйте другой запрос</div>
+            <Link href="/catalog" className="mt-4 inline-block rounded-[11px] bg-lime px-5 py-2.5 text-[13px] font-bold text-lime-ink">
+              Открыть каталог
+            </Link>
+          </div>
+        )}
+      </div>
+    </MobileFrame>
+  );
+}
