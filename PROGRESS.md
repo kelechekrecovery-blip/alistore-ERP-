@@ -7,6 +7,7 @@
 - Result: `/` now matches the prototype's dark wide marketplace composition with desktop navigation, search hero, category promos, real catalog cards and product imagery. The real API powers catalog/product/reviews; favorites, comparison, cart quantities, promo/bonus pricing, checkout, account and customer service flows remain functional. The Next.js 16 dynamic product route was also fixed by awaiting `params`, eliminating false “Товар не найден” screens.
 - Checks run: two production web builds; browser QA on `/`, `/catalog`, a real `/product/:id`, `/cart`, `/checkout`, and `/login`; live add-to-cart navigation; full Playwright suite on isolated ports after the final shared-frame change.
 - Outcome: web production build passed; Playwright passed 11/11; browser QA confirmed loaded product images, no horizontal overflow, desktop main widths, and a working catalog → product → cart → checkout flow. Local web was restarted on `http://127.0.0.1:3000/` with the desktop storefront open.
+- Commit: `50698a1`.
 - Next step: replace the two remaining test catalog rows with the production assortment and real product media supplied by the owner.
 
 ## 2026-07-10
