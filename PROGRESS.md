@@ -7,7 +7,7 @@
 - Result: PostgreSQL, the current Nest API, Next Site 2.0, and Expo Metro now run together locally. Added the missing SDK-compatible `babel-preset-expo`, accepted Expo's typed-route TypeScript includes, and applied the existing patched `uuid@11.1.1` override to the isolated mobile lockfile.
 - Checks run: API health and Swagger HTTP checks; Site 2.0 home/ERP HTTP checks; Expo iOS and Android Hermes bundle compilation; mobile typecheck; mobile store preflight; mobile dependency audit; listening-port verification; `git diff --check`.
 - Outcome: API and web return HTTP 200, Expo manifest and both platform bundles return HTTP 200, mobile typecheck passed, store preflight passed with 0 failures and 2 expected production-credential warnings, and mobile audit reports 0 vulnerabilities. Expo Go is available on LAN; local iOS Simulator launch still requires a working full Xcode `simctl` installation.
-- Commit: pending.
+- Commit: `44b4998`.
 - Next step: keep the local stack available for hands-on QA, then continue with the B2B/wholesale quote scaffold after the completed Emergency P0 work.
 
 ## 2026-07-10
