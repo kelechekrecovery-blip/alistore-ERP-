@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { motion } from 'motion/react';
 import { useState } from 'react';
 import type { CatalogProduct } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -13,7 +14,7 @@ import { productImage } from '@/components/ProductCard';
  * Mobile hits/catalog product card (Клиент App 2.0): real product thumbnail with an
  * optional badge + favourite toggle, name, Sora price, stock line and a lime add button.
  */
-export function MobileProductCard({ product, badge }: { product: CatalogProduct; badge?: string }) {
+export function MobileProductCard({ product, badge, priority = false }: { product: CatalogProduct; badge?: string; priority?: boolean }) {
   const { add } = useCart();
   const { has, toggle } = useFavorites();
   const [added, setAdded] = useState(false);
@@ -28,9 +29,14 @@ export function MobileProductCard({ product, badge }: { product: CatalogProduct;
   }
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-[#2E2822] bg-[#221E19]">
+    <motion.div
+      className="overflow-hidden rounded-[16px] border border-[#2E2822] bg-[#221E19]"
+      whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+    >
       <Link href={href} className="relative block h-[120px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-        <Image src={productImage(product)} alt={product.name} fill sizes="200px" className="object-contain p-3" />
+        <Image src={productImage(product)} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" />
         {badge && (
           <span className="absolute left-2 top-2 rounded-[6px] bg-coral px-1.5 py-[3px] text-[10px] font-bold text-white">
             {badge}
@@ -71,6 +77,6 @@ export function MobileProductCard({ product, badge }: { product: CatalogProduct;
           {added ? 'Добавлено ✓' : inStock ? 'В корзину' : 'Под заказ'}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

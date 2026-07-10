@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { MotionConfig } from 'motion/react';
 import { CartProvider } from '@/lib/cart';
 import { AuthProvider } from '@/lib/auth';
 import { FavoritesProvider } from '@/lib/favorites';
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <CartProvider>
             <FavoritesProvider>
-              <CompareProvider>{children}</CompareProvider>
+              <CompareProvider>
+                <MotionConfig reducedMotion="user">{children}</MotionConfig>
+              </CompareProvider>
             </FavoritesProvider>
           </CartProvider>
         </AuthProvider>

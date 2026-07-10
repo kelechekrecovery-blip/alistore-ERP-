@@ -53,3 +53,69 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+@keyframes store-enter {
+  0%, 100% { opacity: 1; transform: translate3d(0, 0, 0); }
+  45% { opacity: 1; transform: translate3d(0, -4px, 0); }
+}
+
+@keyframes store-product-enter {
+  0%, 100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  55% { opacity: 1; transform: translate3d(0, -8px, 0) scale(1.015) rotate(0.4deg); }
+}
+
+@keyframes store-product-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-0.5deg); }
+  50% { transform: translate3d(0, -12px, 0) rotate(0.7deg); }
+}
+
+@keyframes store-scroll-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.store-motion-enter {
+  animation: store-enter 680ms cubic-bezier(0.16, 1, 0.3, 1) var(--store-delay, 0s) both;
+}
+
+.store-motion-stagger > * {
+  animation: store-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.store-motion-stagger > :nth-child(1) { animation-delay: 60ms; }
+.store-motion-stagger > :nth-child(2) { animation-delay: 130ms; }
+.store-motion-stagger > :nth-child(3) { animation-delay: 200ms; }
+.store-motion-stagger > :nth-child(4) { animation-delay: 270ms; }
+.store-motion-stagger > :nth-child(5) { animation-delay: 340ms; }
+
+.store-product-float {
+  animation:
+    store-product-enter 820ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both,
+    store-product-float 5.4s ease-in-out 1.1s 2;
+}
+
+.store-card-enter {
+  animation: store-enter 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.store-scroll-progress {
+  transform: scaleX(0);
+}
+
+@supports (animation-timeline: scroll()) {
+  .store-scroll-progress {
+    animation: store-scroll-progress linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-motion-enter,
+  .store-motion-stagger > *,
+  .store-product-float,
+  .store-card-enter,
+  .store-scroll-progress {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

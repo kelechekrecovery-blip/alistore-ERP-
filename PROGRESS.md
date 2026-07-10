@@ -2,6 +2,15 @@
 
 ## 2026-07-10
 
+- Task: install a reusable Skiper UI skill and introduce polished, accessible motion across the AliStore customer ecosystem.
+- Files changed: local `~/.codex/skills/skiper-ui`, desktop storefront home/header/product cards, global motion tokens/keyframes, shared MotionConfig/primitives, preserved mobile home at `/app`, mobile card image/micro-interactions, web dependencies, motion Playwright coverage, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the desktop storefront at `/` now has a staged hero, finite product float, animated promo hierarchy, native scroll-progress indicator, card lift/tap feedback, and safe section motion. The parallel mobile prototype work was preserved at `/app` instead of being overwritten. All motion starts from a fully visible frame because the embedded browser can suspend `requestAnimationFrame` and lacks `IntersectionObserver`; reduced-motion disables all decorative animation.
+- Checks run: skill `quick_validate.py`; web production build; dependency audit; browser DOM/computed-style QA; targeted storefront motion Playwright; full Playwright suite; `git diff --check`.
+- Outcome: skill validation passed; web build passed; audit reports 0 vulnerabilities; browser QA confirmed visible animated elements and no horizontal overflow; targeted motion test passed 1/1; full Playwright passed 12/12 including reduced-motion and `/app` preservation.
+- Next step: extend the same motion language to product gallery transitions and account/order state changes while keeping POS/ERP motion restrained and task-focused.
+
+## 2026-07-10
+
 - Task: restore the full desktop customer storefront from the archived `AliStore-Экосистема.zip` prototype instead of serving the mobile app shell at `/`.
 - Files changed: customer home/catalog/product/favorites/compare/cart/checkout/login/account routes, shared customer frame, storefront header/footer/product card, product visual assets, web dependencies, `BACKLOG.md`, and `PROGRESS.md`.
 - Result: `/` now matches the prototype's dark wide marketplace composition with desktop navigation, search hero, category promos, real catalog cards and product imagery. The real API powers catalog/product/reviews; favorites, comparison, cart quantities, promo/bonus pricing, checkout, account and customer service flows remain functional. The Next.js 16 dynamic product route was also fixed by awaiting `params`, eliminating false “Товар не найден” screens.

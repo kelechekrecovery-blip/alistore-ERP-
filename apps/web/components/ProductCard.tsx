@@ -37,7 +37,7 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
   }
 
   return (
-    <article className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/[0.09] bg-white/[0.035] transition duration-300 hover:-translate-y-1 hover:border-white/[0.18] hover:bg-white/[0.055]">
+    <article className="store-card-enter group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/[0.09] bg-white/[0.035] transition duration-300 hover:-translate-y-1.5 hover:border-white/[0.18] hover:bg-white/[0.055] active:scale-[0.99]">
       <div className="relative aspect-[4/3] overflow-hidden bg-[radial-gradient(circle_at_50%_15%,rgba(249,115,22,.12),transparent_50%),linear-gradient(150deg,#191932,#101021)]">
         <Link href={href} className="absolute inset-0" aria-label={product.name}>
           <Image src={productImage(product)} alt={product.name} fill sizes="(max-width: 700px) 50vw, 280px" className="object-contain p-5 transition duration-500 group-hover:scale-[1.06]" />

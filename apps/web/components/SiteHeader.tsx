@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
+import { ScrollProgress } from './storefront/Motion';
 
 const NAV = [
   { href: '/', label: 'Магазин' },
@@ -76,6 +77,7 @@ export function SiteHeader() {
           </div>
         </div>
       )}
+      <ScrollProgress />
     </header>
   );
 }
