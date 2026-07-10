@@ -5,6 +5,7 @@ import { Minus, Plus, ShieldCheck, ShoppingBag, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
+import MobileCart from '@/components/mobile/MobileCart';
 import { useCart } from '@/lib/cart';
 import { som } from '@/lib/format';
 
@@ -18,7 +19,9 @@ export default function CartPage() {
     setPromoError(applyPromo(promoInput) ? null : 'Промокод не найден. Для проверки: SALE5000 или ALI10');
   }
 
-  return <div className="min-h-screen bg-[#0c0c17] text-[#f6f7fb]">
+  return <>
+    <div className="lg:hidden"><MobileCart /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-10 sm:py-14">
       <div className="text-xs text-[#6c7080]">Главная / Корзина</div>
@@ -40,7 +43,8 @@ export default function CartPage() {
       </div>}
     </main>
     <SiteFooter />
-  </div>;
+    </div>
+  </>;
 }
 
 function SummaryRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) { return <div className="flex justify-between gap-4"><span>{label}</span><span className={accent ? 'text-[#7ee2a0]' : 'text-[#d7d9e2]'}>{value}</span></div>; }
