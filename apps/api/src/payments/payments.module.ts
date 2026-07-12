@@ -9,6 +9,9 @@ import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { GiftcardsModule } from '../giftcards/giftcards.module';
+import { ConfigService } from '@nestjs/config';
+import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from './payment-gateway-provider';
+import { selectPaymentGatewayProvider } from './payment-gateway-selector';
 
 @Module({
   imports: [
@@ -20,7 +23,16 @@ import { GiftcardsModule } from '../giftcards/giftcards.module';
     RateLimitModule,
     GiftcardsModule,
   ],
-  providers: [PaymentsService, PaymentIntentsService],
+  providers: [
+    PaymentsService,
+    PaymentIntentsService,
+    {
+      provide: PAYMENT_GATEWAY_PROVIDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): PaymentGatewayProvider =>
+        selectPaymentGatewayProvider((name) => config.get<string>(name)),
+    },
+  ],
   controllers: [PaymentsController],
   exports: [PaymentsService],
 })

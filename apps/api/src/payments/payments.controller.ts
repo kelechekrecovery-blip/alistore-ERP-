@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -97,8 +98,11 @@ export class PaymentsController {
   @HttpCode(200)
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  webhook(@Body() dto: PaymentWebhookDto) {
-    return this.intents.webhook(dto);
+  webhook(
+    @Req() request: { rawBody?: Buffer; headers: Record<string, string | string[] | undefined> },
+    @Body() dto: PaymentWebhookDto,
+  ) {
+    return this.intents.webhook(dto, { rawBody: request.rawBody, headers: request.headers });
   }
 
   @ApiOperation({

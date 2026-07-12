@@ -6,11 +6,14 @@ import { PaymentIntentsService } from '../src/payments/payment-intents.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UnitsService } from '../src/units/units.service';
+import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
+import { ProductionPaymentGatewayProvider } from '../src/payments/production-payment-gateway.provider';
 
 describe('Online payment intents (integration)', () => {
   let prisma: PrismaService;
   let orders: OrdersService;
   let intents: PaymentIntentsService;
+  let payments: PaymentsService;
   let units: UnitsService;
   let seq = 0;
 
@@ -20,8 +23,8 @@ describe('Online payment intents (integration)', () => {
     const audit = new AuditService(prisma);
     units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
-    const payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
-    intents = new PaymentIntentsService(prisma, orders, payments);
+    payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
+    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider());
   });
 
   afterAll(async () => {
@@ -117,5 +120,25 @@ describe('Online payment intents (integration)', () => {
     const paidAgain = await intents.create({ orderId: order.id, method: 'card', amount: 100000 }).catch((e) => e);
     expect(paidAgain).toBeInstanceOf(ConflictError);
     expect(paidAgain.code).toBe('order_already_paid');
+  });
+
+  it('fails before reserving stock when the selected production adapter is not activated', async () => {
+    const order = await webOrder();
+    const production = new PaymentIntentsService(
+      prisma,
+      orders,
+      payments,
+      new ProductionPaymentGatewayProvider({
+        apiUrl: 'https://payments.example.test',
+        merchantId: 'merchant',
+        apiKey: 'secret',
+        webhookSecret: 'webhook-secret',
+      }),
+    );
+
+    await expect(production.create({ orderId: order.id, method: 'card', amount: 100000 }))
+      .rejects.toMatchObject({ status: 503 });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('created');
+    expect(await prisma.deviceUnit.count({ where: { status: 'in_stock' } })).toBe(1);
   });
 });

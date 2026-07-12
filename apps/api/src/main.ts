@@ -5,7 +5,7 @@ import { AppModule } from './app.module';
 import { setupOpenApi } from './openapi';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.setGlobalPrefix('api');
   app.useStaticAssets(process.env.MEDIA_LOCAL_DIR ?? './uploads', {
     prefix: process.env.MEDIA_PUBLIC_BASE ?? '/uploads',

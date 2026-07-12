@@ -7,6 +7,7 @@ import { PaymentIntentsService } from '../src/payments/payment-intents.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UnitsService } from '../src/units/units.service';
+import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 
 describe('Gift cards / store credit (integration)', () => {
   let prisma: PrismaService;
@@ -25,7 +26,7 @@ describe('Gift cards / store credit (integration)', () => {
     orders = new OrdersService(prisma, audit, units);
     giftcards = new GiftcardsService(prisma, audit);
     payments = new PaymentsService(prisma, audit, units, approvals, giftcards, orders);
-    intents = new PaymentIntentsService(prisma, orders, payments);
+    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider());
   });
 
   afterAll(async () => {

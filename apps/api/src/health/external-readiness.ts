@@ -45,6 +45,27 @@ interface CheckDefinition {
 
 const CHECKS: CheckDefinition[] = [
   {
+    id: 'payment_gateway',
+    area: 'payments',
+    title: 'Production payment gateway',
+    requiredEnv: [
+      'PAYMENT_PROVIDER',
+      'PAYMENT_API_URL',
+      'PAYMENT_MERCHANT_ID',
+      'PAYMENT_API_KEY',
+      'PAYMENT_WEBHOOK_SECRET',
+    ],
+    completionMarkerEnv: 'PAYMENT_PROVIDER_CERTIFIED',
+    manualChecks: [
+      'Real intent creation and amount/order reconciliation verified',
+      'Invalid webhook signature rejected using raw request bytes',
+      'Duplicate provider event delivered twice and applied once',
+      'Approved online refund reconciled with the provider account',
+    ],
+    blocking: true,
+    note: 'Provider port and sandbox are ready; production activation requires a merchant contract, credentials, signed webhook specification, and live refund reconciliation.',
+  },
+  {
     id: 'ai_provider',
     area: 'ai',
     title: 'Hosted AI provider',
@@ -212,7 +233,12 @@ function evaluateCheck(definition: CheckDefinition, env: EnvReader): ExternalRea
 
   let status: ReadinessStatus;
   if (definition.completionMarkerEnv) {
-    status = env(definition.completionMarkerEnv) === 'true' ? 'ready' : 'manual_required';
+    const missingCredentials = (definition.requiredEnv ?? []).some((name) => !hasEnv(env, name));
+    status = missingCredentials
+      ? 'missing'
+      : env(definition.completionMarkerEnv) === 'true'
+        ? 'ready'
+        : 'manual_required';
   } else if (definition.requiredAny) {
     status = anySatisfied
       ? 'ready'

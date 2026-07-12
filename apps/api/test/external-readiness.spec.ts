@@ -26,6 +26,12 @@ describe('External readiness report', () => {
   it('returns ready when every blocking integration is configured or certified', () => {
     const env: Record<string, string> = {
       AI_PROVIDER_KEY: 'set',
+      PAYMENT_PROVIDER: 'production',
+      PAYMENT_API_URL: 'https://payments.example.test',
+      PAYMENT_MERCHANT_ID: 'set',
+      PAYMENT_API_KEY: 'set',
+      PAYMENT_WEBHOOK_SECRET: 'set',
+      PAYMENT_PROVIDER_CERTIFIED: 'true',
       TELEGRAM_BOT_TOKEN: 'set',
       WHATSAPP_ACCESS_TOKEN: 'set',
       WHATSAPP_PHONE_NUMBER_ID: 'set',
@@ -70,5 +76,20 @@ describe('External readiness report', () => {
     expect(
       whatsappReport.checks.find((check) => check.id === 'campaign_delivery')?.status,
     ).toBe('ready');
+  });
+
+  it('keeps a fully configured payment gateway manual until live certification', () => {
+    const env: Record<string, string> = {
+      PAYMENT_PROVIDER: 'production',
+      PAYMENT_API_URL: 'https://payments.example.test',
+      PAYMENT_MERCHANT_ID: 'set',
+      PAYMENT_API_KEY: 'set',
+      PAYMENT_WEBHOOK_SECRET: 'set',
+      PAYMENT_PROVIDER_CERTIFIED: 'false',
+    };
+    const payment = buildExternalReadinessReport((name) => env[name]).checks
+      .find((check) => check.id === 'payment_gateway');
+    expect(payment?.status).toBe('manual_required');
+    expect(payment?.blocking).toBe(true);
   });
 });

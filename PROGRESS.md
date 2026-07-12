@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: add the production-shaped payment gateway port without provider secrets or speculative network endpoints.
+- Files changed: payment gateway contract, sandbox adapter, production fail-visible adapter, env selector and DI wiring, intent orchestration, selector/intent/readiness tests, API env templates, external readiness, backlog/progress/activation docs.
+- Result: `PaymentIntentsService` now delegates create-intent and raw-request webhook verification through `PaymentGatewayProvider`; absent or explicit sandbox env keeps the existing sandbox behavior. Unknown modes and incomplete production configuration fail closed during startup. A complete `PAYMENT_PROVIDER=production` configuration selects a server-only adapter that refuses transactions before stock/order mutation until the chosen provider's signed contract is implemented. The port defines refund semantics while readiness remains manual until external refund reconciliation is certified.
+- Checks run: targeted Jest for selector, payment intents, gift cards, production preflight and external readiness; API TypeScript build; full `mvp:verify -- --skip-e2e`; final full API Jest; targeted Playwright web checkout; `git diff --check`.
+- Outcome: full API regression passed 100/100 suites with 364/364 tests; API/web builds and mobile typecheck passed; sandbox checkout passed Playwright 1/1. External readiness reports payment merchant credentials plus signed webhook/refund certification as a blocking production dependency without exposing secret values.
+- Next step: make the production runtime fail fast when `CORS_ORIGINS` is empty and expose that requirement in core preflight.
+
+## 2026-07-12
+
 - Task: complete the first extended-ecosystem gap with Purchase Order procurement and ERP receiving.
 - Files changed: Prisma procurement schema/migration, `apps/api/src/procurement/`, AppModule, RBAC, Event Ledger types, procurement integration tests, web procurement API/UI, ERP reorder integration, Playwright DB reset and procurement UI flow, readiness/backlog/progress docs, and the Nest realtime test type boundary exposed by the final regression gate.
 - Result: owners/admins can create, send and cancel supplier POs; warehouse/admin/owner staff can receive serialized IMEIs partially or completely into stock. Receipt idempotency, PO row locking, quantity limits, IMEI uniqueness, inventory movements, device units and immutable ledger events commit atomically. Concurrent receipts cannot exceed ordered quantity.

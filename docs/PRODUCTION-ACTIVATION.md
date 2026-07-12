@@ -23,6 +23,8 @@ Fill `apps/api/.env.production` with real values. The file is ignored by git.
 Required for a production-ready report:
 
 - `DATABASE_URL`, `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`.
+- Payment gateway: `PAYMENT_PROVIDER=production`, `PAYMENT_API_URL`, `PAYMENT_MERCHANT_ID`, `PAYMENT_API_KEY`, and `PAYMENT_WEBHOOK_SECRET` after the merchant contract is active.
+- Keep `PAYMENT_PROVIDER_CERTIFIED=false` until signed webhook, replay, reconciliation, and refund checks pass against the provider account.
 - One AI key: `AI_PROVIDER_KEY` or `OPENROUTER_API_KEY`.
 - Telegram: `TELEGRAM_BOT_TOKEN`, webhook URL/secret, callback QA.
 - WhatsApp: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, webhook verify token.
@@ -58,6 +60,7 @@ npm run readiness -w @alistore/api -- --env-file .env.production --json
 
 Before setting the strict gate to green, verify live callbacks:
 
+- Payment provider creates a real intent, rejects an invalid webhook signature, deduplicates a replay, reconciles amount/order, and completes a refund reconciliation run.
 - Telegram bot receives webhook updates and opens `/tg` with valid signed initData.
 - WhatsApp Cloud API can send a template/test message and validate the webhook token.
 - Apple Sign in returns an identity token accepted by `POST /auth/social/apple`.
