@@ -1,5 +1,14 @@
 # PROGRESS
 
+## 2026-07-13
+
+- Task: execute Master Plan iteration 4, complete the custom desktop customer account contour.
+- Files changed: shared responsive account-detail frame; devices, order detail, Event Ledger status and warranty certificate routes; Next 16 dynamic route wrappers; seeded desktop/mobile Playwright regression; design/backlog tracking.
+- Result: customer-owned devices, order details, order timeline and warranty certificates now use the exact gray/white storefront system on desktop and retain the fixed dark Client App shell at 402px. The browser regression exposed that three Next 16 routes still treated `params` synchronously; all now await server route params, restoring actual order/status/warranty data loading.
+- Checks run: focused Playwright 1/1 with a real customer, paid order, payment and sold IMEI; isolated full Playwright 21/21; Next production build; 1440px and 402px computed theme/overflow assertions; `git diff --check`.
+- Outcome: the complete desktop customer purchase and account contour is accepted. No custom customer route remains on the obsolete mobile-only desktop shell.
+- Next step: begin Android Client OTP/session parity, then cart/checkout/payment/orders.
+
 ## 2026-07-12
 
 - Task: execute Master Plan iteration 3, shared account and customer self-service desktop shell.

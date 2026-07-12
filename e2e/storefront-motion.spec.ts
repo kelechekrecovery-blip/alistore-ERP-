@@ -103,6 +103,21 @@ test('remaining desktop customer routes use the shop system through account entr
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
 
   const customer = await prisma.customer.create({ data: { phone: '+996700990021', name: 'Visual Route Customer' } });
+  const { product, unit } = await seedProduct('ACCOUNT-DETAIL-E2E', 124_990, 100_000);
+  const order = await prisma.order.create({
+    data: {
+      customerId: customer.id,
+      status: 'paid',
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'AliStore Манас',
+      pickupCode: '7391',
+      total: product.price,
+      items: { create: { sku: product.sku, qty: 1, price: product.price, imei: unit.imei } },
+      payments: { create: { amount: product.price, method: 'card', status: 'received', txnId: `visual-${Date.now()}` } },
+    },
+  });
+  await prisma.deviceUnit.update({ where: { id: unit.id }, data: { status: 'sold', orderId: order.id } });
   const accessToken = sign(
     { sub: customer.id, phone: customer.phone, typ: 'customer' },
     'dev-secret-alistore-local',
@@ -121,4 +136,24 @@ test('remaining desktop customer routes use the shop system through account entr
     expect(await page.locator('.customer-service-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
   }
+
+  const detailRoutes = [
+    { route: '/account/devices', text: product.name },
+    { route: `/account/orders/${order.id}`, text: `Заказ #${order.id.slice(-8)}` },
+    { route: `/account/orders/${order.id}/status`, text: `Заказ #${order.id.slice(-8)}` },
+    { route: `/account/warranty/${encodeURIComponent(unit.imei)}`, text: 'Гарантийный талон' },
+  ];
+  for (const { route, text } of detailRoutes) {
+    await page.goto(route);
+    await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
+    expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+  }
+
+  await page.setViewportSize({ width: 402, height: 858 });
+  await page.goto('/account/devices');
+  await expect(page.getByText(product.name, { exact: true })).toBeVisible();
+  await expect(page.locator('.account-detail-header')).toBeHidden();
+  expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(14, 12, 10)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });

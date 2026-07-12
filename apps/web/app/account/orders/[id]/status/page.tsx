@@ -2,6 +2,6 @@ import OrderStatusPage from './OrderStatusClient';
 
 export const dynamic = 'force-dynamic';
 
-export default function Page({ params }: { params: { id: string } }) {
-  return <OrderStatusPage params={params} />;
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  return <OrderStatusPage params={await params} />;
 }

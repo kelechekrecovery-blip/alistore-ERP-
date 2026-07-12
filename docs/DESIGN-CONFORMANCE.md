@@ -21,7 +21,7 @@ Prototype HTML is a reference, not production code to embed or copy verbatim.
 
 | Surface | Reference | Theme | Status |
 |---|---|---|---|
-| Desktop storefront | `alistore-shop.html` | Light gray/white + Ink + coral accent | Main purchase routes and shared self-service pages aligned; custom order/device/warranty account screens pending |
+| Desktop storefront | `alistore-shop.html` | Light gray/white + Ink + coral accent | Complete customer purchase, account, order, device, warranty and self-service contour aligned |
 | Client mobile | `AliStore Клиент App 2.0.dc.html` | Dark warm black + Coral/Lime | Existing web reference aligned; native parity ongoing |
 | POS | `AliStore POS 2.0.dc.html` | Always dark + Lime action | Functional shell exists; pixel pass pending |
 | Staff | `AliStore Сотрудник App 2.0.dc.html` | Always dark + role states | Functional shell exists; pixel pass pending |

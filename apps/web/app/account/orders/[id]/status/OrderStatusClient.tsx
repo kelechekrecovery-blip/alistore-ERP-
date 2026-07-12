@@ -7,6 +7,7 @@ import { fetchOrder, fetchOrderLedger, type OrderDetail } from '@/lib/api';
 import { buildOrderTimeline, TERMINAL_BAD, type TimelineStep } from '@/lib/order-status';
 import { som } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
+import { AccountDetailFrame } from '@/components/AccountDetailFrame';
 
 function fmt(iso: string): string {
   const d = new Date(iso);
@@ -41,9 +42,7 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
   }, [authed, hydrated, params.id, user]);
 
   const frame = (children: React.ReactNode) => (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">{children}</div>
-    </div>
+    <AccountDetailFrame>{children}</AccountDetailFrame>
   );
 
   if (order === null) return frame(<div className="grid flex-1 place-items-center font-mono text-sm text-[#8A7F76]">Загрузка…</div>);

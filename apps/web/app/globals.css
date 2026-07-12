@@ -121,6 +121,65 @@
 }
 
 @media (min-width: 768px) {
+  .account-detail-shell {
+    position: static;
+    z-index: auto;
+    display: block;
+    min-height: 100vh;
+    background: #f5f5f7;
+    color: #1d1d1f;
+  }
+
+  .account-detail-header,
+  .account-detail-footer {
+    display: block;
+  }
+
+  .account-detail-panel {
+    width: min(1180px, 92vw);
+    max-width: none;
+    min-height: 620px;
+    height: auto;
+    margin-inline: auto;
+    padding-block: 32px 64px;
+    background: transparent;
+    color: #1d1d1f;
+  }
+
+  .account-detail-panel > .overflow-y-auto {
+    overflow: visible;
+    padding-inline: 0;
+  }
+
+  .account-detail-panel .bg-\[\#221E19\],
+  .account-detail-panel .bg-\[\#16130F\] {
+    background: #fff !important;
+  }
+
+  .account-detail-panel .border-\[\#2E2822\] {
+    border-color: #e5e5e7 !important;
+  }
+
+  .account-detail-panel .text-white,
+  .account-detail-panel .text-\[\#D8CFC6\] {
+    color: #1d1d1f !important;
+  }
+
+  .account-detail-panel .text-\[\#A79C92\],
+  .account-detail-panel .text-\[\#8A7F76\],
+  .account-detail-panel .text-\[\#6E645C\] {
+    color: #6e6e73 !important;
+  }
+
+  .account-detail-panel .bg-lime {
+    background: #1d1d1f !important;
+    color: #fff !important;
+  }
+
+  .account-detail-panel .text-lime {
+    color: #ff4d2e !important;
+  }
+
   .customer-service-shell {
     background: #f5f5f7;
     color: #1d1d1f;
@@ -242,5 +301,12 @@
 
   .checkout-panel .bg-lime {
     background: #ff4d2e !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .account-detail-header,
+  .account-detail-footer {
+    display: none;
   }
 }

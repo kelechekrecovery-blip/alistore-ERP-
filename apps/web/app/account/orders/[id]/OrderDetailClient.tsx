@@ -8,6 +8,7 @@ import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
 import { som } from '@/lib/format';
+import { AccountDetailFrame } from '@/components/AccountDetailFrame';
 
 const TIMELINE = ['Оформлен', 'Собран', 'Оплачен', 'Сборка', 'Доставка', 'Завершён'];
 const STAGE: Record<string, number> = {
@@ -37,9 +38,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const bySku = useMemo(() => new Map(catalog.map((p) => [p.sku, p])), [catalog]);
 
   const frame = (children: React.ReactNode) => (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">{children}</div>
-    </div>
+    <AccountDetailFrame>{children}</AccountDetailFrame>
   );
 
   if (order === null) return frame(<div className="grid flex-1 place-items-center font-mono text-sm text-[#8A7F76]">Загрузка…</div>);

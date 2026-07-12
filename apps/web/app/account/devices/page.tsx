@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { fetchMyDevices, type MyDevice } from '@/lib/api';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
+import { AccountDetailFrame } from '@/components/AccountDetailFrame';
 
 const WSTATUS: Record<string, string> = {
   created: 'Обращение принято', received: 'Принято в сервис', diagnostics: 'Диагностика',
@@ -26,8 +27,7 @@ export default function DevicesPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[440px] flex-col bg-[#16130F] text-white">
+    <AccountDetailFrame>
         <div className="flex items-center gap-3 px-4 pb-3 pt-5">
           <button type="button" onClick={() => router.back()} className="text-xl">←</button>
           <span className="font-display text-xl font-bold">Мои устройства</span>
@@ -74,7 +74,6 @@ export default function DevicesPage() {
             );
           })}
         </div>
-      </div>
-    </div>
+    </AccountDetailFrame>
   );
 }
