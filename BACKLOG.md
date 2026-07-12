@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add the native SwiftUI Staff order queue: server-filtered operational stages, order/item detail, IMEI fulfillment, guarded picking/packing/pickup/courier/completion actions, refresh/error/empty states and typed API contract tests.
 - Add the first native SwiftUI Staff operational vertical: authenticated current shift, open/detail refresh, payment-aware expected cash, discrepancy reason enforcement, close reconciliation, pull-to-refresh and typed contract tests.
 - Add native SwiftUI Client offline checkout recovery: durable SwiftData order commands, stable server-enforced idempotency keys, queued/syncing/conflict/failed states, foreground replay, manual retry, and duplicate-order/Event Ledger regression coverage.
 - Add native SwiftUI Client APNs registration foundation: push entitlement, permission/status UI, UIApplication device-token bridge, stable installation id, customer-JWT token binding, API acceptance for native APNs tokens, and compatibility tests preserving Expo delivery filtering.

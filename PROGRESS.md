@@ -936,3 +936,12 @@
 - Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: Client, Staff, Courier and POS targets built; AliStoreCore XCTest passed 12/12, including shift decoding, bearer transport, expected-cash calculation and open/close payload contracts.
 - Next step: implement the native Staff order queue with detail, reserve/fulfill/status actions and role-aware server failures.
+
+## 2026-07-12
+
+- Task: implement the native SwiftUI Staff fulfillment queue and guarded order actions.
+- Files changed: `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Tests/APIClientTests.swift`, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: Staff now loads server-filtered order queues, displays fulfillment and item/IMEI detail, assigns serialized stock through `fulfill`, and advances paid orders through picking, packed, pickup/courier handoff and completion using the server state machine. Every action uses staff JWT and reloads authoritative state; network, empty, loading and RBAC/domain failures are surfaced without locally assigning order or stock status.
+- Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: all four SwiftUI targets built; AliStoreCore XCTest passed 14/14, including authenticated queue query, fulfillment response and transition contracts.
+- Next step: add native Staff Customer 360 and warranty/support queues, then scanner and Evidence Vault capture.

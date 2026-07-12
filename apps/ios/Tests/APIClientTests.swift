@@ -4,6 +4,44 @@ import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    func testDecodesStaffOrderQueue() async throws {
+        let session = makeSession(status: 200, body: """
+        [{"id":"order-1","channel":"web","fulfillmentType":"pickup","pickupPoint":"BISHKEK-1","deliveryAddress":null,"deliverySlot":null,"pickupCode":"PU-123","status":"created","total":109900,"createdAt":"2026-07-12T12:00:00Z","items":[{"sku":"IP-1","qty":1,"price":109900,"imei":null}],"customer":{"phone":"+996555000000","name":"Тест"}}]
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let orders: [CustomerOrder] = try await client.get("orders?status=created", token: "staff-token")
+
+        XCTAssertEqual(orders.first?.status, "created")
+        XCTAssertEqual(orders.first?.items.first?.sku, "IP-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.query, "status=created")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+    }
+
+    func testDecodesStaffFulfillmentAndTransitionContracts() async throws {
+        var session = makeSession(status: 200, body: """
+        {"order":{"id":"order-1","status":"reserved"},"assigned":["123456789012345"]}
+        """)
+        var client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let fulfilled: FulfillOrderResponse = try await client.post(
+            "orders/order-1/fulfill",
+            body: EmptyRequest(),
+            token: "staff-token"
+        )
+        XCTAssertEqual(fulfilled.order.status, "reserved")
+        XCTAssertEqual(fulfilled.assigned, ["123456789012345"])
+
+        session = makeSession(status: 200, body: "{\"id\":\"order-1\",\"status\":\"picking\"}")
+        client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let transitioned: OrderStatusMutation = try await client.post(
+            "orders/order-1/transition",
+            body: OrderTransitionRequest(to: "picking"),
+            token: "staff-token"
+        )
+        XCTAssertEqual(transitioned.status, "picking")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/orders/order-1/transition")
+    }
+
     func testDecodesStaffShiftWithDrawerReconciliation() async throws {
         let session = makeSession(status: 200, body: """
         {"id":"shift-1","staffId":"staff-1","point":"BISHKEK-1","openCash":5000,"closeCash":null,"diff":null,"openedAt":"2026-07-12T12:00:00Z","closedAt":null,"payments":[{"id":"pay-1","amount":1200,"method":"cash","status":"received"},{"id":"pay-2","amount":3000,"method":"card","status":"received"}]}

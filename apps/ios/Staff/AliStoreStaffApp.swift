@@ -25,12 +25,7 @@ private struct StaffRootView: View {
     var body: some View {
         TabView {
             NavigationStack {
-                List {
-                    NativeStatusCard(title: "Заказы", value: "Очередь магазина", symbol: "shippingbox", tint: .orange)
-                    NativeStatusCard(title: "Поддержка", value: "Customer 360", symbol: "message", tint: .blue)
-                    NativeStatusCard(title: "Гарантия", value: "SLA-кейсы", symbol: "checkmark.shield", tint: .green)
-                }
-                .navigationTitle("Задачи")
+                StaffOrdersView(session: session)
             }
             .tabItem { Label("Задачи", systemImage: "checklist") }
             EmptyStateView(title: "Сканер", detail: "IMEI, приёмка и инвентаризация.", symbol: "barcode.viewfinder")
@@ -39,6 +34,189 @@ private struct StaffRootView: View {
                 StaffShiftView(session: session, logout: logout)
             }
             .tabItem { Label("Смена", systemImage: "clock") }
+        }
+    }
+}
+
+private struct StaffOrdersView: View {
+    let session: StaffSession
+    @State private var status = "created"
+    @State private var orders: [CustomerOrder] = []
+    @State private var isLoading = true
+    @State private var busyOrderId: String?
+    @State private var errorMessage: String?
+    private let environment = AppEnvironment.live()
+
+    private let statuses = [
+        ("created", "Новые"),
+        ("reserved", "Резерв"),
+        ("paid", "Оплачены"),
+        ("picking", "Сборка"),
+        ("packed", "Упакованы"),
+        ("ready_for_pickup", "Выдача"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Статус", selection: $status) {
+                ForEach(statuses, id: \.0) { Text($0.1).tag($0.0) }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+
+            if isLoading {
+                ProgressView("Загружаем заказы…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage {
+                ContentUnavailableView {
+                    Label("Очередь недоступна", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text(errorMessage)
+                } actions: {
+                    Button("Повторить", systemImage: "arrow.clockwise") { Task { await loadOrders() } }
+                }
+            } else if orders.isEmpty {
+                ContentUnavailableView("Нет заказов", systemImage: "shippingbox", description: Text("В выбранной очереди сейчас пусто."))
+            } else {
+                List(orders) { order in
+                    NavigationLink {
+                        StaffOrderDetailView(
+                            order: order,
+                            actionLabel: actionLabel(order),
+                            isBusy: busyOrderId == order.id,
+                            onAction: { Task { await performAction(order) } }
+                        )
+                    } label: {
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack {
+                                Text("#\(order.id.suffix(8))").font(.headline.monospaced())
+                                Spacer()
+                                Text(money(order.total)).fontWeight(.semibold)
+                            }
+                            Text(order.items.map { "\($0.sku) × \($0.qty)" }.joined(separator: ", "))
+                                .font(.subheadline)
+                                .lineLimit(2)
+                            Label(fulfillmentLabel(order), systemImage: order.fulfillmentType == "courier" ? "truck.box" : "storefront")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .listStyle(.plain)
+                .refreshable { await loadOrders() }
+            }
+        }
+        .navigationTitle("Заказы")
+        .task(id: status) { await loadOrders() }
+    }
+
+    @MainActor
+    private func loadOrders() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            orders = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "orders?status=\(status)",
+                token: session.accessToken
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func performAction(_ order: CustomerOrder) async {
+        guard let action = nextAction(order) else { return }
+        busyOrderId = order.id
+        errorMessage = nil
+        defer { busyOrderId = nil }
+        do {
+            let api = APIClient(baseURL: environment.apiBaseURL)
+            if action == "fulfill" {
+                let _: FulfillOrderResponse = try await api.post(
+                    "orders/\(order.id)/fulfill",
+                    body: EmptyRequest(),
+                    token: session.accessToken
+                )
+            } else {
+                let _: OrderStatusMutation = try await api.post(
+                    "orders/\(order.id)/transition",
+                    body: OrderTransitionRequest(to: action),
+                    token: session.accessToken
+                )
+            }
+            await loadOrders()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func nextAction(_ order: CustomerOrder) -> String? {
+        switch order.status {
+        case "created": "fulfill"
+        case "paid": "picking"
+        case "picking": "packed"
+        case "packed": order.fulfillmentType == "courier" ? "courier_assigned" : "ready_for_pickup"
+        case "ready_for_pickup": "completed"
+        default: nil
+        }
+    }
+
+    private func actionLabel(_ order: CustomerOrder) -> String? {
+        switch nextAction(order) {
+        case "fulfill": "Назначить IMEI"
+        case "picking": "Начать сборку"
+        case "packed": "Упаковано"
+        case "courier_assigned": "Передать курьеру"
+        case "ready_for_pickup": "Готов к выдаче"
+        case "completed": "Выдать заказ"
+        default: nil
+        }
+    }
+
+    private func fulfillmentLabel(_ order: CustomerOrder) -> String {
+        order.fulfillmentType == "courier" ? (order.deliveryAddress ?? "Доставка") : (order.pickupPoint ?? "Самовывоз")
+    }
+
+    private func money(_ amount: Int) -> String {
+        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+    }
+
+    private struct StaffOrderDetailView: View {
+        let order: CustomerOrder
+        let actionLabel: String?
+        let isBusy: Bool
+        let onAction: () -> Void
+
+        var body: some View {
+            List {
+                Section("Заказ") {
+                    LabeledContent("Номер", value: "#\(order.id.suffix(8))")
+                    LabeledContent("Статус", value: order.status)
+                    LabeledContent("Канал", value: order.channel)
+                    LabeledContent("Сумма", value: order.total.formatted(.currency(code: "KGS").precision(.fractionLength(0))))
+                }
+                Section("Товары") {
+                    ForEach(Array(order.items.enumerated()), id: \.offset) { _, item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.sku).fontWeight(.semibold)
+                            Text("\(item.qty) × \(item.price.formatted()) сом")
+                            if let imei = item.imei { Text("IMEI \(imei)").font(.caption.monospaced()).foregroundStyle(.secondary) }
+                        }
+                    }
+                }
+                if let actionLabel {
+                    Section {
+                        Button(actionLabel, systemImage: "checkmark.circle.fill", action: onAction)
+                            .disabled(isBusy)
+                    }
+                }
+            }
+            .navigationTitle("Заказ")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

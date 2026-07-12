@@ -147,6 +147,26 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
     public let items: [CustomerOrderItem]
 }
 
+public struct OrderStatusMutation: Decodable, Sendable {
+    public let id: String
+    public let status: String
+}
+
+public struct FulfillOrderResponse: Decodable, Sendable {
+    public let order: OrderStatusMutation
+    public let assigned: [String]
+}
+
+public struct OrderTransitionRequest: Encodable, Sendable {
+    public let to: String
+
+    public init(to: String) { self.to = to }
+}
+
+public struct EmptyRequest: Encodable, Sendable {
+    public init() {}
+}
+
 public struct CreateOrderItem: Codable, Sendable {
     public let sku: String
     public let qty: Int
