@@ -141,13 +141,14 @@ export class ReportsService {
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
   async dashboard() {
-    const [sales, refunds, ordersByStatus, unitsByStatus, byMethod, orderCount, openShifts, pendingApprovals, revenue7d] =
+    const [sales, refunds, expenses, ordersByStatus, unitsByStatus, byMethod, orderCount, openShifts, pendingApprovals, revenue7d] =
       await Promise.all([
         this.prisma.payment.aggregate({
           _sum: { amount: true },
           where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
         }),
         this.prisma.payment.aggregate({ _sum: { amount: true }, where: { amount: { lt: 0 } } }),
+        this.prisma.expense.aggregate({ _sum: { amount: true }, where: { status: 'paid' } }),
         this.prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
         this.prisma.deviceUnit.groupBy({ by: ['status'], _count: { _all: true } }),
         this.prisma.payment.groupBy({
@@ -163,12 +164,15 @@ export class ReportsService {
 
     const salesGross = sales._sum.amount ?? 0;
     const refunded = Math.abs(refunds._sum.amount ?? 0);
+    const operatingExpenses = expenses._sum.amount ?? 0;
 
     return {
       money: {
         salesGross,
         refunds: refunded,
         net: salesGross - refunded,
+        expenses: operatingExpenses,
+        operatingProfit: salesGross - refunded - operatingExpenses,
         byMethod: byMethod.map((m) => ({ method: m.method, amount: m._sum.amount ?? 0 })),
       },
       orders: {

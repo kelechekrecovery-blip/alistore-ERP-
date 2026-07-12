@@ -1,7 +1,7 @@
 import { API_BASE } from './api';
 
 export interface Dashboard {
-  money: { salesGross: number; refunds: number; net: number; byMethod: { method: string; amount: number }[] };
+  money: { salesGross: number; refunds: number; net: number; expenses: number; operatingProfit: number; byMethod: { method: string; amount: number }[] };
   orders: { total: number; byStatus: { status: string; count: number }[] };
   stock: { byStatus: { status: string; count: number }[] };
   ops: { openShifts: number; pendingApprovals: number };

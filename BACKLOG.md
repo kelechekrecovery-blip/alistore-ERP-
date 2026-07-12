@@ -1,6 +1,8 @@
 # BACKLOG
 
 ## Next
+- Add product variants and bundles with component stock validation, catalog/POS presentation, RBAC, Event Ledger and E2E coverage.
+- Extend Finance 2.0 with period budgets and plan-vs-actual reporting on top of the paid expense ledger.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
 - Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
 - Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
@@ -12,6 +14,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add the first Finance 2.0 vertical: idempotent operating expenses, approval/rejection/payment state machine, race-safe transitions, RBAC, Event Ledger, paid-expense P&L, ERP workflow, and browser regression coverage.
 - Make the MVP release gate deterministic and destructive-test-safe: require a separate test database, reset it before API Jest, repair inventory movement cleanup ordering, and harden Telegram Mini App navigation coverage.
 - Add a fail-closed `OtpSender` port with silent dev sender, production adapter boundary, challenge cleanup on delivery failure, and live SMS certification readiness.
 - Harden production runtime startup with fail-fast core preflight, exact CORS allowlist validation, Helmet CSP/security headers, dev-safe HSTS behavior, and regression tests.

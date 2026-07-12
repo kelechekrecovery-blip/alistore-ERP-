@@ -170,19 +170,26 @@ enum PurchaseOrderStatus {
   cancelled
 }
 
+enum ExpenseStatus {
+  submitted
+  approved
+  rejected
+  paid
+}
+
 // ---------- CORE ----------
 model Customer {
-  id        String          @id @default(cuid())
-  phone     String          @unique // PII — маскировать младшим ролям
-  name      String
-  consent   Boolean         @default(false) // маркетинг только при true
-  segments  String[]
-  ltv       Int             @default(0)
+  id         String             @id @default(cuid())
+  phone      String             @unique // PII — маскировать младшим ролям
+  name       String
+  consent    Boolean            @default(false) // маркетинг только при true
+  segments   String[]
+  ltv        Int                @default(0)
   identities CustomerIdentity[]
   pushTokens PushToken[]
-  orders    Order[]
-  tradeIns  TradeInDevice[]
-  createdAt DateTime        @default(now())
+  orders     Order[]
+  tradeIns   TradeInDevice[]
+  createdAt  DateTime           @default(now())
   // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
   // без @relation, чтобы очистка в тестах не каскадила через FK.
 }
@@ -204,19 +211,19 @@ model CustomerIdentity {
 }
 
 model PushToken {
-  id         String    @id @default(cuid())
-  token      String    @unique
+  id         String     @id @default(cuid())
+  token      String     @unique
   platform   String
   deviceId   String
-  appScope   String    @default("anonymous") // anonymous | customer | staff
+  appScope   String     @default("anonymous") // anonymous | customer | staff
   customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   staffId    String?
   staff      StaffUser? @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  enabled    Boolean   @default(true)
-  lastSeenAt DateTime  @default(now())
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  enabled    Boolean    @default(true)
+  lastSeenAt DateTime   @default(now())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   @@index([customerId, enabled])
   @@index([staffId, enabled])
@@ -224,17 +231,17 @@ model PushToken {
 }
 
 model Product {
-  id        String              @id @default(cuid())
-  sku       String              @unique
-  name      String
-  price     Int
-  cost      Int
-  category  String
-  attrs     Json
-  archived  Boolean             @default(false) // soft-delete: НЕ удалять физически
-  updatedAt DateTime            @default(now()) @updatedAt
-  units     DeviceUnit[]
-  movements InventoryMovement[]
+  id                 String              @id @default(cuid())
+  sku                String              @unique
+  name               String
+  price              Int
+  cost               Int
+  category           String
+  attrs              Json
+  archived           Boolean             @default(false) // soft-delete: НЕ удалять физически
+  updatedAt          DateTime            @default(now()) @updatedAt
+  units              DeviceUnit[]
+  movements          InventoryMovement[]
   purchaseOrderItems PurchaseOrderItem[]
 
   @@index([category])
@@ -417,30 +424,59 @@ model WarrantyCase {
 
 // Поставщик техники. Scorecard считается из связанных RMA.
 model Supplier {
-  id        String        @id @default(cuid())
-  name      String        @unique
-  contact   String?
-  rmas      SupplierRma[]
+  id             String          @id @default(cuid())
+  name           String          @unique
+  contact        String?
+  rmas           SupplierRma[]
   purchaseOrders PurchaseOrder[]
-  createdAt DateTime      @default(now())
+  expenses       Expense[]
+  createdAt      DateTime        @default(now())
+}
+
+model Expense {
+  id             String        @id @default(cuid())
+  idempotencyKey String        @unique
+  category       String
+  description    String
+  amount         Int
+  point          String?
+  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
+  supplierId     String?
+  status         ExpenseStatus @default(submitted)
+  requestedBy    String
+  approvedBy     String?
+  rejectedBy     String?
+  rejectionNote  String?
+  paidBy         String?
+  paymentKey     String?       @unique
+  incurredAt     DateTime      @default(now())
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category, incurredAt])
+  @@index([supplierId])
 }
 
 model PurchaseOrder {
-  id          String              @id @default(cuid())
-  number      String              @unique
-  idempotencyKey String?          @unique
-  supplier    Supplier            @relation(fields: [supplierId], references: [id])
-  supplierId  String
-  status      PurchaseOrderStatus @default(draft)
-  location    String
-  note        String?
-  createdBy   String
-  sentAt      DateTime?
-  receivedAt  DateTime?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  items       PurchaseOrderItem[]
-  receipts    PurchaseReceipt[]
+  id             String              @id @default(cuid())
+  number         String              @unique
+  idempotencyKey String?             @unique
+  supplier       Supplier            @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  status         PurchaseOrderStatus @default(draft)
+  location       String
+  note           String?
+  createdBy      String
+  sentAt         DateTime?
+  receivedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  items          PurchaseOrderItem[]
+  receipts       PurchaseReceipt[]
 
   @@index([supplierId, createdAt])
   @@index([status, createdAt])
@@ -605,21 +641,21 @@ model BusinessBuyerProfile {
 }
 
 model B2BQuote {
-  id               String         @id @default(cuid())
-  customerId       String
-  status           B2BQuoteStatus @default(requested)
-  paymentIntent    String         @default("invoice") // invoice | bank_transfer
-  fulfillmentType  String         @default("delivery") // delivery | pickup
-  deliveryAddress  String?
-  pickupPoint      String?
-  comment          String?
-  staffNote        String?
-  listTotal        Int
-  quotedTotal      Int?
-  validUntil       DateTime?
-  items            B2BQuoteItem[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  customerId      String
+  status          B2BQuoteStatus @default(requested)
+  paymentIntent   String         @default("invoice") // invoice | bank_transfer
+  fulfillmentType String         @default("delivery") // delivery | pickup
+  deliveryAddress String?
+  pickupPoint     String?
+  comment         String?
+  staffNote       String?
+  listTotal       Int
+  quotedTotal     Int?
+  validUntil      DateTime?
+  items           B2BQuoteItem[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([customerId, createdAt])
   @@index([status, createdAt])
@@ -723,16 +759,16 @@ model OutboxMessage {
 // Staff login carries a role in the JWT so dangerous actions are authorized on
 // the server (Role Permission Matrix), not trusted from the request body.
 model StaffUser {
-  id           String   @id @default(cuid())
-  username     String   @unique
-  passwordHash String
-  role         Role
-  active       Boolean  @default(true)
-  totpSecret   String?
-  totpEnabled  Boolean  @default(false)
+  id            String      @id @default(cuid())
+  username      String      @unique
+  passwordHash  String
+  role          Role
+  active        Boolean     @default(true)
+  totpSecret    String?
+  totpEnabled   Boolean     @default(false)
   totpLastToken String? // last used TOTP code — single-use guard (anti-replay)
-  pushTokens   PushToken[]
-  createdAt    DateTime @default(now())
+  pushTokens    PushToken[]
+  createdAt     DateTime    @default(now())
 
   @@index([role])
 }

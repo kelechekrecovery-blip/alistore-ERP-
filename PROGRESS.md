@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: start the post-MVP ecosystem wave with the Finance 2.0 operating-expense lifecycle.
+- Files changed: Prisma expense status/model/migration, finance DTO/service/controller/module, RBAC and Event Ledger catalogue, dashboard P&L aggregation, ERP finance API/UI, integration/browser tests, deterministic E2E staff fixture, backlog/readiness/progress docs.
+- Result: admin/owner staff can submit an idempotent categorized expense, approve or reject it, and pay only an approved request. Review/payment transitions lock the expense row, replayed payments are idempotent, changed payloads conflict, and every mutation commits with an immutable expense Ledger event. P&L now deducts paid expenses and displays operating profit; the ERP provides the complete working queue.
+- Checks run: Prisma format/validate/generate and dev migration deploy; targeted finance/reports API tests; API/web production builds; targeted Finance Playwright; full API gate; repeated full 15-flow Playwright after removing fixture login pressure; final `mvp:verify`; `git diff --check`.
+- Outcome: 104/104 API suites with 375/375 tests and 15/15 Playwright flows pass together with API/web builds and native typecheck. The real staff login rate limit remains unchanged; API-only browser fixtures now sign the known E2E JWT instead of consuming anti-bruteforce quota.
+- Next step: implement product variants/bundles as the next Wave 1 vertical, then quantity/consignment warehouse and HR schedules.
+
+## 2026-07-12
+
 - Task: audit native iOS/Android software and store-release readiness after the stabilized MVP gate.
 - Files changed: readiness snapshot and progress record only; application code required no repair.
 - Result: the Expo package, icons/splash, bundle/package IDs, runtime/update settings, notification plugin, EAS profiles, store metadata, privacy/review docs and release workflow satisfy the local preflight. Strict mode remains fail-closed until the ignored production env and external credentials exist.

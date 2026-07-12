@@ -34,6 +34,7 @@ import { Card } from '@/components/erp/Card';
 import { ReadinessView } from '@/components/erp/ReadinessView';
 import { RiskCenterView } from '@/components/erp/RiskCenterView';
 import { StockView } from '@/components/erp/StockView';
+import { FinanceView } from '@/components/erp/FinanceView';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
@@ -230,7 +231,7 @@ export default function ErpPage() {
           {route === 'ai' && <AiView insights={insights} />}
           {route === 'pricing' && <PricingView accessToken={session.accessToken} />}
           {route === 'reorder' && <ReorderView accessToken={session.accessToken} />}
-          {route === 'finance' && <FinanceView d={d} />}
+          {route === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
           {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}
@@ -241,34 +242,6 @@ export default function ErpPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-function FinanceView({ d }: { d: Dashboard | null }) {
-  const rows = d
-    ? [
-        { label: 'Выручка', value: som(d.money.salesGross), color: '#fff' },
-        { label: 'Возвраты', value: `−${som(d.money.refunds)}`, color: '#FF8A7A' },
-        { label: 'Чистыми', value: som(d.money.net), color: '#C6FF3D' },
-      ]
-    : [];
-  return (
-    <Card>
-      <div className="mb-4 font-display text-[15px] font-bold">P&L</div>
-      {rows.map((r) => (
-        <div key={r.label} className="flex justify-between border-b border-[#221E19] py-2.5 text-[13px]">
-          <span style={{ color: r.color }}>{r.label}</span>
-          <span className="font-mono tabular" style={{ color: r.color }}>{r.value}</span>
-        </div>
-      ))}
-      <div className="mt-4 mb-2 text-xs uppercase tracking-wide text-[#8A7F76]">По способам</div>
-      {(d?.money.byMethod ?? []).map((m) => (
-        <div key={m.method} className="flex justify-between py-1 text-[13px] text-[#D8CFC6]">
-          <span>{m.method}</span>
-          <span className="font-mono tabular">{som(m.amount)}</span>
-        </div>
-      ))}
-    </Card>
   );
 }
 

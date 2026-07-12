@@ -164,6 +164,14 @@ p, admin, procurement, receive
 p, owner, procurement, receive
 p, admin, procurement, cancel
 p, owner, procurement, cancel
+p, admin, finance, read
+p, owner, finance, read
+p, admin, finance, create
+p, owner, finance, create
+p, admin, finance, approve
+p, owner, finance, approve
+p, admin, finance, pay
+p, owner, finance, pay
 p, cashier, debts, create
 p, seller, debts, create
 p, senior_seller, debts, create

@@ -1,6 +1,7 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { sign } from 'jsonwebtoken';
 
 const databaseUrl =
   process.env.E2E_DATABASE_URL ??
@@ -26,6 +27,7 @@ export async function resetDb() {
   await prisma.supportTicket.deleteMany();
   await prisma.supplierRma.deleteMany();
   await prisma.purchaseOrder.deleteMany();
+  await prisma.expense.deleteMany();
   await prisma.supplier.deleteMany();
   await prisma.customerIdentity.deleteMany();
   await prisma.reservation.deleteMany();
@@ -57,22 +59,18 @@ export async function seedProduct(prefix: string, price = 100000, cost = 80000) 
 }
 
 export async function bootstrapStaff(
-  request: APIRequestContext,
+  _request: APIRequestContext,
   role: Role = 'owner',
 ): Promise<string> {
   const username = `e2e-${role}-${Date.now().toString(36)}`;
-  await prisma.staffUser.create({
+  const staff = await prisma.staffUser.create({
     data: {
       username,
       passwordHash: await argon2.hash('pass-e2e'),
       role,
     },
   });
-  const login = await postJson<{ accessToken: string }>(request, '/staff-auth/login', {
-    username,
-    password: 'pass-e2e',
-  });
-  return login.accessToken;
+  return sign({ sub: staff.id, role: staff.role, typ: 'staff' }, 'dev-secret-alistore-local', { expiresIn: '8h' });
 }
 
 export async function customerToken(request: APIRequestContext, phone: string): Promise<string> {

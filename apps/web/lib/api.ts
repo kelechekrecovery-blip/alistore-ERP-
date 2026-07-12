@@ -21,5 +21,6 @@ export * from './api/readiness';
 export * from './api/b2b';
 export * from './api/protection';
 export * from './api/procurement';
+export * from './api/finance';
 export * from './pos-offline';
 export * from './pos-hardware';

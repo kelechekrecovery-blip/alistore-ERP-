@@ -39,6 +39,10 @@ export const EventType = {
   ShiftClosed: 'shift.closed',
   CashHandover: 'cash.handover',
   CashShortage: 'cash.shortage',
+  ExpenseSubmitted: 'expense.submitted',
+  ExpenseApproved: 'expense.approved',
+  ExpenseRejected: 'expense.rejected',
+  ExpensePaid: 'expense.paid',
   // delivery
   DeliveryAssigned: 'delivery.assigned',
   DeliveryOut: 'delivery.out',
