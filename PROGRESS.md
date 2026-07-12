@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: continue the canonical handoff migration through the desktop customer purchase path.
+- Files changed: product detail, cart, account overview, checkout browser flow assertions, backlog and progress.
+- Result: product media/specs/reviews, cart lines/promo/bonus/summary, and account identity/services/order history now use Sand/Tint, white cards, Coral actions, Ink text and the handoff radius/type hierarchy. Mobile components and business behavior remain unchanged.
+- Checks run: Next production build; product/cart token assertions inside the sandbox-card checkout E2E; `git diff --check`.
+- Outcome: production build passes. The E2E gate verifies both redesigned screens before continuing through delivery, customer details, payment intent and successful paid order.
+- Next step: migrate the desktop checkout visual shell and account subpages, then start the POS/Staff/ERP pixel passes.
+
+## 2026-07-12
+
 - Task: adopt the complete desktop `design_handoff_alistore` as the exclusive design source and begin ecosystem-wide conformance with the customer storefront.
 - Files changed: synchronized 23-screen handoff package and engineering docs, design conformance contract, desktop storefront header/home/catalog/product cards/footer, responsive Playwright assertions, backlog and progress.
 - Result: the repository no longer uses the older truncated handoff. Desktop web follows the handoff's light Sand/Tint storefront with Coral actions, Ink typography, Sora/Golos hierarchy and 14-22px card geometry; the 402px Client App remains the separate dark Coral/Lime prototype. Business/API behavior was preserved.

@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- Complete the handoff-only visual migration after the desktop storefront foundation: product/cart/checkout/account, then POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
+- Complete the handoff-only visual migration after the desktop storefront foundation: checkout and account subpages, then POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
 - Close native Android feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Extend the canonical light web storefront system through product detail, cart and account overview, with checkout E2E assertions locking the Sand background before the real sandbox payment flow.
 - Synchronize the complete desktop `design_handoff_alistore` into the repository, declare it the only UI source of truth, and align desktop storefront home/catalog/header/footer/product cards to the specified light Sand/Tint + Coral system while preserving the dark Client App 2.0 phone shell.
 - Move transactional outbox scheduling/delivery onto BullMQ with an API producer, separate fail-fast Nest worker process, exponential retries, authenticated Redis production preflight, live Redis scheduled-job smoke, lifecycle tests and pg-boss compatibility during phased migration.
 - Add parser-validated local/staging runtime definitions for password-protected persistent Redis and pinned Meilisearch v1.37, including healthchecks, volumes, production env contract and operator wiring documentation.
