@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: close the Android Client visual-shell gap against `AliStore Клиент App 2.0`.
+- Files changed: shared Android Compose application shell, architecture gap map, backlog and progress tracking.
+- Result: Client now opens on a dark AliStore home with coral/lime service offers, category rail, iPhone hero, responsive two-column product presentation, interactive favorites/cart collections, account destinations and the exact five-tab map. Staff, Courier and POS retain their independent role shells.
+- Checks run: four-app `npm run android:build`; all-module `npm run android:test` including unit and Lint; install/explicit launch on Android API 36 emulator; physical screenshot `/tmp/alistore-android-client-home.png` inspected for blank rendering, framing, overlap and navigation fit; `git diff --check`.
+- Outcome: four APKs and Android Lint are green; Client home and account render without clipping or overlap at the emulator viewport. Product rows were not visible in this smoke because the current development catalog is empty; live-catalog data rendering remains covered by the typed API/build path and needs seeded visual regression coverage.
+- Next step: implement Android customer OTP/session and checkout/payment/account vertical parity, then add Compose UI tests with seeded catalog fixtures.
+
+## 2026-07-12
+
 - Task: complete Phase 0 residual IDOR closure and certify the full baseline.
 - Files changed: guest capability contract; support, warranty, trade-in and Evidence controllers/services; web customer/staff Evidence clients; security/rate-limit regressions; readiness, gap-map and backlog documentation.
 - Result: anonymous self-service writes now require a signed 30-minute capability bound to the customer and requested action. Customer JWT ownership and active Staff JWT paths are preserved. Evidence uploads resolve the target entity owner server-side; customer/guest access to another customer or staff-only inventory/shift evidence is rejected, and ledger actors are derived from JWT/capability rather than body input.
