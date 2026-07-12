@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: execute Master Plan iteration 3, shared account and customer self-service desktop shell.
+- Files changed: responsive `MobileAppFrame`, desktop storefront compatibility rules and expanded customer-route Playwright coverage.
+- Result: addresses, bonuses, notifications, settings, returns, device protection, support and trade-in now render as gray/white storefront workspaces at desktop widths while preserving their existing storage, API, evidence and authorization behavior. Phone widths keep the dark Client App frame and tokens.
+- Checks run: focused customer-route Playwright 1/1 across five representative destinations; isolated full Playwright 21/21; Next production build; 1440x1000 full-page Chrome screenshot `/tmp/alistore-account-bonuses-desktop.png`; direct visual inspection; computed background and horizontal-overflow checks; `git diff --check`.
+- Outcome: the shared self-service route family is accepted for desktop. Custom devices, order detail/status and device-warranty pages still use independent shells and remain tracked.
+- Next step: align those custom account screens, then begin Android Client OTP/session parity.
+
+## 2026-07-12
+
 - Task: execute Master Plan iteration 2, remaining desktop storefront entry routes.
 - Files changed: desktop favorites, compare, login and account overview surfaces; shared responsive login styling; storefront route Playwright regression; design/readiness/backlog tracking.
 - Result: search routes into the aligned catalog, while favorites, compare, OTP login and authenticated account overview now use the exact `alistore-shop.html` gray canvas, white surfaces, line borders, black primary actions and coral accents on desktop. Existing storage, comparison, authentication and account behavior is preserved; phone views retain the dark Client App handoff.

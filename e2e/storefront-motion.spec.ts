@@ -102,7 +102,7 @@ test('remaining desktop customer routes use the shop system through account entr
   expect(await page.locator('.login-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
 
-  const customer = await prisma.customer.create({ data: { phone: '+996700990021' } });
+  const customer = await prisma.customer.create({ data: { phone: '+996700990021', name: 'Visual Route Customer' } });
   const accessToken = sign(
     { sub: customer.id, phone: customer.phone, typ: 'customer' },
     'dev-secret-alistore-local',
@@ -114,4 +114,11 @@ test('remaining desktop customer routes use the shop system through account entr
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
   expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+
+  for (const route of ['/account/addresses', '/account/bonuses', '/account/settings', '/support', '/trade-in']) {
+    await page.goto(route);
+    await expect(page.locator('.customer-service-title')).toBeVisible();
+    expect(await page.locator('.customer-service-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+  }
 });

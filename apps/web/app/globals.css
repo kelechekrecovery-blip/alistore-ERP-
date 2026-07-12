@@ -121,6 +121,62 @@
 }
 
 @media (min-width: 768px) {
+  .customer-service-shell {
+    background: #f5f5f7;
+    color: #1d1d1f;
+  }
+
+  .customer-service-main {
+    width: min(1180px, 92vw);
+    padding-block: 48px 72px;
+  }
+
+  .customer-service-back {
+    border-color: #e5e5e7;
+    background: #fff;
+    color: #1d1d1f;
+  }
+
+  .customer-service-title {
+    color: #1d1d1f;
+    font-size: 32px;
+  }
+
+  .customer-service-subtitle {
+    color: #6e6e73;
+  }
+
+  .customer-service-content {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .customer-service-content .bg-\[\#221E19\],
+  .customer-service-content .bg-\[\#16130F\] {
+    background: #fff !important;
+  }
+
+  .customer-service-content .border-\[\#2E2822\] {
+    border-color: #e5e5e7 !important;
+  }
+
+  .customer-service-content .text-\[\#D8CFC6\],
+  .customer-service-content .text-\[\#A79C92\] {
+    color: #424245 !important;
+  }
+
+  .customer-service-content .text-\[\#8A7F76\],
+  .customer-service-content .text-\[\#6E645C\] {
+    color: #6e6e73 !important;
+  }
+
+  .customer-service-content .bg-lime {
+    background: #1d1d1f !important;
+    color: #fff !important;
+  }
+
   .login-shell {
     background: #f5f5f7 !important;
     color: #0f0f0f !important;
