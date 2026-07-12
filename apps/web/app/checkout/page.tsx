@@ -103,7 +103,7 @@ export default function CheckoutPage() {
         deliverySlot: delivery === 'pickup' ? selectedPickupPoint.meta : DELIVERY.find((d) => d.id === delivery)?.meta,
         total: payable,
         items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })),
-      });
+      }, customer.guestCapability, crypto.randomUUID());
       let currentOrder: CreatedOrder = order;
       if (giftCard && giftAmount > 0) {
         const paid = await payOrder({
@@ -129,7 +129,7 @@ export default function CheckoutPage() {
         method: payment,
         amount: dueAfterGift,
         actor: 'web_checkout',
-      });
+      }, customer.guestCapability);
       setDone({ order: { ...currentOrder, status: intent.orderStatus }, intent });
     } catch { setError('Не удалось оформить заказ.'); } finally { setBusy(false); }
   }

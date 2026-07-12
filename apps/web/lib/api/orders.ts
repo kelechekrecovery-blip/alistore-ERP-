@@ -19,14 +19,14 @@ export interface CreatedOrder {
 }
 
 /** Find-or-create a customer by phone (guest checkout). Throws on API error. */
-export async function createCustomer(input: { phone: string; name?: string }): Promise<{ id: string }> {
+export async function createCustomer(input: { phone: string; name?: string }): Promise<{ id: string; guestCapability: string; capabilityExpiresIn: number }> {
   const res = await fetch(`${API_BASE}/customers`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`customers responded ${res.status}`);
-  return (await res.json()) as { id: string };
+  return (await res.json()) as { id: string; guestCapability: string; capabilityExpiresIn: number };
 }
 
 /** Create an order from the storefront cart. Throws on API error. */
@@ -39,10 +39,14 @@ export async function createOrder(input: {
   deliverySlot?: string;
   total: number;
   items: OrderLine[];
-}): Promise<CreatedOrder> {
+}, guestCapability: string, idempotencyKey: string): Promise<CreatedOrder> {
   const res = await fetch(`${API_BASE}/orders`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      'x-guest-capability': guestCapability,
+      'idempotency-key': idempotencyKey,
+    },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`orders responded ${res.status}`);

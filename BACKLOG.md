@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- Replace trusted guest `customerId`/entity IDs with short-lived scoped capability tokens across guest checkout, support, warranty, trade-in and Evidence Vault; preserve customer JWT and staff RBAC paths and add cross-customer/expired-capability regressions.
+- Extend short-lived scoped guest capabilities from checkout to support, warranty, trade-in and Evidence Vault; verify entity ownership, preserve customer JWT/staff RBAC paths and add cross-customer/expired-capability regressions.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
 - Close native Android feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
@@ -21,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Protect guest web/Telegram checkout with a signed 30-minute customer capability scoped to order creation and payment intent, require stable order idempotency keys, reject owner/scope/tamper mismatches, and preserve authenticated customer checkout separately.
 - Close Phase 0 order/consent IDOR and stabilize browser release setup: require owner/staff authorization for order detail, require JWT and server-derived actor for consent, update authenticated account/ERP clients, and seed E2E staff directly in the isolated test database without consuming production bootstrap rate limits.
 - Add native SwiftUI Staff scanner and Evidence Vault: EAN-8/EAN-13/Code128/QR camera capture, manual IMEI fallback, camera/photo evidence selection, authenticated multipart upload, server-derived actor, iOS privacy declarations and deterministic multipart contract tests.
 - Add native SwiftUI Staff Customer 360 and warranty handling: authenticated aggregate profile, role-masked PII, spend/debt/order/support visibility, SLA warnings, guarded warranty progression, typed PATCH transport and contract tests.

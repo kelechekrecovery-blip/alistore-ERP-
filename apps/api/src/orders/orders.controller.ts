@@ -33,13 +33,7 @@ import { requireActiveStaff } from '../auth/staff-principal';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
-
-/**
- * NOTE: `actor` is hardcoded to a system principal for the MVP core. Auth (JWT +
- * role) and the real actor id land with the auth module; permission checks stay
- * server-side per the Role Permission Matrix.
- */
-const SYSTEM_ACTOR = 'system';
+import { requireGuestCapability } from '../auth/guest-capability';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -140,8 +134,13 @@ export class OrdersController {
   @Post()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  create(@Body() dto: CreateOrderDto) {
-    return this.orders.create(dto, SYSTEM_ACTOR);
+  create(
+    @Headers('x-guest-capability') capability: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreateOrderDto,
+  ) {
+    const guest = requireGuestCapability(capability, 'orders:create', dto.customerId);
+    return this.orders.create(dto, `guest:${guest.sub}`, idempotencyKey);
   }
 
   @ApiOperation({

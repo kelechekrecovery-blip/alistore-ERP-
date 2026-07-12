@@ -2,10 +2,10 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000/api';
 
 /** POST JSON and unwrap the response, surfacing the API's error message on failure. */
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
+export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

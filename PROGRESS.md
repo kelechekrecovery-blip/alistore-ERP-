@@ -972,3 +972,12 @@
 - Checks run: targeted order/PII HTTP suites; API build; web production build; full `mvp:verify`; all-target iOS build/XCTest; four-APK Android build and unit/Lint gate; `git diff --check`.
 - Outcome: API 105/105 suites and 383/383 tests; Playwright 19/19; iOS 4 targets and XCTest 17/17; Android 4 APK build plus unit/Lint green. External readiness remains blocked by 9 credential groups and one physical POS certification, exactly as reported by the secret-safe readiness gate.
 - Next step: finish Phase 0 with scoped guest capability tokens for checkout/support/warranty/trade-in/evidence, then repeat IDOR and full release gates.
+
+## 2026-07-12
+
+- Task: implement the first production-network prerequisite: scoped guest capabilities for web and Telegram checkout.
+- Files changed: guest capability signer/verifier, customer/order/payment controllers, storefront/Telegram checkout API clients, capability/rate-limit tests, activation/backlog/progress docs.
+- Result: `POST /customers` returns a signed 30-minute capability bound to one customer and checkout-only scopes. Public order creation requires matching `orders:create`, records a guest principal and accepts a stable idempotency key; public payment intent requires `payments:intent` and resolves the order through customer ownership. Customer JWT endpoints remain unchanged.
+- Checks run: API build; web production build; capability and public-rate-limit Jest 6/6; Playwright desktop/phone checkout 2/2; Telegram Mini App checkout 1/1; `git diff --check`.
+- Outcome: valid checkout and Telegram flows remain green; missing/tampered/wrong-owner capabilities fail closed in the capability contract. Support, warranty, trade-in and Evidence entity ownership remain the next Phase 0 security iteration.
+- Next step: extend capability scopes and server-side ownership checks to support, warranty, trade-in and Evidence Vault before generating managed-cloud deployment manifests.

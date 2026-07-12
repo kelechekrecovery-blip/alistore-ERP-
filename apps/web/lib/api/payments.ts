@@ -29,8 +29,8 @@ export function createPaymentIntent(input: {
   amount: number;
   returnUrl?: string;
   actor?: string;
-}): Promise<PaymentIntent> {
-  return postJson('/payments/intents', input);
+}, guestCapability: string): Promise<PaymentIntent> {
+  return postJson('/payments/intents', input, { 'x-guest-capability': guestCapability });
 }
 
 export function confirmSandboxPayment(input: {

@@ -26,6 +26,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 import type { Customer } from '@prisma/client';
 import type { CustomerOverview } from './customer-overview';
+import { issueGuestCheckoutCapability } from '../auth/guest-capability';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -70,8 +71,13 @@ export class CustomersController {
   @Post()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  upsert(@Body() dto: UpsertCustomerDto) {
-    return this.customers.upsert(dto);
+  async upsert(@Body() dto: UpsertCustomerDto) {
+    const customer = await this.customers.upsert(dto);
+    return {
+      ...customer,
+      guestCapability: issueGuestCheckoutCapability(customer.id),
+      capabilityExpiresIn: 1800,
+    };
   }
 
   @ApiOperation({ summary: 'Set marketing consent (Notification Preferences, customer.consent_changed)' })

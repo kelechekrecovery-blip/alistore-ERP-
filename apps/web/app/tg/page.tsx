@@ -148,7 +148,7 @@ export default function TelegramMiniAppPage() {
         deliverySlot: 'AliStore Центр · сегодня',
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
-      });
+      }, customer.guestCapability, crypto.randomUUID());
       if (payment === 'cash') {
         setDone({ order });
         setCart([]);
@@ -159,7 +159,7 @@ export default function TelegramMiniAppPage() {
         method: payment,
         amount: subtotal,
         actor: 'telegram_mini_app',
-      });
+      }, customer.guestCapability);
       setDone({ order: { ...order, status: intent.orderStatus }, intent });
       setCart([]);
     } catch {

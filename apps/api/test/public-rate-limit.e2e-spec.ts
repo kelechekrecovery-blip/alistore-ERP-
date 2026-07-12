@@ -13,6 +13,7 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { SupportController } from '../src/support/support.controller';
 import { SupportService } from '../src/support/support.service';
 import { AuthzService } from '../src/authz/authz.service';
+import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
 
 /**
  * Abuse guardrails for public write endpoints: checkout path, support tickets,
@@ -44,12 +45,18 @@ describe('public endpoint rate limits', () => {
     await app.close();
   });
 
-  async function exhaust(path: string, body: Record<string, unknown>, allowed: number, okStatus: number) {
+  async function exhaust(
+    path: string,
+    body: Record<string, unknown>,
+    allowed: number,
+    okStatus: number,
+    headers?: Record<string, string>,
+  ) {
     const server = app.getHttpServer();
     for (let i = 0; i < allowed; i += 1) {
-      await request(server).post(path).send(body).expect(okStatus);
+      await request(server).post(path).set(headers ?? {}).send(body).expect(okStatus);
     }
-    await request(server).post(path).send(body).expect(429);
+    await request(server).post(path).set(headers ?? {}).send(body).expect(429);
   }
 
   it('rate-limits checkout customer creation', async () => {
@@ -62,6 +69,7 @@ describe('public endpoint rate limits', () => {
       { customerId: 'customer-1', channel: 'web', total: 1000, items: [{ sku: 'SKU', qty: 1, price: 1000 }] },
       20,
       201,
+      { 'x-guest-capability': issueGuestCheckoutCapability('customer-1') },
     );
   });
 

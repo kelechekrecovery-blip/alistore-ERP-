@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Param,
   Post,
@@ -34,6 +35,7 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
+import { requireGuestCapability } from '../auth/guest-capability';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -84,8 +86,12 @@ export class PaymentsController {
   @Post('intents')
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  intent(@Body() dto: CreatePaymentIntentDto) {
-    return this.intents.create(dto);
+  intent(
+    @Headers('x-guest-capability') capability: string | undefined,
+    @Body() dto: CreatePaymentIntentDto,
+  ) {
+    const guest = requireGuestCapability(capability, 'payments:intent');
+    return this.intents.createForCustomer(guest.sub, dto);
   }
 
   @ApiOperation({ summary: 'Create an online payment intent for the authenticated customer order' })

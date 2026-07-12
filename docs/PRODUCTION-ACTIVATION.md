@@ -12,6 +12,11 @@ npm run mvp:verify
 This runs Prisma schema validation, Prisma Client generation, API build, web build,
 full API Jest, Playwright E2E, and a non-strict external readiness report.
 
+Guest web and Telegram checkout first obtain a short-lived signed customer capability
+from `POST /customers`; order creation and public payment intents reject missing,
+tampered, wrong-owner or wrong-scope capabilities. Do not bypass this contract in an
+edge proxy or production client.
+
 ## 2. Prepare production env
 
 ```bash
