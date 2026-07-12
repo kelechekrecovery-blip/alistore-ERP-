@@ -174,3 +174,40 @@ public struct PaymentIntent: Decodable, Sendable {
     public let paymentUrl: String
     public let qrPayload: String?
 }
+
+public struct DeviceWarrantySummary: Decodable, Sendable {
+    public let id: String
+    public let status: String
+    public let sla: Date
+}
+
+public struct CustomerDevice: Decodable, Identifiable, Sendable {
+    public var id: String { imei }
+    public let imei: String
+    public let product: String
+    public let status: String
+    public let warrantyUntil: String?
+    public let daysLeft: Int?
+    public let warranty: DeviceWarrantySummary?
+}
+
+public struct OpenWarrantyRequest: Encodable, Sendable {
+    public let imei: String
+    public let customerId: String
+    public let problem: String
+
+    public init(imei: String, customerId: String, problem: String) {
+        self.imei = imei
+        self.customerId = customerId
+        self.problem = problem
+    }
+}
+
+public struct WarrantyCase: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let imei: String
+    public let customerId: String
+    public let problem: String
+    public let status: String
+    public let sla: Date
+}

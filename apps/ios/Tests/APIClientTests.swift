@@ -103,6 +103,37 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
     }
 
+    func testDecodesCustomerDevices() async throws {
+        let session = makeSession(status: 200, body: """
+        [{"imei":"123456789012345","product":"iPhone 15","status":"sold","warrantyUntil":"2027-07-12T00:00:00.000Z","daysLeft":365,"warranty":null}]
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let devices: [CustomerDevice] = try await client.get("customers/me/devices", token: "access-1")
+
+        XCTAssertEqual(devices.first?.product, "iPhone 15")
+        XCTAssertEqual(devices.first?.daysLeft, 365)
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
+    }
+
+    func testOpensCustomerWarrantyCase() async throws {
+        let session = makeSession(status: 201, body: """
+        {"id":"w1","imei":"123456789012345","customerId":"customer-1","problem":"Не включается","status":"created","sla":"2026-07-15T12:00:00Z"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let warranty: WarrantyCase = try await client.post(
+            "warranty",
+            body: OpenWarrantyRequest(imei: "123456789012345", customerId: "customer-1", problem: "Не включается"),
+            token: "access-1",
+            idempotencyKey: "warranty-1"
+        )
+
+        XCTAssertEqual(warranty.status, "created")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/warranty")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "warranty-1")
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)

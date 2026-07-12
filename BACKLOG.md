@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native SwiftUI Client devices and warranty flow: owner-scoped purchased-device inventory, coverage/days-left/case status, authenticated warranty opening, explicit empty/error/loading states, and typed contract tests.
 - Add native SwiftUI Client online payment intents for card, MBank QR, O!Деньги QR and installment: JWT ownership guard, provider handoff URL/QR, awaiting-payment state, and server-side ownership/integration regressions without client-side paid status mutation.
 - Add native SwiftUI Client cart and authenticated checkout: stock-capped quantity controls, pickup/courier fulfillment, address validation, cart badge, JWT-owned `POST /orders/mine`, idempotency key, completion state, and typed contract regression.
 - Add native SwiftUI Client OTP authentication with Keychain session persistence, refresh-token rotation on restore, server logout, authenticated account state, and protected order history with typed contract tests.

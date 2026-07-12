@@ -34,7 +34,7 @@ private struct ClientRootView: View {
                 .badge(cart.values.reduce(0, +))
             OrdersView(environment: environment, auth: auth)
                 .tabItem { Label("Заказы", systemImage: "shippingbox") }
-            AccountView(auth: auth)
+            AccountView(environment: environment, auth: auth)
                 .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
         }
         .tint(.orange)
@@ -270,6 +270,7 @@ private struct OrdersView: View {
 }
 
 private struct AccountView: View {
+    let environment: AppEnvironment
     let auth: CustomerAuthStore
     @State private var phone = "+996"
     @State private var code = ""
@@ -284,6 +285,9 @@ private struct AccountView: View {
                     Section("Аккаунт") {
                         LabeledContent("Телефон", value: session.phone)
                         LabeledContent("ID", value: String(session.customerId.suffix(8)))
+                        NavigationLink("Мои устройства и гарантия") {
+                            DevicesView(environment: environment, auth: auth)
+                        }
                     }
                     Section {
                         Button("Выйти", role: .destructive) { Task { await auth.logout() } }
@@ -325,6 +329,126 @@ private struct AccountView: View {
     private var normalizedPhone: String {
         let digits = phone.filter(\.isNumber)
         return "+\(digits)"
+    }
+}
+
+private struct DevicesView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var devices: [CustomerDevice] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView("Загружаем устройства")
+            } else if let errorMessage {
+                ContentUnavailableView("Устройства недоступны", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
+            } else if devices.isEmpty {
+                EmptyStateView(title: "Устройств пока нет", detail: "Купленные устройства появятся после оплаты заказа.", symbol: "iphone")
+            } else {
+                List(devices) { device in
+                    NavigationLink {
+                        WarrantyRequestView(environment: environment, auth: auth, device: device)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(device.product).font(.headline)
+                                Spacer()
+                                Text(device.warranty?.status ?? "Гарантия")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(device.daysLeft.map { $0 > 0 } == true ? .green : .secondary)
+                            }
+                            Text("IMEI \(device.imei)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                            if let days = device.daysLeft {
+                                Text(days > 0 ? "Осталось \(days) дн." : "Гарантия завершена").font(.caption)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("Мои устройства")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            devices = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/devices", token: token)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct WarrantyRequestView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let device: CustomerDevice
+    @State private var problem = ""
+    @State private var isSubmitting = false
+    @State private var created: WarrantyCase?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Form {
+            Section("Устройство") {
+                LabeledContent("Модель", value: device.product)
+                LabeledContent("IMEI", value: device.imei)
+                if let days = device.daysLeft { LabeledContent("Гарантия", value: "\(days) дн.") }
+            }
+            if let warranty = device.warranty {
+                Section("Обращение") {
+                    LabeledContent("Статус", value: warranty.status)
+                    LabeledContent("SLA", value: warranty.sla, format: .dateTime.day().month().year())
+                }
+            } else if let created {
+                Section("Обращение") {
+                    LabeledContent("Статус", value: created.status)
+                    LabeledContent("SLA", value: created.sla, format: .dateTime.day().month().year())
+                }
+            } else {
+                Section("Проблема") {
+                    TextField("Опишите неисправность", text: $problem, axis: .vertical)
+                        .lineLimit(3...7)
+                    if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting { ProgressView() } else { Text("Открыть гарантийное обращение") }
+                    }
+                    .disabled(isSubmitting || problem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .navigationTitle("Гарантия")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func submit() async {
+        guard let session = auth.session else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            created = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "warranty",
+                body: OpenWarrantyRequest(imei: device.imei, customerId: session.customerId, problem: problem.trimmingCharacters(in: .whitespacesAndNewlines)),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

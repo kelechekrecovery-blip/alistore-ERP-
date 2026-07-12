@@ -891,3 +891,12 @@
 - Checks run: `git diff --check`; `npm run api:build`; targeted API Jest `payment-intents.e2e-spec.ts`; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: API build passed; payment integration passed 5/5 including foreign-order rejection and duplicate webhook idempotency; all four SwiftUI targets built; AliStoreCore XCTest passed 6/6 including authenticated intent URL/header/QR decoding.
 - Next step: add post-payment order status reconciliation/deep-link refresh, then native devices/warranty and push registration.
+
+## 2026-07-12
+
+- Task: add native SwiftUI Client purchased devices and warranty self-service.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Tests/APIClientTests.swift`, generated iOS project, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: the signed-in account now lists owner-scoped purchased IMEIs from `GET /customers/me/devices`, shows model/status/coverage days and an existing warranty case, and opens a new problem report through authenticated `POST /warranty`. Loading, network failure, no-device, existing-case, submitting, and success states are explicit.
+- Checks run: `git diff --check`; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: all four SwiftUI targets built; AliStoreCore XCTest passed 8/8 including device decoding, bearer-auth transport, warranty request path/idempotency, and case/SLA decoding.
+- Next step: finish iOS Client with payment deep-link reconciliation, native APNs registration, and offline command replay before starting the iOS Staff parity wave.
