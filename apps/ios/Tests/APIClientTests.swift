@@ -4,6 +4,31 @@ import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    func testDecodesStaffShiftWithDrawerReconciliation() async throws {
+        let session = makeSession(status: 200, body: """
+        {"id":"shift-1","staffId":"staff-1","point":"BISHKEK-1","openCash":5000,"closeCash":null,"diff":null,"openedAt":"2026-07-12T12:00:00Z","closedAt":null,"payments":[{"id":"pay-1","amount":1200,"method":"cash","status":"received"},{"id":"pay-2","amount":3000,"method":"card","status":"received"}]}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let shift: CashShift = try await client.get("shifts/shift-1", token: "staff-token")
+
+        XCTAssertEqual(shift.expectedCash, 6200)
+        XCTAssertEqual(shift.payments?.count, 2)
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+    }
+
+    func testEncodesStaffShiftOpenAndCloseContracts() throws {
+        let open = try JSONEncoder().encode(OpenShiftRequest(staffId: "spoof-ignored", point: "BISHKEK-1", openCash: 5000))
+        let openPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: open) as? [String: Any])
+        XCTAssertEqual(openPayload["point"] as? String, "BISHKEK-1")
+        XCTAssertEqual(openPayload["openCash"] as? Int, 5000)
+
+        let close = try JSONEncoder().encode(CloseShiftRequest(closeCash: 6100, reason: "Недостача"))
+        let closePayload = try XCTUnwrap(JSONSerialization.jsonObject(with: close) as? [String: Any])
+        XCTAssertEqual(closePayload["closeCash"] as? Int, 6100)
+        XCTAssertEqual(closePayload["reason"] as? String, "Недостача")
+    }
+
     @MainActor
     func testQueuesNativeOrderWithStableIdempotencyKey() throws {
         let container = try ModelContainer(

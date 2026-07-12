@@ -31,6 +31,54 @@ public struct StaffLogin: Encodable, Sendable {
     }
 }
 
+public struct ShiftPayment: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let amount: Int
+    public let method: String
+    public let status: String
+}
+
+public struct CashShift: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let staffId: String
+    public let point: String
+    public let openCash: Int
+    public let closeCash: Int?
+    public let diff: Int?
+    public let openedAt: Date
+    public let closedAt: Date?
+    public let payments: [ShiftPayment]?
+    public let expected: Int?
+
+    public var expectedCash: Int {
+        expected ?? openCash + (payments ?? [])
+            .filter { $0.method == "cash" && $0.status == "received" }
+            .reduce(0) { $0 + $1.amount }
+    }
+}
+
+public struct OpenShiftRequest: Encodable, Sendable {
+    public let staffId: String
+    public let point: String
+    public let openCash: Int
+
+    public init(staffId: String, point: String, openCash: Int) {
+        self.staffId = staffId
+        self.point = point
+        self.openCash = openCash
+    }
+}
+
+public struct CloseShiftRequest: Encodable, Sendable {
+    public let closeCash: Int
+    public let reason: String?
+
+    public init(closeCash: Int, reason: String?) {
+        self.closeCash = closeCash
+        self.reason = reason
+    }
+}
+
 public struct OTPRequest: Encodable, Sendable {
     public let phone: String
 

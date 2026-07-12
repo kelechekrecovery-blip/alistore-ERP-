@@ -927,3 +927,12 @@
 - Checks run: development migration; safe test-schema sync because the historical test database predates Prisma migration baselining; API production build; targeted order-account E2E; all-target iOS generation/build; AliStoreCore XCTest on iPhone 17 Pro Simulator.
 - Outcome: order E2E passed 3/3, including cross-customer idempotency isolation; all four SwiftUI targets built; XCTest passed 10/10. Live APNs delivery, pixel/device smoke and App Store signing remain external or subsequent gates and are not claimed complete.
 - Next step: run the final Client visual/simulator smoke, then implement the iOS Staff operational vertical.
+
+## 2026-07-12
+
+- Task: replace the native SwiftUI Staff shift placeholder with a live cash-shift lifecycle.
+- Files changed: `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Tests/APIClientTests.swift`, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: authenticated staff can load the server-owned current shift, open a point with starting cash, refresh full payment detail, see expected drawer cash, enter counted cash, supply the mandatory discrepancy reason and close the shift. Loading, unavailable, retry and off-shift states are explicit; server JWT/RBAC ownership and Event Ledger rules remain authoritative.
+- Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: Client, Staff, Courier and POS targets built; AliStoreCore XCTest passed 12/12, including shift decoding, bearer transport, expected-cash calculation and open/close payload contracts.
+- Next step: implement the native Staff order queue with detail, reserve/fulfill/status actions and role-aware server failures.
