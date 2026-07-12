@@ -70,9 +70,9 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   return <>
     <div className="md:hidden"><MobileProduct product={product} similar={similar} reviews={reviews} /></div>
-    <div className="hidden min-h-screen bg-sand text-ink md:block">
+    <div className="hidden min-h-screen bg-[#f5f5f7] text-[#0f0f0f] [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
     <SiteHeader />
-    <main className="mx-auto w-[min(1200px,92vw)] py-8 sm:py-12">
+    <main className="mx-auto max-w-[1400px] px-5 py-8">
       <nav className="mb-7 flex flex-wrap items-center gap-2 text-xs text-[#8A7F76]" aria-label="Хлебные крошки"><Link href="/">Главная</Link><span>/</span><Link href="/catalog">Каталог</Link><span>/</span><span className="text-[#6E645C]">{product.name}</span></nav>
       <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
         <div>

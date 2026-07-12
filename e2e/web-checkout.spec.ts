@@ -11,15 +11,15 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
 
   await page.goto(`/product/${product.id}`);
   await expect(page.getByRole('heading', { name: product.name })).toBeVisible();
-  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
 
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: 'Корзина', exact: true })).toBeVisible();
-  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
 
   await page.goto('/checkout');
   await expect(page.getByText('Способ получения')).toBeVisible();
-  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
+  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
   expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900001');

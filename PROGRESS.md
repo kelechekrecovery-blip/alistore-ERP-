@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: execute Master Plan iteration 1, exact desktop customer purchase vertical.
+- Files changed: shared desktop ProductCard, catalog, product, cart and desktop checkout tokens; storefront and checkout Playwright regressions; design/readiness/backlog tracking.
+- Result: desktop `catalog → product → cart → checkout` now uses the archived `alistore-shop.html` system: `#f5f5f7` canvas, white surfaces, `#e5e5e7` borders, Manrope-compatible density, compact four-column cards, ratings/spec tags, stock/credit rows, real product images, black cart actions and coral checkout CTA. Existing data hooks, filters, favorites, compare, quantity, promo/bonus and sandbox payment behavior remain intact. Phone routes retain the dark Client App handoff.
+- Checks run: Next production build; targeted storefront Playwright 4/4; full Playwright 20/20; seeded development catalog; 1440x1000 full-page Chrome screenshot `/tmp/alistore-catalog-exact.png`; direct visual inspection for palette, header, grid, image loading, footer, clipping and overflow; `git diff --check`.
+- Outcome: exact catalog/product/cart/checkout browser vertical is accepted at desktop and the phone checkout regression remains green. Search, favorites, compare, login and account still require the same desktop pass.
+- Next step: complete remaining desktop customer routes, then start Android Client OTP/session parity.
+
+## 2026-07-12
+
 - Task: close the Android Client visual-shell gap against `AliStore Клиент App 2.0`.
 - Files changed: shared Android Compose application shell, architecture gap map, backlog and progress tracking.
 - Result: Client now opens on a dark AliStore home with coral/lime service offers, category rail, iPhone hero, responsive two-column product presentation, interactive favorites/cart collections, account destinations and the exact five-tab map. Staff, Courier and POS retain their independent role shells.

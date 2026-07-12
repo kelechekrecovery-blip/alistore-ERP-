@@ -52,3 +52,36 @@ test('native-style Client App keeps the dark handoff theme on phone viewports', 
   await expect(page.getByText('iPhone 17 Pro Max', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });
+
+test('desktop catalog, product and cart keep the exact shop visual system', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('INNER-SHOP-E2E', 124990);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto('/catalog');
+  await expect(page.getByRole('heading', { name: 'Каталог техники' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'В корзину' })).toBeVisible();
+  const catalogTheme = await page.evaluate(() => {
+    const desktop = document.querySelector('.md\\:block');
+    const card = document.querySelector('article');
+    return {
+      background: desktop ? getComputedStyle(desktop).backgroundColor : '',
+      card: card ? getComputedStyle(card).backgroundColor : '',
+      border: card ? getComputedStyle(card).borderTopColor : '',
+    };
+  });
+  expect(catalogTheme).toEqual({
+    background: 'rgb(245, 245, 247)',
+    card: 'rgb(255, 255, 255)',
+    border: 'rgb(229, 229, 231)',
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+
+  await page.goto(`/product/${product.id}`);
+  await expect(page.getByRole('heading', { name: product.name })).toBeVisible();
+  await page.getByRole('button', { name: 'В корзину' }).click();
+  await page.goto('/cart');
+  await expect(page.locator('.md\\:block').getByRole('link', { name: product.name, exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Перейти к оформлению' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+});
