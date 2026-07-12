@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- Bring the native Android Client home, catalog, favorites and five-tab navigation to visual parity with the now-aligned SwiftUI Client and `AliStore Клиент App 2.0.dc.html`.
 - Extend the exact `alistore-shop.html` desktop visual system from the aligned home/header into catalog, product, favorites, compare, cart, checkout and account without changing their business flows.
 - Extend short-lived scoped guest capabilities from checkout to support, warranty, trade-in and Evidence Vault; verify entity ownership, preserve customer JWT/staff RBAC paths and add cross-customer/expired-capability regressions.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
@@ -22,6 +23,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Align the native SwiftUI Client home/catalog navigation to `AliStore Клиент App 2.0`: dark coral/lime branded home, service cards, category rail, hero, product grid, working favorites and the exact five-tab map with Orders retained inside Account.
 - Replace the incorrectly inferred warm editorial storefront home with the exact archived `alistore-shop.html` desktop structure: utility strip, dense search header, category navigation, dark product hero, trade-in/installment offers, quick categories, benefit strip and real catalog hits.
 - Protect guest web/Telegram checkout with a signed 30-minute customer capability scoped to order creation and payment intent, require stable order idempotency keys, reject owner/scope/tamper mismatches, and preserve authenticated customer checkout separately.
 - Close Phase 0 order/consent IDOR and stabilize browser release setup: require owner/staff authorization for order detail, require JWT and server-derived actor for consent, update authenticated account/ERP clients, and seed E2E staff directly in the isolated test database without consuming production bootstrap rate limits.

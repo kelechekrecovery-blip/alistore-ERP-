@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: audit and correct the real native mobile Client after the storefront visual correction.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: the SwiftUI Client no longer opens on a generic system catalog list. It now follows `AliStore Клиент App 2.0.dc.html` with a dark branded home, coral/lime service cards, horizontal categories, iPhone hero, product grid, working local favorites and the exact `Главная / Каталог / Избранное / Корзина / Кабинет` tab map. Orders remain reachable from Account and payment-return reconciliation routes there.
+- Checks run: `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test`; install and launch in iPhone 17 Pro Simulator; native screenshot `/tmp/alistore-ios-client-new.png`.
+- Outcome: Client, Staff, Courier and POS targets built; AliStoreCore XCTest passed 17/17; the physical simulator screenshot has no visible clipping or overlap. Android Client visual parity remains the next native UI iteration.
+- Next step: implement the same prototype-aligned Client home/catalog/favorites navigation in Kotlin Compose and run four-APK + emulator gates.
+
+## 2026-07-12
+
 - Task: correct the public desktop storefront against the complete AliStore shop prototype after the user identified the design mismatch.
 - Files changed: `apps/web/app/page.tsx`, `apps/web/components/SiteHeader.tsx`, `apps/web/app/layout.tsx`, `e2e/storefront-motion.spec.ts`, `docs/DESIGN-CONFORMANCE.md`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: `/` now follows the exact `alistore-shop.html` composition with a black utility strip, white catalog/search header, category rail, dark iPhone hero, trade-in and installment offers, eight quick categories, compact trust strip and live catalog hits. The mobile Client shell remains separate below 768px and `/warranty` remains an internal operational screen.

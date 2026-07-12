@@ -21,7 +21,16 @@ private final class ClientAppDelegate: NSObject, UIApplicationDelegate {
 }
 
 private enum ClientTab: Hashable {
-    case catalog, cart, orders, account
+    case home, catalog, favorites, cart, account
+}
+
+private enum ClientTheme {
+    static let background = Color(red: 0.055, green: 0.047, blue: 0.039)
+    static let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    static let line = Color(red: 0.18, green: 0.157, blue: 0.133)
+    static let coral = Color(red: 1, green: 0.357, blue: 0.18)
+    static let lime = Color(red: 0.776, green: 1, blue: 0.239)
+    static let muted = Color(red: 0.655, green: 0.612, blue: 0.573)
 }
 
 @main
@@ -42,7 +51,8 @@ private struct ClientRootView: View {
     @State private var catalogLoading = true
     @State private var catalogError: String?
     @State private var cart: [String: Int] = [:]
-    @State private var selectedTab: ClientTab = .catalog
+    @State private var favorites: Set<String> = []
+    @State private var selectedTab: ClientTab = .home
     @State private var orderRefreshRevision = 0
     @State private var pushStatus = "Push не настроен"
     @Environment(\.modelContext) private var modelContext
@@ -55,21 +65,25 @@ private struct ClientRootView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart)
+            ClientHomeView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
+                .tabItem { Label("Главная", systemImage: "house") }
+                .tag(ClientTab.home)
+            CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
                 .tabItem { Label("Каталог", systemImage: "square.grid.2x2") }
                 .tag(ClientTab.catalog)
+            FavoritesView(products: products, cart: $cart, favorites: $favorites)
+                .tabItem { Label("Избранное", systemImage: "heart") }
+                .tag(ClientTab.favorites)
             CartView(environment: environment, auth: auth, products: products, cart: $cart)
                 .tabItem { Label("Корзина", systemImage: "bag") }
                 .badge(cart.values.reduce(0, +))
                 .tag(ClientTab.cart)
-            OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
-                .tabItem { Label("Заказы", systemImage: "shippingbox") }
-                .tag(ClientTab.orders)
-            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, onEnablePush: enablePush)
+            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, onEnablePush: enablePush)
                 .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
                 .tag(ClientTab.account)
         }
-        .tint(.orange)
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
         .task {
             async let restore: Void = auth.restore()
             async let catalog: Void = loadCatalog()
@@ -77,7 +91,7 @@ private struct ClientRootView: View {
         }
         .onOpenURL { url in
             guard url.scheme == "alistore", url.host == "payment-return" else { return }
-            selectedTab = .orders
+            selectedTab = .account
             orderRefreshRevision += 1
         }
         .onChange(of: scenePhase) { _, phase in
@@ -407,6 +421,7 @@ private struct AccountView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
     let pushStatus: String
+    let orderRefreshRevision: Int
     let onEnablePush: () -> Void
     @State private var phone = "+996"
     @State private var code = ""
@@ -421,6 +436,9 @@ private struct AccountView: View {
                     Section("Аккаунт") {
                         LabeledContent("Телефон", value: session.phone)
                         LabeledContent("ID", value: String(session.customerId.suffix(8)))
+                        NavigationLink("Мои заказы") {
+                            OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
+                        }
                         NavigationLink("Мои устройства и гарантия") {
                             DevicesView(environment: environment, auth: auth)
                         }
@@ -660,40 +678,190 @@ private struct CatalogView: View {
     let isLoading: Bool
     let errorMessage: String?
     @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    @State private var search = ""
+
+    private var visibleProducts: [Product] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return products }
+        return products.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.category.localizedCaseInsensitiveContains(query) }
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
                 if isLoading {
-                    ProgressView("Загружаем каталог")
+                    ProgressView("Загружаем каталог").tint(ClientTheme.lime)
                 } else if let errorMessage {
                     ContentUnavailableView("Каталог недоступен", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
                 } else if products.isEmpty {
                     EmptyStateView(title: "Каталог пока пуст", detail: "Товары появятся после синхронизации.", symbol: "square.grid.2x2")
                 } else {
-                    List(products) { product in
-                        NavigationLink {
-                            ProductDetail(product: product, cart: $cart)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(product.name).font(.headline)
-                                Text(product.category).font(.caption).foregroundStyle(.secondary)
-                                HStack {
-                                    Text(product.price, format: .currency(code: "KGS")).fontWeight(.semibold)
-                                    Spacer()
-                                    Text(product.availableUnits > 0 ? "В наличии" : "Под заказ")
-                                        .font(.caption)
-                                        .foregroundStyle(product.availableUnits > 0 ? .green : .secondary)
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                            ForEach(visibleProducts) { product in
+                                NavigationLink {
+                                    ProductDetail(product: product, cart: $cart)
+                                } label: {
+                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .padding(.vertical, 4)
                         }
+                        .padding(16)
                     }
-                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
-            .navigationTitle("AliStore")
+            .navigationTitle("Каталог")
+            .searchable(text: $search, prompt: "Техника и бренды")
         }
+    }
+}
+
+private struct ClientHomeView: View {
+    let products: [Product]
+    let isLoading: Bool
+    let errorMessage: String?
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    let openCatalog: () -> Void
+
+    private let categories = [("Смартфоны", "iphone"), ("Ноутбуки", "laptopcomputer"), ("Аудио", "airpodsmax"), ("Часы", "applewatch"), ("Планшеты", "ipad")]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(spacing: 10) {
+                        ServiceCard(title: "Доставка 1–2 ч", detail: "по Бишкеку", symbol: "bolt.fill", highlighted: true)
+                        ServiceCard(title: "Самовывоз", detail: "бесплатно", symbol: "building.2")
+                        ServiceCard(title: "Trade-in", detail: "оценка за 30с", symbol: "arrow.triangle.2.circlepath")
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(categories, id: \.0) { category in
+                                Button(action: openCatalog) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: category.1).font(.title3)
+                                        Text(category.0).font(.caption2)
+                                    }
+                                    .foregroundStyle(.white)
+                                    .frame(width: 82, height: 70)
+                                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                                }
+                            }
+                        }
+                    }
+                    Button(action: openCatalog) {
+                        ZStack(alignment: .bottomTrailing) {
+                            LinearGradient(colors: [Color(red: 0.16, green: 0.16, blue: 0.18), ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            Image(systemName: "iphone.gen3").font(.system(size: 96, weight: .thin)).foregroundStyle(.white.opacity(0.12)).padding(16)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("НОВИНКА · В НАЛИЧИИ").font(.caption2.monospaced().weight(.bold)).foregroundStyle(ClientTheme.lime)
+                                Text("iPhone 17 Pro Max").font(.title2.weight(.heavy)).foregroundStyle(.white)
+                                Text("от 115 000 сом · рассрочка 0%").font(.caption).foregroundStyle(ClientTheme.muted)
+                                Text("Смотреть").font(.subheadline.weight(.bold)).foregroundStyle(.black).padding(.horizontal, 18).frame(height: 40).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).padding(.top, 6)
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(22)
+                        }
+                        .frame(height: 174)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(ClientTheme.line))
+                    }
+                    .buttonStyle(.plain)
+                    HStack {
+                        Text("Хиты продаж").font(.title3.weight(.bold))
+                        Spacer()
+                        Button("Все", action: openCatalog).foregroundStyle(ClientTheme.lime)
+                    }
+                    if isLoading {
+                        ProgressView().tint(ClientTheme.lime).frame(maxWidth: .infinity)
+                    } else if let errorMessage {
+                        Text(errorMessage).font(.caption).foregroundStyle(.red)
+                    } else if products.isEmpty {
+                        Text("Каталог скоро наполнится").foregroundStyle(ClientTheme.muted).frame(maxWidth: .infinity).padding(30).background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    } else {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                            ForEach(products.prefix(6)) { product in
+                                NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(ClientTheme.background)
+            .navigationTitle("AliStore")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Image(systemName: "bell").foregroundStyle(.white) } }
+        }
+    }
+}
+
+private struct FavoritesView: View {
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    private var items: [Product] { products.filter { favorites.contains($0.id) } }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                if items.isEmpty {
+                    ContentUnavailableView("Нет избранного", systemImage: "heart", description: Text("Сохраняйте товары, чтобы быстро вернуться к ним."))
+                } else {
+                    ScrollView { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) { ForEach(items) { NativeProductCard(product: $0, cart: $cart, favorites: $favorites) } }.padding(16) }
+                }
+            }
+            .navigationTitle("Избранное")
+        }
+    }
+}
+
+private struct NativeProductCard: View {
+    let product: Product
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)).frame(height: 112)
+                Image(systemName: product.category.localizedCaseInsensitiveContains("ноут") ? "laptopcomputer" : "iphone.gen3").font(.system(size: 52, weight: .ultraLight)).foregroundStyle(.white.opacity(0.8)).frame(maxWidth: .infinity, maxHeight: 112)
+                Button { if favorites.contains(product.id) { favorites.remove(product.id) } else { favorites.insert(product.id) } } label: { Image(systemName: favorites.contains(product.id) ? "heart.fill" : "heart").foregroundStyle(favorites.contains(product.id) ? ClientTheme.coral : .white).frame(width: 44, height: 44) }
+            }
+            Text(product.name).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
+            Text(product.price.formatted(.currency(code: "KGS"))).font(.subheadline.monospacedDigit().weight(.bold)).foregroundStyle(.white)
+            Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Label("В корзину", systemImage: "bag.badge.plus").font(.caption.weight(.bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
+        }
+        .padding(10)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+    }
+}
+
+private struct ServiceCard: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    var highlighted = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: symbol).font(.title3)
+            Spacer(minLength: 2)
+            Text(title).font(.caption.weight(.bold)).lineLimit(2)
+            Text(detail).font(.caption2).foregroundStyle(highlighted ? .white.opacity(0.8) : ClientTheme.muted)
+        }
+        .foregroundStyle(.white)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
+        .background(highlighted ? ClientTheme.coral : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(highlighted ? Color.clear : ClientTheme.line))
     }
 }
 
