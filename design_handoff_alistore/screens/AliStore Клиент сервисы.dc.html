@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #EDE6DC; } ::selection { background: #FF5B2E; color: #fff; } .sc::-webkit-scrollbar{width:6px;}</style>
+</helmet>
+
+<div style="background: #EDE6DC; font-family: 'Golos Text', sans-serif; color: #201B17; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #201B17; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1080px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px;">Клиентские сервисы</span>
+    </div>
+    <div class="sc" style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <div onClick="{{ t.pick }}" style="flex-shrink: 0; background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- COMPARE -->
+    <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ true }}">
+      <div style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 140px 1fr 1fr 1fr; border-bottom: 1px solid #EBE2D8;">
+          <div style="padding: 16px; font-size: 12px; color: #8A7F76;">Сравнение</div>
+          <sc-for list="{{ cmpHead }}" as="h" hint-placeholder-count="3"><div style="padding: 16px; text-align: center;"><div style="height: 60px; background: {{ h.thumb }}; background-size: contain; background-repeat: no-repeat; background-position: center;"></div><div style="font-size: 13px; font-weight: 600; margin-top: 8px;">{{ h.name }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 15px; color: #E8410F; margin-top: 4px;">{{ h.price }}</div></div></sc-for>
+        </div>
+        <sc-for list="{{ cmpRows }}" as="r" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 140px 1fr 1fr 1fr; border-bottom: 1px solid #F0E9E0;"><div style="padding: 12px 16px; font-size: 13px; color: #8A7F76;">{{ r.k }}</div><sc-for list="{{ r.vals }}" as="v" hint-placeholder-count="3"><div style="padding: 12px 16px; text-align: center; font-size: 13px; color: {{ v.color }}; font-weight: {{ v.weight }};">{{ v.t }}</div></sc-for></div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- REFERRAL -->
+    <sc-if value="{{ isReferral }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 18px; padding: 26px; color: #fff;">
+          <div style="font-size: 32px;">🎁</div>
+          <div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; margin-top: 12px;">Приведи друга</div>
+          <div style="font-size: 14px; color: #FFE0D5; margin-top: 8px; line-height: 1.5;">Друг получает 500 бонусов на первую покупку, вы — 500 после его заказа.</div>
+          <div style="background: rgba(255,255,255,0.2); border-radius: 10px; padding: 12px 16px; margin-top: 18px; display: flex; align-items: center; gap: 10px;"><span style="font-family: 'JetBrains Mono'; font-size: 16px; font-weight: 700;">NURBEK500</span><span style="margin-left: auto; font-size: 12px;">Копировать</span></div>
+        </div>
+        <div style="background: #fff; border: 1px solid #EBE2D8; border-radius: 18px; padding: 22px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; margin-bottom: 14px;">Ваши приглашения</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;"><div style="background: #F7F2EC; border-radius: 12px; padding: 14px;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #FF5B2E;">6</div><div style="font-size: 12px; color: #8A7F76;">приглашено</div></div><div style="background: #F7F2EC; border-radius: 12px; padding: 14px;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #3E9B66;">2 000</div><div style="font-size: 12px; color: #8A7F76;">бонусов заработано</div></div></div>
+          <div style="font-size: 13px; color: #6E645C; line-height: 1.8;">· Азамат — купил, +500 ✓<br>· Тимур — купил, +500 ✓<br>· Салтанат — зарегистрировался<br>· ещё 3 перешли по ссылке</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- MY DEVICES -->
+    <sc-if value="{{ isDevices }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{ devices }}" as="d" hint-placeholder-count="3">
+          <div style="background: #fff; border: 1px solid #EBE2D8; border-radius: 16px; padding: 18px; display: flex; align-items: center; gap: 16px;">
+            <div style="width: 50px; height: 50px; border-radius: 12px; background: {{ d.thumb }}; background-size: cover; background-position: center; flex-shrink: 0;"></div>
+            <div style="flex: 1;"><div style="font-size: 15px; font-weight: 600;">{{ d.name }}</div><div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #8A7F76;">IMEI {{ d.imei }} · куплен {{ d.date }}</div></div>
+            <div style="text-align: right;"><span style="background: {{ d.wBg }}; color: {{ d.wFg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ d.warranty }}</span><div style="font-size: 12px; color: #7FB0EC; margin-top: 6px; cursor: pointer;">История ремонтов →</div></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #8A7F76; margin-top: 12px;">Все устройства клиента с гарантией, талоном и историей сервиса. Заявка в ремонт в один тап.</div>
+    </sc-if>
+
+    <!-- ADDRESSES -->
+    <sc-if value="{{ isAddr }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 640px;">
+        <sc-for list="{{ addresses }}" as="a" hint-placeholder-count="3">
+          <div style="background: #fff; border: 1px solid {{ a.border }}; border-radius: 14px; padding: 16px; display: flex; align-items: center; gap: 14px;"><span style="font-size: 22px;">{{ a.icon }}</span><div style="flex: 1;"><div style="font-size: 14px; font-weight: 600;">{{ a.label }} <sc-if value="{{ a.default }}" hint-placeholder-val="{{ false }}"><span style="color: #3E9B66; font-size: 11px;">· по умолчанию</span></sc-if></div><div style="font-size: 13px; color: #6E645C;">{{ a.addr }}</div><sc-if value="{{ a.other }}" hint-placeholder-val="{{ false }}"><div style="font-size: 12px; color: #FF5B2E; margin-top: 2px;">Получатель: {{ a.recipient }}</div></sc-if></div></div>
+        </sc-for>
+        <div style="background: #fff; border: 1px dashed #D8CCC0; border-radius: 14px; padding: 16px; text-align: center; color: #8A7F76; font-size: 14px; cursor: pointer;">+ Добавить адрес / получателя</div>
+      </div>
+    </sc-if>
+
+    <!-- Q&A -->
+    <sc-if value="{{ isQna }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 720px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; margin-bottom: 4px;">Вопросы о товаре · iPhone 15</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 16px;">Покупатели спрашивают — отвечает магазин или владельцы.</div>
+        <sc-for list="{{ qna }}" as="q" hint-placeholder-count="3">
+          <div style="background: #fff; border: 1px solid #EBE2D8; border-radius: 14px; padding: 16px; margin-bottom: 10px;"><div style="font-size: 14px; font-weight: 600;">❓ {{ q.q }}</div><div style="font-size: 13px; color: #6E645C; margin-top: 8px; padding-left: 4px; border-left: 2px solid #FF5B2E; padding-left: 12px;">{{ q.a }}</div><div style="font-size: 11px; color: #8A7F76; margin-top: 6px;">{{ q.by }} · 👍 {{ q.likes }}</div></div>
+        </sc-for>
+        <div style="background: #fff; border: 1px solid #EBE2D8; border-radius: 12px; padding: 14px; color: #8A7F76; font-size: 13px;">Задать свой вопрос…</div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "compare" };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["compare","Сравнение"],["referral","Приведи друга"],["devices","Мои устройства"],["addr","Адреса и получатели"],["qna","Вопросы о товаре"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#fff", fg: t === x[0] ? "#fff" : "#4A4139", border: t === x[0] ? "#FF5B2E" : "#EBE2D8" }));
+    const cmpHead = [
+      { name:"iPhone 15", price:"109 900", thumb:"url('assets/p-iphone.png')" },
+      { name:"Galaxy S24", price:"99 900", thumb:"url('assets/p-samsung.png')" },
+      { name:"iPhone 14 Б/У", price:"58 900", thumb:"url('assets/p-iphone.png')" }
+    ];
+    const v = (t,best) => ({ t, color: best?"#3E9B66":"#201B17", weight: best?700:400 });
+    const cmpRows = [
+      { k:"Экран", vals:[v("6.1\" OLED"),v("6.2\" AMOLED",true),v("6.1\" OLED")] },
+      { k:"Память", vals:[v("128 ГБ"),v("256 ГБ",true),v("128 ГБ")] },
+      { k:"Камера", vals:[v("48 Мп"),v("50 Мп",true),v("12 Мп")] },
+      { k:"Состояние", vals:[v("Новый",true),v("Новый",true),v("Б/У A")] },
+      { k:"Гарантия", vals:[v("12 мес",true),v("12 мес",true),v("6 мес")] }
+    ];
+    const w = (txt,ok) => ({ warranty:txt, wBg: ok?"#EAF6EF":"#FBEEEC", wFg: ok?"#3E9B66":"#C6362C" });
+    const devices = [
+      { name:"iPhone 15 128", imei:"35••042", date:"05.07.26", thumb:"url('assets/p-iphone.png')", ...w("гарантия 11 мес",true) },
+      { name:"AirPods Pro 2", imei:"F2••K9", date:"12.03.26", thumb:"url('assets/p-airpods.png')", ...w("гарантия 7 мес",true) },
+      { name:"Apple Watch S8", imei:"35••221", date:"01.11.25", thumb:"url('assets/p-watch.png')", ...w("истекла",false) }
+    ];
+    const addresses = [
+      { icon:"🏠", label:"Дом", addr:"Бишкек, ул. Киевская 95, кв 12", default:true, border:"#FF5B2E", other:false },
+      { icon:"🏢", label:"Работа", addr:"Бишкек, пр. Чуй 155, офис 4", default:false, border:"#EBE2D8", other:false },
+      { icon:"🎁", label:"Маме", addr:"Ош, ул. Ленина 20", default:false, border:"#EBE2D8", other:true, recipient:"Асель +996 555 ..." }
+    ];
+    const qna = [
+      { q:"Есть ли eSIM?", a:"Да, iPhone 15 поддерживает eSIM + физическую SIM.", by:"AliStore", likes:"14" },
+      { q:"Оригинал или реф?", a:"Все новые — оригинал с гарантией. Есть отдельно Б/У привозные грейд A.", by:"AliStore", likes:"22" },
+      { q:"Быстрая зарядка в комплекте?", a:"Кабель USB-C есть, адаптер — отдельно (Apple убрал из коробки).", by:"Азамат (клиент)", likes:"8" }
+    ];
+    return { tabs, isCompare:t==="compare", isReferral:t==="referral", isDevices:t==="devices", isAddr:t==="addr", isQna:t==="qna",
+      cmpHead, cmpRows, devices, addresses, qna };
+  }
+}
+</script>
+</body>
+</html>

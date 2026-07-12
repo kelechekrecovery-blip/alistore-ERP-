@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: adopt the complete desktop `design_handoff_alistore` as the exclusive design source and begin ecosystem-wide conformance with the customer storefront.
+- Files changed: synchronized 23-screen handoff package and engineering docs, design conformance contract, desktop storefront header/home/catalog/product cards/footer, responsive Playwright assertions, backlog and progress.
+- Result: the repository no longer uses the older truncated handoff. Desktop web follows the handoff's light Sand/Tint storefront with Coral actions, Ink typography, Sora/Golos hierarchy and 14-22px card geometry; the 402px Client App remains the separate dark Coral/Lime prototype. Business/API behavior was preserved.
+- Checks run: handoff inventory/checksum comparison; live reference screenshots for Client App and ERP; Next production build; live desktop screenshot at 863x954; live phone screenshot at 402x858; computed token and horizontal-overflow checks; targeted Playwright; `git diff --check`.
+- Outcome: production build passes, both responsive shells render without horizontal overflow, and automated tests lock desktop light vs native-style mobile dark behavior. Remaining screens are explicitly queued for reference-by-reference migration rather than visual invention.
+- Next step: align product detail, cart, checkout and account to the same handoff, then POS/Staff/ERP and native screens.
+
+## 2026-07-12
+
 - Task: introduce the target BullMQ boundary and separate worker without moving business truth out of PostgreSQL.
 - Files changed: BullMQ outbox producer/worker lifecycle, standalone Nest worker entrypoint, legacy scheduler role guards, production env/preflight, focused tests, dependencies/lockfile, infrastructure docs, architecture/backlog/readiness/progress.
 - Result: `JOB_BACKEND=bullmq` makes the API register an idempotent minute scheduler with five exponential retries while `PROCESS_ROLE=worker` exclusively consumes outbox jobs. The worker fails fast without Redis; API startup can degrade but production preflight blocks missing/non-authenticated Redis configuration. Reservation/debt schedulers stay on pg-boss until parity migration and are suppressed inside the worker process.

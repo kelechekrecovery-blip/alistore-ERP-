@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 760px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Юридическое · КР</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- CONSENT -->
+    <sc-if value="{{ isConsent }}" hint-placeholder-val="{{ true }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 22px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">Согласие на обработку персональных данных</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">По закону КР «О персональных данных». Запрашивается при регистрации, скупке, рассрочке.</div>
+        <sc-for list="{{ consents }}" as="c" hint-placeholder-count="3">
+          <div onClick="{{ c.toggle }}" style="display: flex; align-items: start; gap: 12px; padding: 12px 0; border-bottom: 1px solid #1A1611; cursor: pointer;"><span style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid {{ c.on ? '#C6FF3D' : '#3A342E' }}; background: {{ c.on ? '#C6FF3D' : 'transparent' }}; color: #14110E; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 2px;">{{ c.mark }}</span><div><div style="font-size: 14px; color: #D8CFC6;">{{ c.label }}<sc-if value="{{ c.required }}" hint-placeholder-val="{{ false }}"><span style="color: #FF8A7A;"> *</span></sc-if></div><div style="font-size: 12px; color: #8A7F76; margin-top: 2px;">{{ c.note }}</div></div></div>
+        </sc-for>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 14px; line-height: 1.5;">Согласие логируется с датой и версией текста (Evidence Vault). Клиент может отозвать. PII шифруется, доступ — по ролям, срок хранения ограничен.</div>
+      </div>
+    </sc-if>
+
+    <!-- INSTALLMENT CONTRACT -->
+    <sc-if value="{{ isInstallment }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #fff; border-radius: 16px; padding: 28px; color: #201B17;">
+        <div style="text-align: center; border-bottom: 2px solid #201B17; padding-bottom: 14px; margin-bottom: 18px;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 18px;">ДОГОВОР РАССРОЧКИ</div><div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #8A7F76; margin-top: 4px;">№ INS-2026-0442 · г. Бишкек</div></div>
+        <div style="font-size: 13px; line-height: 1.7; color: #3A322B;">
+          <p style="margin: 0 0 10px;"><b>Продавец:</b> ОсОО «AliStore», г. Бишкек. <b>Покупатель:</b> Асанов Нурбек, паспорт ID •••• 4521.</p>
+          <p style="margin: 0 0 10px;"><b>Товар:</b> iPhone 15 128 ГБ, IMEI 35••042. <b>Цена:</b> 109 900 сом.</p>
+          <p style="margin: 0 0 10px;"><b>Условия:</b> первый взнос 0 сом, срок 12 мес, ежемесячный платёж 9 158 сом, переплата 0% (партнёр-банк).</p>
+          <p style="margin: 0 0 10px;"><b>График платежей</b> прилагается. При просрочке — согласно п.5 и закону КР.</p>
+        </div>
+        <div style="display: flex; gap: 30px; margin-top: 24px; font-size: 12px; color: #8A7F76;"><div style="flex: 1; border-top: 1px solid #201B17; padding-top: 6px;">Продавец</div><div style="flex: 1; border-top: 1px solid #201B17; padding-top: 6px;">Покупатель</div></div>
+        <div style="display: flex; gap: 10px; margin-top: 18px;"><div style="flex: 1; background: #FF5B2E; color: #fff; border-radius: 10px; padding: 12px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">🖨 Печать договора</div><div style="flex: 1; background: #F7F2EC; color: #201B17; border-radius: 10px; padding: 12px; text-align: center; font-weight: 600; font-size: 14px; cursor: pointer;">В приложение клиента</div></div>
+      </div>
+    </sc-if>
+
+    <!-- AGE/PASSPORT CHECK -->
+    <sc-if value="{{ isAge }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 22px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">Проверка личности</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">Обязательна при рассрочке и скупке Б/У (защита от мошенничества и несовершеннолетних).</div>
+        <div style="background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 16px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #1A1611;"><span style="color: #A79C92;">Документ</span><span style="color: #fff;">ID паспорт КР</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #1A1611;"><span style="color: #A79C92;">Возраст</span><span style="color: #C6FF3D;">28 лет ✓ (18+)</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #1A1611;"><span style="color: #A79C92;">Фото документа</span><span style="color: #7FB0EC;">📷 загружено → Evidence</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;"><span style="color: #A79C92;">Проверка по базам</span><span style="color: #C6FF3D;">✓ чисто</span></div>
+        </div>
+        <div style="background: #1A2E1F; border: 1px solid #2E4A38; border-radius: 12px; padding: 14px; font-size: 13px; color: #7FD3A0;">✓ Личность подтверждена. Можно оформлять рассрочку/скупку.</div>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Данные паспорта шифруются, доступ логируется. При возрасте &lt;18 — операция блокируется.</div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "consent", consent: {0:true,1:true,2:false} };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["consent","Согласие ПД"],["installment","Договор рассрочки"],["age","Проверка личности"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const cDef = [
+      ["Обработка данных для заказа","Имя, телефон, адрес — для исполнения заказа",true],
+      ["Хранение для гарантии","IMEI, чек, история покупок",true],
+      ["Маркетинговые уведомления","Акции, новинки (можно отозвать)",false]
+    ];
+    const consents = cDef.map((c,i)=>({ label:c[0], note:c[1], required:c[2], on:!!this.state.consent[i], mark:this.state.consent[i]?"✓":"",
+      toggle:()=>{ const cc={...this.state.consent}; cc[i]=!cc[i]; this.setState({consent:cc}); } }));
+    return { tabs, isConsent:t==="consent", isInstallment:t==="installment", isAge:t==="age", consents };
+  }
+}
+</script>
+</body>
+</html>

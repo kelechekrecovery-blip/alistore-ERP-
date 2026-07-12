@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1120px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">HR</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- SCHEDULE -->
+    <sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ true }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px; overflow-x: auto;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 16px;">График смен · неделя (Центр)</div>
+        <div style="display: grid; grid-template-columns: 110px repeat(7, 1fr); gap: 6px; min-width: 700px;">
+          <div></div>
+          <sc-for list="{{ days }}" as="d" hint-placeholder-count="7"><div style="text-align: center; font-size: 12px; color: #8A7F76; padding: 6px;">{{ d }}</div></sc-for>
+          <sc-for list="{{ schedule }}" as="row" hint-placeholder-count="4">
+            <div style="font-size: 13px; color: #fff; padding: 10px 6px; display: flex; align-items: center;">{{ row.name }}</div>
+            <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="7">
+              <div style="background: {{ c.bg }}; border-radius: 8px; padding: 8px 4px; text-align: center; font-size: 11px; color: {{ c.fg }};">{{ c.label }}</div>
+            </sc-for>
+          </sc-for>
+        </div>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 14px;">🟩 смена · ⬜ выходной. AI подсказывает: пятница-суббота нужен +1 продавец (пик продаж).</div>
+      </div>
+    </sc-if>
+
+    <!-- TIMESHEET -->
+    <sc-if value="{{ isTime }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Сотрудник</span><span>Смен</span><span>Часов</span><span>Опозданий</span><span>Переработка</span></div>
+        <sc-for list="{{ timesheet }}" as="r" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center; font-family: 'JetBrains Mono'; font-size: 13px;"><span style="font-family: 'Golos Text'; color: #fff;">{{ r.name }}</span><span style="color: #A79C92;">{{ r.shifts }}</span><span style="color: #D8CFC6;">{{ r.hours }}</span><span style="color: {{ r.lateColor }};">{{ r.late }}</span><span style="color: #7FD3A0;">{{ r.over }}</span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Табель из отметок смен (открытие/закрытие). Опоздания → штрафы (по правилам), переработка → доплата. Данные идут в расчёт ЗП.</div>
+    </sc-if>
+
+    <!-- PROFILE -->
+    <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: 300px 1fr; gap: 16px;">
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 22px; align-self: start; text-align: center;">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg,#FF5B2E,#E8410F); display: flex; align-items: center; justify-content: center; font-family: 'Sora'; font-weight: 800; font-size: 28px; color: #fff; margin: 0 auto;">Аз</div>
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 18px; color: #fff; margin-top: 12px;">Азизбек Токтосунов</div>
+          <div style="font-size: 13px; color: #8A7F76;">Ст. продавец · Центр</div>
+          <div style="background: rgba(198,255,61,0.12); color: #C6FF3D; border-radius: 999px; padding: 5px 12px; font-size: 12px; margin-top: 12px; display: inline-block;">● Активен · с 2024</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+            <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Данные</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;"><div><span style="color: #8A7F76;">Телефон:</span> <span style="color: #D8CFC6;">+996 700 •• 12</span></div><div><span style="color: #8A7F76;">Роль:</span> <span style="color: #D8CFC6;">Ст. продавец</span></div><div><span style="color: #8A7F76;">Ставка:</span> <span style="color: #D8CFC6;">40 000 + 3%</span></div><div><span style="color: #8A7F76;">Аттестации:</span> <span style="color: #C6FF3D;">3/3 ✓</span></div></div>
+          </div>
+          <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+            <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">История</div>
+            <div style="font-size: 13px; color: #A79C92; line-height: 1.8;">· KPI июнь: 96% · бонус 13 800<br>· Пройден курс «Приём Б/У»<br>· 2 опоздания за месяц (штраф 1 000)<br>· Повышен до ст. продавца · май 2026</div>
+          </div>
+          <div style="display: flex; gap: 10px;"><div style="background: #221E19; color: #D8CFC6; border-radius: 10px; padding: 11px 16px; font-size: 13px; cursor: pointer;">Изменить роль/ставку</div><div style="background: #3A1F1C; color: #FF8A7A; border-radius: 10px; padding: 11px 16px; font-size: 13px; cursor: pointer;">Заблокировать / уволить</div></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- HANDOVER -->
+    <sc-if value="{{ isHandover }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 22px; max-width: 640px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">Передача смены</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">Одна касса, два продавца подряд. Деньги и ответственность передаются под сверку.</div>
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 18px;">
+          <div style="flex: 1; background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; text-align: center;"><div style="font-size: 12px; color: #8A7F76;">Сдаёт</div><div style="font-size: 15px; color: #fff; font-weight: 600; margin-top: 4px;">Азизбек</div><div style="font-size: 11px; color: #8A7F76;">09:00–15:00</div></div>
+          <span style="font-size: 20px; color: #FF5B2E;">→</span>
+          <div style="flex: 1; background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; text-align: center;"><div style="font-size: 12px; color: #8A7F76;">Принимает</div><div style="font-size: 15px; color: #fff; font-weight: 600; margin-top: 4px;">Сайкал</div><div style="font-size: 11px; color: #8A7F76;">15:00–21:00</div></div>
+        </div>
+        <div style="background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 16px; margin-bottom: 16px;"><div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;"><span style="color: #A79C92;">Наличные в кассе</span><span style="font-family: 'JetBrains Mono'; color: #fff;">218 000</span></div><div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;"><span style="color: #A79C92;">Пересчёт принимающим</span><span style="font-family: 'JetBrains Mono'; color: #C6FF3D;">218 000 ✓</span></div></div>
+        <div onClick="{{ handover }}" style="background: {{ handoverBg }}; color: #14110E; border-radius: 12px; padding: 14px; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer;">{{ handoverLabel }}</div>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Смена не закрывается — передаётся. Событие shift.handover в Event Ledger, ответственность за кассу переходит к Сайкал.</div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "schedule", handedOver: false };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["schedule","График смен"],["time","Табель"],["profile","Профиль"],["handover","Передача смены"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const days = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+    const on = { bg:"rgba(198,255,61,0.12)", fg:"#C6FF3D", label:"9–21" };
+    const off = { bg:"#100D0B", fg:"#4A4139", label:"—" };
+    const schedule = [
+      { name:"Азизбек", cells:[on,on,off,on,on,on,off] },
+      { name:"Сайкал", cells:[off,on,on,on,on,off,on] },
+      { name:"Сыдык", cells:[on,off,on,off,on,on,on] },
+      { name:"Риезидин", cells:[on,on,on,off,off,on,on] }
+    ];
+    const timesheet = [
+      { name:"Азизбек", shifts:"22", hours:"264", late:"2", lateColor:"#E5B23C", over:"+6" },
+      { name:"Сайкал", shifts:"20", hours:"240", late:"0", lateColor:"#8A7F76", over:"+2" },
+      { name:"Сыдык", shifts:"21", hours:"252", late:"4", lateColor:"#FF8A7A", over:"0" },
+      { name:"Риезидин", shifts:"23", hours:"276", late:"1", lateColor:"#E5B23C", over:"+10" },
+      { name:"Тахсир", shifts:"19", hours:"228", late:"0", lateColor:"#8A7F76", over:"0" }
+    ];
+    const ho = this.state.handedOver;
+    return { tabs, isSchedule:t==="schedule", isTime:t==="time", isProfile:t==="profile", isHandover:t==="handover",
+      days, schedule, timesheet,
+      handoverLabel: ho?"✓ Смена передана Сайкал":"Подтвердить передачу смены", handoverBg: ho?"#7FD3A0":"#C6FF3D",
+      handover:()=>this.setState({handedOver:true}) };
+  }
+}
+</script>
+</body>
+</html>
