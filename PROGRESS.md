@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: introduce the target BullMQ boundary and separate worker without moving business truth out of PostgreSQL.
+- Files changed: BullMQ outbox producer/worker lifecycle, standalone Nest worker entrypoint, legacy scheduler role guards, production env/preflight, focused tests, dependencies/lockfile, infrastructure docs, architecture/backlog/readiness/progress.
+- Result: `JOB_BACKEND=bullmq` makes the API register an idempotent minute scheduler with five exponential retries while `PROCESS_ROLE=worker` exclusively consumes outbox jobs. The worker fails fast without Redis; API startup can degrade but production preflight blocks missing/non-authenticated Redis configuration. Reservation/debt schedulers stay on pg-boss until parity migration and are suppressed inside the worker process.
+- Checks run: API TypeScript build; 3 focused relay tests; production preflight tests; password-protected local Redis 8.6 smoke with real BullMQ scheduler and worker delivery; full sequential API regression; production dependency audit; `git diff --check`.
+- Outcome: live scheduled delivery executed once through the separate worker; API build passes; dependency audit reports 0 vulnerabilities; full regression passes 105/105 suites and 378/378 tests. A deliberately parallel Jest attempt exposed the known rate-limit socket race, then the required sequential gate passed completely.
+- Next step: add idempotent catalog reindex jobs and automatic Meilisearch bootstrap, then migrate reservation/debt schedulers with parity tests.
+
+## 2026-07-12
+
 - Task: add the missing Redis and Meilisearch runtime layer from the target architecture.
 - Files changed: Docker Compose services/volumes/healthchecks, API development and production env contracts, infrastructure runbook, architecture map, backlog and progress.
 - Result: Redis 7.4 is password-protected with AOF persistence and health probing; Meilisearch v1.37 is pinned with a master key, persistent data, disabled analytics and health probing. The API contract now exposes matching Redis/search variables while documenting PostgreSQL as authoritative and catalog fallback behavior.

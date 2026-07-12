@@ -30,7 +30,9 @@ For production deployment, backup, restore drill and rollback steps, use
   Postgres (`alistore_dev`) with a **read-only** reporting user — never the app's
   read-write credentials.
 - **Redis** — password is required even locally; use the matching `REDIS_URL` in
-  the API/worker environment.
+  the API/worker environment. Run the API with `PROCESS_ROLE=api` and a separate
+  process with `npm run start:worker -w @alistore/api`; the worker script forces
+  `PROCESS_ROLE=worker` and fails fast when Redis cannot be reached.
 - **Meilisearch** — configure `MEILI_HOST=http://localhost:7700`, the same
   `MEILI_API_KEY`, and run the protected catalog reindex endpoint once after boot.
 
@@ -64,6 +66,6 @@ Until `NOTIFICATION_TRANSPORT=novu`, outbox deliveries are logged
 | ------------- | ----------------------------------------- | -------------------------- |
 | Notifications | `NOTIFICATION_TRANSPORT`, `NOVU_API_*`    | `OutboxModule` transport   |
 | Object store  | `MINIO_*`                                 | (pending an upload surface)|
-| Jobs/cache    | `REDIS_URL`, `REDIS_PASSWORD`             | BullMQ/cache runtime       |
+| Jobs/cache    | `JOB_BACKEND`, `PROCESS_ROLE`, `REDIS_URL`| BullMQ API producer/worker |
 | Search        | `MEILI_HOST`, `MEILI_API_KEY`             | Catalog adapter            |
 | BI            | connect Metabase → `alistore_dev` (RO)    | Metabase UI                |

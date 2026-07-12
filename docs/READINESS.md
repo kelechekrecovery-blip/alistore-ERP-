@@ -5,7 +5,7 @@
 и не должны смешиваться с готовностью первого магазина к запуску.
 
 - **47 backend-модулей** (NestJS) · **35 веб-роутов** (Next.js) · **24 миграции**
-- **104 API test suites / 375 тестов — зелёные** (`jest`)
+- **105 API test suites / 378 тестов — зелёные** (`jest --runInBand`)
 - **16 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle и desktop storefront при 863px (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API tests pass **2/2** and Client launches on iPhone 17 Pro Simulator; Android unit test/Lint pass and all four apps cold-launch on an API 36 emulator. Full per-role feature parity remains in progress. Expo is retained only as a legacy behavior reference.

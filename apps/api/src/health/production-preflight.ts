@@ -121,6 +121,28 @@ const CHECKS: CheckDefinition[] = [
     note: 'OUTBOX_RELAY_ENABLED=true lets transactional notifications and webhooks leave the durable outbox.',
     evaluate: (env) => boolReady(env, 'OUTBOX_RELAY_ENABLED'),
   },
+  {
+    id: 'bullmq_runtime',
+    area: 'jobs',
+    title: 'BullMQ Redis runtime configured',
+    requiredEnv: ['JOB_BACKEND', 'REDIS_URL'],
+    note: 'JOB_BACKEND=bullmq and an authenticated redis:// or rediss:// REDIS_URL are required.',
+    evaluate: (env) => {
+      const backend = env('JOB_BACKEND')?.trim().toLowerCase();
+      const redisUrl = env('REDIS_URL')?.trim();
+      if (!backend || !redisUrl) return 'missing';
+      if (backend !== 'bullmq') return 'unsafe';
+      try {
+        const parsed = new URL(redisUrl);
+        return (parsed.protocol === 'redis:' || parsed.protocol === 'rediss:') &&
+          Boolean(parsed.hostname) && Boolean(parsed.password)
+          ? 'ready'
+          : 'unsafe';
+      } catch {
+        return 'unsafe';
+      }
+    },
+  },
 ];
 
 export function buildProductionPreflightReport(

@@ -3,7 +3,7 @@
 ## Next
 - Close native Android feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
-- Add Redis and BullMQ with an explicit cache/job boundary and separate worker process; PostgreSQL/Event Ledger remain authoritative and current pg-boss jobs migrate only after parity tests.
+- Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
 - Complete the new Redis/Meilisearch runtime with a live Docker/staging smoke, automatic index bootstrap and idempotent product reindex jobs.
 - Add Kubernetes deployment manifests for API, web and workers with migration jobs, secrets, probes, autoscaling and rollback gates.
 - Add product variants and bundles with component stock validation, catalog/POS presentation, RBAC, Event Ledger and E2E coverage.
@@ -19,6 +19,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Move transactional outbox scheduling/delivery onto BullMQ with an API producer, separate fail-fast Nest worker process, exponential retries, authenticated Redis production preflight, live Redis scheduled-job smoke, lifecycle tests and pg-boss compatibility during phased migration.
 - Add parser-validated local/staging runtime definitions for password-protected persistent Redis and pinned Meilisearch v1.37, including healthchecks, volumes, production env contract and operator wiring documentation.
 - Establish the native Android foundation: separate Client, Staff, Courier and POS Kotlin/Jetpack Compose APKs, shared typed API core, Android Keystore AES-GCM token storage, SQLite idempotent offline queue, WorkManager replay, deep links, local-only Debug networking, unit test, four-app build and Android Lint gate.
 - Establish the native iOS foundation required by the new architecture: one shared Swift framework plus separate Client, Staff, Courier and POS SwiftUI app targets, typed API errors, Keychain, SwiftData offline commands, deep links, fail-closed Release API config, simulator tests and Client smoke launch.

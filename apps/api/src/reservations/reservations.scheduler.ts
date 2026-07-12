@@ -32,6 +32,7 @@ export class ReservationsScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.config.get<string>('PROCESS_ROLE') === 'worker') return;
     if (this.config.get<string>('RESERVATION_SWEEP_ENABLED') !== 'true') {
       this.logger.log(
         'Reservation sweep disabled (set RESERVATION_SWEEP_ENABLED=true to enable)',

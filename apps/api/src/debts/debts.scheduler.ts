@@ -27,6 +27,7 @@ export class DebtsReminderScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.config.get<string>('PROCESS_ROLE') === 'worker') return;
     if (this.config.get<string>('DEBT_REMINDERS_ENABLED') !== 'true') {
       this.logger.log(
         'Debt reminders disabled (set DEBT_REMINDERS_ENABLED=true to enable)',

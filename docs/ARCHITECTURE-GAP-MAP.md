@@ -15,7 +15,7 @@ been built or tested; it does not mean external production certification is comp
 | Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
 | Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |
 | S3/MinIO | S3 adapter, compressed WebP ingestion and MinIO compose exist | Partial | live MinIO integration test, private evidence policy, signed URLs, backup |
-| BullMQ workers | Background jobs currently use durable `pg-boss` on PostgreSQL | Missing versus target | Redis/BullMQ worker process, retries/DLQ, idempotent jobs, observability |
+| BullMQ workers | Transactional outbox has a BullMQ producer/scheduler and separate fail-fast worker; reservation/debt jobs remain on `pg-boss` during migration | Partial | migrate remaining jobs, DLQ dashboard, job metrics and staging soak |
 | API gateway / edge | Caddy edge exists; Nest is the only application API | Partial | production routing, TLS, limits and gateway health in staging |
 | Kubernetes + CDN | No manifests or Helm/Kustomize deployment | Missing | staging namespace, migrations job, probes, autoscaling, rollback drill |
 | GitHub Actions | API/web/test/Playwright CI exists | Partial | add native builds, worker/infra validation and signed release workflows |
@@ -57,9 +57,9 @@ Shared Android foundation:
 
 1. Native parity wave: Client checkout/account; Staff operations; Courier delivery/COD;
    POS sale/offline sync. Each flow must run against the existing Nest contracts.
-2. Redis + BullMQ: introduce explicit cache/job ports, a separate worker process,
-   idempotent job IDs, retries and dead-letter visibility. Keep PostgreSQL/Event Ledger
-   as business truth; Redis is never authoritative.
+2. Complete BullMQ migration: move reservation/debt schedulers after parity tests,
+   add dead-letter visibility and job metrics. Keep PostgreSQL/Event Ledger as
+   business truth; Redis is never authoritative.
 3. Meilisearch runtime: service, index bootstrap and product mutation jobs with
    Postgres fallback.
 4. S3 hardening: private evidence objects, signed reads, lifecycle and restore drill.

@@ -17,7 +17,7 @@ describe('Production preflight report', () => {
 
     expect(report.status).toBe('blocked');
     expect(report.generatedAt).toBe('2026-07-08T00:00:00.000Z');
-    expect(report.summary.missing).toBe(3);
+    expect(report.summary.missing).toBe(4);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
@@ -57,6 +57,8 @@ describe('Production preflight report', () => {
         AUTH_OTP_DEV_ECHO: 'false',
         RESERVATION_SWEEP_ENABLED: 'true',
         OUTBOX_RELAY_ENABLED: 'true',
+        JOB_BACKEND: 'bullmq',
+        REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
       })[name],
     );
 
