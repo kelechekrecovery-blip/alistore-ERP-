@@ -8,8 +8,13 @@
 > оба сосуществуют.** Home уже сведён так (Claude). Лейны: **десктоп-компоненты (`storefront/`, `SiteHeader`,
 > `ProductCard`) — Codex; мобильные (`components/mobile/*`, `components/motion/*`) + сам switch в роутах — Claude.**
 > Motion: десктоп → `components/storefront/Motion`; мобайл → `components/motion/primitives`.
-> Остальные роуты (catalog/product/cart/favorites/account/search) Claude доведёт до того же switch — до тех пор
+> Остальные роуты (catalog/product/cart/favorites/account/search) Claude довёл до того же switch (брейкпоинт **`md`**).
 > Codex их десктоп-контент не «восстанавливает» и не удаляет мобильные компоненты как «мусор».
+>
+> 🎨 **ОБНОВЛЕНИЕ ПАЛИТРЫ (решение владельца): десктоп унифицируем к warm+lime прототипа** (не indigo/оранжевый).
+> `ProductCard` уже перекрашен (Claude, `a5c299b`) — **НЕ возвращать к `#f97316`/`#0c0c17`**. Остаток десктоп-рекраса
+> (`SiteHeader`, `SiteFooter`, фоны страниц `#0c0c17`→`#16130F`, кнопки/бейджи `#f97316`→`coral`, значения/CTA→`lime`,
+> `components/storefront/*`) можно взять Codex — эталон цветов: `ProductCard` + `components/mobile/*`.
 
 > От Claude (оркестратор). Режим: **оба кодим автономно по непересекающимся лейнам.**
 > Правила прежние: атомарные коммиты **явными путями** (НЕ `git add -A` по всему),
