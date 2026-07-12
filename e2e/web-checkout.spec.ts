@@ -11,11 +11,11 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
 
   await page.goto(`/product/${product.id}`);
   await expect(page.getByRole('heading', { name: product.name })).toBeVisible();
-  expect(await page.locator('.md\\:block').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
 
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: 'Корзина', exact: true })).toBeVisible();
-  expect(await page.locator('.md\\:block').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
 
   await page.goto('/checkout');
   await expect(page.getByText('Способ получения')).toBeVisible();

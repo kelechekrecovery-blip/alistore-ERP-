@@ -25,6 +25,13 @@ export class HealthController {
   @Get()
   @HealthCheck()
   check() {
+    return this.ready();
+  }
+
+  /** Explicit readiness alias for managed-cloud probes. */
+  @Get('ready')
+  @HealthCheck()
+  ready() {
     return this.health.check([
       () => this.db.pingCheck('database', this.prisma),
       () => this.memory.checkHeap('memory_heap', READINESS_HEAP_LIMIT_BYTES),

@@ -4,8 +4,8 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **47 backend-модулей** (NestJS) · **35 веб-роутов** (Next.js) · **24 миграции**
-- **105 API test suites / 383 теста — зелёные** (`jest --runInBand`)
+- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **26 миграций**
+- **106 API test suites / 391 тест — зелёные** (`jest --runInBand`)
 - **19 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle и desktop storefront при 863px (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API tests pass **17/17** on iPhone 17 Pro Simulator; Android unit test/Lint pass and all four apps cold-launch on an API 36 emulator. Full per-role feature parity remains in progress. Expo is retained only as a legacy behavior reference.
@@ -70,9 +70,9 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest --runInBand    # 105 suites / 383 теста ✓
+cd apps/api && npx jest --runInBand    # 106 suites / 391 тест ✓
 npm run api:build                     # ✓
-cd apps/web && npx next build         # ✓ (35 роутов)
+cd apps/web && npx next build         # ✓ (37 роутов)
 npm run e2e                           # 19/19 ✓
 npm run mobile:store-preflight        # 0 failures; production env warnings only
 cd apps/mobile && npx expo-doctor     # 20/20 ✓

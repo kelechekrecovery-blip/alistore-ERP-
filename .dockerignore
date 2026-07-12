@@ -1,0 +1,13 @@
+.git
+.next
+**/.next
+**/build
+**/node_modules
+node_modules
+playwright-report
+test-results
+uploads
+*.log
+.env*
+!.env.example
+!.env.production.example

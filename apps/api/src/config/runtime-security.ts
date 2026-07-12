@@ -1,5 +1,6 @@
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { HelmetOptions } from 'helmet';
+import type { RequestHandler } from 'express';
 
 export type RuntimeEnvReader = (name: string) => string | undefined;
 
@@ -32,6 +33,38 @@ export function resolveHelmetOptions(env: RuntimeEnvReader): HelmetOptions {
         upgradeInsecureRequests: production ? [] : null,
       },
     },
+  };
+}
+
+export function resolveAllowedHosts(env: RuntimeEnvReader): string[] {
+  const hosts = (env('ALLOWED_HOSTS') ?? '')
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  if (env('NODE_ENV') === 'production' && hosts.length === 0) {
+    throw new Error('ALLOWED_HOSTS is required in production');
+  }
+  for (const host of hosts) {
+    if (host.includes('://') || host.includes('/') || host.includes(':') || host === 'localhost') {
+      throw new Error(`Invalid allowed host: ${host}`);
+    }
+  }
+  return [...new Set(hosts)];
+}
+
+export function allowedHostsMiddleware(env: RuntimeEnvReader): RequestHandler {
+  const allowed = resolveAllowedHosts(env);
+  return (request, response, next) => {
+    if (env('NODE_ENV') !== 'production' || request.path.startsWith('/api/health/')) {
+      next();
+      return;
+    }
+    const host = (request.headers.host ?? '').split(':', 1)[0].toLowerCase();
+    if (!allowed.includes(host)) {
+      response.status(421).json({ statusCode: 421, message: 'Misdirected Request' });
+      return;
+    }
+    next();
   };
 }
 

@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: implement the repository-controlled portion of the public managed-cloud Web MVP launch plan.
+- Files changed: production/staging Render Blueprints, API/web Dockerfiles, CI infrastructure job, production config and health/security, Order demo migration/invariants, R2 backup operation, Sentry web instrumentation, demo UI/receipt, managed-cloud runbook, tests and readiness tracking.
+- Result: public demo orders are marked only by the server and cannot reserve IMEI, move through operations, create Payment rows, mark paid, sell stock or send transactional notices. Sandbox intents remain demonstrable. API/web reject unknown production hosts except health probes; Next exposes `/healthz`, API exposes `/api/health/live` and `/api/health/ready`. Render Frankfurt definitions cover web, API, BullMQ worker, authenticated private Redis, private Meilisearch, paid PostgreSQL/PITR and daily R2 backup; production auto-deploy is disabled for manual approval.
+- Checks run: Prisma validate/generate and migration on dev/test DB; API/web production builds; mobile typecheck; full API Jest 106/106 suites and 391/391 tests; focused demo/security/readiness tests 24/24; Playwright 18/19 followed by corrected checkout 2/2; Render YAML parser; dependency audit 0 vulnerabilities. Docker image build/scan is configured in GitHub Actions but not run locally because Docker is unavailable.
+- Outcome: repository launch contour is ready for staging account activation. External creation of Cloudflare/Render/R2/Sentry/domain accounts, Render Blueprint validation/import, authenticated Key Value activation, DNS/Access/WAF, live R2 backup/restore and container smoke remain genuine external gates and are not claimed complete.
+- Next step: owner creates the external accounts with 2FA, then import `infra/render.staging.yaml` and execute `docs/MANAGED-CLOUD-LAUNCH.md` from staging through production demo.
+
+## 2026-07-12
+
 - Task: audit and correct the real native mobile Client after the storefront visual correction.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `BACKLOG.md`, `PROGRESS.md`.
 - Result: the SwiftUI Client no longer opens on a generic system catalog list. It now follows `AliStore Клиент App 2.0.dc.html` with a dark branded home, coral/lime service cards, horizontal categories, iPhone hero, product grid, working local favorites and the exact `Главная / Каталог / Избранное / Корзина / Кабинет` tab map. Orders remain reachable from Account and payment-return reconciliation routes there.

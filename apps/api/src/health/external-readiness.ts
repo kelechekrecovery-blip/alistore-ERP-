@@ -195,7 +195,7 @@ const CHECKS: CheckDefinition[] = [
     title: 'S3/MinIO media storage',
     requiredEnv: ['S3_ENDPOINT', 'MINIO_BUCKET', 'MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD'],
     optionalEnv: ['S3_REGION', 'S3_PUBLIC_BASE'],
-    blocking: false,
+    blocking: true,
     note: 'Local disk storage works in dev; configure S3-compatible storage for production evidence.',
   },
   {
@@ -203,7 +203,7 @@ const CHECKS: CheckDefinition[] = [
     area: 'production',
     title: 'Sentry/GlitchTip error reporting',
     requiredEnv: ['SENTRY_DSN'],
-    blocking: false,
+    blocking: true,
     note: 'Optional for dev, recommended before production launch.',
   },
 ];
@@ -212,7 +212,8 @@ export function buildExternalReadinessReport(
   env: EnvReader,
   now = new Date(),
 ): ExternalReadinessReport {
-  const checks = CHECKS.map((definition) => evaluateCheck(definition, env));
+  const demoMode = env('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
+  const checks = CHECKS.map((definition) => evaluateCheck(definition, env, demoMode));
   const blockingRemaining = checks.filter(
     (check) => check.blocking && check.status !== 'ready',
   ).length;
@@ -233,7 +234,10 @@ export function buildExternalReadinessReport(
   };
 }
 
-function evaluateCheck(definition: CheckDefinition, env: EnvReader): ExternalReadinessCheck {
+function evaluateCheck(definition: CheckDefinition, env: EnvReader, demoMode: boolean): ExternalReadinessCheck {
+  const blocking = demoMode
+    ? definition.id === 's3_media_storage' || definition.id === 'observability'
+    : definition.blocking ?? false;
   const requiredEnv = requiredEnvNames(definition);
   const optionalEnv = definition.optionalEnv ?? [];
   const configuredEnv = [...requiredEnv, ...optionalEnv].filter((name) => hasEnv(env, name));
@@ -256,13 +260,13 @@ function evaluateCheck(definition: CheckDefinition, env: EnvReader): ExternalRea
   } else if (definition.requiredAny) {
     status = anySatisfied
       ? 'ready'
-      : definition.blocking === false
+      : !blocking
         ? 'optional'
         : 'missing';
   } else if (missingEnv.length === 0) {
     status = 'ready';
   } else {
-    status = definition.blocking === false ? 'optional' : 'missing';
+    status = !blocking ? 'optional' : 'missing';
   }
 
   return {
@@ -270,7 +274,7 @@ function evaluateCheck(definition: CheckDefinition, env: EnvReader): ExternalRea
     area: definition.area,
     title: definition.title,
     status,
-    blocking: definition.blocking ?? false,
+    blocking,
     requiredEnv,
     optionalEnv,
     configuredEnv,

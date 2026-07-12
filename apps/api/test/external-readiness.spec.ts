@@ -50,6 +50,11 @@ describe('External readiness report', () => {
       EXPO_PUBLIC_EAS_PROJECT_ID: 'set',
       EXPO_TOKEN: 'set',
       POS_HARDWARE_CERTIFIED: 'true',
+      S3_ENDPOINT: 'https://account.eu.r2.cloudflarestorage.com',
+      MINIO_BUCKET: 'alistore-media-prod',
+      MINIO_ROOT_USER: 'set',
+      MINIO_ROOT_PASSWORD: 'set',
+      SENTRY_DSN: 'https://public@example.ingest.sentry.io/1',
     };
 
     const report = buildExternalReadinessReport((name) => env[name]);
@@ -96,5 +101,26 @@ describe('External readiness report', () => {
       .find((check) => check.id === 'payment_gateway');
     expect(payment?.status).toBe('manual_required');
     expect(payment?.blocking).toBe(true);
+  });
+
+  it('makes live providers optional in public demo but still requires private storage and monitoring', () => {
+    const env: Record<string, string> = {
+      PUBLIC_DEMO_MODE: 'true',
+      PAYMENT_PROVIDER: 'sandbox',
+      PAYMENT_PROVIDER_CERTIFIED: 'false',
+      SMS_PROVIDER_CERTIFIED: 'false',
+      POS_HARDWARE_CERTIFIED: 'false',
+      S3_ENDPOINT: 'https://account.eu.r2.cloudflarestorage.com',
+      MINIO_BUCKET: 'alistore-media-prod',
+      MINIO_ROOT_USER: 'set',
+      MINIO_ROOT_PASSWORD: 'set',
+      SENTRY_DSN: 'https://public@example.ingest.sentry.io/1',
+    };
+    const report = buildExternalReadinessReport((name) => env[name]);
+
+    expect(report.status).toBe('ready');
+    expect(report.summary.blockingRemaining).toBe(0);
+    expect(report.checks.find((check) => check.id === 'payment_gateway')).toMatchObject({ blocking: false });
+    expect(report.checks.find((check) => check.id === 's3_media_storage')).toMatchObject({ status: 'ready', blocking: true });
   });
 });

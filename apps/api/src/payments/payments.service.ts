@@ -163,6 +163,12 @@ export class PaymentsService {
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
       }
+      if (order.isDemo) {
+        throw new ConflictError(
+          'demo_payment_forbidden',
+          `Демо-заказ ${order.id} не создаёт платёж и не меняет остатки`,
+        );
+      }
 
       // Invariant: no paid without an active reservation.
       if (!PAYABLE_STATUSES.has(order.status)) {

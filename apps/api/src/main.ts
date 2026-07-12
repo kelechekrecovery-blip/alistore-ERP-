@@ -4,13 +4,14 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { setupOpenApi } from './openapi';
 import helmet from 'helmet';
-import { resolveCorsOptions, resolveHelmetOptions } from './config/runtime-security';
+import { allowedHostsMiddleware, resolveCorsOptions, resolveHelmetOptions } from './config/runtime-security';
 import { assertProductionRuntimeReady } from './health/production-preflight';
 
 async function bootstrap(): Promise<void> {
   const env = (name: string) => process.env[name];
   assertProductionRuntimeReady(env);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  app.use(allowedHostsMiddleware(env));
   app.setGlobalPrefix('api');
   app.useStaticAssets(process.env.MEDIA_LOCAL_DIR ?? './uploads', {
     prefix: process.env.MEDIA_PUBLIC_BASE ?? '/uploads',

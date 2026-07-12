@@ -1,4 +1,4 @@
-import { resolveCorsOptions, resolveHelmetOptions } from '../src/config/runtime-security';
+import { allowedHostsMiddleware, resolveAllowedHosts, resolveCorsOptions, resolveHelmetOptions } from '../src/config/runtime-security';
 
 describe('Runtime security configuration', () => {
   const env = (values: Record<string, string>) => (name: string) => values[name];
@@ -24,5 +24,23 @@ describe('Runtime security configuration', () => {
     const production = resolveHelmetOptions(env({ NODE_ENV: 'production' }));
     expect(production.strictTransportSecurity).toMatchObject({ maxAge: 31_536_000 });
     expect(production.contentSecurityPolicy).toBeTruthy();
+  });
+
+  it('requires exact hostnames and rejects unsafe production values', () => {
+    expect(() => resolveAllowedHosts(env({ NODE_ENV: 'production' }))).toThrow('ALLOWED_HOSTS is required');
+    expect(() => resolveAllowedHosts(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'https://api.alistore.kg' }))).toThrow('Invalid allowed host');
+    expect(resolveAllowedHosts(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'api.alistore.kg,API.ALISTORE.KG' }))).toEqual(['api.alistore.kg']);
+  });
+
+  it('allows health probes but rejects unknown production hosts', () => {
+    const middleware = allowedHostsMiddleware(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'api.alistore.kg' }));
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const next = jest.fn();
+    middleware({ path: '/api/orders', headers: { host: 'service.onrender.com' } } as never, response as never, next);
+    expect(response.status).toHaveBeenCalledWith(421);
+    expect(next).not.toHaveBeenCalled();
+
+    middleware({ path: '/api/health/live', headers: { host: 'service.onrender.com' } } as never, response as never, next);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });

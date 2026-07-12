@@ -1,4 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OrderStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,6 +31,7 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly units: UnitsService,
     @Optional() private readonly outbox?: OutboxService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
   get(id: string) {
@@ -59,6 +61,7 @@ export class OrdersService {
 
   /** Create an order (status `created`) and write order.created to the ledger. */
   async create(dto: CreateOrderDto, actor: string, idempotencyKey?: string) {
+    const isDemo = this.config?.get<string>('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
     try {
       return await this.audit.transaction(async (tx) => {
         if (idempotencyKey) {
@@ -76,6 +79,7 @@ export class OrdersService {
         const order = await tx.order.create({
           data: {
             idempotencyKey,
+            isDemo,
             customerId: dto.customerId,
             channel: dto.channel,
             fulfillmentType: dto.fulfillmentType ?? defaultFulfillment(dto.channel),
@@ -96,7 +100,7 @@ export class OrdersService {
           },
           include: { items: true },
         });
-        if (this.outbox) {
+        if (this.outbox && !order.isDemo) {
           await enqueueConsentedCustomerNotice(tx, this.outbox, {
             customerId: order.customerId,
             template: 'order_confirmed',
@@ -118,6 +122,7 @@ export class OrdersService {
                 deliverySlot: order.deliverySlot,
                 pickupCode: order.pickupCode,
                 total: order.total,
+                isDemo: order.isDemo,
               },
               refs: [order.id],
             },
@@ -156,6 +161,7 @@ export class OrdersService {
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
+      this.assertNotDemo(order);
       assertTransition(order.status, 'reserved');
 
       const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
@@ -195,6 +201,7 @@ export class OrdersService {
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
+      this.assertNotDemo(order);
       assertTransition(order.status, to);
       const updated = await tx.order.update({
         where: { id: orderId },
@@ -246,6 +253,7 @@ export class OrdersService {
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
+      this.assertNotDemo(order);
       assertTransition(order.status, 'reserved');
 
       const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
@@ -321,5 +329,14 @@ export class OrdersService {
       });
       return { result: { order: updated, assigned }, events };
     });
+  }
+
+  private assertNotDemo(order: { id: string; isDemo: boolean }): void {
+    if (order.isDemo) {
+      throw new ConflictError(
+        'demo_order_read_only',
+        `Демо-заказ ${order.id} нельзя передавать в оплату, склад или исполнение`,
+      );
+    }
   }
 }

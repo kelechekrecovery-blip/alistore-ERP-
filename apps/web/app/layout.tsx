@@ -6,6 +6,7 @@ import { CartProvider } from '@/lib/cart';
 import { AuthProvider } from '@/lib/auth';
 import { FavoritesProvider } from '@/lib/favorites';
 import { CompareProvider } from '@/lib/compare';
+import { DemoModeBanner } from '@/components/DemoModeBanner';
 
 export const metadata: Metadata = {
   title: 'AliStore — электроника с гарантией в Кыргызстане',
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <FavoritesProvider>
               <CompareProvider>
                 <MotionConfig reducedMotion="user">{children}</MotionConfig>
+                <DemoModeBanner />
               </CompareProvider>
             </FavoritesProvider>
           </CartProvider>

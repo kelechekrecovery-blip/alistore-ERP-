@@ -17,7 +17,7 @@ describe('Production preflight report', () => {
 
     expect(report.status).toBe('blocked');
     expect(report.generatedAt).toBe('2026-07-08T00:00:00.000Z');
-    expect(report.summary.missing).toBe(4);
+    expect(report.summary.missing).toBe(5);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
@@ -53,6 +53,7 @@ describe('Production preflight report', () => {
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://alistore-prod.internal:5432/alistore',
         CORS_ORIGINS: 'https://alistore.kg,https://admin.alistore.kg',
+        ALLOWED_HOSTS: 'api.alistore.kg',
         JWT_SECRET: strongSecret,
         AUTH_OTP_DEV_ECHO: 'false',
         RESERVATION_SWEEP_ENABLED: 'true',

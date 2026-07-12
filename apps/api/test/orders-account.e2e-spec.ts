@@ -2,6 +2,8 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
+import { ConfigService } from '@nestjs/config';
+import { ConflictError } from '../src/common/errors';
 
 /**
  * Personal account: listByCustomer returns only the caller's orders, newest first.
@@ -95,5 +97,26 @@ describe('Orders by customer (account)', () => {
     await expect(
       orders.create({ ...input, customerId: attacker.id }, attacker.id, key),
     ).rejects.toMatchObject({ code: 'order_idempotency_owner_mismatch' });
+  });
+
+  it('marks demo orders server-side and blocks operational transitions', async () => {
+    const demoOrders = new OrdersService(
+      prisma,
+      new AuditService(prisma),
+      new UnitsService(prisma),
+      undefined,
+      new ConfigService({ PUBLIC_DEMO_MODE: 'true' }),
+    );
+    const owner = await customer();
+    const order = await demoOrders.create(
+      { customerId: owner.id, channel: 'web', total: 100, items: [{ sku: 'DEMO', qty: 1, price: 100 }] },
+      'demo:web',
+    );
+
+    expect(order.isDemo).toBe(true);
+    await expect(demoOrders.transition(order.id, 'confirmed', 'staff:test')).rejects.toMatchObject({
+      code: 'demo_order_read_only',
+    } satisfies Partial<ConflictError>);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('created');
   });
 });

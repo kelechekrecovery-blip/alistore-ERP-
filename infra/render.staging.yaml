@@ -1,0 +1,117 @@
+services:
+  - type: web
+    name: alistore-api-staging
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health/live
+    preDeployCommand: npm run db:deploy -w @alistore/api
+    envVars:
+      - fromGroup: alistore-staging-common
+      - key: PROCESS_ROLE
+        value: api
+      - key: DATABASE_URL
+        fromDatabase: { name: alistore-postgres-staging, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: alistore-redis-staging, type: keyvalue, property: connectionString }
+      - key: MEILI_API_KEY
+        fromService: { name: alistore-meilisearch-staging, type: pserv, envVarKey: MEILI_MASTER_KEY }
+      - { key: S3_ENDPOINT, sync: false }
+      - { key: MINIO_ROOT_USER, sync: false }
+      - { key: MINIO_ROOT_PASSWORD, sync: false }
+      - { key: SENTRY_DSN, sync: false }
+  - type: web
+    name: alistore-web-staging
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./docker/web.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /healthz
+    envVars:
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: PUBLIC_DEMO_MODE
+        value: "true"
+      - key: NEXT_PUBLIC_DEMO_MODE
+        value: "true"
+      - key: SENTRY_DSN
+        fromService: { name: alistore-api-staging, type: web, envVarKey: SENTRY_DSN }
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        fromService: { name: alistore-api-staging, type: web, envVarKey: SENTRY_DSN }
+      - { key: SENTRY_ENVIRONMENT, value: staging }
+      - { key: NEXT_PUBLIC_SENTRY_ENVIRONMENT, value: staging }
+  - type: worker
+    name: alistore-worker-staging
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:worker -w @alistore/api
+    autoDeployTrigger: checksPass
+    envVars:
+      - fromGroup: alistore-staging-common
+      - key: PROCESS_ROLE
+        value: worker
+      - key: DATABASE_URL
+        fromDatabase: { name: alistore-postgres-staging, property: connectionString }
+      - key: REDIS_URL
+        fromService: { name: alistore-redis-staging, type: keyvalue, property: connectionString }
+      - key: MEILI_API_KEY
+        fromService: { name: alistore-meilisearch-staging, type: pserv, envVarKey: MEILI_MASTER_KEY }
+      - key: S3_ENDPOINT
+        fromService: { name: alistore-api-staging, type: web, envVarKey: S3_ENDPOINT }
+      - key: MINIO_ROOT_USER
+        fromService: { name: alistore-api-staging, type: web, envVarKey: MINIO_ROOT_USER }
+      - key: MINIO_ROOT_PASSWORD
+        fromService: { name: alistore-api-staging, type: web, envVarKey: MINIO_ROOT_PASSWORD }
+      - key: SENTRY_DSN
+        fromService: { name: alistore-api-staging, type: web, envVarKey: SENTRY_DSN }
+  - type: pserv
+    name: alistore-meilisearch-staging
+    runtime: image
+    region: frankfurt
+    plan: starter
+    image: { url: "getmeili/meilisearch:v1.37" }
+    disk: { name: meili-data, mountPath: /meili_data, sizeGB: 5 }
+    envVars:
+      - { key: MEILI_ENV, value: production }
+      - { key: MEILI_NO_ANALYTICS, value: "true" }
+      - { key: MEILI_MASTER_KEY, generateValue: true }
+  - type: keyvalue
+    name: alistore-redis-staging
+    region: frankfurt
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+databases:
+  - name: alistore-postgres-staging
+    region: frankfurt
+    plan: basic-256mb
+    databaseName: alistore_staging
+    user: alistore_app
+    postgresMajorVersion: "16"
+    ipAllowList: []
+envVarGroups:
+  - name: alistore-staging-common
+    envVars:
+      - { key: NODE_ENV, value: production }
+      - { key: JWT_SECRET, generateValue: true }
+      - { key: CORS_ORIGINS, value: "https://staging.alistore.kg,https://admin-staging.alistore.kg" }
+      - { key: ALLOWED_HOSTS, value: api-staging.alistore.kg }
+      - { key: PUBLIC_DEMO_MODE, value: "true" }
+      - { key: AUTH_OTP_DEV_ECHO, value: "false" }
+      - { key: PAYMENT_PROVIDER, value: sandbox }
+      - { key: JOB_BACKEND, value: bullmq }
+      - { key: RESERVATION_SWEEP_ENABLED, value: "true" }
+      - { key: OUTBOX_RELAY_ENABLED, value: "true" }
+      - { key: MEILI_HOST, value: "http://alistore-meilisearch-staging:7700" }
+      - { key: MEDIA_STORAGE, value: s3 }
+      - { key: S3_REGION, value: auto }
+      - { key: MINIO_BUCKET, value: alistore-media-staging }

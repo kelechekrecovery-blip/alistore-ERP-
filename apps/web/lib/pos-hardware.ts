@@ -73,6 +73,7 @@ export function printPosReceipt(snapshot: PosReceiptSnapshot, result?: PosSaleRe
 }
 
 function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: PosSaleResult | null) {
+  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const rows = snapshot.lines.map((line) => `
     <tr>
       <td>
@@ -85,7 +86,9 @@ function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: P
     </tr>
   `).join('');
   const imeis = result?.imeis?.length ? `<p><b>IMEI:</b> ${escapeHtml(result.imeis.join(', '))}</p>` : '';
-  const status = result ? 'Event Ledger: synced' : 'Offline receipt: pending sync';
+  const status = demoMode
+    ? 'DEMO: списание и фискализация не производятся'
+    : result ? 'Event Ledger: synced' : 'Offline receipt: pending sync';
   const paymentSummary = snapshot.payments?.length
     ? snapshot.payments
       .map((payment) => `${escapeHtml(methodName(payment.method))}: ${som(payment.amount)}`)
@@ -108,9 +111,11 @@ function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: P
         small { display: block; color: #555; font-size: 10px; }
         .total { display: flex; justify-content: space-between; margin-top: 3mm; font-size: 17px; font-weight: 800; }
         .muted { color: #555; font-size: 10px; text-align: center; }
+        .demo { border: 2px solid #111; padding: 2mm; text-align: center; font-weight: 800; margin-bottom: 3mm; }
       </style>
     </head>
     <body>
+      ${demoMode ? '<div class="demo">ДЕМО · НЕФИСКАЛЬНЫЙ ЧЕК</div>' : ''}
       <h1>AliStore</h1>
       <p><b>${escapeHtml(snapshot.shop)}</b></p>
       <p>Чек: ${escapeHtml(receiptNo)}</p>

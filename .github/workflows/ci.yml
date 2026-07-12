@@ -6,6 +6,30 @@ on:
     branches: [main, master, codex/open-source-integrations]
 
 jobs:
+  infrastructure:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Parse Render blueprints
+        run: |
+          ruby -e "require 'yaml'; %w[render.yaml infra/render.staging.yaml].each { |f| abort(f) unless YAML.safe_load(File.read(f), aliases: true)['services'].is_a?(Array) }"
+      - name: Build API image
+        run: docker build -f docker/api.Dockerfile -t alistore-api:${{ github.sha }} .
+      - name: Build web image
+        run: docker build -f docker/web.Dockerfile -t alistore-web:${{ github.sha }} .
+      - uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: alistore-api:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+      - uses: gitleaks/gitleaks-action@v2
+
   test:
     runs-on: ubuntu-latest
     services:

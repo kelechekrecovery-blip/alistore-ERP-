@@ -41,6 +41,16 @@ export class PaymentIntentsService {
     }
     this.gateway.assertOperational();
 
+    if (order.isDemo) {
+      return this.gateway.createIntent({
+        orderId: order.id,
+        orderStatus: order.status,
+        method: dto.method,
+        amount: dto.amount,
+        returnUrl: dto.returnUrl,
+      });
+    }
+
     let status: OrderStatus = order.status;
     if (status === 'created' || status === 'confirmed') {
       const fulfilled = await this.orders.fulfill(order.id, dto.actor ?? 'web_checkout');

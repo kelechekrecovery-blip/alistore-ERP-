@@ -1,4 +1,4 @@
-import { resolveCorsOptions } from '../config/runtime-security';
+import { resolveAllowedHosts, resolveCorsOptions } from '../config/runtime-security';
 
 export type ProductionPreflightStatus = 'ready' | 'missing' | 'unsafe';
 
@@ -75,6 +75,21 @@ const CHECKS: CheckDefinition[] = [
       try {
         resolveCorsOptions(env);
         return 'ready';
+      } catch {
+        return 'unsafe';
+      }
+    },
+  },
+  {
+    id: 'allowed_hosts',
+    area: 'security',
+    title: 'Production host allowlist',
+    requiredEnv: ['ALLOWED_HOSTS'],
+    note: 'Set exact public API hostnames; localhost, URLs and direct Render origin hostnames are rejected.',
+    evaluate: (env) => {
+      try {
+        const hosts = resolveAllowedHosts(env);
+        return hosts.some((host) => host.endsWith('.onrender.com')) ? 'unsafe' : 'ready';
       } catch {
         return 'unsafe';
       }

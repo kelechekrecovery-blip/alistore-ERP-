@@ -287,6 +287,7 @@ model DeviceUnit {
 model Order {
   id              String      @id @default(cuid())
   idempotencyKey  String?     @unique
+  isDemo          Boolean     @default(false)
   customer        Customer    @relation(fields: [customerId], references: [id])
   customerId      String
   status          OrderStatus @default(draft)
@@ -303,6 +304,7 @@ model Order {
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
   @@index([customerId])
+  @@index([isDemo, createdAt])
   @@index([status])
   @@index([fulfillmentType, status])
   @@index([pickupPoint, status])

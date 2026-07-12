@@ -47,6 +47,11 @@ describe('Health (terminus)', () => {
     expect(res.body.status).toBe('ok');
   });
 
+  it('GET /health/ready → DB and heap readiness', async () => {
+    const response = await request(app.getHttpServer()).get('/health/ready').expect(200);
+    expect(response.body.status).toBe('ok');
+  });
+
   it('GET /health/integrations → external readiness without secret values', async () => {
     const res = await request(app.getHttpServer())
       .get('/health/integrations')

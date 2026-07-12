@@ -1,0 +1,207 @@
+services:
+  - type: web
+    name: alistore-api-prod
+    runtime: docker
+    region: frankfurt
+    plan: standard
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: off
+    renderSubdomainPolicy: disabled
+    healthCheckPath: /api/health/live
+    preDeployCommand: npm run db:deploy -w @alistore/api
+    envVars:
+      - fromGroup: alistore-prod-common
+      - key: PROCESS_ROLE
+        value: api
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionPoolString
+      - key: REDIS_URL
+        fromService:
+          name: alistore-redis-prod
+          type: keyvalue
+          property: connectionString
+      - key: MEILI_API_KEY
+        fromService:
+          name: alistore-meilisearch-prod
+          type: pserv
+          envVarKey: MEILI_MASTER_KEY
+      - key: S3_ENDPOINT
+        sync: false
+      - key: MINIO_ROOT_USER
+        sync: false
+      - key: MINIO_ROOT_PASSWORD
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: web
+    name: alistore-web-prod
+    runtime: docker
+    region: frankfurt
+    plan: standard
+    dockerfilePath: ./docker/web.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: off
+    renderSubdomainPolicy: disabled
+    healthCheckPath: /healthz
+    envVars:
+      - key: ALLOWED_HOSTS
+        value: alistore.kg,www.alistore.kg,admin.alistore.kg
+      - key: PUBLIC_DEMO_MODE
+        value: "true"
+      - key: NEXT_PUBLIC_DEMO_MODE
+        value: "true"
+      - key: SENTRY_DSN
+        fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
+        value: production
+
+  - type: worker
+    name: alistore-worker-prod
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:worker -w @alistore/api
+    autoDeployTrigger: off
+    envVars:
+      - fromGroup: alistore-prod-common
+      - key: PROCESS_ROLE
+        value: worker
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionPoolString
+      - key: REDIS_URL
+        fromService:
+          name: alistore-redis-prod
+          type: keyvalue
+          property: connectionString
+      - key: MEILI_API_KEY
+        fromService:
+          name: alistore-meilisearch-prod
+          type: pserv
+          envVarKey: MEILI_MASTER_KEY
+      - key: S3_ENDPOINT
+        fromService: { name: alistore-api-prod, type: web, envVarKey: S3_ENDPOINT }
+      - key: MINIO_ROOT_USER
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_USER }
+      - key: MINIO_ROOT_PASSWORD
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_PASSWORD }
+      - key: SENTRY_DSN
+        fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
+
+  - type: cron
+    name: alistore-backup-prod
+    runtime: docker
+    region: frankfurt
+    schedule: "0 3 * * *"
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    dockerCommand: node apps/api/dist/ops/backup-to-s3.js
+    envVars:
+      - fromGroup: alistore-prod-common
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionString
+      - key: S3_ENDPOINT
+        fromService: { name: alistore-api-prod, type: web, envVarKey: S3_ENDPOINT }
+      - key: MINIO_ROOT_USER
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_USER }
+      - key: MINIO_ROOT_PASSWORD
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_PASSWORD }
+
+  - type: pserv
+    name: alistore-meilisearch-prod
+    runtime: image
+    region: frankfurt
+    plan: starter
+    image:
+      url: getmeili/meilisearch:v1.37
+    disk:
+      name: meili-data
+      mountPath: /meili_data
+      sizeGB: 10
+    envVars:
+      - key: MEILI_ENV
+        value: production
+      - key: MEILI_NO_ANALYTICS
+        value: "true"
+      - key: MEILI_MASTER_KEY
+        generateValue: true
+
+  - type: keyvalue
+    name: alistore-redis-prod
+    region: frankfurt
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+
+databases:
+  - name: alistore-postgres-prod
+    region: frankfurt
+    plan: basic-1gb
+    databaseName: alistore_prod
+    user: alistore_app
+    postgresMajorVersion: "16"
+    connectionPool: pgbouncer
+    ipAllowList: []
+    storageAutoscalingEnabled: true
+
+envVarGroups:
+  - name: alistore-prod-common
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://alistore.kg,https://www.alistore.kg,https://admin.alistore.kg
+      - key: ALLOWED_HOSTS
+        value: api.alistore.kg
+      - key: PUBLIC_DEMO_MODE
+        value: "true"
+      - key: AUTH_OTP_DEV_ECHO
+        value: "false"
+      - key: PAYMENT_PROVIDER
+        value: sandbox
+      - key: PAYMENT_PROVIDER_CERTIFIED
+        value: "false"
+      - key: SMS_PROVIDER
+        value: silent
+      - key: SMS_PROVIDER_CERTIFIED
+        value: "false"
+      - key: POS_HARDWARE_CERTIFIED
+        value: "false"
+      - key: JOB_BACKEND
+        value: bullmq
+      - key: RESERVATION_SWEEP_ENABLED
+        value: "true"
+      - key: OUTBOX_RELAY_ENABLED
+        value: "true"
+      - key: MEILI_HOST
+        value: http://alistore-meilisearch-prod:7700
+      - key: MEILI_PRODUCTS_INDEX
+        value: products
+      - key: MEDIA_STORAGE
+        value: s3
+      - key: S3_REGION
+        value: auto
+      - key: EVIDENCE_SIGNED_URL_TTL_SECONDS
+        value: "300"
+      - key: S3_PUBLIC_BASE
+        value: https://media.alistore.kg
+      - key: MINIO_BUCKET
+        value: alistore-media-prod
+      - key: S3_BACKUP_BUCKET
+        value: alistore-backups-prod

@@ -8,6 +8,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { UnitsService } from '../src/units/units.service';
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 import { ProductionPaymentGatewayProvider } from '../src/payments/production-payment-gateway.provider';
+import { ConfigService } from '@nestjs/config';
 
 describe('Online payment intents (integration)', () => {
   let prisma: PrismaService;
@@ -159,5 +160,29 @@ describe('Online payment intents (integration)', () => {
       .rejects.toMatchObject({ status: 503 });
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('created');
     expect(await prisma.deviceUnit.count({ where: { status: 'in_stock' } })).toBe(1);
+  });
+
+  it('creates a sandbox intent for demo without reserving, paying, or selling stock', async () => {
+    const demoOrders = new OrdersService(
+      prisma,
+      new AuditService(prisma),
+      units,
+      undefined,
+      new ConfigService({ PUBLIC_DEMO_MODE: 'true' }),
+    );
+    seq += 1;
+    const customer = await prisma.customer.create({ data: { phone: `+9967028${seq.toString().padStart(4, '0')}`, name: 'Demo customer' } });
+    const product = await prisma.product.create({ data: { sku: `DEMO-PAY-${seq}`, name: 'Demo phone', price: 100000, cost: 80000, category: 'phones', attrs: {} } });
+    await prisma.deviceUnit.create({ data: { imei: `DEMO-IMEI-${seq}`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
+    const order = await demoOrders.create({ customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] }, 'demo:web');
+    const demoIntents = new PaymentIntentsService(prisma, demoOrders, payments, new SandboxPaymentGatewayProvider());
+
+    const intent = await demoIntents.create({ orderId: order.id, method: 'card', amount: 100000 });
+    expect(intent.orderStatus).toBe('created');
+    expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
+    await expect(demoIntents.webhook({ orderId: order.id, method: 'card', amount: 100000, txnId: intent.txnId, status: 'succeeded' }))
+      .rejects.toMatchObject({ code: 'demo_payment_forbidden' });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+    expect((await prisma.deviceUnit.findFirstOrThrow({ where: { productId: product.id } })).status).toBe('in_stock');
   });
 });

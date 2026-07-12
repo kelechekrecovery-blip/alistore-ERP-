@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { MediaStorage, StoredObject } from '../media-storage';
 
 /**
@@ -13,6 +14,7 @@ export class S3Storage implements MediaStorage {
   private readonly client: S3Client;
   private readonly bucket: string;
   private readonly publicBase: string;
+  private readonly evidenceUrlTtl: number;
 
   constructor(config: ConfigService) {
     const endpoint =
@@ -20,6 +22,7 @@ export class S3Storage implements MediaStorage {
     this.bucket = config.get<string>('MINIO_BUCKET') ?? 'alistore';
     this.publicBase =
       config.get<string>('S3_PUBLIC_BASE') ?? `${endpoint}/${this.bucket}`;
+    this.evidenceUrlTtl = Math.min(900, Math.max(60, Number(config.get<string>('EVIDENCE_SIGNED_URL_TTL_SECONDS') ?? 300)));
     this.client = new S3Client({
       endpoint,
       region: config.get<string>('S3_REGION') ?? 'us-east-1',
@@ -44,6 +47,9 @@ export class S3Storage implements MediaStorage {
         ContentType: contentType,
       }),
     );
-    return { key, url: `${this.publicBase}/${key}`, bytes: body.byteLength };
+    const url = key.startsWith('evidence/')
+      ? await getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: this.evidenceUrlTtl })
+      : `${this.publicBase}/${key}`;
+    return { key, url, bytes: body.byteLength };
   }
 }
