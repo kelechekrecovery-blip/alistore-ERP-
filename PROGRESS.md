@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: add the missing Redis and Meilisearch runtime layer from the target architecture.
+- Files changed: Docker Compose services/volumes/healthchecks, API development and production env contracts, infrastructure runbook, architecture map, backlog and progress.
+- Result: Redis 7.4 is password-protected with AOF persistence and health probing; Meilisearch v1.37 is pinned with a master key, persistent data, disabled analytics and health probing. The API contract now exposes matching Redis/search variables while documenting PostgreSQL as authoritative and catalog fallback behavior.
+- Checks run: Ruby/Psych Compose YAML parse; required-service and required-healthcheck assertions; `git diff --check`.
+- Outcome: the Compose contract parses and contains all six expected services with healthchecks on stateful runtimes. Live containers remain unverified because Docker is not installed on this host and stay an explicit staging gate.
+- Next step: introduce the BullMQ queue port and separate worker process, then attach automatic idempotent catalog reindex jobs.
+
+## 2026-07-12
+
 - Task: establish the native Android half of the requested Swift/Kotlin application architecture.
 - Files changed: Android Gradle workspace, shared Kotlin core, four Compose app modules, typed REST client, Android Keystore token encryption, SQLite offline queue, WorkManager replay, deep links, unit test, root scripts, architecture/backlog/readiness/progress docs.
 - Result: Client, Staff, Courier and POS are separate installable Android applications with independent package IDs. Client reads the real catalog through the shared API core; every app uses the same role-aware UI foundation. Offline mutations persist stable idempotency keys, encrypted token material stays inside Android Keystore, Debug alone permits the emulator-local API, and Release cleartext is disabled.

@@ -11,6 +11,41 @@
 name: alistore-infra
 
 services:
+  # Ephemeral cache and BullMQ transport. PostgreSQL/Event Ledger remain truth.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change-me-please}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-me-please}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Storefront search acceleration. The API falls back to PostgreSQL on outage.
+  meilisearch:
+    image: getmeili/meilisearch:v1.37
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_API_KEY:-change-me-search-key}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili-data:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7700/health | grep available"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   # S3-compatible object storage — product photos, Evidence Vault (фото/акты).
   minio:
     image: minio/minio:latest
@@ -81,5 +116,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  redis-data:
+  meili-data:
   minio-data:
   metabase-db:

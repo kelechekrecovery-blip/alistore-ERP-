@@ -12,8 +12,8 @@ been built or tested; it does not mean external production certification is comp
 | NestJS modular monolith | 47 domain modules behind one API | Ready | API build and 104 Jest suites |
 | PostgreSQL + Prisma | 24 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
 | Append-only Event Ledger | `AuditService.transaction` commits mutations and events together | Ready | ledger/invariant/concurrency suites |
-| Redis cache | No Redis runtime or cache adapter | Missing | cache port, fail-open reads, invalidation tests, compose health |
-| Meilisearch | Optional catalog adapter and Postgres fallback exist; runtime service and automatic indexing are absent | Partial | compose service, bootstrap settings, incremental reindex worker, fallback test |
+| Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
+| Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |
 | S3/MinIO | S3 adapter, compressed WebP ingestion and MinIO compose exist | Partial | live MinIO integration test, private evidence policy, signed URLs, backup |
 | BullMQ workers | Background jobs currently use durable `pg-boss` on PostgreSQL | Missing versus target | Redis/BullMQ worker process, retries/DLQ, idempotent jobs, observability |
 | API gateway / edge | Caddy edge exists; Nest is the only application API | Partial | production routing, TLS, limits and gateway health in staging |

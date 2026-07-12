@@ -1,13 +1,14 @@
 # AliStore — self-hosted v1 infrastructure
 
-> ⚠️ **Not run or verified on the dev machine** — Docker is not installed there.
-> These files are authored to be correct, but bring them up on a host with Docker
-> and adjust before relying on them.
+> Docker is not installed on the current dev machine, so the Compose document is
+> parser-validated but still requires a live container smoke on staging.
 
 ## Services (`docker-compose.yml`)
 
 | Service       | Port                         | Purpose                                            |
 | ------------- | ---------------------------- | -------------------------------------------------- |
+| `redis`       | 6379                         | BullMQ/cache transport; never business truth       |
+| `meilisearch` | 7700                         | Catalog search with PostgreSQL fallback            |
 | `minio`       | 9000 (S3 API), 9001 (console)| Object storage — product photos, Evidence Vault    |
 | `minio-init`  | —                            | One-shot: creates the default bucket               |
 | `metabase`    | 3001                         | Owner BI / Command Center dashboards               |
@@ -28,6 +29,10 @@ For production deployment, backup, restore drill and rollback steps, use
 - **Metabase** — http://localhost:3001. On first boot, connect it to the AliStore
   Postgres (`alistore_dev`) with a **read-only** reporting user — never the app's
   read-write credentials.
+- **Redis** — password is required even locally; use the matching `REDIS_URL` in
+  the API/worker environment.
+- **Meilisearch** — configure `MEILI_HOST=http://localhost:7700`, the same
+  `MEILI_API_KEY`, and run the protected catalog reindex endpoint once after boot.
 
 ## Notifications (Novu)
 
@@ -59,4 +64,6 @@ Until `NOTIFICATION_TRANSPORT=novu`, outbox deliveries are logged
 | ------------- | ----------------------------------------- | -------------------------- |
 | Notifications | `NOTIFICATION_TRANSPORT`, `NOVU_API_*`    | `OutboxModule` transport   |
 | Object store  | `MINIO_*`                                 | (pending an upload surface)|
+| Jobs/cache    | `REDIS_URL`, `REDIS_PASSWORD`             | BullMQ/cache runtime       |
+| Search        | `MEILI_HOST`, `MEILI_API_KEY`             | Catalog adapter            |
 | BI            | connect Metabase → `alistore_dev` (RO)    | Metabase UI                |
