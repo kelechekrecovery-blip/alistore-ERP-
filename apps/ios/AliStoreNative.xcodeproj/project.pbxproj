@@ -1,0 +1,972 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01C9B58409FE5FF2AA3F5A3E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5A549F226050ACB113FF4E /* OfflineQueue.swift */; };
+		189C03F1DEAE49BBDFDDDA40 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		247D979D2B6ABCFDFDA09A5C /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */; };
+		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */; };
+		8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */; };
+		8C5A4F7C9419670E633A9668 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EBC4D5C06A5630E3B7D69D /* Models.swift */; };
+		8DD0417F646F1BEC0FF7830A /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04AAB6220384C05861A21153 /* NativeShell.swift */; };
+		A562636391B66F2B1BED55CA /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		A6B3E652D932FE6D10C39B25 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */; };
+		B92D85D26242A0D8F65E1A52 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F23ACBE05CF3A0E1499E0B /* APIClient.swift */; };
+		CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */; };
+		DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */; };
+		E4AFBA9E7AA4F56F3FB28A7E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A617D85C85DD435B687E350 /* StaffLoginView.swift */; };
+		F5420D98BEB7F7E63A8AFCAE /* AliStoreCourierApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */; };
+		FA0AB9B3D7316B9DA3538939 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42436819B18857A22AC06504 /* APIClientTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		074F76269C2BA59CB22450E3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
+			remoteInfo = AliStoreCore;
+		};
+		1E1D4563B2376A920E849819 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
+			remoteInfo = AliStoreCore;
+		};
+		85C7B61B68AD63E7CA9CE9B6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
+			remoteInfo = AliStoreCore;
+		};
+		A35D5F7D6213D19D9F199A39 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
+			remoteInfo = AliStoreCore;
+		};
+		B2859D65C78ECD058C961930 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
+			remoteInfo = AliStoreCore;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3D779579474E099128206EBF /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				FA0AB9B3D7316B9DA3538939 /* AliStoreCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5520EFDBB144DF693FA49EA8 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		562D47FA3544BB4AD03928E6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E4AFBA9E7AA4F56F3FB28A7E /* AliStoreCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6D2BA5158165A16AC72A4850 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				01C9B58409FE5FF2AA3F5A3E /* AliStoreCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CDD1189B856203D300AE4AE9 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				189C03F1DEAE49BBDFDDDA40 /* AliStoreCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		04AAB6220384C05861A21153 /* NativeShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeShell.swift; sourceTree = "<group>"; };
+		11F23ACBE05CF3A0E1499E0B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		1897622CBA172469A7099983 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2A617D85C85DD435B687E350 /* StaffLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffLoginView.swift; sourceTree = "<group>"; };
+		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3397795D183792BD78015F89 /* AliStoreCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = AliStoreCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureTokenStore.swift; sourceTree = "<group>"; };
+		41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientApp.swift; sourceTree = "<group>"; };
+		42436819B18857A22AC06504 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		48457E88937519CA203EA7DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		524C0236048CC4F9188201E1 /* AliStoreCourier.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreCourier.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStorePOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A5A549F226050ACB113FF4E /* OfflineQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueue.swift; sourceTree = "<group>"; };
+		915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAuthStore.swift; sourceTree = "<group>"; };
+		92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffApp.swift; sourceTree = "<group>"; };
+		942E788E79F852B2161181F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStorePOSApp.swift; sourceTree = "<group>"; };
+		A9EBC4D5C06A5630E3B7D69D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		213C24D8A5A56CCCADC3BB14 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B28F15B77DC83EA0AEE4519 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B92D85D26242A0D8F65E1A52 /* AliStoreCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC15B8EDBA4BC6C1A914037F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				247D979D2B6ABCFDFDA09A5C /* AliStoreCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E88CC460372D3C37D2E64CAB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DD0417F646F1BEC0FF7830A /* AliStoreCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FC4360CF959C9BF3C1897FE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A562636391B66F2B1BED55CA /* AliStoreCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0C5B852F9D1EE5188942BAA0 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				11F23ACBE05CF3A0E1499E0B /* APIClient.swift */,
+				7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */,
+				A9EBC4D5C06A5630E3B7D69D /* Models.swift */,
+				04AAB6220384C05861A21153 /* NativeShell.swift */,
+				8A5A549F226050ACB113FF4E /* OfflineQueue.swift */,
+				3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */,
+				915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */,
+				2A617D85C85DD435B687E350 /* StaffLoginView.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		1BB465B1D36CFDB9F5FF6922 /* Staff */ = {
+			isa = PBXGroup;
+			children = (
+				92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */,
+				942E788E79F852B2161181F9 /* Info.plist */,
+			);
+			path = Staff;
+			sourceTree = "<group>";
+		};
+		29CB0946D745BDD994C57D0E /* POS */ = {
+			isa = PBXGroup;
+			children = (
+				9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */,
+				2BEAEC396827506007C9829E /* Info.plist */,
+			);
+			path = POS;
+			sourceTree = "<group>";
+		};
+		30160F294B75A406B6360903 /* Courier */ = {
+			isa = PBXGroup;
+			children = (
+				F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */,
+				1897622CBA172469A7099983 /* Info.plist */,
+			);
+			path = Courier;
+			sourceTree = "<group>";
+		};
+		62642BFF471DBC6589C5F93D = {
+			isa = PBXGroup;
+			children = (
+				AFE690C0BC04797125C4CBEF /* Client */,
+				30160F294B75A406B6360903 /* Courier */,
+				29CB0946D745BDD994C57D0E /* POS */,
+				0C5B852F9D1EE5188942BAA0 /* Shared */,
+				1BB465B1D36CFDB9F5FF6922 /* Staff */,
+				DEA3F994B811795AA50AEFDB /* Tests */,
+				88AE5FDBFD9B360957B0229C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		88AE5FDBFD9B360957B0229C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */,
+				3397795D183792BD78015F89 /* AliStoreCore.framework */,
+				83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */,
+				524C0236048CC4F9188201E1 /* AliStoreCourier.app */,
+				7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */,
+				B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AFE690C0BC04797125C4CBEF /* Client */ = {
+			isa = PBXGroup;
+			children = (
+				41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */,
+				48457E88937519CA203EA7DE /* Info.plist */,
+			);
+			path = Client;
+			sourceTree = "<group>";
+		};
+		DEA3F994B811795AA50AEFDB /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				42436819B18857A22AC06504 /* APIClientTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2443E875BF45E22BBB848960 /* AliStoreClient */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ABBBAFA58E438391703AA7AC /* Build configuration list for PBXNativeTarget "AliStoreClient" */;
+			buildPhases = (
+				4D8486CDB47814615512A494 /* Sources */,
+				E88CC460372D3C37D2E64CAB /* Frameworks */,
+				3D779579474E099128206EBF /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				94F8E9AB128E28F514F083D4 /* PBXTargetDependency */,
+			);
+			name = AliStoreClient;
+			packageProductDependencies = (
+			);
+			productName = AliStoreClient;
+			productReference = C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */;
+			productType = "com.apple.product-type.application";
+		};
+		72054852527678365D2752CC /* AliStoreCourier */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 91FC872B723CC0143095C8B1 /* Build configuration list for PBXNativeTarget "AliStoreCourier" */;
+			buildPhases = (
+				539D3B29BFA12829B33EEA30 /* Sources */,
+				213C24D8A5A56CCCADC3BB14 /* Frameworks */,
+				562D47FA3544BB4AD03928E6 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DEB765DF04BE670A232DC18F /* PBXTargetDependency */,
+			);
+			name = AliStoreCourier;
+			packageProductDependencies = (
+			);
+			productName = AliStoreCourier;
+			productReference = 524C0236048CC4F9188201E1 /* AliStoreCourier.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A363FAEC848E9A2E1504F4F1 /* AliStoreStaff */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B2E1B25443BEB0E157A8E8DD /* Build configuration list for PBXNativeTarget "AliStoreStaff" */;
+			buildPhases = (
+				1DE12775BCA27DE3EEE707C4 /* Sources */,
+				FC4360CF959C9BF3C1897FE0 /* Frameworks */,
+				5520EFDBB144DF693FA49EA8 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				49BA464E644F8F9B93155CED /* PBXTargetDependency */,
+			);
+			name = AliStoreStaff;
+			packageProductDependencies = (
+			);
+			productName = AliStoreStaff;
+			productReference = B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */;
+			productType = "com.apple.product-type.application";
+		};
+		BD21F76168637D79959BA6FB /* AliStoreCoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6C690CD044197929F5F9E4DA /* Build configuration list for PBXNativeTarget "AliStoreCoreTests" */;
+			buildPhases = (
+				B46D93D44AA22409AEEF28FB /* Sources */,
+				4B28F15B77DC83EA0AEE4519 /* Frameworks */,
+				CDD1189B856203D300AE4AE9 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				14F13422D7870CE1782D0D22 /* PBXTargetDependency */,
+			);
+			name = AliStoreCoreTests;
+			packageProductDependencies = (
+			);
+			productName = AliStoreCoreTests;
+			productReference = 83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		CA8BF2CD39686C821BDE5345 /* AliStoreCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8561EC62D37111A7CE0F4353 /* Build configuration list for PBXNativeTarget "AliStoreCore" */;
+			buildPhases = (
+				B63ED0FCA8EEF9046820F85A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AliStoreCore;
+			packageProductDependencies = (
+			);
+			productName = AliStoreCore;
+			productReference = 3397795D183792BD78015F89 /* AliStoreCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		DC8CC0056CE6295039B84B22 /* AliStorePOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 080C24DEE8C0E45FE5C079AD /* Build configuration list for PBXNativeTarget "AliStorePOS" */;
+			buildPhases = (
+				7932F1F6D0AC11F4E7ACC3FB /* Sources */,
+				BC15B8EDBA4BC6C1A914037F /* Frameworks */,
+				6D2BA5158165A16AC72A4850 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D24788843A16D97FBC38CBDD /* PBXTargetDependency */,
+			);
+			name = AliStorePOS;
+			packageProductDependencies = (
+			);
+			productName = AliStorePOS;
+			productReference = 7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		CB2BE8DFF4C369828C62B817 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2443E875BF45E22BBB848960 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					72054852527678365D2752CC = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					A363FAEC848E9A2E1504F4F1 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					BD21F76168637D79959BA6FB = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					CA8BF2CD39686C821BDE5345 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					DC8CC0056CE6295039B84B22 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = C3AD59F41DFE0078315AFD33 /* Build configuration list for PBXProject "AliStoreNative" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 62642BFF471DBC6589C5F93D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 88AE5FDBFD9B360957B0229C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2443E875BF45E22BBB848960 /* AliStoreClient */,
+				CA8BF2CD39686C821BDE5345 /* AliStoreCore */,
+				BD21F76168637D79959BA6FB /* AliStoreCoreTests */,
+				72054852527678365D2752CC /* AliStoreCourier */,
+				DC8CC0056CE6295039B84B22 /* AliStorePOS */,
+				A363FAEC848E9A2E1504F4F1 /* AliStoreStaff */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1DE12775BCA27DE3EEE707C4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D8486CDB47814615512A494 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		539D3B29BFA12829B33EEA30 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5420D98BEB7F7E63A8AFCAE /* AliStoreCourierApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7932F1F6D0AC11F4E7ACC3FB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B46D93D44AA22409AEEF28FB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B63ED0FCA8EEF9046820F85A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */,
+				A6B3E652D932FE6D10C39B25 /* AppEnvironment.swift in Sources */,
+				8C5A4F7C9419670E633A9668 /* Models.swift in Sources */,
+				95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */,
+				03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */,
+				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,
+				77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */,
+				E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		14F13422D7870CE1782D0D22 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
+			targetProxy = 85C7B61B68AD63E7CA9CE9B6 /* PBXContainerItemProxy */;
+		};
+		49BA464E644F8F9B93155CED /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
+			targetProxy = 1E1D4563B2376A920E849819 /* PBXContainerItemProxy */;
+		};
+		94F8E9AB128E28F514F083D4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
+			targetProxy = A35D5F7D6213D19D9F199A39 /* PBXContainerItemProxy */;
+		};
+		D24788843A16D97FBC38CBDD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
+			targetProxy = B2859D65C78ECD058C961930 /* PBXContainerItemProxy */;
+		};
+		DEB765DF04BE670A232DC18F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
+			targetProxy = 074F76269C2BA59CB22450E3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		13CAD953B982589FF2366315 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "$(ALISTORE_API_BASE_URL)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Courier/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.courier;
+				PRODUCT_NAME = AliStoreCourier;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		2C99C583D981DCAEDED31FB8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "$(ALISTORE_API_BASE_URL)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Client/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.client;
+				PRODUCT_NAME = AliStore;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		2E5DD6D218BFCD3A3D15AC2D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.core.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5BA03919C44C1429936ED28F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "http://127.0.0.1:4000/api";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Courier/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.courier;
+				PRODUCT_NAME = AliStoreCourier;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6003EC7F79A860C3220F6949 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.core;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		665D3F6463CFBF3AAF38864D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		70DC337812F9AAA29422D547 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.core;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		790AFFF250A82A4EBD1CFED2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "http://127.0.0.1:4000/api";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Staff/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.staff;
+				PRODUCT_NAME = AliStoreStaff;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9E3E2A576E3D682ECA241689 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "$(ALISTORE_API_BASE_URL)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Staff/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.staff;
+				PRODUCT_NAME = AliStoreStaff;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A4E62A5DA36EE4DCC2752338 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "http://127.0.0.1:4000/api";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = POS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.pos;
+				PRODUCT_NAME = AliStorePOS;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA0226E24573AF3215AA27A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "$(ALISTORE_API_BASE_URL)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = POS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.pos;
+				PRODUCT_NAME = AliStorePOS;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AE622C30578194F00E861F44 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		EA264166879AF3811BD43088 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				API_BASE_URL = "http://127.0.0.1:4000/api";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Client/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.client;
+				PRODUCT_NAME = AliStore;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EFFDFAA391BFF640A78D7D8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.core.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		080C24DEE8C0E45FE5C079AD /* Build configuration list for PBXNativeTarget "AliStorePOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A4E62A5DA36EE4DCC2752338 /* Debug */,
+				AA0226E24573AF3215AA27A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6C690CD044197929F5F9E4DA /* Build configuration list for PBXNativeTarget "AliStoreCoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EFFDFAA391BFF640A78D7D8E /* Debug */,
+				2E5DD6D218BFCD3A3D15AC2D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8561EC62D37111A7CE0F4353 /* Build configuration list for PBXNativeTarget "AliStoreCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70DC337812F9AAA29422D547 /* Debug */,
+				6003EC7F79A860C3220F6949 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		91FC872B723CC0143095C8B1 /* Build configuration list for PBXNativeTarget "AliStoreCourier" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5BA03919C44C1429936ED28F /* Debug */,
+				13CAD953B982589FF2366315 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		ABBBAFA58E438391703AA7AC /* Build configuration list for PBXNativeTarget "AliStoreClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EA264166879AF3811BD43088 /* Debug */,
+				2C99C583D981DCAEDED31FB8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B2E1B25443BEB0E157A8E8DD /* Build configuration list for PBXNativeTarget "AliStoreStaff" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				790AFFF250A82A4EBD1CFED2 /* Debug */,
+				9E3E2A576E3D682ECA241689 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C3AD59F41DFE0078315AFD33 /* Build configuration list for PBXProject "AliStoreNative" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE622C30578194F00E861F44 /* Debug */,
+				665D3F6463CFBF3AAF38864D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = CB2BE8DFF4C369828C62B817 /* Project object */;
+}

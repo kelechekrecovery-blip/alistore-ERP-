@@ -1,6 +1,11 @@
 # BACKLOG
 
 ## Next
+- Build the native Android workspace with Kotlin/Jetpack Compose, shared typed API core, encrypted token storage, Room offline queue, WorkManager sync, and separate Client/Staff/Courier/POS application modules.
+- Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
+- Add Redis and BullMQ with an explicit cache/job boundary and separate worker process; PostgreSQL/Event Ledger remain authoritative and current pg-boss jobs migrate only after parity tests.
+- Add Meilisearch and Redis services to local/staging infrastructure, automatic index bootstrap and idempotent product reindex jobs.
+- Add Kubernetes deployment manifests for API, web and workers with migration jobs, secrets, probes, autoscaling and rollback gates.
 - Add product variants and bundles with component stock validation, catalog/POS presentation, RBAC, Event Ledger and E2E coverage.
 - Extend Finance 2.0 with period budgets and plan-vs-actual reporting on top of the paid expense ledger.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
@@ -14,6 +19,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Establish the native iOS foundation required by the new architecture: one shared Swift framework plus separate Client, Staff, Courier and POS SwiftUI app targets, typed API errors, Keychain, SwiftData offline commands, deep links, fail-closed Release API config, simulator tests and Client smoke launch.
 - Restore the desktop storefront across 768px+ browser windows for home, catalog, product, favorites, cart and account, with a matching search redirect and overflow-safe header regression coverage at the in-app browser's 863px width.
 - Add the first Finance 2.0 vertical: idempotent operating expenses, approval/rejection/payment state machine, race-safe transitions, RBAC, Event Ledger, paid-expense P&L, ERP workflow, and browser regression coverage.
 - Make the MVP release gate deterministic and destructive-test-safe: require a separate test database, reset it before API Jest, repair inventory movement cleanup ordering, and harden Telegram Mini App navigation coverage.

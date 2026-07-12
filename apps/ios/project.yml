@@ -1,0 +1,164 @@
+name: AliStoreNative
+options:
+  bundleIdPrefix: kg.alistore
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  AliStoreCore:
+    type: framework
+    platform: iOS
+    sources: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.core
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreClient:
+    type: application
+    platform: iOS
+    sources: Client
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: Client/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore
+        UILaunchScreen: {}
+        API_BASE_URL: $(API_BASE_URL)
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.client
+            CFBundleURLSchemes: [alistore]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.client
+        PRODUCT_NAME: AliStore
+        TARGETED_DEVICE_FAMILY: "1,2"
+        API_BASE_URL: http://127.0.0.1:4000/api
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+  AliStoreStaff:
+    type: application
+    platform: iOS
+    sources: Staff
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: Staff/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore Staff
+        UILaunchScreen: {}
+        API_BASE_URL: $(API_BASE_URL)
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.staff
+            CFBundleURLSchemes: [alistore-staff]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.staff
+        PRODUCT_NAME: AliStoreStaff
+        TARGETED_DEVICE_FAMILY: "1,2"
+        API_BASE_URL: http://127.0.0.1:4000/api
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+  AliStoreCourier:
+    type: application
+    platform: iOS
+    sources: Courier
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: Courier/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore Courier
+        UILaunchScreen: {}
+        API_BASE_URL: $(API_BASE_URL)
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.courier
+            CFBundleURLSchemes: [alistore-courier]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.courier
+        PRODUCT_NAME: AliStoreCourier
+        TARGETED_DEVICE_FAMILY: "1,2"
+        API_BASE_URL: http://127.0.0.1:4000/api
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+  AliStorePOS:
+    type: application
+    platform: iOS
+    sources: POS
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: POS/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore POS
+        UILaunchScreen: {}
+        API_BASE_URL: $(API_BASE_URL)
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.pos
+            CFBundleURLSchemes: [alistore-pos]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.pos
+        PRODUCT_NAME: AliStorePOS
+        TARGETED_DEVICE_FAMILY: "1,2"
+        API_BASE_URL: http://127.0.0.1:4000/api
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+  AliStoreCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: Tests
+    dependencies:
+      - target: AliStoreCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.core.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  AliStoreClient:
+    build:
+      targets:
+        AliStoreClient: all
+    run:
+      config: Debug
+    test:
+      targets:
+        - AliStoreCoreTests
+  AliStoreStaff:
+    build:
+      targets:
+        AliStoreStaff: all
+    run:
+      config: Debug
+  AliStoreCourier:
+    build:
+      targets:
+        AliStoreCourier: all
+    run:
+      config: Debug
+  AliStorePOS:
+    build:
+      targets:
+        AliStorePOS: all
+    run:
+      config: Debug

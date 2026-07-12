@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: adopt the new Codex architecture requirement and replace the Expo-only release assumption with a real native iOS foundation.
+- Files changed: architecture gap map, generated Xcode project/spec, AliStoreCore REST/Keychain/SwiftData/UI foundation, four SwiftUI application targets, native API tests, root iOS scripts, backlog/readiness/progress docs.
+- Result: Client, Staff, Courier and POS are separate iOS applications with independent bundle IDs and deep links. Shared code provides typed server-error handling, secure device-only token storage and persistent idempotent offline commands. Client loads the real catalog API; role apps have real staff authentication and task-specific navigation shells. Debug uses the local API while Release requires injected `ALISTORE_API_BASE_URL`.
+- Checks run: XcodeGen project generation; all-target iOS Simulator build; two API contract unit tests; install/launch on iPhone 17 Pro Simulator; live process/log inspection and screenshot; `git diff --check`.
+- Outcome: all five native targets build successfully, tests pass 2/2, and `kg.alistore.client` remains running in Simulator with the native catalog empty state. Android Kotlin, complete native feature parity, Redis/BullMQ and Kubernetes are explicitly tracked as required work rather than being described as ready.
+- Next step: create the Android Kotlin multi-application workspace and prove all four debug apps compile before implementing the first shared checkout vertical on both platforms.
+
+## 2026-07-12
+
 - Task: restore the full desktop customer storefront in the actual 863px-wide in-app desktop browser.
 - Files changed: responsive shell boundaries for home/catalog/product/favorites/cart/account/search, compact desktop header actions, storefront responsive Playwright coverage, backlog/readiness/progress docs.
 - Result: customer routes now select the complete desktop storefront from 768px upward instead of incorrectly showing the native-style mobile shell until 1024px. At narrow desktop widths the header hides secondary search/favorites icon buttons while preserving navigation, cart and account access; `/search` redirects into desktop catalog on the same breakpoint.

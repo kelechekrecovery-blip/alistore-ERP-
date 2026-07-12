@@ -1,0 +1,44 @@
+import Foundation
+import Observation
+
+@MainActor
+@Observable
+public final class StaffAuthStore {
+    public private(set) var session: StaffSession?
+    public private(set) var isLoading = false
+    public private(set) var errorMessage: String?
+
+    private let api: APIClient
+    private let tokens: SecureTokenStore
+
+    public init(environment: AppEnvironment, keychainService: String) {
+        self.api = APIClient(baseURL: environment.apiBaseURL)
+        self.tokens = SecureTokenStore(service: keychainService)
+    }
+
+    public func login(username: String, password: String) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let session: StaffSession = try await api.post(
+                "staff-auth/login",
+                body: StaffLogin(username: username, password: password)
+            )
+            try tokens.save(session.accessToken)
+            self.session = session
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    public func logout() {
+        do {
+            try tokens.clear()
+            session = nil
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}

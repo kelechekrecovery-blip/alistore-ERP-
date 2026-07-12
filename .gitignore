@@ -19,6 +19,9 @@ apps/mobile/google-service-account*.json
 apps/mobile/credentials.json
 apps/mobile/*.keystore
 apps/mobile/*.jks
+apps/ios/**/xcuserdata/
+apps/ios/**/*.xcuserstate
+apps/ios/*.xcarchive/
 # prisma
 apps/api/prisma/*.db
 # logs / os
