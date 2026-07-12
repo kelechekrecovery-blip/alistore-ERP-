@@ -84,6 +84,25 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "native-order-1")
     }
 
+    func testCreatesCustomerOwnedPaymentIntent() async throws {
+        let session = makeSession(status: 201, body: """
+        {"intentId":"PI-O2-1","provider":"mbank","orderId":"o2","orderStatus":"awaiting_payment","method":"qr_mbank","amount":109900,"txnId":"txn-1","status":"requires_action","expiresAt":"2026-07-12T12:15:00Z","paymentUrl":"/sandbox/payments/mbank/PI-O2-1","qrPayload":"MBANK|o2|109900"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let intent: PaymentIntent = try await client.post(
+            "payments/intents/mine",
+            body: CreatePaymentIntentRequest(orderId: "o2", method: .qrMBank, amount: 109900),
+            token: "access-1",
+            idempotencyKey: "native-payment-1"
+        )
+
+        XCTAssertEqual(intent.status, "requires_action")
+        XCTAssertEqual(intent.qrPayload, "MBANK|o2|109900")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/payments/intents/mine")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)

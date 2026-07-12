@@ -27,7 +27,7 @@ is not the final App Store/Google Play artifact.
 
 | App | iOS SwiftUI | Android Kotlin | Remaining feature parity |
 |---|---|---|---|
-| Client | Native target builds and runs; live catalog, cart/quantity, pickup/courier checkout, JWT-owned order creation, OTP account with Keychain refresh rotation, protected order history, typed API and SwiftData queue foundation | Native Compose APK builds; live catalog, typed API, Keystore and SQLite/WorkManager queue foundation | iOS online payment intents, warranty/devices, push and offline replay; Android full client parity |
+| Client | Native target builds and runs; live catalog, cart/quantity, pickup/courier checkout, JWT-owned order and payment-intent creation, card/MBank/O!Деньги/installment handoff, OTP account with Keychain refresh rotation, protected order history, typed API and SwiftData queue foundation | Native Compose APK builds; live catalog, typed API, Keystore and SQLite/WorkManager queue foundation | iOS post-payment reconciliation UI, warranty/devices, push and offline replay; Android full client parity |
 | Staff | Native target builds; staff login and role shell | Separate Compose APK builds with role shell and shared secure/offline core | task queues, Customer 360, scanner, warranty/support, shift evidence |
 | Courier | Native target builds; staff login and route/COD shell | Separate Compose APK builds with role shell and shared secure/offline core | assigned runs, map/navigation, delivery transitions, evidence, COD handover |
 | POS | Native target builds; staff login and sale/offline shell | Separate Compose APK builds with role shell and shared secure/offline core | catalog sync, scanner, ticket, split tender, approval, receipt/hardware, replay |

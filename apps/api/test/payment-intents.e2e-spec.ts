@@ -122,6 +122,25 @@ describe('Online payment intents (integration)', () => {
     expect(paidAgain.code).toBe('order_already_paid');
   });
 
+  it('creates a customer intent only for an order owned by that JWT principal', async () => {
+    const order = await webOrder();
+    const stored = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+
+    await expect(intents.createForCustomer('another-customer', {
+      orderId: order.id,
+      method: 'card',
+      amount: 100000,
+    })).rejects.toMatchObject({ code: 'order_not_found' });
+
+    const intent = await intents.createForCustomer(stored.customerId, {
+      orderId: order.id,
+      method: 'card',
+      amount: 100000,
+    });
+    expect(intent.orderId).toBe(order.id);
+    expect(intent.orderStatus).toBe('awaiting_payment');
+  });
+
   it('fails before reserving stock when the selected production adapter is not activated', async () => {
     const order = await webOrder();
     const production = new PaymentIntentsService(

@@ -882,3 +882,12 @@
 - Checks run: `git diff --check`; `npm run ios:generate`; `npm run ios:build`; `npm run api:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: all four SwiftUI targets built; API TypeScript build passed; AliStoreCore XCTest passed 5/5 including the bearer-authenticated `/orders/mine` request and idempotency header contract.
 - Next step: add native online payment-intent selection/reconciliation, then devices/warranty and push registration.
+
+## 2026-07-12
+
+- Task: add provider-neutral online payment intent handoff to the native SwiftUI Client checkout.
+- Files changed: `apps/api/src/payments/{payment-intents.service,payments.controller}.ts`, `apps/api/test/payment-intents.e2e-spec.ts`, `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Tests/APIClientTests.swift`, generated iOS project, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: checkout now offers cash, card, MBank QR, O!Деньги QR, and installment. Online methods call guarded `POST /payments/intents/mine`, which verifies order ownership from JWT before reservation/awaiting-payment transition. The Client displays provider URL/QR and explicitly waits for the signed webhook instead of locally marking the order paid.
+- Checks run: `git diff --check`; `npm run api:build`; targeted API Jest `payment-intents.e2e-spec.ts`; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: API build passed; payment integration passed 5/5 including foreign-order rejection and duplicate webhook idempotency; all four SwiftUI targets built; AliStoreCore XCTest passed 6/6 including authenticated intent URL/header/QR decoding.
+- Next step: add post-payment order status reconciliation/deep-link refresh, then native devices/warranty and push registration.

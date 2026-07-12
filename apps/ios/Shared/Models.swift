@@ -137,3 +137,40 @@ public struct CreateOrderRequest: Encodable, Sendable {
         self.items = items
     }
 }
+
+public enum OnlinePaymentMethod: String, CaseIterable, Identifiable, Sendable {
+    case card
+    case qrMBank = "qr_mbank"
+    case qrODengi = "qr_odengi"
+    case installment
+
+    public var id: String { rawValue }
+}
+
+public struct CreatePaymentIntentRequest: Encodable, Sendable {
+    public let orderId: String
+    public let method: String
+    public let amount: Int
+    public let returnUrl: String?
+
+    public init(orderId: String, method: OnlinePaymentMethod, amount: Int, returnUrl: String? = nil) {
+        self.orderId = orderId
+        self.method = method.rawValue
+        self.amount = amount
+        self.returnUrl = returnUrl
+    }
+}
+
+public struct PaymentIntent: Decodable, Sendable {
+    public let intentId: String
+    public let provider: String
+    public let orderId: String
+    public let orderStatus: String
+    public let method: String
+    public let amount: Int
+    public let txnId: String
+    public let status: String
+    public let expiresAt: Date
+    public let paymentUrl: String
+    public let qrPayload: String?
+}

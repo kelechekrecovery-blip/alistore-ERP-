@@ -64,10 +64,12 @@ private struct CartView: View {
     let products: [Product]
     @Binding var cart: [String: Int]
     @State private var fulfillment = "pickup"
+    @State private var paymentMethod = "cash"
     @State private var address = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var completedOrder: CustomerOrder?
+    @State private var paymentIntent: PaymentIntent?
 
     private var lines: [(Product, Int)] {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
@@ -78,11 +80,25 @@ private struct CartView: View {
         NavigationStack {
             Group {
                 if let order = completedOrder {
-                    ContentUnavailableView(
-                        "Заказ оформлен",
-                        systemImage: "checkmark.circle.fill",
-                        description: Text("#\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
-                    )
+                    VStack(spacing: 18) {
+                        ContentUnavailableView(
+                            paymentIntent == nil ? "Заказ оформлен" : "Ожидает оплаты",
+                            systemImage: paymentIntent == nil ? "checkmark.circle.fill" : "creditcard",
+                            description: Text("#\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
+                        )
+                        if let paymentIntent {
+                            if let url = paymentURL(paymentIntent) {
+                                Link("Перейти к оплате", destination: url)
+                                    .buttonStyle(.borderedProminent)
+                            }
+                            if let qr = paymentIntent.qrPayload {
+                                Text(qr).font(.caption.monospaced()).textSelection(.enabled).padding(.horizontal)
+                            }
+                            Text("Статус подтвердит только платёжный webhook.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 } else if lines.isEmpty {
                     EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
                 } else {
@@ -110,6 +126,15 @@ private struct CartView: View {
                                 TextField("Адрес доставки", text: $address)
                             } else {
                                 LabeledContent("Точка", value: "AliStore Центр")
+                            }
+                        }
+                        Section("Оплата") {
+                            Picker("Способ", selection: $paymentMethod) {
+                                Text("При получении").tag("cash")
+                                Text("Карта").tag(OnlinePaymentMethod.card.rawValue)
+                                Text("MBank QR").tag(OnlinePaymentMethod.qrMBank.rawValue)
+                                Text("O!Деньги QR").tag(OnlinePaymentMethod.qrODengi.rawValue)
+                                Text("Рассрочка").tag(OnlinePaymentMethod.installment.rawValue)
                             }
                         }
                         Section {
@@ -165,11 +190,23 @@ private struct CartView: View {
                 token: session.accessToken,
                 idempotencyKey: UUID().uuidString
             )
+            if let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) {
+                paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
+                    "payments/intents/mine",
+                    body: CreatePaymentIntentRequest(orderId: order.id, method: onlineMethod, amount: order.total),
+                    token: session.accessToken,
+                    idempotencyKey: UUID().uuidString
+                )
+            }
             completedOrder = order
             cart.removeAll()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func paymentURL(_ intent: PaymentIntent) -> URL? {
+        URL(string: intent.paymentUrl, relativeTo: environment.apiBaseURL)?.absoluteURL
     }
 }
 

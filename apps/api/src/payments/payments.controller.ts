@@ -88,6 +88,16 @@ export class PaymentsController {
     return this.intents.create(dto);
   }
 
+  @ApiOperation({ summary: 'Create an online payment intent for the authenticated customer order' })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ description: 'Customer-owned payment provider intent created.' })
+  @Post('intents/mine')
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  customerIntent(@CurrentUser() user: AuthPrincipal, @Body() dto: CreatePaymentIntentDto) {
+    return this.intents.createForCustomer(user.customerId, dto);
+  }
+
   @ApiOperation({
     summary: 'Sandbox/provider webhook: confirm an online payment idempotently',
   })

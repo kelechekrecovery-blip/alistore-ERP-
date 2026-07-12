@@ -62,6 +62,14 @@ export class PaymentIntentsService {
     });
   }
 
+  async createForCustomer(customerId: string, dto: CreatePaymentIntentDto): Promise<PaymentIntentView> {
+    const order = await this.prisma.order.findFirst({ where: { id: dto.orderId, customerId } });
+    if (!order) {
+      throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
+    }
+    return this.create({ ...dto, actor: customerId });
+  }
+
   async webhook(dto: PaymentWebhookDto, request?: Omit<GatewayWebhookRequest, 'payload'>) {
     const verified = await this.gateway.verifyWebhook({
       payload: dto,
