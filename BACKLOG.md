@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Align the functional POS terminal to the canonical `AliStore POS 2.0` handoff: 1180px terminal, 420px receipt, warm dark operational palette, three-column catalog, reference scanner copy, and browser-locked geometry without removing sync/offline/payment operations.
 - Make checkout responsive to the canonical platform rule: light Sand/Coral desktop shell and unchanged dark Coral/Lime Client App phone shell, with both modes verified before a real sandbox-card paid order.
 - Extend the canonical light web storefront system through product detail, cart and account overview, with checkout E2E assertions locking the Sand background before the real sandbox payment flow.
 - Synchronize the complete desktop `design_handoff_alistore` into the repository, declare it the only UI source of truth, and align desktop storefront home/catalog/header/footer/product cards to the specified light Sand/Tint + Coral system while preserving the dark Client App 2.0 phone shell.

@@ -315,7 +315,10 @@ export default function PosPage() {
         ⌂ Выйти
       </Link>
 
-      <div className="flex h-[820px] max-h-[95vh] w-full max-w-[1180px] overflow-hidden rounded-[24px] border-8 border-[#201B17] bg-[#16130F] shadow-2xl">
+      <main
+        data-testid="pos-terminal"
+        className="relative flex h-[820px] max-h-[95vh] w-full max-w-[1180px] overflow-hidden rounded-[24px] border-8 border-[#201B17] bg-[#16130F] shadow-2xl"
+      >
         <PosCatalog
           cashier={cashier}
           shop={SHOP}
@@ -385,7 +388,7 @@ export default function PosPage() {
             {toast}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

@@ -837,3 +837,12 @@
 - Outcome: live API returned all three new signals; ERP displayed 2 high + 1 medium with the expected labels/details; clicking repeat returns opened `CRM · Inbox`; temporary owner/customer/orders/returns/write-offs were deleted afterward. Local API was restarted on port 4000 because `start:dev` is a non-watch `ts-node` process.
 - Commit: `e2491fc` (`feat(risk): align owner signals with design`).
 - Next step: implement the first unblocked extended-module gap from Claude Design, starting with Purchase Order procurement and PO receiving on top of the existing supplier/inventory services.
+
+## 2026-07-12
+
+- Task: align the working POS terminal with `design_handoff_alistore/screens/AliStore POS 2.0.dc.html` without reducing operational behavior.
+- Files changed: `apps/web/app/pos/page.tsx`, `apps/web/components/pos/PosCatalog.tsx`, `apps/web/components/pos/PosTicket.tsx`, `e2e/pos-ui.spec.ts`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: the terminal now exposes a stable 1180px canonical shell, 420px receipt rail, minimum-safe catalog layout, exact reference scanner prompt, quieter staff action treatment, and durable selectors for visual acceptance. Existing staff login, scanner, catalog sync, offline queue, printing, discounts, split payments, and checkout remain intact.
+- Checks run: `git diff --check`; `npm run build -w @alistore/web`; isolated Chromium `npx playwright test e2e/pos-ui.spec.ts` with real staff bootstrap, catalog load, geometry/color/overflow assertions, database rename, reload, and delta-sync verification.
+- Outcome: Next production build passed for all 35 routes; POS browser UAT passed 1/1 in 5.0s.
+- Next step: continue the handoff-only visual migration with the Staff operational app, then the remaining ERP module screens and native SwiftUI/Compose surfaces.

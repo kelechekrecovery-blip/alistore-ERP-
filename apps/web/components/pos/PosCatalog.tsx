@@ -73,7 +73,7 @@ export function PosCatalog({
   onLogoutStaff,
 }: PosCatalogProps) {
   return (
-    <div className="flex flex-1 flex-col border-r border-[#2E2822]">
+    <section data-testid="pos-catalog" className="flex min-w-0 flex-1 flex-col border-r border-[#2E2822]">
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#2E2822] px-5 py-4">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-coral font-display text-lg font-extrabold text-white">
           A
@@ -87,7 +87,7 @@ export function PosCatalog({
         <button
           type="button"
           onClick={onLogoutStaff}
-          className="rounded-chip border border-[#2E2822] px-3 py-1.5 text-xs font-semibold text-[#D8CFC6] hover:border-[#3A342E]"
+          className="rounded-chip border border-[#2E2822] px-3 py-1.5 text-xs font-semibold text-[#8A7F76] transition hover:border-[#3A342E] hover:text-white"
         >
           Выйти staff
         </button>
@@ -104,7 +104,8 @@ export function PosCatalog({
             onKeyDown={(e) => {
               if (e.key === 'Enter') onScan(scanCode);
             }}
-            placeholder="SKU / штрихкод / IMEI"
+            aria-label="Поиск или сканирование товара"
+            placeholder="Поиск или скан штрихкода…"
             className="min-w-0 flex-1 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime"
           />
           <button type="button" onClick={() => onScan(scanCode)} className="rounded-[10px] bg-lime px-4 py-2 text-sm font-bold text-lime-ink">
@@ -170,13 +171,13 @@ export function PosCatalog({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-5 pt-2">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3" data-testid="pos-product-grid">
           {grid.map((p) => (
             <button
               key={p.id}
               type="button"
               onClick={() => onAdd(p)}
-              className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3 text-left transition hover:border-lime/40"
+              className="min-w-0 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3 text-left transition hover:border-lime/40 focus-visible:border-lime focus-visible:outline-none"
             >
               <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
                 <Image src={productImage(p)} alt={p.name} fill sizes="120px" className="object-contain p-2" />
@@ -196,6 +197,6 @@ export function PosCatalog({
           ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

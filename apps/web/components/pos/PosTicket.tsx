@@ -43,7 +43,7 @@ export function PosTicket({
   onCheckout,
 }: PosTicketProps) {
   return (
-    <div className="flex w-[420px] flex-shrink-0 flex-col bg-[#1A1611]">
+    <aside data-testid="pos-ticket" className="flex w-[420px] flex-shrink-0 flex-col bg-[#1A1611]">
       <div className="flex flex-shrink-0 items-center border-b border-[#2E2822] px-5 py-4">
         <span className="font-display text-[17px] font-bold text-white">Чек</span>
         <span className="ml-2 text-sm text-[#8A7F76]">{count} поз.</span>
@@ -134,6 +134,6 @@ export function PosTicket({
           </button>
         </div>
       )}
-    </div>
+    </aside>
   );
 }
