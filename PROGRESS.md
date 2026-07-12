@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: audit native iOS/Android software and store-release readiness after the stabilized MVP gate.
+- Files changed: readiness snapshot and progress record only; application code required no repair.
+- Result: the Expo package, icons/splash, bundle/package IDs, runtime/update settings, notification plugin, EAS profiles, store metadata, privacy/review docs and release workflow satisfy the local preflight. Strict mode remains fail-closed until the ignored production env and external credentials exist.
+- Checks run: mobile TypeScript check through `mvp:verify`; `mobile:store-preflight`; Expo config render; `expo-doctor`; strict production store preflight; local Xcode/Simulator, ADB/Android Emulator and Java availability probe.
+- Outcome: local preflight passed with 0 failures and 2 expected production-env warnings; Expo Doctor passed 20/20. Strict preflight correctly reported 6 external/configuration failures. Binary smoke QA is blocked on this machine because only Apple Command Line Tools are installed, no iOS Simulator is available, no Android AVD/emulator is installed, and no Java runtime is present.
+- Next step: continue software expansion with the first post-MVP ecosystem wave; perform TestFlight/Play Internal and physical-device checkout/push/crash smoke after the operator supplies accounts, credentials and native SDK hosts.
+
+## 2026-07-12
+
 - Task: make the full MVP/UAT release gate deterministic and prevent accidental destructive tests against the development database.
 - Files changed: MVP verification runner, seven FK-sensitive API test cleanups, Telegram Mini App browser navigation, backlog and progress records.
 - Result: `mvp:verify` now requires `TEST_DATABASE_URL`/`E2E_DATABASE_URL`, refuses the active development database or a database without a test marker, resets the isolated schema before Jest, and runs API tests sequentially. Test cleanups delete inventory movements before products, and the Telegram shell waits for DOM readiness instead of an unrelated late load event.

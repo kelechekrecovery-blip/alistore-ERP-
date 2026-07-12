@@ -8,6 +8,7 @@
 - **103 API test suites / 373 теста — зелёные** (`jest`)
 - **14 Playwright smoke-flow — зелёные**, включая owner/warehouse Purchase Order lifecycle (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
+- Native software gate: store preflight **0 ошибок / 2 ожидаемых env-warning**, Expo Doctor **20/20**, TypeScript ✓. Binary/device QA ждёт полного Xcode/Android SDK и store credentials.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
 
 Легенда: ✅ готово · 🟡 частично · ⛔ ждёт внешних доступов (ключи/аккаунты/железо)
@@ -73,4 +74,6 @@ cd apps/api && npx jest --runInBand    # 103 suites / 373 теста ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (35 роутов)
 npm run e2e                           # 14/14 ✓
+npm run mobile:store-preflight        # 0 failures; production env warnings only
+cd apps/mobile && npx expo-doctor     # 20/20 ✓
 ```
