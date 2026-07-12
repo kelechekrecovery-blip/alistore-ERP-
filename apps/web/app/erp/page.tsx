@@ -33,6 +33,7 @@ import { CampaignsView } from '@/components/erp/CampaignsView';
 import { Card } from '@/components/erp/Card';
 import { ReadinessView } from '@/components/erp/ReadinessView';
 import { RiskCenterView } from '@/components/erp/RiskCenterView';
+import { StockView } from '@/components/erp/StockView';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
@@ -84,12 +85,6 @@ const SIGNAL_ACTION: Record<string, { tab?: Route; href?: string }> = {
   discount_frequency: { tab: 'kpi' },
   write_off_spike: { tab: 'stock' },
 };
-const STATUS_RU: Record<string, string> = {
-  created: 'Оформлен', reserved: 'Зарезервирован', paid: 'Оплачен', completed: 'Завершён',
-  cancelled: 'Отменён', refunded: 'Возврат', exchanged: 'Обмен', in_stock: 'В наличии',
-  sold: 'Продан', written_off: 'Списан', returned: 'Возвращён', in_repair: 'В ремонте',
-};
-const ru = (s: string) => STATUS_RU[s] ?? s;
 
 export default function ErpPage() {
   const router = useRouter();
@@ -274,31 +269,6 @@ function FinanceView({ d }: { d: Dashboard | null }) {
         </div>
       ))}
     </Card>
-  );
-}
-
-function StockView({ d }: { d: Dashboard | null }) {
-  return (
-    <div className="grid gap-3.5 sm:grid-cols-2">
-      <Card>
-        <div className="mb-3.5 font-display text-[15px] font-bold">Склад по статусам</div>
-        {(d?.stock.byStatus ?? []).map((s) => (
-          <div key={s.status} className="flex justify-between border-b border-[#221E19] py-2 text-[13px]">
-            <span className="text-[#D8CFC6]">{ru(s.status)}</span>
-            <span className="font-mono tabular">{s.count}</span>
-          </div>
-        ))}
-      </Card>
-      <Card>
-        <div className="mb-3.5 font-display text-[15px] font-bold">Заказы по статусам</div>
-        {(d?.orders.byStatus ?? []).map((s) => (
-          <div key={s.status} className="flex justify-between border-b border-[#221E19] py-2 text-[13px]">
-            <span className="text-[#D8CFC6]">{ru(s.status)}</span>
-            <span className="font-mono tabular">{s.count}</span>
-          </div>
-        ))}
-      </Card>
-    </div>
   );
 }
 
