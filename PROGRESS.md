@@ -846,3 +846,12 @@
 - Checks run: `git diff --check`; `npm run build -w @alistore/web`; isolated Chromium `npx playwright test e2e/pos-ui.spec.ts` with real staff bootstrap, catalog load, geometry/color/overflow assertions, database rename, reload, and delta-sync verification.
 - Outcome: Next production build passed for all 35 routes; POS browser UAT passed 1/1 in 5.0s.
 - Next step: continue the handoff-only visual migration with the Staff operational app, then the remaining ERP module screens and native SwiftUI/Compose surfaces.
+
+## 2026-07-12
+
+- Task: align the working Staff application with `design_handoff_alistore/screens/AliStore Сотрудник App 2.0.dc.html` while preserving the extended operational modules.
+- Files changed: `apps/web/app/staff/page.tsx`, `e2e/staff-ui.spec.ts`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: `/staff` now uses the canonical 402px phone composition, 44px status bar, warm dark shell, four reference primary actions, four-item bottom navigation, back controls on inner views, and the AI task CTA. B2B, device protection, and POS remain reachable as secondary operations; shift evidence, orders, KPI tasks, and trade-in behavior are unchanged.
+- Checks run: `git diff --check`; `npm run build -w @alistore/web`; isolated Chromium `npx playwright test e2e/staff-ui.spec.ts` with real staff bootstrap/login, geometry and color assertions, primary/nav count checks, KPI navigation/back flow, and overflow guard.
+- Outcome: Next production build passed for all 35 routes; Staff browser UAT passed 1/1 in 3.0s.
+- Next step: align the ERP owner shell and module navigation against its canonical desktop handoff, then continue through native SwiftUI/Compose surfaces.

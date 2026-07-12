@@ -36,8 +36,6 @@ type Tab = 'home' | 'orders' | 'b2b' | 'protection' | 'tasks' | 'buyback';
 const NAV: { id: Tab; icon: string; label: string }[] = [
   { id: 'home', icon: '⌂', label: 'Главная' },
   { id: 'orders', icon: '📦', label: 'Заказы' },
-  { id: 'b2b', icon: '▦', label: 'Опт' },
-  { id: 'protection', icon: '◇', label: 'Защита' },
   { id: 'tasks', icon: '📊', label: 'KPI' },
   { id: 'buyback', icon: '♻️', label: 'Скупка' },
 ];
@@ -250,11 +248,19 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center bg-[#0E0C0A] font-sans">
-      <div className="flex h-full w-full max-w-[420px] flex-col bg-[#16130F] text-white">
+    <div className="fixed inset-0 z-50 flex justify-center bg-[#0E0C0A] font-sans sm:items-start sm:bg-[#C9C0B4] sm:p-6">
+      <main
+        data-testid="staff-app"
+        className="relative flex h-full w-full max-w-[402px] flex-col overflow-hidden bg-[#16130F] text-white sm:h-[858px] sm:max-h-[calc(100vh-48px)] sm:rounded-[46px] sm:border-[10px] sm:border-[#14110E] sm:shadow-2xl"
+      >
+        <div className="hidden h-11 flex-shrink-0 items-center justify-between px-5 text-[13px] font-semibold sm:flex">
+          <span>9:41</span>
+          <span className="font-mono">Сотрудник</span>
+          <span>▪▪▪ 100%</span>
+        </div>
         {/* header */}
-        <div className="flex flex-shrink-0 items-center gap-3 px-4 pb-3 pt-5">
-          <span className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-lg font-extrabold">
+        <div className="flex flex-shrink-0 items-center gap-3 px-4 pb-3 pt-5 sm:pt-1.5">
+          <span className="grid h-[42px] w-[42px] place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-lg font-extrabold">
             {session.username.slice(0, 2).toUpperCase()}
           </span>
           <div className="flex-1">
@@ -329,25 +335,30 @@ export default function StaffPage() {
                 </div>
               )}
 
-              <div className="mb-4 grid grid-cols-2 gap-2.5">
-                <Action icon="📦" label="Заказы" onClick={() => setTab('orders')} />
-                <Action icon="▦" label="B2B · Опт" onClick={() => setTab('b2b')} />
-                <Action icon="◇" label="Защита устройств" onClick={() => setTab('protection')} />
-                <Action icon="📊" label="Задачи и KPI" onClick={() => setTab('tasks')} />
-                <Action icon="♻️" label="Скупка Б/У" onClick={() => setTab('buyback')} />
-                <ActionLink icon="🖥" label="POS · Касса" href="/pos" />
+              <div className="mb-4 grid grid-cols-2 gap-2.5" data-testid="staff-primary-actions">
+                <Action icon="📦" label="Заказы" badge="Новые заказы" onClick={() => setTab('orders')} />
+                <ActionLink icon="＋" label="Добавить товар" badge="Каталог" href="/admin/products" />
+                <Action icon="♻️" label="Скупка Б/У" badge="По регламенту" onClick={() => setTab('buyback')} />
+                <Action icon="📊" label="Задачи и KPI" badge="2 активных" onClick={() => setTab('tasks')} />
+              </div>
+
+              <div className="mb-4 flex gap-2 overflow-x-auto" aria-label="Дополнительные операции">
+                <CompactAction label="B2B · Опт" onClick={() => setTab('b2b')} />
+                <CompactAction label="Защита" onClick={() => setTab('protection')} />
+                <Link href="/pos" className="flex-shrink-0 rounded-chip border border-[#2E2822] bg-[#221E19] px-3 py-2 text-xs font-semibold text-[#D8CFC6]">POS · Касса</Link>
               </div>
 
               <div className="rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
                 <div className="mb-2 font-mono text-xs text-lime">🤖 ЗАДАЧА ОТ AI</div>
                 <div className="text-[14px] leading-relaxed">Мало продаж аксессуаров сегодня. Предлагай чехол/зарядку к каждому телефону — цель +5 к чеку.</div>
+                <button type="button" onClick={() => setTab('tasks')} className="mt-3 w-full rounded-[10px] bg-lime py-2.5 text-[13px] font-bold text-lime-ink">К задачам</button>
               </div>
             </>
           )}
 
           {tab === 'orders' && (
             <div className="pt-1">
-              <h2 className="mb-3 font-display text-lg font-bold">Заказы</h2>
+              <SectionTitle title="Заказы" onBack={() => setTab('home')} />
               {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
               {orders && orders.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Очередь пуста</p>}
               {(orders ?? []).map((o) => (
@@ -377,7 +388,7 @@ export default function StaffPage() {
 
           {tab === 'tasks' && (
             <div className="pt-1">
-              <h2 className="mb-3 font-display text-lg font-bold">Задачи и KPI</h2>
+              <SectionTitle title="Задачи и KPI" onBack={() => setTab('home')} />
               <div className="mb-3.5 rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
                 <div className="mb-2 flex justify-between text-[13px]"><span className="text-[#D8CFC6]">KPI месяца</span><span className="font-mono text-lime">92%</span></div>
                 <div className="h-2 overflow-hidden rounded-chip bg-[#16130F]"><div className="h-full w-[92%] bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" /></div>
@@ -391,7 +402,7 @@ export default function StaffPage() {
 
           {tab === 'b2b' && (
             <div className="pt-1">
-              <h2 className="mb-3 font-display text-lg font-bold">B2B · Оптовые заявки</h2>
+              <SectionTitle title="B2B · Оптовые заявки" onBack={() => setTab('home')} />
               {b2bQuotes === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
               {b2bQuotes && b2bQuotes.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Заявок пока нет</p>}
               {(b2bQuotes ?? []).map((quote) => {
@@ -426,7 +437,7 @@ export default function StaffPage() {
 
           {tab === 'protection' && (
             <div className="pt-1">
-              <h2 className="mb-3 font-display text-lg font-bold">Защита устройств</h2>
+              <SectionTitle title="Защита устройств" onBack={() => setTab('home')} />
               {protection === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
               {protection && protection.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Заявок пока нет</p>}
               {(protection ?? []).map((policy) => {
@@ -460,7 +471,7 @@ export default function StaffPage() {
 
           {tab === 'buyback' && (
             <div className="pt-1">
-              <h2 className="mb-3 font-display text-lg font-bold">Скупка Б/У</h2>
+              <SectionTitle title="Скупка Б/У" onBack={() => setTab('home')} />
               <p className="mb-3.5 text-[13px] leading-relaxed text-[#A79C92]">Проверьте по регламенту, затем оформите договор.</p>
               {BUYBACK.map((b, i) => (
                 <Check key={i} label={b} done={buyback[i]} onClick={() => setBuyback((a) => a.map((v, j) => (j === i ? !v : v)))} />
@@ -553,7 +564,7 @@ export default function StaffPage() {
             </button>
           ))}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -566,20 +577,33 @@ function Stat({ value, label, accent }: { value: string; label: string; accent?:
     </div>
   );
 }
-function Action({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+function Action({ icon, label, badge, onClick }: { icon: string; label: string; badge?: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
       <div className="text-2xl">{icon}</div>
       <div className="mt-2 text-[13px] font-semibold">{label}</div>
+      {badge && <div className="mt-0.5 text-[11px] text-lime">{badge}</div>}
     </button>
   );
 }
-function ActionLink({ icon, label, href }: { icon: string; label: string; href: string }) {
+function ActionLink({ icon, label, badge, href }: { icon: string; label: string; badge?: string; href: string }) {
   return (
     <Link href={href} className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
       <div className="text-2xl">{icon}</div>
       <div className="mt-2 text-[13px] font-semibold">{label}</div>
+      {badge && <div className="mt-0.5 text-[11px] text-lime">{badge}</div>}
     </Link>
+  );
+}
+function CompactAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="flex-shrink-0 rounded-chip border border-[#2E2822] bg-[#221E19] px-3 py-2 text-xs font-semibold text-[#D8CFC6]">{label}</button>;
+}
+function SectionTitle({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="mb-3.5 flex items-center gap-2.5">
+      <button type="button" onClick={onBack} aria-label="Назад на главную" className="text-xl text-white">←</button>
+      <h2 className="font-display text-[19px] font-bold">{title}</h2>
+    </div>
   );
 }
 function Check({ label, done, onClick }: { label: string; done: boolean; onClick: () => void }) {
