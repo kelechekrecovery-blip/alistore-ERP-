@@ -19,6 +19,8 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
 
   await page.goto('/checkout');
   await expect(page.getByText('Способ получения')).toBeVisible();
+  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(247, 242, 236)');
+  expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900001');
   await page.getByPlaceholder('Имя').fill('E2E Buyer');
@@ -38,4 +40,17 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   });
   expect(order?.pickupCode).toMatch(/^PU-/);
   expect(await prisma.payment.count({ where: { orderId: order?.id, method: 'card' } })).toBe(1);
+});
+
+test('phone checkout preserves the dark Client App handoff theme', async ({ page }) => {
+  await page.setViewportSize({ width: 402, height: 858 });
+  await page.addInitScript(() => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ id: 'mobile-checkout', sku: 'MOBILE-CHECKOUT', name: 'iPhone', price: 109900, qty: 1 }]));
+  });
+
+  await page.goto('/checkout');
+  await expect(page.getByText('Способ получения')).toBeVisible();
+  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(12, 12, 23)');
+  expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(17, 17, 32)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });

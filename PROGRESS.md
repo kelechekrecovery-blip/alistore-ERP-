@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: complete the adaptive checkout portion of the canonical customer design migration.
+- Files changed: checkout semantic surface classes, responsive design-system overrides, desktop/mobile checkout E2E, backlog and progress.
+- Result: one checkout implementation now renders as light Sand/white/Coral on desktop and dark warm-black/Lime on phone, preserving the same delivery, pickup, contacts, gift card, payment intent and confirmation logic. Native account subpages remain intentionally dark because they map to Client App screens rather than wide web pages.
+- Checks run: Next production build; desktop product/cart/checkout token assertions; full sandbox card order to paid; 402x858 dark-theme and overflow assertion; `git diff --check`.
+- Outcome: production build passes and checkout browser coverage passes 2/2. The local storefront was restored on port 3000 after isolated testing.
+- Next step: align POS 2.0 against its exact prototype, then Staff and ERP module shells.
+
+## 2026-07-12
+
 - Task: continue the canonical handoff migration through the desktop customer purchase path.
 - Files changed: product detail, cart, account overview, checkout browser flow assertions, backlog and progress.
 - Result: product media/specs/reviews, cart lines/promo/bonus/summary, and account identity/services/order history now use Sand/Tint, white cards, Coral actions, Ink text and the handoff radius/type hierarchy. Mobile components and business behavior remain unchanged.

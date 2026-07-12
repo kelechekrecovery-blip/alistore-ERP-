@@ -154,10 +154,10 @@ export default function CheckoutPage() {
   }
 
   const wrap = (children: React.ReactNode) => (
-    <div className="min-h-screen bg-[#0c0c17] font-sans text-white">
+    <div className="checkout-shell min-h-screen bg-[#0c0c17] font-sans text-white">
       <SiteHeader />
       <main className="mx-auto w-[min(900px,92vw)] py-10 sm:py-14">
-        <div className="overflow-hidden rounded-[22px] border border-white/[0.1] bg-[#111120] shadow-[0_28px_90px_-55px_rgba(249,115,22,.55)]">
+        <div className="checkout-panel overflow-hidden rounded-[22px] border border-white/[0.1] bg-[#111120] shadow-[0_28px_90px_-55px_rgba(249,115,22,.55)]">
           {children}
         </div>
       </main>
@@ -172,23 +172,23 @@ export default function CheckoutPage() {
         <div className="mt-5 font-display text-2xl font-extrabold">{done.intent && !done.paid ? 'Ожидаем оплату' : 'Заказ оформлен!'}</div>
         <div className="mt-2.5 text-sm text-[#A79C92]">№ <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · {done.order.status}. Мы свяжемся для подтверждения.</div>
         {done.order.pickupCode && (
-          <div className="mt-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] px-5 py-3">
+          <div className="checkout-surface mt-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] px-5 py-3">
             <div className="text-[12px] text-[#A79C92]">Код выдачи</div>
             <div className="mt-1 font-display text-xl font-extrabold text-lime">{done.order.pickupCode}</div>
           </div>
         )}
         {done.intent && !done.paid && (
-          <div className="mt-5 w-full rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
+          <div className="checkout-surface mt-5 w-full rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
             <div className="text-[13px] font-semibold text-white">{PAYMENT.find((p) => p.id === done.intent?.method)?.name}</div>
             <div className="mt-1 font-mono text-[11px] break-all text-[#8A7F76]">{done.intent.qrPayload ?? done.intent.paymentUrl}</div>
             <div className="mt-2 text-[12px] text-[#A79C92]">Sandbox intent: {done.intent.intentId} · до {new Date(done.intent.expiresAt).toLocaleTimeString('ru-RU')}</div>
-            <button type="button" disabled={busy} onClick={confirmPayment} className="mt-3 w-full rounded-[12px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60">
+            <button type="button" disabled={busy} onClick={confirmPayment} className="checkout-primary mt-3 w-full rounded-[12px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60">
               {busy ? 'Проверяем…' : 'Подтвердить sandbox-платёж'}
             </button>
             {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
           </div>
         )}
-        <Link href={`/account/orders/${done.order.id}`} className="mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Отследить заказ</Link>
+        <Link href={`/account/orders/${done.order.id}`} className="checkout-primary mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Отследить заказ</Link>
         <Link href="/" className="mt-4 text-sm text-[#A79C92]">На главную</Link>
       </div>,
     );
@@ -212,21 +212,21 @@ export default function CheckoutPage() {
           <>
             <div className="mb-3 font-display text-base font-bold">Способ получения</div>
             {DELIVERY.map((d) => (
-              <button key={d.id} type="button" onClick={() => setDelivery(d.id)} className={`mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={d.id} type="button" onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-[#2E2822]'}`}>
                 <span className="text-2xl">{d.icon}</span>
                 <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-[#A79C92]">{d.meta}</div></div>
                 <span className="text-[13px] text-[#D8CFC6]">{d.price}</span>
               </button>
             ))}
             {delivery === 'pickup' && (
-              <div className="mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
                 <div className="mb-2 text-[13px] font-semibold">Точка самовывоза</div>
                 {PICKUP_POINTS.map((point) => (
                   <button
                     key={point.id}
                     type="button"
                     onClick={() => setPickupPoint(point.id)}
-                    className={`mb-2 flex w-full items-start gap-3 rounded-[11px] border p-3 text-left last:mb-0 ${pickupPoint === point.id ? 'border-lime bg-lime/5' : 'border-[#3A342E] bg-[#16130F]'}`}
+                    className={`checkout-nested mb-2 flex w-full items-start gap-3 rounded-[11px] border p-3 text-left last:mb-0 ${pickupPoint === point.id ? 'border-lime bg-lime/5' : 'border-[#3A342E] bg-[#16130F]'}`}
                   >
                     <span className={`mt-0.5 h-4 w-4 rounded-full border-2 ${pickupPoint === point.id ? 'border-lime bg-lime' : 'border-[#3A342E]'}`} />
                     <span className="min-w-0">
@@ -238,7 +238,7 @@ export default function CheckoutPage() {
               </div>
             )}
             {delivery !== 'pickup' && (
-              <Link href="/account/addresses" className="mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <Link href="/account/addresses" className="checkout-surface mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
                 <div className="flex items-center justify-between text-[13px] font-semibold">
                   <span>Адрес доставки</span>
                   <span className="text-lime">изменить</span>
@@ -246,44 +246,44 @@ export default function CheckoutPage() {
                 <div className="mt-1.5 text-[12px] leading-relaxed text-[#A79C92]">{address ? `${address.title}: ${address.text}` : 'Добавьте адрес доставки'}</div>
               </Link>
             )}
-            <button type="button" onClick={() => setStep(1)} className="mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">Далее</button>
+            <button type="button" onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">Далее</button>
           </>
         )}
         {step === 1 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Контакты</div>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="mb-2.5 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="mb-2.5 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5 text-sm text-white outline-none focus:border-lime" />
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="checkout-field mb-2.5 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5 text-sm text-white outline-none focus:border-lime" />
             {error && <p className="text-sm text-[#FF8A7A]">{error}</p>}
-            <button type="button" disabled={!phoneValid} onClick={() => setStep(2)} className="mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">Далее</button>
+            <button type="button" disabled={!phoneValid} onClick={() => setStep(2)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">Далее</button>
           </>
         )}
         {step === 2 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
             {PAYMENT.map((p) => (
-              <button key={p.id} type="button" onClick={() => setPayment(p.id)} className={`mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={p.id} type="button" onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-[#2E2822]'}`}>
                 <span className="text-xl">{p.icon}</span>
                 <span className="flex-1 text-sm">{p.name}</span>
                 <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-[#3A342E]'}`} style={{ height: 18, width: 18 }} />
               </button>
             ))}
-            <div className="mt-3 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <div className="checkout-surface mt-3 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
               <div className="mb-2 text-sm font-semibold">Подарочная карта</div>
               <div className="flex gap-2">
-                <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="min-w-0 flex-1 rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
-                <button type="button" disabled={giftBusy} onClick={applyGiftCard} className="rounded-[10px] bg-lime px-3 text-sm font-bold text-lime-ink disabled:opacity-60">{giftBusy ? '...' : 'OK'}</button>
+                <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="checkout-field min-w-0 flex-1 rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
+                <button type="button" disabled={giftBusy} onClick={applyGiftCard} className="checkout-primary rounded-[10px] bg-lime px-3 text-sm font-bold text-lime-ink disabled:opacity-60">{giftBusy ? '...' : 'OK'}</button>
               </div>
               {giftCard && <div className="mt-2 text-[12px] text-lime">Баланс {som(giftCard.balance)} · спишем {som(giftAmount)}</div>}
               {giftError && <div className="mt-2 text-[12px] text-[#FF8A7A]">{giftError}</div>}
             </div>
-            <button type="button" onClick={() => setStep(3)} className="mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">К подтверждению</button>
+            <button type="button" onClick={() => setStep(3)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">К подтверждению</button>
           </>
         )}
         {step === 3 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
-            <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+            <div className="checkout-surface rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
               {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint.name} />}
               {delivery !== 'pickup' && <Row k="Адрес" v={address?.text ?? 'не указан'} />}
@@ -299,7 +299,7 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span></div>
             </div>
             {error && <p className="mt-3 text-sm text-[#FF8A7A]">{error}</p>}
-            <button type="button" disabled={busy} onClick={place} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
+            <button type="button" disabled={busy} onClick={place} className="checkout-primary mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
           </>
         )}
       </div>
