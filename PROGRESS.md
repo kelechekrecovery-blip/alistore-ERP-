@@ -918,3 +918,12 @@
 - Checks run: `git diff --check`; `npm run api:build`; targeted notifications registry + Expo transport Jest; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: API build passed; push tests passed 7/7; all four SwiftUI targets built with Client APNs entitlement; AliStoreCore XCTest passed 9/9. Live APNs delivery remains credential/device-gated and is not claimed certified.
 - Next step: implement native offline order command replay, then begin iOS Staff operational parity.
+
+## 2026-07-12
+
+- Task: complete native SwiftUI Client offline order persistence and replay.
+- Files changed: `apps/api/prisma/{schema.prisma,migrations/20260712171500_add_order_idempotency}`, `apps/api/src/orders/*`, `apps/api/test/orders-account.e2e-spec.ts`, `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/{Models,OfflineQueue}.swift`, `apps/ios/Tests/APIClientTests.swift`, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: checkout now persists an order command after a network failure with its original idempotency key, exposes queued/syncing/conflict/failed states and manual retry, and replays retryable commands when the authenticated app returns to foreground. The API stores the order idempotency key and returns the original order without emitting a duplicate Event Ledger entry.
+- Checks run: development migration; safe test-schema sync because the historical test database predates Prisma migration baselining; API production build; targeted order-account E2E; all-target iOS generation/build; AliStoreCore XCTest on iPhone 17 Pro Simulator.
+- Outcome: order E2E passed 3/3, including cross-customer idempotency isolation; all four SwiftUI targets built; XCTest passed 10/10. Live APNs delivery, pixel/device smoke and App Store signing remain external or subsequent gates and are not claimed complete.
+- Next step: run the final Client visual/simulator smoke, then implement the iOS Staff operational vertical.

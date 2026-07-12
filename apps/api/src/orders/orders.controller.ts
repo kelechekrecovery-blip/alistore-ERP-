@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Post,
@@ -63,8 +64,16 @@ export class OrdersController {
   @ApiCreatedResponse({ description: 'Customer-owned order created.' })
   @Post('mine')
   @UseGuards(JwtAuthGuard)
-  createMine(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateOrderDto) {
-    return this.orders.create({ ...dto, customerId: user.customerId, channel: 'mobile' }, user.customerId);
+  createMine(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreateOrderDto,
+  ) {
+    return this.orders.create(
+      { ...dto, customerId: user.customerId, channel: 'mobile' },
+      user.customerId,
+      idempotencyKey,
+    );
   }
 
   @ApiOperation({ summary: 'List orders by status — staff fulfillment queue' })

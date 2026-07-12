@@ -286,6 +286,7 @@ model DeviceUnit {
 
 model Order {
   id              String      @id @default(cuid())
+  idempotencyKey  String?     @unique
   customer        Customer    @relation(fields: [customerId], references: [id])
   customerId      String
   status          OrderStatus @default(draft)

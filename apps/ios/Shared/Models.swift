@@ -99,7 +99,7 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
     public let items: [CustomerOrderItem]
 }
 
-public struct CreateOrderItem: Encodable, Sendable {
+public struct CreateOrderItem: Codable, Sendable {
     public let sku: String
     public let qty: Int
     public let price: Int
@@ -111,7 +111,7 @@ public struct CreateOrderItem: Encodable, Sendable {
     }
 }
 
-public struct CreateOrderRequest: Encodable, Sendable {
+public struct CreateOrderRequest: Codable, Sendable {
     public let customerId: String
     public let channel: String
     public let fulfillmentType: String

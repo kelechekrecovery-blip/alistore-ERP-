@@ -58,58 +58,87 @@ export class OrdersService {
   }
 
   /** Create an order (status `created`) and write order.created to the ledger. */
-  async create(dto: CreateOrderDto, actor: string) {
-    return this.audit.transaction(async (tx) => {
-      const order = await tx.order.create({
-        data: {
-          customerId: dto.customerId,
-          channel: dto.channel,
-          fulfillmentType: dto.fulfillmentType ?? defaultFulfillment(dto.channel),
-          pickupPoint: dto.pickupPoint,
-          deliveryAddress: dto.deliveryAddress,
-          deliverySlot: dto.deliverySlot,
-          pickupCode: pickupCode(),
-          total: dto.total,
-          status: 'created',
-          items: {
-            create: dto.items.map((i) => ({
-              sku: i.sku,
-              qty: i.qty,
-              price: i.price,
-              imei: i.imei,
-            })),
-          },
-        },
-        include: { items: true },
-      });
-      if (this.outbox) {
-        await enqueueConsentedCustomerNotice(tx, this.outbox, {
-          customerId: order.customerId,
-          template: 'order_confirmed',
-          payload: { orderId: order.id, channel: order.channel, total: order.total },
-        });
-      }
-      return {
-        result: order,
-        events: [
-          {
-            type: EventType.OrderCreated,
-            actor,
-            payload: {
-              orderId: order.id,
-              channel: order.channel,
-              fulfillmentType: order.fulfillmentType,
-              pickupPoint: order.pickupPoint,
-              deliveryAddress: order.deliveryAddress,
-              deliverySlot: order.deliverySlot,
-              pickupCode: order.pickupCode,
-              total: order.total,
+  async create(dto: CreateOrderDto, actor: string, idempotencyKey?: string) {
+    try {
+      return await this.audit.transaction(async (tx) => {
+        if (idempotencyKey) {
+          const existing = await tx.order.findUnique({
+            where: { idempotencyKey },
+            include: { items: true },
+          });
+          if (existing) {
+            if (existing.customerId !== dto.customerId) {
+              throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
+            }
+            return { result: existing, events: [] };
+          }
+        }
+        const order = await tx.order.create({
+          data: {
+            idempotencyKey,
+            customerId: dto.customerId,
+            channel: dto.channel,
+            fulfillmentType: dto.fulfillmentType ?? defaultFulfillment(dto.channel),
+            pickupPoint: dto.pickupPoint,
+            deliveryAddress: dto.deliveryAddress,
+            deliverySlot: dto.deliverySlot,
+            pickupCode: pickupCode(),
+            total: dto.total,
+            status: 'created',
+            items: {
+              create: dto.items.map((i) => ({
+                sku: i.sku,
+                qty: i.qty,
+                price: i.price,
+                imei: i.imei,
+              })),
             },
-            refs: [order.id],
           },
-        ],
-      };
-    });
+          include: { items: true },
+        });
+        if (this.outbox) {
+          await enqueueConsentedCustomerNotice(tx, this.outbox, {
+            customerId: order.customerId,
+            template: 'order_confirmed',
+            payload: { orderId: order.id, channel: order.channel, total: order.total },
+          });
+        }
+        return {
+          result: order,
+          events: [
+            {
+              type: EventType.OrderCreated,
+              actor,
+              payload: {
+                orderId: order.id,
+                channel: order.channel,
+                fulfillmentType: order.fulfillmentType,
+                pickupPoint: order.pickupPoint,
+                deliveryAddress: order.deliveryAddress,
+                deliverySlot: order.deliverySlot,
+                pickupCode: order.pickupCode,
+                total: order.total,
+              },
+              refs: [order.id],
+            },
+          ],
+        };
+      });
+    } catch (error) {
+      if (idempotencyKey && typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+        const existing = await this.prisma.order.findUnique({
+          where: { idempotencyKey },
+          include: { items: true },
+        });
+        if (existing) {
+          if (existing.customerId !== dto.customerId) {
+            throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
+          }
+          return existing;
+        }
+      }
+      throw error;
+    }
   }
 
   /**

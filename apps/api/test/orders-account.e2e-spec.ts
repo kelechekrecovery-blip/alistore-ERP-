@@ -62,4 +62,38 @@ describe('Orders by customer (account)', () => {
     expect(mine[0].createdAt >= mine[1].createdAt).toBe(true);
     expect(mine[0].items).toBeDefined();
   });
+
+  it('returns the same order for a repeated native idempotency key', async () => {
+    const owner = await customer();
+    const input = {
+      customerId: owner.id,
+      channel: 'mobile' as const,
+      total: 100,
+      items: [{ sku: 'OFFLINE-1', qty: 1, price: 100 }],
+    };
+
+    const first = await orders.create(input, owner.id, 'native-order-retry-1');
+    const replay = await orders.create(input, owner.id, 'native-order-retry-1');
+
+    expect(replay.id).toBe(first.id);
+    expect(await prisma.order.count({ where: { idempotencyKey: 'native-order-retry-1' } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'order.created', refs: { has: first.id } } })).toBe(1);
+  });
+
+  it('does not expose an idempotent order to another customer', async () => {
+    const owner = await customer();
+    const attacker = await customer();
+    const key = 'native-order-owner-scope-1';
+    const input = {
+      customerId: owner.id,
+      channel: 'mobile' as const,
+      total: 100,
+      items: [{ sku: 'OFFLINE-2', qty: 1, price: 100 }],
+    };
+    await orders.create(input, owner.id, key);
+
+    await expect(
+      orders.create({ ...input, customerId: attacker.id }, attacker.id, key),
+    ).rejects.toMatchObject({ code: 'order_idempotency_owner_mismatch' });
+  });
 });

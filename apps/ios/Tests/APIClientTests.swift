@@ -1,8 +1,36 @@
 import AliStoreCore
 import Foundation
+import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    @MainActor
+    func testQueuesNativeOrderWithStableIdempotencyKey() throws {
+        let container = try ModelContainer(
+            for: PendingMutation.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let request = CreateOrderRequest(
+            customerId: "customer-1",
+            fulfillmentType: "pickup",
+            pickupPoint: "BISHKEK-1",
+            deliveryAddress: nil,
+            total: 100,
+            items: [CreateOrderItem(sku: "OFFLINE-1", qty: 1, price: 100)]
+        )
+
+        try OfflineOrderQueue.enqueue(
+            request,
+            idempotencyKey: "offline-order-1",
+            context: container.mainContext
+        )
+
+        let queued = try container.mainContext.fetch(FetchDescriptor<PendingMutation>())
+        XCTAssertEqual(queued.count, 1)
+        XCTAssertEqual(queued.first?.state, "queued")
+        XCTAssertEqual(queued.first?.idempotencyKey, "offline-order-1")
+    }
+
     func testDecodesCatalogContract() async throws {
         let session = makeSession(status: 200, body: """
         {"items":[{"id":"p1","sku":"IP-1","name":"iPhone","price":100000,"category":"phones","availableUnits":2}],"total":1}

@@ -45,6 +45,7 @@ private struct ClientRootView: View {
     @State private var selectedTab: ClientTab = .catalog
     @State private var orderRefreshRevision = 0
     @State private var pushStatus = "Push не настроен"
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
     init(environment: AppEnvironment) {
@@ -80,7 +81,10 @@ private struct ClientRootView: View {
             orderRefreshRevision += 1
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, auth.session != nil { orderRefreshRevision += 1 }
+            if phase == .active, auth.session != nil {
+                orderRefreshRevision += 1
+                Task { await replayPendingOrders() }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsToken)) { notification in
             guard let token = notification.object as? String else { return }
@@ -100,6 +104,23 @@ private struct ClientRootView: View {
             catalogError = nil
         } catch {
             catalogError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func replayPendingOrders() async {
+        guard let token = auth.session?.accessToken else { return }
+        let descriptor = FetchDescriptor<PendingMutation>(
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
+        guard let mutations = try? modelContext.fetch(descriptor) else { return }
+        for mutation in mutations where mutation.state == "queued" || mutation.state == "failed" {
+            await OfflineOrderQueue.replay(
+                mutation,
+                api: APIClient(baseURL: environment.apiBaseURL),
+                token: token,
+                context: modelContext
+            )
         }
     }
 
@@ -151,6 +172,7 @@ private struct CartView: View {
     let auth: CustomerAuthStore
     let products: [Product]
     @Binding var cart: [String: Int]
+    @Environment(\.modelContext) private var modelContext
     @State private var fulfillment = "pickup"
     @State private var paymentMethod = "cash"
     @State private var address = ""
@@ -158,6 +180,7 @@ private struct CartView: View {
     @State private var errorMessage: String?
     @State private var completedOrder: CustomerOrder?
     @State private var paymentIntent: PaymentIntent?
+    @State private var queuedOffline = false
 
     private var lines: [(Product, Int)] {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
@@ -167,7 +190,13 @@ private struct CartView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let order = completedOrder {
+                if queuedOffline {
+                    ContentUnavailableView(
+                        "Заказ сохранён офлайн",
+                        systemImage: "arrow.triangle.2.circlepath",
+                        description: Text("Повторите отправку в Кабинет → Синхронизация.")
+                    )
+                } else if let order = completedOrder {
                     VStack(spacing: 18) {
                         ContentUnavailableView(
                             paymentIntent == nil ? "Заказ оформлен" : "Ожидает оплаты",
@@ -271,12 +300,13 @@ private struct CartView: View {
             total: total,
             items: lines.map { CreateOrderItem(sku: $0.0.sku, qty: $0.1, price: $0.0.price) }
         )
+        let idempotencyKey = UUID().uuidString
         do {
             let order: CustomerOrder = try await APIClient(baseURL: environment.apiBaseURL).post(
                 "orders/mine",
                 body: request,
                 token: session.accessToken,
-                idempotencyKey: UUID().uuidString
+                idempotencyKey: idempotencyKey
             )
             if let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) {
                 paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
@@ -294,7 +324,17 @@ private struct CartView: View {
             completedOrder = order
             cart.removeAll()
         } catch {
-            errorMessage = error.localizedDescription
+            if error is URLError {
+                do {
+                    try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
+                    queuedOffline = true
+                    cart.removeAll()
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -389,6 +429,11 @@ private struct AccountView: View {
                         LabeledContent("Статус", value: pushStatus)
                         Button("Включить push", systemImage: "bell.badge") { onEnablePush() }
                     }
+                    Section("Синхронизация") {
+                        NavigationLink("Офлайн-операции") {
+                            OfflineQueueView(environment: environment, auth: auth)
+                        }
+                    }
                     Section {
                         Button("Выйти", role: .destructive) { Task { await auth.logout() } }
                     }
@@ -429,6 +474,64 @@ private struct AccountView: View {
     private var normalizedPhone: String {
         let digits = phone.filter(\.isNumber)
         return "+\(digits)"
+    }
+}
+
+private struct OfflineQueueView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \PendingMutation.createdAt) private var mutations: [PendingMutation]
+
+    var body: some View {
+        Group {
+            if mutations.isEmpty {
+                EmptyStateView(title: "Очередь пуста", detail: "Все операции синхронизированы.", symbol: "checkmark.icloud")
+            } else {
+                List(mutations) { mutation in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Заказ").font(.headline)
+                            Spacer()
+                            Text(stateLabel(mutation.state))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(stateColor(mutation.state))
+                        }
+                        Text(String(mutation.idempotencyKey.prefix(12))).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        if let error = mutation.lastError { Text(error).font(.caption).foregroundStyle(.red) }
+                        Button("Повторить", systemImage: "arrow.clockwise") {
+                            Task { await retry(mutation) }
+                        }
+                        .disabled(mutation.state == "syncing" || auth.session == nil)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .navigationTitle("Синхронизация")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func retry(_ mutation: PendingMutation) async {
+        guard let token = auth.session?.accessToken else { return }
+        await OfflineOrderQueue.replay(
+            mutation,
+            api: APIClient(baseURL: environment.apiBaseURL),
+            token: token,
+            context: modelContext
+        )
+    }
+
+    private func stateLabel(_ state: String) -> String {
+        ["queued": "В очереди", "syncing": "Отправка", "conflict": "Конфликт", "failed": "Ошибка"][state] ?? state
+    }
+
+    private func stateColor(_ state: String) -> Color {
+        switch state {
+        case "conflict", "failed": return .red
+        case "syncing": return .orange
+        default: return .secondary
+        }
     }
 }
 
