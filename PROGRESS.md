@@ -873,3 +873,12 @@
 - Checks run: `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator; `git diff --check`.
 - Outcome: all four SwiftUI application targets and shared framework built successfully; AliStoreCore XCTest passed 4/4 including OTP request contract, bearer-authenticated order contract, ISO-8601 order decoding, catalog decoding, and server-error propagation.
 - Next step: implement the native SwiftUI Client cart and signed-in checkout/payment flow, then devices/warranty and push registration.
+
+## 2026-07-12
+
+- Task: implement the native SwiftUI Client cart and authenticated order checkout vertical.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Tests/APIClientTests.swift`, `apps/api/src/orders/orders.controller.ts`, generated iOS project, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: catalog products can be added to a shared cart, quantities are capped by live availability, the tab displays an item badge, and checkout supports pickup or courier address. Order creation uses the new guarded `POST /orders/mine`; customer ownership and actor come from JWT rather than the submitted customer id, while the request carries an idempotency key and clears the cart only after a decoded server success.
+- Checks run: `git diff --check`; `npm run ios:generate`; `npm run ios:build`; `npm run api:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: all four SwiftUI targets built; API TypeScript build passed; AliStoreCore XCTest passed 5/5 including the bearer-authenticated `/orders/mine` request and idempotency header contract.
+- Next step: add native online payment-intent selection/reconciliation, then devices/warranty and push registration.

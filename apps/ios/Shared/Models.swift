@@ -98,3 +98,42 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
     public let createdAt: Date
     public let items: [CustomerOrderItem]
 }
+
+public struct CreateOrderItem: Encodable, Sendable {
+    public let sku: String
+    public let qty: Int
+    public let price: Int
+
+    public init(sku: String, qty: Int, price: Int) {
+        self.sku = sku
+        self.qty = qty
+        self.price = price
+    }
+}
+
+public struct CreateOrderRequest: Encodable, Sendable {
+    public let customerId: String
+    public let channel: String
+    public let fulfillmentType: String
+    public let pickupPoint: String?
+    public let deliveryAddress: String?
+    public let total: Int
+    public let items: [CreateOrderItem]
+
+    public init(
+        customerId: String,
+        fulfillmentType: String,
+        pickupPoint: String?,
+        deliveryAddress: String?,
+        total: Int,
+        items: [CreateOrderItem]
+    ) {
+        self.customerId = customerId
+        self.channel = "mobile"
+        self.fulfillmentType = fulfillmentType
+        self.pickupPoint = pickupPoint
+        self.deliveryAddress = deliveryAddress
+        self.total = total
+        self.items = items
+    }
+}

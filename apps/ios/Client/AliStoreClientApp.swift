@@ -15,6 +15,10 @@ struct AliStoreClientApp: App {
 private struct ClientRootView: View {
     let environment: AppEnvironment
     @State private var auth: CustomerAuthStore
+    @State private var products: [Product] = []
+    @State private var catalogLoading = true
+    @State private var catalogError: String?
+    @State private var cart: [String: Int] = [:]
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -23,17 +27,149 @@ private struct ClientRootView: View {
 
     var body: some View {
         TabView {
-            CatalogView(environment: environment)
+            CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart)
                 .tabItem { Label("Каталог", systemImage: "square.grid.2x2") }
-            EmptyStateView(title: "Корзина пуста", detail: "Добавленные товары будут доступны офлайн.", symbol: "bag")
+            CartView(environment: environment, auth: auth, products: products, cart: $cart)
                 .tabItem { Label("Корзина", systemImage: "bag") }
+                .badge(cart.values.reduce(0, +))
             OrdersView(environment: environment, auth: auth)
                 .tabItem { Label("Заказы", systemImage: "shippingbox") }
             AccountView(auth: auth)
                 .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
         }
         .tint(.orange)
-        .task { await auth.restore() }
+        .task {
+            async let restore: Void = auth.restore()
+            async let catalog: Void = loadCatalog()
+            _ = await (restore, catalog)
+        }
+    }
+
+    private func loadCatalog() async {
+        catalogLoading = true
+        defer { catalogLoading = false }
+        do {
+            let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
+            products = response.items
+            catalogError = nil
+        } catch {
+            catalogError = error.localizedDescription
+        }
+    }
+}
+
+private struct CartView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @State private var fulfillment = "pickup"
+    @State private var address = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var completedOrder: CustomerOrder?
+
+    private var lines: [(Product, Int)] {
+        cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
+    }
+    private var total: Int { lines.reduce(0) { $0 + $1.0.price * $1.1 } }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let order = completedOrder {
+                    ContentUnavailableView(
+                        "Заказ оформлен",
+                        systemImage: "checkmark.circle.fill",
+                        description: Text("#\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
+                    )
+                } else if lines.isEmpty {
+                    EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
+                } else {
+                    List {
+                        Section("Товары") {
+                            ForEach(lines, id: \.0.id) { product, quantity in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(product.name).font(.headline)
+                                        Text(product.price, format: .currency(code: "KGS")).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Stepper("\(quantity)", value: quantityBinding(product.id), in: 0...max(1, product.availableUnits))
+                                        .fixedSize()
+                                }
+                            }
+                        }
+                        Section("Получение") {
+                            Picker("Способ", selection: $fulfillment) {
+                                Text("Самовывоз").tag("pickup")
+                                Text("Курьер").tag("courier")
+                            }
+                            .pickerStyle(.segmented)
+                            if fulfillment == "courier" {
+                                TextField("Адрес доставки", text: $address)
+                            } else {
+                                LabeledContent("Точка", value: "AliStore Центр")
+                            }
+                        }
+                        Section {
+                            LabeledContent("Итого", value: total, format: .currency(code: "KGS"))
+                            if auth.session == nil {
+                                Text("Войдите по SMS-коду во вкладке «Кабинет».").font(.caption).foregroundStyle(.secondary)
+                            }
+                            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                            Button {
+                                Task { await checkout() }
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if isSubmitting { ProgressView() } else { Text("Оформить заказ").fontWeight(.semibold) }
+                                    Spacer()
+                                }
+                            }
+                            .disabled(isSubmitting || auth.session == nil || (fulfillment == "courier" && address.trimmingCharacters(in: .whitespaces).isEmpty))
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Корзина")
+        }
+    }
+
+    private func quantityBinding(_ id: String) -> Binding<Int> {
+        Binding(
+            get: { cart[id] ?? 0 },
+            set: { value in
+                if value == 0 { cart.removeValue(forKey: id) } else { cart[id] = value }
+            }
+        )
+    }
+
+    private func checkout() async {
+        guard let session = auth.session else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        let request = CreateOrderRequest(
+            customerId: session.customerId,
+            fulfillmentType: fulfillment,
+            pickupPoint: fulfillment == "pickup" ? "BISHKEK-1" : nil,
+            deliveryAddress: fulfillment == "courier" ? address.trimmingCharacters(in: .whitespaces) : nil,
+            total: total,
+            items: lines.map { CreateOrderItem(sku: $0.0.sku, qty: $0.1, price: $0.0.price) }
+        )
+        do {
+            let order: CustomerOrder = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "orders/mine",
+                body: request,
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+            completedOrder = order
+            cart.removeAll()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -156,10 +292,10 @@ private struct AccountView: View {
 }
 
 private struct CatalogView: View {
-    let environment: AppEnvironment
-    @State private var products: [Product] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
+    let products: [Product]
+    let isLoading: Bool
+    let errorMessage: String?
+    @Binding var cart: [String: Int]
 
     var body: some View {
         NavigationStack {
@@ -173,7 +309,7 @@ private struct CatalogView: View {
                 } else {
                     List(products) { product in
                         NavigationLink {
-                            ProductDetail(product: product)
+                            ProductDetail(product: product, cart: $cart)
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(product.name).font(.headline)
@@ -193,26 +329,13 @@ private struct CatalogView: View {
                 }
             }
             .navigationTitle("AliStore")
-            .task { await load() }
-            .refreshable { await load() }
-        }
-    }
-
-    private func load() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
-            products = response.items
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }
 
 private struct ProductDetail: View {
     let product: Product
+    @Binding var cart: [String: Int]
 
     var body: some View {
         List {
@@ -223,7 +346,9 @@ private struct ProductDetail: View {
                 LabeledContent("Доступно", value: "\(product.availableUnits)")
             }
             Section {
-                Button("Добавить в корзину", systemImage: "bag.badge.plus") {}
+                Button("Добавить в корзину", systemImage: "bag.badge.plus") {
+                    cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+                }
                     .disabled(product.availableUnits == 0)
             }
         }

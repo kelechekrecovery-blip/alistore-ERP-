@@ -58,6 +58,32 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
     }
 
+    func testCreatesIdempotentNativeOrder() async throws {
+        let session = makeSession(status: 201, body: """
+        {"id":"o2","channel":"mobile","fulfillmentType":"pickup","pickupPoint":"BISHKEK-1","deliveryAddress":null,"deliverySlot":null,"pickupCode":null,"status":"created","total":109900,"createdAt":"2026-07-12T12:00:00Z","items":[{"sku":"IP-1","qty":1,"price":109900,"imei":null}]}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let input = CreateOrderRequest(
+            customerId: "customer-1",
+            fulfillmentType: "pickup",
+            pickupPoint: "BISHKEK-1",
+            deliveryAddress: nil,
+            total: 109900,
+            items: [CreateOrderItem(sku: "IP-1", qty: 1, price: 109900)]
+        )
+
+        let order: CustomerOrder = try await client.post(
+            "orders/mine",
+            body: input,
+            token: "access-1",
+            idempotencyKey: "native-order-1"
+        )
+
+        XCTAssertEqual(order.id, "o2")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/orders/mine")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "native-order-1")
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)

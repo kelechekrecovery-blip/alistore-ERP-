@@ -58,6 +58,15 @@ export class OrdersController {
     return this.orders.listByCustomer(user.customerId);
   }
 
+  @ApiOperation({ summary: 'Create an order for the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ description: 'Customer-owned order created.' })
+  @Post('mine')
+  @UseGuards(JwtAuthGuard)
+  createMine(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateOrderDto) {
+    return this.orders.create({ ...dto, customerId: user.customerId, channel: 'mobile' }, user.customerId);
+  }
+
   @ApiOperation({ summary: 'List orders by status — staff fulfillment queue' })
   @ApiBearerAuth()
   @ApiOkResponse({ description: 'Orders in the given status, newest first.' })
