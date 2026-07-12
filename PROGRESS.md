@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: execute Master Plan iteration 2, remaining desktop storefront entry routes.
+- Files changed: desktop favorites, compare, login and account overview surfaces; shared responsive login styling; storefront route Playwright regression; design/readiness/backlog tracking.
+- Result: search routes into the aligned catalog, while favorites, compare, OTP login and authenticated account overview now use the exact `alistore-shop.html` gray canvas, white surfaces, line borders, black primary actions and coral accents on desktop. Existing storage, comparison, authentication and account behavior is preserved; phone views retain the dark Client App handoff.
+- Checks run: Next production build; focused route Playwright 1/1; full Playwright 21/21; browser failure-state inspection exposed and removed a test dependency on the global OTP request budget; `git diff --check`.
+- Outcome: all main desktop customer entry and purchase routes are accepted. Account subroutes and support/trade-in/warranty still require the exact desktop pass and remain explicitly tracked.
+- Next step: align account subroutes and self-service pages, then start Android Client OTP/session parity.
+
+## 2026-07-12
+
 - Task: execute Master Plan iteration 1, exact desktop customer purchase vertical.
 - Files changed: shared desktop ProductCard, catalog, product, cart and desktop checkout tokens; storefront and checkout Playwright regressions; design/readiness/backlog tracking.
 - Result: desktop `catalog → product → cart → checkout` now uses the archived `alistore-shop.html` system: `#f5f5f7` canvas, white surfaces, `#e5e5e7` borders, Manrope-compatible density, compact four-column cards, ratings/spec tags, stock/credit rows, real product images, black cart actions and coral checkout CTA. Existing data hooks, filters, favorites, compare, quantity, promo/bonus and sandbox payment behavior remain intact. Phone routes retain the dark Client App handoff.

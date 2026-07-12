@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { resetDb, seedProduct } from './helpers';
+import { sign } from 'jsonwebtoken';
+import { prisma, resetDb, seedProduct } from './helpers';
 
 test('desktop storefront matches the AliStore shop prototype', async ({ page }) => {
   await resetDb();
@@ -84,4 +85,33 @@ test('desktop catalog, product and cart keep the exact shop visual system', asyn
   await expect(page.locator('.md\\:block').getByRole('link', { name: product.name, exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Перейти к оформлению' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+});
+
+test('remaining desktop customer routes use the shop system through account entry', async ({ page }) => {
+  await resetDb();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto('/search?q=iphone');
+  await expect(page).toHaveURL(/\/catalog\?q=iphone$/);
+
+  await page.goto('/favorites');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  await page.goto('/compare');
+  expect(await page.locator('main').locator('..').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  await page.goto('/login?next=/account');
+  expect(await page.locator('.login-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+
+  const customer = await prisma.customer.create({ data: { phone: '+996700990021' } });
+  const accessToken = sign(
+    { sub: customer.id, phone: customer.phone, typ: 'customer' },
+    'dev-secret-alistore-local',
+    { expiresIn: '1h' },
+  );
+  await page.evaluate((tokens) => {
+    localStorage.setItem('alistore.auth.v1', JSON.stringify(tokens));
+  }, { accessToken, refreshToken: 'visual-route-test' });
+  await page.goto('/account');
+  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
 });

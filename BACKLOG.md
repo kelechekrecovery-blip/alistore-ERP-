@@ -2,7 +2,7 @@
 
 ## Next
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
-- Extend the exact `alistore-shop.html` desktop visual system from the aligned home/catalog/product/cart/checkout into search, favorites, compare, login and account routes without changing their business flows.
+- Extend the exact `alistore-shop.html` desktop visual system from the aligned account overview into account order/detail, addresses, bonuses, devices, returns, protection and settings plus support, trade-in and warranty, without changing their business flows.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
 - Close native Android feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
@@ -22,6 +22,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Align search, favorites, compare, login and account overview to the exact `alistore-shop.html` desktop system while preserving the dark native-style phone flow; add deterministic authenticated route coverage without weakening the global OTP abuse limit.
 - Align the desktop purchase vertical `catalog → product → cart → checkout` to the exact `alistore-shop.html` system: gray canvas, white/line surfaces, dense four-column product anatomy, real product assets, black cart actions and unchanged dark Client App mobile flow, with production build, 1440px screenshot and full 20-flow Playwright gate.
 - Align the native Android Client shell to `AliStore Клиент App 2.0`: dark coral/lime home, service offers, category rail, product hero/grid, working favorites/cart sets, account menu and exact five-tab navigation, with four-APK build/Lint and emulator visual smoke.
 - Close the remaining Phase 0 guest IDOR surface: require short-lived customer-bound capabilities for support, warranty, trade-in and Evidence Vault, preserve customer JWT/staff RBAC paths, verify Evidence entity ownership and reject cross-customer access.

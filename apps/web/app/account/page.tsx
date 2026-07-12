@@ -41,13 +41,13 @@ export default function AccountPage() {
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account'); }, [hydrated, user, router]);
   useEffect(() => { if (user) authed(fetchMyOrders).then(setOrders).catch(() => setOrders([])); }, [user, authed]);
 
-  if (!hydrated || !user) return <div className="min-h-screen bg-sand text-[#6E645C]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
+  if (!hydrated || !user) return <div className="min-h-screen bg-[#f5f5f7] text-[#4a4a4a]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
   return <>
     <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} onLogout={async () => { await logout(); router.push('/'); }} /></div>
-    <div className="hidden min-h-screen bg-sand text-ink md:block">
+    <div className="hidden min-h-screen bg-[#f5f5f7] text-[#0f0f0f] [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
     <SiteHeader />
-    <main className="mx-auto w-[min(1200px,92vw)] py-10 sm:py-14">
+    <main className="mx-auto max-w-[1400px] px-5 py-10">
       <div className="text-xs text-[#8A7F76]">Главная / Кабинет</div>
       <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><h1 className="font-display text-4xl font-extrabold sm:text-5xl">Личный кабинет</h1><p className="mt-3 text-[#6E645C]">Заказы, устройства, гарантия и бонусы в одном месте.</p></div><button type="button" onClick={async () => { await logout(); router.push('/'); }} className="flex items-center gap-2 self-start rounded-[11px] border border-[#DED3C8] bg-white px-4 py-2.5 text-sm text-[#6E645C] hover:border-danger/40 hover:text-danger"><LogOut size={16} /> Выйти</button></div>
 
