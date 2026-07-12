@@ -37,28 +37,28 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
   }
 
   return (
-    <article className="store-card-enter group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/[0.09] bg-white/[0.035] transition duration-300 hover:-translate-y-1.5 hover:border-white/[0.18] hover:bg-white/[0.055] active:scale-[0.99]">
-      <div className="relative aspect-[4/3] overflow-hidden bg-[radial-gradient(circle_at_50%_15%,rgba(249,115,22,.12),transparent_50%),linear-gradient(150deg,#191932,#101021)]">
+    <article className="store-card-enter group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-[#2E2822] bg-[#221E19] transition duration-300 hover:-translate-y-1.5 hover:border-lime/40 hover:bg-[#2A2620] active:scale-[0.99]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#2A2620] to-[#16130F]">
         <Link href={href} className="absolute inset-0" aria-label={product.name}>
           <Image src={productImage(product)} alt={product.name} fill sizes="(max-width: 700px) 50vw, 280px" className="object-contain p-5 transition duration-500 group-hover:scale-[1.06]" />
         </Link>
-        <span className="absolute left-3 top-3 rounded-full border border-[#f97316]/30 bg-[#f97316]/15 px-2.5 py-1 text-[11px] font-semibold text-[#fb9a4b]">{condition}</span>
-        <button type="button" onClick={() => toggle(product.id)} aria-label={has(product.id) ? 'Удалить из избранного' : 'Добавить в избранное'} className={`absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-[10px] border border-white/[0.09] bg-[#0c0c17]/70 backdrop-blur ${has(product.id) ? 'text-[#f97316]' : 'text-[#a2a6b6] hover:text-white'}`}>
+        <span className="absolute left-3 top-3 rounded-full border border-coral/30 bg-coral/15 px-2.5 py-1 text-[11px] font-semibold text-[#FF8A5F]">{condition}</span>
+        <button type="button" onClick={() => toggle(product.id)} aria-label={has(product.id) ? 'Удалить из избранного' : 'Добавить в избранное'} className={`absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-[10px] border border-[#2E2822] bg-[#14110E]/70 backdrop-blur ${has(product.id) ? 'text-coral' : 'text-[#A79C92] hover:text-white'}`}>
           <Heart size={17} fill={has(product.id) ? 'currentColor' : 'none'} />
         </button>
       </div>
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center justify-between gap-2 text-[11px]">
-          <span className="truncate uppercase tracking-[0.08em] text-[#6c7080]">{product.category}</span>
-          <span className={inStock ? 'text-[#7ee2a0]' : 'text-[#f4c27d]'}>{inStock ? `${product.availableUnits} в наличии` : 'Под заказ'}</span>
+          <span className="truncate uppercase tracking-[0.08em] text-[#8A7F76]">{product.category}</span>
+          <span className={inStock ? 'text-lime' : 'text-warn'}>{inStock ? `${product.availableUnits} в наличии` : 'Под заказ'}</span>
         </div>
-        <Link href={href} className="mt-2 min-h-[44px] text-[15px] font-medium leading-[1.45] text-[#f6f7fb] transition hover:text-[#fb9a4b]">{product.name}</Link>
+        <Link href={href} className="mt-2 min-h-[44px] text-[15px] font-medium leading-[1.45] text-white transition hover:text-lime">{product.name}</Link>
         <div className="mt-auto flex items-end justify-between gap-3 pt-4">
           <div>
             <div className="font-display text-xl font-bold text-white">{som(product.price)}</div>
-            <div className="mt-1 text-[11px] text-[#6c7080]">+{Math.max(1, Math.floor(product.price / 100))} бонусов</div>
+            <div className="mt-1 text-[11px] text-[#8A7F76]">+{Math.max(1, Math.floor(product.price / 100))} бонусов</div>
           </div>
-          <button type="button" disabled={!inStock} onClick={addToCart} title={added ? 'Добавлено' : 'В корзину'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-[11px] transition disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-[#5f6372] ${added ? 'bg-[#22c55e] text-white' : 'bg-[#f97316] text-[#180f02] hover:bg-[#fb9a4b]'}`}>
+          <button type="button" disabled={!inStock} onClick={addToCart} title={added ? 'Добавлено' : 'В корзину'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-[11px] transition disabled:cursor-not-allowed disabled:bg-[#2E2822] disabled:text-[#6E645C] ${added ? 'bg-success text-white' : 'bg-lime text-lime-ink hover:brightness-95'}`}>
             <ShoppingBag size={18} />
           </button>
         </div>
