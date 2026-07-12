@@ -27,7 +27,7 @@ is not the final App Store/Google Play artifact.
 
 | App | iOS SwiftUI | Android Kotlin | Remaining feature parity |
 |---|---|---|---|
-| Client | Native target builds and runs; live catalog, cart/quantity, pickup/courier checkout, JWT-owned idempotent order/payment intents, persistent SwiftData order queue with foreground replay/conflict/manual retry, card/MBank/O!Деньги/installment handoff, payment-return reconciliation, OTP/Keychain refresh, protected orders, owned-device warranty, APNs permission/token/customer registry and typed API | Native Compose APK builds with prototype-aligned home, catalog, favorites, cart, account and five-tab shell; typed API, Keystore and SQLite/WorkManager queue foundation | iOS live APNs delivery plus final visual/device smoke; Android OTP/checkout/payment/account vertical parity |
+| Client | Native target builds and runs; live catalog, cart/quantity, pickup/courier checkout, JWT-owned idempotent order/payment intents, persistent SwiftData order queue with foreground replay/conflict/manual retry, card/MBank/O!Деньги/installment handoff, payment-return reconciliation, OTP/Keychain refresh, protected orders, owned-device warranty, APNs permission/token/customer registry and typed API | Native Compose APK builds with prototype-aligned home/catalog/favorites/cart/account shell; typed OTP, encrypted access/refresh pair, refresh-on-restore, server logout, Keystore and SQLite/WorkManager queue foundation | iOS live APNs delivery plus final visual/device smoke; Android checkout/payment/orders/account-data parity |
 | Staff | Native target builds; staff login; live order fulfillment queue; Customer 360 and guarded warranty SLA; camera EAN/QR/Code128 scanner with manual fallback; camera/photo Evidence Vault upload for all supported entity types; live reconciled shift lifecycle through staff JWT and RBAC | Separate Compose APK builds with role shell and shared secure/offline core | physical-device scanner/camera certification, full support actions, general tasks and push |
 | Courier | Native target builds; staff login and route/COD shell | Separate Compose APK builds with role shell and shared secure/offline core | assigned runs, map/navigation, delivery transitions, evidence, COD handover |
 | POS | Native target builds; staff login and sale/offline shell | Separate Compose APK builds with role shell and shared secure/offline core | catalog sync, scanner, ticket, split tender, approval, receipt/hardware, replay |
@@ -45,13 +45,13 @@ Shared Android foundation:
 
 - Four independently installable Kotlin/Jetpack Compose application modules and
   one shared Android library.
-- Typed REST catalog client with server-error propagation and strict API URL validation.
-- Android Keystore AES-GCM token encryption; ciphertext alone is stored in preferences.
+- Typed REST catalog/auth client with server-error propagation and strict API URL validation.
+- Android Keystore AES-GCM access/refresh encryption, refresh-on-401 restore and server logout; ciphertext alone is stored in preferences.
 - SQLite-backed persistent mutation queue with unique idempotency keys and a
   WorkManager replay worker.
 - Custom deep-link schemes, emulator-local Debug API and cleartext disabled in Release.
-- All four Debug and release-configured APKs build; unit tests and Android Lint pass.
-  Client, Staff, Courier and POS cold-launch successfully on an Android API 36 emulator.
+- All four Debug APKs build; unit tests, Android Lint and Client Compose auth tests pass.
+  Client OTP/login and process-restart session restore are verified against the local API on Android API 36.
 
 ## Execution order
 

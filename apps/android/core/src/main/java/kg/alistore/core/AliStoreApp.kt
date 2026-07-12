@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,12 +72,17 @@ fun AliStoreApp(role: AppRole, apiBaseUrl: String) {
 
 @Composable
 private fun ClientApp(apiBaseUrl: String) {
+  val context = LocalContext.current.applicationContext
   var selected by remember { mutableStateOf(0) }
   var products by remember { mutableStateOf<List<Product>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var favorites by remember { mutableStateOf(setOf<String>()) }
   var cart by remember { mutableStateOf(setOf<String>()) }
+  var authState by remember { mutableStateOf<AuthState>(AuthState.Restoring) }
+  val authManager = remember(apiBaseUrl) {
+    AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"))
+  }
   val tabs = listOf(
     ClientTab("Главная", Icons.Default.Home),
     ClientTab("Каталог", Icons.Default.Search),
@@ -91,6 +97,7 @@ private fun ClientApp(apiBaseUrl: String) {
       .onFailure { error = it.message }
     loading = false
   }
+  LaunchedEffect(authManager) { authState = authManager.restore() }
 
   MaterialTheme {
     Scaffold(
@@ -115,7 +122,7 @@ private fun ClientApp(apiBaseUrl: String) {
         selected == 1 -> ProductGrid("Каталог", products, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
         selected == 2 -> ProductGrid("Избранное", products.filter { it.id in favorites }, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
         selected == 3 -> ProductGrid("Корзина", products.filter { it.id in cart }, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
-        else -> ClientAccount(favorites.size, cart.size, Modifier.padding(padding))
+        else -> ClientAccount(authState, authManager, { authState = it }, favorites.size, cart.size, Modifier.padding(padding))
       }
     }
   }
@@ -231,17 +238,6 @@ private fun ServiceTile(title: String, detail: String, color: Color, modifier: M
   Column(modifier.background(color, RoundedCornerShape(8.dp)).padding(14.dp)) {
     Text(title, color = content, fontSize = 17.sp, fontWeight = FontWeight.Black)
     Text(detail, color = content.copy(alpha = .76f), fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
-  }
-}
-
-@Composable
-private fun ClientAccount(favoriteCount: Int, cartCount: Int, modifier: Modifier = Modifier) {
-  LazyColumn(modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    item { Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(bottom = 8.dp)) }
-    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Адреса", "Поддержка", "Настройки")) { title ->
-      Text(title, color = Color.White, modifier = Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(8.dp)).padding(16.dp))
-    }
-    item { Text("Избранное: $favoriteCount · Корзина: $cartCount", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
   }
 }
 

@@ -6,7 +6,10 @@ plugins {
 android {
   namespace = "kg.alistore.core"
   compileSdk = 36
-  defaultConfig { minSdk = 26 }
+  defaultConfig {
+    minSdk = 26
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -19,6 +22,7 @@ kotlin { jvmToolchain(17) }
 dependencies {
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
+  androidTestImplementation(composeBom)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.material3)
@@ -27,5 +31,10 @@ dependencies {
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.androidx.work.runtime.ktx)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation(libs.androidx.compose.ui.test.manifest)
   testImplementation(libs.junit)
+  testImplementation(libs.kotlinx.coroutines.test)
+  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+  androidTestImplementation(libs.androidx.test.ext.junit)
+  androidTestImplementation(libs.androidx.test.runner)
 }

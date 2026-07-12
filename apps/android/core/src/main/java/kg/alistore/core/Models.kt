@@ -20,3 +20,9 @@ data class PendingMutation(
   val attempts: Int,
   val createdAt: Long,
 )
+
+data class AuthTokens(val accessToken: String, val refreshToken: String)
+
+data class AuthUser(val customerId: String, val phone: String?, val type: String)
+
+data class OtpChallenge(val devCode: String?)

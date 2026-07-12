@@ -7,7 +7,7 @@ shared Android core:
 - `:staff` — Staff (`kg.alistore.staff`)
 - `:courier` — Courier (`kg.alistore.courier`)
 - `:pos` — POS (`kg.alistore.pos`)
-- `:core` — typed API, Android Keystore token encryption, SQLite offline queue,
+- `:core` — typed API/auth, Android Keystore session encryption, SQLite offline queue,
   WorkManager replay and shared role-aware Compose shell.
 
 Debug builds use `http://10.0.2.2:4000/api`. Release builds fail before compilation
@@ -17,4 +17,10 @@ unless the release pipeline injects an HTTPS endpoint through
 ```bash
 cd apps/android
 ./gradlew :app:assembleDebug :staff:assembleDebug :courier:assembleDebug :pos:assembleDebug
+./gradlew :core:connectedDebugAndroidTest
 ```
+
+The Client authenticates through phone OTP, stores the access/refresh pair encrypted
+with Android Keystore, refreshes an expired access token during process restore, and
+revokes the refresh session on logout. Dev OTP autofill appears only when the API
+explicitly returns `devCode`; production builds rely on the configured SMS provider.

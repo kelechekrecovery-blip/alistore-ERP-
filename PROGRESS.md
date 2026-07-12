@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: execute Master Plan Android iteration 1, native Client OTP and durable customer session.
+- Files changed: typed Android auth models/gateway, API client auth endpoints, Keystore access/refresh storage, session manager, Compose OTP/signed-in account UI, JVM and instrumentation tests, Android architecture/readme/backlog tracking.
+- Result: the Compose Client requests and verifies phone OTP, persists both tokens using AES-GCM/Android Keystore, restores the customer through `/auth/me`, refreshes once after access-token 401, clears revoked/corrupt sessions and performs best-effort server logout before local removal. The cabinet now shows the server-derived phone instead of a static guest list; dev-code autofill depends solely on API `devCode`.
+- Checks run: core JVM auth tests 5/5; Client Kotlin compilation; Compose instrumentation 2/2 on `savio_api36_arm64`; four debug APK builds; all-module unit tests and Android Lint; real emulator OTP request/verify against `10.0.2.2:4000`; signed-in account screenshot `/tmp/alistore-android-client-account.png`; process `force-stop/start` session-restore smoke; `git diff --check`.
+- Outcome: Android Client OTP/session parity is accepted. Real SMS remains an external provider certification; cart quantity, checkout/payment, orders and account data are the next native Client vertical.
+- Next step: implement Android cart quantities and JWT-owned idempotent pickup/courier checkout, then payment handoff and order history.
+
+## 2026-07-13
+
 - Task: execute Master Plan iteration 4, complete the custom desktop customer account contour.
 - Files changed: shared responsive account-detail frame; devices, order detail, Event Ledger status and warranty certificate routes; Next 16 dynamic route wrappers; seeded desktop/mobile Playwright regression; design/backlog tracking.
 - Result: customer-owned devices, order details, order timeline and warranty certificates now use the exact gray/white storefront system on desktop and retain the fixed dark Client App shell at 402px. The browser regression exposed that three Next 16 routes still treated `params` synchronously; all now await server route params, restoring actual order/status/warranty data loading.
