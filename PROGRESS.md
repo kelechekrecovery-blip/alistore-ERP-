@@ -945,3 +945,12 @@
 - Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: all four SwiftUI targets built; AliStoreCore XCTest passed 14/14, including authenticated queue query, fulfillment response and transition contracts.
 - Next step: add native Staff Customer 360 and warranty/support queues, then scanner and Evidence Vault capture.
+
+## 2026-07-12
+
+- Task: add native SwiftUI Staff Customer 360 and guarded warranty operations.
+- Files changed: `apps/ios/Shared/{APIClient,Models}.swift`, `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Tests/APIClientTests.swift`, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: Staff can open an authenticated customer aggregate by internal ID and inspect role-masked contact data, LTV, consent, segments, purchases, paid spend, open debt, warranty cases and support tickets. Warranty rows expose SLA/overdue state and only the next permitted server transition; typed PATCH transport submits the action and reloads the authoritative aggregate.
+- Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: all four SwiftUI targets built; AliStoreCore XCTest passed 16/16, including Customer 360 masked-PII decoding, authenticated transport and warranty PATCH contract.
+- Next step: implement native barcode/IMEI scanner input and Evidence Vault image capture/upload for Staff operations.

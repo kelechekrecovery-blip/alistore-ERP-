@@ -167,6 +167,81 @@ public struct EmptyRequest: Encodable, Sendable {
     public init() {}
 }
 
+public struct Customer360: Decodable, Sendable {
+    public let customer: Customer360Profile
+    public let orders: Customer360Orders
+    public let debts: Customer360Debts
+    public let warranties: Customer360Warranties
+    public let tickets: Customer360Tickets
+}
+
+public struct Customer360Profile: Decodable, Sendable {
+    public let id: String
+    public let name: String
+    public let phone: String
+    public let consent: Bool
+    public let segments: [String]
+    public let ltv: Int
+    public let createdAt: Date
+}
+
+public struct Customer360Order: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let status: String
+    public let total: Int
+    public let createdAt: Date
+}
+
+public struct Customer360Orders: Decodable, Sendable {
+    public let total: Int
+    public let spent: Int
+    public let recent: [Customer360Order]
+}
+
+public struct Customer360Debt: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let balance: Int
+    public let status: String
+    public let dueDate: Date
+}
+
+public struct Customer360Debts: Decodable, Sendable {
+    public let count: Int
+    public let openBalance: Int
+    public let items: [Customer360Debt]
+}
+
+public struct Customer360Warranty: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let imei: String
+    public let status: String
+    public let sla: Date
+}
+
+public struct Customer360Warranties: Decodable, Sendable {
+    public let open: Int
+    public let items: [Customer360Warranty]
+}
+
+public struct Customer360Ticket: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let subject: String
+    public let status: String
+    public let priority: String
+    public let sla: Date
+}
+
+public struct Customer360Tickets: Decodable, Sendable {
+    public let open: Int
+    public let items: [Customer360Ticket]
+}
+
+public struct WarrantyStatusRequest: Encodable, Sendable {
+    public let status: String
+
+    public init(status: String) { self.status = status }
+}
+
 public struct CreateOrderItem: Codable, Sendable {
     public let sku: String
     public let qty: Int

@@ -31,10 +31,174 @@ private struct StaffRootView: View {
             EmptyStateView(title: "Сканер", detail: "IMEI, приёмка и инвентаризация.", symbol: "barcode.viewfinder")
                 .tabItem { Label("Сканер", systemImage: "barcode.viewfinder") }
             NavigationStack {
+                Customer360View(session: session)
+            }
+            .tabItem { Label("Клиенты", systemImage: "person.2") }
+            NavigationStack {
                 StaffShiftView(session: session, logout: logout)
             }
             .tabItem { Label("Смена", systemImage: "clock") }
         }
+    }
+}
+
+private struct Customer360View: View {
+    let session: StaffSession
+    @State private var customerId = ""
+    @State private var overview: Customer360?
+    @State private var isLoading = false
+    @State private var busyWarrantyId: String?
+    @State private var errorMessage: String?
+    private let environment = AppEnvironment.live()
+
+    var body: some View {
+        List {
+            Section("Customer 360") {
+                TextField("ID клиента", text: $customerId)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Button("Открыть профиль", systemImage: "magnifyingglass") { Task { await loadOverview() } }
+                    .disabled(customerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+            }
+            if isLoading {
+                Section { ProgressView("Загружаем профиль…") }
+            }
+            if let errorMessage {
+                Section { Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
+            }
+            if let overview {
+                profileSections(overview)
+            } else if !isLoading && errorMessage == nil {
+                Section {
+                    ContentUnavailableView("Выберите клиента", systemImage: "person.text.rectangle", description: Text("Введите внутренний ID из заказа или сканера."))
+                }
+            }
+        }
+        .navigationTitle("Клиенты")
+        .refreshable { if overview != nil { await loadOverview() } }
+    }
+
+    @ViewBuilder
+    private func profileSections(_ overview: Customer360) -> some View {
+        Section("Профиль") {
+            LabeledContent("Имя", value: overview.customer.name)
+            LabeledContent("Телефон", value: overview.customer.phone)
+            LabeledContent("LTV", value: money(overview.customer.ltv))
+            LabeledContent("Согласие", value: overview.customer.consent ? "Есть" : "Нет")
+            if !overview.customer.segments.isEmpty {
+                LabeledContent("Сегменты", value: overview.customer.segments.joined(separator: ", "))
+            }
+        }
+        Section("Покупки") {
+            LabeledContent("Заказов", value: String(overview.orders.total))
+            LabeledContent("Оплачено", value: money(overview.orders.spent))
+            ForEach(overview.orders.recent) { order in
+                LabeledContent("#\(order.id.suffix(6)) · \(order.status)", value: money(order.total))
+            }
+        }
+        Section("Финансы и обращения") {
+            LabeledContent("Открытый долг", value: money(overview.debts.openBalance))
+            LabeledContent("Гарантий", value: String(overview.warranties.open))
+            LabeledContent("Тикетов", value: String(overview.tickets.open))
+        }
+        if !overview.warranties.items.isEmpty {
+            Section("Гарантия") {
+                ForEach(overview.warranties.items) { warranty in
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack {
+                            Text(warranty.imei).font(.subheadline.monospaced())
+                            Spacer()
+                            Text(warranty.status).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Label(
+                            warranty.sla.formatted(date: .abbreviated, time: .omitted),
+                            systemImage: warranty.sla < Date() ? "exclamationmark.circle.fill" : "clock"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(warranty.sla < Date() ? .red : .secondary)
+                        if let next = nextWarrantyStatus(warranty.status) {
+                            Button(warrantyActionLabel(next), systemImage: "arrow.right.circle") {
+                                Task { await transitionWarranty(warranty.id, to: next) }
+                            }
+                            .disabled(busyWarrantyId != nil)
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+        }
+        if !overview.tickets.items.isEmpty {
+            Section("Поддержка") {
+                ForEach(overview.tickets.items) { ticket in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ticket.subject).fontWeight(.semibold)
+                        Text("\(ticket.priority) · \(ticket.status)").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func loadOverview() async {
+        let id = customerId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            overview = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "customers/\(id)/overview",
+                token: session.accessToken
+            )
+        } catch {
+            overview = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func transitionWarranty(_ id: String, to status: String) async {
+        busyWarrantyId = id
+        errorMessage = nil
+        defer { busyWarrantyId = nil }
+        do {
+            let _: WarrantyCase = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                "warranty/\(id)",
+                body: WarrantyStatusRequest(status: status),
+                token: session.accessToken
+            )
+            await loadOverview()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func nextWarrantyStatus(_ status: String) -> String? {
+        switch status {
+        case "created": "received"
+        case "received": "diagnostics"
+        case "diagnostics": "approved"
+        case "waiting_supplier": "approved"
+        case "approved": "repaired"
+        case "repaired", "rejected", "replaced": "closed"
+        default: nil
+        }
+    }
+
+    private func warrantyActionLabel(_ status: String) -> String {
+        switch status {
+        case "received": "Принять устройство"
+        case "diagnostics": "Начать диагностику"
+        case "approved": "Согласовать ремонт"
+        case "repaired": "Ремонт завершён"
+        case "closed": "Закрыть обращение"
+        default: status
+        }
+    }
+
+    private func money(_ amount: Int) -> String {
+        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
     }
 }
 

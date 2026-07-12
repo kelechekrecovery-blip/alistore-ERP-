@@ -4,6 +4,37 @@ import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    func testDecodesStaffCustomer360AndMaskedPII() async throws {
+        let session = makeSession(status: 200, body: """
+        {"customer":{"id":"customer-1","name":"Тест","phone":"+996******00","consent":true,"segments":["vip"],"ltv":150000,"createdAt":"2026-07-12T12:00:00Z"},"orders":{"total":1,"spent":109900,"recent":[{"id":"order-1","status":"paid","total":109900,"createdAt":"2026-07-12T12:00:00Z"}]},"debts":{"count":1,"openBalance":40100,"items":[{"id":"debt-1","balance":40100,"status":"open","dueDate":"2026-08-12T12:00:00Z"}]},"warranties":{"open":1,"items":[{"id":"warranty-1","imei":"123456789012345","status":"created","sla":"2026-07-26T12:00:00Z"}]},"tickets":{"open":1,"items":[{"id":"ticket-1","subject":"Доставка","status":"new","priority":"high","sla":"2026-07-13T12:00:00Z"}]}}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let overview: Customer360 = try await client.get("customers/customer-1/overview", token: "staff-token")
+
+        XCTAssertEqual(overview.customer.phone, "+996******00")
+        XCTAssertEqual(overview.orders.spent, 109900)
+        XCTAssertEqual(overview.warranties.items.first?.status, "created")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+    }
+
+    func testPatchesStaffWarrantyTransition() async throws {
+        let session = makeSession(status: 200, body: """
+        {"id":"warranty-1","imei":"123456789012345","customerId":"customer-1","problem":"Не включается","status":"received","sla":"2026-07-26T12:00:00Z"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let warranty: WarrantyCase = try await client.patch(
+            "warranty/warranty-1",
+            body: WarrantyStatusRequest(status: "received"),
+            token: "staff-token"
+        )
+
+        XCTAssertEqual(warranty.status, "received")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "PATCH")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/warranty/warranty-1")
+    }
+
     func testDecodesStaffOrderQueue() async throws {
         let session = makeSession(status: 200, body: """
         [{"id":"order-1","channel":"web","fulfillmentType":"pickup","pickupPoint":"BISHKEK-1","deliveryAddress":null,"deliverySlot":null,"pickupCode":"PU-123","status":"created","total":109900,"createdAt":"2026-07-12T12:00:00Z","items":[{"sku":"IP-1","qty":1,"price":109900,"imei":null}],"customer":{"phone":"+996555000000","name":"Тест"}}]

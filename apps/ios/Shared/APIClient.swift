@@ -57,6 +57,16 @@ public actor APIClient {
         let _: EmptyResponse = try await request(path, method: "POST", token: token, body: encoded, as: EmptyResponse.self)
     }
 
+    public func patch<Body: Encodable & Sendable, Response: Decodable & Sendable>(
+        _ path: String,
+        body: Body,
+        token: String? = nil,
+        as type: Response.Type = Response.self
+    ) async throws -> Response {
+        let encoded = try JSONEncoder().encode(body)
+        return try await request(path, method: "PATCH", token: token, body: encoded, as: type)
+    }
+
     private func request<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
