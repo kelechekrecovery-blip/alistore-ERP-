@@ -90,9 +90,15 @@ final class APIClientTests: XCTestCase {
         """)
         let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
 
+        let request = CreatePaymentIntentRequest(
+            orderId: "o2",
+            method: .qrMBank,
+            amount: 109900,
+            returnUrl: "alistore://payment-return?orderId=o2"
+        )
         let intent: PaymentIntent = try await client.post(
             "payments/intents/mine",
-            body: CreatePaymentIntentRequest(orderId: "o2", method: .qrMBank, amount: 109900),
+            body: request,
             token: "access-1",
             idempotencyKey: "native-payment-1"
         )
@@ -101,6 +107,9 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(intent.qrPayload, "MBANK|o2|109900")
         XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/payments/intents/mine")
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
+        let body = try JSONEncoder().encode(request)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["returnUrl"] as? String, "alistore://payment-return?orderId=o2")
     }
 
     func testDecodesCustomerDevices() async throws {

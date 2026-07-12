@@ -900,3 +900,12 @@
 - Checks run: `git diff --check`; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: all four SwiftUI targets built; AliStoreCore XCTest passed 8/8 including device decoding, bearer-auth transport, warranty request path/idempotency, and case/SLA decoding.
 - Next step: finish iOS Client with payment deep-link reconciliation, native APNs registration, and offline command replay before starting the iOS Staff parity wave.
+
+## 2026-07-12
+
+- Task: finish native iOS payment-return routing and server status reconciliation.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Tests/APIClientTests.swift`, generated iOS project, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: payment intents now carry `alistore://payment-return?orderId=...`; the app routes that callback directly to Orders and reloads owner-scoped status from the API. Returning to foreground from a bank/payment app also triggers reconciliation, so the Client never infers payment success locally.
+- Checks run: `git diff --check`; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator. A brittle raw-body assertion failed twice because URLProtocol does not retain streamed request bodies; it was replaced with structured JSON encoding validation and the full gate was rerun.
+- Outcome: all four SwiftUI targets built; final AliStoreCore XCTest passed 8/8, including exact payment return URL encoding. No failed test remains.
+- Next step: implement native APNs token registration and offline command replay, then start iOS Staff operational parity.

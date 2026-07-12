@@ -2,6 +2,10 @@ import AliStoreCore
 import SwiftData
 import SwiftUI
 
+private enum ClientTab: Hashable {
+    case catalog, cart, orders, account
+}
+
 @main
 struct AliStoreClientApp: App {
     private let container = OfflineStore.container()
@@ -19,6 +23,9 @@ private struct ClientRootView: View {
     @State private var catalogLoading = true
     @State private var catalogError: String?
     @State private var cart: [String: Int] = [:]
+    @State private var selectedTab: ClientTab = .catalog
+    @State private var orderRefreshRevision = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -26,22 +33,34 @@ private struct ClientRootView: View {
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart)
                 .tabItem { Label("Каталог", systemImage: "square.grid.2x2") }
+                .tag(ClientTab.catalog)
             CartView(environment: environment, auth: auth, products: products, cart: $cart)
                 .tabItem { Label("Корзина", systemImage: "bag") }
                 .badge(cart.values.reduce(0, +))
-            OrdersView(environment: environment, auth: auth)
+                .tag(ClientTab.cart)
+            OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
                 .tabItem { Label("Заказы", systemImage: "shippingbox") }
+                .tag(ClientTab.orders)
             AccountView(environment: environment, auth: auth)
                 .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
+                .tag(ClientTab.account)
         }
         .tint(.orange)
         .task {
             async let restore: Void = auth.restore()
             async let catalog: Void = loadCatalog()
             _ = await (restore, catalog)
+        }
+        .onOpenURL { url in
+            guard url.scheme == "alistore", url.host == "payment-return" else { return }
+            selectedTab = .orders
+            orderRefreshRevision += 1
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, auth.session != nil { orderRefreshRevision += 1 }
         }
     }
 
@@ -193,7 +212,12 @@ private struct CartView: View {
             if let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) {
                 paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
                     "payments/intents/mine",
-                    body: CreatePaymentIntentRequest(orderId: order.id, method: onlineMethod, amount: order.total),
+                    body: CreatePaymentIntentRequest(
+                        orderId: order.id,
+                        method: onlineMethod,
+                        amount: order.total,
+                        returnUrl: "alistore://payment-return?orderId=\(order.id)"
+                    ),
                     token: session.accessToken,
                     idempotencyKey: UUID().uuidString
                 )
@@ -213,6 +237,7 @@ private struct CartView: View {
 private struct OrdersView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
+    let refreshRevision: Int
     @State private var orders: [CustomerOrder] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -248,7 +273,7 @@ private struct OrdersView: View {
                 }
             }
             .navigationTitle("Мои заказы")
-            .task(id: auth.session?.accessToken) { await load() }
+            .task(id: "\(auth.session?.accessToken ?? "guest")-\(refreshRevision)") { await load() }
             .refreshable { await load() }
         }
     }
