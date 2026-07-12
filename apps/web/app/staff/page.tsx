@@ -131,6 +131,7 @@ export default function StaffPage() {
           entityId: opened.id,
           label: 'shift_open_photo',
           actor: session.staffId,
+          accessToken: session.accessToken,
         })
         : [];
       setOpenShiftFiles([]);
@@ -152,6 +153,7 @@ export default function StaffPage() {
           entityId: shift.id,
           label: 'shift_close_photo',
           actor: session.staffId,
+          accessToken: session.accessToken,
         })
         : [];
       setCloseShiftFiles([]);
@@ -219,7 +221,7 @@ export default function StaffPage() {
         price: Number(buybackForm.price),
         sellerPassport: buybackForm.passport.trim(),
         actor: session.staffId,
-      }, session.accessToken);
+      }, { accessToken: session.accessToken, staffIntake: true });
       setTradeIn(result);
       setBuyback(BUYBACK.map(() => true));
       flash('Договор оформлен');

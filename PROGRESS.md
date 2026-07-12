@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: complete Phase 0 residual IDOR closure and certify the full baseline.
+- Files changed: guest capability contract; support, warranty, trade-in and Evidence controllers/services; web customer/staff Evidence clients; security/rate-limit regressions; readiness, gap-map and backlog documentation.
+- Result: anonymous self-service writes now require a signed 30-minute capability bound to the customer and requested action. Customer JWT ownership and active Staff JWT paths are preserved. Evidence uploads resolve the target entity owner server-side; customer/guest access to another customer or staff-only inventory/shift evidence is rejected, and ledger actors are derived from JWT/capability rather than body input.
+- Checks run: clean baseline and post-fix `npm run mvp:verify`; API/web production builds; targeted 5-suite/9-test security gate; all-target iOS build plus XCTest 17/17; four-APK Android build plus unit/Lint; `git diff --check`.
+- Outcome: API 106/106 suites and 392/392 tests; Playwright 19/19; iOS and Android gates green. Phase 0 software gate is complete with zero known Critical/High IDOR defects. Production remains blocked only by external cloud/provider credentials, legal approval and physical-device/hardware certification.
+- Next step: import the managed staging Blueprint when owner accounts exist; meanwhile continue the autonomous software path with Android Client visual/feature parity and exact desktop customer-route styling.
+
+## 2026-07-12
+
 - Task: implement the repository-controlled portion of the public managed-cloud Web MVP launch plan.
 - Files changed: production/staging Render Blueprints, API/web Dockerfiles, CI infrastructure job, production config and health/security, Order demo migration/invariants, R2 backup operation, Sentry web instrumentation, demo UI/receipt, managed-cloud runbook, tests and readiness tracking.
 - Result: public demo orders are marked only by the server and cannot reserve IMEI, move through operations, create Payment rows, mark paid, sell stock or send transactional notices. Sandbox intents remain demonstrable. API/web reject unknown production hosts except health probes; Next exposes `/healthz`, API exposes `/api/health/live` and `/api/health/ready`. Render Frankfurt definitions cover web, API, BullMQ worker, authenticated private Redis, private Meilisearch, paid PostgreSQL/PITR and daily R2 backup; production auto-deploy is disabled for manual approval.

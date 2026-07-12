@@ -32,10 +32,14 @@ export async function openWarranty(input: {
   imei: string;
   customerId: string;
   problem: string;
-}): Promise<WarrantyCase> {
+}, credential: { accessToken?: string; guestCapability?: string }): Promise<WarrantyCase> {
   const res = await fetch(`${API_BASE}/warranty`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(credential.accessToken ? { authorization: `Bearer ${credential.accessToken}` } : {}),
+      ...(credential.guestCapability ? { 'x-guest-capability': credential.guestCapability } : {}),
+    },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`open warranty ${res.status}`);

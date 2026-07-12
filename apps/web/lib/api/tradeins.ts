@@ -21,9 +21,12 @@ export function createTradeIn(input: {
   price: number;
   sellerPassport: string;
   actor?: string;
-}, accessToken?: string): Promise<TradeIn> {
-  if (accessToken) {
-    return postAuthJson('/tradeins/intake', input, accessToken);
+}, credential: { accessToken?: string; guestCapability?: string; staffIntake?: boolean }): Promise<TradeIn> {
+  if (credential.staffIntake && credential.accessToken) {
+    return postAuthJson('/tradeins/intake', input, credential.accessToken);
   }
-  return postJson('/tradeins', input);
+  return postJson('/tradeins', input, {
+    ...(credential.accessToken ? { authorization: `Bearer ${credential.accessToken}` } : {}),
+    ...(credential.guestCapability ? { 'x-guest-capability': credential.guestCapability } : {}),
+  });
 }

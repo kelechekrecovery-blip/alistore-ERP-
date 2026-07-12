@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Headers, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -15,11 +15,13 @@ import {
 import { ValidationError } from '../common/errors';
 import { EvidenceImageDto } from './evidence.dto';
 import { EvidenceService } from './evidence.service';
+import { requireGuestCapability } from '../auth/guest-capability';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 @ApiTags('evidence')
 @Controller('evidence')
 export class EvidenceController {
-  constructor(private readonly evidence: EvidenceService) {}
+  constructor(private readonly evidence: EvidenceService, private readonly staffAuth: StaffAuthService) {}
 
   @ApiOperation({ summary: 'Attach an image evidence file to a domain entity' })
   @ApiConsumes('multipart/form-data')
@@ -42,17 +44,26 @@ export class EvidenceController {
   @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // storage-abuse / cost DoS guard
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 8 * 1024 * 1024 } }))
-  uploadImage(
+  async uploadImage(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: EvidenceImageDto,
     @CurrentUser() user?: AuthPrincipal,
+    @Headers('x-guest-capability') capability?: string,
   ) {
     if (!file) {
       throw new ValidationError('no_file', 'Файл не приложен (поле "file")');
     }
-    // Never trust the body's `actor` — it lands in the append-only ledger. Derive it from
-    // the token when present (staff/customer), else 'guest'.
-    const actor = user ? (user.typ === 'staff' ? `staff:${user.customerId}` : user.customerId) : 'guest';
+    let guestCustomerId: string | undefined;
+    if (user?.typ === 'staff') {
+      await this.staffAuth.me(user.customerId);
+    } else {
+      guestCustomerId = user?.typ === 'customer'
+        ? undefined
+        : requireGuestCapability(capability, 'evidence:write').sub;
+      const customerId = user?.customerId ?? guestCustomerId!;
+      await this.evidence.assertCustomerOwnsEntity(customerId, dto.entityType, dto.entityId);
+    }
+    const actor = user?.typ === 'staff' ? `staff:${user.customerId}` : user?.customerId ?? guestCustomerId!;
     return this.evidence.attachImage(file.buffer, { ...dto, actor });
   }
 }

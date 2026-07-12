@@ -9,6 +9,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { SupportModule } from '../src/support/support.module';
+import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
 
 describe('Support CRM RBAC split', () => {
   let app: INestApplication;
@@ -89,6 +90,7 @@ describe('Support CRM RBAC split', () => {
 
     const opened = await request(app.getHttpServer())
       .post('/support/tickets')
+      .set('x-guest-capability', issueGuestCheckoutCapability(customer.id))
       .send({
         customerId: customer.id,
         channel: 'web',
@@ -96,6 +98,12 @@ describe('Support CRM RBAC split', () => {
         actor: 'spoof',
       })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/support/tickets')
+      .set('x-guest-capability', issueGuestCheckoutCapability(otherCustomer.id))
+      .send({ customerId: customer.id, channel: 'web', subject: 'Spoofed owner' })
+      .expect(403);
 
     const created = await prisma.auditEvent.findFirst({ where: { type: 'ticket.created' } });
     expect(created?.actor).toBe(customer.id);

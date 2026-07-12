@@ -27,7 +27,7 @@ function basePrice(model: string) {
 }
 
 export default function TradeInPage() {
-  const { user } = useAuth();
+  const { user, authed } = useAuth();
   const [model, setModel] = useState('iPhone 13 · 128 ГБ');
   const [imei, setImei] = useState('');
   const [grade, setGrade] = useState<TradeInGrade>('B');
@@ -51,8 +51,9 @@ export default function TradeInPage() {
     setBusy(true);
     setError(null);
     try {
-      const customerId = user?.customerId ?? (await createCustomer({ phone: phone.trim(), name: name.trim() || undefined })).id;
-      const tradeIn = await createTradeIn({
+      const guest = user ? null : await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
+      const customerId = user?.customerId ?? guest!.id;
+      const create = (accessToken?: string) => createTradeIn({
         customerId,
         model: note.trim() ? `${model.trim()} (${note.trim()})` : model.trim(),
         imei: imei.trim() || undefined,
@@ -60,7 +61,8 @@ export default function TradeInPage() {
         price,
         sellerPassport: passport.trim(),
         actor: 'customer_app',
-      });
+      }, { accessToken, guestCapability: guest?.guestCapability });
+      const tradeIn = user ? await authed(create) : await create();
       const evidence = files.length
         ? await uploadEvidenceImages({
             files,
@@ -68,6 +70,9 @@ export default function TradeInPage() {
             entityId: tradeIn.id,
             label: 'device_photo',
             actor: 'customer_app',
+            ...(user
+              ? { accessToken: await authed(async (token) => token) }
+              : { guestCapability: guest!.guestCapability }),
           })
         : [];
       setDone({ tradeIn, evidenceCount: evidence.length });

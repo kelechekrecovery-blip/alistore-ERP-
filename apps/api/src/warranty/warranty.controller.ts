@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Patch,
@@ -30,6 +31,7 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
+import { requireGuestCapability } from '../auth/guest-capability';
 
 const SYSTEM_ACTOR = 'system';
 
@@ -73,11 +75,17 @@ export class WarrantyController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // anti-spam on anonymous case creation
-  open(@Body() dto: OpenWarrantyDto, @CurrentUser() user?: AuthPrincipal) {
+  open(
+    @Body() dto: OpenWarrantyDto,
+    @CurrentUser() user?: AuthPrincipal,
+    @Headers('x-guest-capability') capability?: string,
+  ) {
     if (user?.typ === 'customer' && dto.customerId !== user.customerId) {
       throw new ForbiddenException('Нельзя открыть гарантию от имени другого клиента');
     }
     const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
+    if (!user) requireGuestCapability(capability, 'warranty:create', customerId);
+    if (user?.typ === 'staff') throw new ForbiddenException('Используйте staff warranty workflow');
     return this.warranty.open({ ...dto, customerId }, user?.typ === 'customer' ? user.customerId : SYSTEM_ACTOR);
   }
 

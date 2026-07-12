@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -20,6 +20,7 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireGuestCapability } from '../auth/guest-capability';
 
 @ApiTags('support')
 @Controller('support/tickets')
@@ -36,11 +37,17 @@ export class SupportController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  open(@Body() dto: OpenTicketDto, @CurrentUser() user?: AuthPrincipal) {
+  open(
+    @Body() dto: OpenTicketDto,
+    @CurrentUser() user?: AuthPrincipal,
+    @Headers('x-guest-capability') capability?: string,
+  ) {
     if (user?.typ === 'customer' && dto.customerId !== user.customerId) {
       throw new ForbiddenException('Нельзя открыть тикет от имени другого клиента');
     }
     const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
+    if (!user) requireGuestCapability(capability, 'support:create', customerId);
+    if (user?.typ === 'staff') throw new ForbiddenException('Используйте staff support workflow');
     return this.support.open({ ...dto, customerId }, customerId);
   }
 

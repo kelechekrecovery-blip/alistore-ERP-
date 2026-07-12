@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { uploadEvidenceImages } from '@/lib/api';
 import { openWarranty } from '@/lib/warranty';
 import { EvidencePicker } from './EvidencePicker';
+import { useAuth } from '@/lib/auth';
 
 /** Per-device warranty request on the customer order detail. */
 export function WarrantyRequest({ imei, customerId }: { imei: string; customerId: string }) {
+  const { authed } = useAuth();
   const [open, setOpen] = useState(false);
   const [problem, setProblem] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -17,7 +19,10 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
     if (!problem.trim()) return;
     setState('sending');
     try {
-      const warranty = await openWarranty({ imei, customerId, problem: problem.trim() });
+      const warranty = await authed((accessToken) => openWarranty(
+        { imei, customerId, problem: problem.trim() },
+        { accessToken },
+      ));
       const evidence = files.length
         ? await uploadEvidenceImages({
             files,
@@ -25,6 +30,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
             entityId: warranty.id,
             label: 'defect_photo',
             actor: customerId,
+            accessToken: await authed(async (token) => token),
           })
         : [];
       setEvidenceCount(evidence.length);

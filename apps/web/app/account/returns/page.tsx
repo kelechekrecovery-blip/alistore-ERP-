@@ -54,6 +54,7 @@ export default function ReturnsPage() {
             entityId: ret.id,
             label: 'return_photo',
             actor: user?.customerId ?? 'customer_app',
+            accessToken: await authed(async (token) => token),
           })
         : [];
       setDone({ ret, evidenceCount: evidence.length });

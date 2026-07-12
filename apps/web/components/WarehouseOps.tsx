@@ -49,6 +49,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
             entityId: r.movementId,
             label: 'transfer_photo',
             actor,
+            accessToken,
           })
         : [];
       flash(`✓ ${r.imei}: ${r.from} → ${r.to} · фото ${evidence.length}`);
@@ -75,6 +76,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
             entityId: r.movementId,
             label: 'count_photo',
             actor,
+            accessToken,
           })
         : [];
       flash(`✓ Учтено ${r.counted}, было ${r.expected}, расхождение ${r.diff} · сканов ${scannedImeis.length} · фото ${evidence.length}`);

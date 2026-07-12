@@ -20,12 +20,18 @@ export function openSupportTicket(input: {
   body?: string;
   priority?: 'normal' | 'high' | 'urgent';
   actor?: string;
-}): Promise<SupportTicket> {
-  return postJson('/support/tickets', input);
+}, credential: { accessToken?: string; guestCapability?: string }): Promise<SupportTicket> {
+  return postJson('/support/tickets', input, {
+    ...(credential.accessToken ? { authorization: `Bearer ${credential.accessToken}` } : {}),
+    ...(credential.guestCapability ? { 'x-guest-capability': credential.guestCapability } : {}),
+  });
 }
 
-export async function fetchSupportTickets(customerId: string): Promise<SupportTicket[]> {
-  const res = await fetch(`${API_BASE}/support/tickets?customerId=${encodeURIComponent(customerId)}`, { cache: 'no-store' });
+export async function fetchSupportTickets(customerId: string, accessToken: string): Promise<SupportTicket[]> {
+  const res = await fetch(`${API_BASE}/support/tickets?customerId=${encodeURIComponent(customerId)}`, {
+    cache: 'no-store',
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error(`support tickets ${res.status}`);
   return (await res.json()) as SupportTicket[];
 }

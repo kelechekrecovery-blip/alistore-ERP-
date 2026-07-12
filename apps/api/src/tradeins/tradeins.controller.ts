@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -18,6 +18,8 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
+import { requireGuestCapability } from '../auth/guest-capability';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @ApiTags('tradeins')
 @Controller('tradeins')
@@ -32,10 +34,20 @@ export class TradeInsController {
   @ApiCreatedResponse({ type: TradeInViewDto })
   @ApiUnprocessableEntityResponse({ description: 'Customer does not exist or payload is invalid.' })
   @Post()
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } }) // anti-abuse: public KYC/passport endpoint
-  create(@Body() dto: CreateTradeInDto) {
-    return this.tradeIns.create(dto, dto.customerId);
+  create(
+    @Body() dto: CreateTradeInDto,
+    @CurrentUser() user?: AuthPrincipal,
+    @Headers('x-guest-capability') capability?: string,
+  ) {
+    if (user?.typ === 'staff') throw new ForbiddenException('Используйте /tradeins/intake');
+    const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
+    if (user?.typ === 'customer' && dto.customerId !== customerId) {
+      throw new ForbiddenException('Нельзя создать trade-in от имени другого клиента');
+    }
+    if (!user) requireGuestCapability(capability, 'tradeins:create', customerId);
+    return this.tradeIns.create({ ...dto, customerId }, customerId);
   }
 
   @ApiOperation({

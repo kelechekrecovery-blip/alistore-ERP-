@@ -8,6 +8,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { TradeInsModule } from '../src/tradeins/tradeins.module';
+import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
 
 describe('Trade-in self-service and staff intake RBAC', () => {
   let app: INestApplication;
@@ -99,8 +100,16 @@ describe('Trade-in self-service and staff intake RBAC', () => {
 
     const publicTradeIn = await request(app.getHttpServer())
       .post('/tradeins')
+      .set('x-guest-capability', issueGuestCheckoutCapability(customer.id))
       .send(payload(customer.id))
       .expect(201);
+
+    const otherCustomer = await customerFixture();
+    await request(app.getHttpServer())
+      .post('/tradeins')
+      .set('x-guest-capability', issueGuestCheckoutCapability(otherCustomer.id))
+      .send(payload(customer.id))
+      .expect(403);
 
     expect(publicTradeIn.body.sellerPassportMasked).toBe('ID1***67');
     const publicEvent = await prisma.auditEvent.findFirst({ where: { type: 'tradein.assessed' } });

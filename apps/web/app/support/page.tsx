@@ -14,7 +14,7 @@ const channels = [
 ] as const;
 
 export default function SupportPage() {
-  const { user } = useAuth();
+  const { user, authed } = useAuth();
   const [channel, setChannel] = useState<(typeof channels)[number]['id']>('whatsapp');
   const [subject, setSubject] = useState('Помощь с заказом');
   const [body, setBody] = useState('');
@@ -29,23 +29,25 @@ export default function SupportPage() {
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
   useEffect(() => {
     if (!user?.customerId) return;
-    fetchSupportTickets(user.customerId).then(setTickets).catch(() => setTickets([]));
-  }, [user?.customerId, done]);
+    authed((token) => fetchSupportTickets(user.customerId, token)).then(setTickets).catch(() => setTickets([]));
+  }, [user?.customerId, done, authed]);
 
   async function submit() {
     if (!subject.trim() || !body.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      const customerId = user?.customerId ?? (await createCustomer({ phone: phone.trim(), name: name.trim() || undefined })).id;
-      const ticket = await openSupportTicket({
+      const guest = user ? null : await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
+      const customerId = user?.customerId ?? guest!.id;
+      const create = (accessToken?: string) => openSupportTicket({
         customerId,
         channel,
         subject: subject.trim(),
         body: body.trim(),
         priority: subject.toLowerCase().includes('возврат') || subject.toLowerCase().includes('гарант') ? 'high' : 'normal',
         actor: 'customer_app',
-      });
+      }, { accessToken, guestCapability: guest?.guestCapability });
+      const ticket = user ? await authed(create) : await create();
       const evidence = files.length
         ? await uploadEvidenceImages({
             files,
@@ -53,6 +55,9 @@ export default function SupportPage() {
             entityId: ticket.id,
             label: 'support_attachment',
             actor: customerId,
+            ...(user
+              ? { accessToken: await authed(async (token) => token) }
+              : { guestCapability: guest!.guestCapability }),
           })
         : [];
       setDone({ ticket, evidenceCount: evidence.length });

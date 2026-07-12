@@ -74,7 +74,13 @@ describe('public endpoint rate limits', () => {
   });
 
   it('rate-limits public support ticket creation', async () => {
-    await exhaust('/support/tickets', { customerId: 'customer-1', channel: 'web', subject: 'Help' }, 5, 201);
+    await exhaust(
+      '/support/tickets',
+      { customerId: 'customer-1', channel: 'web', subject: 'Help' },
+      5,
+      201,
+      { 'x-guest-capability': issueGuestCheckoutCapability('customer-1') },
+    );
   });
 
   it('rate-limits sandbox/provider payment webhooks', async () => {

@@ -24,6 +24,8 @@ export async function uploadEvidenceImage(input: {
   entityId: string;
   label?: string;
   actor?: string;
+  accessToken?: string;
+  guestCapability?: string;
 }): Promise<EvidenceAttachment> {
   const form = new FormData();
   form.append('file', input.file);
@@ -34,6 +36,10 @@ export async function uploadEvidenceImage(input: {
 
   const res = await fetch(`${API_BASE}/evidence/images`, {
     method: 'POST',
+    headers: {
+      ...(input.accessToken ? { authorization: `Bearer ${input.accessToken}` } : {}),
+      ...(input.guestCapability ? { 'x-guest-capability': input.guestCapability } : {}),
+    },
     body: form,
   });
   if (!res.ok) {
@@ -49,6 +55,8 @@ export async function uploadEvidenceImages(input: {
   entityId: string;
   label?: string;
   actor?: string;
+  accessToken?: string;
+  guestCapability?: string;
 }): Promise<EvidenceAttachment[]> {
   const results: EvidenceAttachment[] = [];
   for (const file of input.files) {

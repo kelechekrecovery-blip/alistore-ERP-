@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import { AuditService } from '../src/audit/audit.service';
 import { ValidationError } from '../src/common/errors';
+import { ForbiddenException } from '@nestjs/common';
 import { EvidenceService } from '../src/evidence/evidence.service';
 import { MediaService } from '../src/media/media.service';
 import { LocalDiskStorage } from '../src/media/storage/local-disk.storage';
@@ -38,6 +39,13 @@ describe('Evidence Vault (integration)', () => {
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
+    await prisma.supportTicket.deleteMany();
+    await prisma.return.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
+    await prisma.warrantyCase.deleteMany();
+    await prisma.customer.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
@@ -119,5 +127,29 @@ describe('Evidence Vault (integration)', () => {
     expect(err).toBeInstanceOf(ValidationError);
     expect(err.code).toBe('evidence_entity_not_found');
     expect(await prisma.auditEvent.count()).toBe(0);
+  });
+
+  it('binds customer evidence to an entity owned by that customer', async () => {
+    const owner = await prisma.customer.create({
+      data: { phone: `+996700EV${seq++}`, name: 'Evidence owner' },
+    });
+    const other = await prisma.customer.create({
+      data: { phone: `+996701EV${seq++}`, name: 'Other evidence owner' },
+    });
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        customerId: owner.id,
+        channel: 'web',
+        subject: 'Evidence ownership',
+        priority: 'normal',
+        sla: new Date(Date.now() + 60_000),
+      },
+    });
+
+    await expect(evidence.assertCustomerOwnsEntity(owner.id, 'support', ticket.id)).resolves.toBeUndefined();
+    await expect(evidence.assertCustomerOwnsEntity(other.id, 'support', ticket.id))
+      .rejects.toMatchObject({ message: 'evidence_owner_mismatch' });
+    await expect(evidence.assertCustomerOwnsEntity(owner.id, 'inventory', 'any'))
+      .rejects.toBeInstanceOf(ForbiddenException);
   });
 });

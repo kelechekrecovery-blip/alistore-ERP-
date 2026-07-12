@@ -1,7 +1,14 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { sign, verify } from 'jsonwebtoken';
 
-export type GuestCapabilityScope = 'orders:create' | 'payments:intent' | 'payments:gift_card';
+export type GuestCapabilityScope =
+  | 'orders:create'
+  | 'payments:intent'
+  | 'payments:gift_card'
+  | 'support:create'
+  | 'warranty:create'
+  | 'tradeins:create'
+  | 'evidence:write';
 
 interface GuestCapabilityClaims {
   sub: string;
@@ -24,7 +31,15 @@ export function issueGuestCheckoutCapability(customerId: string): string {
     {
       sub: customerId,
       typ: 'guest_capability',
-      scopes: ['orders:create', 'payments:intent', 'payments:gift_card'],
+      scopes: [
+        'orders:create',
+        'payments:intent',
+        'payments:gift_card',
+        'support:create',
+        'warranty:create',
+        'tradeins:create',
+        'evidence:write',
+      ],
     } satisfies Omit<GuestCapabilityClaims, 'iat' | 'exp'>,
     secret(),
     { issuer: ISSUER, audience: AUDIENCE, expiresIn: '30m' },

@@ -8,17 +8,17 @@ been built or tested; it does not mean external production certification is comp
 
 | Target | Current implementation | Status | Acceptance gate |
 |---|---|---|---|
-| Next.js storefront + ERP/admin | 35 routes, production build and Playwright coverage | Ready | `npm run build -w @alistore/web`, full Playwright |
-| NestJS modular monolith | 47 domain modules behind one API | Ready | API build and 104 Jest suites |
-| PostgreSQL + Prisma | 24 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
+| Next.js storefront + ERP/admin | 37 routes, production build and 19-flow Playwright coverage | Ready | `npm run build -w @alistore/web`, full Playwright |
+| NestJS modular monolith | 47 domain modules behind one API | Ready | API build and 106 Jest suites |
+| PostgreSQL + Prisma | 26 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
 | Append-only Event Ledger | `AuditService.transaction` commits mutations and events together | Ready | ledger/invariant/concurrency suites |
 | Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
 | Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |
 | S3/MinIO | S3 adapter, compressed WebP ingestion and MinIO compose exist | Partial | live MinIO integration test, private evidence policy, signed URLs, backup |
 | BullMQ workers | Transactional outbox has a BullMQ producer/scheduler and separate fail-fast worker; reservation/debt jobs remain on `pg-boss` during migration | Partial | migrate remaining jobs, DLQ dashboard, job metrics and staging soak |
-| API gateway / edge | Caddy edge exists; Nest is the only application API | Partial | production routing, TLS, limits and gateway health in staging |
-| Kubernetes + CDN | No manifests or Helm/Kustomize deployment | Missing | staging namespace, migrations job, probes, autoscaling, rollback drill |
-| GitHub Actions | API/web/test/Playwright CI exists | Partial | add native builds, worker/infra validation and signed release workflows |
+| API gateway / edge | Render Blueprint plus Cloudflare host/CORS contract are implemented; live accounts and DNS are external | Partial | import staging Blueprint, TLS/WAF/Access, origin-blocking smoke |
+| Managed deployment | Production/staging Render Blueprints, API/web/worker images, migration pre-deploy and private data-service wiring exist | Partial | live Render deploy, backup/restore, rollback and soak; Kubernetes is deferred until operational evidence requires it |
+| GitHub Actions | API/web/test/Playwright, image builds, Trivy and secret scanning exist | Partial | add native builds and signed release workflows |
 
 ## Native applications
 

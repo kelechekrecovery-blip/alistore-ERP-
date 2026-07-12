@@ -9,6 +9,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { WarrantyModule } from '../src/warranty/warranty.module';
+import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
 
 describe('Warranty console RBAC', () => {
   let app: INestApplication;
@@ -105,8 +106,15 @@ describe('Warranty console RBAC', () => {
 
     const opened = await request(app.getHttpServer())
       .post('/warranty')
+      .set('x-guest-capability', issueGuestCheckoutCapability(customer.id))
       .send({ customerId: customer.id, imei, problem: 'battery' })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/warranty')
+      .set('x-guest-capability', issueGuestCheckoutCapability(otherCustomer.id))
+      .send({ customerId: customer.id, imei, problem: 'spoofed guest' })
+      .expect(403);
 
     await request(app.getHttpServer())
       .post('/warranty')

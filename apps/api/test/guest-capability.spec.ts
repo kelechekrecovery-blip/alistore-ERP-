@@ -8,6 +8,7 @@ describe('guest checkout capability', () => {
     const token = issueGuestCheckoutCapability('customer-1');
     expect(requireGuestCapability(token, 'orders:create', 'customer-1').sub).toBe('customer-1');
     expect(requireGuestCapability(token, 'payments:intent').scopes).toContain('payments:intent');
+    expect(requireGuestCapability(token, 'evidence:write').scopes).toContain('support:create');
     expect(() => requireGuestCapability(token, 'orders:create', 'customer-2'))
       .toThrow('guest_capability_owner_mismatch');
   });

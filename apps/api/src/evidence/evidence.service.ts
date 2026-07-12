@@ -5,6 +5,7 @@ import { ValidationError } from '../common/errors';
 import { MediaService, type IngestedImage } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceEntityType, EvidenceImageDto } from './evidence.dto';
+import { ForbiddenException } from '@nestjs/common';
 
 export interface EvidenceAttachment {
   entityType: EvidenceEntityType;
@@ -45,6 +46,36 @@ export class EvidenceService {
         },
       ],
     }));
+  }
+
+  async assertCustomerOwnsEntity(customerId: string, type: EvidenceEntityType, id: string): Promise<void> {
+    let ownerId: string | null = null;
+    switch (type) {
+      case 'tradein':
+        ownerId = (await this.prisma.tradeInDevice.findUnique({ where: { id }, select: { customerId: true } }))?.customerId ?? null;
+        break;
+      case 'warranty':
+        ownerId = (await this.prisma.warrantyCase.findUnique({ where: { id }, select: { customerId: true } }))?.customerId ?? null;
+        break;
+      case 'support':
+        ownerId = (await this.prisma.supportTicket.findUnique({ where: { id }, select: { customerId: true } }))?.customerId ?? null;
+        break;
+      case 'order':
+        ownerId = (await this.prisma.order.findUnique({ where: { id }, select: { customerId: true } }))?.customerId ?? null;
+        break;
+      case 'return': {
+        const item = await this.prisma.return.findUnique({ where: { id }, select: { orderId: true } });
+        ownerId = item
+          ? (await this.prisma.order.findUnique({ where: { id: item.orderId }, select: { customerId: true } }))?.customerId ?? null
+          : null;
+        break;
+      }
+      case 'inventory':
+      case 'shift':
+        throw new ForbiddenException('evidence_staff_only_entity');
+    }
+    if (!ownerId) throw new ValidationError('evidence_entity_not_found', `${type} ${id} не найден`);
+    if (ownerId !== customerId) throw new ForbiddenException('evidence_owner_mismatch');
   }
 
   private async assertEntityExists(type: EvidenceEntityType, id: string) {
