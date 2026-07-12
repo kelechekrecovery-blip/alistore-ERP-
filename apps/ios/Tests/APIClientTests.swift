@@ -4,6 +4,38 @@ import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    func testUploadsAuthenticatedStaffEvidenceMultipart() async throws {
+        let session = makeSession(status: 201, body: """
+        {"entityType":"order","entityId":"order-1","asset":{"key":"evidence/order/order-1/photo.webp","url":"/media/photo.webp","width":1200,"height":900,"bytes":42000,"format":"webp"},"label":"handover"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let attachment = try await client.uploadEvidence(
+            imageData: Data([0xff, 0xd8, 0xff, 0xd9]),
+            entityType: "order",
+            entityId: "order-1",
+            label: "handover",
+            token: "staff-token"
+        )
+
+        XCTAssertEqual(attachment.asset.format, "webp")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "POST")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/evidence/images")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+        XCTAssertTrue(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
+        let multipart = EvidenceMultipart.build(
+            imageData: Data([0xff, 0xd8, 0xff, 0xd9]),
+            entityType: "order",
+            entityId: "order-1",
+            label: "handover",
+            boundary: "test-boundary"
+        )
+        let text = String(decoding: multipart.body, as: UTF8.self)
+        XCTAssertTrue(text.contains("name=\"entityType\"\r\n\r\norder"))
+        XCTAssertTrue(text.contains("name=\"entityId\"\r\n\r\norder-1"))
+        XCTAssertTrue(text.contains("name=\"file\"; filename=\"evidence.jpg\""))
+    }
+
     func testDecodesStaffCustomer360AndMaskedPII() async throws {
         let session = makeSession(status: 200, body: """
         {"customer":{"id":"customer-1","name":"Тест","phone":"+996******00","consent":true,"segments":["vip"],"ltv":150000,"createdAt":"2026-07-12T12:00:00Z"},"orders":{"total":1,"spent":109900,"recent":[{"id":"order-1","status":"paid","total":109900,"createdAt":"2026-07-12T12:00:00Z"}]},"debts":{"count":1,"openBalance":40100,"items":[{"id":"debt-1","balance":40100,"status":"open","dueDate":"2026-08-12T12:00:00Z"}]},"warranties":{"open":1,"items":[{"id":"warranty-1","imei":"123456789012345","status":"created","sla":"2026-07-26T12:00:00Z"}]},"tickets":{"open":1,"items":[{"id":"ticket-1","subject":"Доставка","status":"new","priority":"high","sla":"2026-07-13T12:00:00Z"}]}}

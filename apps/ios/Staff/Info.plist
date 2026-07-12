@@ -38,6 +38,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Сканирование IMEI и фото для подтверждения операций</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Выбор фото для Evidence Vault</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

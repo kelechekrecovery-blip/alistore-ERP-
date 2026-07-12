@@ -59,6 +59,8 @@ targets:
         CFBundleDisplayName: AliStore Staff
         UILaunchScreen: {}
         API_BASE_URL: $(API_BASE_URL)
+        NSCameraUsageDescription: Сканирование IMEI и фото для подтверждения операций
+        NSPhotoLibraryUsageDescription: Выбор фото для Evidence Vault
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.staff
             CFBundleURLSchemes: [alistore-staff]

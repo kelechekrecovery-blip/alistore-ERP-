@@ -28,7 +28,9 @@ private struct StaffRootView: View {
                 StaffOrdersView(session: session)
             }
             .tabItem { Label("Задачи", systemImage: "checklist") }
-            EmptyStateView(title: "Сканер", detail: "IMEI, приёмка и инвентаризация.", symbol: "barcode.viewfinder")
+            NavigationStack {
+                StaffScannerView(session: session)
+            }
                 .tabItem { Label("Сканер", systemImage: "barcode.viewfinder") }
             NavigationStack {
                 Customer360View(session: session)

@@ -954,3 +954,12 @@
 - Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
 - Outcome: all four SwiftUI targets built; AliStoreCore XCTest passed 16/16, including Customer 360 masked-PII decoding, authenticated transport and warranty PATCH contract.
 - Next step: implement native barcode/IMEI scanner input and Evidence Vault image capture/upload for Staff operations.
+
+## 2026-07-12
+
+- Task: implement native Staff barcode/IMEI scanning and Evidence Vault image upload.
+- Files changed: `apps/ios/Staff/{AliStoreStaffApp,StaffScannerView}.swift`, `apps/ios/Staff/Info.plist`, `apps/ios/Shared/{APIClient,Models}.swift`, `apps/ios/Tests/APIClientTests.swift`, `apps/ios/project.yml`, generated Xcode project, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: Staff can scan EAN-8, EAN-13, Code128 and QR values through AVFoundation or enter IMEI manually; select the target operation, capture/select a JPEG and upload authenticated multipart evidence. The API derives the ledger actor from Staff JWT, validates the entity and returns the stored WebP asset; simulator-safe manual/photo fallbacks remain available.
+- Checks run: `git diff --check`; repeated `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator. Swift 6 initially rejected AVFoundation delegate isolation and the first multipart test relied on unavailable transported `httpBody`; both gates were corrected and fully rerun.
+- Outcome: all four SwiftUI targets built; final AliStoreCore XCTest passed 17/17, including multipart fields, file metadata, bearer header and Evidence response decoding. Real camera focus/scanning and photo upload still require physical-device certification.
+- Next step: add Staff support queue actions and native push routing, then run the Staff simulator UI smoke and visual pass.

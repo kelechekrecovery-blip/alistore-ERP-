@@ -22,6 +22,7 @@
 		95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04AAB6220384C05861A21153 /* NativeShell.swift */; };
 		A562636391B66F2B1BED55CA /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		A6B3E652D932FE6D10C39B25 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */; };
+		A80FCD2AA45BA0E8B994C5C6 /* StaffScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDD9376D59012178E0570F2 /* StaffScannerView.swift */; };
 		B92D85D26242A0D8F65E1A52 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F23ACBE05CF3A0E1499E0B /* APIClient.swift */; };
 		CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */; };
@@ -137,6 +138,7 @@
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3397795D183792BD78015F89 /* AliStoreCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = AliStoreCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureTokenStore.swift; sourceTree = "<group>"; };
+		3DDD9376D59012178E0570F2 /* StaffScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffScannerView.swift; sourceTree = "<group>"; };
 		41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientApp.swift; sourceTree = "<group>"; };
 		42436819B18857A22AC06504 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		48457E88937519CA203EA7DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -222,6 +224,7 @@
 			children = (
 				92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */,
 				942E788E79F852B2161181F9 /* Info.plist */,
+				3DDD9376D59012178E0570F2 /* StaffScannerView.swift */,
 			);
 			path = Staff;
 			sourceTree = "<group>";
@@ -473,6 +476,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */,
+				A80FCD2AA45BA0E8B994C5C6 /* StaffScannerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -242,6 +242,22 @@ public struct WarrantyStatusRequest: Encodable, Sendable {
     public init(status: String) { self.status = status }
 }
 
+public struct EvidenceAsset: Decodable, Sendable {
+    public let key: String
+    public let url: String
+    public let width: Int
+    public let height: Int
+    public let bytes: Int
+    public let format: String
+}
+
+public struct EvidenceAttachment: Decodable, Sendable {
+    public let entityType: String
+    public let entityId: String
+    public let asset: EvidenceAsset
+    public let label: String?
+}
+
 public struct CreateOrderItem: Codable, Sendable {
     public let sku: String
     public let qty: Int

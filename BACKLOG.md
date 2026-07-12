@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native SwiftUI Staff scanner and Evidence Vault: EAN-8/EAN-13/Code128/QR camera capture, manual IMEI fallback, camera/photo evidence selection, authenticated multipart upload, server-derived actor, iOS privacy declarations and deterministic multipart contract tests.
 - Add native SwiftUI Staff Customer 360 and warranty handling: authenticated aggregate profile, role-masked PII, spend/debt/order/support visibility, SLA warnings, guarded warranty progression, typed PATCH transport and contract tests.
 - Add the native SwiftUI Staff order queue: server-filtered operational stages, order/item detail, IMEI fulfillment, guarded picking/packing/pickup/courier/completion actions, refresh/error/empty states and typed API contract tests.
 - Add the first native SwiftUI Staff operational vertical: authenticated current shift, open/detail refresh, payment-aware expected cash, discrepancy reason enforcement, close reconciliation, pull-to-refresh and typed contract tests.
