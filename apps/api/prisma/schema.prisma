@@ -162,6 +162,14 @@ enum ProtectionStatus {
   cancelled
 }
 
+enum PurchaseOrderStatus {
+  draft
+  sent
+  receiving
+  received
+  cancelled
+}
+
 // ---------- CORE ----------
 model Customer {
   id        String          @id @default(cuid())
@@ -227,6 +235,7 @@ model Product {
   updatedAt DateTime            @default(now()) @updatedAt
   units     DeviceUnit[]
   movements InventoryMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([category])
   @@index([archived])
@@ -412,7 +421,56 @@ model Supplier {
   name      String        @unique
   contact   String?
   rmas      SupplierRma[]
+  purchaseOrders PurchaseOrder[]
   createdAt DateTime      @default(now())
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  number      String              @unique
+  idempotencyKey String?          @unique
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  supplierId  String
+  status      PurchaseOrderStatus @default(draft)
+  location    String
+  note        String?
+  createdBy   String
+  sentAt      DateTime?
+  receivedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  items       PurchaseOrderItem[]
+  receipts    PurchaseReceipt[]
+
+  @@index([supplierId, createdAt])
+  @@index([status, createdAt])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  product         Product       @relation(fields: [productId], references: [id])
+  productId       String
+  orderedQty      Int
+  receivedQty     Int           @default(0)
+  unitCost        Int
+
+  @@unique([purchaseOrderId, productId])
+  @@index([productId])
+}
+
+model PurchaseReceipt {
+  id              String        @id @default(cuid())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  idempotencyKey  String
+  actor           String
+  payload         Json
+  createdAt       DateTime      @default(now())
+
+  @@unique([purchaseOrderId, idempotencyKey])
+  @@index([purchaseOrderId, createdAt])
 }
 
 // Возврат брака поставщику (RMA). Машина статусов + SLA; просрочка → Risk Center.

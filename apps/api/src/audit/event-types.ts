@@ -57,6 +57,12 @@ export const EventType = {
   RmaResolved: 'rma.resolved',
   RmaRejected: 'rma.rejected',
   RmaClosed: 'rma.closed',
+  // procurement
+  PurchaseOrderCreated: 'purchase_order.created',
+  PurchaseOrderSent: 'purchase_order.sent',
+  PurchaseOrderReceiving: 'purchase_order.receiving',
+  PurchaseOrderReceived: 'purchase_order.received',
+  PurchaseOrderCancelled: 'purchase_order.cancelled',
   // approvals
   ApprovalRequested: 'approval.requested',
   ApprovalApproved: 'approval.approved',

@@ -42,6 +42,7 @@ import { GiftcardsModule } from './giftcards/giftcards.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { B2BModule } from './b2b/b2b.module';
 import { ProtectionModule } from './protection/protection.module';
+import { ProcurementModule } from './procurement/procurement.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { ProtectionModule } from './protection/protection.module';
     NotificationsModule,
     B2BModule,
     ProtectionModule,
+    ProcurementModule,
   ],
 })
 export class AppModule {}

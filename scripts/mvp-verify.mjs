@@ -17,7 +17,8 @@ const steps = [
   ['API build', 'npm', ['run', 'api:build']],
   ['Web build', 'npm', ['run', 'build', '-w', '@alistore/web']],
   ['Mobile typecheck', 'npm', ['--prefix', 'apps/mobile', 'run', 'typecheck']],
-  ['API Jest', 'npm', ['run', 'api:test']],
+  // Integration suites share one test database and must not clean fixtures concurrently.
+  ['API Jest', 'npm', ['run', 'test', '-w', '@alistore/api', '--', '--runInBand']],
 ];
 
 if (!skipE2e) {

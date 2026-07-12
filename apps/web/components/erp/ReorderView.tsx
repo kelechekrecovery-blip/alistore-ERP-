@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchReorder, type ReorderReport, type ReorderReview } from '@/lib/ai';
+import { ProcurementView } from './ProcurementView';
 
 const URGENCY_META: Record<ReorderReview['urgency'], { color: string; dot: string; label: string }> = {
   high: { color: '#FF8A7A', dot: '🔴', label: 'Срочно' },
@@ -19,11 +20,11 @@ export function ReorderView({ accessToken }: { accessToken: string }) {
     fetchReorder(accessToken).then(setReport).catch(() => setFailed(true));
   }, [accessToken]);
 
-  if (failed) return <p className="font-mono text-sm text-[#FF8A7A]">Не удалось загрузить закупки.</p>;
-  if (report === null) return <p className="font-mono text-sm text-[#6E645C]">Считаю потребность…</p>;
+  if (failed) return <div className="max-w-5xl"><p className="font-mono text-sm text-[#FF8A7A]">Рекомендации недоступны для этой роли.</p><ProcurementView accessToken={accessToken} /></div>;
+  if (report === null) return <div className="max-w-5xl"><p className="font-mono text-sm text-[#6E645C]">Считаю потребность…</p><ProcurementView accessToken={accessToken} /></div>;
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-5xl">
       <div className="mb-4 flex items-center gap-2.5 rounded-[14px] border border-[#2E2822] bg-[#1A1611] px-4 py-3">
         <span className="grid h-8 w-8 place-items-center rounded-full bg-[#221E19] text-base">🛒</span>
         <div>
@@ -79,6 +80,7 @@ export function ReorderView({ accessToken }: { accessToken: string }) {
           );
         })}
       </div>
+      <ProcurementView accessToken={accessToken} />
     </div>
   );
 }

@@ -16,7 +16,9 @@ describe('RealtimeGateway (socket.io)', () => {
       providers: [RealtimeGateway],
     }).compile();
     app = moduleRef.createNestApplication();
-    app.useWebSocketAdapter(new IoAdapter(app));
+    const adapter = new IoAdapter(app);
+    // Nest 11.1.28 publishes incompatible handler aliases across these two public APIs.
+    app.useWebSocketAdapter(adapter as unknown as Parameters<INestApplication['useWebSocketAdapter']>[0]);
     gateway = moduleRef.get(RealtimeGateway);
     await app.listen(0);
     const { port } = app.getHttpServer().address() as AddressInfo;

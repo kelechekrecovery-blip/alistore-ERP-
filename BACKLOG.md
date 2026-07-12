@@ -12,6 +12,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add end-to-end Purchase Order procurement: supplier PO creation, send/cancel state machine, race-safe partial/full IMEI receiving, inventory movements, Event Ledger/RBAC, ERP workflow, and browser regression coverage.
 - Align Risk Center with the latest Claude Design rules: repeat customer returns over 30 days, staff discount-receipt share over 30%, and seven-day write-off growth, with real Prisma aggregation, Command Center routing, and browser-verified ERP presentation.
 - Install and validate a local `skiper-ui` Codex skill, then add a fail-visible motion foundation: animated desktop storefront, native scroll progress, product/card micro-interactions, reduced-motion policy, preserved mobile `/app`, and Playwright regression coverage.
 - Restore the full desktop AliStore Site 2.0 from the archived ecosystem prototype: responsive storefront shell, home, catalog, product, favorites, compare, cart, checkout, login, account, and shared customer-service pages on the real API.

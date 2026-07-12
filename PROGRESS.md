@@ -1,5 +1,14 @@
 # PROGRESS
 
+## 2026-07-12
+
+- Task: complete the first extended-ecosystem gap with Purchase Order procurement and ERP receiving.
+- Files changed: Prisma procurement schema/migration, `apps/api/src/procurement/`, AppModule, RBAC, Event Ledger types, procurement integration tests, web procurement API/UI, ERP reorder integration, Playwright DB reset and procurement UI flow, readiness/backlog/progress docs, and the Nest realtime test type boundary exposed by the final regression gate.
+- Result: owners/admins can create, send and cancel supplier POs; warehouse/admin/owner staff can receive serialized IMEIs partially or completely into stock. Receipt idempotency, PO row locking, quantity limits, IMEI uniqueness, inventory movements, device units and immutable ledger events commit atomically. Concurrent receipts cannot exceed ordered quantity.
+- Checks run: Prisma migration deploy and test schema sync; targeted procurement Jest (3/3); API TypeScript build; Next production build (35 routes); full API Jest sequentially; targeted realtime Jest; browser Playwright owner login → create PO → send → receive IMEI; `git diff --check`.
+- Outcome: full `mvp:verify` passed: Prisma validation/generation, API/web builds, mobile typecheck, 99/99 API suites with 359/359 tests, and 14/14 Playwright flows. Both owner and warehouse completed the ERP receiving flow. Review findings were closed for stale-role JWTs, create/receive idempotency payload conflicts, empty inputs, batch limits, concurrent over-receipt and form preservation. External readiness reports the expected credential/hardware blockers.
+- Next step: add the provider-neutral payment gateway port and production configuration selector without real secrets, keeping sandbox as the default.
+
 ## 2026-07-10
 
 - Task: install a reusable Skiper UI skill and introduce polished, accessible motion across the AliStore customer ecosystem.

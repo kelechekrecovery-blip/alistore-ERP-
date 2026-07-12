@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { AuthzModule } from '../authz/authz.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { ProcurementController } from './procurement.controller';
+import { ProcurementService } from './procurement.service';
+
+@Module({
+  imports: [StaffAuthModule, AuthzModule],
+  controllers: [ProcurementController],
+  providers: [ProcurementService],
+  exports: [ProcurementService],
+})
+export class ProcurementModule {}

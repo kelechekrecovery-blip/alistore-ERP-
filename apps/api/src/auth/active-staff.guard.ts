@@ -13,7 +13,10 @@ export class ActiveStaffGuard implements CanActivate {
     if (user?.typ !== 'staff' || !user.role) {
       throw new ForbiddenException('Требуется staff JWT');
     }
-    await this.staffAuth.me(user.customerId);
+    const staff = await this.staffAuth.me(user.customerId);
+    if (staff.role !== user.role) {
+      throw new ForbiddenException('Роль сотрудника изменена. Войдите снова');
+    }
     return true;
   }
 }
