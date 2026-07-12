@@ -855,3 +855,12 @@
 - Checks run: `git diff --check`; `npm run build -w @alistore/web`; isolated Chromium `npx playwright test e2e/staff-ui.spec.ts` with real staff bootstrap/login, geometry and color assertions, primary/nav count checks, KPI navigation/back flow, and overflow guard.
 - Outcome: Next production build passed for all 35 routes; Staff browser UAT passed 1/1 in 3.0s.
 - Next step: align the ERP owner shell and module navigation against its canonical desktop handoff, then continue through native SwiftUI/Compose surfaces.
+
+## 2026-07-12
+
+- Task: align the authenticated ERP owner shell with `design_handoff_alistore/screens/AliStore ERP 2.0.dc.html` while retaining post-prototype modules.
+- Files changed: `apps/web/app/erp/page.tsx`, `e2e/erp-secure.spec.ts`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: `/erp` now uses the canonical centered 1280x820 framed workspace, 230px operational sidebar, 26px top/content alignment, and prototype core navigation order. Pricing, procurement, campaigns, risk, readiness, and Event Ledger remain available in a clearly separated extended-module group.
+- Checks run: `git diff --check`; `npm run build -w @alistore/web`; isolated Chromium `npx playwright test e2e/erp-secure.spec.ts` with real owner bootstrap/login, exact shell/sidebar dimensions, module-group presence, protected Reports/AI calls, AI/pricing/readiness navigation, and overflow guard.
+- Outcome: Next production build passed for all 35 routes; authenticated ERP browser UAT passed 1/1 in 2.5s with no report/AI 401 or 403 responses.
+- Next step: align the first deep ERP module against its dedicated handoff, starting with Finance 2.0, then Warehouse, Product Management, HR, Logistics, CMS, Analytics, Security, Service Center, and Legal.

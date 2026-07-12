@@ -15,6 +15,7 @@ test('ERP loads protected reports and AI with a staff session', async ({ page, r
     }
   });
 
+  await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto('/erp');
   await expect(page.getByText('AliStore ERP · вход')).toBeVisible();
   await page.getByPlaceholder('username').fill(username);
@@ -23,6 +24,11 @@ test('ERP loads protected reports and AI with a staff session', async ({ page, r
 
   await expect(page.getByText('AliStore ERP').first()).toBeVisible();
   await expect(page.getByText('Дашборд').first()).toBeVisible();
+  await expect(page.getByTestId('erp-shell')).toHaveCSS('width', '1280px');
+  await expect(page.getByTestId('erp-shell')).toHaveCSS('height', '820px');
+  await expect(page.getByTestId('erp-sidebar')).toHaveCSS('width', '230px');
+  await expect(page.getByTestId('erp-main')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(page.getByText('Расширенные модули')).toBeVisible();
 
   await page.getByRole('button', { name: /Ассистент/ }).click();
   await expect(page.getByText('AI-ассистент').first()).toBeVisible();
@@ -32,6 +38,10 @@ test('ERP loads protected reports and AI with a staff session', async ({ page, r
   await expect(page.getByText('Готовность запуска').first()).toBeVisible();
   await expect(page.getByText('Production readiness').first()).toBeVisible();
   await expect(page.getByText(/strict gate:/).first()).toBeVisible();
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
 
   expect(protectedResponses.filter((r) => r.status === 401 || r.status === 403)).toEqual([]);
 });

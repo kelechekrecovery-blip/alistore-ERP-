@@ -40,22 +40,24 @@ import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/st
 
 type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'readiness' | 'ledger';
 
-const NAV: { id: Route; icon: string; label: string }[] = [
+const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
-  { id: 'ai', icon: '🧠', label: 'Ассистент' },
-  { id: 'pricing', icon: '🏷️', label: 'Цены' },
-  { id: 'reorder', icon: '🛒', label: 'Закупки' },
+  { id: 'stock', icon: '📦', label: 'Склад' },
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
-  { id: 'stock', icon: '📦', label: 'Склад' },
   { id: 'crm', icon: '💬', label: 'CRM · Инбокс' },
+  { id: 'ai', icon: '🧠', label: 'Ассистент' },
+];
+const EXTENDED_NAV: { id: Route; icon: string; label: string }[] = [
+  { id: 'pricing', icon: '🏷️', label: 'Цены' },
+  { id: 'reorder', icon: '🛒', label: 'Закупки' },
   { id: 'campaigns', icon: '◌', label: 'Кампании' },
   { id: 'risks', icon: '⚠', label: 'Риски' },
   { id: 'readiness', icon: '✓', label: 'Готовность' },
   { id: 'ledger', icon: '📜', label: 'Event Ledger' },
 ];
 const TITLES: Record<Route, [string, string]> = {
-  dash: ['Дашборд', 'Обзор · всё из Event Ledger'],
+  dash: ['Дашборд', 'Обзор сети · сегодня'],
   ai: ['AI-ассистент', 'Инсайты владельца из Event Ledger'],
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
   reorder: ['Закупки', 'Что дозаказать по спросу/остатку'],
@@ -156,9 +158,13 @@ export default function ErpPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-[#0E0C0A] font-sans text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-[#0E0C0A] p-5 font-sans text-white">
+      <div
+        data-testid="erp-shell"
+        className="flex h-[820px] max-h-full w-full max-w-[1280px] overflow-hidden rounded-[20px] border border-[#2E2822] bg-[#16130F] shadow-2xl"
+      >
       {/* SIDEBAR */}
-      <aside className="flex w-56 flex-shrink-0 flex-col border-r border-[#2E2822] bg-[#1A1611] p-3">
+      <aside data-testid="erp-sidebar" className="flex w-[230px] flex-shrink-0 flex-col border-r border-[#2E2822] bg-[#1A1611] px-3 py-[18px]">
         <div className="flex items-center gap-2.5 px-2 pb-4">
           <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-coral font-display text-base font-extrabold text-white">A</span>
           <div>
@@ -166,8 +172,8 @@ export default function ErpPage() {
             <div className="text-[10px] text-[#8A7F76]">Владелец</div>
           </div>
         </div>
-        <nav className="flex flex-col gap-0.5">
-          {NAV.map((m) => (
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+          {CORE_NAV.map((m) => (
             <button
               key={m.id}
               type="button"
@@ -186,6 +192,24 @@ export default function ErpPage() {
               ) : null}
             </button>
           ))}
+          <div className="mb-1 mt-3 border-t border-[#2E2822] px-3 pt-3 text-[10px] font-semibold uppercase text-[#6E645C]">
+            Расширенные модули
+          </div>
+          {EXTENDED_NAV.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setRoute(m.id)}
+              className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-[13px] transition ${
+                route === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
+              }`}
+            >
+              <span className="text-base">{m.icon}</span>
+              <span>{m.label}</span>
+              {m.id === 'risks' && risks.length > 0 && <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{risks.length}</span>}
+              {m.id === 'readiness' && readiness?.summary.blockingRemaining ? <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{readiness.summary.blockingRemaining}</span> : null}
+            </button>
+          ))}
         </nav>
         <div className="mt-auto rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
           <div className="text-[11px] text-[#8A7F76]">Сеть</div>
@@ -196,8 +220,8 @@ export default function ErpPage() {
       </aside>
 
       {/* MAIN */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center border-b border-[#2E2822] bg-[#16130F] px-7 py-4">
+      <main data-testid="erp-main" className="min-w-0 flex-1 overflow-y-auto">
+        <div className="sticky top-0 z-10 flex items-center border-b border-[#2E2822] bg-[#16130F] px-[26px] py-4">
           <div>
             <div className="font-display text-xl font-bold">{TITLES[route][0]}</div>
             <div className="text-xs text-[#8A7F76]">{TITLES[route][1]}</div>
@@ -224,7 +248,7 @@ export default function ErpPage() {
           </div>
         </div>
 
-        <div className="p-7">
+        <div className="px-[26px] py-[22px]">
           {route === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
@@ -241,6 +265,7 @@ export default function ErpPage() {
           {route === 'ledger' && <LedgerView ledger={ledger} />}
         </div>
       </main>
+      </div>
     </div>
   );
 }
