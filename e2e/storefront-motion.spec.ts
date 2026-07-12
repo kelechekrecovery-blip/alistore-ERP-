@@ -27,3 +27,19 @@ test('desktop storefront motion stays visible and respects reduced motion', asyn
   await page.goto('/app');
   await expect(page.getByText('iPhone 17 Pro Max')).toBeVisible();
 });
+
+test('desktop storefront remains active in a narrow desktop browser window', async ({ page }) => {
+  await resetDb();
+  await seedProduct('DESKTOP-E2E');
+  await page.setViewportSize({ width: 863, height: 954 });
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Электроника, которая уже рядом.' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(863);
+
+  await page.goto('/catalog');
+  await expect(page.getByRole('heading', { name: 'Каталог техники' })).toBeVisible();
+  await expect(page.getByPlaceholder('Поиск по названию, SKU и категории')).toBeVisible();
+});

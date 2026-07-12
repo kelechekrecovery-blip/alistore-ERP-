@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: restore the full desktop customer storefront in the actual 863px-wide in-app desktop browser.
+- Files changed: responsive shell boundaries for home/catalog/product/favorites/cart/account/search, compact desktop header actions, storefront responsive Playwright coverage, backlog/readiness/progress docs.
+- Result: customer routes now select the complete desktop storefront from 768px upward instead of incorrectly showing the native-style mobile shell until 1024px. At narrow desktop widths the header hides secondary search/favorites icon buttons while preserving navigation, cart and account access; `/search` redirects into desktop catalog on the same breakpoint.
+- Checks run: live in-app browser DOM and viewport inspection at 863x954; horizontal overflow element audit; web production build; targeted storefront Playwright at normal and 863px viewports; full Playwright regression; `git diff --check`.
+- Outcome: the visible browser now renders the desktop hero/navigation at 863px with `scrollWidth=863`; production build passes and Playwright passes 16/16.
+- Next step: continue Wave 1 with product variants and bundles.
+
+## 2026-07-12
+
 - Task: start the post-MVP ecosystem wave with the Finance 2.0 operating-expense lifecycle.
 - Files changed: Prisma expense status/model/migration, finance DTO/service/controller/module, RBAC and Event Ledger catalogue, dashboard P&L aggregation, ERP finance API/UI, integration/browser tests, deterministic E2E staff fixture, backlog/readiness/progress docs.
 - Result: admin/owner staff can submit an idempotent categorized expense, approve or reject it, and pay only an approved request. Review/payment transitions lock the expense row, replayed payments are idempotent, changed payloads conflict, and every mutation commits with an immutable expense Ledger event. P&L now deducts paid expenses and displays operating profit; the ERP provides the complete working queue.

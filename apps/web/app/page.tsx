@@ -34,12 +34,12 @@ export default function HomePage() {
   return (
     <>
       {/* Narrow viewports / Capacitor native → Клиент App 2.0 mobile shell. */}
-      <div className="lg:hidden">
+      <div className="md:hidden">
         <MobileHome />
       </div>
 
       {/* Desktop browser → wide storefront. */}
-      <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
+      <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] md:block">
       <SiteHeader />
       <main>
         <section className="mx-auto w-[min(1200px,92vw)] pb-6 pt-10 lg:pt-14">

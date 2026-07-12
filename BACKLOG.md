@@ -14,6 +14,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Restore the desktop storefront across 768px+ browser windows for home, catalog, product, favorites, cart and account, with a matching search redirect and overflow-safe header regression coverage at the in-app browser's 863px width.
 - Add the first Finance 2.0 vertical: idempotent operating expenses, approval/rejection/payment state machine, race-safe transitions, RBAC, Event Ledger, paid-expense P&L, ERP workflow, and browser regression coverage.
 - Make the MVP release gate deterministic and destructive-test-safe: require a separate test database, reset it before API Jest, repair inventory movement cleanup ordering, and harden Telegram Mini App navigation coverage.
 - Add a fail-closed `OtpSender` port with silent dev sender, production adapter boundary, challenge cleanup on delivery failure, and live SMS certification readiness.

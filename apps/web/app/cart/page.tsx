@@ -20,8 +20,8 @@ export default function CartPage() {
   }
 
   return <>
-    <div className="lg:hidden"><MobileCart /></div>
-    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
+    <div className="md:hidden"><MobileCart /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] md:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-10 sm:py-14">
       <div className="text-xs text-[#6c7080]">Главная / Корзина</div>

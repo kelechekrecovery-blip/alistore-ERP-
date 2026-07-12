@@ -48,10 +48,10 @@ export function SiteHeader() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/catalog" aria-label="Поиск" title="Поиск" className="hidden h-10 w-10 place-items-center rounded-[11px] border border-white/[0.09] bg-white/[0.035] text-[#a2a6b6] transition hover:border-white/20 hover:text-white sm:grid">
+          <Link href="/catalog" aria-label="Поиск" title="Поиск" className="hidden h-10 w-10 place-items-center rounded-[11px] border border-white/[0.09] bg-white/[0.035] text-[#a2a6b6] transition hover:border-white/20 hover:text-white lg:grid">
             <Search size={18} />
           </Link>
-          <Link href="/favorites" aria-label="Избранное" title="Избранное" className="relative hidden h-10 w-10 place-items-center rounded-[11px] border border-white/[0.09] bg-white/[0.035] text-[#a2a6b6] transition hover:border-white/20 hover:text-white sm:grid">
+          <Link href="/favorites" aria-label="Избранное" title="Избранное" className="relative hidden h-10 w-10 place-items-center rounded-[11px] border border-white/[0.09] bg-white/[0.035] text-[#a2a6b6] transition hover:border-white/20 hover:text-white lg:grid">
             <Heart size={18} />
             {favoritesCount > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-[#f97316] px-1 text-[10px] font-bold text-[#180f02]">{favoritesCount}</span>}
           </Link>

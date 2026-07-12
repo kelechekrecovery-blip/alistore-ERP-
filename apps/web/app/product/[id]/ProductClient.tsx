@@ -69,8 +69,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   }
 
   return <>
-    <div className="lg:hidden"><MobileProduct product={product} similar={similar} reviews={reviews} /></div>
-    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
+    <div className="md:hidden"><MobileProduct product={product} similar={similar} reviews={reviews} /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] md:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-8 sm:py-12">
       <nav className="mb-7 flex flex-wrap items-center gap-2 text-xs text-[#6c7080]" aria-label="Хлебные крошки"><Link href="/">Главная</Link><span>/</span><Link href="/catalog">Каталог</Link><span>/</span><span className="text-[#a2a6b6]">{product.name}</span></nav>

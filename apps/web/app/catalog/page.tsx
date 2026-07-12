@@ -42,8 +42,8 @@ export default function CatalogPage() {
   const reset = () => { setQuery(''); setCategory('Все'); setCondition('Все'); setStockOnly(false); setSort('popular'); };
 
   return <>
-    <div className="lg:hidden"><MobileCatalog /></div>
-    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] lg:block">
+    <div className="md:hidden"><MobileCatalog /></div>
+    <div className="hidden min-h-screen bg-[#0c0c17] text-[#f6f7fb] md:block">
     <SiteHeader />
     <main className="mx-auto w-[min(1200px,92vw)] py-10">
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

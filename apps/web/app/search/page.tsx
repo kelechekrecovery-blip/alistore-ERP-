@@ -13,14 +13,14 @@ export default function SearchPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (window.matchMedia('(min-width: 1024px)').matches) {
+    if (window.matchMedia('(min-width: 768px)').matches) {
       const q = new URLSearchParams(window.location.search).get('q');
       router.replace(q ? `/catalog?q=${encodeURIComponent(q)}` : '/catalog');
     }
   }, [router]);
 
   return (
-    <div className="lg:hidden">
+    <div className="md:hidden">
       <MobileSearch />
     </div>
   );

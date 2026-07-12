@@ -6,7 +6,7 @@
 
 - **47 backend-модулей** (NestJS) · **35 веб-роутов** (Next.js) · **24 миграции**
 - **104 API test suites / 375 тестов — зелёные** (`jest`)
-- **15 Playwright smoke-flow — зелёные**, включая Purchase Order и Finance expense lifecycle (`npm run e2e`)
+- **16 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle и desktop storefront при 863px (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native software gate: store preflight **0 ошибок / 2 ожидаемых env-warning**, Expo Doctor **20/20**, TypeScript ✓. Binary/device QA ждёт полного Xcode/Android SDK и store credentials.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -73,7 +73,7 @@ npm run launch:readiness:strict       # strict external gate
 cd apps/api && npx jest --runInBand    # 104 suites / 375 тестов ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (35 роутов)
-npm run e2e                           # 15/15 ✓
+npm run e2e                           # 16/16 ✓
 npm run mobile:store-preflight        # 0 failures; production env warnings only
 cd apps/mobile && npx expo-doctor     # 20/20 ✓
 ```
