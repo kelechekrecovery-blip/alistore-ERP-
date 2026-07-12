@@ -12,6 +12,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Make the MVP release gate deterministic and destructive-test-safe: require a separate test database, reset it before API Jest, repair inventory movement cleanup ordering, and harden Telegram Mini App navigation coverage.
 - Add a fail-closed `OtpSender` port with silent dev sender, production adapter boundary, challenge cleanup on delivery failure, and live SMS certification readiness.
 - Harden production runtime startup with fail-fast core preflight, exact CORS allowlist validation, Helmet CSP/security headers, dev-safe HSTS behavior, and regression tests.
 - Add a provider-neutral `PaymentGatewayProvider` port with sandbox default, complete-env production selector, fail-visible live adapter stub, and payment readiness reporting without storing or logging secrets.

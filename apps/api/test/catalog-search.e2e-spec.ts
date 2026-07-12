@@ -26,6 +26,7 @@ describe('Catalog search integration', () => {
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();

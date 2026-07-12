@@ -32,6 +32,7 @@ describe('Customer 360 (integration)', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.tradeInDevice.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.customer.deleteMany();

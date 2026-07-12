@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: make the full MVP/UAT release gate deterministic and prevent accidental destructive tests against the development database.
+- Files changed: MVP verification runner, seven FK-sensitive API test cleanups, Telegram Mini App browser navigation, backlog and progress records.
+- Result: `mvp:verify` now requires `TEST_DATABASE_URL`/`E2E_DATABASE_URL`, refuses the active development database or a database without a test marker, resets the isolated schema before Jest, and runs API tests sequentially. Test cleanups delete inventory movements before products, and the Telegram shell waits for DOM readiness instead of an unrelated late load event.
+- Checks run: deliberate same-database refusal; isolated schema reset; targeted 7 suites / 22 tests; full `mvp:verify`; second `mvp:verify -- --skip-e2e`; `git diff --check`.
+- Outcome: the full gate passed API/web production builds, native typecheck, 103/103 API suites with 373/373 tests, and 14/14 Playwright flows. The second clean-database server run again passed 103/103 suites and 373/373 tests.
+- Next step: run native Expo/store preflights and separate software readiness from external signing, push, provider, device and store-account blockers.
+
+## 2026-07-12
+
 - Task: add the production SMS/OTP provider boundary while preserving safe local authentication.
 - Files changed: OTP sender contract, noop/production adapters and selector, AuthService/AuthModule wiring, sender/selector/auth/readiness tests, API env templates, readiness/activation/backlog/progress docs.
 - Result: login and recovery OTP now deliver through `OtpSender`. Local/test noop never logs or persists plaintext codes; production requires an explicit complete provider config and the unimplemented live adapter fails before challenge creation. Runtime delivery failure removes the just-created challenge, preventing an undelivered usable OTP from remaining in the database.

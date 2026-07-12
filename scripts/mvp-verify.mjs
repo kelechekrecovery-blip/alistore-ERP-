@@ -10,6 +10,7 @@ const env = { ...process.env, ...loadEnvFile('apps/api/.env') };
 if (!env.E2E_DATABASE_URL && env.TEST_DATABASE_URL) {
   env.E2E_DATABASE_URL = env.TEST_DATABASE_URL;
 }
+const testDatabaseEnv = testDatabaseOverride(env);
 
 const steps = [
   ['Prisma schema validate', 'npx', ['prisma', 'validate', '--schema', 'apps/api/prisma/schema.prisma']],
@@ -17,8 +18,14 @@ const steps = [
   ['API build', 'npm', ['run', 'api:build']],
   ['Web build', 'npm', ['run', 'build', '-w', '@alistore/web']],
   ['Mobile typecheck', 'npm', ['--prefix', 'apps/mobile', 'run', 'typecheck']],
+  [
+    'Test database reset',
+    'npx',
+    ['prisma', 'db', 'push', '--schema', 'apps/api/prisma/schema.prisma', '--force-reset', '--accept-data-loss', '--skip-generate'],
+    testDatabaseEnv,
+  ],
   // Integration suites share one test database and must not clean fixtures concurrently.
-  ['API Jest', 'npm', ['run', 'test', '-w', '@alistore/api', '--', '--runInBand']],
+  ['API Jest', 'npm', ['run', 'test', '-w', '@alistore/api', '--', '--runInBand'], testDatabaseEnv],
 ];
 
 if (!skipE2e) {
@@ -37,11 +44,11 @@ steps.push([
   ],
 ]);
 
-for (const [label, command, commandArgs] of steps) {
+for (const [label, command, commandArgs, stepEnv] of steps) {
   console.log(`\n==> ${label}`);
   const result = spawnSync(command, commandArgs, {
     cwd: process.cwd(),
-    env,
+    env: { ...env, ...(stepEnv ?? {}) },
     shell: false,
     stdio: 'inherit',
   });
@@ -80,4 +87,26 @@ function unquote(value) {
     return value.slice(1, -1);
   }
   return value;
+}
+
+function testDatabaseOverride(runtimeEnv) {
+  const testUrl = runtimeEnv.TEST_DATABASE_URL ?? runtimeEnv.E2E_DATABASE_URL;
+  if (!testUrl) {
+    throw new Error('TEST_DATABASE_URL is required for mvp:verify');
+  }
+  const parsed = new URL(testUrl);
+  if (!/test/i.test(parsed.pathname)) {
+    throw new Error('Refusing to reset a database whose name does not contain "test"');
+  }
+  if (runtimeEnv.DATABASE_URL && normalizedDatabase(runtimeEnv.DATABASE_URL) === normalizedDatabase(testUrl)) {
+    throw new Error('TEST_DATABASE_URL must differ from DATABASE_URL');
+  }
+  return { DATABASE_URL: testUrl, TEST_DATABASE_URL: testUrl, E2E_DATABASE_URL: testUrl };
+}
+
+function normalizedDatabase(value) {
+  const parsed = new URL(value);
+  parsed.search = '';
+  parsed.hash = '';
+  return parsed.toString();
 }

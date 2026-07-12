@@ -5,7 +5,7 @@ test('Telegram Mini App shell creates an order with channel telegram', async ({ 
   await resetDb();
   const { product } = await seedProduct('TG-E2E');
 
-  await page.goto('/tg');
+  await page.goto('/tg', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText('AliStore Mini')).toBeVisible();
   await expect(page.getByText(product.name)).toBeVisible();
 
