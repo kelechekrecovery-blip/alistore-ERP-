@@ -14,6 +14,12 @@ struct AliStoreClientApp: App {
 
 private struct ClientRootView: View {
     let environment: AppEnvironment
+    @State private var auth: CustomerAuthStore
+
+    init(environment: AppEnvironment) {
+        self.environment = environment
+        _auth = State(initialValue: CustomerAuthStore(environment: environment))
+    }
 
     var body: some View {
         TabView {
@@ -21,12 +27,131 @@ private struct ClientRootView: View {
                 .tabItem { Label("Каталог", systemImage: "square.grid.2x2") }
             EmptyStateView(title: "Корзина пуста", detail: "Добавленные товары будут доступны офлайн.", symbol: "bag")
                 .tabItem { Label("Корзина", systemImage: "bag") }
-            EmptyStateView(title: "Заказов пока нет", detail: "История появится после входа по номеру телефона.", symbol: "shippingbox")
+            OrdersView(environment: environment, auth: auth)
                 .tabItem { Label("Заказы", systemImage: "shippingbox") }
-            EmptyStateView(title: "Аккаунт", detail: "OTP-вход, бонусы, адреса и гарантия.", symbol: "person.crop.circle")
+            AccountView(auth: auth)
                 .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
         }
         .tint(.orange)
+        .task { await auth.restore() }
+    }
+}
+
+private struct OrdersView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var orders: [CustomerOrder] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if auth.isRestoring || isLoading {
+                    ProgressView("Загружаем заказы")
+                } else if auth.session == nil {
+                    EmptyStateView(title: "Войдите в аккаунт", detail: "История заказов доступна после входа по SMS-коду.", symbol: "person.badge.key")
+                } else if let errorMessage {
+                    ContentUnavailableView("Заказы недоступны", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
+                } else if orders.isEmpty {
+                    EmptyStateView(title: "Заказов пока нет", detail: "Здесь появятся покупки из магазина и приложения.", symbol: "shippingbox")
+                } else {
+                    List(orders) { order in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Заказ #\(order.id.suffix(6))").font(.headline)
+                                Spacer()
+                                Text(order.status).font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                            }
+                            Text("\(order.items.reduce(0) { $0 + $1.qty }) тов. · \(order.total.formatted(.currency(code: "KGS")))")
+                                .font(.subheadline)
+                            Text(order.createdAt, format: .dateTime.day().month().year())
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Мои заказы")
+            .task(id: auth.session?.accessToken) { await load() }
+            .refreshable { await load() }
+        }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else {
+            orders = []
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            orders = try await APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct AccountView: View {
+    let auth: CustomerAuthStore
+    @State private var phone = "+996"
+    @State private var code = ""
+    @State private var codeRequested = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if auth.isRestoring {
+                    Section { ProgressView("Восстанавливаем сессию") }
+                } else if let session = auth.session {
+                    Section("Аккаунт") {
+                        LabeledContent("Телефон", value: session.phone)
+                        LabeledContent("ID", value: String(session.customerId.suffix(8)))
+                    }
+                    Section {
+                        Button("Выйти", role: .destructive) { Task { await auth.logout() } }
+                    }
+                } else {
+                    Section("Вход по SMS") {
+                        TextField("+996 555 000 000", text: $phone)
+                            .keyboardType(.phonePad)
+                        if codeRequested {
+                            TextField("6-значный код", text: $code)
+                                .keyboardType(.numberPad)
+                            if let devCode = auth.devCode {
+                                Text("Dev-код: \(devCode)").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if let error = auth.errorMessage {
+                        Section { Text(error).foregroundStyle(.red) }
+                    }
+                    Section {
+                        if codeRequested {
+                            Button("Войти") {
+                                Task { await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber)) }
+                            }
+                            .disabled(auth.isLoading || code.filter(\.isNumber).count != 6)
+                        } else {
+                            Button("Получить код") {
+                                Task { codeRequested = await auth.requestOTP(phone: normalizedPhone) }
+                            }
+                            .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Кабинет")
+        }
+    }
+
+    private var normalizedPhone: String {
+        let digits = phone.filter(\.isNumber)
+        return "+\(digits)"
     }
 }
 

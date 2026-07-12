@@ -48,6 +48,15 @@ public actor APIClient {
         return try await request(path, method: "POST", token: token, body: encoded, idempotencyKey: idempotencyKey, as: type)
     }
 
+    public func postNoContent<Body: Encodable & Sendable>(
+        _ path: String,
+        body: Body,
+        token: String? = nil
+    ) async throws {
+        let encoded = try JSONEncoder().encode(body)
+        let _: EmptyResponse = try await request(path, method: "POST", token: token, body: encoded, as: EmptyResponse.self)
+    }
+
     private func request<Response: Decodable & Sendable>(
         _ path: String,
         method: String,
@@ -74,6 +83,9 @@ public actor APIClient {
             let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data)
             throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
         }
+        if Response.self == EmptyResponse.self, data.isEmpty {
+            return EmptyResponse() as! Response
+        }
         do {
             return try decoder.decode(type, from: data)
         } catch {
@@ -81,6 +93,8 @@ public actor APIClient {
         }
     }
 }
+
+private struct EmptyResponse: Decodable, Sendable {}
 
 private struct ErrorPayload: Decodable {
     let message: String

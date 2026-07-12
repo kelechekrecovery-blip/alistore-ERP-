@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native SwiftUI Client OTP authentication with Keychain session persistence, refresh-token rotation on restore, server logout, authenticated account state, and protected order history with typed contract tests.
 - Align the authenticated owner ERP shell to the canonical `AliStore ERP 2.0` handoff: 1280x820 framed workspace, 230px sidebar, exact desktop spacing, core module order, and a separate extended-module group retaining every newer operational surface.
 - Align the functional Staff app to the canonical `AliStore Сотрудник App 2.0` handoff: 402px phone shell, status bar, four primary actions, four-section bottom navigation, inner-screen back controls, AI task CTA, and retained B2B/protection/POS extensions.
 - Align the functional POS terminal to the canonical `AliStore POS 2.0` handoff: 1180px terminal, 420px receipt, warm dark operational palette, three-column catalog, reference scanner copy, and browser-locked geometry without removing sync/offline/payment operations.

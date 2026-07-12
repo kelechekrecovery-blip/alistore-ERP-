@@ -864,3 +864,12 @@
 - Checks run: `git diff --check`; `npm run build -w @alistore/web`; isolated Chromium `npx playwright test e2e/erp-secure.spec.ts` with real owner bootstrap/login, exact shell/sidebar dimensions, module-group presence, protected Reports/AI calls, AI/pricing/readiness navigation, and overflow guard.
 - Outcome: Next production build passed for all 35 routes; authenticated ERP browser UAT passed 1/1 in 2.5s with no report/AI 401 or 403 responses.
 - Next step: align the first deep ERP module against its dedicated handoff, starting with Finance 2.0, then Warehouse, Product Management, HR, Logistics, CMS, Analytics, Security, Service Center, and Legal.
+
+## 2026-07-12
+
+- Task: close the first App Store-blocking SwiftUI Client parity gap: customer OTP session and authenticated order history.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/{APIClient,CustomerAuthStore,Models}.swift`, `apps/ios/Tests/APIClientTests.swift`, generated `apps/ios/AliStoreNative.xcodeproj/project.pbxproj`, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: the native Client now requests and verifies SMS OTP, resolves the authenticated principal, persists the complete customer session in device-only Keychain, validates or refresh-rotates it on launch, revokes it on logout, and loads owner-scoped `GET /orders/mine` history with explicit restoring/loading/error/empty states.
+- Checks run: `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator; `git diff --check`.
+- Outcome: all four SwiftUI application targets and shared framework built successfully; AliStoreCore XCTest passed 4/4 including OTP request contract, bearer-authenticated order contract, ISO-8601 order decoding, catalog decoding, and server-error propagation.
+- Next step: implement the native SwiftUI Client cart and signed-in checkout/payment flow, then devices/warranty and push registration.
