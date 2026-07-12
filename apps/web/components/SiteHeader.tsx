@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Heart, Menu, Search, ShoppingBag, User, X } from 'lucide-react';
-import { useState } from 'react';
+import { Heart, MapPin, Menu, Phone, Scale, Search, ShoppingBag, User, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { ScrollProgress } from './storefront/Motion';
 
-const NAV = [
+const MOBILE_NAV = [
   { href: '/', label: 'Магазин' },
   { href: '/catalog', label: 'Каталог' },
   { href: '/trade-in', label: 'Trade-in' },
@@ -17,67 +17,94 @@ const NAV = [
   { href: '/b2b', label: 'Для бизнеса' },
 ];
 
+const CATEGORY_NAV = [
+  ['Смартфоны', '/catalog?category=Смартфоны'],
+  ['Ноутбуки', '/catalog?category=Ноутбуки'],
+  ['Планшеты', '/catalog?category=Планшеты'],
+  ['Наушники', '/catalog?category=Аудио'],
+  ['Часы', '/catalog?category=Часы'],
+  ['Телевизоры', '/catalog?category=Телевизоры'],
+  ['Аксессуары', '/catalog?category=Аксессуары'],
+  ['Trade-in', '/trade-in'],
+] as const;
+
 export function SiteHeader() {
   const pathname = usePathname();
   const { count, hydrated: cartHydrated } = useCart();
   const { count: favoritesCount } = useFavorites();
-  const { user, hydrated: authHydrated } = useAuth();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
-  const active = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
-
   return (
-    <header className="sticky top-0 z-50 border-b border-[#E7DDD3] bg-[#F7F2EC]/90 text-ink backdrop-blur-xl">
-      <nav className="mx-auto flex h-[74px] w-[min(1200px,92vw)] items-center gap-6" aria-label="Основная навигация">
-        <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="AliStore — магазин">
-          <span className="grid h-10 w-10 place-items-center rounded-[11px] bg-coral font-display text-lg font-extrabold text-white shadow-[0_10px_28px_-14px_rgba(232,65,15,.5)]">A</span>
-          <span>
-            <strong className="block font-display text-[18px] font-bold leading-none tracking-normal text-ink">ALISTORE</strong>
-            <span className="mt-1 block text-[9px] uppercase tracking-[0.18em] text-[#8A7F76]">Электроника · Бишкек</span>
-          </span>
+    <header className="sticky top-0 z-50 bg-white text-[#0f0f0f] shadow-[0_1px_0_#e5e5e7]">
+      <div className="bg-[#0f0f0f] text-white">
+        <div className="mx-auto flex h-8 max-w-[1400px] items-center justify-between px-5 text-xs">
+          <div className="hidden items-center gap-6 text-white/80 md:flex">
+            <Link href="/about" className="hover:text-white">О компании</Link>
+            <Link href="/delivery" className="hover:text-white">Доставка и оплата</Link>
+            <Link href="/support" className="hover:text-white">Гарантия и сервис</Link>
+            <Link href="/b2b" className="hover:text-white">Для бизнеса</Link>
+          </div>
+          <div className="ml-auto flex items-center gap-5 text-white/80">
+            <span className="hidden items-center gap-1.5 sm:flex"><MapPin size={13} /> Манас</span>
+            <a href="tel:+996555123456" className="flex items-center gap-1.5 hover:text-white"><Phone size={13} /> +996 555 123 456</a>
+            <span className="hidden lg:inline">Ежедневно 09:00–21:00</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto grid h-[76px] max-w-[1400px] grid-cols-[auto_1fr_auto] items-center gap-3 px-4 md:h-[88px] md:grid-cols-[auto_auto_1fr_auto] md:gap-6 md:px-5">
+        <Link href="/" className="flex shrink-0 items-baseline gap-1.5" aria-label="AliStore Electronics">
+          <strong className="text-[22px] font-extrabold leading-none md:text-2xl">AliStore</strong>
+          <span className="hidden text-[10px] uppercase tracking-[0.15em] text-[#8a8a8a] lg:inline">Electronics</span>
         </Link>
 
-        <div className="mx-auto hidden items-center gap-5 md:flex xl:gap-7">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className={`relative py-2 text-sm transition-colors ${active(item.href) ? 'font-semibold text-ink' : 'text-[#6E645C] hover:text-deep'}`}>
-              {item.label}
-              {active(item.href) && <span className="absolute inset-x-0 -bottom-[17px] h-0.5 bg-coral" />}
-            </Link>
-          ))}
-        </div>
+        <Link href="/catalog" className="hidden h-11 items-center gap-2.5 rounded-[10px] bg-[#ff4d2e] px-[18px] text-sm font-bold text-white transition-colors hover:bg-[#e63a1c] md:flex">
+          <Menu size={17} /> Каталог
+        </Link>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Link href="/catalog" aria-label="Поиск" title="Поиск" className="hidden h-10 w-10 place-items-center rounded-[11px] border border-[#DED3C8] bg-white text-[#6E645C] transition hover:border-coral hover:text-deep lg:grid">
-            <Search size={18} />
-          </Link>
-          <Link href="/favorites" aria-label="Избранное" title="Избранное" className="relative hidden h-10 w-10 place-items-center rounded-[11px] border border-[#DED3C8] bg-white text-[#6E645C] transition hover:border-coral hover:text-deep lg:grid">
-            <Heart size={18} />
-            {favoritesCount > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">{favoritesCount}</span>}
-          </Link>
-          <Link href="/cart" aria-label="Корзина" title="Корзина" className="relative grid h-10 w-10 place-items-center rounded-[11px] border border-[#DED3C8] bg-white text-[#6E645C] transition hover:border-coral hover:text-deep">
-            <ShoppingBag size={18} />
-            {cartHydrated && count > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">{count}</span>}
-          </Link>
-          <Link href={user ? '/account' : '/login'} className="hidden items-center gap-2 rounded-[11px] bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_28px_-16px_rgba(232,65,15,.7)] transition hover:bg-deep sm:flex">
-            <User size={16} />
-            {authHydrated && user ? 'Кабинет' : 'Войти'}
-          </Link>
-          <button type="button" onClick={() => setOpen((value) => !value)} className="grid h-10 w-10 place-items-center rounded-[11px] border border-[#DED3C8] bg-white text-ink md:hidden" aria-label={open ? 'Закрыть меню' : 'Открыть меню'}>
-            {open ? <X size={20} /> : <Menu size={20} />}
+        <form action="/catalog" className="relative hidden h-11 min-w-0 md:block">
+          <label htmlFor="header-search" className="sr-only">Поиск по каталогу</label>
+          <input id="header-search" name="q" placeholder="Поиск по товарам" className="h-full w-full rounded-[10px] border border-[#e5e5e7] bg-[#f5f5f7] px-[18px] pr-14 text-sm outline-none transition focus:border-[#0f0f0f] focus:bg-white" />
+          <button type="submit" aria-label="Найти" className="absolute bottom-1 right-1 top-1 grid w-10 place-items-center rounded-lg bg-[#0f0f0f] text-white"><Search size={17} /></button>
+        </form>
+
+        <div className="ml-auto flex items-center gap-0.5 md:gap-1">
+          <HeaderTool href="/favorites" label="Избранное" icon={<Heart size={22} />} count={favoritesCount} hideLabel />
+          <HeaderTool href="/compare" label="Сравнить" icon={<Scale size={22} />} hideLabel />
+          <HeaderTool href={user ? '/account' : '/login'} label={user ? 'Профиль' : 'Войти'} icon={<User size={22} />} hideLabel />
+          <HeaderTool href="/cart" label="Корзина" icon={<ShoppingBag size={22} />} count={cartHydrated ? count : 0} />
+          <button type="button" onClick={() => setOpen((value) => !value)} className="grid h-11 w-11 place-items-center rounded-lg text-[#4a4a4a] md:hidden" aria-label={open ? 'Закрыть меню' : 'Открыть меню'}>
+            {open ? <X size={22} /> : <Menu size={22} />}
           </button>
+        </div>
+      </div>
+
+      <nav className="hidden border-t border-[#e5e5e7] md:block" aria-label="Категории товаров">
+        <div className="mx-auto flex max-w-[1400px] gap-6 overflow-x-auto px-5">
+          {CATEGORY_NAV.map(([label, href], index) => (
+            <Link key={label} href={href} className={`relative whitespace-nowrap py-3.5 text-[13px] font-medium text-[#4a4a4a] hover:text-[#0f0f0f] ${index === 0 && pathname === '/' ? 'font-bold text-[#0f0f0f] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-[#ff4d2e]' : ''}`}>{label}</Link>
+          ))}
+          <Link href="/catalog?promo=true" className="whitespace-nowrap py-3.5 text-[13px] font-semibold text-[#ff4d2e]">Акции</Link>
         </div>
       </nav>
 
       {open && (
-        <div className="border-t border-[#E7DDD3] bg-sand px-[4vw] py-4 md:hidden">
-          <div className="mx-auto grid max-w-[1200px] gap-1">
-            {NAV.map((item) => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={`rounded-[10px] px-3 py-3 text-sm ${active(item.href) ? 'bg-tint text-deep' : 'text-[#6E645C]'}`}>{item.label}</Link>)}
-            <Link href={user ? '/account' : '/login'} onClick={() => setOpen(false)} className="mt-2 rounded-[10px] bg-coral px-3 py-3 text-center text-sm font-bold text-white">{user ? 'Кабинет' : 'Войти'}</Link>
-          </div>
-        </div>
+        <nav className="border-t border-[#e5e5e7] bg-white px-4 py-3 md:hidden" aria-label="Мобильная навигация">
+          {MOBILE_NAV.map((item) => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="block border-b border-[#e5e5e7] px-2 py-3 text-sm font-semibold last:border-0">{item.label}</Link>)}
+        </nav>
       )}
       <ScrollProgress />
     </header>
+  );
+}
+
+function HeaderTool({ href, label, icon, count = 0, hideLabel = false }: { href: string; label: string; icon: ReactNode; count?: number; hideLabel?: boolean }) {
+  return (
+    <Link href={href} aria-label={label} className="relative flex min-w-11 flex-col items-center gap-1 rounded-lg px-2 py-2 text-[#4a4a4a] transition-colors hover:bg-[#f5f5f7] hover:text-[#0f0f0f] lg:min-w-[66px]">
+      {icon}
+      <span className={`${hideLabel ? 'hidden lg:block' : 'hidden sm:block'} text-[10px] font-medium`}>{label}</span>
+      {count > 0 && <span className="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#ff4d2e] px-1 text-[9px] font-bold text-white">{count}</span>}
+    </Link>
   );
 }

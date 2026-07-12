@@ -1,7 +1,10 @@
 # AliStore design conformance
 
-`design_handoff_alistore/` is the only visual and interaction source of truth.
-The tracked copy is synchronized from `/Users/alistore/Desktop/design_handoff_alistore`.
+`design_handoff_alistore/` is the visual and interaction source of truth for the
+ecosystem. The desktop customer storefront additionally has an explicit complete
+reference at `/Users/alistore/Desktop/Новая папка 3/Новая папка/alistore strategy/alistore-shop.html`.
+It takes precedence over storefront styling inferred from mobile Client tokens.
+The tracked handoff copy is synchronized from `/Users/alistore/Desktop/design_handoff_alistore`.
 Prototype HTML is a reference, not production code to embed or copy verbatim.
 
 ## Non-negotiable tokens
@@ -18,7 +21,7 @@ Prototype HTML is a reference, not production code to embed or copy verbatim.
 
 | Surface | Reference | Theme | Status |
 |---|---|---|---|
-| Desktop storefront | `Native Design System.md`, Client flows/assets | Light Sand/Tint + Coral | Home/catalog/shared card shell aligned |
+| Desktop storefront | `alistore-shop.html` | Light gray/white + Ink + coral accent | Home and dense desktop header aligned; inner pages pending pixel pass |
 | Client mobile | `AliStore Клиент App 2.0.dc.html` | Dark warm black + Coral/Lime | Existing web reference aligned; native parity ongoing |
 | POS | `AliStore POS 2.0.dc.html` | Always dark + Lime action | Functional shell exists; pixel pass pending |
 | Staff | `AliStore Сотрудник App 2.0.dc.html` | Always dark + role states | Functional shell exists; pixel pass pending |

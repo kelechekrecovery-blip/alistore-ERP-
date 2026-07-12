@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: correct the public desktop storefront against the complete AliStore shop prototype after the user identified the design mismatch.
+- Files changed: `apps/web/app/page.tsx`, `apps/web/components/SiteHeader.tsx`, `apps/web/app/layout.tsx`, `e2e/storefront-motion.spec.ts`, `docs/DESIGN-CONFORMANCE.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: `/` now follows the exact `alistore-shop.html` composition with a black utility strip, white catalog/search header, category rail, dark iPhone hero, trade-in and installment offers, eight quick categories, compact trust strip and live catalog hits. The mobile Client shell remains separate below 768px and `/warranty` remains an internal operational screen.
+- Checks run: web production build; 1440x1000 Chrome screenshot; horizontal overflow assertion (`1440/1440`); focused Playwright storefront suite at desktop, 863px and mobile widths.
+- Outcome: production build passed; Playwright passed 3/3; the visual screenshot matches the discovered prototype structure. Catalog and remaining inner customer pages are explicitly queued for the same pixel pass.
+- Next step: extend the exact storefront visual system through catalog, product, favorites, compare, cart, checkout and account.
+
+## 2026-07-12
+
 - Task: complete the adaptive checkout portion of the canonical customer design migration.
 - Files changed: checkout semantic surface classes, responsive design-system overrides, desktop/mobile checkout E2E, backlog and progress.
 - Result: one checkout implementation now renders as light Sand/white/Coral on desktop and dark warm-black/Lime on phone, preserving the same delivery, pickup, contacts, gift card, payment intent and confirmation logic. Native account subpages remain intentionally dark because they map to Client App screens rather than wide web pages.
