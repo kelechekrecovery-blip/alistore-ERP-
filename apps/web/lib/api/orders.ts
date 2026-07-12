@@ -117,8 +117,11 @@ export interface OrderDetail {
   payments: { amount: number; method: string; status: string }[];
 }
 
-export async function fetchOrder(id: string): Promise<OrderDetail | null> {
-  const res = await fetch(`${API_BASE}/orders/${id}`, { cache: 'no-store' });
+export async function fetchOrder(id: string, accessToken: string): Promise<OrderDetail | null> {
+  const res = await fetch(`${API_BASE}/orders/${id}`, {
+    cache: 'no-store',
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`order ${res.status}`);
   return (await res.json()) as OrderDetail;

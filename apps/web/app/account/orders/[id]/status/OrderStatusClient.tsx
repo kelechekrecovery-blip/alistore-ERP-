@@ -20,18 +20,24 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
   const [steps, setSteps] = useState<TimelineStep[]>([]);
 
   useEffect(() => {
-    fetchOrder(params.id).then((o) => setOrder(o ?? 'missing'));
-  }, [params.id]);
-
-  useEffect(() => {
     if (!hydrated) return;
     if (!user) {
+      setOrder('missing');
       setSteps([]);
       return;
     }
-    authed((token) => fetchOrderLedger(params.id, token))
-      .then((l) => setSteps(buildOrderTimeline(l)))
-      .catch(() => setSteps([]));
+    Promise.all([
+      authed((token) => fetchOrder(params.id, token)),
+      authed((token) => fetchOrderLedger(params.id, token)),
+    ])
+      .then(([nextOrder, ledger]) => {
+        setOrder(nextOrder ?? 'missing');
+        setSteps(buildOrderTimeline(ledger));
+      })
+      .catch(() => {
+        setOrder('missing');
+        setSteps([]);
+      });
   }, [authed, hydrated, params.id, user]);
 
   const frame = (children: React.ReactNode) => (

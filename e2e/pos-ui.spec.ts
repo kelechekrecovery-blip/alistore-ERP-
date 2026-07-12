@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { postJson, prisma, resetDb, seedProduct } from './helpers';
+import { prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
 test('POS UI delta-syncs the cached catalog after staff login', async ({ page, request }) => {
   await resetDb();
-  const username = `e2e-pos-ui-${Date.now().toString(36)}`;
-  const password = 'pass-e2e';
-  await postJson(request, '/staff-auth/bootstrap', { username, password });
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-pos-ui');
   const { product } = await seedProduct('POS-UI');
 
   await page.goto('/pos');

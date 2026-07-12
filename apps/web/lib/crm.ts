@@ -25,19 +25,6 @@ export async function fetchTickets(status: string | undefined, accessToken: stri
   return (await res.json()) as Ticket[];
 }
 
-async function patch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error((d as { message?: string }).message ?? `request ${res.status}`);
-  }
-  return (await res.json()) as T;
-}
-
 async function patchAuth<T>(path: string, body: unknown, accessToken: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',
@@ -78,6 +65,6 @@ export async function fetchCustomerOverview(id: string, accessToken: string): Pr
   return (await res.json()) as CustomerOverview;
 }
 
-export function setConsent(id: string, consent: boolean, actor = 'agent'): Promise<{ consent: boolean }> {
-  return patch(`/customers/${id}/consent`, { consent, actor });
+export function setConsent(id: string, consent: boolean, accessToken: string): Promise<{ consent: boolean }> {
+  return patchAuth(`/customers/${id}/consent`, { consent }, accessToken);
 }

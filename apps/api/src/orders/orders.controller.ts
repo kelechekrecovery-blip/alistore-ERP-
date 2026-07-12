@@ -115,9 +115,20 @@ export class OrdersController {
   @ApiOkResponse({ description: 'Order found.' })
   @ApiNotFoundResponse({ description: 'Order does not exist.' })
   @Get(':id')
-  async get(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard)
+  async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     const order = await this.orders.get(id);
     if (!order) throw new NotFoundException(`Заказ ${id} не найден`);
+    if (user.typ === 'customer') {
+      if (order.customerId !== user.customerId) {
+        throw new NotFoundException(`Заказ ${id} не найден`);
+      }
+    } else {
+      await requireActiveStaff(user, this.staffAuth);
+      if (!user.role || !(await this.authz.can(user.role, 'orders', 'queue'))) {
+        throw new ForbiddenException('Недостаточно прав для просмотра заказа');
+      }
+    }
     return order;
   }
 

@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { postJson, resetDb } from './helpers';
+import { resetDb, seedStaffCredentials } from './helpers';
 
 test('ERP loads protected reports and AI with a staff session', async ({ page, request }) => {
   await resetDb();
-  const username = `e2e-erp-${Date.now().toString(36)}`;
-  const password = 'pass-e2e';
-  await postJson(request, '/staff-auth/bootstrap', { username, password });
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-erp');
 
   const protectedResponses: { url: string; status: number }[] = [];
   page.on('response', (response) => {

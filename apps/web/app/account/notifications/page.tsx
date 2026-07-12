@@ -41,7 +41,7 @@ export default function NotificationsPage() {
     const prev = consentState;
     setConsentState('saving');
     try {
-      await setConsent(user.customerId, next, 'customer_app');
+      await authed((token) => setConsent(user.customerId, next, token));
       setConsentState(next ? 'on' : 'off');
     } catch {
       setConsentState(prev);

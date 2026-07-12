@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { postJson, prisma, resetDb } from './helpers';
+import { prisma, resetDb, seedStaffCredentials } from './helpers';
 
 test('admin manages products with AI enrichment and approval-gated danger actions', async ({ page, request }) => {
   await resetDb();
-  const username = `e2e-products-${Date.now().toString(36)}`;
-  const password = 'pass-e2e';
-  await postJson(request, '/staff-auth/bootstrap', { username, password });
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-products');
 
   const sku = `UI-PRODUCT-${Date.now().toString(36)}`.toUpperCase();
   await page.goto('/admin/products');

@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { sign } from 'jsonwebtoken';
 import { AuditModule } from '../src/audit/audit.module';
 import { InventoryModule } from '../src/inventory/inventory.module';
 import { OrdersModule } from '../src/orders/orders.module';
@@ -139,6 +140,42 @@ describe('Staff session rollout for operational endpoints', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(current.body.staffId).toBe(staffId);
+  });
+
+  it('protects order detail from anonymous and foreign-customer IDOR', async () => {
+    const owner = await prisma.customer.create({
+      data: { phone: `+996700${RUN}01`, name: 'Order owner' },
+    });
+    const foreign = await prisma.customer.create({
+      data: { phone: `+996700${RUN}02`, name: 'Foreign customer' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: owner.id,
+        channel: 'web',
+        total: 100,
+        items: { create: { sku: `IDOR-${RUN}`, qty: 1, price: 100 } },
+      },
+    });
+    const customerToken = (id: string, phone: string) => sign(
+      { sub: id, typ: 'customer', phone },
+      process.env.JWT_SECRET ?? 'dev-insecure-change-me',
+      { expiresIn: '15m' },
+    );
+
+    await request(app.getHttpServer()).get(`/orders/${order.id}`).expect(401);
+    await request(app.getHttpServer())
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${customerToken(foreign.id, foreign.phone)}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${customerToken(owner.id, owner.phone)}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .expect(200);
   });
 
   it('enforces shift role permissions after staff JWT auth', async () => {

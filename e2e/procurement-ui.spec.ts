@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { postJson, prisma, resetDb } from './helpers';
+import { postJson, prisma, resetDb, seedStaffCredentials } from './helpers';
 
 test.afterEach(async () => {
   await resetDb();
@@ -7,9 +7,7 @@ test.afterEach(async () => {
 
 test('owner creates, sends, and receives a purchase order in ERP', async ({ page, request }) => {
   await resetDb();
-  const username = `e2e-procurement-${Date.now().toString(36)}`;
-  const password = 'pass-e2e';
-  await postJson(request, '/staff-auth/bootstrap', { username, password });
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-procurement');
 
   const supplier = await prisma.supplier.create({
     data: { name: `E2E Supplier ${Date.now().toString(36)}` },
@@ -54,19 +52,10 @@ test('owner creates, sends, and receives a purchase order in ERP', async ({ page
 
 test('warehouse role can open procurement and receive a sent PO', async ({ page, request }) => {
   await resetDb();
-  const ownerUsername = `e2e-owner-${Date.now().toString(36)}`;
-  const password = 'pass-e2e';
-  await postJson(request, '/staff-auth/bootstrap', { username: ownerUsername, password });
-  const owner = await postJson<{ accessToken: string }>(request, '/staff-auth/login', {
-    username: ownerUsername,
-    password,
-  });
-  const warehouseUsername = `e2e-warehouse-${Date.now().toString(36)}`;
-  await postJson(request, '/staff-auth/staff', {
-    username: warehouseUsername,
-    password,
-    role: 'warehouse',
-  }, owner.accessToken);
+  const owner = await seedStaffCredentials('owner', 'e2e-owner');
+  const warehouse = await seedStaffCredentials('warehouse', 'e2e-warehouse');
+  const warehouseUsername = warehouse.username;
+  const password = warehouse.password;
 
   const supplier = await prisma.supplier.create({ data: { name: `Warehouse Supplier ${Date.now().toString(36)}` } });
   const product = await prisma.product.create({

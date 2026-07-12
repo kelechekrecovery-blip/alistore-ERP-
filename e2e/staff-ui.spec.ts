@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { postJson, resetDb } from './helpers';
+import { resetDb, seedStaffCredentials } from './helpers';
 
 test('Staff app follows the canonical four-section mobile shell', async ({ page, request }) => {
   await resetDb();
-  const username = `e2e-staff-ui-${Date.now().toString(36)}`;
-  const password = 'pass-e2e';
-  await postJson(request, '/staff-auth/bootstrap', { username, password });
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-staff-ui');
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/staff');

@@ -103,6 +103,11 @@ describe('Customer PII read policy (required JWT + masking)', () => {
 
     await request(app.getHttpServer())
       .patch(`/customers/${owner.id}/consent`)
+      .send({ consent: true, actor: 'anonymous-spoof' })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .patch(`/customers/${owner.id}/consent`)
       .set('Authorization', `Bearer ${customerToken(owner.id, owner.phone)}`)
       .send({ consent: true, actor: 'spoof' })
       .expect(200);
@@ -115,5 +120,9 @@ describe('Customer PII read policy (required JWT + masking)', () => {
 
     const saved = await prisma.customer.findUniqueOrThrow({ where: { id: owner.id } });
     expect(saved.consent).toBe(true);
+    const event = await prisma.auditEvent.findFirst({
+      where: { type: 'customer.consent_changed', refs: { has: owner.id } },
+    });
+    expect(event?.actor).toBe(owner.id);
   });
 });

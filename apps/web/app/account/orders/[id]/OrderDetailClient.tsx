@@ -19,14 +19,21 @@ const BAD = new Set(['cancelled', 'returned', 'refunded']);
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { add } = useCart();
-  const { user } = useAuth();
+  const { user, hydrated, authed } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
 
   useEffect(() => {
-    fetchOrder(params.id).then((o) => setOrder(o ?? 'missing'));
+    if (!hydrated) return;
+    if (!user) {
+      setOrder('missing');
+      return;
+    }
+    authed((token) => fetchOrder(params.id, token))
+      .then((o) => setOrder(o ?? 'missing'))
+      .catch(() => setOrder('missing'));
     fetchCatalog({ limit: 100 }).then((c) => setCatalog(c.items));
-  }, [params.id]);
+  }, [authed, hydrated, params.id, user]);
   const bySku = useMemo(() => new Map(catalog.map((p) => [p.sku, p])), [catalog]);
 
   const frame = (children: React.ReactNode) => (

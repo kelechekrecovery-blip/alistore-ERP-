@@ -22,7 +22,6 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CustomersService } from './customers.service';
 import { SetConsentDto, UpsertCustomerDto } from './customers.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 import type { Customer } from '@prisma/client';
@@ -80,12 +79,15 @@ export class CustomersController {
   @ApiOkResponse({ description: 'Consent updated.' })
   @ApiNotFoundResponse({ description: 'Customer does not exist.' })
   @Patch(':id/consent')
-  @UseGuards(OptionalJwtAuthGuard)
-  setConsent(@Param('id') id: string, @Body() dto: SetConsentDto, @CurrentUser() user?: AuthPrincipal) {
-    if (user?.typ === 'customer' && user.customerId !== id) {
+  @UseGuards(JwtAuthGuard)
+  setConsent(@Param('id') id: string, @Body() dto: SetConsentDto, @CurrentUser() user: AuthPrincipal) {
+    if (user.typ === 'customer' && user.customerId !== id) {
       throw new ForbiddenException('Нельзя менять согласие другого клиента');
     }
-    return this.customers.setConsent(id, dto.consent, user?.typ === 'customer' ? user.customerId : dto.actor ?? 'customer');
+    if (user.typ === 'staff' && user.role !== 'admin' && user.role !== 'owner') {
+      throw new ForbiddenException('Недостаточно прав для изменения согласия');
+    }
+    return this.customers.setConsent(id, dto.consent, user.customerId);
   }
 
   /** A customer may read only their own profile; any authenticated staff may read any. */

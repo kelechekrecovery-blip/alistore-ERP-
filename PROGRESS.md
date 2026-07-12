@@ -963,3 +963,12 @@
 - Checks run: `git diff --check`; repeated `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator. Swift 6 initially rejected AVFoundation delegate isolation and the first multipart test relied on unavailable transported `httpBody`; both gates were corrected and fully rerun.
 - Outcome: all four SwiftUI targets built; final AliStoreCore XCTest passed 17/17, including multipart fields, file metadata, bearer header and Evidence response decoding. Real camera focus/scanning and photo upload still require physical-device certification.
 - Next step: add Staff support queue actions and native push routing, then run the Staff simulator UI smoke and visual pass.
+
+## 2026-07-12
+
+- Task: start Phase 0 with a full release baseline, deterministic browser setup and the first API IDOR closure.
+- Files changed: order/customer controllers and security regressions, authenticated account/ERP API calls, Playwright staff seeding helpers/specs, `BACKLOG.md`, `docs/READINESS.md`, `PROGRESS.md`.
+- Result: public order detail no longer exposes items/payments; customer access is owner-scoped and staff access requires an active permitted role. Marketing consent now requires JWT, rejects foreign customers and junior staff, and always records the token principal instead of body `actor`. Browser tests seed staff directly in the isolated E2E database, so the one-time production bootstrap throttle remains enabled without order-dependent 429 failures.
+- Checks run: targeted order/PII HTTP suites; API build; web production build; full `mvp:verify`; all-target iOS build/XCTest; four-APK Android build and unit/Lint gate; `git diff --check`.
+- Outcome: API 105/105 suites and 383/383 tests; Playwright 19/19; iOS 4 targets and XCTest 17/17; Android 4 APK build plus unit/Lint green. External readiness remains blocked by 9 credential groups and one physical POS certification, exactly as reported by the secret-safe readiness gate.
+- Next step: finish Phase 0 with scoped guest capability tokens for checkout/support/warranty/trade-in/evidence, then repeat IDOR and full release gates.

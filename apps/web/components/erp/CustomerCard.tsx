@@ -24,7 +24,7 @@ export function CustomerCard({ customerId, accessToken }: { customerId: string; 
     if (!ov) return;
     setBusy(true);
     try {
-      await setConsent(customerId, !ov.customer.consent);
+      await setConsent(customerId, !ov.customer.consent, accessToken);
       load();
     } finally {
       setBusy(false);
