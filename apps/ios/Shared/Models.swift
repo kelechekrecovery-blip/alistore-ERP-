@@ -211,3 +211,28 @@ public struct WarrantyCase: Decodable, Identifiable, Sendable {
     public let status: String
     public let sla: Date
 }
+
+public struct RegisterPushTokenRequest: Encodable, Sendable {
+    public let token: String
+    public let platform: String
+    public let deviceId: String
+    public let scope: String
+
+    public init(token: String, deviceId: String) {
+        self.token = token
+        self.platform = "ios"
+        self.deviceId = deviceId
+        self.scope = "customer"
+    }
+}
+
+public struct RegisteredPushToken: Decodable, Sendable {
+    public let id: String
+    public let token: String
+    public let platform: String
+    public let deviceId: String
+    public let scope: String
+    public let customerId: String?
+    public let enabled: Bool
+    public let lastSeenAt: Date
+}

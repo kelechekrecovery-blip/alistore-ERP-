@@ -1,6 +1,24 @@
 import AliStoreCore
 import SwiftData
 import SwiftUI
+import UIKit
+import UserNotifications
+
+private extension Notification.Name {
+    static let alistoreAPNsToken = Notification.Name("alistore.apns.token")
+    static let alistoreAPNsFailure = Notification.Name("alistore.apns.failure")
+}
+
+private final class ClientAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(name: .alistoreAPNsToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .alistoreAPNsFailure, object: error.localizedDescription)
+    }
+}
 
 private enum ClientTab: Hashable {
     case catalog, cart, orders, account
@@ -8,6 +26,7 @@ private enum ClientTab: Hashable {
 
 @main
 struct AliStoreClientApp: App {
+    @UIApplicationDelegateAdaptor(ClientAppDelegate.self) private var appDelegate
     private let container = OfflineStore.container()
 
     var body: some Scene {
@@ -25,6 +44,7 @@ private struct ClientRootView: View {
     @State private var cart: [String: Int] = [:]
     @State private var selectedTab: ClientTab = .catalog
     @State private var orderRefreshRevision = 0
+    @State private var pushStatus = "Push не настроен"
     @Environment(\.scenePhase) private var scenePhase
 
     init(environment: AppEnvironment) {
@@ -44,7 +64,7 @@ private struct ClientRootView: View {
             OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
                 .tabItem { Label("Заказы", systemImage: "shippingbox") }
                 .tag(ClientTab.orders)
-            AccountView(environment: environment, auth: auth)
+            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, onEnablePush: enablePush)
                 .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
                 .tag(ClientTab.account)
         }
@@ -62,6 +82,13 @@ private struct ClientRootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, auth.session != nil { orderRefreshRevision += 1 }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsToken)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await registerPushToken(token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsFailure)) { notification in
+            pushStatus = notification.object as? String ?? "APNs registration failed"
+        }
     }
 
     private func loadCatalog() async {
@@ -74,6 +101,48 @@ private struct ClientRootView: View {
         } catch {
             catalogError = error.localizedDescription
         }
+    }
+
+    private func enablePush() {
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+                guard granted else {
+                    pushStatus = "Уведомления отключены"
+                    return
+                }
+                pushStatus = "Регистрация APNs…"
+                await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+            } catch {
+                pushStatus = error.localizedDescription
+            }
+        }
+    }
+
+    private func registerPushToken(_ token: String) async {
+        guard let session = auth.session else {
+            pushStatus = "Войдите, чтобы привязать push"
+            return
+        }
+        do {
+            let deviceId = installationId()
+            let registered: RegisteredPushToken = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "notifications/push-tokens",
+                body: RegisterPushTokenRequest(token: token, deviceId: deviceId),
+                token: session.accessToken
+            )
+            pushStatus = registered.enabled ? "Push подключён" : "Push отключён"
+        } catch {
+            pushStatus = error.localizedDescription
+        }
+    }
+
+    private func installationId() -> String {
+        let key = "alistore.client.installation-id"
+        if let value = UserDefaults.standard.string(forKey: key) { return value }
+        let value = "ios-\(UUID().uuidString.lowercased())"
+        UserDefaults.standard.set(value, forKey: key)
+        return value
     }
 }
 
@@ -297,6 +366,8 @@ private struct OrdersView: View {
 private struct AccountView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
+    let pushStatus: String
+    let onEnablePush: () -> Void
     @State private var phone = "+996"
     @State private var code = ""
     @State private var codeRequested = false
@@ -313,6 +384,10 @@ private struct AccountView: View {
                         NavigationLink("Мои устройства и гарантия") {
                             DevicesView(environment: environment, auth: auth)
                         }
+                    }
+                    Section("Уведомления") {
+                        LabeledContent("Статус", value: pushStatus)
+                        Button("Включить push", systemImage: "bell.badge") { onEnablePush() }
                     }
                     Section {
                         Button("Выйти", role: .destructive) { Task { await auth.logout() } }

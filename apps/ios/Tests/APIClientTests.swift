@@ -143,6 +143,24 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "warranty-1")
     }
 
+    func testRegistersNativeAPNsTokenForCustomer() async throws {
+        let token = String(repeating: "ab", count: 32)
+        let session = makeSession(status: 201, body: """
+        {"id":"push-1","token":"\(token)","platform":"ios","deviceId":"ios-install-1","scope":"customer","customerId":"customer-1","enabled":true,"lastSeenAt":"2026-07-12T12:00:00Z"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let registered: RegisteredPushToken = try await client.post(
+            "notifications/push-tokens",
+            body: RegisterPushTokenRequest(token: token, deviceId: "ios-install-1"),
+            token: "access-1"
+        )
+
+        XCTAssertTrue(registered.enabled)
+        XCTAssertEqual(registered.scope, "customer")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)

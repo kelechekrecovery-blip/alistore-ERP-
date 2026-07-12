@@ -909,3 +909,12 @@
 - Checks run: `git diff --check`; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator. A brittle raw-body assertion failed twice because URLProtocol does not retain streamed request bodies; it was replaced with structured JSON encoding validation and the full gate was rerun.
 - Outcome: all four SwiftUI targets built; final AliStoreCore XCTest passed 8/8, including exact payment return URL encoding. No failed test remains.
 - Next step: implement native APNs token registration and offline command replay, then start iOS Staff operational parity.
+
+## 2026-07-12
+
+- Task: add native APNs permission, token capture, and customer-bound registration for the SwiftUI Client.
+- Files changed: `apps/ios/Client/{AliStoreClientApp.swift,Client.entitlements}`, `apps/ios/project.yml`, `apps/ios/Shared/Models.swift`, `apps/ios/Tests/APIClientTests.swift`, generated iOS project, `apps/api/src/notifications/push-token.dto.ts`, `apps/api/test/notifications-push-tokens.spec.ts`, `docs/ARCHITECTURE-GAP-MAP.md`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: the Client requests alert/badge/sound permission, registers with UIApplication/APNs, converts the device token to hex, persists a stable installation id, and binds the token to the signed-in customer through `POST /notifications/push-tokens`. The API accepts native APNs tokens as well as Expo tokens; Expo transport continues filtering only Expo-compatible destinations.
+- Checks run: `git diff --check`; `npm run api:build`; targeted notifications registry + Expo transport Jest; `npm run ios:generate`; `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator.
+- Outcome: API build passed; push tests passed 7/7; all four SwiftUI targets built with Client APNs entitlement; AliStoreCore XCTest passed 9/9. Live APNs delivery remains credential/device-gated and is not claimed certified.
+- Next step: implement native offline order command replay, then begin iOS Staff operational parity.

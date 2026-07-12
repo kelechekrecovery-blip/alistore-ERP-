@@ -1,9 +1,16 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { PUSH_TOKEN_PATTERN } from '../src/notifications/push-token.dto';
 
 describe('Notifications push token registry (integration)', () => {
   let prisma: PrismaService;
   let notifications: NotificationsService;
+
+  it('accepts native APNs tokens while retaining Expo token compatibility', () => {
+    expect(PUSH_TOKEN_PATTERN.test('ab'.repeat(32))).toBe(true);
+    expect(PUSH_TOKEN_PATTERN.test('ExponentPushToken[customer123]')).toBe(true);
+    expect(PUSH_TOKEN_PATTERN.test('not-a-push-token')).toBe(false);
+  });
 
   beforeAll(async () => {
     prisma = new PrismaService();

@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native SwiftUI Client APNs registration foundation: push entitlement, permission/status UI, UIApplication device-token bridge, stable installation id, customer-JWT token binding, API acceptance for native APNs tokens, and compatibility tests preserving Expo delivery filtering.
 - Add native SwiftUI Client payment-return reconciliation: provider return URL, `alistore://payment-return` routing to Orders, foreground refresh after external payment apps, and server-authoritative status reload.
 - Add native SwiftUI Client devices and warranty flow: owner-scoped purchased-device inventory, coverage/days-left/case status, authenticated warranty opening, explicit empty/error/loading states, and typed contract tests.
 - Add native SwiftUI Client online payment intents for card, MBank QR, O!Деньги QR and installment: JWT ownership guard, provider handoff URL/QR, awaiting-payment state, and server-side ownership/integration regressions without client-side paid status mutation.
