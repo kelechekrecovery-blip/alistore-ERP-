@@ -25,6 +25,7 @@ Required for a production-ready report:
 - `DATABASE_URL`, `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and exact HTTPS origins in `CORS_ORIGINS`.
 - Payment gateway: `PAYMENT_PROVIDER=production`, `PAYMENT_API_URL`, `PAYMENT_MERCHANT_ID`, `PAYMENT_API_KEY`, and `PAYMENT_WEBHOOK_SECRET` after the merchant contract is active.
 - Keep `PAYMENT_PROVIDER_CERTIFIED=false` until signed webhook, replay, reconciliation, and refund checks pass against the provider account.
+- SMS/OTP: set `SMS_PROVIDER=production`, API URL/key and approved sender ID; keep `SMS_PROVIDER_CERTIFIED=false` until login/recovery delivery and outage cleanup pass on a real phone.
 - One AI key: `AI_PROVIDER_KEY` or `OPENROUTER_API_KEY`.
 - Telegram: `TELEGRAM_BOT_TOKEN`, webhook URL/secret, callback QA.
 - WhatsApp: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, webhook verify token.

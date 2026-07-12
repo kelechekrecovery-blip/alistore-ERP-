@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
@@ -12,6 +12,8 @@ import {
   verifyAppleIdentityToken,
   verifyTelegramLogin,
 } from './social-login';
+import { NoopOtpSender } from './noop-otp.sender';
+import { OTP_SENDER, OtpSender } from './otp-sender';
 
 export interface AuthTokens {
   accessToken: string;
@@ -38,6 +40,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    @Inject(OTP_SENDER) private readonly otpSender: OtpSender = new NoopOtpSender(),
   ) {}
 
   /**
@@ -47,13 +50,20 @@ export class AuthService {
    */
   async requestOtp(
     phone: string,
+    purpose: 'login' | 'recovery' = 'login',
   ): Promise<{ challengeId: string; devCode?: string }> {
+    this.otpSender.assertOperational();
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const codeHash = await argon2.hash(code);
     const challenge = await this.prisma.otpChallenge.create({
       data: { phone, codeHash, expiresAt: new Date(Date.now() + OTP_TTL_MS) },
     });
-    // TODO: deliver via an SMS gateway (KG provider) behind an OtpSender port.
+    try {
+      await this.otpSender.send({ phone, code, purpose, expiresInSeconds: OTP_TTL_MS / 1000 });
+    } catch (error) {
+      await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+      throw error;
+    }
     const echo = this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true';
     return echo
       ? { challengeId: challenge.id, devCode: code }
@@ -62,7 +72,7 @@ export class AuthService {
 
   /** Issue an access-recovery OTP. Uses the same SMS channel without revealing account existence. */
   requestRecoveryOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
-    return this.requestOtp(phone);
+    return this.requestOtp(phone, 'recovery');
   }
 
   /**

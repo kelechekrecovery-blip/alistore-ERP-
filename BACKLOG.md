@@ -12,6 +12,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add a fail-closed `OtpSender` port with silent dev sender, production adapter boundary, challenge cleanup on delivery failure, and live SMS certification readiness.
 - Harden production runtime startup with fail-fast core preflight, exact CORS allowlist validation, Helmet CSP/security headers, dev-safe HSTS behavior, and regression tests.
 - Add a provider-neutral `PaymentGatewayProvider` port with sandbox default, complete-env production selector, fail-visible live adapter stub, and payment readiness reporting without storing or logging secrets.
 - Add end-to-end Purchase Order procurement: supplier PO creation, send/cancel state machine, race-safe partial/full IMEI receiving, inventory movements, Event Ledger/RBAC, ERP workflow, and browser regression coverage.

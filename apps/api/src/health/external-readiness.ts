@@ -45,6 +45,20 @@ interface CheckDefinition {
 
 const CHECKS: CheckDefinition[] = [
   {
+    id: 'sms_provider',
+    area: 'auth',
+    title: 'Production SMS/OTP provider',
+    requiredEnv: ['SMS_PROVIDER', 'SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID'],
+    completionMarkerEnv: 'SMS_PROVIDER_CERTIFIED',
+    manualChecks: [
+      'Login and recovery OTP delivered to a real Kyrgyzstan phone number',
+      'Sender ID approved and visible on the handset',
+      'Provider outage returns an error without leaving a usable challenge',
+    ],
+    blocking: true,
+    note: 'OTP sender port is ready; production activation requires a provider contract, sender ID, credentials, and live delivery certification.',
+  },
+  {
     id: 'payment_gateway',
     area: 'payments',
     title: 'Production payment gateway',

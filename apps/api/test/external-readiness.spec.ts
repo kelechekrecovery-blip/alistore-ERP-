@@ -26,6 +26,11 @@ describe('External readiness report', () => {
   it('returns ready when every blocking integration is configured or certified', () => {
     const env: Record<string, string> = {
       AI_PROVIDER_KEY: 'set',
+      SMS_PROVIDER: 'production',
+      SMS_API_URL: 'https://sms.example.test',
+      SMS_API_KEY: 'set',
+      SMS_SENDER_ID: 'AliStore',
+      SMS_PROVIDER_CERTIFIED: 'true',
       PAYMENT_PROVIDER: 'production',
       PAYMENT_API_URL: 'https://payments.example.test',
       PAYMENT_MERCHANT_ID: 'set',

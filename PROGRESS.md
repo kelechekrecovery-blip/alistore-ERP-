@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: add the production SMS/OTP provider boundary while preserving safe local authentication.
+- Files changed: OTP sender contract, noop/production adapters and selector, AuthService/AuthModule wiring, sender/selector/auth/readiness tests, API env templates, readiness/activation/backlog/progress docs.
+- Result: login and recovery OTP now deliver through `OtpSender`. Local/test noop never logs or persists plaintext codes; production requires an explicit complete provider config and the unimplemented live adapter fails before challenge creation. Runtime delivery failure removes the just-created challenge, preventing an undelivered usable OTP from remaining in the database.
+- Checks run: targeted OTP selector/sender/auth/readiness Jest; API build; full `mvp:verify -- --skip-e2e`; `git diff --check`.
+- Outcome: targeted 4 suites / 17 tests passed. Full gate passed API/web builds, mobile typecheck and 103/103 API suites with 373/373 tests. External readiness now blocks until provider credentials, sender ID, real-phone delivery, and outage cleanup are certified.
+- Next step: run native store/release preflights and close every software-only warning before external Apple/Google/EAS credentials are supplied.
+
+## 2026-07-12
+
 - Task: close the unblocked G0 production runtime security gate.
 - Files changed: runtime CORS/Helmet configuration, application bootstrap preflight assertion, production preflight checks/tests, API env templates, Helmet dependency/lockfile, readiness/activation/backlog/progress docs.
 - Result: production startup now fails before Nest/DB initialization when core settings are missing or unsafe. `CORS_ORIGINS` is an exact HTTP(S) origin allowlist in production; wildcard/empty values are rejected. Helmet supplies CSP and baseline headers, with HSTS/upgrade-insecure-requests enabled only in production and API media explicitly allowed cross-origin.

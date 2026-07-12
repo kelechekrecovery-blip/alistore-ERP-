@@ -9,6 +9,8 @@ import { resolveJwtSecret } from './jwt-secret';
 import { AuthController } from './auth.controller';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
+import { OTP_SENDER, OtpSender } from './otp-sender';
+import { selectOtpSender } from './otp-sender-selector';
 
 /**
  * Phone+OTP authentication. AuditService and PrismaService are provided globally;
@@ -28,7 +30,18 @@ import { RateLimitModule } from '../rate-limit/rate-limit.module';
       }),
     }),
   ],
-  providers: [AuthService, TotpService, JwtStrategy, OptionalJwtAuthGuard],
+  providers: [
+    AuthService,
+    TotpService,
+    JwtStrategy,
+    OptionalJwtAuthGuard,
+    {
+      provide: OTP_SENDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): OtpSender =>
+        selectOtpSender((name) => config.get<string>(name)),
+    },
+  ],
   controllers: [AuthController],
   exports: [AuthService, TotpService, OptionalJwtAuthGuard],
 })
