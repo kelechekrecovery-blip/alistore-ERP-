@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- Build the native Android workspace with Kotlin/Jetpack Compose, shared typed API core, encrypted token storage, Room offline queue, WorkManager sync, and separate Client/Staff/Courier/POS application modules.
+- Close native Android feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Add Redis and BullMQ with an explicit cache/job boundary and separate worker process; PostgreSQL/Event Ledger remain authoritative and current pg-boss jobs migrate only after parity tests.
 - Add Meilisearch and Redis services to local/staging infrastructure, automatic index bootstrap and idempotent product reindex jobs.
@@ -19,6 +19,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Establish the native Android foundation: separate Client, Staff, Courier and POS Kotlin/Jetpack Compose APKs, shared typed API core, Android Keystore AES-GCM token storage, SQLite idempotent offline queue, WorkManager replay, deep links, local-only Debug networking, unit test, four-app build and Android Lint gate.
 - Establish the native iOS foundation required by the new architecture: one shared Swift framework plus separate Client, Staff, Courier and POS SwiftUI app targets, typed API errors, Keychain, SwiftData offline commands, deep links, fail-closed Release API config, simulator tests and Client smoke launch.
 - Restore the desktop storefront across 768px+ browser windows for home, catalog, product, favorites, cart and account, with a matching search redirect and overflow-safe header regression coverage at the in-app browser's 863px width.
 - Add the first Finance 2.0 vertical: idempotent operating expenses, approval/rejection/payment state machine, race-safe transitions, RBAC, Event Ledger, paid-expense P&L, ERP workflow, and browser regression coverage.

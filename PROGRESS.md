@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: establish the native Android half of the requested Swift/Kotlin application architecture.
+- Files changed: Android Gradle workspace, shared Kotlin core, four Compose app modules, typed REST client, Android Keystore token encryption, SQLite offline queue, WorkManager replay, deep links, unit test, root scripts, architecture/backlog/readiness/progress docs.
+- Result: Client, Staff, Courier and POS are separate installable Android applications with independent package IDs. Client reads the real catalog through the shared API core; every app uses the same role-aware UI foundation. Offline mutations persist stable idempotency keys, encrypted token material stays inside Android Keystore, Debug alone permits the emulator-local API, and Release cleartext is disabled.
+- Checks run: four-module Debug and release-configured APK builds; deliberate missing-release-URL rejection; JVM unit tests; Android Lint across every module; install/cold-launch of Client, Staff, Courier and POS on an Android API 36 ARM64 emulator; foreground Activity and crash-log inspection; Client screenshot; live API health; `git diff --check`.
+- Outcome: all four APKs build and cold-launch successfully, the API URL fail-closed unit/release gates pass, and Lint reports no errors. Client renders its native catalog empty state against the live local API, all four package IDs become the foreground Activity, and no AliStore fatal exception appears in logcat. Complete business-flow parity and store signing remain tracked work.
+- Next step: implement Client OTP/cart/checkout/account as the first matching iOS/Android vertical, then Staff, Courier and POS operational parity.
+
+## 2026-07-12
+
 - Task: adopt the new Codex architecture requirement and replace the Expo-only release assumption with a real native iOS foundation.
 - Files changed: architecture gap map, generated Xcode project/spec, AliStoreCore REST/Keychain/SwiftData/UI foundation, four SwiftUI application targets, native API tests, root iOS scripts, backlog/readiness/progress docs.
 - Result: Client, Staff, Courier and POS are separate iOS applications with independent bundle IDs and deep links. Shared code provides typed server-error handling, secure device-only token storage and persistent idempotent offline commands. Client loads the real catalog API; role apps have real staff authentication and task-specific navigation shells. Debug uses the local API while Release requires injected `ALISTORE_API_BASE_URL`.

@@ -27,10 +27,10 @@ is not the final App Store/Google Play artifact.
 
 | App | iOS SwiftUI | Android Kotlin | Remaining feature parity |
 |---|---|---|---|
-| Client | Native target builds and runs; live catalog, typed API, Keychain and SwiftData queue foundation | Missing | OTP/account, cart/checkout/payment, orders, warranty, push, offline replay |
-| Staff | Native target builds; staff login and role shell | Missing | task queues, Customer 360, scanner, warranty/support, shift evidence |
-| Courier | Native target builds; staff login and route/COD shell | Missing | assigned runs, map/navigation, delivery transitions, evidence, COD handover |
-| POS | Native target builds; staff login and sale/offline shell | Missing | catalog sync, scanner, ticket, split tender, approval, receipt/hardware, replay |
+| Client | Native target builds and runs; live catalog, typed API, Keychain and SwiftData queue foundation | Native Compose APK builds; live catalog, typed API, Keystore and SQLite/WorkManager queue foundation | OTP/account, cart/checkout/payment, orders, warranty, push, offline replay |
+| Staff | Native target builds; staff login and role shell | Separate Compose APK builds with role shell and shared secure/offline core | task queues, Customer 360, scanner, warranty/support, shift evidence |
+| Courier | Native target builds; staff login and route/COD shell | Separate Compose APK builds with role shell and shared secure/offline core | assigned runs, map/navigation, delivery transitions, evidence, COD handover |
+| POS | Native target builds; staff login and sale/offline shell | Separate Compose APK builds with role shell and shared secure/offline core | catalog sync, scanner, ticket, split tender, approval, receipt/hardware, replay |
 
 Shared iOS foundation:
 
@@ -41,21 +41,31 @@ Shared iOS foundation:
 - Debug API is local; Release resolves `ALISTORE_API_BASE_URL` and fails at startup
   if it was not injected as a valid URL.
 
+Shared Android foundation:
+
+- Four independently installable Kotlin/Jetpack Compose application modules and
+  one shared Android library.
+- Typed REST catalog client with server-error propagation and strict API URL validation.
+- Android Keystore AES-GCM token encryption; ciphertext alone is stored in preferences.
+- SQLite-backed persistent mutation queue with unique idempotency keys and a
+  WorkManager replay worker.
+- Custom deep-link schemes, emulator-local Debug API and cleartext disabled in Release.
+- All four Debug and release-configured APKs build; unit tests and Android Lint pass.
+  Client, Staff, Courier and POS cold-launch successfully on an Android API 36 emulator.
+
 ## Execution order
 
-1. Android native workspace: Kotlin, Jetpack Compose, Room, encrypted storage,
-   WorkManager, four application modules and shared typed API core.
-2. Native parity wave: Client checkout/account; Staff operations; Courier delivery/COD;
+1. Native parity wave: Client checkout/account; Staff operations; Courier delivery/COD;
    POS sale/offline sync. Each flow must run against the existing Nest contracts.
-3. Redis + BullMQ: introduce explicit cache/job ports, a separate worker process,
+2. Redis + BullMQ: introduce explicit cache/job ports, a separate worker process,
    idempotent job IDs, retries and dead-letter visibility. Keep PostgreSQL/Event Ledger
    as business truth; Redis is never authoritative.
-4. Meilisearch runtime: service, index bootstrap and product mutation jobs with
+3. Meilisearch runtime: service, index bootstrap and product mutation jobs with
    Postgres fallback.
-5. S3 hardening: private evidence objects, signed reads, lifecycle and restore drill.
-6. Kubernetes/CDN: API, web and worker workloads, migration job, secrets, probes,
+4. S3 hardening: private evidence objects, signed reads, lifecycle and restore drill.
+5. Kubernetes/CDN: API, web and worker workloads, migration job, secrets, probes,
    ingress, autoscaling and rollback validation.
-7. Store release: signing, production URLs, privacy manifests/data safety, push,
+6. Store release: signing, production URLs, privacy manifests/data safety, push,
    TestFlight/Play Internal and physical-device smoke.
 
 ## Non-negotiable validation
