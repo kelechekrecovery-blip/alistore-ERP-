@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+- Task: close the unblocked G0 production runtime security gate.
+- Files changed: runtime CORS/Helmet configuration, application bootstrap preflight assertion, production preflight checks/tests, API env templates, Helmet dependency/lockfile, readiness/activation/backlog/progress docs.
+- Result: production startup now fails before Nest/DB initialization when core settings are missing or unsafe. `CORS_ORIGINS` is an exact HTTP(S) origin allowlist in production; wildcard/empty values are rejected. Helmet supplies CSP and baseline headers, with HSTS/upgrade-insecure-requests enabled only in production and API media explicitly allowed cross-origin.
+- Checks run: targeted runtime-security, production-preflight and health Jest; API build; deliberate unsafe production startup; live dev API header/CORS curl; dependency audit; full `mvp:verify -- --skip-e2e`; `git diff --check`.
+- Outcome: unsafe production exited with code 1 before listening; live API returned CSP/CORP/nosniff and reflected the dev origin; audit found 0 vulnerabilities. Full gate passed API/web builds, mobile typecheck and 101/101 API suites with 368/368 tests.
+- Next step: audit native iOS/Android store gates and close every software-only warning while external signing/push credentials remain blocked.
+
+## 2026-07-12
+
 - Task: add the production-shaped payment gateway port without provider secrets or speculative network endpoints.
 - Files changed: payment gateway contract, sandbox adapter, production fail-visible adapter, env selector and DI wiring, intent orchestration, selector/intent/readiness tests, API env templates, external readiness, backlog/progress/activation docs.
 - Result: `PaymentIntentsService` now delegates create-intent and raw-request webhook verification through `PaymentGatewayProvider`; absent or explicit sandbox env keeps the existing sandbox behavior. Unknown modes and incomplete production configuration fail closed during startup. A complete `PAYMENT_PROVIDER=production` configuration selects a server-only adapter that refuses transactions before stock/order mutation until the chosen provider's signed contract is implemented. The port defines refund semantics while readiness remains manual until external refund reconciliation is certified.

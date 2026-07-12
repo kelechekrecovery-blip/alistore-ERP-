@@ -22,7 +22,7 @@ Fill `apps/api/.env.production` with real values. The file is ignored by git.
 
 Required for a production-ready report:
 
-- `DATABASE_URL`, `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`.
+- `DATABASE_URL`, `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and exact HTTPS origins in `CORS_ORIGINS`.
 - Payment gateway: `PAYMENT_PROVIDER=production`, `PAYMENT_API_URL`, `PAYMENT_MERCHANT_ID`, `PAYMENT_API_KEY`, and `PAYMENT_WEBHOOK_SECRET` after the merchant contract is active.
 - Keep `PAYMENT_PROVIDER_CERTIFIED=false` until signed webhook, replay, reconciliation, and refund checks pass against the provider account.
 - One AI key: `AI_PROVIDER_KEY` or `OPENROUTER_API_KEY`.
@@ -45,8 +45,9 @@ npm run launch:readiness:strict
 ```
 
 `launch:preflight` checks the core production env: `NODE_ENV=production`,
-`DATABASE_URL`, strong `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and enabled background
-jobs. `launch:readiness` prints a secret-safe external report. `launch:check` runs the
+`DATABASE_URL`, exact `CORS_ORIGINS`, strong `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`, and enabled background
+jobs. The API runs the same core check before production bootstrap and applies Helmet CSP/security headers.
+`launch:readiness` prints a secret-safe external report. `launch:check` runs the
 strict core preflight and strict external readiness gates together.
 
 For machine-readable automation:

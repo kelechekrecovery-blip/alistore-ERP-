@@ -1,4 +1,4 @@
-import { buildProductionPreflightReport } from '../src/health/production-preflight';
+import { assertProductionRuntimeReady, buildProductionPreflightReport } from '../src/health/production-preflight';
 
 describe('Production preflight report', () => {
   it('blocks the production example until real core settings are filled', () => {
@@ -17,11 +17,12 @@ describe('Production preflight report', () => {
 
     expect(report.status).toBe('blocked');
     expect(report.generatedAt).toBe('2026-07-08T00:00:00.000Z');
-    expect(report.summary.missing).toBe(2);
+    expect(report.summary.missing).toBe(3);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
         expect.stringContaining('Strong JWT secret'),
+        expect.stringContaining('Production CORS allowlist'),
       ]),
     );
   });
@@ -51,6 +52,7 @@ describe('Production preflight report', () => {
       ({
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://alistore-prod.internal:5432/alistore',
+        CORS_ORIGINS: 'https://alistore.kg,https://admin.alistore.kg',
         JWT_SECRET: strongSecret,
         AUTH_OTP_DEV_ECHO: 'false',
         RESERVATION_SWEEP_ENABLED: 'true',
@@ -61,5 +63,22 @@ describe('Production preflight report', () => {
     expect(report.status).toBe('ready');
     expect(report.summary.blockingRemaining).toBe(0);
     expect(report.nextActions).toEqual([]);
+  });
+
+  it('fails application startup in unsafe production without leaking values', () => {
+    const secret = 'unsafe-secret-value';
+    const env = (name: string) => ({
+      NODE_ENV: 'production',
+      DATABASE_URL: '',
+      JWT_SECRET: secret,
+      AUTH_OTP_DEV_ECHO: 'true',
+    })[name];
+    expect(() => assertProductionRuntimeReady(env)).toThrow('Production runtime preflight failed');
+    try {
+      assertProductionRuntimeReady(env);
+    } catch (error) {
+      expect(String(error)).not.toContain(secret);
+    }
+    expect(() => assertProductionRuntimeReady(() => undefined)).not.toThrow();
   });
 });

@@ -1,3 +1,5 @@
+import { resolveCorsOptions } from '../config/runtime-security';
+
 export type ProductionPreflightStatus = 'ready' | 'missing' | 'unsafe';
 
 export interface ProductionPreflightCheck {
@@ -64,6 +66,21 @@ const CHECKS: CheckDefinition[] = [
     note: 'DATABASE_URL must point at the production PostgreSQL database.',
   },
   {
+    id: 'cors_origins',
+    area: 'security',
+    title: 'Production CORS allowlist',
+    requiredEnv: ['CORS_ORIGINS'],
+    note: 'Set exact HTTPS storefront/admin origins separated by commas; wildcard and empty production CORS are rejected.',
+    evaluate: (env) => {
+      try {
+        resolveCorsOptions(env);
+        return 'ready';
+      } catch {
+        return 'unsafe';
+      }
+    },
+  },
+  {
     id: 'jwt_secret',
     area: 'auth',
     title: 'Strong JWT secret',
@@ -127,6 +144,16 @@ export function buildProductionPreflightReport(
       .filter((check) => check.status !== 'ready')
       .map((check) => `${check.title}: ${check.note}`),
   };
+}
+
+export function assertProductionRuntimeReady(env: EnvReader): void {
+  if (env('NODE_ENV') !== 'production') return;
+  const report = buildProductionPreflightReport(env);
+  if (report.status === 'ready') return;
+  const failedIds = report.checks
+    .filter((check) => check.status !== 'ready')
+    .map((check) => check.id);
+  throw new Error(`Production runtime preflight failed: ${failedIds.join(', ')}`);
 }
 
 function evaluateCheck(

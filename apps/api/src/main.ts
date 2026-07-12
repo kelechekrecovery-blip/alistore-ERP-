@@ -3,8 +3,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { setupOpenApi } from './openapi';
+import helmet from 'helmet';
+import { resolveCorsOptions, resolveHelmetOptions } from './config/runtime-security';
+import { assertProductionRuntimeReady } from './health/production-preflight';
 
 async function bootstrap(): Promise<void> {
+  const env = (name: string) => process.env[name];
+  assertProductionRuntimeReady(env);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.setGlobalPrefix('api');
   app.useStaticAssets(process.env.MEDIA_LOCAL_DIR ?? './uploads', {
@@ -13,21 +18,8 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
   );
-  // CORS: restrict to an explicit allowlist in production (CORS_ORIGINS="a,b"); reflect the
-  // request origin in dev when unset so localhost:3000 → :4000 keeps working.
-  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-  app.enableCors(corsOrigins.length ? { origin: corsOrigins, credentials: true } : { origin: true });
-  // Baseline security headers (dependency-free; helmet not required for these).
-  app.use((_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    next();
-  });
+  app.enableCors(resolveCorsOptions(env));
+  app.use(helmet(resolveHelmetOptions(env)));
   setupOpenApi(app);
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);

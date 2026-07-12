@@ -10,9 +10,9 @@
 ---
 
 ## G0 — Прод-каркас безопасности (без внешних зависимостей) — СНАЧАЛА
-- 🟩 **Fail-fast прод-гард**: приложение НЕ стартует при `NODE_ENV=production`, если `JWT_SECRET`
+- ✅ 🟩 **Fail-fast прод-гард**: приложение НЕ стартует при `NODE_ENV=production`, если `JWT_SECRET`
   дефолтный или `AUTH_OTP_DEV_ECHO=true`. (main.ts / config)
-- 🟩 **CORS по allowlist из env** + `helmet` (HSTS/CSP/nosniff/frameguard). Сейчас `enableCors()` нараспашку.
+- ✅ 🟩 **CORS по allowlist из env** + Helmet (HSTS/CSP/nosniff/frameguard); production wildcard/empty allowlist rejected.
 - 🟦 **`.env.production.example`** + чеклист смены всех секретов (JWT, DB, MinIO, Novu…).
 - **Приёмка:** `npm run launch:preflight:strict` зелёный на прод-конфиге; старт с дефолт-секретом падает.
 

@@ -5,7 +5,7 @@
 и не должны смешиваться с готовностью первого магазина к запуску.
 
 - **46 backend-модулей** (NestJS) · **35 веб-роутов** (Next.js) · **23 миграции**
-- **100 API test suites / 364 теста — зелёные** (`jest`)
+- **101 API test suites / 368 тестов — зелёные** (`jest`)
 - **14 Playwright smoke-flow — зелёные**, включая owner/warehouse Purchase Order lifecycle (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -68,7 +68,7 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest --runInBand    # 100 suites / 364 теста ✓
+cd apps/api && npx jest --runInBand    # 101 suites / 368 тестов ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (35 роутов)
 npm run e2e                           # 14/14 ✓
