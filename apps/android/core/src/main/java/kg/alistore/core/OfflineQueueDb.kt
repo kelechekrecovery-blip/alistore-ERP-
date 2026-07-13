@@ -54,12 +54,12 @@ class OfflineQueueDb(
     return id
   }
 
-  fun pending(limit: Int = 50): List<PendingMutation> {
+  fun pending(limit: Int = 50, includeConflicts: Boolean = false): List<PendingMutation> {
     val cursor = readableDatabase.query(
       "pending_mutation",
       null,
-      "state != ?",
-      arrayOf("conflict"),
+      if (includeConflicts) null else "state != ?",
+      if (includeConflicts) null else arrayOf("conflict"),
       null,
       null,
       "created_at ASC",
@@ -88,6 +88,15 @@ class OfflineQueueDb(
   fun markSent(id: String) { writableDatabase.delete("pending_mutation", "id = ?", arrayOf(id)) }
 
   fun retry(id: String) { markState(id, "queued") }
+
+  fun replaceBodyAndRetry(id: String, body: String) {
+    writableDatabase.update("pending_mutation", ContentValues().apply {
+      put("body", body)
+      put("state", "queued")
+      putNull("last_error")
+      put("updated_at", System.currentTimeMillis())
+    }, "id = ?", arrayOf(id))
+  }
 
   fun markState(id: String, state: String, error: String? = null, incrementAttempt: Boolean = false) {
     writableDatabase.update("pending_mutation", ContentValues().apply {

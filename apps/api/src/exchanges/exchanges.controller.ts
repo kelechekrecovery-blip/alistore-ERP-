@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -31,7 +31,14 @@ export class ExchangesController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('exchanges', 'create')
-  exchange(@CurrentUser() user: AuthPrincipal, @Body() dto: ExchangeDto) {
-    return this.exchanges.exchange(dto, user.customerId);
+  exchange(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: ExchangeDto,
+  ) {
+    const key = idempotencyKey?.trim();
+    if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+    if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+    return this.exchanges.exchange(dto, user.customerId, key);
   }
 }

@@ -32,6 +32,7 @@ test('staff exchanges a sold IMEI into a higher-priced replacement', async ({ re
     '/exchanges',
     { originalOrderId: original.id, oldImei: 'E2E-OLD-IMEI', newProductId: newProduct.id, method: 'cash' },
     staffToken,
+    { 'idempotency-key': 'e2e-exchange-1' },
   );
 
   expect(result.surcharge).toBe(20000);

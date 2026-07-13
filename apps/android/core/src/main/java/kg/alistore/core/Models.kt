@@ -93,8 +93,25 @@ data class CourierDelivery(
   val run: CourierRunSummary?,
 )
 
-data class PosLine(val productId: String, val sku: String, val price: Int, val qty: Int)
+data class PosLine(val productId: String, val sku: String, val price: Int, val qty: Int, val imei: String? = null)
+data class PosUnit(val imei: String, val productId: String, val status: String, val sku: String, val product: String, val price: Int)
 data class PosTender(val method: String, val amount: Int)
+data class PosReceipt(val markup: String, val svg: String, val escposBase64: String)
+data class PosPayment(val id: String, val orderId: String?, val amount: Int, val method: String, val status: String)
+data class PosReturn(val id: String, val orderId: String, val reason: String, val status: String, val createdAt: String)
+data class PosExchangeRequest(
+  val originalOrderId: String,
+  val oldImei: String,
+  val newProductId: String,
+  val method: String,
+)
+data class PosExchangeResult(
+  val exchangeOrderId: String,
+  val returnId: String,
+  val surcharge: Int,
+  val oldImei: String,
+  val newImei: String,
+)
 data class PosSaleRequest(
   val point: String,
   val lines: List<PosLine>,

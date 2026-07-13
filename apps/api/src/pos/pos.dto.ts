@@ -25,6 +25,9 @@ export class PosLineDto {
 
   @ApiProperty({ minimum: 1, example: 1 })
   @IsInt() @Min(1) qty!: number;
+
+  @ApiPropertyOptional({ example: '356789012345678', description: 'Exact serialized unit selected by scanner.' })
+  @IsOptional() @IsString() imei?: string;
 }
 
 export class PosPaymentDto {

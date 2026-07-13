@@ -35,7 +35,6 @@ export function exchangeDevice(input: {
   oldImei: string;
   newProductId: string;
   method: string;
-  requester?: string;
-}, accessToken: string): Promise<ExchangeResult> {
-  return postAuthJson('/exchanges', input, accessToken);
+}, accessToken: string, idempotencyKey: string): Promise<ExchangeResult> {
+  return postAuthJson('/exchanges', input, accessToken, { 'idempotency-key': idempotencyKey });
 }

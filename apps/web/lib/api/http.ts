@@ -20,12 +20,14 @@ export async function postAuthJson<T>(
   path: string,
   body: unknown,
   accessToken: string,
+  headers?: Record<string, string>,
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${accessToken}`,
+      ...headers,
     },
     body: JSON.stringify(body),
   });

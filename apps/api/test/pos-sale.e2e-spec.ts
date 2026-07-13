@@ -180,6 +180,42 @@ describe('POS sale (integration)', () => {
     expect(await prisma.payment.count()).toBe(0);
   });
 
+  it('sells the exact in-stock IMEI selected by the POS scanner', async () => {
+    const product = await seedProduct(2);
+    const selected = await prisma.deviceUnit.findFirstOrThrow({
+      where: { productId: product.id, status: 'in_stock' },
+      orderBy: { id: 'desc' },
+    });
+
+    const result = expectCompleted(await pos.sale({
+      staffId: 'staff_pos_scanner',
+      point: 'BISHKEK-1',
+      method: 'card',
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1, imei: selected.imei }],
+    }));
+
+    expect(result.imeis).toEqual([selected.imei]);
+    expect((await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: selected.imei } })).status).toBe('sold');
+    expect(await prisma.deviceUnit.count({ where: { productId: product.id, status: 'in_stock' } })).toBe(1);
+  });
+
+  it('rejects a scanned IMEI that belongs to another product', async () => {
+    const product = await seedProduct(1);
+    const other = await seedProduct(1);
+    const selected = await prisma.deviceUnit.findFirstOrThrow({ where: { productId: other.id } });
+
+    const err = await pos.sale({
+      staffId: 'staff_pos_wrong_imei',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1, imei: selected.imei }],
+    }).catch((error) => error);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.code).toBe('imei_product_mismatch');
+    expect(await prisma.order.count()).toBe(0);
+  });
+
   it('reuses an already-open shift instead of opening a second', async () => {
     const p1 = await seedProduct(1);
     const p2 = await seedProduct(1);

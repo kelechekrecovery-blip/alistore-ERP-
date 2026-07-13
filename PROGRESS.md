@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: complete the native Android POS software vertical against the shared ERP/API contracts.
+- Files changed: Android POS/core sale, shift, scanner, offline queue, receipt and after-sale screens; POS/unit/exchange API services and DTOs; integration/unit tests; backlog/readiness/gap-map documentation.
+- Result: the cashier now opens and reconciles a server-owned shift, scans SKU or exact IMEI through keyboard/camera input, sells only the API-validated serialized unit, recovers queued approvals without changing the original sale key, loads the canonical server receipt/ESC-POS payload, inspects payments, advances returns, requests approval-gated refunds and executes an atomic idempotent exchange. A repeated exchange returns the original result and cannot create a second order or stock movement.
+- Checks run: targeted POS/exchange/RBAC Jest 19/19; full `npm run mvp:verify` (Prisma, API/Web production builds, mobile typecheck, API Jest 110/110 suites and 423/423 tests, Playwright 22/22, secret-safe external readiness report); four-APK Android build; all-module JVM tests and Lint; Android API 36 connected Compose suite 23/23; `git diff --check`.
+- Outcome: Android POS software parity is complete for the implemented MVP contracts. Physical ESC/POS printing, scanner focus/recognition and bank-terminal integration remain device/provider certification gates and are not claimed complete.
+- Next step: add Courier Evidence and push/deep-link routing, then perform physical Android device certification when hardware and credentials are available.
+
+## 2026-07-13
+
 - Task: replace the Android POS placeholder with the first integrated native counter-sale vertical and define the ERP App/site completion plan.
 - Files changed: POS actor DTO hardening and server-canonical catalog validation; Android POS typed gateway/models, cashier-only Keystore session, catalog/cart/split-payment/approval UI, isolated offline queue/WorkManager replay and JVM/Compose tests; API test isolation; ERP/site integration plan and readiness tracking.
 - Result: the native POS now reads the same catalog used by the storefront, writes sales through the same NestJS Order/Payment/Shift/Inventory/Event Ledger services visible in ERP, and never trusts a client actor, SKU or price. Cash/card/MBank split tender, discount approval retry and stable offline replay are implemented; a queued approval is retained as a conflict rather than converted into a sale.

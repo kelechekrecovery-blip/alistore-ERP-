@@ -1,5 +1,9 @@
 package kg.alistore.core
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.Data
@@ -135,35 +140,94 @@ private fun PosWorkspace(session: StaffSession, api: ApiClient, apiBaseUrl: Stri
   val manager = remember(api) { PosSaleManager(api, queue) }
   var selected by rememberSaveable { mutableStateOf(0) }
   var products by remember { mutableStateOf<List<Product>>(emptyList()) }
+  var shift by remember { mutableStateOf<CashShift?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
-  LaunchedEffect(apiBaseUrl) { runCatching { api.catalog() }.onSuccess { products = it }.onFailure { error = it.message } }
+  LaunchedEffect(apiBaseUrl) {
+    runCatching { api.catalog() }.onSuccess { products = it }.onFailure { error = it.message }
+    runCatching { api.currentShift(session.accessToken) }.onSuccess { shift = it }.onFailure { error = it.message }
+  }
   Scaffold(containerColor = PosInk, bottomBar = {
     NavigationBar(containerColor = PosSurface) {
-      listOf("Продажа", "Офлайн", "Профиль").forEachIndexed { index, label ->
+      listOf("Продажа", "Офлайн", "Смена", "Операции").forEachIndexed { index, label ->
         NavigationBarItem(selected == index, { selected = index }, { Icon(if (index == 0) Icons.Default.Home else if (index == 1) Icons.Default.ShoppingCart else Icons.Default.AccountCircle, label) }, label = { Text(label) })
       }
     }
   }) { padding ->
     when (selected) {
-      0 -> PosSaleScreen(products, error, session, manager, apiBaseUrl, Modifier.padding(padding))
+      0 -> PosSaleScreen(products, error, shift, session, api, manager, apiBaseUrl, { selected = 2 }, Modifier.padding(padding))
       1 -> PosOfflineScreen(queue, apiBaseUrl, Modifier.padding(padding))
-      else -> PosProfile(session, onLogout, Modifier.padding(padding))
+      2 -> StaffShiftScreen(session, api, onLogout, Modifier.padding(padding)) { shift = it }
+      else -> PosAfterSaleScreen(products, session, api, onLogout, Modifier.padding(padding))
     }
   }
 }
 
 @Composable
-private fun PosSaleScreen(products: List<Product>, error: String?, session: StaffSession, manager: PosSaleManager, apiBaseUrl: String, modifier: Modifier) {
+private fun PosSaleScreen(
+  products: List<Product>,
+  error: String?,
+  shift: CashShift?,
+  session: StaffSession,
+  gateway: PosGateway,
+  manager: PosSaleManager,
+  apiBaseUrl: String,
+  onOpenShift: () -> Unit,
+  modifier: Modifier,
+) {
   val context = LocalContext.current.applicationContext
   val scope = rememberCoroutineScope()
   var cart by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+  var selectedImeis by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+  var scannerCode by rememberSaveable { mutableStateOf("") }
+  var scanning by remember { mutableStateOf(false) }
+  var scannerBusy by remember { mutableStateOf(false) }
   var discount by rememberSaveable { mutableStateOf("0") }
   var method by rememberSaveable { mutableStateOf("cash") }
   var splitCash by rememberSaveable { mutableStateOf("") }
   var activeSaleId by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var approvalId by rememberSaveable { mutableStateOf<String?>(null) }
+  var receipt by remember { mutableStateOf<PosReceipt?>(null) }
   var message by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
+  fun applyScannerCode(raw: String) {
+    val code = normalizeStaffCode(raw)
+    if (code.isBlank()) return
+    scannerCode = code
+    val product = products.firstOrNull { it.sku.equals(code, ignoreCase = true) }
+    if (product != null) {
+      val qty = cart[product.id] ?: 0
+      if (qty < product.availableUnits) cart = cart + (product.id to qty + 1)
+      message = if (qty < product.availableUnits) "${product.name} добавлен" else "Нет доступного остатка"
+      scannerCode = ""
+      return
+    }
+    scannerBusy = true
+    scope.launch {
+      runCatching { gateway.lookupPosUnit(code, session.accessToken) }
+        .onSuccess { unit ->
+          val matched = products.firstOrNull { it.id == unit.productId }
+          when {
+            unit.status != "in_stock" -> message = "IMEI недоступен: ${unit.status}"
+            matched == null -> message = "Товар IMEI отсутствует в каталоге кассы"
+            else -> {
+              cart = cart + (matched.id to 1)
+              selectedImeis = selectedImeis + (matched.id to unit.imei)
+              message = "IMEI ${unit.imei.takeLast(6)} привязан к ${matched.name}"
+              scannerCode = ""
+            }
+          }
+        }
+        .onFailure { message = it.message }
+      scannerBusy = false
+    }
+  }
+  val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    if (granted) scanning = true else message = "Разрешите камеру для сканера"
+  }
+  fun openScanner() {
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) scanning = true
+    else cameraPermission.launch(Manifest.permission.CAMERA)
+  }
   val gross = products.sumOf { (cart[it.id] ?: 0) * it.price }
   val pct = discount.toIntOrNull()?.coerceIn(0, 100) ?: 0
   val total = gross * (100 - pct) / 100
@@ -172,25 +236,51 @@ private fun PosSaleScreen(products: List<Product>, error: String?, session: Staf
       Text("Продажа", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
       Text("Чек: ${cart.values.sum()} поз. · $total сом", color = PosMuted, modifier = Modifier.padding(bottom = 12.dp))
       error?.let { Text(it, color = PosCoral) }
+      if (shift == null) {
+        Card(colors = CardDefaults.cardColors(containerColor = PosSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+          Column(Modifier.padding(14.dp)) {
+            Text("Смена закрыта", color = PosCoral, fontWeight = FontWeight.Bold)
+            Text("Откройте кассовую смену до первой продажи", color = PosMuted, fontSize = 12.sp)
+            OutlinedButton(onClick = onOpenShift, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-open-shift")) { Text("Перейти к смене") }
+          }
+        }
+      }
+      OutlinedTextField(
+        scannerCode,
+        { scannerCode = normalizeStaffCode(it) },
+        label = { Text("SKU, штрихкод или IMEI") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().testTag("pos-scanner-code"),
+      )
+      Row(Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        OutlinedButton(onClick = { applyScannerCode(scannerCode) }, enabled = scannerCode.isNotBlank() && !scannerBusy, modifier = Modifier.weight(1f).testTag("pos-use-code")) { Text("Добавить") }
+        OutlinedButton(onClick = { openScanner() }, enabled = !scannerBusy, modifier = Modifier.weight(1f).testTag("pos-open-scanner")) { Text("Камера") }
+      }
     }
     items(products, key = Product::id) { product ->
       val qty = cart[product.id] ?: 0
+      val selectedImei = selectedImeis[product.id]
       Card(colors = CardDefaults.cardColors(containerColor = PosSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-          Column(Modifier.weight(1f)) { Text(product.name, color = Color.White, fontWeight = FontWeight.Bold); Text("${product.sku} · ${product.price} сом · ${product.availableUnits} шт.", color = PosMuted, fontSize = 11.sp) }
+          Column(Modifier.weight(1f)) {
+            Text(product.name, color = Color.White, fontWeight = FontWeight.Bold)
+            Text("${product.sku} · ${product.price} сом · ${product.availableUnits} шт.", color = PosMuted, fontSize = 11.sp)
+            selectedImei?.let { Text("IMEI ${it.takeLast(8)}", color = PosLime, fontSize = 11.sp) }
+          }
           Row {
             if (qty > 0) {
               IconButton(
                 onClick = {
                   cart = if (qty == 1) cart - product.id else cart + (product.id to qty - 1)
+                  if (qty == 1) selectedImeis = selectedImeis - product.id
                 },
                 modifier = Modifier.semantics { contentDescription = "Уменьшить ${product.name}" },
               ) { Text("-", color = Color.White, fontSize = 24.sp) }
               Text("$qty", color = Color.White, modifier = Modifier.padding(top = 12.dp))
             }
             IconButton(
-              onClick = { if (qty < product.availableUnits) cart = cart + (product.id to qty + 1) },
-              enabled = qty < product.availableUnits,
+              onClick = { if (qty < product.availableUnits && selectedImei == null) cart = cart + (product.id to qty + 1) },
+              enabled = qty < product.availableUnits && selectedImei == null,
             ) { Icon(Icons.Default.Add, "Добавить ${product.name}", tint = PosLime) }
           }
         }
@@ -210,7 +300,7 @@ private fun PosSaleScreen(products: List<Product>, error: String?, session: Staf
           val cash = splitCash.toIntOrNull()?.coerceIn(0, total) ?: 0
           val tenders = if (cash in 1 until total) listOf(PosTender("cash", cash), PosTender(method.takeUnless { it == "cash" } ?: "card", total - cash)) else listOf(PosTender(method, total))
           val request = PosSaleRequest(
-            point = "BISHKEK-1", lines = products.mapNotNull { product -> cart[product.id]?.takeIf { it > 0 }?.let { PosLine(product.id, product.sku, product.price, it) } },
+            point = shift?.point ?: "BISHKEK-1", lines = products.mapNotNull { product -> cart[product.id]?.takeIf { it > 0 }?.let { PosLine(product.id, product.sku, product.price, it, selectedImeis[product.id]) } },
             tenders = tenders, discountPct = pct, clientSaleId = activeSaleId, approvalId = approvalId,
           )
           busy = true
@@ -220,40 +310,228 @@ private fun PosSaleScreen(products: List<Product>, error: String?, session: Staf
                 is PosSubmitResult.Queued -> { message = "Продажа сохранена офлайн"; schedulePosSync(context, apiBaseUrl) }
                 is PosSubmitResult.Online -> when (val sale = result.result) {
                   is PosSaleResult.ApprovalRequired -> { approvalId = sale.approvalId; message = "Запрошено одобрение" }
-                  is PosSaleResult.Completed -> { message = "${sale.receiptNo} · оплачено ${sale.total} сом"; cart = emptyMap(); approvalId = null; activeSaleId = UUID.randomUUID().toString() }
+                  is PosSaleResult.Completed -> {
+                    message = "${sale.receiptNo} · оплачено ${sale.total} сом"
+                    receipt = runCatching { gateway.renderPosReceipt(sale.orderId, session.accessToken) }.getOrNull()
+                    cart = emptyMap(); selectedImeis = emptyMap(); approvalId = null; activeSaleId = UUID.randomUUID().toString()
+                  }
                 }
               } }
               .onFailure { message = it.message }
             busy = false
           }
         },
-        enabled = !busy && cart.isNotEmpty() && total > 0,
+        enabled = !busy && shift != null && cart.isNotEmpty() && total > 0,
         colors = ButtonDefaults.buttonColors(containerColor = PosLime, contentColor = PosInk),
         modifier = Modifier.fillMaxWidth().height(58.dp).padding(top = 10.dp).testTag("pos-submit"),
       ) { Text("Оплатить $total сом", fontWeight = FontWeight.Bold) }
       message?.let { Text(it, color = PosLime, modifier = Modifier.padding(top = 8.dp)) }
+      receipt?.let { rendered ->
+        Card(
+          colors = CardDefaults.cardColors(containerColor = Color.White),
+          shape = RoundedCornerShape(8.dp),
+          modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("pos-receipt"),
+        ) {
+          Column(Modifier.padding(14.dp)) {
+            Text("Чек с сервера", color = PosInk, fontWeight = FontWeight.Bold)
+            Text(rendered.markup, color = PosInk, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            Text("ESC/POS готов к печати", color = Color(0xFF456400), fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+          }
+        }
+      }
     }
   }
+  if (scanning) BarcodeCamera(
+    onCode = { applyScannerCode(it); scanning = false },
+    onClose = { scanning = false },
+    previewTag = "pos-camera-preview",
+    closeTag = "pos-close-scanner",
+  )
 }
 
 @Composable
 private fun PosOfflineScreen(queue: OfflineQueueDb, apiBaseUrl: String, modifier: Modifier) {
   val context = LocalContext.current.applicationContext
-  val pending = queue.pending()
+  var revision by remember { mutableStateOf(0) }
+  val pending = remember(revision) { queue.pending(includeConflicts = true) }
   LazyColumn(modifier.fillMaxSize().background(PosInk).statusBarsPadding(), contentPadding = PaddingValues(18.dp)) {
     item { Text("Офлайн-очередь", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black); Text("${pending.size} команд", color = PosMuted) }
-    items(pending, key = PendingMutation::id) { command -> Text("${command.state} · ${command.idempotencyKey.takeLast(8)} · попыток ${command.attempts}", color = if (command.state == "conflict") PosCoral else Color.White, modifier = Modifier.padding(top = 12.dp)) }
+    items(pending, key = PendingMutation::id) { command ->
+      val approvalId = approvalIdFromQueueError(command.lastError)
+      Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Text("${command.state} · ${command.idempotencyKey.takeLast(8)} · попыток ${command.attempts}", color = if (command.state == "conflict") PosCoral else Color.White)
+        if (approvalId != null) {
+          Text("Approval #${approvalId.takeLast(8)}", color = PosMuted, fontSize = 11.sp)
+          OutlinedButton(onClick = {
+            queue.replaceBodyAndRetry(command.id, attachPosApproval(command.body, approvalId))
+            schedulePosSync(context, apiBaseUrl)
+            revision += 1
+          }, modifier = Modifier.fillMaxWidth().testTag("pos-approval-retry")) { Text("Повторить после одобрения") }
+        } else if (command.state == "failed") {
+          OutlinedButton(onClick = { queue.retry(command.id); schedulePosSync(context, apiBaseUrl); revision += 1 }, modifier = Modifier.fillMaxWidth()) { Text("Повторить") }
+        }
+      }
+    }
     item { OutlinedButton(onClick = { schedulePosSync(context, apiBaseUrl) }, modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) { Text("Синхронизировать") } }
   }
 }
 
 @Composable
-private fun PosProfile(session: StaffSession, onLogout: () -> Unit, modifier: Modifier) {
-  Column(modifier.fillMaxSize().background(PosInk).statusBarsPadding().padding(24.dp)) {
-    Text(session.username, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
-    Text(session.role, color = PosMuted)
-    OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) { Text("Выйти") }
+private fun PosAfterSaleScreen(
+  products: List<Product>,
+  session: StaffSession,
+  gateway: PosGateway,
+  onLogout: () -> Unit,
+  modifier: Modifier,
+) {
+  val scope = rememberCoroutineScope()
+  var returns by remember { mutableStateOf<List<PosReturn>>(emptyList()) }
+  var orderId by rememberSaveable { mutableStateOf("") }
+  var receipt by remember { mutableStateOf<PosReceipt?>(null) }
+  var payments by remember { mutableStateOf<List<PosPayment>>(emptyList()) }
+  var paymentId by rememberSaveable { mutableStateOf("") }
+  var refundAmount by rememberSaveable { mutableStateOf("") }
+  var refundReason by rememberSaveable { mutableStateOf("") }
+  var oldImei by rememberSaveable { mutableStateOf("") }
+  var newProductId by rememberSaveable { mutableStateOf("") }
+  var exchangeMethod by rememberSaveable { mutableStateOf("cash") }
+  var exchangeKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
+  var busy by remember { mutableStateOf(false) }
+  var message by remember { mutableStateOf<String?>(null) }
+
+  fun refreshReturns() {
+    scope.launch {
+      runCatching { gateway.posReturns(session.accessToken) }
+        .onSuccess { returns = it }
+        .onFailure { message = it.message }
+    }
   }
+  LaunchedEffect(Unit) { refreshReturns() }
+
+  LazyColumn(modifier.fillMaxSize().background(PosInk).statusBarsPadding(), contentPadding = PaddingValues(16.dp)) {
+    item {
+      Text("Операции", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+      Text("Чеки, возвраты, refund и обмен", color = PosMuted, modifier = Modifier.padding(bottom = 12.dp))
+      OutlinedTextField(orderId, { orderId = it.trim() }, label = { Text("ID заказа") }, modifier = Modifier.fillMaxWidth().testTag("pos-operation-order"))
+      Button(
+        onClick = {
+          busy = true
+          scope.launch {
+            runCatching {
+              receipt = gateway.renderPosReceipt(orderId, session.accessToken)
+              payments = gateway.posPayments(orderId, session.accessToken)
+            }.onSuccess {
+              paymentId = payments.firstOrNull { it.amount > 0 }?.id.orEmpty()
+              refundAmount = payments.firstOrNull { it.amount > 0 }?.amount?.toString().orEmpty()
+              message = "Заказ загружен"
+            }.onFailure { message = it.message }
+            busy = false
+          }
+        },
+        enabled = !busy && orderId.isNotBlank(),
+        colors = ButtonDefaults.buttonColors(containerColor = PosLime, contentColor = PosInk),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-load-order"),
+      ) { Text("Загрузить чек и платежи") }
+      receipt?.let { Text(it.markup, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp)) }
+      payments.forEach { payment ->
+        Text("${payment.method} · ${payment.amount} сом · ${payment.status} · ${payment.id.takeLast(8)}", color = PosMuted, fontSize = 11.sp)
+      }
+
+      Text("Refund через approval", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
+      OutlinedTextField(paymentId, { paymentId = it.trim() }, label = { Text("ID платежа") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      OutlinedTextField(refundAmount, { refundAmount = it.filter(Char::isDigit) }, label = { Text("Сумма") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      OutlinedTextField(refundReason, { refundReason = it }, label = { Text("Причина") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      OutlinedButton(
+        onClick = {
+          busy = true
+          scope.launch {
+            runCatching { gateway.requestPosRefund(paymentId, refundAmount.toInt(), refundReason, session.accessToken) }
+              .onSuccess { message = "Refund ожидает approval #${it.takeLast(8)}" }
+              .onFailure { message = it.message }
+            busy = false
+          }
+        },
+        enabled = !busy && paymentId.isNotBlank() && (refundAmount.toIntOrNull() ?: 0) > 0 && refundReason.isNotBlank(),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-request-refund"),
+      ) { Text("Запросить возврат денег") }
+
+      Text("Обмен устройства", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
+      OutlinedTextField(oldImei, { oldImei = normalizeStaffCode(it) }, label = { Text("Старый IMEI") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      OutlinedTextField(newProductId, { newProductId = it.trim() }, label = { Text("ID нового товара") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf("cash" to "Наличные", "card" to "Карта", "qr_mbank" to "MBank").forEach { (wire, label) ->
+          OutlinedButton(onClick = { exchangeMethod = wire }, modifier = Modifier.weight(1f)) { Text(if (exchangeMethod == wire) "✓ $label" else label, fontSize = 10.sp) }
+        }
+      }
+      products.take(4).forEach { product ->
+        OutlinedButton(onClick = { newProductId = product.id }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+          Text("${product.name} · ${product.price} сом", fontSize = 11.sp)
+        }
+      }
+      Button(
+        onClick = {
+          busy = true
+          scope.launch {
+            runCatching {
+              gateway.exchangePosDevice(PosExchangeRequest(orderId, oldImei, newProductId, exchangeMethod), session.accessToken, exchangeKey)
+            }.onSuccess {
+              message = "Обмен завершён · новый IMEI ${it.newImei.takeLast(8)} · доплата ${it.surcharge} сом"
+              exchangeKey = UUID.randomUUID().toString(); refreshReturns()
+            }.onFailure { message = it.message }
+            busy = false
+          }
+        },
+        enabled = !busy && orderId.isNotBlank() && oldImei.isNotBlank() && newProductId.isNotBlank(),
+        colors = ButtonDefaults.buttonColors(containerColor = PosLime, contentColor = PosInk),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-exchange"),
+      ) { Text("Оформить обмен") }
+
+      Text("Очередь возвратов", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
+    }
+    items(returns, key = PosReturn::id) { ret ->
+      Card(colors = CardDefaults.cardColors(containerColor = PosSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 7.dp)) {
+        Column(Modifier.padding(12.dp)) {
+          Text("${ret.status} · заказ ${ret.orderId.takeLast(8)}", color = Color.White, fontWeight = FontWeight.Bold)
+          Text(ret.reason, color = PosMuted, fontSize = 11.sp)
+          Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            nextReturnStatuses(ret.status).forEach { next ->
+              OutlinedButton(onClick = {
+                busy = true
+                scope.launch {
+                  runCatching { gateway.transitionPosReturn(ret.id, next, session.accessToken) }
+                    .onSuccess { updated -> returns = returns.map { if (it.id == updated.id) updated else it }; message = "Возврат: ${updated.status}" }
+                    .onFailure { message = it.message }
+                  busy = false
+                }
+              }, enabled = !busy, modifier = Modifier.weight(1f)) { Text(returnStatusLabel(next), fontSize = 10.sp) }
+            }
+          }
+        }
+      }
+    }
+    item {
+      message?.let { Text(it, color = PosLime, modifier = Modifier.padding(top = 12.dp).testTag("pos-operation-message")) }
+      Text("${session.username} · ${session.role}", color = PosMuted, modifier = Modifier.padding(top = 24.dp))
+      OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Выйти") }
+    }
+  }
+}
+
+private fun nextReturnStatuses(status: String): List<String> = when (status) {
+  "requested" -> listOf("under_review", "rejected")
+  "under_review" -> listOf("approved", "rejected")
+  "approved" -> listOf("processing")
+  "processing" -> listOf("reconciled")
+  else -> emptyList()
+}
+
+private fun returnStatusLabel(status: String): String = when (status) {
+  "under_review" -> "Проверка"
+  "approved" -> "Одобрить"
+  "rejected" -> "Отклонить"
+  "processing" -> "Принять"
+  "reconciled" -> "Сверить"
+  else -> status
 }
 
 @Composable private fun PosLoading() { Column(Modifier.fillMaxSize().background(PosInk), verticalArrangement = Arrangement.Center) { CircularProgressIndicator(color = PosLime, modifier = Modifier.padding(24.dp)) } }

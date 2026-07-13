@@ -345,6 +345,7 @@ fun StaffShiftScreen(
   gateway: StaffOperationsGateway,
   onLogout: () -> Unit,
   modifier: Modifier = Modifier,
+  onShiftChanged: (CashShift?) -> Unit = {},
 ) {
   var shift by remember { mutableStateOf<CashShift?>(null) }
   var loading by remember { mutableStateOf(true) }
@@ -361,7 +362,12 @@ fun StaffShiftScreen(
   LaunchedEffect(revision) {
     loading = true
     runCatching { gateway.currentShift(session.accessToken) }
-      .onSuccess { shift = it; error = null; if (it != null && closeCash.isBlank()) closeCash = it.expectedCash.toString() }
+      .onSuccess {
+        shift = it
+        onShiftChanged(it)
+        error = null
+        if (it != null && closeCash.isBlank()) closeCash = it.expectedCash.toString()
+      }
       .onFailure { error = it.message ?: "Не удалось загрузить смену" }
     loading = false
   }
@@ -384,7 +390,12 @@ fun StaffShiftScreen(
             busy = true; error = null
             scope.launch {
               runCatching { gateway.openShift(OpenShiftRequest(session.staffId, point.trim(), openCash.toInt()), session.accessToken, openKey) }
-                .onSuccess { shift = it; openKey = UUID.randomUUID().toString(); closeCash = it.expectedCash.toString() }
+                .onSuccess {
+                  shift = it
+                  onShiftChanged(it)
+                  openKey = UUID.randomUUID().toString()
+                  closeCash = it.expectedCash.toString()
+                }
                 .onFailure { error = it.message }
               busy = false
             }
@@ -414,7 +425,13 @@ fun StaffShiftScreen(
             busy = true; error = null
             scope.launch {
               runCatching { gateway.closeShift(current.id, CloseShiftRequest(closeCash.toInt(), reason), session.accessToken, closeKey) }
-                .onSuccess { shift = null; closeKey = UUID.randomUUID().toString(); closeCash = ""; reason = "" }
+                .onSuccess {
+                  shift = null
+                  onShiftChanged(null)
+                  closeKey = UUID.randomUUID().toString()
+                  closeCash = ""
+                  reason = ""
+                }
                 .onFailure { error = it.message }
               busy = false
             }

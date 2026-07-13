@@ -46,7 +46,7 @@ internal fun posReplayDecision(response: RawApiResponse): PosReplayDecision {
   val status = response.status
   if (status == 202) {
     val approvalId = runCatching { org.json.JSONObject(response.body).optString("approvalId") }.getOrNull()
-    return PosReplayDecision.Conflict("Требуется approval ${approvalId?.takeLast(8).orEmpty()}".trim())
+    return PosReplayDecision.Conflict("approval_required:${approvalId.orEmpty()}")
   }
   return when {
     status in 200..299 -> PosReplayDecision.Sent
@@ -55,3 +55,11 @@ internal fun posReplayDecision(response: RawApiResponse): PosReplayDecision {
     else -> PosReplayDecision.Retry
   }
 }
+
+internal fun approvalIdFromQueueError(error: String?): String? = error
+  ?.takeIf { it.startsWith("approval_required:") }
+  ?.substringAfter(':')
+  ?.takeIf(String::isNotBlank)
+
+internal fun attachPosApproval(body: String, approvalId: String): String =
+  org.json.JSONObject(body).put("approvalId", approvalId).toString()

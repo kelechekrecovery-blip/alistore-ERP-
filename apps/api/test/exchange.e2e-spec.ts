@@ -100,4 +100,23 @@ describe('Exchange (integration)', () => {
     expect(err).toBeInstanceOf(ValidationError);
     expect(err.code).toBe('exchange_needs_refund');
   });
+
+  it('replays the same exchange idempotently and rejects key reuse', async () => {
+    const first = await setup(100000, 130000);
+    const dto = { originalOrderId: first.order.id, oldImei: first.oldImei, newProductId: first.newProduct.id, method: 'cash' as const };
+    const created = await exchanges.exchange(dto, 'cashier', 'stable-exchange');
+    const replay = await exchanges.exchange(dto, 'cashier', 'stable-exchange');
+
+    expect(replay.exchangeOrderId).toBe(created.exchangeOrderId);
+    expect(replay.idempotent).toBe(true);
+    expect(await prisma.order.count({ where: { channel: 'exchange' } })).toBe(1);
+
+    const other = await setup(100000, 140000);
+    const error = await exchanges.exchange(
+      { originalOrderId: other.order.id, oldImei: other.oldImei, newProductId: other.newProduct.id, method: 'cash' },
+      'cashier',
+      'stable-exchange',
+    ).catch((cause) => cause);
+    expect(error.code).toBe('idempotency_key_reused');
+  });
 });

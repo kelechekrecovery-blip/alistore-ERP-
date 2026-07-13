@@ -217,9 +217,11 @@ fun StaffScannerScreen(
     }
   }
 
-  if (scanning) StaffBarcodeCamera(
+  if (scanning) BarcodeCamera(
     onCode = { code = normalizeStaffCode(it); scanning = false; pendingCameraAction = null },
     onClose = { scanning = false; pendingCameraAction = null },
+    previewTag = "staff-camera-preview",
+    closeTag = "staff-close-scanner",
   )
 }
 
@@ -233,7 +235,12 @@ private fun Bitmap.evidenceDraft(): StaffEvidenceDraft {
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 @Composable
-private fun StaffBarcodeCamera(onCode: (String) -> Unit, onClose: () -> Unit) {
+internal fun BarcodeCamera(
+  onCode: (String) -> Unit,
+  onClose: () -> Unit,
+  previewTag: String,
+  closeTag: String,
+) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
   val executor = remember { Executors.newSingleThreadExecutor() }
@@ -252,7 +259,7 @@ private fun StaffBarcodeCamera(onCode: (String) -> Unit, onClose: () -> Unit) {
       executor.shutdown()
     }
   }
-  Box(Modifier.fillMaxSize().background(Color.Black).testTag("staff-camera-preview")) {
+  Box(Modifier.fillMaxSize().background(Color.Black).testTag(previewTag)) {
     AndroidView(
       factory = { previewContext ->
         PreviewView(previewContext).also { previewView ->
@@ -279,7 +286,7 @@ private fun StaffBarcodeCamera(onCode: (String) -> Unit, onClose: () -> Unit) {
     )
     Column(Modifier.align(Alignment.TopCenter).statusBarsPadding().fillMaxWidth().background(Color.Black.copy(alpha = .72f)).padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
       Text("Наведите камеру на EAN, QR, Code128 или IMEI", color = Color.White)
-      TextButton(onClick = onClose, modifier = Modifier.testTag("staff-close-scanner")) { Text("Закрыть", color = StaffCoral) }
+      TextButton(onClick = onClose, modifier = Modifier.testTag(closeTag)) { Text("Закрыть", color = StaffCoral) }
     }
   }
 }

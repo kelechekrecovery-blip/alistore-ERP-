@@ -130,6 +130,20 @@ export class PosService {
     // Assign concrete IMEI units per line; accessories (no units) sell as plain lines.
     const items: OrderLine[] = [];
     for (const line of dto.lines) {
+      if (line.imei) {
+        if (line.qty !== 1) {
+          throw new ValidationError('serialized_quantity_invalid', 'Строка с IMEI должна иметь количество 1');
+        }
+        const selected = await this.units.getByImei(line.imei);
+        if (selected.productId !== line.productId || selected.sku !== line.sku) {
+          throw new ValidationError('imei_product_mismatch', `IMEI ${line.imei} не относится к ${line.sku}`);
+        }
+        if (selected.status !== 'in_stock') {
+          throw new ConflictError('unit_not_available', `IMEI ${line.imei} недоступен (статус: ${selected.status})`);
+        }
+        items.push({ sku: line.sku, qty: 1, price: line.price, imei: line.imei });
+        continue;
+      }
       const available = await this.units.listAvailable(line.productId, line.qty);
       if (available.length >= line.qty) {
         for (const unit of available.slice(0, line.qty)) {

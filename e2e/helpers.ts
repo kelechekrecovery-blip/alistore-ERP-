@@ -106,10 +106,11 @@ export async function postJson<T>(
   path: string,
   body: unknown,
   token?: string,
+  headers?: Record<string, string>,
 ): Promise<T> {
   const response = await request.post(`${API_BASE}${path}`, {
     data: body,
-    headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
   });
   expect(response.ok(), `${path} -> ${response.status()} ${await response.text()}`).toBeTruthy();
   return (await response.json()) as T;

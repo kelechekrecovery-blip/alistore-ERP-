@@ -238,6 +238,53 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun posSale(request: PosSaleRequest, token: String): PosSaleResult =
     this.request("pos/sale", "POST", request.toJson(), token).posSaleResult()
 
+  override suspend fun lookupPosUnit(imei: String, token: String): PosUnit =
+    request("units/${java.net.URLEncoder.encode(imei, Charsets.UTF_8.name())}", "GET", token = token).posUnit()
+
+  override suspend fun renderPosReceipt(orderId: String, token: String): PosReceipt =
+    request("receipts/order/${java.net.URLEncoder.encode(orderId, Charsets.UTF_8.name())}", "GET", token = token).posReceipt()
+
+  override suspend fun posPayments(orderId: String, token: String): List<PosPayment> =
+    requestArray("payments?orderId=${java.net.URLEncoder.encode(orderId, Charsets.UTF_8.name())}", token).let { array ->
+      buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).posPayment()) }
+    }
+
+  override suspend fun posReturns(token: String): List<PosReturn> = requestArray("returns", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).posReturn()) }
+  }
+
+  override suspend fun transitionPosReturn(returnId: String, status: String, token: String): PosReturn =
+    request(
+      "returns/${java.net.URLEncoder.encode(returnId, Charsets.UTF_8.name())}",
+      "PATCH",
+      JSONObject().put("status", status),
+      token,
+    ).posReturn()
+
+  override suspend fun requestPosRefund(paymentId: String, amount: Int, reason: String, token: String): String =
+    request(
+      "payments/${java.net.URLEncoder.encode(paymentId, Charsets.UTF_8.name())}/refund",
+      "POST",
+      JSONObject().put("amount", amount).put("reason", reason),
+      token,
+    ).getString("approvalId")
+
+  override suspend fun exchangePosDevice(
+    request: PosExchangeRequest,
+    token: String,
+    idempotencyKey: String,
+  ): PosExchangeResult = this.request(
+    "exchanges",
+    "POST",
+    JSONObject()
+      .put("originalOrderId", request.originalOrderId)
+      .put("oldImei", request.oldImei)
+      .put("newProductId", request.newProductId)
+      .put("method", request.method),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).posExchange()
+
   override suspend fun uploadEvidence(
     entityType: String,
     entityId: String,
@@ -458,7 +505,9 @@ private fun JSONObject.courierRun() = CourierRunSummary(
 internal fun PosSaleRequest.toJson() = JSONObject()
   .put("point", point)
   .put("lines", org.json.JSONArray().apply { lines.forEach { line ->
-    put(JSONObject().put("productId", line.productId).put("sku", line.sku).put("price", line.price).put("qty", line.qty))
+    put(JSONObject().put("productId", line.productId).put("sku", line.sku).put("price", line.price).put("qty", line.qty).apply {
+      line.imei?.let { put("imei", it) }
+    })
   } })
   .put("payments", org.json.JSONArray().apply { tenders.forEach { tender ->
     put(JSONObject().put("method", tender.method).put("amount", tender.amount))
@@ -479,6 +528,30 @@ private fun JSONObject.posSaleResult(): PosSaleResult = if (optBoolean("pendingA
     imeis = optJSONArray("imeis")?.let { values -> buildList { for (index in 0 until values.length()) add(values.getString(index)) } }.orEmpty(),
   )
 }
+
+private fun JSONObject.posUnit() = PosUnit(
+  imei = getString("imei"), productId = getString("productId"), status = getString("status"),
+  sku = getString("sku"), product = getString("product"), price = getInt("price"),
+)
+
+private fun JSONObject.posReceipt() = PosReceipt(
+  markup = getString("markup"), svg = getString("svg"), escposBase64 = getString("escposBase64"),
+)
+
+private fun JSONObject.posPayment() = PosPayment(
+  id = getString("id"), orderId = nullableString("orderId"), amount = getInt("amount"),
+  method = getString("method"), status = getString("status"),
+)
+
+private fun JSONObject.posReturn() = PosReturn(
+  id = getString("id"), orderId = getString("orderId"), reason = getString("reason"),
+  status = getString("status"), createdAt = getString("createdAt"),
+)
+
+private fun JSONObject.posExchange() = PosExchangeResult(
+  exchangeOrderId = getString("exchangeOrderId"), returnId = getString("returnId"),
+  surcharge = getInt("surcharge"), oldImei = getString("oldImei"), newImei = getString("newImei"),
+)
 
 private fun JSONObject.cashShift() = CashShift(
   id = getString("id"), staffId = getString("staffId"), point = getString("point"), openCash = getInt("openCash"),

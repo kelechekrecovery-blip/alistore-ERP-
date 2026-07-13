@@ -33,6 +33,13 @@ class PosSaleManagerTest {
     val gateway = object : PosGateway {
       override suspend fun posSale(request: PosSaleRequest, token: String) =
         PosSaleResult.ApprovalRequired("approval-1", "discount")
+      override suspend fun lookupPosUnit(imei: String, token: String) = error("not used")
+      override suspend fun renderPosReceipt(orderId: String, token: String) = error("not used")
+      override suspend fun posPayments(orderId: String, token: String) = error("not used")
+      override suspend fun posReturns(token: String) = error("not used")
+      override suspend fun transitionPosReturn(returnId: String, status: String, token: String) = error("not used")
+      override suspend fun requestPosRefund(paymentId: String, amount: Int, reason: String, token: String) = error("not used")
+      override suspend fun exchangePosDevice(request: PosExchangeRequest, token: String, idempotencyKey: String) = error("not used")
     }
 
     val result = PosSaleManager(gateway, queue).submit(request, "staff-token")
@@ -46,7 +53,11 @@ class PosSaleManagerTest {
     val decision = posReplayDecision(RawApiResponse(202, "{\"approvalId\":\"approval-12345678\"}"))
 
     assertTrue(decision is PosReplayDecision.Conflict)
-    assertTrue((decision as PosReplayDecision.Conflict).message.contains("12345678"))
+    val message = (decision as PosReplayDecision.Conflict).message
+    assertEquals("approval-12345678", approvalIdFromQueueError(message))
+    val body = attachPosApproval(request.toJson().toString(), approvalIdFromQueueError(message)!!)
+    assertEquals("approval-12345678", org.json.JSONObject(body).getString("approvalId"))
+    assertEquals("sale-stable-1", org.json.JSONObject(body).getString("clientSaleId"))
   }
 }
 
@@ -62,4 +73,11 @@ private class PosRecordingQueue : MutationQueue {
 
 private class FailingPosGateway(private val error: Exception) : PosGateway {
   override suspend fun posSale(request: PosSaleRequest, token: String): PosSaleResult = throw error
+  override suspend fun lookupPosUnit(imei: String, token: String) = error("not used")
+  override suspend fun renderPosReceipt(orderId: String, token: String) = error("not used")
+  override suspend fun posPayments(orderId: String, token: String) = error("not used")
+  override suspend fun posReturns(token: String) = error("not used")
+  override suspend fun transitionPosReturn(returnId: String, status: String, token: String) = error("not used")
+  override suspend fun requestPosRefund(paymentId: String, amount: Int, reason: String, token: String) = error("not used")
+  override suspend fun exchangePosDevice(request: PosExchangeRequest, token: String, idempotencyKey: String) = error("not used")
 }

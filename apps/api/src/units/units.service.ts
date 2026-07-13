@@ -35,6 +35,7 @@ export class UnitsService {
     }
     return {
       imei: unit.imei,
+      productId: unit.productId,
       status: unit.status,
       orderId: unit.orderId,
       product: unit.product.name,

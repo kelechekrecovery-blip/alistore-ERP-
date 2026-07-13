@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   exchangeDevice,
   fetchCatalog,
@@ -30,6 +30,7 @@ export default function ExchangePage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState<ExchangeResult | null>(null);
+  const exchangeKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -62,9 +63,9 @@ export default function ExchangePage() {
         oldImei: unit.imei,
         newProductId: newProduct.id,
         method,
-        requester: session.staffId,
-      }, session.accessToken);
+      }, session.accessToken, exchangeKey.current);
       setResult(r);
+      exchangeKey.current = crypto.randomUUID();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка обмена');
     } finally {

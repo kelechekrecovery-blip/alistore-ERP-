@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -21,8 +22,18 @@ export class ExchangesService {
     private readonly audit: AuditService,
   ) {}
 
-  async exchange(dto: ExchangeDto, actor: string) {
+  async exchange(dto: ExchangeDto, actor: string, idempotencyKey?: string) {
+    const key = idempotencyKey?.trim() ? `exchange:${idempotencyKey.trim()}` : undefined;
+    if (key) {
+      const existing = await this.prisma.order.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
+      if (existing) return this.replayExchange(existing, dto);
+    }
     return this.audit.transaction(async (tx) => {
+      if (key) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))::text AS locked`;
+        const existing = await tx.order.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
+        if (existing) return { result: await this.replayExchange(existing, dto, tx), events: [] };
+      }
       const order = await tx.order.findUnique({
         where: { id: dto.originalOrderId },
         include: { items: true },
@@ -86,6 +97,7 @@ export class ExchangesService {
       const newOrder = await tx.order.create({
         data: {
           customerId: order.customerId,
+          idempotencyKey: key,
           channel: 'exchange',
           total: newProduct.price,
           status: 'paid',
@@ -131,9 +143,38 @@ export class ExchangesService {
           surcharge,
           oldImei: dto.oldImei,
           newImei: newUnit.imei,
+          idempotent: false,
         },
         events,
       };
     });
+  }
+
+  private async replayExchange(
+    exchangeOrder: { id: string; items: { sku: string; imei: string | null }[] },
+    dto: ExchangeDto,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const [product, event, ret, payment] = await Promise.all([
+      db.product.findUnique({ where: { id: dto.newProductId } }),
+      db.auditEvent.findFirst({ where: { type: EventType.OrderExchanged, refs: { has: exchangeOrder.id } }, orderBy: { ts: 'desc' } }),
+      db.return.findFirst({ where: { orderId: dto.originalOrderId, reason: 'обмен' }, orderBy: { createdAt: 'desc' } }),
+      db.payment.findFirst({ where: { orderId: exchangeOrder.id }, orderBy: { createdAt: 'asc' } }),
+    ]);
+    const payload = (event?.payload ?? {}) as Record<string, unknown>;
+    if (
+      !product || exchangeOrder.items[0]?.sku !== product.sku ||
+      payload.orderId !== dto.originalOrderId || payload.oldImei !== dto.oldImei || !ret
+    ) {
+      throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован для другого обмена');
+    }
+    return {
+      exchangeOrderId: exchangeOrder.id,
+      returnId: ret.id,
+      surcharge: payment?.amount ?? 0,
+      oldImei: dto.oldImei,
+      newImei: exchangeOrder.items[0]?.imei ?? String(payload.newImei ?? ''),
+      idempotent: true,
+    };
   }
 }

@@ -185,7 +185,6 @@ describe('Returns and exchanges RBAC split', () => {
         oldImei: exchange.oldImei,
         newProductId: exchange.newProduct.id,
         method: 'cash',
-        requester: 'spoof',
       })
       .expect(401);
     await request(app.getHttpServer())
@@ -196,18 +195,17 @@ describe('Returns and exchanges RBAC split', () => {
         oldImei: exchange.oldImei,
         newProductId: exchange.newProduct.id,
         method: 'cash',
-        requester: 'spoof',
       })
       .expect(403);
     await request(app.getHttpServer())
       .post('/exchanges')
       .set('Authorization', `Bearer ${cashierToken}`)
+      .set('Idempotency-Key', `exchange-${RUN}`)
       .send({
         originalOrderId: exchange.order.id,
         oldImei: exchange.oldImei,
         newProductId: exchange.newProduct.id,
         method: 'cash',
-        requester: 'spoof',
       })
       .expect(201);
 
