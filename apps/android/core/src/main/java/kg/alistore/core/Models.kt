@@ -18,7 +18,10 @@ data class PendingMutation(
   val body: String,
   val idempotencyKey: String,
   val attempts: Int,
+  val state: String,
+  val lastError: String?,
   val createdAt: Long,
+  val updatedAt: Long,
 )
 
 data class AuthTokens(val accessToken: String, val refreshToken: String)
@@ -26,3 +29,23 @@ data class AuthTokens(val accessToken: String, val refreshToken: String)
 data class AuthUser(val customerId: String, val phone: String?, val type: String)
 
 data class OtpChallenge(val devCode: String?)
+
+data class CreateOrderItem(val sku: String, val qty: Int, val price: Int)
+
+data class CreateOrderRequest(
+  val customerId: String,
+  val fulfillmentType: String,
+  val pickupPoint: String?,
+  val deliveryAddress: String?,
+  val total: Int,
+  val items: List<CreateOrderItem>,
+)
+
+data class CustomerOrder(
+  val id: String,
+  val status: String,
+  val total: Int,
+  val fulfillmentType: String,
+  val pickupPoint: String?,
+  val deliveryAddress: String?,
+)

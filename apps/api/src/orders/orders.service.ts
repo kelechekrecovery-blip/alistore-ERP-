@@ -60,6 +60,44 @@ export class OrdersService {
   }
 
   /** Create an order (status `created`) and write order.created to the ledger. */
+  async createFromCatalog(dto: CreateOrderDto, actor: string, idempotencyKey?: string) {
+    if (idempotencyKey) {
+      const existing = await this.prisma.order.findUnique({
+        where: { idempotencyKey },
+        include: { items: true },
+      });
+      if (existing) {
+        if (existing.customerId !== dto.customerId) {
+          throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
+        }
+        return existing;
+      }
+    }
+
+    if (dto.fulfillmentType === 'courier' && !dto.deliveryAddress?.trim()) {
+      throw new ValidationError('delivery_address_required', 'Укажите адрес доставки');
+    }
+    const quantities = new Map<string, number>();
+    for (const item of dto.items) quantities.set(item.sku, (quantities.get(item.sku) ?? 0) + item.qty);
+    const skus = [...quantities.keys()];
+    const products = await this.prisma.product.findMany({
+      where: { sku: { in: skus }, archived: false },
+      include: { units: { where: { status: 'in_stock' }, select: { id: true } } },
+    });
+    const bySku = new Map(products.map((product) => [product.sku, product]));
+    const items = skus.map((sku) => {
+      const product = bySku.get(sku);
+      if (!product) throw new ValidationError('product_not_found', `Товар ${sku} не найден`);
+      const qty = quantities.get(sku)!;
+      if (product.units.length < qty) {
+        throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: доступно ${product.units.length}`);
+      }
+      return { sku, qty, price: product.price };
+    });
+    const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    return this.create({ ...dto, channel: 'mobile', total, items }, actor, idempotencyKey);
+  }
+
   async create(dto: CreateOrderDto, actor: string, idempotencyKey?: string) {
     const isDemo = this.config?.get<string>('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
     try {

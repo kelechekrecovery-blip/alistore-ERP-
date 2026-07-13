@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: execute Master Plan Android iteration 2, native cart and durable customer checkout.
+- Files changed: Android cart/checkout models and Compose UI, typed order transport, SQLite mutation states, token-refreshing WorkManager replay, server-authoritative customer order quoting, order security/invariant tests, Android architecture/readme/backlog tracking.
+- Result: Client quantities are capped by live catalog availability and pickup/courier checkout uses the customer JWT with a stable idempotency key. `/orders/mine` now ignores client price, total and IMEI, recalculates current catalog prices and available serialized stock, and preserves idempotent replay after inventory changes. Network failures queue the exact command; replay stores queued/syncing/conflict/failed states, refreshes an expired access token and does not automatically retry conflicts. The account conflict-list/manual-retry UI remains open.
+- Checks run: focused order/account API 6/6; API production build; Android core JVM 10/10; Compose instrumentation 3/3 on API 36; four debug APK builds; all-module unit tests and Android Lint; cart/checkout emulator screenshot `/tmp/alistore-android-client-cart.png`; `git diff --check`. Full API regression reached 103/106 suites and 391/394 tests; two transient HTTP socket failures passed immediately in isolation, while the pre-existing realtime socket suite still cannot connect in this local run and remains an explicit infrastructure follow-up.
+- Outcome: Android cart and order-creation vertical is accepted by its targeted API/native gates. Payment handoff, payment-return reconciliation, order history and remaining account data are still open; full baseline certification is not claimed while realtime is red.
+- Next step: implement Android payment intent/handoff/return and server-refreshed order history, then continue Staff parity.
+
+## 2026-07-13
+
 - Task: execute Master Plan Android iteration 1, native Client OTP and durable customer session.
 - Files changed: typed Android auth models/gateway, API client auth endpoints, Keystore access/refresh storage, session manager, Compose OTP/signed-in account UI, JVM and instrumentation tests, Android architecture/readme/backlog tracking.
 - Result: the Compose Client requests and verifies phone OTP, persists both tokens using AES-GCM/Android Keystore, restores the customer through `/auth/me`, refreshes once after access-token 401, clears revoked/corrupt sessions and performs best-effort server logout before local removal. The cabinet now shows the server-derived phone instead of a static guest list; dev-code autofill depends solely on API `devCode`.

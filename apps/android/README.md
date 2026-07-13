@@ -24,3 +24,10 @@ The Client authenticates through phone OTP, stores the access/refresh pair encry
 with Android Keystore, refreshes an expired access token during process restore, and
 revokes the refresh session on logout. Dev OTP autofill appears only when the API
 explicitly returns `devCode`; production builds rely on the configured SMS provider.
+
+The Client cart enforces catalog stock caps and submits pickup/courier checkout through
+the customer JWT with a stable idempotency key. Prices, availability and the resulting
+order status are recalculated by the API. Network failures enter the encrypted-session
+WorkManager replay contour; conflicts remain visible for manual retry instead of being
+silently resubmitted by the worker. A dedicated conflict-list screen remains part of
+the account-data parity phase.

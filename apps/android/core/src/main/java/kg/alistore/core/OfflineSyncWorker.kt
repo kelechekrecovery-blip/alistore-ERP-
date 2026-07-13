@@ -10,19 +10,25 @@ class OfflineSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
     val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
     val queue = OfflineQueueDb(applicationContext)
-    val token = SecureTokenStore(applicationContext, "alistore-session").read()
+    val tokenStore = SecureTokenStore(applicationContext, "alistore-session")
+    var session = tokenStore.readSession()
     val client = ApiClient(apiBaseUrl)
     var retryRequired = false
     for (mutation in queue.pending()) {
       try {
-        val status = client.send(mutation, token)
+        queue.markState(mutation.id, "syncing", incrementAttempt = true)
+        var status = client.send(mutation, session?.accessToken)
+        if (status == 401 && session != null) {
+          session = client.refresh(session.refreshToken).also(tokenStore::saveSession)
+          status = client.send(mutation, session.accessToken)
+        }
         when {
           status in 200..299 -> queue.markSent(mutation.id)
-          status == 409 || status == 422 -> queue.markAttempt(mutation.id)
-          else -> { queue.markAttempt(mutation.id); retryRequired = true }
+          status == 409 || status == 422 -> queue.markState(mutation.id, "conflict", "HTTP $status")
+          else -> { queue.markState(mutation.id, "failed", "HTTP $status"); retryRequired = true }
         }
-      } catch (_: Exception) {
-        queue.markAttempt(mutation.id)
+      } catch (error: Exception) {
+        queue.markState(mutation.id, "queued", error.message)
         retryRequired = true
       }
     }

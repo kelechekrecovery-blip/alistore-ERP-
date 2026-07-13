@@ -63,7 +63,7 @@ export class OrdersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateOrderDto,
   ) {
-    return this.orders.create(
+    return this.orders.createFromCatalog(
       { ...dto, customerId: user.customerId, channel: 'mobile' },
       user.customerId,
       idempotencyKey,

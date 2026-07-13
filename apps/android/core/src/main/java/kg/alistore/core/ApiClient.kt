@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-class ApiClient(private val baseUrl: String) : AuthGateway {
+class ApiClient(private val baseUrl: String) : AuthGateway, CheckoutGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -49,6 +49,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway {
     request("auth/logout", "POST", JSONObject().put("refreshToken", refreshToken), allowEmpty = true)
   }
 
+  override suspend fun createOrder(request: CreateOrderRequest, token: String, idempotencyKey: String): CustomerOrder =
+    request("orders/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey).order()
+
   fun send(mutation: PendingMutation, token: String?): Int {
     val connection = open(mutation.endpoint, mutation.method)
     return try {
@@ -69,11 +72,13 @@ class ApiClient(private val baseUrl: String) : AuthGateway {
     body: JSONObject? = null,
     token: String? = null,
     allowEmpty: Boolean = false,
+    idempotencyKey: String? = null,
   ): JSONObject = withContext(Dispatchers.IO) {
     val connection = open(path, method)
     try {
       connection.setRequestProperty("Content-Type", "application/json")
       if (!token.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
+      if (!idempotencyKey.isNullOrBlank()) connection.setRequestProperty("Idempotency-Key", idempotencyKey)
       if (body != null) {
         connection.doOutput = true
         connection.outputStream.use { it.write(body.toString().toByteArray()) }
@@ -103,5 +108,17 @@ class ApiClient(private val baseUrl: String) : AuthGateway {
 }
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
+
+private fun JSONObject.order() = CustomerOrder(
+  id = getString("id"),
+  status = getString("status"),
+  total = getInt("total"),
+  fulfillmentType = optString("fulfillmentType", "pickup"),
+  pickupPoint = nullableString("pickupPoint"),
+  deliveryAddress = nullableString("deliveryAddress"),
+)
+
+private fun JSONObject.nullableString(key: String): String? =
+  if (isNull(key)) null else optString(key).takeIf(String::isNotBlank)
 
 class ApiException(val status: Int, override val message: String) : Exception(message)

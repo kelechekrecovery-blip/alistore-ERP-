@@ -78,10 +78,16 @@ private fun ClientApp(apiBaseUrl: String) {
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var favorites by remember { mutableStateOf(setOf<String>()) }
-  var cart by remember { mutableStateOf(setOf<String>()) }
+  var cart by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
   var authState by remember { mutableStateOf<AuthState>(AuthState.Restoring) }
   val authManager = remember(apiBaseUrl) {
     AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"))
+  }
+  val addToCart: (String) -> Unit = { id ->
+    products.firstOrNull { it.id == id }?.let { product ->
+      val current = cart[id] ?: 0
+      if (product.availableUnits > current) cart = cart + (id to current + 1)
+    }
   }
   val tabs = listOf(
     ClientTab("Главная", Icons.Default.Home),
@@ -118,10 +124,19 @@ private fun ClientApp(apiBaseUrl: String) {
       when {
         loading -> Loading(Modifier.padding(padding))
         error != null -> ClientMessage("Каталог недоступен", error, Modifier.padding(padding))
-        selected == 0 -> ClientHome(products, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
-        selected == 1 -> ProductGrid("Каталог", products, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
-        selected == 2 -> ProductGrid("Избранное", products.filter { it.id in favorites }, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
-        selected == 3 -> ProductGrid("Корзина", products.filter { it.id in cart }, favorites, cart, { favorites = favorites.toggle(it) }, { cart = cart + it }, Modifier.padding(padding))
+        selected == 0 -> ClientHome(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
+        selected == 1 -> ProductGrid("Каталог", products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
+        selected == 2 -> ProductGrid("Избранное", products.filter { it.id in favorites }, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
+        selected == 3 -> ClientCheckout(
+          apiBaseUrl = apiBaseUrl,
+          products = products,
+          cart = cart,
+          authState = authState,
+          onQuantity = { id, quantity -> cart = if (quantity <= 0) cart - id else cart + (id to quantity) },
+          onClear = { cart = emptyMap() },
+          onLogin = { selected = 4 },
+          modifier = Modifier.padding(padding),
+        )
         else -> ClientAccount(authState, authManager, { authState = it }, favorites.size, cart.size, Modifier.padding(padding))
       }
     }

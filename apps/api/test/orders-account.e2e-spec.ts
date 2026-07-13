@@ -30,6 +30,8 @@ describe('Orders by customer (account)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.deviceUnit.deleteMany();
+    await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
@@ -80,6 +82,54 @@ describe('Orders by customer (account)', () => {
     expect(replay.id).toBe(first.id);
     expect(await prisma.order.count({ where: { idempotencyKey: 'native-order-retry-1' } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'order.created', refs: { has: first.id } } })).toBe(1);
+  });
+
+  it('creates authenticated native orders from server prices and current stock', async () => {
+    const owner = await customer();
+    const product = await prisma.product.create({
+      data: { sku: 'NATIVE-SERVER-PRICE', name: 'Native phone', price: 125000, cost: 100000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.createMany({
+      data: [
+        { imei: 'NATIVE-SERVER-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+        { imei: 'NATIVE-SERVER-2', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+      ],
+    });
+
+    const order = await orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'mobile',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'BISHKEK-1',
+      total: 2,
+      items: [{ sku: product.sku, qty: 2, price: 1, imei: 'CLIENT-CANNOT-ASSIGN' }],
+    }, owner.id, 'native-server-quote-1');
+
+    expect(order.total).toBe(250000);
+    expect(order.items).toEqual([expect.objectContaining({ sku: product.sku, qty: 2, price: 125000, imei: null })]);
+    await prisma.deviceUnit.updateMany({ where: { productId: product.id }, data: { status: 'reserved' } });
+    const replay = await orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'mobile',
+      total: 1,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, 'native-server-quote-1');
+    expect(replay.id).toBe(order.id);
+  });
+
+  it('rejects native checkout when catalog stock is insufficient', async () => {
+    const owner = await customer();
+    const product = await prisma.product.create({
+      data: { sku: 'NATIVE-LOW-STOCK', name: 'One phone', price: 90000, cost: 70000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.create({ data: { imei: 'NATIVE-LOW-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
+
+    await expect(orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'mobile',
+      total: 1,
+      items: [{ sku: product.sku, qty: 2, price: 1 }],
+    }, owner.id, 'native-low-stock-1')).rejects.toMatchObject({ code: 'insufficient_stock' });
   });
 
   it('does not expose an idempotent order to another customer', async () => {

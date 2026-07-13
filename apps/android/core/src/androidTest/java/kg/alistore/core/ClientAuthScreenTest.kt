@@ -3,9 +3,12 @@ package kg.alistore.core
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import org.junit.Rule
@@ -44,6 +47,24 @@ class ClientAuthScreenTest {
 
     compose.onNodeWithTag("account-title").assertIsDisplayed()
     compose.onNodeWithTag("auth-logout").assertIsDisplayed().assertTextContains("Выйти")
+  }
+
+  @Test
+  fun courierCheckoutRequiresAddressAndShowsCartTotal() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val product = Product("product-1", "PHONE-1", "AliStore Phone", 125000, "phones", 2)
+    compose.setContent {
+      MaterialTheme {
+        ClientCheckout("http://10.0.2.2:4000/api", listOf(product), mapOf(product.id to 2), state, { _, _ -> }, {}, {})
+      }
+    }
+
+    compose.onNodeWithTag("checkout-total").assertTextEquals("250000 сом")
+    compose.onNodeWithText("Курьер").performClick()
+    compose.onNodeWithTag("checkout-submit").assertIsNotEnabled()
+    compose.onNodeWithTag("checkout-address").performTextReplacement("Бишкек, Киевская 95")
+    compose.onNodeWithTag("checkout-submit").assertIsEnabled()
   }
 }
 
