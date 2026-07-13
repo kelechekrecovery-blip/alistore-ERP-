@@ -4,6 +4,7 @@ node_modules/
 dist/
 build/
 .next/
+.next-*/
 out/
 # env & secrets (never commit)
 .env

@@ -863,7 +863,44 @@ model StaffUser {
   totpEnabled   Boolean     @default(false)
   totpLastToken String? // last used TOTP code — single-use guard (anti-replay)
   pushTokens    PushToken[]
+  assignedTasks StaffTask[] @relation("StaffTaskAssignee")
+  createdTasks  StaffTask[] @relation("StaffTaskCreator")
   createdAt     DateTime    @default(now())
 
   @@index([role])
+}
+
+enum StaffTaskStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum StaffTaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+model StaffTask {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  status      StaffTaskStatus   @default(open)
+  priority    StaffTaskPriority @default(normal)
+  assigneeId  String
+  assignee    StaffUser         @relation("StaffTaskAssignee", fields: [assigneeId], references: [id])
+  createdById String
+  createdBy   StaffUser         @relation("StaffTaskCreator", fields: [createdById], references: [id])
+  dueAt       DateTime?
+  relatedType String?
+  relatedId   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  completedAt DateTime?
+
+  @@index([assigneeId, status])
+  @@index([dueAt])
 }

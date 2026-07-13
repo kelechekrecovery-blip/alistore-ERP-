@@ -44,6 +44,7 @@ import { B2BModule } from './b2b/b2b.module';
 import { ProtectionModule } from './protection/protection.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { FinanceModule } from './finance/finance.module';
+import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { FinanceModule } from './finance/finance.module';
     ProtectionModule,
     ProcurementModule,
     FinanceModule,
+    StaffTasksModule,
   ],
 })
 export class AppModule {}

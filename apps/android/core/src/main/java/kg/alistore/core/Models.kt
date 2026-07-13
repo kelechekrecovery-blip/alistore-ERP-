@@ -203,6 +203,20 @@ data class Customer360Ticket(
 )
 data class Customer360Tickets(val open: Int, val items: List<Customer360Ticket>)
 
+data class StaffTask(
+  val id: String,
+  val title: String,
+  val description: String?,
+  val status: String,
+  val priority: String,
+  val assigneeId: String,
+  val dueAt: String?,
+  val relatedType: String?,
+  val relatedId: String?,
+  val createdAt: String,
+  val completedAt: String?,
+)
+
 data class OpenSupportTicketRequest(
   val channel: String,
   val subject: String,

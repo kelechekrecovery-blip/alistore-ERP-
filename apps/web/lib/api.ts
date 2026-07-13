@@ -23,5 +23,6 @@ export * from './api/protection';
 export * from './api/procurement';
 export * from './api/finance';
 export * from './api/customer-account';
+export * from './api/staff-tasks';
 export * from './pos-offline';
 export * from './pos-hardware';

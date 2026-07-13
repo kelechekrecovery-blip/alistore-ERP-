@@ -36,7 +36,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" npm exec -w @alistore/web -- next dev -p ${webPort}`,
+      command: `NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" npm exec -w @alistore/web -- next dev -p ${webPort}`,
       url: `http://127.0.0.1:${webPort}/checkout`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

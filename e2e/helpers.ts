@@ -14,6 +14,7 @@ export const prisma = new PrismaClient({
 export const API_BASE = `http://127.0.0.1:${Number(process.env.E2E_API_PORT ?? 4200)}/api`;
 
 export async function resetDb() {
+  await prisma.staffTask.deleteMany();
   await prisma.deviceProtectionPolicy.deleteMany();
   await prisma.b2BQuote.deleteMany();
   await prisma.businessBuyerProfile.deleteMany();
@@ -80,6 +81,7 @@ export async function seedStaffCredentials(role: Role = 'owner', prefix = 'e2e')
     data: { username, passwordHash: await argon2.hash(password), role },
   });
   return {
+    staffId: staff.id,
     username,
     password,
     accessToken: sign(

@@ -99,6 +99,8 @@ export const EventType = {
   B2BQuoteUpdated: 'b2b.quote_updated',
   ProtectionRequested: 'protection.requested',
   ProtectionUpdated: 'protection.updated',
+  StaffTaskCreated: 'staff_task.created',
+  StaffTaskUpdated: 'staff_task.updated',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

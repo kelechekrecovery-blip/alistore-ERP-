@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
-  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway {
+  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -183,6 +183,13 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 
   override suspend fun escalateSupport(ticketId: String, token: String): SupportTicket =
     request("support/tickets/$ticketId/escalate", "PATCH", JSONObject(), token).supportTicket()
+
+  override suspend fun staffTasks(token: String): List<StaffTask> = requestArray("staff-tasks/mine", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).staffTask()) }
+  }
+
+  override suspend fun updateStaffTask(taskId: String, status: String, token: String): StaffTask =
+    request("staff-tasks/mine/$taskId", "PATCH", JSONObject().put("status", status), token).staffTask()
 
   override suspend fun uploadEvidence(
     entityType: String,
@@ -455,6 +462,13 @@ internal fun JSONObject.customerOverview() = Customer360(
       }
     } },
   ) },
+)
+
+internal fun JSONObject.staffTask() = StaffTask(
+  id = getString("id"), title = getString("title"), description = nullableString("description"),
+  status = getString("status"), priority = getString("priority"), assigneeId = getString("assigneeId"),
+  dueAt = nullableString("dueAt"), relatedType = nullableString("relatedType"), relatedId = nullableString("relatedId"),
+  createdAt = getString("createdAt"), completedAt = nullableString("completedAt"),
 )
 
 private fun JSONObject.customerReturn() = CustomerReturn(

@@ -21,7 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -89,6 +89,7 @@ fun StaffApp(apiBaseUrl: String) {
         api,
         api,
         api,
+        api,
         onLogout = { state = manager.logout() },
       )
     }
@@ -151,14 +152,15 @@ fun StaffSignedInScreen(
   gateway: StaffOperationsGateway,
   evidenceGateway: StaffEvidenceGateway,
   customerGateway: StaffCustomerGateway,
+  taskGateway: StaffTaskGateway,
   onLogout: () -> Unit,
 ) {
   var selected by rememberSaveable { mutableStateOf(0) }
   val tabs = listOf(
     StaffTab("Главная", Icons.Default.Home),
     StaffTab("Заказы", Icons.Default.ShoppingCart),
+    StaffTab("Задачи", Icons.Default.CheckCircle),
     StaffTab("Сканер", Icons.Default.Search),
-    StaffTab("Клиенты", Icons.Default.Person),
     StaffTab("Смена", Icons.Default.AccountCircle),
   )
   Scaffold(
@@ -181,9 +183,10 @@ fun StaffSignedInScreen(
     when (selected) {
       0 -> StaffHome(session, Modifier.padding(padding)) { selected = it }
       1 -> StaffOrdersScreen(session, gateway, Modifier.padding(padding))
-      2 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
-      3 -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding))
-      else -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding))
+      2 -> StaffTasksScreen(session, taskGateway, Modifier.padding(padding))
+      3 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
+      4 -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding))
+      else -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding))
     }
   }
 }
@@ -202,8 +205,9 @@ private fun StaffHome(session: StaffSession, modifier: Modifier, onTab: (Int) ->
       Spacer(Modifier.height(22.dp))
     }
     item { StaffShortcut("Очередь заказов", "Комплектация и выдача", StaffCoral) { onTab(1) } }
-    item { StaffShortcut("Customer 360", "Покупки, гарантия и поддержка", StaffLime, StaffInk) { onTab(3) } }
-    item { StaffShortcut("Сканер", "EAN, QR и IMEI", Color(0xFF82B1FF)) { onTab(2) } }
+    item { StaffShortcut("Задачи и KPI", "Назначения на сегодня", StaffLime, StaffInk) { onTab(2) } }
+    item { StaffShortcut("Customer 360", "Покупки, гарантия и поддержка", Color(0xFF82B1FF)) { onTab(5) } }
+    item { StaffShortcut("Сканер", "EAN, QR и IMEI", StaffCoral) { onTab(3) } }
     item { StaffShortcut("Кассовая смена", "Открытие и сверка", Color(0xFFFFD166), StaffInk) { onTab(4) } }
     item {
       Text(

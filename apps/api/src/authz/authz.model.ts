@@ -27,6 +27,8 @@ p, owner, stock_adjust, approve
 p, owner, delete, approve
 p, admin, pii, approve
 p, owner, staff, manage
+p, admin, staff_tasks, manage
+p, owner, staff_tasks, manage
 p, cashier, pos, sale
 p, seller, pos, sale
 p, senior_seller, pos, sale

@@ -1,9 +1,18 @@
 import { expect, test } from '@playwright/test';
-import { resetDb, seedStaffCredentials } from './helpers';
+import { prisma, resetDb, seedStaffCredentials } from './helpers';
 
 test('Staff app follows the canonical four-section mobile shell', async ({ page, request }) => {
   await resetDb();
-  const { username, password } = await seedStaffCredentials('owner', 'e2e-staff-ui');
+  const { staffId, username, password } = await seedStaffCredentials('owner', 'e2e-staff-ui');
+  const task = await prisma.staffTask.create({
+    data: {
+      title: 'Подготовить витрину к открытию',
+      description: 'Проверить ценники и выкладку устройств',
+      priority: 'high',
+      assigneeId: staffId,
+      createdById: staffId,
+    },
+  });
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/staff');
@@ -21,6 +30,13 @@ test('Staff app follows the canonical four-section mobile shell', async ({ page,
 
   await page.getByRole('button', { name: 'Задачи и KPI' }).click();
   await expect(page.getByRole('heading', { name: 'Задачи и KPI' })).toBeVisible();
+  await expect(page.getByText(task.title)).toBeVisible();
+  await page.getByRole('button', { name: `Начать: ${task.title}` }).click();
+  await expect(page.getByRole('button', { name: `Завершить: ${task.title}` })).toBeVisible();
+  await page.getByRole('button', { name: `Завершить: ${task.title}` }).click();
+  await expect(page.getByRole('button', { name: `Выполнено: ${task.title}` })).toBeDisabled();
+  await expect.poll(async () => (await prisma.staffTask.findUnique({ where: { id: task.id } }))?.status)
+    .toBe('completed');
   await page.getByRole('button', { name: 'Назад на главную' }).click();
   await expect(page.getByText('ЗАДАЧА ОТ AI')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(

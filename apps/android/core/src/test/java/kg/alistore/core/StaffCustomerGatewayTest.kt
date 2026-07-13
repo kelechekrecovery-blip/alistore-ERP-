@@ -27,4 +27,13 @@ class StaffCustomerGatewayTest {
     assertEquals(listOf("waiting", "resolved"), nextSupportStatuses("in_progress"))
     assertEquals(emptyList<String>(), nextSupportStatuses("closed"))
   }
+
+  @Test fun parsesStaffTaskContract() {
+    val task = JSONObject(
+      """{"id":"task-1","title":"Обновить ценники","description":null,"status":"open","priority":"high","assigneeId":"staff-1","dueAt":"2026-07-14T10:00:00Z","relatedType":null,"relatedId":null,"createdAt":"2026-07-13T10:00:00Z","completedAt":null}"""
+    ).staffTask()
+    assertEquals("Обновить ценники", task.title)
+    assertEquals("high", task.priority)
+    assertEquals(null, task.completedAt)
+  }
 }

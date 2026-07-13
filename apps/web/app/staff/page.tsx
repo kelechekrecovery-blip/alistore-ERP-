@@ -20,6 +20,9 @@ import {
   type QueueOrder,
   type TradeIn,
   type TradeInGrade,
+  fetchMyStaffTasks,
+  updateMyStaffTask,
+  type StaffTask,
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
@@ -39,7 +42,6 @@ const NAV: { id: Tab; icon: string; label: string }[] = [
   { id: 'tasks', icon: '📊', label: 'KPI' },
   { id: 'buyback', icon: '♻️', label: 'Скупка' },
 ];
-const TASKS = ['Предлагать аксессуары к телефонам', 'Обновить ценники на витрине', 'Проверить остатки Apple Watch'];
 const BUYBACK = ['Проверить IMEI по базе краденого', 'Осмотреть состояние, присвоить грейд', 'Сделать фото (4 ракурса)', 'Внести данные клиента и паспорт'];
 
 export default function StaffPage() {
@@ -50,7 +52,8 @@ export default function StaffPage() {
   const [quoteTotals, setQuoteTotals] = useState<Record<string, string>>({});
   const [protection, setProtection] = useState<DeviceProtectionPolicy[] | null>(null);
   const [protectionPremiums, setProtectionPremiums] = useState<Record<string, string>>({});
-  const [tasks, setTasks] = useState<boolean[]>(TASKS.map(() => false));
+  const [tasks, setTasks] = useState<StaffTask[] | null>(null);
+  const [taskError, setTaskError] = useState('');
   const [buyback, setBuyback] = useState<boolean[]>(BUYBACK.map(() => false));
   const [tradeIn, setTradeIn] = useState<TradeIn | null>(null);
   const [buybackForm, setBuybackForm] = useState({
@@ -114,7 +117,34 @@ export default function StaffPage() {
   }, [session]);
   useEffect(() => { if (tab === 'protection' && session) loadProtection(); }, [tab, loadProtection, session]);
 
+  const loadTasks = useCallback(async () => {
+    if (!session) return;
+    setTasks(null);
+    setTaskError('');
+    try {
+      setTasks(await fetchMyStaffTasks(session.accessToken));
+    } catch (error) {
+      setTasks([]);
+      setTaskError(error instanceof Error ? error.message : 'Не удалось загрузить задачи');
+    }
+  }, [session]);
+  useEffect(() => { if (tab === 'tasks' && session) loadTasks(); }, [tab, loadTasks, session]);
+
   function flash(m: string) { setToast(m); window.setTimeout(() => setToast(''), 1600); }
+
+  async function taskAction(task: StaffTask) {
+    if (!session || task.status === 'completed') return;
+    setBusy(task.id);
+    try {
+      await updateMyStaffTask(task.id, task.status === 'open' ? 'in_progress' : 'completed', session.accessToken);
+      await loadTasks();
+      flash('Задача обновлена');
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Не удалось обновить задачу');
+    } finally {
+      setBusy(null);
+    }
+  }
   function fileList(event: ChangeEvent<HTMLInputElement>) {
     return Array.from(event.target.files ?? []);
   }
@@ -396,8 +426,33 @@ export default function StaffPage() {
                 <div className="h-2 overflow-hidden rounded-chip bg-[#16130F]"><div className="h-full w-[92%] bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" /></div>
                 <div className="mt-2 text-[11px] text-[#8A7F76]">До бонуса 15 000 сом осталось 8%</div>
               </div>
-              {TASKS.map((t, i) => (
-                <Check key={i} label={t} done={tasks[i]} onClick={() => setTasks((a) => a.map((v, j) => (j === i ? !v : v)))} />
+              {tasks === null && <p className="py-8 text-center text-sm text-[#8A7F76]">Загрузка…</p>}
+              {taskError && (
+                <div className="py-7 text-center">
+                  <p className="text-sm text-[#D69A83]">{taskError}</p>
+                  <button type="button" onClick={loadTasks} className="mt-3 rounded-[9px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink">
+                    Повторить
+                  </button>
+                </div>
+              )}
+              {!taskError && tasks?.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Назначенных задач нет</p>}
+              {(tasks ?? []).map((task) => (
+                <div key={task.id} className="mb-2.5 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      disabled={busy === task.id || task.status === 'completed'}
+                      onClick={() => taskAction(task)}
+                      aria-label={`${task.status === 'completed' ? 'Выполнено' : task.status === 'open' ? 'Начать' : 'Завершить'}: ${task.title}`}
+                      className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border text-xs ${task.status === 'completed' ? 'border-lime bg-lime text-lime-ink' : 'border-[#554C44] text-transparent'}`}
+                    >✓</button>
+                    <div className="min-w-0 flex-1">
+                      <div className={`text-[13px] font-semibold ${task.status === 'completed' ? 'text-[#6E645C] line-through' : 'text-[#D8CFC6]'}`}>{task.title}</div>
+                      {task.description && <div className="mt-1 text-[11px] text-[#8A7F76]">{task.description}</div>}
+                      <div className="mt-2 flex gap-2 font-mono text-[10px] text-[#8A7F76]"><span>{task.status}</span><span>{task.priority}</span>{task.dueAt && <span>до {task.dueAt.slice(0, 10)}</span>}</div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
