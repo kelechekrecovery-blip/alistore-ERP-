@@ -5,10 +5,10 @@
 и не должны смешиваться с готовностью первого магазина к запуску.
 
 - **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **26 миграций**
-- **106 API test suites / 392 теста — зелёные** (`jest --runInBand`)
-- **21 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle и exact desktop customer routes (`npm run e2e`)
+- **108 API test suites / 408 тестов — зелёные** (`jest --runInBand`)
+- **22 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle, customer account synchronization и exact desktop customer routes (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
-- Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API tests pass **17/17** on iPhone 17 Pro Simulator; Android unit test/Lint pass and all four apps cold-launch on an API 36 emulator. Full per-role feature parity remains in progress. Expo is retained only as a legacy behavior reference.
+- Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API tests pass **17/17** on iPhone 17 Pro Simulator; Android unit test/Lint and **13/13 Client/Staff Compose UI tests** pass on API 36. Android Staff now has real staff-JWT order queues and cash shifts; scanner/service workflows, Courier and POS parity remain in progress. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
 
 Легенда: ✅ готово · 🟡 частично · ⛔ ждёт внешних доступов (ключи/аккаунты/железо)

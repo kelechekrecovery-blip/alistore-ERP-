@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: replace the Android Staff placeholder with the first authenticated ERP App operational vertical.
+- Files changed: cash-shift Prisma idempotency migration and Nest controller/service; concurrent shift regressions; Android staff session models/manager/Keystore binding; typed staff/shift/order API; Compose login, home, order queue and shift reconciliation screens; JVM/Compose tests and readiness/backlog documentation.
+- Result: Android Staff now restores an encrypted staff JWT only after `/staff-auth/me` confirms an active employee, loads RBAC-filtered server order queues, performs guarded fulfillment transitions and opens/closes the same cash shifts used by web POS/ERP. Exact shift retries preserve one idempotency key, concurrent commands create one shift and one Event Ledger event, and discrepancies require a reason. Scanner is deliberately marked pending rather than simulated.
+- Checks run: Prisma format/generate, dev migration and isolated test DB sync; targeted shift integration 7/7; API production build; full API 108/108 suites and 408/408 tests; Next production build for 37 routes; Playwright 22/22; four Android APK builds; Android unit/Lint; API 36 Compose UI 13/13; original-resolution Staff queue visual `/tmp/alistore-staff-orders-safe.png` inspected and status-bar overlap corrected; `git diff --check`.
+- Outcome: feature commit `ff1a2dc`; the website, ERP and Android Staff share PostgreSQL/NestJS order and shift contracts for this vertical. Android Staff scanner, tasks, Customer 360, support/warranty, Evidence and push remain open; Courier/POS Android apps remain foundations, so full ERP App readiness is not claimed.
+- Next step: add Android Staff scanner plus Evidence Vault capture using the existing staff JWT/RBAC APIs, then Customer 360 and support/warranty actions.
+
+## 2026-07-13
+
 - Task: synchronize customer loyalty, addresses and settings across API, web checkout/account and the native Android Client.
 - Files changed: customer-account Prisma models/migration, owner-scoped NestJS customer endpoints and Event Ledger types, typed web/Android clients and screens, checkout address integration, API/Playwright/Compose regressions, architecture/backlog/readme documentation.
 - Result: loyalty balance/coupons/history, address CRUD/primary rotation and profile/consent/channel preferences now use PostgreSQL-backed customer JWT endpoints. Web and Android share the same contracts; signed-in web checkout loads the server primary address, while guest checkout retains its local fallback. Address creation preserves one idempotency key through access-token refresh and concurrent exact replay creates one row.

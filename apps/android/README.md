@@ -58,3 +58,12 @@ API; and updates profile, marketing consent and notification channels. Loading, 
 error and retry states are covered by the API 36 Compose suite. Loyalty redemption during
 checkout remains a separate server-authoritative money-flow task and is not inferred by
 the client.
+
+The Staff APK now has its own password login and encrypted Keystore token. Process
+restore revalidates the employee through `staff-auth/me`, so revoked users cannot keep
+working from a stale local role. Its order queue reads the same guarded order state
+machine used by web ERP/Staff, and its shift screen opens, reloads and reconciles the
+same cash shifts used by POS. Open/close retries retain a stable idempotency key and
+cash discrepancies require a reason before the API writes the result to Event Ledger.
+Scanner, tasks, Customer 360, support/warranty, Evidence capture and push remain the
+next Android Staff parity wave.
