@@ -7,6 +7,7 @@
 - Result: Android Client now lists and creates only the authenticated customer's support tickets and return requests, starts a return from signed-in order history, preserves one command key across 401 refresh/retry, and uploads optional photos through the authenticated Evidence Vault. The API derives ownership from JWT, rejects changed-payload key reuse, exact-replays concurrent duplicates and emits one critical Ledger event.
 - Checks run: Prisma generate, dev migration and isolated test DB sync; focused support/returns API 4/4; full API sequential 107/107 suites and 403/403 tests; API production build; Web production build across 37 routes; four Android APK builds; all-module unit tests and Android Lint; Compose instrumentation 7/7 on API 36 after final UI polish; original-resolution Compose render `/tmp/alistore-android-support-render.png` inspected; `git diff --check`.
 - Outcome: Android support and returns vertical is accepted at software/emulator level. Live camera/provider behavior still requires physical-device certification; Client bonuses, addresses and settings are the next native slice.
+- Commit: `6cf61ad feat(android): add support and returns self-service`.
 - Next step: implement Android Client bonuses, addresses and settings with owner-scoped typed contracts and Compose state coverage, then move to Staff parity.
 
 ## 2026-07-13
