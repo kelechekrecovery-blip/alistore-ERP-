@@ -50,3 +50,11 @@ customer's tickets and return requests, preserves one command key across token r
 and manual retry, and can attach a photo through the private Evidence Vault upload API.
 Return creation starts from an eligible order loaded through `orders/mine`; the API
 derives ownership from the customer JWT and exact-replays concurrent duplicate commands.
+
+Bonuses, addresses and settings use the same customer-owned API as the web cabinet.
+The Client renders the server ledger balance, coupons and history; creates addresses with
+a stable idempotency key across token refresh; rotates the primary address through the
+API; and updates profile, marketing consent and notification channels. Loading, empty,
+error and retry states are covered by the API 36 Compose suite. Loyalty redemption during
+checkout remains a separate server-authoritative money-flow task and is not inferred by
+the client.

@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: synchronize customer loyalty, addresses and settings across API, web checkout/account and the native Android Client.
+- Files changed: customer-account Prisma models/migration, owner-scoped NestJS customer endpoints and Event Ledger types, typed web/Android clients and screens, checkout address integration, API/Playwright/Compose regressions, architecture/backlog/readme documentation.
+- Result: loyalty balance/coupons/history, address CRUD/primary rotation and profile/consent/channel preferences now use PostgreSQL-backed customer JWT endpoints. Web and Android share the same contracts; signed-in web checkout loads the server primary address, while guest checkout retains its local fallback. Address creation preserves one idempotency key through access-token refresh and concurrent exact replay creates one row.
+- Checks run: Prisma development migration and test schema sync; API production build; targeted account E2E 3/3; full API 108/108 suites and 406/406 tests; Next production build for 37 routes; full Playwright 22/22; four Android APK builds; Android unit/Lint; API 36 Compose UI 10/10; Android bonus screen visual capture; `git diff --check`.
+- Outcome: feature commit `92d3a5b`; account data is now demonstrably shared by ERP/API, web and Android. Live provider/device certification is still external, and loyalty redemption remains in `BACKLOG.md` because the current web cart discount is not yet server-authoritative.
+- Next step: implement the Android Staff operational parity wave, starting with authenticated shift and order queues using existing staff JWT/RBAC contracts.
+
+## 2026-07-13
+
 - Task: execute Master Plan Android iteration 5, owner-scoped support and idempotent returns with Evidence Vault hooks.
 - Files changed: support/return idempotency schema and migration; customer-owned `mine` controllers, DTOs and race-safe services; RBAC/idempotency/Event Ledger regressions; Android support/return models, typed API, account routing, Evidence photo picker, Compose loading/empty/error/submission states and UI tests; architecture/backlog/readme tracking.
 - Result: Android Client now lists and creates only the authenticated customer's support tickets and return requests, starts a return from signed-in order history, preserves one command key across 401 refresh/retry, and uploads optional photos through the authenticated Evidence Vault. The API derives ownership from JWT, rejects changed-payload key reuse, exact-replays concurrent duplicates and emits one critical Ledger event.
