@@ -62,16 +62,21 @@ private val Lime = Color(0xFFC8F04B)
 private data class ClientTab(val label: String, val icon: ImageVector)
 
 @Composable
-fun AliStoreApp(role: AppRole, apiBaseUrl: String) {
+fun AliStoreApp(
+  role: AppRole,
+  apiBaseUrl: String,
+  deepLinkUrl: String? = null,
+  deepLinkRevision: Long = 0,
+) {
   if (role == AppRole.CLIENT) {
-    ClientApp(apiBaseUrl)
+    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision)
     return
   }
   RoleApp(role)
 }
 
 @Composable
-private fun ClientApp(apiBaseUrl: String) {
+private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision: Long) {
   val context = LocalContext.current.applicationContext
   var selected by remember { mutableStateOf(0) }
   var products by remember { mutableStateOf<List<Product>>(emptyList()) }
@@ -80,6 +85,8 @@ private fun ClientApp(apiBaseUrl: String) {
   var favorites by remember { mutableStateOf(setOf<String>()) }
   var cart by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
   var authState by remember { mutableStateOf<AuthState>(AuthState.Restoring) }
+  var accountRoute by remember { mutableStateOf<String?>(null) }
+  var orderRefreshRevision by remember { mutableStateOf(0) }
   val authManager = remember(apiBaseUrl) {
     AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"))
   }
@@ -104,6 +111,13 @@ private fun ClientApp(apiBaseUrl: String) {
     loading = false
   }
   LaunchedEffect(authManager) { authState = authManager.restore() }
+  LaunchedEffect(deepLinkUrl, deepLinkRevision) {
+    if (deepLinkUrl?.startsWith("alistore://payment-return") == true) {
+      selected = 4
+      accountRoute = "orders"
+      orderRefreshRevision += 1
+    }
+  }
 
   MaterialTheme {
     Scaffold(
@@ -136,8 +150,21 @@ private fun ClientApp(apiBaseUrl: String) {
           onClear = { cart = emptyMap() },
           onLogin = { selected = 4 },
           modifier = Modifier.padding(padding),
+          authManager = authManager,
+          onAuthState = { authState = it },
         )
-        else -> ClientAccount(authState, authManager, { authState = it }, favorites.size, cart.size, Modifier.padding(padding))
+        else -> ClientAccount(
+          authState,
+          authManager,
+          { authState = it },
+          favorites.size,
+          cart.values.sum(),
+          Modifier.padding(padding),
+          apiBaseUrl = apiBaseUrl,
+          route = accountRoute,
+          onRoute = { accountRoute = it },
+          orderRefreshRevision = orderRefreshRevision,
+        )
       }
     }
   }

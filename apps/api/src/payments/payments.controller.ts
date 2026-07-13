@@ -88,10 +88,11 @@ export class PaymentsController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   intent(
     @Headers('x-guest-capability') capability: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreatePaymentIntentDto,
   ) {
     const guest = requireGuestCapability(capability, 'payments:intent');
-    return this.intents.createForCustomer(guest.sub, dto);
+    return this.intents.createForCustomer(guest.sub, dto, idempotencyKey);
   }
 
   @ApiOperation({ summary: 'Create an online payment intent for the authenticated customer order' })
@@ -100,8 +101,12 @@ export class PaymentsController {
   @Post('intents/mine')
   @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  customerIntent(@CurrentUser() user: AuthPrincipal, @Body() dto: CreatePaymentIntentDto) {
-    return this.intents.createForCustomer(user.customerId, dto);
+  customerIntent(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreatePaymentIntentDto,
+  ) {
+    return this.intents.createForCustomer(user.customerId, dto, idempotencyKey);
   }
 
   @ApiOperation({

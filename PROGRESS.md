@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: execute Master Plan Android iteration 3, idempotent payment handoff/return and protected order history.
+- Files changed: provider-neutral payment-intent command persistence and migration; deterministic sandbox payment page/confirmation; customer payment API idempotency; Android payment models, checkout methods, deep-link lifecycle, token refresh and order-history UI; API/native regressions and architecture/backlog documentation.
+- Result: Android Client now creates card, MBank, O!Деньги and installment intents with a stable payment idempotency key, opens the server-returned provider handoff, routes `alistore://payment-return` to Orders and reloads JWT-owned server statuses without assigning `paid` locally. The API persists exact owner/payload responses for replay, rejects key reuse with another command, derives sandbox confirmation from trusted stored data and blocks arbitrary redirect targets. Order history has loading, empty, error, retry and one-shot refresh-on-401 states.
+- Checks run: Prisma validate/generate and dev/test migration; payment/sandbox API 11/11; full API 107/107 suites and 399/399 tests; API and Web production builds; focused checkout Playwright 2/2; Android core JVM 14/14; Compose instrumentation 4/4 on API 36; all four APK builds; all-module unit tests and Android Lint; live OTP → order → repeated payment intent → sandbox confirmation → repeated confirmation HTTP smoke; live Nest health and Socket.IO handshake; Android cold-start payment-return deep-link smoke and inspected screenshot `/tmp/alistore-android-payment-return.png`; `git diff --check`.
+- Outcome: the Android payment and order-history vertical is accepted by API, native and live local transport gates. Live merchant applications, production credentials and physical-device push/provider smoke remain external release gates; bonuses, addresses, devices, warranty, support and returns remain the next Client parity slice.
+- Next step: implement Android account/self-service data beginning with devices and warranty, then support and returns.
+
+## 2026-07-13
+
 - Task: execute Master Plan Android iteration 2, native cart and durable customer checkout.
 - Files changed: Android cart/checkout models and Compose UI, typed order transport, SQLite mutation states, token-refreshing WorkManager replay, server-authoritative customer order quoting, order security/invariant tests, Android architecture/readme/backlog tracking.
 - Result: Client quantities are capped by live catalog availability and pickup/courier checkout uses the customer JWT with a stable idempotency key. `/orders/mine` now ignores client price, total and IMEI, recalculates current catalog prices and available serialized stock, and preserves idempotent replay after inventory changes. Network failures queue the exact command; replay stores queued/syncing/conflict/failed states, refreshes an expired access token and does not automatically retry conflicts. The account conflict-list/manual-retry UI remains open.

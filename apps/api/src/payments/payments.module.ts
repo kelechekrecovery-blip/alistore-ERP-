@@ -12,6 +12,7 @@ import { GiftcardsModule } from '../giftcards/giftcards.module';
 import { ConfigService } from '@nestjs/config';
 import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from './payment-gateway-provider';
 import { selectPaymentGatewayProvider } from './payment-gateway-selector';
+import { SandboxPaymentsController } from './sandbox-payments.controller';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { selectPaymentGatewayProvider } from './payment-gateway-selector';
         selectPaymentGatewayProvider((name) => config.get<string>(name)),
     },
   ],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, SandboxPaymentsController],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

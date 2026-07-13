@@ -31,3 +31,10 @@ order status are recalculated by the API. Network failures enter the encrypted-s
 WorkManager replay contour; conflicts remain visible for manual retry instead of being
 silently resubmitted by the worker. A dedicated conflict-list screen remains part of
 the account-data parity phase.
+
+Online checkout creates card, MBank, O!Деньги or installment intents through the
+customer-owned API with a separate stable payment idempotency key. The app opens the
+provider URL, handles `alistore://payment-return`, and routes back to a protected order
+history that reloads server-authoritative payment/order statuses. A 401 during intent
+creation or order loading triggers one refresh-token rotation and repeats the same
+idempotent command; the Client never assigns `paid` locally.

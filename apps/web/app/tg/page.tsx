@@ -159,7 +159,7 @@ export default function TelegramMiniAppPage() {
         method: payment,
         amount: subtotal,
         actor: 'telegram_mini_app',
-      }, customer.guestCapability);
+      }, customer.guestCapability, crypto.randomUUID());
       setDone({ order: { ...order, status: intent.orderStatus }, intent });
       setCart([]);
     } catch {

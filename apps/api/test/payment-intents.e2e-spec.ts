@@ -33,6 +33,7 @@ describe('Online payment intents (integration)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.onlinePaymentIntentCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
@@ -140,6 +141,36 @@ describe('Online payment intents (integration)', () => {
     });
     expect(intent.orderId).toBe(order.id);
     expect(intent.orderStatus).toBe('awaiting_payment');
+  });
+
+  it('replays a customer intent by idempotency key and rejects payload reuse', async () => {
+    const order = await webOrder();
+    const stored = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const request = { orderId: order.id, method: 'card' as const, amount: 100000, returnUrl: 'alistore://payment-return' };
+
+    const first = await intents.createForCustomer(stored.customerId, request, 'intent-key-1');
+    const replay = await intents.createForCustomer(stored.customerId, request, 'intent-key-1');
+
+    expect(replay).toEqual(first);
+    expect(await prisma.onlinePaymentIntentCommand.count()).toBe(1);
+    await expect(intents.createForCustomer(stored.customerId, { ...request, method: 'qr_mbank' }, 'intent-key-1'))
+      .rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    const paid = await intents.confirmSandboxIntent(first.intentId);
+    expect(paid.order?.status).toBe('paid');
+    const duplicate = await intents.confirmSandboxIntent(first.intentId);
+    expect(duplicate.idempotent).toBe(true);
+  });
+
+  it('derives stable sandbox transaction identifiers from the provider idempotency key', async () => {
+    const gateway = new SandboxPaymentGatewayProvider();
+    const input = {
+      idempotencyKey: 'provider-key-1', orderId: 'order-1', orderStatus: 'awaiting_payment' as const,
+      method: 'card' as const, amount: 100000,
+    };
+    const first = await gateway.createIntent(input);
+    const replay = await gateway.createIntent(input);
+    expect(replay.intentId).toBe(first.intentId);
+    expect(replay.txnId).toBe(first.txnId);
   });
 
   it('fails before reserving stock when the selected production adapter is not activated', async () => {

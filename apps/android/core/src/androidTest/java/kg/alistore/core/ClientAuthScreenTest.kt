@@ -66,6 +66,30 @@ class ClientAuthScreenTest {
     compose.onNodeWithTag("checkout-address").performTextReplacement("Бишкек, Киевская 95")
     compose.onNodeWithTag("checkout-submit").assertIsEnabled()
   }
+
+  @Test
+  fun orderHistoryShowsServerStatusAndTotal() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val order = CustomerOrder(
+      "order-12345678", "awaiting_payment", 125000, "pickup", "BISHKEK-1", null,
+      listOf(CustomerOrderItem("PHONE-1", 1, 125000)), "2026-07-13T01:30:00.000Z",
+    )
+    compose.setContent {
+      MaterialTheme {
+        ClientOrdersScreen(
+          "https://api.alistore.kg/api", state, 1, {}, providedGateway = UiOrdersGateway(listOf(order)),
+        )
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("order-order-12345678").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("orders-title").assertIsDisplayed()
+    compose.onNodeWithText("Ожидает оплаты").assertIsDisplayed()
+    compose.onNodeWithText("1 тов. · 125000 сом").assertIsDisplayed()
+  }
 }
 
 private class UiSessionStore(private var tokens: AuthTokens? = null) : SessionStore {
@@ -80,4 +104,8 @@ private class UiAuthGateway : AuthGateway {
   override suspend fun refresh(refreshToken: String) = AuthTokens("access", "refresh")
   override suspend fun me(accessToken: String) = AuthUser("customer-1", "+996700123456", "customer")
   override suspend fun logout(refreshToken: String) = Unit
+}
+
+private class UiOrdersGateway(private val result: List<CustomerOrder>) : CustomerOrdersGateway {
+  override suspend fun orders(token: String) = result
 }

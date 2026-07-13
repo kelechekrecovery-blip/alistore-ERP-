@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-class ApiClient(private val baseUrl: String) : AuthGateway, CheckoutGateway {
+class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -52,6 +52,22 @@ class ApiClient(private val baseUrl: String) : AuthGateway, CheckoutGateway {
   override suspend fun createOrder(request: CreateOrderRequest, token: String, idempotencyKey: String): CustomerOrder =
     request("orders/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey).order()
 
+  override suspend fun createPaymentIntent(
+    request: CreatePaymentIntentRequest,
+    token: String,
+    idempotencyKey: String,
+  ): PaymentIntent = request(
+    "payments/intents/mine",
+    "POST",
+    request.toJson(),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).paymentIntent()
+
+  override suspend fun orders(token: String): List<CustomerOrder> = requestArray("orders/mine", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).order()) }
+  }
+
   fun send(mutation: PendingMutation, token: String?): Int {
     val connection = open(mutation.endpoint, mutation.method)
     return try {
@@ -96,6 +112,23 @@ class ApiClient(private val baseUrl: String) : AuthGateway, CheckoutGateway {
     }
   }
 
+  private suspend fun requestArray(path: String, token: String) = withContext(Dispatchers.IO) {
+    val connection = open(path, "GET")
+    try {
+      connection.setRequestProperty("Authorization", "Bearer $token")
+      val status = connection.responseCode
+      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+      if (status !in 200..299) {
+        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
+        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" })
+      }
+      org.json.JSONArray(payload)
+    } finally {
+      connection.disconnect()
+    }
+  }
+
   private fun open(path: String, method: String): HttpURLConnection {
     val cleanPath = path.removePrefix("/")
     return (URL("${baseUrl.trimEnd('/')}/$cleanPath").openConnection() as HttpURLConnection).apply {
@@ -116,6 +149,29 @@ private fun JSONObject.order() = CustomerOrder(
   fulfillmentType = optString("fulfillmentType", "pickup"),
   pickupPoint = nullableString("pickupPoint"),
   deliveryAddress = nullableString("deliveryAddress"),
+  items = optJSONArray("items")?.let { array ->
+    buildList {
+      for (index in 0 until array.length()) {
+        val item = array.getJSONObject(index)
+        add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price")))
+      }
+    }
+  }.orEmpty(),
+  createdAt = nullableString("createdAt"),
+)
+
+private fun JSONObject.paymentIntent() = PaymentIntent(
+  intentId = getString("intentId"),
+  provider = getString("provider"),
+  orderId = getString("orderId"),
+  orderStatus = getString("orderStatus"),
+  method = getString("method"),
+  amount = getInt("amount"),
+  txnId = getString("txnId"),
+  status = getString("status"),
+  expiresAt = getString("expiresAt"),
+  paymentUrl = getString("paymentUrl"),
+  qrPayload = nullableString("qrPayload"),
 )
 
 private fun JSONObject.nullableString(key: String): String? =

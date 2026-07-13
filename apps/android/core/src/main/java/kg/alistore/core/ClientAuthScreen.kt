@@ -1,6 +1,7 @@
 package kg.alistore.core
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,13 +49,17 @@ internal fun ClientAccount(
   favoriteCount: Int,
   cartCount: Int,
   modifier: Modifier = Modifier,
+  apiBaseUrl: String = "",
+  route: String? = null,
+  onRoute: (String?) -> Unit = {},
+  orderRefreshRevision: Int = 0,
 ) {
   when (state) {
     AuthState.Restoring -> Column(modifier.fillMaxSize().background(AuthInk), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
       CircularProgressIndicator(color = AuthLime)
       Text("Восстанавливаем сессию", color = AuthMuted, modifier = Modifier.padding(top = 12.dp))
     }
-    is AuthState.SignedIn -> SignedInAccount(state, manager, onState, favoriteCount, cartCount, modifier)
+    is AuthState.SignedIn -> SignedInAccount(state, manager, onState, favoriteCount, cartCount, modifier, apiBaseUrl, route, onRoute, orderRefreshRevision)
     else -> OtpLogin(state, manager, onState, modifier)
   }
 }
@@ -138,7 +143,15 @@ private fun SignedInAccount(
   favoriteCount: Int,
   cartCount: Int,
   modifier: Modifier,
+  apiBaseUrl: String,
+  route: String?,
+  onRoute: (String?) -> Unit,
+  orderRefreshRevision: Int,
 ) {
+  if (route == "orders") {
+    ClientOrdersScreen(apiBaseUrl, state, orderRefreshRevision, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
   val scope = rememberCoroutineScope()
   var busy by remember { mutableStateOf(false) }
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -147,7 +160,13 @@ private fun SignedInAccount(
       Text(state.user.phone ?: "Профиль AliStore", color = AuthLime, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
     }
     items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Адреса", "Поддержка", "Настройки")) { title ->
-      Text(title, color = Color.White, modifier = Modifier.fillMaxWidth().background(AuthSurface, RoundedCornerShape(8.dp)).padding(16.dp))
+      Text(
+        title,
+        color = Color.White,
+        modifier = Modifier.fillMaxWidth().background(AuthSurface, RoundedCornerShape(8.dp))
+          .clickable(enabled = title == "Мои заказы") { onRoute("orders") }
+          .padding(16.dp),
+      )
     }
     item {
       Text("Избранное: $favoriteCount · Корзина: $cartCount", color = AuthMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))

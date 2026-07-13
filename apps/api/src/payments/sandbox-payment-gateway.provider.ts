@@ -8,6 +8,7 @@ import {
   PaymentIntentView,
   PaymentProviderName,
 } from './payment-gateway-provider';
+import { createHash } from 'node:crypto';
 
 const PROVIDER: Record<GatewayCreateIntentInput['method'], PaymentProviderName> = {
   card: 'card',
@@ -24,8 +25,11 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
   async createIntent(input: GatewayCreateIntentInput): Promise<PaymentIntentView> {
     const provider = PROVIDER[input.method];
     const issuedAt = Date.now();
-    const txnId = `${provider}-${input.orderId}-${issuedAt}`;
-    const intentId = `PI-${input.orderId.slice(-8).toUpperCase()}-${issuedAt.toString(36).toUpperCase()}`;
+    const replayToken = input.idempotencyKey
+      ? createHash('sha256').update(input.idempotencyKey).digest('hex').slice(0, 16)
+      : issuedAt.toString(36);
+    const txnId = `${provider}-${input.orderId}-${replayToken}`;
+    const intentId = `PI-${input.orderId.slice(-8).toUpperCase()}-${replayToken.toUpperCase()}`;
     const expiresAt = new Date(issuedAt + 15 * 60 * 1000).toISOString();
     return {
       intentId,
@@ -51,7 +55,7 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
   }
 
   private paymentUrl(provider: PaymentProviderName, intentId: string, returnUrl?: string): string {
-    const base = `/sandbox/payments/${provider}/${intentId}`;
+    const base = `/api/sandbox/payments/${provider}/${intentId}`;
     return returnUrl ? `${base}?returnUrl=${encodeURIComponent(returnUrl)}` : base;
   }
 

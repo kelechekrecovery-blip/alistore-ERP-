@@ -53,6 +53,12 @@ class AuthSessionManager(
     return AuthState.Guest
   }
 
+  suspend fun refresh(state: AuthState.SignedIn): AuthState = runCatching {
+    val refreshed = api.refresh(state.tokens.refreshToken)
+    store.saveSession(refreshed)
+    signedIn(refreshed)
+  }.getOrElse(::failAndClear)
+
   private suspend fun signedIn(tokens: AuthTokens): AuthState.SignedIn =
     AuthState.SignedIn(api.me(tokens.accessToken), tokens)
 

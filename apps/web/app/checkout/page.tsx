@@ -129,7 +129,7 @@ export default function CheckoutPage() {
         method: payment,
         amount: dueAfterGift,
         actor: 'web_checkout',
-      }, customer.guestCapability);
+      }, customer.guestCapability, crypto.randomUUID());
       setDone({ order: { ...currentOrder, status: intent.orderStatus }, intent });
     } catch { setError('Не удалось оформить заказ.'); } finally { setBusy(false); }
   }

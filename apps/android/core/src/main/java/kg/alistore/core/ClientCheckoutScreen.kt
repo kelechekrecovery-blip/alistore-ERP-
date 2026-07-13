@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import java.util.UUID
+import java.net.URL
 import kotlinx.coroutines.launch
 
 private val CheckoutInk = Color(0xFF16130F)
@@ -56,13 +58,17 @@ internal fun ClientCheckout(
   onClear: () -> Unit,
   onLogin: () -> Unit,
   modifier: Modifier = Modifier,
+  authManager: AuthSessionManager? = null,
+  onAuthState: (AuthState) -> Unit = {},
 ) {
   val context = LocalContext.current.applicationContext
   val scope = rememberCoroutineScope()
   val checkout = remember(apiBaseUrl) { CheckoutManager(ApiClient(apiBaseUrl), OfflineQueueDb(context)) }
   var fulfillment by rememberSaveable { mutableStateOf("pickup") }
+  var paymentMethod by rememberSaveable { mutableStateOf("cash") }
   var address by rememberSaveable { mutableStateOf("") }
   var idempotencyKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
+  var paymentIdempotencyKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var result by remember { mutableStateOf<CheckoutResult?>(null) }
@@ -70,9 +76,10 @@ internal fun ClientCheckout(
   val total = lines.sumOf { (product, quantity) -> product.price * quantity }
 
   if (result != null) {
-    CheckoutResultScreen(result!!, modifier) {
+    CheckoutResultScreen(result!!, apiBaseUrl, modifier) {
       result = null
       idempotencyKey = UUID.randomUUID().toString()
+      paymentIdempotencyKey = UUID.randomUUID().toString()
     }
     return
   }
@@ -126,6 +133,25 @@ internal fun ClientCheckout(
       }
     }
     item {
+      Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).background(CheckoutSurface, RoundedCornerShape(8.dp)).padding(14.dp)) {
+        Text("Оплата", color = Color.White, fontWeight = FontWeight.Bold)
+        listOf(
+          "cash" to "При получении",
+          OnlinePaymentMethod.CARD.wireValue to "Карта",
+          OnlinePaymentMethod.MBANK.wireValue to "MBank QR",
+          OnlinePaymentMethod.ODENGI.wireValue to "O!Деньги QR",
+          OnlinePaymentMethod.INSTALLMENT.wireValue to "Рассрочка",
+        ).chunked(2).forEach { row ->
+          Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { (value, label) ->
+              PaymentMethodButton(label, paymentMethod == value, Modifier.weight(1f)) { paymentMethod = value; error = null }
+            }
+            if (row.size == 1) androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+          }
+        }
+      }
+    }
+    item {
       Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
           Text("Итого", color = CheckoutMuted)
@@ -149,7 +175,24 @@ internal fun ClientCheckout(
                   total = total,
                   items = lines.map { (product, quantity) -> CreateOrderItem(product.sku, quantity, product.price) },
                 )
-                runCatching { checkout.submit(request, authState.tokens.accessToken, idempotencyKey) }
+                val onlineMethod = OnlinePaymentMethod.entries.firstOrNull { it.wireValue == paymentMethod }
+                suspend fun submit(token: String) = checkout.submit(
+                  request,
+                  token,
+                  idempotencyKey,
+                  onlineMethod,
+                  if (onlineMethod == null) null else paymentIdempotencyKey,
+                )
+                var attempt = runCatching {
+                  submit(authState.tokens.accessToken)
+                }
+                if (attempt.exceptionOrNull() is ApiException &&
+                  (attempt.exceptionOrNull() as ApiException).status == 401 && authManager != null) {
+                  val refreshed = authManager.refresh(authState)
+                  onAuthState(refreshed)
+                  if (refreshed is AuthState.SignedIn) attempt = runCatching { submit(refreshed.tokens.accessToken) }
+                }
+                attempt
                   .onSuccess { next ->
                     result = next
                     onClear()
@@ -181,15 +224,41 @@ private fun FulfillmentButton(label: String, selected: Boolean, modifier: Modifi
 }
 
 @Composable
-private fun CheckoutResultScreen(result: CheckoutResult, modifier: Modifier, onContinue: () -> Unit) {
+private fun PaymentMethodButton(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+  Button(
+    onClick = onClick,
+    modifier = modifier,
+    colors = ButtonDefaults.buttonColors(
+      containerColor = if (selected) CheckoutCoral else CheckoutLine,
+      contentColor = Color.White,
+    ),
+    shape = RoundedCornerShape(7.dp),
+  ) { Text(label, fontSize = 11.sp, maxLines = 1) }
+}
+
+@Composable
+private fun CheckoutResultScreen(result: CheckoutResult, apiBaseUrl: String, modifier: Modifier, onContinue: () -> Unit) {
   val created = result as? CheckoutResult.Created
+  val uriHandler = LocalUriHandler.current
+  val intent = created?.paymentIntent
   Column(modifier.fillMaxSize().background(CheckoutInk).padding(24.dp), verticalArrangement = Arrangement.Center) {
-    Text(if (created != null) "Заказ оформлен" else "Заказ сохранён офлайн", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Black)
+    Text(if (intent != null) "Ожидает оплаты" else if (created != null) "Заказ оформлен" else "Заказ сохранён офлайн", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Black)
     Text(if (created != null) "#${created.order.id.takeLast(8)} · ${created.order.total} сом · ${created.order.status}" else "Отправим автоматически, когда появится сеть", color = CheckoutMuted, modifier = Modifier.padding(top = 8.dp))
-    if (created != null) Text("Статус оплаты и выдачи подтверждает только сервер", color = CheckoutLime, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+    if (intent != null) {
+      Button(
+        onClick = { uriHandler.openUri(resolvePaymentUrl(apiBaseUrl, intent.paymentUrl)) },
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).testTag("payment-open"),
+        colors = ButtonDefaults.buttonColors(containerColor = CheckoutCoral, contentColor = Color.White),
+      ) { Text("Перейти к оплате", fontWeight = FontWeight.Bold) }
+      intent.qrPayload?.let { Text(it, color = CheckoutMuted, fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp)) }
+    }
+    if (created != null) Text("Статус оплаты и выдачи подтвердит только сервер", color = CheckoutLime, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
     Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = 18.dp), colors = ButtonDefaults.buttonColors(containerColor = CheckoutLime, contentColor = CheckoutInk)) { Text("Продолжить") }
   }
 }
+
+internal fun resolvePaymentUrl(apiBaseUrl: String, paymentUrl: String): String =
+  runCatching { URL(URL(apiBaseUrl), paymentUrl).toString() }.getOrDefault(paymentUrl)
 
 @Composable
 private fun CheckoutMessage(title: String, detail: String, modifier: Modifier) {

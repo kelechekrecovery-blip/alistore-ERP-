@@ -27,6 +27,35 @@ class CheckoutManagerTest {
   }
 
   @Test
+  fun createsPaymentIntentWithStableKeyAfterOrder() = runTest {
+    val gateway = FakeCheckoutGateway()
+    val result = CheckoutManager(gateway, FakeMutationQueue()).submit(
+      request,
+      "access",
+      "order-key-2",
+      OnlinePaymentMethod.MBANK,
+      "payment-key-2",
+    ) as CheckoutResult.Created
+
+    assertEquals("intent-1", result.paymentIntent?.intentId)
+    assertEquals("payment-key-2", gateway.paymentKey)
+    assertEquals("alistore://payment-return?orderId=order-1", gateway.paymentRequest?.returnUrl)
+  }
+
+  @Test
+  fun paymentNetworkFailureDoesNotQueueAnAlreadyCreatedOrder() = runTest {
+    val queue = FakeMutationQueue()
+    val gateway = FakeCheckoutGateway(paymentFailure = IOException("provider offline"))
+
+    assertThrows(IOException::class.java) {
+      kotlinx.coroutines.runBlocking {
+        CheckoutManager(gateway, queue).submit(request, "access", "order-key-3", OnlinePaymentMethod.CARD, "payment-key-3")
+      }
+    }
+    assertTrue(queue.records.isEmpty())
+  }
+
+  @Test
   fun networkFailureQueuesExactRequestAndStableKey() = runTest {
     val queue = FakeMutationQueue()
     val gateway = FakeCheckoutGateway(IOException("offline"))
@@ -59,12 +88,45 @@ class CheckoutManagerTest {
       kotlinx.coroutines.runBlocking { CheckoutManager(FakeCheckoutGateway(), FakeMutationQueue()).submit(request, "access", "") }
     }
   }
+
+  @Test
+  fun resolvesRelativeAndAbsolutePaymentUrls() {
+    assertEquals(
+      "https://api.alistore.kg/sandbox/payments/card/intent-1",
+      resolvePaymentUrl("https://api.alistore.kg/api", "/sandbox/payments/card/intent-1"),
+    )
+    assertEquals(
+      "https://bank.example/pay/1",
+      resolvePaymentUrl("https://api.alistore.kg/api", "https://bank.example/pay/1"),
+    )
+  }
 }
 
-private class FakeCheckoutGateway(private val failure: Throwable? = null) : CheckoutGateway {
+private class FakeCheckoutGateway(
+  private val failure: Throwable? = null,
+  private val paymentFailure: Throwable? = null,
+) : PurchaseGateway {
+  var paymentKey: String? = null
+  var paymentRequest: CreatePaymentIntentRequest? = null
+
   override suspend fun createOrder(request: CreateOrderRequest, token: String, idempotencyKey: String): CustomerOrder {
     failure?.let { throw it }
     return CustomerOrder("order-1", "created", 250000, "courier", null, request.deliveryAddress)
+  }
+
+  override suspend fun createPaymentIntent(
+    request: CreatePaymentIntentRequest,
+    token: String,
+    idempotencyKey: String,
+  ): PaymentIntent {
+    paymentFailure?.let { throw it }
+    paymentRequest = request
+    paymentKey = idempotencyKey
+    return PaymentIntent(
+      "intent-1", "mbank", request.orderId, "awaiting_payment", request.method.wireValue,
+      request.amount, "txn-1", "requires_action", "2026-07-13T02:00:00Z",
+      "/sandbox/payments/mbank/intent-1", "alistore-mbank://pay",
+    )
   }
 }
 

@@ -48,4 +48,36 @@ data class CustomerOrder(
   val fulfillmentType: String,
   val pickupPoint: String?,
   val deliveryAddress: String?,
+  val items: List<CustomerOrderItem> = emptyList(),
+  val createdAt: String? = null,
+)
+
+data class CustomerOrderItem(val sku: String, val qty: Int, val price: Int)
+
+enum class OnlinePaymentMethod(val wireValue: String) {
+  CARD("card"),
+  MBANK("qr_mbank"),
+  ODENGI("qr_odengi"),
+  INSTALLMENT("installment"),
+}
+
+data class CreatePaymentIntentRequest(
+  val orderId: String,
+  val method: OnlinePaymentMethod,
+  val amount: Int,
+  val returnUrl: String,
+)
+
+data class PaymentIntent(
+  val intentId: String,
+  val provider: String,
+  val orderId: String,
+  val orderStatus: String,
+  val method: String,
+  val amount: Int,
+  val txnId: String,
+  val status: String,
+  val expiresAt: String,
+  val paymentUrl: String,
+  val qrPayload: String?,
 )

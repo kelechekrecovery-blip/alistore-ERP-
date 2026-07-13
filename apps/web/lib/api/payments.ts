@@ -29,8 +29,11 @@ export function createPaymentIntent(input: {
   amount: number;
   returnUrl?: string;
   actor?: string;
-}, guestCapability: string): Promise<PaymentIntent> {
-  return postJson('/payments/intents', input, { 'x-guest-capability': guestCapability });
+}, guestCapability: string, idempotencyKey: string): Promise<PaymentIntent> {
+  return postJson('/payments/intents', input, {
+    'x-guest-capability': guestCapability,
+    'idempotency-key': idempotencyKey,
+  });
 }
 
 export function confirmSandboxPayment(input: {

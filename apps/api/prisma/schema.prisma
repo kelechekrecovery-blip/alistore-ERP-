@@ -339,6 +339,22 @@ model Payment {
   @@index([status, createdAt]) // dashboards/KPI/payroll filter by status + date window
 }
 
+model OnlinePaymentIntentCommand {
+  id             String        @id @default(cuid())
+  idempotencyKey String        @unique
+  customerId     String
+  orderId        String
+  method         PaymentMethod
+  amount         Int
+  returnUrl      String?
+  response       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([orderId])
+}
+
 model GiftCard {
   id             String         @id @default(cuid())
   code           String         @unique

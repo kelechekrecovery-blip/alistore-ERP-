@@ -79,6 +79,19 @@ class AuthSessionManagerTest {
     assertNull(store.tokens)
     assertEquals(listOf("refresh"), api.logoutCalls)
   }
+
+  @Test
+  fun explicitlyRefreshesAndPersistsSessionForActiveApiFlows() = runTest {
+    val store = FakeStore(AuthTokens("expired", "refresh-1"))
+    val api = FakeAuthGateway().apply { refreshed = AuthTokens("access-2", "refresh-2") }
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), store.tokens!!)
+
+    val refreshed = AuthSessionManager(api, store).refresh(state)
+
+    assertTrue(refreshed is AuthState.SignedIn)
+    assertEquals(AuthTokens("access-2", "refresh-2"), store.tokens)
+    assertEquals(listOf("refresh-1"), api.refreshCalls)
+  }
 }
 
 private class FakeStore(initial: AuthTokens? = null) : SessionStore {

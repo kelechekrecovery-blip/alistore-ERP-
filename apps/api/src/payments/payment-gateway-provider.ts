@@ -20,6 +20,7 @@ export interface PaymentIntentView {
 }
 
 export interface GatewayCreateIntentInput {
+  idempotencyKey?: string;
   orderId: string;
   orderStatus: OrderStatus;
   method: OnlinePaymentMethod;
