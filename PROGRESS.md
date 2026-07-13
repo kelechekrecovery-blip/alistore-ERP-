@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: replace Android/web Staff task placeholders with one server-authoritative operational task workflow.
+- Files changed: StaffTask Prisma model/migration; NestJS task DTO/service/controller/RBAC/Event Ledger; Android typed gateway, Compose task screen and JVM/API 36 regressions; web task client/error states; isolated Next E2E build directory; Playwright task lifecycle; backlog and readiness documentation.
+- Result: an admin/owner can assign a task to an active employee; only that authenticated employee can list or advance it through `open → in_progress → completed`. Foreign, revoked and stale-role access is rejected, illegal/repeated transitions conflict, and completion writes one Ledger event. Web Staff and Android Staff read and update the same PostgreSQL record, with loading, empty, error and retry states.
+- Checks run: Prisma format/generate and migration on development/test databases; API production build; targeted Staff task API 2/2; full API Jest 109/109 suites and 411/411 tests; web production build for 37 routes; targeted Staff Playwright lifecycle 1/1; full Playwright 22/22; Android Staff APK/JVM gate; full API 36 Compose 20/20; MediaStore visual `/tmp/alistore-staff-tasks-valid.png` inspected; `git diff --check`.
+- Outcome: shared Staff tasks are complete at software/emulator/browser level. iOS task parity, FCM/APNs routing and physical-device certification are not claimed.
+- Next step: add authenticated Android FCM token registration and push/deep-link routing for Staff, then begin Courier assignment/delivery/COD.
+
+## 2026-07-13
+
 - Task: complete Android Staff Customer 360 with guarded warranty/support operations and close the remaining active-staff read gap.
 - Files changed: customer API authorization/module/security test; Android typed models/API/gateway; Customer 360 Compose screen/navigation; JVM and API 36 UI tests; backlog, gap map and Android readiness docs.
 - Result: Staff can search an internal customer ID and inspect server-masked profile data, LTV, purchases, debt, recent orders, warranties and support tickets. Warehouse/admin roles can advance warranty cases; admin/owner roles can transition or escalate support. Every action sends the stored staff JWT, reloads server-authoritative state and surfaces permission/error/empty/loading states. Revoked staff and stale-role tokens now fail Customer 360 reads.
