@@ -5,6 +5,7 @@ import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
+import { OutboxService } from '../outbox/outbox.service';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
@@ -14,6 +15,7 @@ export class CourierService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   listMine(courierId: string) {
@@ -82,6 +84,20 @@ export class CourierService {
           data: { status: 'courier_assigned', courierId: dto.courierId, courierRunId: run.id },
         });
         if (updated.count !== 1) throw new ConflictError('order_assignment_race', `Заказ ${order.id} уже назначен`);
+      }
+      if (orderIds.length > 0) {
+        await this.outbox.enqueueOnTx(tx, {
+          channel: 'push',
+          recipient: dto.courierId,
+          template: 'courier_run_assigned',
+          payload: {
+            title: 'Новый маршрут AliStore',
+            body: `${orderIds.length} доставок · COD ${run.codTotal} сом`,
+            runId: run.id,
+            orderIds,
+            deepLink: `alistore-courier://deliveries/${orderIds[0]}`,
+          },
+        });
       }
       return { result: { ...run, orderIds }, events };
     });

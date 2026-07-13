@@ -21,6 +21,16 @@ class StaffPushRouteTest {
     assertNull(parseStaffPushRoute("alistore-staff://unknown/item-1"))
   }
 
+  @Test fun routesOnlyCourierDeliveryDeepLinks() {
+    assertEquals(
+      CourierPushRoute("order/encoded"),
+      parseCourierPushRoute("alistore-courier://deliveries/order%2Fencoded"),
+    )
+    assertNull(parseCourierPushRoute("alistore-courier://deliveries"))
+    assertNull(parseCourierPushRoute("alistore-courier://orders/order-1"))
+    assertNull(parseCourierPushRoute("https://example.com/deliveries/order-1"))
+  }
+
   @Test fun pushRegistrationSendsTheFcmTokenUnderTheStoredStaffJwt() = runTest {
     var method = ""
     var authorization = ""

@@ -78,7 +78,7 @@ fun AliStoreApp(
     return
   }
   if (role == AppRole.COURIER) {
-    CourierApp(apiBaseUrl)
+    CourierApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, staffPushRegistrar)
     return
   }
   if (role == AppRole.POS) {

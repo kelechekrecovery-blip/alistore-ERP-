@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: complete Android Courier Evidence and push/deep-link routing against the shared API/ERP contracts.
+- Files changed: Courier route/Evidence Compose UI; courier Firebase registrar/service/manifest/release guard; scoped deep-link parser; transactional assignment outbox; API/JVM/Compose tests; backlog and readiness documentation.
+- Result: an ERP courier assignment now commits its Order/CourierRun/Event Ledger changes and durable push notification in one transaction. Android Courier registers its FCM token under the stored courier staff JWT, routes only `alistore-courier://deliveries/{orderId}` notifications, focuses the assigned delivery and uploads camera/gallery proof to the private order Evidence Vault without trusting a client actor or status.
+- Checks run: targeted courier/Evidence/RBAC Jest 14/14; full `npm run mvp:verify` (Prisma, API/Web production builds, mobile typecheck, API Jest 110/110 suites and 423/423 tests, Playwright 22/22, secret-safe external readiness report); four-APK Android build; all-module JVM tests and Lint; existing Android API 36 connected Compose suite 23/23; targeted Courier Compose login/Evidence suite 2/2; `git diff --check`.
+- Outcome: Android Courier software/emulator parity is complete for assignment, route, Evidence, delivery/failure, COD, offline replay and push routing. Live FCM delivery and physical maps/camera/network certification remain external device/credential gates.
+- Next step: close the next software-owned gap, server-authoritative loyalty earning/redemption, while live cloud/provider/device certification waits for owner credentials and hardware.
+
+## 2026-07-13
+
 - Task: complete the native Android POS software vertical against the shared ERP/API contracts.
 - Files changed: Android POS/core sale, shift, scanner, offline queue, receipt and after-sale screens; POS/unit/exchange API services and DTOs; integration/unit tests; backlog/readiness/gap-map documentation.
 - Result: the cashier now opens and reconciles a server-owned shift, scans SKU or exact IMEI through keyboard/camera input, sells only the API-validated serialized unit, recovers queued approvals without changing the original sale key, loads the canonical server receipt/ESC-POS payload, inspects payments, advances returns, requests approval-gated refunds and executes an atomic idempotent exchange. A repeated exchange returns the original result and cannot create a second order or stock movement.

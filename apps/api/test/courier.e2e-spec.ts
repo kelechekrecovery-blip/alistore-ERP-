@@ -2,6 +2,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { CourierService } from '../src/courier/courier.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
+import { OutboxService } from '../src/outbox/outbox.service';
 
 /**
  * Courier COD handover (invariant #4): COD is not money-closed until the courier
@@ -16,7 +17,8 @@ describe('Courier COD handover (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    courier = new CourierService(prisma, new AuditService(prisma));
+    const outbox = new OutboxService(prisma, { deliver: async () => undefined });
+    courier = new CourierService(prisma, new AuditService(prisma), outbox);
   });
 
   afterAll(async () => {
@@ -24,6 +26,7 @@ describe('Courier COD handover (integration)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.outboxMessage.deleteMany();
     await prisma.courierCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
@@ -125,6 +128,14 @@ describe('Courier COD handover (integration)', () => {
     const mine = await courier.listMine(staff.id);
     expect(mine).toHaveLength(1);
     expect(mine[0]).toMatchObject({ id: order.id, status: 'courier_assigned', courierRunId: run.id });
+    const push = await prisma.outboxMessage.findFirst({
+      where: { channel: 'push', recipient: staff.id, template: 'courier_run_assigned' },
+    });
+    expect(push?.payload).toMatchObject({
+      runId: run.id,
+      orderIds: [order.id],
+      deepLink: `alistore-courier://deliveries/${order.id}`,
+    });
   });
 
   it('replays delivery commands once and reconciles COD before handover', async () => {
