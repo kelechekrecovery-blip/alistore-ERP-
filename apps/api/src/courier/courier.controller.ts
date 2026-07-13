@@ -1,7 +1,9 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Post,
@@ -19,7 +21,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { CourierService } from './courier.service';
-import { CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
+import { CompleteDeliveryDto, CreateRunDto, HandoverDto } from './courier.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -40,8 +42,8 @@ export class CourierController {
   @ApiNotFoundResponse({ description: 'Run does not exist.' })
   @Get('runs/:id')
   @RequirePermission('courier', 'read')
-  async getRun(@Param('id') id: string) {
-    const run = await this.courier.getRun(id);
+  async getRun(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    const run = await this.courier.getRun(id, user.role === 'courier' ? user.customerId : undefined);
     if (!run) throw new NotFoundException(`Курьерский рейс ${id} не найден`);
     return run;
   }
@@ -52,6 +54,37 @@ export class CourierController {
   @RequirePermission('courier', 'assign')
   createRun(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateRunDto) {
     return this.courier.createRun(dto, user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Assigned deliveries for the active courier JWT' })
+  @ApiOkResponse({ description: 'Only deliveries assigned to the current courier.' })
+  @Get('me/deliveries')
+  @RequirePermission('courier', 'read')
+  listMine(@CurrentUser() user: AuthPrincipal) {
+    return this.courier.listMine(user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Start an assigned delivery' })
+  @Post('orders/:id/start')
+  @RequirePermission('orders', 'transition')
+  start(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.courier.startDelivery(id, user.customerId, requireIdempotencyKey(key));
+  }
+
+  @ApiOperation({ summary: 'Complete delivery and record server-reconciled COD' })
+  @Post('orders/:id/deliver')
+  @RequirePermission('orders', 'transition')
+  deliver(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CompleteDeliveryDto,
+  ) {
+    return this.courier.completeDelivery(id, dto, user.customerId, requireIdempotencyKey(key));
   }
 
   @ApiOperation({
@@ -65,6 +98,13 @@ export class CourierController {
   @Post('handover')
   @RequirePermission('courier', 'handover')
   handover(@CurrentUser() user: AuthPrincipal, @Body() dto: HandoverDto) {
-    return this.courier.handover(dto, user.customerId);
+    return this.courier.handover(dto, user.customerId, user.role === 'courier' ? user.customerId : undefined);
   }
+}
+
+function requireIdempotencyKey(value: string | undefined): string {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -29,7 +29,15 @@ export class DeliveriesController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown order.' })
   @Post(':id/fail')
   @RequirePermission('delivery', 'fail')
-  fail(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: FailDeliveryDto) {
-    return this.courier.failDelivery(id, dto, user.customerId);
+  fail(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: FailDeliveryDto,
+  ) {
+    const key = idempotencyKey?.trim();
+    if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+    if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+    return this.courier.failDelivery(id, dto, user.customerId, key);
   }
 }

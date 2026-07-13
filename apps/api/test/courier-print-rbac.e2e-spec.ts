@@ -20,6 +20,7 @@ describe('Courier and print/export RBAC', () => {
   let cashierId: string;
   let courierToken: string;
   let courierId: string;
+  let secondCourierToken: string;
   let sellerToken: string;
   let warehouseToken: string;
   let warehouseId: string;
@@ -45,8 +46,8 @@ describe('Courier and print/export RBAC', () => {
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
 
-    const createSession = async (role: 'cashier' | 'courier' | 'seller' | 'warehouse') => {
-      const username = `${role}-print-${RUN}`;
+    const createSession = async (role: 'cashier' | 'courier' | 'seller' | 'warehouse', suffix = '') => {
+      const username = `${role}${suffix}-print-${RUN}`;
       const staff = await staffAuth.createStaff(username, 'pass', role);
       const token = (await staffAuth.login(username, 'pass')).accessToken;
       return { id: staff.id, token };
@@ -59,6 +60,7 @@ describe('Courier and print/export RBAC', () => {
     const courier = await createSession('courier');
     courierId = courier.id;
     courierToken = courier.token;
+    secondCourierToken = (await createSession('courier', '-second')).token;
 
     const seller = await createSession('seller');
     sellerToken = seller.token;
@@ -73,10 +75,12 @@ describe('Courier and print/export RBAC', () => {
   });
 
   beforeEach(async () => {
+    await prisma.courierCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
-    await prisma.courierRun.deleteMany();
+    await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.courierRun.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
@@ -84,19 +88,19 @@ describe('Courier and print/export RBAC', () => {
   it('guards courier assignment and COD handover by role and staff actor', async () => {
     await request(app.getHttpServer())
       .post('/courier/runs')
-      .send({ courierId: `courier-${RUN}`, codTotal: 1000 })
+      .send({ courierId, codTotal: 1000 })
       .expect(401);
 
     await request(app.getHttpServer())
       .post('/courier/runs')
       .set('Authorization', `Bearer ${sellerToken}`)
-      .send({ courierId: `courier-${RUN}`, codTotal: 1000 })
+      .send({ courierId, codTotal: 1000 })
       .expect(403);
 
     const run = await request(app.getHttpServer())
       .post('/courier/runs')
       .set('Authorization', `Bearer ${warehouseToken}`)
-      .send({ courierId: `courier-${RUN}`, codTotal: 1000 })
+      .send({ courierId, codTotal: 1000 })
       .expect(201);
 
     const assigned = await prisma.auditEvent.findFirst({ where: { type: 'delivery.assigned' } });
@@ -123,18 +127,46 @@ describe('Courier and print/export RBAC', () => {
       data: { phone: `+9967011${RUN}`, name: 'Delivery RBAC' },
     });
     const order = await prisma.order.create({
-      data: { customerId: customer.id, status: 'out_for_delivery', channel: 'web', total: 1000 },
+      data: {
+        customerId: customer.id,
+        status: 'out_for_delivery',
+        channel: 'web',
+        fulfillmentType: 'courier',
+        courierId,
+        total: 1000,
+      },
     });
 
     await request(app.getHttpServer())
       .post(`/deliveries/${order.id}/fail`)
       .set('Authorization', `Bearer ${sellerToken}`)
+      .set('Idempotency-Key', `seller-fail-${RUN}`)
       .send({ reason: 'client unavailable' })
       .expect(403);
 
     await request(app.getHttpServer())
       .post(`/deliveries/${order.id}/fail`)
+      .set('Authorization', `Bearer ${secondCourierToken}`)
+      .set('Idempotency-Key', `foreign-courier-fail-${RUN}`)
+      .send({ reason: 'client unavailable' })
+      .expect(403);
+
+    const mine = await request(app.getHttpServer())
+      .get('/courier/me/deliveries')
       .set('Authorization', `Bearer ${courierToken}`)
+      .expect(200);
+    expect(mine.body).toHaveLength(1);
+
+    const foreign = await request(app.getHttpServer())
+      .get('/courier/me/deliveries')
+      .set('Authorization', `Bearer ${secondCourierToken}`)
+      .expect(200);
+    expect(foreign.body).toHaveLength(0);
+
+    await request(app.getHttpServer())
+      .post(`/deliveries/${order.id}/fail`)
+      .set('Authorization', `Bearer ${courierToken}`)
+      .set('Idempotency-Key', `courier-fail-${RUN}`)
       .send({ reason: 'client unavailable' })
       .expect(201);
 

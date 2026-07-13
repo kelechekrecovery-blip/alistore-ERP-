@@ -6,7 +6,10 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import java.util.UUID
 
-class OfflineQueueDb(context: Context) : SQLiteOpenHelper(context, "alistore-offline.db", null, 2), MutationQueue {
+class OfflineQueueDb(
+  context: Context,
+  databaseName: String = "alistore-offline.db",
+) : SQLiteOpenHelper(context, databaseName, null, 2), MutationQueue {
   override fun onCreate(db: SQLiteDatabase) {
     db.execSQL("""
       CREATE TABLE pending_mutation (

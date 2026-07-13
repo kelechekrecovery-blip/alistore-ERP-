@@ -76,3 +76,12 @@ the active staff JWT, receives task notifications and routes `alistore-staff://`
 Tasks, Orders, Customer 360, warranty or support. A Staff Release build fails fast without
 both that ignored Firebase file and an HTTPS API URL. Live FCM delivery, camera focus and
 barcode recognition still require physical-device certification.
+
+The Courier APK uses a separate Keystore staff session and accepts only an active
+`courier` role. ERP assigns eligible delivery orders to a courier run; the app then
+loads only JWT-owned assignments, opens map/phone handoffs and invokes dedicated
+start, deliver and fail endpoints. Outstanding COD is calculated from server payment
+records, collection increments the run atomically and handover is blocked until the
+run reconciles. Network failures enter a courier-only SQLite/WorkManager queue that
+retains the original idempotency key across process restart. Evidence photos,
+FCM/deep-link routing and physical maps/camera/network QA remain release gates.

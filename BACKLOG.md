@@ -3,7 +3,7 @@
 ## Next
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
-- Close remaining native Android feature parity in vertical flows: final Client provider/device smoke; Staff physical FCM/scanner/camera certification; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
+- Close remaining native Android feature parity in vertical flows: final Client provider/device smoke; Staff physical FCM/scanner/camera certification; Courier Evidence/push/physical maps-camera certification; POS ticket/split payment/approval/offline replay.
 - Make loyalty earning and checkout redemption server-authoritative: validate available balance under a row lock, write atomic debit/credit entries with order/payment references, prevent replay/double spend, remove the web cart's fixed demo balance and add reconciliation E2E.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
@@ -22,6 +22,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Replace the Android Courier placeholder with an owner-bound delivery/COD vertical: dispatcher assignment to active courier staff, JWT-owned route list, server-only start/deliver/fail transitions, server-reconciled COD, atomic Event Ledger events, exact idempotency replay, Keystore session, map/call handoff and isolated SQLite/WorkManager recovery.
 - Add native Android Staff FCM delivery and routing: staff-JWT token registration, server-side FCM HTTP v1 adapter with service-account OAuth and dead-token cleanup, transactional task notifications, notification permission/channel, task/customer deep links, release credential fail-fast and API 36 Compose coverage.
 - Replace local Staff task checkboxes with a shared operational task contour: PostgreSQL assignments, active-staff ownership, admin/owner creation, guarded self-transitions, Event Ledger, web and Android clients, API 36 Compose visual coverage and browser E2E.
 - Add Android Staff Customer 360, warranty and support operations: active-staff reads, masked PII, order/spend/debt aggregates, role-gated server state transitions, support escalation, API 36 Compose/visual regression and revoked/stale-role IDOR coverage.

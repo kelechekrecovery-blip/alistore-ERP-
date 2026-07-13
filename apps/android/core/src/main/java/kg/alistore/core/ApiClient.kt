@@ -10,7 +10,7 @@ import org.json.JSONObject
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
   StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway,
-  PushRegistrationGateway {
+  PushRegistrationGateway, CourierGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -201,6 +201,40 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     )
   }
 
+  override suspend fun courierDeliveries(token: String): List<CourierDelivery> =
+    requestArray("courier/me/deliveries", token).let { array ->
+      buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).courierDelivery()) }
+    }
+
+  override suspend fun startDelivery(orderId: String, token: String, idempotencyKey: String): CourierDelivery =
+    request("courier/orders/$orderId/start", "POST", JSONObject(), token, idempotencyKey = idempotencyKey).courierDelivery()
+
+  override suspend fun completeDelivery(
+    orderId: String,
+    codAmount: Int,
+    token: String,
+    idempotencyKey: String,
+  ): CourierDelivery = request(
+    "courier/orders/$orderId/deliver",
+    "POST",
+    JSONObject().put("codAmount", codAmount),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).courierDelivery()
+
+  override suspend fun failDelivery(orderId: String, reason: String, token: String, idempotencyKey: String) {
+    request(
+      "deliveries/$orderId/fail",
+      "POST",
+      JSONObject().put("reason", reason),
+      token,
+      idempotencyKey = idempotencyKey,
+    )
+  }
+
+  override suspend fun handoverCourierRun(runId: String, amount: Int, token: String): CourierRunSummary =
+    request("courier/handover", "POST", JSONObject().put("runId", runId).put("amount", amount), token).courierRun()
+
   override suspend fun uploadEvidence(
     entityType: String,
     entityId: String,
@@ -377,6 +411,37 @@ private fun JSONObject.staffSession() = StaffSession(
 private fun JSONObject.staffPrincipal() = StaffPrincipal(
   id = getString("id"), username = getString("username"), role = getString("role"), active = getBoolean("active"),
   totpEnabled = optBoolean("totpEnabled"), type = optString("typ", "staff"),
+)
+
+private fun JSONObject.courierDelivery(): CourierDelivery {
+  val payments = optJSONArray("payments")
+  var paid = 0
+  if (payments != null) for (index in 0 until payments.length()) payments.getJSONObject(index).let { payment ->
+    if (payment.optString("status") in setOf("received", "reconciled")) paid += payment.optInt("amount").coerceAtLeast(0)
+  }
+  return CourierDelivery(
+    id = getString("id"),
+    status = getString("status"),
+    total = getInt("total"),
+    address = nullableString("deliveryAddress"),
+    slot = nullableString("deliverySlot"),
+    customer = optJSONObject("customer")?.let { CourierCustomer(it.optString("name"), it.optString("phone")) }
+      ?: CourierCustomer("Клиент", ""),
+    items = optJSONArray("items")?.let { array -> buildList {
+      for (index in 0 until array.length()) array.getJSONObject(index).let { item ->
+        add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price"), item.nullableString("imei")))
+      }
+    } }.orEmpty(),
+    outstandingCod = (getInt("total") - paid).coerceAtLeast(0),
+    run = optJSONObject("courierRun")?.courierRun(),
+  )
+}
+
+private fun JSONObject.courierRun() = CourierRunSummary(
+  id = getString("id"),
+  codTotal = getInt("codTotal"),
+  collectedTotal = getInt("collectedTotal"),
+  handedOver = getBoolean("handedOver"),
 )
 
 private fun JSONObject.cashShift() = CashShift(

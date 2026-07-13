@@ -72,6 +72,27 @@ data class StaffPrincipal(
   val type: String,
 )
 
+data class CourierCustomer(val name: String, val phone: String)
+
+data class CourierRunSummary(
+  val id: String,
+  val codTotal: Int,
+  val collectedTotal: Int,
+  val handedOver: Boolean,
+)
+
+data class CourierDelivery(
+  val id: String,
+  val status: String,
+  val total: Int,
+  val address: String?,
+  val slot: String?,
+  val customer: CourierCustomer,
+  val items: List<CustomerOrderItem>,
+  val outstandingCod: Int,
+  val run: CourierRunSummary?,
+)
+
 data class ShiftPayment(
   val id: String,
   val amount: Int,

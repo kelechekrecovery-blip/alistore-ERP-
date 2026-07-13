@@ -10,7 +10,7 @@ been built or tested; it does not mean external production certification is comp
 |---|---|---|---|
 | Next.js storefront + ERP/admin | 37 routes, production build and 22-flow Playwright coverage | Ready | `npm run build -w @alistore/web`, full Playwright |
 | NestJS modular monolith | 47 domain modules behind one API | Ready | API build and 110 Jest suites |
-| PostgreSQL + Prisma | 32 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
+| PostgreSQL + Prisma | 33 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
 | Append-only Event Ledger | `AuditService.transaction` commits mutations and events together | Ready | ledger/invariant/concurrency suites |
 | Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
 | Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |
@@ -29,7 +29,7 @@ is not the final App Store/Google Play artifact.
 |---|---|---|---|
 | Client | Native target builds and runs; live catalog, cart/quantity, pickup/courier checkout, JWT-owned idempotent order/payment intents, persistent SwiftData order queue with foreground replay/conflict/manual retry, card/MBank/O!Деньги/installment handoff, payment-return reconciliation, OTP/Keychain refresh, protected orders, owned-device warranty, APNs permission/token/customer registry and typed API | Native Compose APK builds with prototype-aligned home/catalog/favorites/cart/account shell; typed OTP and encrypted refreshable session; stock-capped quantity cart; JWT-owned pickup/courier checkout with server-authoritative pricing; stable order/payment/warranty/support/return/address idempotency; SQLite queued/syncing/conflict/failed replay; card/MBank/O!Деньги/installment handoff; payment-return routing; protected order history; owned-device warranty; owner-scoped support/returns; server-backed loyalty, coupons, addresses, profile and notification consent/preferences | iOS live APNs delivery plus final visual/device smoke; Android final provider/device smoke; server-authoritative loyalty redemption is a separate money-flow task |
 | Staff | Native target builds; staff login; live order fulfillment queue; Customer 360 and guarded warranty SLA; camera EAN/QR/Code128 scanner with manual fallback; camera/photo Evidence Vault upload for all supported entity types; live reconciled shift lifecycle through staff JWT and RBAC | Native Compose APK with Keystore staff session restore, active-staff validation, RBAC order queues/fulfillment actions, idempotent cash-shift reconciliation, Customer 360 with masked PII/spend/debt, role-gated warranty/support actions, CameraX/ML Kit scanner, staff-JWT Evidence upload, PostgreSQL-backed assigned tasks and staff-bound FCM registration/deep-link routing | iOS shared task UI and APNs routing; Android physical FCM/scanner/camera certification |
-| Courier | Native target builds; staff login and route/COD shell | Separate Compose APK builds with role shell and shared secure/offline core | assigned runs, map/navigation, delivery transitions, evidence, COD handover |
+| Courier | Native target builds; staff login and route/COD shell | Native Compose app with courier-only Keystore session, JWT-owned assigned routes, customer/address/slot/items, map and phone handoff, dedicated start/deliver/fail transitions, server-reconciled COD handover and isolated SQLite/WorkManager replay with stable idempotency keys | iOS full flow; Android Evidence photo, push/deep links and physical maps/camera/network certification |
 | POS | Native target builds; staff login and sale/offline shell | Separate Compose APK builds with role shell and shared secure/offline core | catalog sync, scanner, ticket, split tender, approval, receipt/hardware, replay |
 
 Shared iOS foundation:
@@ -50,14 +50,15 @@ Shared Android foundation:
 - SQLite-backed persistent mutation queue with unique idempotency keys, explicit
   queued/syncing/conflict/failed states and a token-refreshing WorkManager replay worker.
 - Custom deep-link schemes, emulator-local Debug API and cleartext disabled in Release.
-- All four Debug APKs build; unit tests, Android Lint and 21 Client/Staff Compose UI tests pass.
+- All four Debug APKs build; unit tests, Android Lint and 22 Client/Staff/Courier Compose UI tests pass.
   Client OTP/login, process-restart session restore, cart/checkout, payment-return routing, server order status, owned-device warranty, support, returns, loyalty, address and settings UI are verified on Android API 36.
 - Staff login/session ownership, order-queue transitions, retry-safe cash-shift reconciliation, Customer 360, guarded warranty/support operations, camera scanner, staff-authorized Evidence upload, shared assigned-task transitions and FCM deep-link routing are verified on Android API 36. Live FCM delivery and physical-device camera/scanner certification remain explicitly open.
+- Courier assignment ownership, route listing, start/deliver/fail, exact command replay, COD collection/handover and offline queue persistence are verified through API integration/RBAC tests plus Android JVM and API 36 Compose gates. Evidence photo, push/deep-link routing and physical maps/camera/network certification remain open.
 - Customer loyalty balance/coupons/history, address book and profile/preferences are shared by web and Android through owner-scoped NestJS endpoints. A browser regression proves a server-created balance/coupon and a UI-created primary address are visible in the cabinet and checkout without relying on local storage.
 
 ## Execution order
 
-1. Native parity wave: Client final provider/device smoke; Staff iOS task/push parity and Android physical certification; Courier delivery/COD;
+1. Native parity wave: Client final provider/device smoke; Staff iOS task/push parity and Android physical certification; Courier iOS parity plus Android Evidence/push/device certification;
    POS sale/offline sync. Each flow must run against the existing Nest contracts.
 2. Complete BullMQ migration: move reservation/debt schedulers after parity tests,
    add dead-letter visibility and job metrics. Keep PostgreSQL/Event Ledger as

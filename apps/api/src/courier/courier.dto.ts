@@ -1,4 +1,4 @@
-import { IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateRunDto {
@@ -11,6 +11,10 @@ export class CreateRunDto {
     description: 'Total cash-on-delivery the courier is expected to collect and hand over',
   })
   @IsInt() @Min(0) codTotal!: number;
+
+  @ApiPropertyOptional({ type: [String], description: 'Courier-fulfillment orders assigned to this run.' })
+  @IsOptional() @IsArray() @ArrayMaxSize(100) @IsString({ each: true })
+  orderIds?: string[];
 }
 
 export class HandoverDto {
@@ -30,9 +34,14 @@ export class HandoverDto {
 
 export class FailDeliveryDto {
   @ApiProperty({ example: 'адрес не найден, клиент недоступен' })
-  @IsString() reason!: string;
+  @IsString() @MaxLength(500) reason!: string;
 
   /** Evidence (photo refs, notes) required for a failed delivery per Evidence Vault. */
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsOptional() @IsObject() evidence?: Record<string, unknown>;
+}
+
+export class CompleteDeliveryDto {
+  @ApiProperty({ minimum: 0, example: 109900, description: 'Cash collected at delivery; API verifies the outstanding order amount.' })
+  @IsInt() @Min(0) codAmount!: number;
 }

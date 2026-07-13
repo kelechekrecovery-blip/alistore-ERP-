@@ -353,6 +353,10 @@ model Order {
   pickupPoint     String?
   deliveryAddress String?
   deliverySlot    String?
+  courierId       String?
+  courier         StaffUser?  @relation("OrderCourier", fields: [courierId], references: [id])
+  courierRunId    String?
+  courierRun      CourierRun? @relation(fields: [courierRunId], references: [id])
   pickupCode      String?
   total           Int
   items           OrderItem[]
@@ -365,6 +369,8 @@ model Order {
   @@index([status])
   @@index([fulfillmentType, status])
   @@index([pickupPoint, status])
+  @@index([courierId, status])
+  @@index([courierRunId])
 }
 
 model OrderItem {
@@ -654,14 +660,30 @@ model TradeInDevice {
 }
 
 model CourierRun {
-  id         String   @id @default(cuid())
-  courierId  String
-  codTotal   Int // COD не сдан >24ч → Risk
-  handedOver Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  courierId      String
+  codTotal       Int // COD не сдан >24ч → Risk
+  handedOver     Boolean  @default(false)
+  collectedTotal Int      @default(0)
+  orders         Order[]
+  createdAt      DateTime @default(now())
 
   @@index([courierId])
   @@index([handedOver])
+}
+
+model CourierCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  courierId      String
+  orderId        String
+  action         String
+  payload        Json
+  response       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([courierId, createdAt])
+  @@index([orderId, createdAt])
 }
 
 model Approval {
@@ -865,6 +887,7 @@ model StaffUser {
   pushTokens    PushToken[]
   assignedTasks StaffTask[] @relation("StaffTaskAssignee")
   createdTasks  StaffTask[] @relation("StaffTaskCreator")
+  courierOrders Order[]     @relation("OrderCourier")
   createdAt     DateTime    @default(now())
 
   @@index([role])

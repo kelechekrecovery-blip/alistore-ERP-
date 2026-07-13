@@ -77,6 +77,10 @@ fun AliStoreApp(
     StaffApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, staffPushRegistrar)
     return
   }
+  if (role == AppRole.COURIER) {
+    CourierApp(apiBaseUrl)
+    return
+  }
   RoleApp(role)
 }
 

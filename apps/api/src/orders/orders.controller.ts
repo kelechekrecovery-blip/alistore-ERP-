@@ -181,6 +181,10 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('orders', 'transition')
   async transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: TransitionDto) {
-    return this.orders.transition(id, dto.to, await requireActiveStaff(user, this.staffAuth));
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    if (user.role === 'courier') {
+      throw new ForbiddenException('Курьер меняет доставку только через courier endpoints с COD и idempotency');
+    }
+    return this.orders.transition(id, dto.to, staffId);
   }
 }

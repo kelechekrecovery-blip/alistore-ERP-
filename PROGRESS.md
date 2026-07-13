@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: replace the Android Courier role placeholder with the owner-bound assignment, delivery and COD vertical shared with ERP/API.
+- Files changed: courier/order Prisma ownership and command schema plus migration; dedicated Nest courier list/start/deliver/fail/COD contracts; generic courier transition bypass guard; integration/RBAC regressions; Android typed gateway/models, courier-only Keystore session, route/COD/profile Compose UI, map/call intents, isolated SQLite/WorkManager replay, JVM/UI tests; backlog and readiness tracking.
+- Result: ERP dispatch can assign eligible courier orders only to an active courier and the API derives outstanding COD from settled payments. A courier JWT lists and mutates only its own assignments; start, deliver and fail commands persist exact idempotency responses in the same transaction as status/Event Ledger changes. Android Courier now supports login/session restore, route/address/slot/items, navigation and calling, online/offline start/deliver/fail, COD collection and handover, retry visibility and profile/logout without locally assigning authoritative status.
+- Checks run: Prisma format/validate/generate; migration on development DB and schema sync on isolated test DB; targeted courier integration/RBAC 10/10; full API Jest 110/110 suites and 419/419 tests; API production build; Android core JVM tests and Lint; all four Debug APK builds; Android all-module unit/Lint gate; Android API 36 Compose 22/22; `git diff --check`.
+- Outcome: Android Courier assignment/delivery/COD is accepted at software/emulator level and integrates with the same PostgreSQL Order, Payment, CourierRun and Event Ledger records used by ERP/web. Evidence photo, courier push/deep links and physical maps/camera/network smoke remain release gates; full Courier store readiness is not claimed.
+- Next step: replace the Android POS placeholder with catalog/ticket, split tender, approval/2FA, shift, receipt and isolated offline replay using the existing POS API invariants.
+
+## 2026-07-13
+
 - Task: complete authenticated Android Staff FCM registration, delivery and deep-link routing.
 - Files changed: FCM HTTP v1 outbox transport and readiness contract; transactional Staff task notification; native token registry validation; Android Firebase wiring, notification service/permission/channel, secure staff-session registration and route parser; API/JVM/Compose tests; release fail-fast and readiness documentation.
 - Result: creating an assigned Staff task now writes its Ledger mutation and durable push outbox message atomically. The worker resolves enabled Android tokens by staff/customer ownership, authenticates to FCM HTTP v1 with a short-lived service-account OAuth assertion, sends string-only scoped data, disables `UNREGISTERED` tokens and returns temporary provider failures for outbox retry. Staff registers only under an active stored staff JWT and notification taps route to Tasks, Orders, Customer 360, warranty or support without trusting a client status mutation.
