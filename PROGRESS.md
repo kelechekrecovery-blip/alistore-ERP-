@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: complete Android Staff barcode/IMEI scanning and Evidence Vault capture/upload.
+- Files changed: Android CameraX/ML Kit dependencies and camera permission; Staff scanner/Evidence Compose screen; staff-specific multipart gateway; JVM and API 36 Compose/camera regressions; Android readme, architecture gap map and backlog tracking.
+- Result: Android Staff now scans EAN-8, EAN-13, Code128 and QR through a lifecycle-bound CameraX analyzer with a bundled offline ML Kit model, accepts manual IMEI/reader input, and maps the value into an Evidence entity. Staff can choose all seven supported entity types, add a label, capture/select a photo and upload it with the stored staff JWT; the existing API validates the entity, derives the actor and writes `evidence.attached` to Event Ledger.
+- Checks run: targeted Staff APK compile; scanner JVM test; targeted Compose upload and API 36 camera open/close smoke; all four Debug APK builds; all-module Android unit tests and Lint; full API 36 Compose suite 16/16; original-resolution `/tmp/alistore-staff-scanner-fixed2.png` inspected, with keyboard and dark-theme contrast defects fixed; `git diff --check`.
+- Outcome: feature commit `20b4615`; Android Staff scanner/Evidence is accepted at software/emulator level and shares the same NestJS/PostgreSQL Evidence contract as iOS/web operations. Physical-device camera focus, real barcode recognition and photo quality remain a release certification gate; Customer 360, support/warranty actions, tasks and push remain open.
+- Next step: implement Android Staff Customer 360 plus guarded warranty/support actions, then tasks and push routing.
+
+## 2026-07-13
+
 - Task: replace the Android Staff placeholder with the first authenticated ERP App operational vertical.
 - Files changed: cash-shift Prisma idempotency migration and Nest controller/service; concurrent shift regressions; Android staff session models/manager/Keystore binding; typed staff/shift/order API; Compose login, home, order queue and shift reconciliation screens; JVM/Compose tests and readiness/backlog documentation.
 - Result: Android Staff now restores an encrypted staff JWT only after `/staff-auth/me` confirms an active employee, loads RBAC-filtered server order queues, performs guarded fulfillment transitions and opens/closes the same cash shifts used by web POS/ERP. Exact shift retries preserve one idempotency key, concurrent commands create one shift and one Event Ledger event, and discrepancies require a reason. Scanner is deliberately marked pending rather than simulated.

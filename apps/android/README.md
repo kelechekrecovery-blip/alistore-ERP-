@@ -65,5 +65,8 @@ working from a stale local role. Its order queue reads the same guarded order st
 machine used by web ERP/Staff, and its shift screen opens, reloads and reconciles the
 same cash shifts used by POS. Open/close retries retain a stable idempotency key and
 cash discrepancies require a reason before the API writes the result to Event Ledger.
-Scanner, tasks, Customer 360, support/warranty, Evidence capture and push remain the
-next Android Staff parity wave.
+The Scanner tab uses bundled ML Kit over CameraX for EAN-8, EAN-13, Code128 and QR,
+keeps a manual IMEI fallback, and attaches camera/gallery evidence to any supported
+operation through the same staff JWT and server-derived Ledger actor. Tasks, Customer
+360, support/warranty actions and push remain the next Android Staff parity wave;
+real camera focus and barcode recognition still require physical-device certification.
