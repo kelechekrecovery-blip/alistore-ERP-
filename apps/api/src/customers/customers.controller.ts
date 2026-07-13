@@ -30,11 +30,15 @@ import type { AuthPrincipal } from '../auth/jwt.strategy';
 import type { Customer } from '@prisma/client';
 import type { CustomerOverview } from './customer-overview';
 import { issueGuestCheckoutCapability } from '../auth/guest-capability';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 @ApiTags('customers')
 @Controller('customers')
 export class CustomersController {
-  constructor(private readonly customers: CustomersService) {}
+  constructor(
+    private readonly customers: CustomersService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @Get('me/loyalty')
   @UseGuards(JwtAuthGuard)
@@ -110,7 +114,7 @@ export class CustomersController {
   @Get(':id/overview')
   @UseGuards(JwtAuthGuard)
   async overview(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
-    this.assertCanReadCustomer(user, id);
+    await this.assertCanReadCustomer(user, id);
     return this.maskOverview(await this.customers.overview(id), user);
   }
 
@@ -121,7 +125,7 @@ export class CustomersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async get(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
-    this.assertCanReadCustomer(user, id);
+    await this.assertCanReadCustomer(user, id);
     const customer = await this.customers.get(id);
     if (!customer) throw new NotFoundException(`Клиент ${id} не найден`);
     return this.maskCustomer(customer, user);
@@ -158,9 +162,15 @@ export class CustomersController {
   }
 
   /** A customer may read only their own profile; any authenticated staff may read any. */
-  private assertCanReadCustomer(user: AuthPrincipal, id: string): void {
+  private async assertCanReadCustomer(user: AuthPrincipal, id: string): Promise<void> {
     if (user.typ === 'customer' && user.customerId !== id) {
       throw new ForbiddenException('Нельзя смотреть профиль другого клиента');
+    }
+    if (user.typ === 'staff') {
+      const staff = await this.staffAuth.me(user.customerId);
+      if (staff.role !== user.role) {
+        throw new ForbiddenException('Роль сотрудника изменена. Войдите снова');
+      }
     }
   }
 

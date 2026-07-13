@@ -34,9 +34,20 @@ describe('Customer PII read policy (required JWT + masking)', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     jwt = moduleRef.get(JwtService);
+    await Promise.all(['seller', 'admin'].map((role) => prisma.staffUser.upsert({
+      where: { id: `staff-${role}-${RUN}` },
+      create: {
+        id: `staff-${role}-${RUN}`,
+        username: `pii-${role}-${RUN}`,
+        passwordHash: 'not-used',
+        role: role as 'seller' | 'admin',
+      },
+      update: { active: true, role: role as 'seller' | 'admin' },
+    })));
   });
 
   afterAll(async () => {
+    await prisma.staffUser.deleteMany({ where: { id: { in: [`staff-seller-${RUN}`, `staff-admin-${RUN}`] } } });
     await app.close();
   });
 
@@ -95,6 +106,23 @@ describe('Customer PII read policy (required JWT + masking)', () => {
       .get(`/customers/${c.id}/overview`)
       .set('Authorization', 'Bearer invalid')
       .expect(401);
+  });
+
+  it('rejects revoked staff and a token carrying a stale role', async () => {
+    const c = await customer();
+    const sellerId = `staff-seller-${RUN}`;
+    await prisma.staffUser.update({ where: { id: sellerId }, data: { active: false } });
+    await request(app.getHttpServer())
+      .get(`/customers/${c.id}/overview`)
+      .set('Authorization', `Bearer ${staffToken('seller')}`)
+      .expect(403);
+
+    await prisma.staffUser.update({ where: { id: sellerId }, data: { active: true, role: 'cashier' } });
+    await request(app.getHttpServer())
+      .get(`/customers/${c.id}/overview`)
+      .set('Authorization', `Bearer ${staffToken('seller')}`)
+      .expect(403);
+    await prisma.staffUser.update({ where: { id: sellerId }, data: { role: 'seller' } });
   });
 
   it('allows customer consent changes only for the authenticated owner', async () => {

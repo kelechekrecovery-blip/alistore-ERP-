@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
-  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway {
+  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -171,6 +171,18 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 
   override suspend fun transitionOrder(orderId: String, to: String, token: String): CustomerOrder =
     request("orders/$orderId/transition", "POST", JSONObject().put("to", to), token).order()
+
+  override suspend fun customerOverview(customerId: String, token: String): Customer360 =
+    request("customers/$customerId/overview", "GET", token = token).customerOverview()
+
+  override suspend fun transitionWarranty(caseId: String, to: String, token: String): WarrantyCase =
+    request("warranty/$caseId", "PATCH", JSONObject().put("status", to), token).warrantyCase()
+
+  override suspend fun transitionSupport(ticketId: String, to: String, token: String): SupportTicket =
+    request("support/tickets/$ticketId/transition", "PATCH", JSONObject().put("to", to), token).supportTicket()
+
+  override suspend fun escalateSupport(ticketId: String, token: String): SupportTicket =
+    request("support/tickets/$ticketId/escalate", "PATCH", JSONObject(), token).supportTicket()
 
   override suspend fun uploadEvidence(
     entityType: String,
@@ -400,6 +412,49 @@ private fun JSONObject.supportTicket() = SupportTicket(
   id = getString("id"), customerId = getString("customerId"), channel = getString("channel"),
   subject = getString("subject"), body = nullableString("body"), priority = getString("priority"),
   status = getString("status"), sla = getString("sla"), createdAt = getString("createdAt"),
+)
+
+internal fun JSONObject.customerOverview() = Customer360(
+  customer = getJSONObject("customer").let { row ->
+    Customer360Profile(
+      id = row.getString("id"), name = row.getString("name"), phone = row.getString("phone"),
+      consent = row.getBoolean("consent"),
+      segments = row.getJSONArray("segments").let { values -> buildList {
+        for (index in 0 until values.length()) add(values.getString(index))
+      } },
+      ltv = row.getInt("ltv"), createdAt = row.getString("createdAt"),
+    )
+  },
+  orders = getJSONObject("orders").let { section -> Customer360Orders(
+    total = section.getInt("total"), spent = section.getInt("spent"),
+    recent = section.getJSONArray("recent").let { rows -> buildList {
+      for (index in 0 until rows.length()) rows.getJSONObject(index).let { row ->
+        add(Customer360Order(row.getString("id"), row.getString("status"), row.getInt("total"), row.getString("createdAt")))
+      }
+    } },
+  ) },
+  debts = getJSONObject("debts").let { section -> Customer360Debts(
+    count = section.getInt("count"), openBalance = section.getInt("openBalance"),
+    items = section.getJSONArray("items").let { rows -> buildList {
+      for (index in 0 until rows.length()) rows.getJSONObject(index).let { row ->
+        add(Customer360Debt(row.getString("id"), row.getInt("balance"), row.getString("status"), row.getString("dueDate")))
+      }
+    } },
+  ) },
+  warranties = getJSONObject("warranties").let { section -> Customer360Warranties(
+    open = section.getInt("open"), items = section.getJSONArray("items").let { rows -> buildList {
+      for (index in 0 until rows.length()) rows.getJSONObject(index).let { row ->
+        add(Customer360Warranty(row.getString("id"), row.getString("imei"), row.getString("status"), row.getString("sla")))
+      }
+    } },
+  ) },
+  tickets = getJSONObject("tickets").let { section -> Customer360Tickets(
+    open = section.getInt("open"), items = section.getJSONArray("items").let { rows -> buildList {
+      for (index in 0 until rows.length()) rows.getJSONObject(index).let { row ->
+        add(Customer360Ticket(row.getString("id"), row.getString("subject"), row.getString("status"), row.getString("priority"), row.getString("sla")))
+      }
+    } },
+  ) },
 )
 
 private fun JSONObject.customerReturn() = CustomerReturn(

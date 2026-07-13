@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -87,6 +88,7 @@ fun StaffApp(apiBaseUrl: String) {
         current.session,
         api,
         api,
+        api,
         onLogout = { state = manager.logout() },
       )
     }
@@ -148,6 +150,7 @@ fun StaffSignedInScreen(
   session: StaffSession,
   gateway: StaffOperationsGateway,
   evidenceGateway: StaffEvidenceGateway,
+  customerGateway: StaffCustomerGateway,
   onLogout: () -> Unit,
 ) {
   var selected by rememberSaveable { mutableStateOf(0) }
@@ -155,6 +158,7 @@ fun StaffSignedInScreen(
     StaffTab("Главная", Icons.Default.Home),
     StaffTab("Заказы", Icons.Default.ShoppingCart),
     StaffTab("Сканер", Icons.Default.Search),
+    StaffTab("Клиенты", Icons.Default.Person),
     StaffTab("Смена", Icons.Default.AccountCircle),
   )
   Scaffold(
@@ -178,6 +182,7 @@ fun StaffSignedInScreen(
       0 -> StaffHome(session, Modifier.padding(padding)) { selected = it }
       1 -> StaffOrdersScreen(session, gateway, Modifier.padding(padding))
       2 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
+      3 -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding))
       else -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding))
     }
   }
@@ -197,8 +202,9 @@ private fun StaffHome(session: StaffSession, modifier: Modifier, onTab: (Int) ->
       Spacer(Modifier.height(22.dp))
     }
     item { StaffShortcut("Очередь заказов", "Комплектация и выдача", StaffCoral) { onTab(1) } }
-    item { StaffShortcut("Кассовая смена", "Открытие и сверка", StaffLime, StaffInk) { onTab(3) } }
+    item { StaffShortcut("Customer 360", "Покупки, гарантия и поддержка", StaffLime, StaffInk) { onTab(3) } }
     item { StaffShortcut("Сканер", "EAN, QR и IMEI", Color(0xFF82B1FF)) { onTab(2) } }
+    item { StaffShortcut("Кассовая смена", "Открытие и сверка", Color(0xFFFFD166), StaffInk) { onTab(4) } }
     item {
       Text(
         if (session.totpEnabled) "2FA включена для опасных операций" else "Включите 2FA перед approval-операциями",
@@ -401,7 +407,7 @@ fun StaffShiftScreen(
 private fun StaffLoading() = Box(Modifier.fillMaxSize().background(StaffInk), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StaffLime) }
 
 @Composable
-private fun StaffError(message: String, onRetry: () -> Unit) {
+internal fun StaffError(message: String, onRetry: () -> Unit) {
   Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
     Text(message, color = StaffCoral)
     TextButton(onClick = onRetry, modifier = Modifier.testTag("staff-retry")) { Text("Повторить") }
@@ -409,7 +415,7 @@ private fun StaffError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun StaffEmpty(title: String, detail: String, modifier: Modifier = Modifier) {
+internal fun StaffEmpty(title: String, detail: String, modifier: Modifier = Modifier) {
   Column(modifier.fillMaxSize().background(StaffInk).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
     Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
     Text(detail, color = StaffMuted, modifier = Modifier.padding(top = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)

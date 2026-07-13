@@ -170,6 +170,39 @@ data class SupportTicket(
   val createdAt: String,
 )
 
+data class Customer360(
+  val customer: Customer360Profile,
+  val orders: Customer360Orders,
+  val debts: Customer360Debts,
+  val warranties: Customer360Warranties,
+  val tickets: Customer360Tickets,
+)
+
+data class Customer360Profile(
+  val id: String,
+  val name: String,
+  val phone: String,
+  val consent: Boolean,
+  val segments: List<String>,
+  val ltv: Int,
+  val createdAt: String,
+)
+
+data class Customer360Order(val id: String, val status: String, val total: Int, val createdAt: String)
+data class Customer360Orders(val total: Int, val spent: Int, val recent: List<Customer360Order>)
+data class Customer360Debt(val id: String, val balance: Int, val status: String, val dueDate: String)
+data class Customer360Debts(val count: Int, val openBalance: Int, val items: List<Customer360Debt>)
+data class Customer360Warranty(val id: String, val imei: String, val status: String, val sla: String)
+data class Customer360Warranties(val open: Int, val items: List<Customer360Warranty>)
+data class Customer360Ticket(
+  val id: String,
+  val subject: String,
+  val status: String,
+  val priority: String,
+  val sla: String,
+)
+data class Customer360Tickets(val open: Int, val items: List<Customer360Ticket>)
+
 data class OpenSupportTicketRequest(
   val channel: String,
   val subject: String,
