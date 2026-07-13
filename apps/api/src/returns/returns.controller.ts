@@ -1,8 +1,10 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Patch,
@@ -19,7 +21,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ReturnsService } from './returns.service';
-import { CreateReturnDto, ReturnStatusDto } from './returns.dto';
+import { CreateMineReturnDto, CreateReturnDto, ReturnStatusDto } from './returns.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -31,6 +33,31 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 @Controller('returns')
 export class ReturnsController {
   constructor(private readonly returns: ReturnsService) {}
+
+  @ApiOperation({ summary: 'List returns of the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: "The current customer's returns, newest first." })
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  mine(@CurrentUser() user: AuthPrincipal) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.returns.listByCustomer(user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Open an idempotent return for the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ description: 'Customer-owned return created or replayed.' })
+  @Post('mine')
+  @UseGuards(JwtAuthGuard)
+  createMine(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreateMineReturnDto,
+  ) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    const key = requireIdempotencyKey(idempotencyKey);
+    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId, key);
+  }
 
   @ApiOperation({ summary: 'List returns by status' })
   @ApiOkResponse({ description: 'Returns, newest first.' })
@@ -75,4 +102,11 @@ export class ReturnsController {
   transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReturnStatusDto) {
     return this.returns.transition(id, dto.status, user.customerId);
   }
+}
+
+function requireIdempotencyKey(value: string | undefined): string {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

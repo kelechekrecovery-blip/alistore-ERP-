@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -10,7 +10,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SupportService } from './support.service';
-import { EscalateTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
+import { EscalateTicketDto, OpenMineTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
@@ -30,6 +30,32 @@ export class SupportController {
     private readonly staffAuth: StaffAuthService,
     private readonly authz: AuthzService,
   ) {}
+
+  @ApiOperation({ summary: 'Open an idempotent ticket for the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ description: 'Customer-owned ticket opened or replayed.' })
+  @Post('mine')
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  openMine(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: OpenMineTicketDto,
+  ) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    const key = requireIdempotencyKey(idempotencyKey);
+    return this.support.open({ ...dto, customerId: user.customerId }, user.customerId, key);
+  }
+
+  @ApiOperation({ summary: 'List tickets of the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: "The current customer's tickets, SLA-first." })
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  mine(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.support.list({ customerId: user.customerId, status });
+  }
 
   @ApiOperation({ summary: 'Open a support ticket (SLA from priority, ticket.created)' })
   @ApiCreatedResponse({ description: 'Ticket opened.' })
@@ -105,4 +131,11 @@ export class SupportController {
       throw new ForbiddenException('Недостаточно прав для этого действия');
     }
   }
+}
+
+function requireIdempotencyKey(value: string | undefined): string {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

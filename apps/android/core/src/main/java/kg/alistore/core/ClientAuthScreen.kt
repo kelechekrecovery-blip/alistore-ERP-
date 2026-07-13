@@ -156,6 +156,14 @@ private fun SignedInAccount(
     ClientDevicesScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
   }
+  if (route == "support") {
+    ClientSupportScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
+  if (route == "returns") {
+    ClientReturnsScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
   val scope = rememberCoroutineScope()
   var busy by remember { mutableStateOf(false) }
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -163,13 +171,18 @@ private fun SignedInAccount(
       Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("account-title"))
       Text(state.user.phone ?: "Профиль AliStore", color = AuthLime, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
     }
-    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Адреса", "Поддержка", "Настройки")) { title ->
+    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Возвраты", "Адреса", "Поддержка", "Настройки")) { title ->
       Text(
         title,
         color = Color.White,
         modifier = Modifier.fillMaxWidth().background(AuthSurface, RoundedCornerShape(8.dp))
-          .clickable(enabled = title in setOf("Мои заказы", "Мои устройства", "Гарантия")) {
-            onRoute(if (title == "Мои заказы") "orders" else "devices")
+          .clickable(enabled = title in setOf("Мои заказы", "Мои устройства", "Гарантия", "Возвраты", "Поддержка")) {
+            onRoute(when (title) {
+              "Мои заказы" -> "orders"
+              "Возвраты" -> "returns"
+              "Поддержка" -> "support"
+              else -> "devices"
+            })
           }
           .padding(16.dp),
       )

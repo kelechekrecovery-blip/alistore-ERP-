@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: execute Master Plan Android iteration 5, owner-scoped support and idempotent returns with Evidence Vault hooks.
+- Files changed: support/return idempotency schema and migration; customer-owned `mine` controllers, DTOs and race-safe services; RBAC/idempotency/Event Ledger regressions; Android support/return models, typed API, account routing, Evidence photo picker, Compose loading/empty/error/submission states and UI tests; architecture/backlog/readme tracking.
+- Result: Android Client now lists and creates only the authenticated customer's support tickets and return requests, starts a return from signed-in order history, preserves one command key across 401 refresh/retry, and uploads optional photos through the authenticated Evidence Vault. The API derives ownership from JWT, rejects changed-payload key reuse, exact-replays concurrent duplicates and emits one critical Ledger event.
+- Checks run: Prisma generate, dev migration and isolated test DB sync; focused support/returns API 4/4; full API sequential 107/107 suites and 403/403 tests; API production build; Web production build across 37 routes; four Android APK builds; all-module unit tests and Android Lint; Compose instrumentation 7/7 on API 36 after final UI polish; original-resolution Compose render `/tmp/alistore-android-support-render.png` inspected; `git diff --check`.
+- Outcome: Android support and returns vertical is accepted at software/emulator level. Live camera/provider behavior still requires physical-device certification; Client bonuses, addresses and settings are the next native slice.
+- Next step: implement Android Client bonuses, addresses and settings with owner-scoped typed contracts and Compose state coverage, then move to Staff parity.
+
+## 2026-07-13
+
 - Task: execute Master Plan Android iteration 4, owned devices and idempotent warranty opening.
 - Files changed: warranty ownership/idempotency domain model and migration; warranty controller/service and web client key propagation; API ownership/RBAC/notification regressions; Android device/warranty models, typed API, account routing, Compose loading/empty/error/detail/submission states and device test; architecture/backlog/readme tracking.
 - Result: Android Client now loads only the authenticated customer's sold devices, displays warranty coverage and current case, and opens a new case while preserving one key across 401 refresh/retry. The API now proves `DeviceUnit.orderId → Order.customerId`, rejects cross-customer IMEIs and a second active case, exact-replays one persisted command and rejects changed-payload key reuse. Case creation and `warranty.created` remain atomic in the Event Ledger.

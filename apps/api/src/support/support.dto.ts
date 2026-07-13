@@ -24,6 +24,20 @@ export class OpenTicketDto {
   @IsOptional() @IsString() actor?: string;
 }
 
+export class OpenMineTicketDto {
+  @ApiProperty({ example: 'app' })
+  @IsIn(CHANNELS as unknown as string[]) channel!: (typeof CHANNELS)[number];
+
+  @ApiProperty({ example: 'Не приходит чек на почту' })
+  @IsString() subject!: string;
+
+  @ApiPropertyOptional({ example: 'Оплатил заказ, чек не пришёл' })
+  @IsOptional() @IsString() body?: string;
+
+  @ApiPropertyOptional({ enum: ['normal', 'high', 'urgent'], example: 'normal' })
+  @IsOptional() @IsIn(['normal', 'high', 'urgent']) priority?: string;
+}
+
 export class TicketTransitionDto {
   @ApiProperty({ enum: TRANSITION_TARGETS, example: 'in_progress' })
   @IsIn(TRANSITION_TARGETS as unknown as string[]) to!: (typeof TRANSITION_TARGETS)[number];

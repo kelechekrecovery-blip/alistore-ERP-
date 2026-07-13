@@ -44,3 +44,9 @@ coverage and the current service case, and opens warranty cases with a stable
 idempotency key that survives one token refresh. The API verifies that the IMEI is
 linked to an order owned by the authenticated customer, rejects a second active case,
 and writes exactly one `warranty.created` Event Ledger entry for an exact replay.
+
+Support and returns are customer-owned native flows. The Client lists only the signed-in
+customer's tickets and return requests, preserves one command key across token refresh
+and manual retry, and can attach a photo through the private Evidence Vault upload API.
+Return creation starts from an eligible order loaded through `orders/mine`; the API
+derives ownership from the customer JWT and exact-replays concurrent duplicate commands.

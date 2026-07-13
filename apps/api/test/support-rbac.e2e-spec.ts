@@ -154,4 +154,49 @@ describe('Support CRM RBAC split', () => {
     const escalated = await prisma.auditEvent.findFirst({ where: { type: 'ticket.escalated' } });
     expect(escalated?.actor).toBe(adminId);
   });
+
+  it('opens and lists native customer tickets with owner scope and exact idempotent replay', async () => {
+    const customer = await customerFixture();
+    const otherCustomer = await prisma.customer.create({
+      data: { phone: `+996706${RUN}`, name: 'Other Native Support' },
+    });
+    const token = customerToken(customer.id, customer.phone);
+    const payload = { channel: 'app', subject: 'Нужна помощь', body: 'Заказ не обновляется' };
+
+    await request(app.getHttpServer())
+      .post('/support/tickets/mine')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload)
+      .expect(400);
+
+    const calls = await Promise.all([
+      request(app.getHttpServer()).post('/support/tickets/mine').set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', `native-support-${RUN}`).send(payload),
+      request(app.getHttpServer()).post('/support/tickets/mine').set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', `native-support-${RUN}`).send(payload),
+    ]);
+    expect(calls.map((call) => call.status)).toEqual([201, 201]);
+    expect(calls[0].body.id).toBe(calls[1].body.id);
+
+    await request(app.getHttpServer())
+      .post('/support/tickets/mine')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', `native-support-${RUN}`)
+      .send({ ...payload, subject: 'Другой вопрос' })
+      .expect(409);
+
+    const mine = await request(app.getHttpServer())
+      .get('/support/tickets/mine')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(mine.body).toHaveLength(1);
+    expect(mine.body[0].customerId).toBe(customer.id);
+
+    const otherMine = await request(app.getHttpServer())
+      .get('/support/tickets/mine')
+      .set('Authorization', `Bearer ${customerToken(otherCustomer.id, otherCustomer.phone)}`)
+      .expect(200);
+    expect(otherMine.body).toEqual([]);
+    expect(await prisma.auditEvent.count({ where: { type: 'ticket.created' } })).toBe(1);
+  });
 });

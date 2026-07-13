@@ -75,3 +75,13 @@ fun OpenWarrantyRequest.toJson(): JSONObject = JSONObject()
   .put("imei", imei)
   .put("customerId", customerId)
   .put("problem", problem)
+
+fun OpenSupportTicketRequest.toJson(): JSONObject = JSONObject()
+  .put("channel", channel)
+  .put("subject", subject)
+  .put("body", body)
+  .put("priority", priority)
+
+fun CreateReturnRequest.toJson(): JSONObject = JSONObject()
+  .put("orderId", orderId)
+  .put("reason", reason)

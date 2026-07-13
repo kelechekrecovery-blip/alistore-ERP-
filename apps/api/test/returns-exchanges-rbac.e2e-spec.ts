@@ -214,4 +214,50 @@ describe('Returns and exchanges RBAC split', () => {
     const exchanged = await prisma.auditEvent.findFirst({ where: { type: 'order.exchanged' } });
     expect(exchanged?.actor).toBe(cashierId);
   });
+
+  it('opens and lists native returns with owner scope and exact idempotent replay', async () => {
+    const { customer, order } = await paidOrderFixture();
+    const other = await prisma.customer.create({
+      data: { phone: `+996709${RUN}`, name: 'Other native return customer' },
+    });
+    const token = customerToken(customer);
+    const payload = { orderId: order.id, reason: 'Не подошёл / передумал' };
+
+    await request(app.getHttpServer())
+      .post('/returns/mine')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload)
+      .expect(400);
+
+    const calls = await Promise.all([
+      request(app.getHttpServer()).post('/returns/mine').set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', `native-return-${RUN}`).send(payload),
+      request(app.getHttpServer()).post('/returns/mine').set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', `native-return-${RUN}`).send(payload),
+    ]);
+    expect(calls.map((call) => call.status)).toEqual([201, 201]);
+    expect(calls[0].body.id).toBe(calls[1].body.id);
+
+    await request(app.getHttpServer())
+      .post('/returns/mine')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', `native-return-${RUN}`)
+      .send({ ...payload, reason: 'Другая причина' })
+      .expect(409);
+
+    const mine = await request(app.getHttpServer())
+      .get('/returns/mine')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(mine.body).toHaveLength(1);
+    expect(mine.body[0].orderId).toBe(order.id);
+    expect(mine.body[0].order.total).toBe(order.total);
+
+    const otherMine = await request(app.getHttpServer())
+      .get('/returns/mine')
+      .set('Authorization', `Bearer ${customerToken(other)}`)
+      .expect(200);
+    expect(otherMine.body).toEqual([]);
+    expect(await prisma.auditEvent.count({ where: { type: 'return.requested' } })).toBe(1);
+  });
 });

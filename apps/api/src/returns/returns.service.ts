@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ReturnStatus } from '@prisma/client';
+import { Return as ReturnRecord, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ForbiddenError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 
 /**
  * Return requests (Return state machine). Recording a return is separate from the
@@ -30,8 +30,32 @@ export class ReturnsService {
     });
   }
 
-  async request(orderId: string, reason: string, requester?: string, expectedCustomerId?: string) {
+  async listByCustomer(customerId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: { customerId },
+      select: { id: true, total: true, createdAt: true, items: true },
+    });
+    const byId = new Map(orders.map((order) => [order.id, order]));
+    const returns = await this.prisma.return.findMany({
+      where: { orderId: { in: orders.map((order) => order.id) } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return returns.map((ret) => ({ ...ret, order: byId.get(ret.orderId)! }));
+  }
+
+  async request(orderId: string, reason: string, requester?: string, expectedCustomerId?: string, idempotencyKey?: string) {
+    const key = idempotencyKey?.trim() || undefined;
+    if (key) {
+      const existing = await this.prisma.return.findUnique({ where: { idempotencyKey: key } });
+      if (existing) return replayReturn(existing, orderId, reason);
+    }
     return this.audit.transaction(async (tx) => {
+      if (key) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'return:' + key}))::text AS locked`;
+        const replay = await tx.return.findUnique({ where: { idempotencyKey: key } });
+        if (replay) return { result: replayReturn(replay, orderId, reason), events: [] };
+      }
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
@@ -41,7 +65,7 @@ export class ReturnsService {
       }
       const actor = requester ?? order.customerId;
       const ret = await tx.return.create({
-        data: { orderId, reason, status: 'requested' },
+        data: { orderId, reason, status: 'requested', idempotencyKey: key },
       });
       return {
         result: ret,
@@ -81,4 +105,11 @@ export class ReturnsService {
       };
     });
   }
+}
+
+function replayReturn(ret: ReturnRecord, orderId: string, reason: string) {
+  if (ret.orderId !== orderId || ret.reason !== reason) {
+    throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим возвратом');
+  }
+  return ret;
 }

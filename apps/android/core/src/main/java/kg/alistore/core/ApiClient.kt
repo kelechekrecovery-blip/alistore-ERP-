@@ -2,11 +2,13 @@ package kg.alistore.core
 
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway {
+class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
+  CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -83,6 +85,68 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     token,
     idempotencyKey = idempotencyKey,
   ).warrantyCase()
+
+  override suspend fun tickets(token: String): List<SupportTicket> = requestArray("support/tickets/mine", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).supportTicket()) }
+  }
+
+  override suspend fun openTicket(
+    request: OpenSupportTicketRequest,
+    token: String,
+    idempotencyKey: String,
+  ): SupportTicket = this.request(
+    "support/tickets/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
+  ).supportTicket()
+
+  override suspend fun returns(token: String): List<CustomerReturn> = requestArray("returns/mine", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).customerReturn()) }
+  }
+
+  override suspend fun openReturn(
+    request: CreateReturnRequest,
+    token: String,
+    idempotencyKey: String,
+  ): CustomerReturn = this.request(
+    "returns/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
+  ).customerReturn()
+
+  override suspend fun uploadEvidence(
+    entityType: String,
+    entityId: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
+  ): EvidenceAttachment = withContext(Dispatchers.IO) {
+    val boundary = "AliStore-${UUID.randomUUID()}"
+    val connection = open("evidence/images", "POST")
+    try {
+      connection.doOutput = true
+      connection.setRequestProperty("Authorization", "Bearer $token")
+      connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+      connection.outputStream.buffered().use { output ->
+        fun field(name: String, value: String) {
+          output.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
+        }
+        field("entityType", entityType)
+        field("entityId", entityId)
+        field("label", "Фото клиента")
+        output.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\nContent-Type: $mimeType\r\n\r\n".toByteArray())
+        output.write(bytes)
+        output.write("\r\n--$boundary--\r\n".toByteArray())
+      }
+      val status = connection.responseCode
+      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+      if (status !in 200..299) {
+        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
+        throw ApiException(status, message.ifBlank { "Ошибка загрузки $status" })
+      }
+      JSONObject(payload).getJSONObject("asset").let { EvidenceAttachment(it.getString("key"), it.getString("url")) }
+    } finally {
+      connection.disconnect()
+    }
+  }
 
   fun send(mutation: PendingMutation, token: String?): Int {
     val connection = open(mutation.endpoint, mutation.method)
@@ -208,6 +272,30 @@ private fun JSONObject.warrantyCase() = WarrantyCase(
   problem = getString("problem"),
   status = getString("status"),
   sla = getString("sla"),
+)
+
+private fun JSONObject.supportTicket() = SupportTicket(
+  id = getString("id"), customerId = getString("customerId"), channel = getString("channel"),
+  subject = getString("subject"), body = nullableString("body"), priority = getString("priority"),
+  status = getString("status"), sla = getString("sla"), createdAt = getString("createdAt"),
+)
+
+private fun JSONObject.customerReturn() = CustomerReturn(
+  id = getString("id"), orderId = getString("orderId"), reason = getString("reason"),
+  status = getString("status"), createdAt = getString("createdAt"),
+  order = optJSONObject("order")?.let { order ->
+    ReturnOrderSummary(
+      total = order.getInt("total"), createdAt = order.getString("createdAt"),
+      items = order.optJSONArray("items")?.let { items ->
+        buildList {
+          for (index in 0 until items.length()) {
+            val item = items.getJSONObject(index)
+            add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price")))
+          }
+        }
+      }.orEmpty(),
+    )
+  },
 )
 
 private fun JSONObject.nullableString(key: String): String? =

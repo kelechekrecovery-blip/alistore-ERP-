@@ -422,6 +422,7 @@ model Return {
   reason    String
   status    ReturnStatus @default(requested)
   refundId  String? // refund → approval, тем же способом
+  idempotencyKey String? @unique
   createdAt DateTime     @default(now())
 
   @@index([orderId])
@@ -651,6 +652,7 @@ model SupportTicket {
   sla        DateTime
   status     TicketStatus @default(new)
   assignee   String?
+  idempotencyKey String? @unique
   createdAt  DateTime     @default(now())
 
   @@index([customerId])

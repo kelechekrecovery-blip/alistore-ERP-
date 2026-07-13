@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TicketStatus } from '@prisma/client';
+import { SupportTicket, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -41,14 +41,24 @@ export class SupportService {
   }
 
   /** Open a ticket for a customer, with an SLA set from its priority. */
-  async open(dto: OpenTicketDto, actor: string) {
+  async open(dto: OpenTicketDto, actor: string, idempotencyKey?: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
     if (!customer) {
       throw new ValidationError('customer_not_found', `Клиент ${dto.customerId} не найден`);
     }
     const priority = normalizePriority(dto.priority);
+    const key = idempotencyKey?.trim() || undefined;
+    if (key) {
+      const existing = await this.prisma.supportTicket.findUnique({ where: { idempotencyKey: key } });
+      if (existing) return replayTicket(existing, dto, priority);
+    }
     const sla = slaFor(priority, Date.now());
     return this.audit.transaction(async (tx) => {
+      if (key) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'support:' + key}))::text AS locked`;
+        const replay = await tx.supportTicket.findUnique({ where: { idempotencyKey: key } });
+        if (replay) return { result: replayTicket(replay, dto, priority), events: [] };
+      }
       const ticket = await tx.supportTicket.create({
         data: {
           customerId: dto.customerId,
@@ -58,6 +68,7 @@ export class SupportService {
           priority,
           sla,
           status: 'new',
+          idempotencyKey: key,
         },
       });
       return {
@@ -132,4 +143,15 @@ export class SupportService {
       };
     });
   }
+}
+
+function replayTicket(
+  ticket: SupportTicket,
+  dto: OpenTicketDto,
+  priority: string,
+) {
+  const same = ticket.customerId === dto.customerId && ticket.channel === dto.channel &&
+    ticket.subject === dto.subject && ticket.body === (dto.body ?? null) && ticket.priority === priority;
+  if (!same) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим обращением');
+  return ticket;
 }

@@ -111,3 +111,41 @@ data class WarrantyCase(
   val status: String,
   val sla: String,
 )
+
+data class SupportTicket(
+  val id: String,
+  val customerId: String,
+  val channel: String,
+  val subject: String,
+  val body: String?,
+  val priority: String,
+  val status: String,
+  val sla: String,
+  val createdAt: String,
+)
+
+data class OpenSupportTicketRequest(
+  val channel: String,
+  val subject: String,
+  val body: String?,
+  val priority: String = "normal",
+)
+
+data class ReturnOrderSummary(
+  val total: Int,
+  val createdAt: String,
+  val items: List<CustomerOrderItem>,
+)
+
+data class CustomerReturn(
+  val id: String,
+  val orderId: String,
+  val reason: String,
+  val status: String,
+  val createdAt: String,
+  val order: ReturnOrderSummary?,
+)
+
+data class CreateReturnRequest(val orderId: String, val reason: String)
+
+data class EvidenceAttachment(val key: String, val url: String)
