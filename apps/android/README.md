@@ -85,3 +85,13 @@ records, collection increments the run atomically and handover is blocked until 
 run reconciles. Network failures enter a courier-only SQLite/WorkManager queue that
 retains the original idempotency key across process restart. Evidence photos,
 FCM/deep-link routing and physical maps/camera/network QA remain release gates.
+
+The POS APK uses its own encrypted cashier session and reads the same catalog and
+stock projection as the storefront and ERP. It builds a quantity-capped ticket,
+supports cash, card and MBank including split tender, and retries a parked discount
+with the same `clientSaleId` after approval. The API ignores client actor identity and
+rejects stale or manipulated SKU/price values before calculating margin, payment or
+stock. Network failures persist the exact command and idempotency key in a POS-only
+SQLite queue; HTTP 202 approval responses remain visible as conflicts instead of being
+discarded. Scanner/IMEI capture, explicit shift controls, queued approval recovery,
+receipt printing, refund/exchange and physical terminal certification remain open.

@@ -196,7 +196,6 @@ describe('Staff session rollout for operational endpoints', () => {
   it('requires staff JWT for POS sale and books the shift under the JWT staff id', async () => {
     const product = await productWithUnit('OPS-POS');
     const payload = {
-      staffId: 'spoof',
       point: 'BISHKEK-1',
       method: 'cash',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],

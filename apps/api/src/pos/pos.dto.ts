@@ -36,7 +36,8 @@ export class PosPaymentDto {
 }
 
 export class PosSaleDto {
-  @ApiProperty({ example: 'staff_seller_01' })
+  @ApiPropertyOptional({ example: 'staff_seller_01', description: 'Derived from staff JWT for HTTP requests.' })
+  @IsOptional()
   @IsString() staffId!: string;
 
   @ApiProperty({ example: 'BISHKEK-1' })

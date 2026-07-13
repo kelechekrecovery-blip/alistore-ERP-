@@ -10,7 +10,7 @@ import org.json.JSONObject
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
   StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway,
-  PushRegistrationGateway, CourierGateway {
+  PushRegistrationGateway, CourierGateway, PosGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -235,6 +235,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun handoverCourierRun(runId: String, amount: Int, token: String): CourierRunSummary =
     request("courier/handover", "POST", JSONObject().put("runId", runId).put("amount", amount), token).courierRun()
 
+  override suspend fun posSale(request: PosSaleRequest, token: String): PosSaleResult =
+    this.request("pos/sale", "POST", request.toJson(), token).posSaleResult()
+
   override suspend fun uploadEvidence(
     entityType: String,
     entityId: String,
@@ -294,6 +297,10 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   }
 
   fun send(mutation: PendingMutation, token: String?): Int {
+    return sendResponse(mutation, token).status
+  }
+
+  fun sendResponse(mutation: PendingMutation, token: String?): RawApiResponse {
     val connection = open(mutation.endpoint, mutation.method)
     return try {
       connection.doOutput = mutation.body.isNotEmpty()
@@ -301,7 +308,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
       connection.setRequestProperty("Idempotency-Key", mutation.idempotencyKey)
       if (!token.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
       if (mutation.body.isNotEmpty()) connection.outputStream.use { it.write(mutation.body.toByteArray()) }
-      connection.responseCode
+      val status = connection.responseCode
+      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+      RawApiResponse(status, stream?.bufferedReader()?.use { it.readText() }.orEmpty())
     } finally {
       connection.disconnect()
     }
@@ -382,6 +391,8 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   }
 }
 
+data class RawApiResponse(val status: Int, val body: String)
+
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
 
 private fun JSONObject.order() = CustomerOrder(
@@ -443,6 +454,31 @@ private fun JSONObject.courierRun() = CourierRunSummary(
   collectedTotal = getInt("collectedTotal"),
   handedOver = getBoolean("handedOver"),
 )
+
+internal fun PosSaleRequest.toJson() = JSONObject()
+  .put("point", point)
+  .put("lines", org.json.JSONArray().apply { lines.forEach { line ->
+    put(JSONObject().put("productId", line.productId).put("sku", line.sku).put("price", line.price).put("qty", line.qty))
+  } })
+  .put("payments", org.json.JSONArray().apply { tenders.forEach { tender ->
+    put(JSONObject().put("method", tender.method).put("amount", tender.amount))
+  } })
+  .put("discountPct", discountPct)
+  .put("clientSaleId", clientSaleId)
+  .apply {
+    approvalId?.let { put("approvalId", it) }
+    reason?.let { put("reason", it) }
+  }
+
+private fun JSONObject.posSaleResult(): PosSaleResult = if (optBoolean("pendingApproval")) {
+  PosSaleResult.ApprovalRequired(getString("approvalId"), optString("reason", "discount"))
+} else {
+  PosSaleResult.Completed(
+    orderId = getString("orderId"), receiptNo = getString("receiptNo"), total = getInt("total"),
+    status = getString("status"), shiftId = getString("shiftId"),
+    imeis = optJSONArray("imeis")?.let { values -> buildList { for (index in 0 until values.length()) add(values.getString(index)) } }.orEmpty(),
+  )
+}
 
 private fun JSONObject.cashShift() = CashShift(
   id = getString("id"), staffId = getString("staffId"), point = getString("point"), openCash = getInt("openCash"),

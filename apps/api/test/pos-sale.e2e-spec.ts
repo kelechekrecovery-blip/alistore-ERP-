@@ -162,6 +162,24 @@ describe('POS sale (integration)', () => {
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
   });
 
+  it('rejects a client-supplied price that differs from the server catalog', async () => {
+    const product = await seedProduct(1);
+
+    const err = await pos
+      .sale({
+        staffId: 'staff_pos_price_tamper',
+        point: 'BISHKEK-1',
+        method: 'cash',
+        lines: [{ productId: product.id, sku: product.sku, price: 1, qty: 1 }],
+      })
+      .catch((e) => e);
+
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.code).toBe('product_price_mismatch');
+    expect(await prisma.order.count()).toBe(0);
+    expect(await prisma.payment.count()).toBe(0);
+  });
+
   it('reuses an already-open shift instead of opening a second', async () => {
     const p1 = await seedProduct(1);
     const p2 = await seedProduct(1);
@@ -320,7 +338,7 @@ describe('POS sale (integration)', () => {
         method: 'cash',
         discountPct: 5,
         approvalId,
-        lines: [{ productId: product.id, sku: product.sku, price: 99000, qty: 1 }],
+        lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 2 }],
       })
       .catch((e) => e);
     expect(err.code).toBe('margin_mismatch');

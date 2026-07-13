@@ -224,12 +224,24 @@ export class PosService {
     const productIds = [...new Set(dto.lines.map((line) => line.productId))];
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, cost: true },
+      select: { id: true, sku: true, price: true, cost: true },
     });
-    const costs = new Map(products.map((product) => [product.id, product.cost]));
-    const missing = productIds.find((id) => !costs.has(id));
+    const catalog = new Map(products.map((product) => [product.id, product]));
+    const missing = productIds.find((id) => !catalog.has(id));
     if (missing) {
       throw new ValidationError('product_not_found', `Товар ${missing} не найден`);
+    }
+    for (const line of dto.lines) {
+      const product = catalog.get(line.productId)!;
+      if (line.sku !== product.sku) {
+        throw new ValidationError('product_sku_mismatch', `SKU товара ${line.productId} изменился`);
+      }
+      if (line.price !== product.price) {
+        throw new ValidationError(
+          'product_price_mismatch',
+          `Цена ${line.sku} изменилась: актуальная цена ${product.price}`,
+        );
+      }
     }
     return evaluateMarginControl(
       dto.lines.map((line) => ({
@@ -237,7 +249,7 @@ export class PosService {
         sku: line.sku,
         qty: line.qty,
         price: line.price,
-        cost: costs.get(line.productId) ?? 0,
+        cost: catalog.get(line.productId)?.cost ?? 0,
       })),
       pct,
       APPROVAL_THRESHOLDS.minMarginSom,

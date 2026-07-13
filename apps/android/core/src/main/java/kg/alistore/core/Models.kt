@@ -93,6 +93,30 @@ data class CourierDelivery(
   val run: CourierRunSummary?,
 )
 
+data class PosLine(val productId: String, val sku: String, val price: Int, val qty: Int)
+data class PosTender(val method: String, val amount: Int)
+data class PosSaleRequest(
+  val point: String,
+  val lines: List<PosLine>,
+  val tenders: List<PosTender>,
+  val discountPct: Int,
+  val clientSaleId: String,
+  val approvalId: String? = null,
+  val reason: String? = null,
+)
+
+sealed interface PosSaleResult {
+  data class Completed(
+    val orderId: String,
+    val receiptNo: String,
+    val total: Int,
+    val status: String,
+    val shiftId: String,
+    val imeis: List<String>,
+  ) : PosSaleResult
+  data class ApprovalRequired(val approvalId: String, val reason: String) : PosSaleResult
+}
+
 data class ShiftPayment(
   val id: String,
   val amount: Int,

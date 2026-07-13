@@ -81,6 +81,10 @@ fun AliStoreApp(
     CourierApp(apiBaseUrl)
     return
   }
+  if (role == AppRole.POS) {
+    PosApp(apiBaseUrl)
+    return
+  }
   RoleApp(role)
 }
 

@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: replace the Android POS placeholder with the first integrated native counter-sale vertical and define the ERP App/site completion plan.
+- Files changed: POS actor DTO hardening and server-canonical catalog validation; Android POS typed gateway/models, cashier-only Keystore session, catalog/cart/split-payment/approval UI, isolated offline queue/WorkManager replay and JVM/Compose tests; API test isolation; ERP/site integration plan and readiness tracking.
+- Result: the native POS now reads the same catalog used by the storefront, writes sales through the same NestJS Order/Payment/Shift/Inventory/Event Ledger services visible in ERP, and never trusts a client actor, SKU or price. Cash/card/MBank split tender, discount approval retry and stable offline replay are implemented; a queued approval is retained as a conflict rather than converted into a sale.
+- Checks run: targeted POS/staff-JWT API 22/22; full API Jest 110/110 suites and 420/420 tests; API production build; all four Android Debug APKs; all-module JVM tests and Android Lint; Android API 36 Compose 23/23; `git diff --check`.
+- Outcome: Android POS counter sale is accepted at software/emulator level. Scanner/IMEI, explicit shift UI, queued-approval recovery, receipt printing, refund/exchange and physical terminal certification remain required, so full POS/store readiness is not claimed.
+- Next step: complete the remaining POS operational cycle, then execute the ERP App/site plan starting with the shared integration contract matrix and cross-surface E2E.
+
+## 2026-07-13
+
 - Task: replace the Android Courier role placeholder with the owner-bound assignment, delivery and COD vertical shared with ERP/API.
 - Files changed: courier/order Prisma ownership and command schema plus migration; dedicated Nest courier list/start/deliver/fail/COD contracts; generic courier transition bypass guard; integration/RBAC regressions; Android typed gateway/models, courier-only Keystore session, route/COD/profile Compose UI, map/call intents, isolated SQLite/WorkManager replay, JVM/UI tests; backlog and readiness tracking.
 - Result: ERP dispatch can assign eligible courier orders only to an active courier and the API derives outstanding COD from settled payments. A courier JWT lists and mutates only its own assignments; start, deliver and fail commands persist exact idempotency responses in the same transaction as status/Event Ledger changes. Android Courier now supports login/session restore, route/address/slot/items, navigation and calling, online/offline start/deliver/fail, COD collection and handover, retry visibility and profile/logout without locally assigning authoritative status.
