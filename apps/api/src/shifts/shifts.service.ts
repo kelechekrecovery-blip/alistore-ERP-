@@ -39,19 +39,27 @@ export class ShiftsService {
   }
 
   /** Open a shift. A staff member can hold only one open shift at a time (409). */
-  async open(dto: OpenShiftDto, actor: string) {
-    const existing = await this.prisma.cashShift.findFirst({
-      where: { staffId: dto.staffId, closedAt: null },
-    });
-    if (existing) {
-      throw new ConflictError(
-        'shift_already_open',
-        `У сотрудника ${dto.staffId} уже открыта смена ${existing.id}`,
-      );
-    }
+  async open(dto: OpenShiftDto, actor: string, idempotencyKey?: string) {
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-open:' + dto.staffId}))::text AS locked`;
+      if (idempotencyKey) {
+        const replay = await tx.cashShift.findUnique({ where: { openIdempotencyKey: idempotencyKey } });
+        if (replay) {
+          if (replay.staffId !== dto.staffId || replay.point !== dto.point || replay.openCash !== dto.openCash) {
+            throw new ConflictError('shift_idempotency_mismatch', 'Ключ открытия смены уже использован для другой команды');
+          }
+          return { result: replay, events: [] };
+        }
+      }
+      const existing = await tx.cashShift.findFirst({ where: { staffId: dto.staffId, closedAt: null } });
+      if (existing) {
+        throw new ConflictError(
+          'shift_already_open',
+          `У сотрудника ${dto.staffId} уже открыта смена ${existing.id}`,
+        );
+      }
       const shift = await tx.cashShift.create({
-        data: { staffId: dto.staffId, point: dto.point, openCash: dto.openCash },
+        data: { staffId: dto.staffId, point: dto.point, openCash: dto.openCash, openIdempotencyKey: idempotencyKey },
       });
       return {
         result: shift,
@@ -90,14 +98,37 @@ export class ShiftsService {
    * without a reason is rejected (422); with a reason it is recorded and a
    * cash.shortage event is appended.
    */
-  async close(shiftId: string, dto: CloseShiftDto, actor: string) {
+  async close(shiftId: string, dto: CloseShiftDto, actor: string, idempotencyKey?: string) {
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-close:' + shiftId}))::text AS locked`;
       const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
       if (!shift) {
         throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
       }
       if (shift.closedAt) {
+        if (idempotencyKey && shift.closeIdempotencyKey === idempotencyKey) {
+          if (
+            shift.closeCash !== dto.closeCash ||
+            (shift.closeReason ?? null) !== (dto.reason?.trim() || null)
+          ) {
+            throw new ConflictError(
+              'shift_idempotency_mismatch',
+              'Ключ закрытия смены уже использован для другой команды',
+            );
+          }
+          return {
+            result: { ...shift, expected: shift.closeCash - (shift.diff ?? 0) },
+            events: [],
+          };
+        }
         throw new ConflictError('shift_already_closed', `Смена ${shiftId} уже закрыта`);
+      }
+
+      if (idempotencyKey) {
+        const used = await tx.cashShift.findUnique({ where: { closeIdempotencyKey: idempotencyKey } });
+        if (used && used.id !== shiftId) {
+          throw new ConflictError('shift_idempotency_mismatch', 'Ключ закрытия смены уже использован');
+        }
       }
 
       const expected = await this.expectedCash(tx, shiftId, shift.openCash);
@@ -114,7 +145,13 @@ export class ShiftsService {
       const events: AuditInput[] = [];
       const closed = await tx.cashShift.update({
         where: { id: shiftId },
-        data: { closeCash: dto.closeCash, diff, closedAt: new Date() },
+        data: {
+          closeCash: dto.closeCash,
+          closeReason: dto.reason?.trim() || null,
+          closeIdempotencyKey: idempotencyKey,
+          diff,
+          closedAt: new Date(),
+        },
       });
       events.push({
         type: EventType.ShiftClosed,

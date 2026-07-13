@@ -107,3 +107,12 @@ fun UpdateCustomerSettingsRequest.toJson(): JSONObject = JSONObject().apply {
   service?.let { put("service", it) }
   promos?.let { put("promos", it) }
 }
+
+fun OpenShiftRequest.toJson(): JSONObject = JSONObject()
+  .put("staffId", staffId)
+  .put("point", point)
+  .put("openCash", openCash)
+
+fun CloseShiftRequest.toJson(): JSONObject = JSONObject()
+  .put("closeCash", closeCash)
+  .put("reason", reason?.trim()?.takeIf(String::isNotBlank) ?: JSONObject.NULL)

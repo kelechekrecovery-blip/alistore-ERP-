@@ -72,6 +72,10 @@ fun AliStoreApp(
     ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision)
     return
   }
+  if (role == AppRole.STAFF) {
+    StaffApp(apiBaseUrl)
+    return
+  }
   RoleApp(role)
 }
 

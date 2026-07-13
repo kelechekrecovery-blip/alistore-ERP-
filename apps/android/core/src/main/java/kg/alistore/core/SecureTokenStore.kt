@@ -11,12 +11,14 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import org.json.JSONObject
 
-class SecureTokenStore(context: Context, private val alias: String) : SessionStore {
+class SecureTokenStore(context: Context, private val alias: String) : SessionStore, StaffSessionStore {
   private val preferences = context.getSharedPreferences("secure-session", Context.MODE_PRIVATE)
 
   fun save(token: String) {
     saveEncrypted(token)
   }
+
+  override fun saveToken(token: String) = save(token)
 
   override fun saveSession(tokens: AuthTokens) {
     saveEncrypted(JSONObject().put("accessToken", tokens.accessToken).put("refreshToken", tokens.refreshToken).toString())
@@ -36,6 +38,8 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     val value = readEncrypted() ?: return null
     return runCatching { JSONObject(value).getString("accessToken") }.getOrDefault(value)
   }
+
+  override fun readToken(): String? = read()
 
   override fun readSession(): AuthTokens? {
     val value = readEncrypted() ?: return null

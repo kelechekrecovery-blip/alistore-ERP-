@@ -50,9 +50,55 @@ data class CustomerOrder(
   val deliveryAddress: String?,
   val items: List<CustomerOrderItem> = emptyList(),
   val createdAt: String? = null,
+  val channel: String = "web",
 )
 
-data class CustomerOrderItem(val sku: String, val qty: Int, val price: Int)
+data class CustomerOrderItem(val sku: String, val qty: Int, val price: Int, val imei: String? = null)
+
+data class StaffSession(
+  val accessToken: String,
+  val staffId: String,
+  val username: String,
+  val role: String,
+  val totpEnabled: Boolean,
+)
+
+data class StaffPrincipal(
+  val id: String,
+  val username: String,
+  val role: String,
+  val active: Boolean,
+  val totpEnabled: Boolean,
+  val type: String,
+)
+
+data class ShiftPayment(
+  val id: String,
+  val amount: Int,
+  val method: String,
+  val status: String,
+)
+
+data class CashShift(
+  val id: String,
+  val staffId: String,
+  val point: String,
+  val openCash: Int,
+  val closeCash: Int?,
+  val closeReason: String?,
+  val diff: Int?,
+  val openedAt: String,
+  val closedAt: String?,
+  val payments: List<ShiftPayment> = emptyList(),
+  val expected: Int? = null,
+) {
+  val expectedCash: Int
+    get() = expected ?: openCash + payments.filter { it.method == "cash" }.sumOf(ShiftPayment::amount)
+}
+
+data class OpenShiftRequest(val staffId: String, val point: String, val openCash: Int)
+
+data class CloseShiftRequest(val closeCash: Int, val reason: String? = null)
 
 enum class OnlinePaymentMethod(val wireValue: String) {
   CARD("card"),

@@ -431,15 +431,18 @@ model GiftCard {
 }
 
 model CashShift {
-  id        String    @id @default(cuid())
-  staffId   String
-  point     String
-  openCash  Int
-  closeCash Int?
-  diff      Int? // расхождение → approval + Risk
-  openedAt  DateTime  @default(now())
-  closedAt  DateTime?
-  payments  Payment[]
+  id                  String    @id @default(cuid())
+  staffId             String
+  point               String
+  openCash            Int
+  closeCash           Int?
+  closeReason         String?
+  openIdempotencyKey  String?   @unique
+  closeIdempotencyKey String?   @unique
+  diff                Int? // расхождение → approval + Risk
+  openedAt            DateTime  @default(now())
+  closedAt            DateTime?
+  payments            Payment[]
 
   @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
   @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy

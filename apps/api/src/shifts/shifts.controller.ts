@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Post,
@@ -66,9 +67,13 @@ export class ShiftsController {
   @ApiConflictResponse({ description: 'Staff already has an open shift.' })
   @Post('open')
   @RequirePermission('shift', 'open')
-  async open(@CurrentUser() user: AuthPrincipal, @Body() dto: OpenShiftDto) {
+  async open(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: OpenShiftDto,
+  ) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
-    return this.shifts.open({ ...dto, staffId }, staffId);
+    return this.shifts.open({ ...dto, staffId }, staffId, idempotencyKey);
   }
 
   @ApiOperation({
@@ -82,8 +87,13 @@ export class ShiftsController {
   })
   @Post(':id/close')
   @RequirePermission('shift', 'close')
-  async close(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CloseShiftDto) {
+  async close(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CloseShiftDto,
+  ) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
-    return this.shifts.close(id, dto, staffId);
+    return this.shifts.close(id, dto, staffId, idempotencyKey);
   }
 }

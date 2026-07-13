@@ -122,6 +122,45 @@ describe('Cash shift reconciliation (integration)', () => {
     expect(err.code).toBe('shift_already_open');
   });
 
+  it('serializes concurrent open replay and emits one ledger event', async () => {
+    const staffId = staff();
+    const command = { staffId, point: 'BISHKEK-1', openCash: 5000 };
+    const [first, second] = await Promise.all([
+      shifts.open(command, staffId, 'shift-open-replay'),
+      shifts.open(command, staffId, 'shift-open-replay'),
+    ]);
+    expect(first.id).toBe(second.id);
+    await expect(prisma.cashShift.count({ where: { staffId, closedAt: null } })).resolves.toBe(1);
+    await expect(prisma.auditEvent.count({ where: { type: 'shift.opened', refs: { has: first.id } } })).resolves.toBe(1);
+
+    const mismatch = await shifts
+      .open({ ...command, openCash: 9000 }, staffId, 'shift-open-replay')
+      .catch((error) => error);
+    expect(mismatch).toBeInstanceOf(ConflictError);
+    expect(mismatch.code).toBe('shift_idempotency_mismatch');
+  });
+
+  it('exact-replays concurrent close and rejects changed payload reuse', async () => {
+    const staffId = staff();
+    const shift = await shifts.open(
+      { staffId, point: 'BISHKEK-1', openCash: 5000 },
+      staffId,
+      'shift-close-open',
+    );
+    const [first, second] = await Promise.all([
+      shifts.close(shift.id, { closeCash: 5000 }, staffId, 'shift-close-replay'),
+      shifts.close(shift.id, { closeCash: 5000 }, staffId, 'shift-close-replay'),
+    ]);
+    expect(first.id).toBe(second.id);
+    await expect(prisma.auditEvent.count({ where: { type: 'shift.closed', refs: { has: shift.id } } })).resolves.toBe(1);
+
+    const mismatch = await shifts
+      .close(shift.id, { closeCash: 5100, reason: 'changed' }, staffId, 'shift-close-replay')
+      .catch((error) => error);
+    expect(mismatch).toBeInstanceOf(ConflictError);
+    expect(mismatch.code).toBe('shift_idempotency_mismatch');
+  });
+
   it('rejects closing an already-closed shift (409)', async () => {
     const shift = await shifts.open(
       { staffId: staff(), point: 'BISHKEK-1', openCash: 0 },

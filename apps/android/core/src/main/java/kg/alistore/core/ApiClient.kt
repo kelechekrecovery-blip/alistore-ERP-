@@ -8,7 +8,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
-  CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway {
+  CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
+  StaffAuthGateway, StaffOperationsGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -131,6 +132,46 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun updateSettings(request: UpdateCustomerSettingsRequest, token: String): CustomerSettings =
     this.request("customers/me/settings", "PATCH", request.toJson(), token).customerSettings()
 
+  override suspend fun staffLogin(username: String, password: String): StaffSession = request(
+    "staff-auth/login", "POST", JSONObject().put("username", username).put("password", password),
+  ).staffSession()
+
+  override suspend fun staffMe(accessToken: String): StaffPrincipal =
+    request("staff-auth/me", "GET", token = accessToken).staffPrincipal()
+
+  override suspend fun currentShift(token: String): CashShift? {
+    val current = requestObjectOrNull("shifts/current", token) ?: return null
+    return request("shifts/${current.getString("id")}", "GET", token = token).cashShift()
+  }
+
+  override suspend fun openShift(
+    request: OpenShiftRequest,
+    token: String,
+    idempotencyKey: String,
+  ): CashShift = this.request(
+    "shifts/open", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
+  ).cashShift()
+
+  override suspend fun closeShift(
+    shiftId: String,
+    request: CloseShiftRequest,
+    token: String,
+    idempotencyKey: String,
+  ): CashShift = this.request(
+    "shifts/$shiftId/close", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
+  ).cashShift()
+
+  override suspend fun staffOrders(status: String, token: String): List<CustomerOrder> =
+    requestArray("orders?status=$status", token).let { array ->
+      buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).order()) }
+    }
+
+  override suspend fun fulfillOrder(orderId: String, token: String): CustomerOrder =
+    request("orders/$orderId/fulfill", "POST", JSONObject(), token).order()
+
+  override suspend fun transitionOrder(orderId: String, to: String, token: String): CustomerOrder =
+    request("orders/$orderId/transition", "POST", JSONObject().put("to", to), token).order()
+
   override suspend fun uploadEvidence(
     entityType: String,
     entityId: String,
@@ -230,6 +271,23 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     }
   }
 
+  private suspend fun requestObjectOrNull(path: String, token: String): JSONObject? = withContext(Dispatchers.IO) {
+    val connection = open(path, "GET")
+    try {
+      connection.setRequestProperty("Authorization", "Bearer $token")
+      val status = connection.responseCode
+      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+      if (status !in 200..299) {
+        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
+        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" })
+      }
+      if (payload.isBlank() || payload == "null") null else JSONObject(payload)
+    } finally {
+      connection.disconnect()
+    }
+  }
+
   private fun open(path: String, method: String): HttpURLConnection {
     val cleanPath = path.removePrefix("/")
     return (URL("${baseUrl.trimEnd('/')}/$cleanPath").openConnection() as HttpURLConnection).apply {
@@ -254,11 +312,34 @@ private fun JSONObject.order() = CustomerOrder(
     buildList {
       for (index in 0 until array.length()) {
         val item = array.getJSONObject(index)
-        add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price")))
+        add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price"), item.nullableString("imei")))
       }
     }
   }.orEmpty(),
   createdAt = nullableString("createdAt"),
+  channel = optString("channel", "web"),
+)
+
+private fun JSONObject.staffSession() = StaffSession(
+  accessToken = getString("accessToken"), staffId = getString("staffId"), username = getString("username"),
+  role = getString("role"), totpEnabled = optBoolean("totpEnabled"),
+)
+
+private fun JSONObject.staffPrincipal() = StaffPrincipal(
+  id = getString("id"), username = getString("username"), role = getString("role"), active = getBoolean("active"),
+  totpEnabled = optBoolean("totpEnabled"), type = optString("typ", "staff"),
+)
+
+private fun JSONObject.cashShift() = CashShift(
+  id = getString("id"), staffId = getString("staffId"), point = getString("point"), openCash = getInt("openCash"),
+  closeCash = if (isNull("closeCash")) null else optInt("closeCash"), closeReason = nullableString("closeReason"),
+  diff = if (isNull("diff")) null else optInt("diff"), openedAt = getString("openedAt"), closedAt = nullableString("closedAt"),
+  payments = optJSONArray("payments")?.let { array -> buildList {
+    for (index in 0 until array.length()) array.getJSONObject(index).let { payment ->
+      add(ShiftPayment(payment.getString("id"), payment.getInt("amount"), payment.getString("method"), payment.getString("status")))
+    }
+  } }.orEmpty(),
+  expected = if (isNull("expected")) null else optInt("expected"),
 )
 
 private fun JSONObject.paymentIntent() = PaymentIntent(
