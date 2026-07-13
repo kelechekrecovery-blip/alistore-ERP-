@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
-export const PUSH_TOKEN_PATTERN = /^(?:(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]|[a-fA-F0-9]{64,200})$/;
+export const FCM_TOKEN_PATTERN = /^(?=.{20,4096}$)[A-Za-z0-9_:-]+$/;
+export const PUSH_TOKEN_PATTERN = /^(?:(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]|[a-fA-F0-9]{64,200}|(?=.{20,4096}$)[A-Za-z0-9_:-]+)$/;
 export const PUSH_PLATFORMS = ['ios', 'android', 'web', 'unknown'] as const;
 export const PUSH_SCOPES = ['anonymous', 'customer', 'staff'] as const;
 
@@ -11,10 +12,11 @@ export type PushScope = (typeof PUSH_SCOPES)[number];
 export class RegisterPushTokenDto {
   @ApiProperty({
     example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
-    description: 'Expo push token or native APNs device token.',
+    description: 'Expo, native APNs or FCM registration token.',
   })
   @IsString()
-  @Matches(PUSH_TOKEN_PATTERN, { message: 'token must be an Expo or APNs push token' })
+  @MaxLength(4096)
+  @Matches(PUSH_TOKEN_PATTERN, { message: 'token must be an Expo, APNs or FCM push token' })
   token!: string;
 
   @ApiProperty({ enum: PUSH_PLATFORMS, example: 'ios' })

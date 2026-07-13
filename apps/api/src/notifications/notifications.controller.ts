@@ -13,7 +13,7 @@ export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @ApiOperation({
-    summary: 'Register an Expo push token for the native mobile app',
+    summary: 'Register an Expo, APNs or FCM token for a native app',
   })
   @ApiBearerAuth()
   @ApiCreatedResponse({ description: 'Push token registered or refreshed.' })

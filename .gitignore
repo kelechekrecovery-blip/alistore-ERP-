@@ -17,6 +17,7 @@ apps/mobile/.expo/
 apps/mobile/.expo-shared/
 apps/mobile/AuthKey_*.p8
 apps/mobile/google-service-account*.json
+google-services.json
 apps/mobile/credentials.json
 apps/mobile/*.keystore
 apps/mobile/*.jks

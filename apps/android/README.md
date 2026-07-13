@@ -70,6 +70,9 @@ keeps a manual IMEI fallback, and attaches camera/gallery evidence to any suppor
 operation through the same staff JWT and server-derived Ledger actor. Tasks, Customer
 360, warranty and support actions use the same server contracts as web ERP. The Tasks
 tab reads PostgreSQL assignments, advances only the signed-in employee's task through
-guarded server states and reloads the authoritative result. FCM routing and physical-device
-certification remain the next Android Staff parity wave; real camera focus and barcode
-recognition still require physical-device certification.
+guarded server states and reloads the authoritative result. When
+`apps/android/staff/google-services.json` is present, Staff registers its FCM token under
+the active staff JWT, receives task notifications and routes `alistore-staff://` links to
+Tasks, Orders, Customer 360, warranty or support. A Staff Release build fails fast without
+both that ignored Firebase file and an HTTPS API URL. Live FCM delivery, camera focus and
+barcode recognition still require physical-device certification.

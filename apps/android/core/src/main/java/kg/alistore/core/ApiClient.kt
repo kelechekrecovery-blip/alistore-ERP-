@@ -9,7 +9,8 @@ import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
-  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway {
+  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway,
+  PushRegistrationGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -190,6 +191,15 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 
   override suspend fun updateStaffTask(taskId: String, status: String, token: String): StaffTask =
     request("staff-tasks/mine/$taskId", "PATCH", JSONObject().put("status", status), token).staffTask()
+
+  override suspend fun registerPushToken(token: String, platform: String, deviceId: String, accessToken: String) {
+    request(
+      "notifications/push-tokens",
+      "POST",
+      JSONObject().put("token", token).put("platform", platform).put("deviceId", deviceId).put("scope", "staff"),
+      accessToken,
+    )
+  }
 
   override suspend fun uploadEvidence(
     entityType: String,

@@ -36,7 +36,7 @@ Required for a production-ready report:
 - WhatsApp: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, webhook verify token.
 - Apple login: `APPLE_CLIENT_ID` plus Apple callback/client configuration.
 - Campaign delivery: `NOTIFICATION_TRANSPORT=channels` with Novu, SMTP, Expo Push, Telegram, or WhatsApp credentials.
-- Native mobile push: `EXPO_PUBLIC_EAS_PROJECT_ID`, `EXPO_TOKEN`, and EAS/APNs/FCM push credentials.
+- Native Android Staff push: `FCM_SERVICE_ACCOUNT_JSON` (or the mounted `FCM_SERVICE_ACCOUNT_KEY_PATH`), ignored app `google-services.json`, and `FCM_PROVIDER_CERTIFIED=false` until physical-device delivery/routing passes. iOS still requires APNs credentials and device certification; Expo remains legacy compatibility only.
 - Media: S3/MinIO values for production Evidence Vault storage.
 - Observability: `SENTRY_DSN` or compatible GlitchTip/Sentry DSN.
 - `POS_HARDWARE_CERTIFIED=true` only after the on-site hardware checks below pass.
@@ -72,7 +72,7 @@ Before setting the strict gate to green, verify live callbacks:
 - WhatsApp Cloud API can send a template/test message and validate the webhook token.
 - Apple Sign in returns an identity token accepted by `POST /auth/social/apple`.
 - Campaign delivery sends through the selected channel transport without fallback logs.
-- Native iOS/Android app obtains an Expo push token and `POST /notifications/push-tokens` stores it.
+- Native Android Staff obtains an FCM token, binds it to the active staff JWT through `POST /notifications/push-tokens`, receives a task notification and opens its scoped deep link. Native iOS separately proves APNs registration and delivery.
 - Sentry/GlitchTip receives a controlled test error from the production API.
 
 ## 5. POS hardware certification

@@ -47,8 +47,8 @@ describe('External readiness report', () => {
       APPLE_PRIVATE_KEY: 'set',
       NOTIFICATION_TRANSPORT: 'channels',
       NOVU_API_KEY: 'set',
-      EXPO_PUBLIC_EAS_PROJECT_ID: 'set',
-      EXPO_TOKEN: 'set',
+      FCM_SERVICE_ACCOUNT_JSON: '{"project_id":"test"}',
+      FCM_PROVIDER_CERTIFIED: 'true',
       POS_HARDWARE_CERTIFIED: 'true',
       S3_ENDPOINT: 'https://account.eu.r2.cloudflarestorage.com',
       MINIO_BUCKET: 'alistore-media-prod',
@@ -101,6 +101,13 @@ describe('External readiness report', () => {
       .find((check) => check.id === 'payment_gateway');
     expect(payment?.status).toBe('manual_required');
     expect(payment?.blocking).toBe(true);
+  });
+
+  it('keeps FCM manual until physical-device delivery is certified', () => {
+    const env = { FCM_SERVICE_ACCOUNT_KEY_PATH: '/run/secrets/fcm.json', FCM_PROVIDER_CERTIFIED: 'false' };
+    const push = buildExternalReadinessReport((name) => env[name as keyof typeof env]).checks
+      .find((check) => check.id === 'native_push_android');
+    expect(push).toMatchObject({ status: 'manual_required', blocking: true, missingEnv: [] });
   });
 
   it('makes live providers optional in public demo but still requires private storage and monitoring', () => {

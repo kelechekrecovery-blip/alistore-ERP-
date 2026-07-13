@@ -44,12 +44,14 @@ describe('Staff tasks HTTP', () => {
   });
 
   afterAll(async () => {
+    await prisma.outboxMessage.deleteMany({ where: { template: 'staff_task_created' } });
     await prisma.staffTask.deleteMany({ where: { createdBy: { username: { endsWith: String(run) } } } });
     await prisma.staffUser.deleteMany({ where: { username: { endsWith: String(run) } } });
     await app.close();
   });
 
   beforeEach(async () => {
+    await prisma.outboxMessage.deleteMany({ where: { template: 'staff_task_created' } });
     await prisma.staffTask.deleteMany({ where: { createdBy: { username: { endsWith: String(run) } } } });
     await prisma.auditEvent.deleteMany({ where: { type: { startsWith: 'staff_task.' } } });
   });
@@ -63,6 +65,10 @@ describe('Staff tasks HTTP', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ title: '  Обновить ценники  ', assigneeId: sellerId, priority: 'high' }).expect(201);
     expect(created.body).toMatchObject({ title: 'Обновить ценники', assigneeId: sellerId, status: 'open' });
+    const queued = await prisma.outboxMessage.findMany({ where: { template: 'staff_task_created' } });
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({ channel: 'push', recipient: sellerId, status: 'pending' });
+    expect(queued[0].payload).toMatchObject({ taskId: created.body.id, deepLink: `alistore-staff://tasks/${created.body.id}` });
 
     const mine = await request(app.getHttpServer()).get('/staff-tasks/mine')
       .set('Authorization', `Bearer ${sellerToken}`).expect(200);

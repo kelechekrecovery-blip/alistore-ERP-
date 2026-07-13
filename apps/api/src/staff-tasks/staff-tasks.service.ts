@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { CreateStaffTaskDto } from './staff-tasks.dto';
 
 const SELF_TRANSITIONS: Record<StaffTaskStatus, StaffTaskStatus[]> = {
@@ -15,7 +16,11 @@ const SELF_TRANSITIONS: Record<StaffTaskStatus, StaffTaskStatus[]> = {
 
 @Injectable()
 export class StaffTasksService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
+  ) {}
 
   mine(staffId: string) {
     return this.prisma.staffTask.findMany({
@@ -34,6 +39,17 @@ export class StaffTasksService {
         dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
         relatedType: dto.relatedType?.trim() || undefined, relatedId: dto.relatedId?.trim() || undefined,
       } });
+      await this.outbox.enqueueOnTx(tx, {
+        channel: 'push',
+        recipient: task.assigneeId,
+        template: 'staff_task_created',
+        payload: {
+          title: 'Новая задача AliStore',
+          body: task.title,
+          taskId: task.id,
+          deepLink: `alistore-staff://tasks/${task.id}`,
+        },
+      });
       return { result: task, events: [{
         type: EventType.StaffTaskCreated, actor,
         payload: { taskId: task.id, assigneeId: task.assigneeId, priority: task.priority },

@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: complete authenticated Android Staff FCM registration, delivery and deep-link routing.
+- Files changed: FCM HTTP v1 outbox transport and readiness contract; transactional Staff task notification; native token registry validation; Android Firebase wiring, notification service/permission/channel, secure staff-session registration and route parser; API/JVM/Compose tests; release fail-fast and readiness documentation.
+- Result: creating an assigned Staff task now writes its Ledger mutation and durable push outbox message atomically. The worker resolves enabled Android tokens by staff/customer ownership, authenticates to FCM HTTP v1 with a short-lived service-account OAuth assertion, sends string-only scoped data, disables `UNREGISTERED` tokens and returns temporary provider failures for outbox retry. Staff registers only under an active stored staff JWT and notification taps route to Tasks, Orders, Customer 360, warranty or support without trusting a client status mutation.
+- Checks run: production dependency audit 0 vulnerabilities; API build; API Jest 110/110 suites and 417/417 tests; Playwright 22/22; Android unit/Lint; four Debug APK builds; API 36 Compose 21/21; deliberate Staff Release rejection without ignored `google-services.json`; `git diff --check`.
+- Outcome: Android Staff FCM is complete at software/emulator level. Live delivery is deliberately not certified until owner-provided Firebase service account/app config and a physical Android device pass token rotation, background/terminated delivery and tap-routing smoke.
+- Next step: implement the Android Courier assignment → route → delivery/failure → COD handover vertical with durable offline replay.
+
+## 2026-07-13
+
 - Task: replace Android/web Staff task placeholders with one server-authoritative operational task workflow.
 - Files changed: StaffTask Prisma model/migration; NestJS task DTO/service/controller/RBAC/Event Ledger; Android typed gateway, Compose task screen and JVM/API 36 regressions; web task client/error states; isolated Next E2E build directory; Playwright task lifecycle; backlog and readiness documentation.
 - Result: an admin/owner can assign a task to an active employee; only that authenticated employee can list or advance it through `open → in_progress → completed`. Foreign, revoked and stale-role access is rejected, illegal/repeated transitions conflict, and completion writes one Ledger event. Web Staff and Android Staff read and update the same PostgreSQL record, with loading, empty, error and retry states.

@@ -2,10 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.CAMERA" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-feature android:name="android.hardware.camera.any" android:required="false" />
   <application android:label="AliStore Staff" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:usesCleartextTraffic="${usesCleartextTraffic}">
-    <activity android:name=".MainActivity" android:exported="true">
+    <service android:name=".StaffFirebaseMessagingService" android:exported="false">
+      <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
+    </service>
+    <activity android:name=".MainActivity" android:launchMode="singleTop" android:exported="true">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+      <intent-filter><action android:name="ALISTORE_STAFF_PUSH"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
       <intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="alistore-staff"/></intent-filter>
     </activity>
   </application>

@@ -67,13 +67,14 @@ fun AliStoreApp(
   apiBaseUrl: String,
   deepLinkUrl: String? = null,
   deepLinkRevision: Long = 0,
+  staffPushRegistrar: StaffPushRegistrar? = null,
 ) {
   if (role == AppRole.CLIENT) {
     ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision)
     return
   }
   if (role == AppRole.STAFF) {
-    StaffApp(apiBaseUrl)
+    StaffApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, staffPushRegistrar)
     return
   }
   RoleApp(role)

@@ -68,9 +68,10 @@ fun StaffCustomer360Screen(
   session: StaffSession,
   gateway: StaffCustomerGateway,
   modifier: Modifier = Modifier,
+  initialCustomerId: String? = null,
 ) {
-  var customerId by rememberSaveable { mutableStateOf("") }
-  var requestedId by rememberSaveable { mutableStateOf<String?>(null) }
+  var customerId by rememberSaveable { mutableStateOf(initialCustomerId.orEmpty()) }
+  var requestedId by rememberSaveable { mutableStateOf(initialCustomerId) }
   var overview by remember { mutableStateOf<Customer360?>(null) }
   var loading by remember { mutableStateOf(false) }
   var busyId by remember { mutableStateOf<String?>(null) }
@@ -79,6 +80,13 @@ fun StaffCustomer360Screen(
   val scope = rememberCoroutineScope()
   val focus = LocalFocusManager.current
   val keyboard = LocalSoftwareKeyboardController.current
+
+  LaunchedEffect(initialCustomerId) {
+    if (!initialCustomerId.isNullOrBlank()) {
+      customerId = initialCustomerId
+      requestedId = initialCustomerId
+    }
+  }
 
   LaunchedEffect(requestedId, revision) {
     val id = requestedId ?: return@LaunchedEffect

@@ -147,6 +147,8 @@ const CHECKS: CheckDefinition[] = [
         'WHATSAPP_PHONE_NUMBER_ID',
       ],
       ['NOTIFICATION_TRANSPORT', 'EXPO_PUBLIC_EAS_PROJECT_ID'],
+      ['NOTIFICATION_TRANSPORT', 'FCM_SERVICE_ACCOUNT_JSON'],
+      ['NOTIFICATION_TRANSPORT', 'FCM_SERVICE_ACCOUNT_KEY_PATH'],
     ],
     optionalEnv: [
       'NOVU_API_URL',
@@ -162,19 +164,22 @@ const CHECKS: CheckDefinition[] = [
     note: 'Segment Builder and ROI are ready; set NOTIFICATION_TRANSPORT=channels/providers or a single transport with Novu, SMTP, Expo Push, Telegram, or WhatsApp credentials.',
   },
   {
-    id: 'native_push',
+    id: 'native_push_android',
     area: 'mobile',
-    title: 'Native push notification credentials',
-    requiredEnv: ['EXPO_PUBLIC_EAS_PROJECT_ID', 'EXPO_TOKEN'],
+    title: 'Android FCM push credentials',
+    requiredAny: [['FCM_SERVICE_ACCOUNT_JSON'], ['FCM_SERVICE_ACCOUNT_KEY_PATH']],
+    completionMarkerEnv: 'FCM_PROVIDER_CERTIFIED',
     optionalEnv: [
-      'EXPO_PUSH_API_URL',
-      'EXPO_PUSH_ACCESS_TOKEN',
-      'FCM_SERVICE_ACCOUNT_KEY_PATH',
-      'APNS_KEY_ID',
-      'APNS_TEAM_ID',
+      'EXPO_PUBLIC_EAS_PROJECT_ID',
+      'EXPO_TOKEN',
+    ],
+    manualChecks: [
+      'Staff token registered under an active staff JWT on a physical Android device',
+      'Foreground and background task notifications open the native Tasks screen',
+      'Revoked tokens are disabled after a provider rejection',
     ],
     blocking: true,
-    note: 'Native iOS/Android app can register Expo push tokens; EAS project and push credentials must be configured before store QA.',
+    note: 'Native Staff FCM registration, delivery and routing are implemented; production service account and physical-device delivery must be certified before release.',
   },
   {
     id: 'pos_hardware',
@@ -251,7 +256,9 @@ function evaluateCheck(definition: CheckDefinition, env: EnvReader, demoMode: bo
 
   let status: ReadinessStatus;
   if (definition.completionMarkerEnv) {
-    const missingCredentials = (definition.requiredEnv ?? []).some((name) => !hasEnv(env, name));
+    const missingCredentials = definition.requiredAny
+      ? !anySatisfied
+      : (definition.requiredEnv ?? []).some((name) => !hasEnv(env, name));
     status = missingCredentials
       ? 'missing'
       : env(definition.completionMarkerEnv) === 'true'

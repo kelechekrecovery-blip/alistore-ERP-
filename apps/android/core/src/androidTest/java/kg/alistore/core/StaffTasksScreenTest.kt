@@ -54,6 +54,30 @@ class StaffTasksScreenTest {
     compose.waitUntil(5_000) { gateway.loads == 1 }
     compose.onNodeWithText("Задач нет").assertIsDisplayed()
   }
+
+  @Test fun staffPushDeepLinkOpensTasksAndRegistersTheSignedInSession() {
+    val tasks = UiTaskGateway()
+    var registered: StaffSession? = null
+    compose.setContent {
+      MaterialTheme {
+        StaffSignedInScreen(
+          session = session,
+          gateway = NoopStaffOperations,
+          evidenceGateway = NoopStaffEvidence,
+          customerGateway = NoopStaffCustomer,
+          taskGateway = tasks,
+          deepLinkUrl = "alistore-staff://tasks/task-1",
+          deepLinkRevision = 1,
+          pushRegistrar = StaffPushRegistrar { registered = it },
+          onLogout = {},
+        )
+      }
+    }
+
+    compose.waitUntil(5_000) { tasks.loads == 1 && registered != null }
+    compose.onNodeWithText("Обновить ценники").assertIsDisplayed()
+    assertEquals(session, registered)
+  }
 }
 
 private class UiTaskGateway(private val empty: Boolean = false) : StaffTaskGateway {
@@ -79,4 +103,27 @@ private class UiTaskGateway(private val empty: Boolean = false) : StaffTaskGatew
     this.status = status
     return task()
   }
+}
+
+private object NoopStaffOperations : StaffOperationsGateway {
+  override suspend fun currentShift(token: String): CashShift? = null
+  override suspend fun openShift(request: OpenShiftRequest, token: String, idempotencyKey: String) = error("unused")
+  override suspend fun closeShift(shiftId: String, request: CloseShiftRequest, token: String, idempotencyKey: String) = error("unused")
+  override suspend fun staffOrders(status: String, token: String): List<CustomerOrder> = emptyList()
+  override suspend fun fulfillOrder(orderId: String, token: String) = error("unused")
+  override suspend fun transitionOrder(orderId: String, to: String, token: String) = error("unused")
+}
+
+private object NoopStaffEvidence : StaffEvidenceGateway {
+  override suspend fun uploadStaffEvidence(
+    entityType: String, entityId: String, label: String, fileName: String,
+    mimeType: String, bytes: ByteArray, token: String,
+  ) = error("unused")
+}
+
+private object NoopStaffCustomer : StaffCustomerGateway {
+  override suspend fun customerOverview(customerId: String, token: String) = error("unused")
+  override suspend fun transitionWarranty(caseId: String, to: String, token: String) = error("unused")
+  override suspend fun transitionSupport(ticketId: String, to: String, token: String) = error("unused")
+  override suspend fun escalateSupport(ticketId: String, token: String) = error("unused")
 }

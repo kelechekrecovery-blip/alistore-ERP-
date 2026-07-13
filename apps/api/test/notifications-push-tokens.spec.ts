@@ -6,9 +6,10 @@ describe('Notifications push token registry (integration)', () => {
   let prisma: PrismaService;
   let notifications: NotificationsService;
 
-  it('accepts native APNs tokens while retaining Expo token compatibility', () => {
+  it('accepts native APNs and FCM tokens while retaining Expo compatibility', () => {
     expect(PUSH_TOKEN_PATTERN.test('ab'.repeat(32))).toBe(true);
     expect(PUSH_TOKEN_PATTERN.test('ExponentPushToken[customer123]')).toBe(true);
+    expect(PUSH_TOKEN_PATTERN.test('d3vice-token_1234567890:APA91b-example')).toBe(true);
     expect(PUSH_TOKEN_PATTERN.test('not-a-push-token')).toBe(false);
   });
 
@@ -95,5 +96,19 @@ describe('Notifications push token registry (integration)', () => {
     expect(registered.scope).toBe('staff');
     expect(registered.staffId).toBe(staff.id);
     expect(registered.customerId).toBeNull();
+  });
+
+  it('binds an FCM registration token to an active Android staff session', async () => {
+    const staff = await prisma.staffUser.create({
+      data: { username: 'push-android-staff', passwordHash: 'not-used', role: 'seller' },
+    });
+    const token = 'android-device-token_1234567890:APA91b-alistore';
+
+    const registered = await notifications.registerPushToken(
+      { token, platform: 'android', deviceId: 'staff-android-installation' },
+      { typ: 'staff', customerId: staff.id, role: staff.role },
+    );
+
+    expect(registered).toMatchObject({ token, scope: 'staff', staffId: staff.id, platform: 'android' });
   });
 });

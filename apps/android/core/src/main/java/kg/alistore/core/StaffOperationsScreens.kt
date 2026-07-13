@@ -70,7 +70,12 @@ internal val StaffLime = Color(0xFFC8F04B)
 private data class StaffTab(val label: String, val icon: ImageVector)
 
 @Composable
-fun StaffApp(apiBaseUrl: String) {
+fun StaffApp(
+  apiBaseUrl: String,
+  deepLinkUrl: String? = null,
+  deepLinkRevision: Long = 0,
+  pushRegistrar: StaffPushRegistrar? = null,
+) {
   val context = LocalContext.current.applicationContext
   val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   val manager = remember(apiBaseUrl) {
@@ -90,6 +95,9 @@ fun StaffApp(apiBaseUrl: String) {
         api,
         api,
         api,
+        deepLinkUrl = deepLinkUrl,
+        deepLinkRevision = deepLinkRevision,
+        pushRegistrar = pushRegistrar,
         onLogout = { state = manager.logout() },
       )
     }
@@ -153,9 +161,13 @@ fun StaffSignedInScreen(
   evidenceGateway: StaffEvidenceGateway,
   customerGateway: StaffCustomerGateway,
   taskGateway: StaffTaskGateway,
+  deepLinkUrl: String? = null,
+  deepLinkRevision: Long = 0,
+  pushRegistrar: StaffPushRegistrar? = null,
   onLogout: () -> Unit,
 ) {
   var selected by rememberSaveable { mutableStateOf(0) }
+  var routedCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
   val tabs = listOf(
     StaffTab("Главная", Icons.Default.Home),
     StaffTab("Заказы", Icons.Default.ShoppingCart),
@@ -163,6 +175,15 @@ fun StaffSignedInScreen(
     StaffTab("Сканер", Icons.Default.Search),
     StaffTab("Смена", Icons.Default.AccountCircle),
   )
+  LaunchedEffect(session.accessToken, pushRegistrar) {
+    if (pushRegistrar != null) runCatching { pushRegistrar.register(session) }
+  }
+  LaunchedEffect(deepLinkUrl, deepLinkRevision) {
+    parseStaffPushRoute(deepLinkUrl)?.let { route ->
+      selected = route.tab
+      routedCustomerId = route.customerId
+    }
+  }
   Scaffold(
     containerColor = StaffInk,
     contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -186,7 +207,7 @@ fun StaffSignedInScreen(
       2 -> StaffTasksScreen(session, taskGateway, Modifier.padding(padding))
       3 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
       4 -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding))
-      else -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding))
+      else -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding), routedCustomerId)
     }
   }
 }
