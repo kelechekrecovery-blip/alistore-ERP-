@@ -68,5 +68,5 @@ cash discrepancies require a reason before the API writes the result to Event Le
 The Scanner tab uses bundled ML Kit over CameraX for EAN-8, EAN-13, Code128 and QR,
 keeps a manual IMEI fallback, and attaches camera/gallery evidence to any supported
 operation through the same staff JWT and server-derived Ledger actor. Tasks, Customer
-360, support/warranty actions and push remain the next Android Staff parity wave;
+general tasks, push routing and physical-device certification remain the next Android Staff parity wave;
 real camera focus and barcode recognition still require physical-device certification.

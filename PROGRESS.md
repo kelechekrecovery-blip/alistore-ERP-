@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: complete Android Staff Customer 360 with guarded warranty/support operations and close the remaining active-staff read gap.
+- Files changed: customer API authorization/module/security test; Android typed models/API/gateway; Customer 360 Compose screen/navigation; JVM and API 36 UI tests; backlog, gap map and Android readiness docs.
+- Result: Staff can search an internal customer ID and inspect server-masked profile data, LTV, purchases, debt, recent orders, warranties and support tickets. Warehouse/admin roles can advance warranty cases; admin/owner roles can transition or escalate support. Every action sends the stored staff JWT, reloads server-authoritative state and surfaces permission/error/empty/loading states. Revoked staff and stale-role tokens now fail Customer 360 reads.
+- Checks run: `npm run api:build`; targeted customer PII/IDOR Jest 4/4; full API Jest 108/108 suites and 409/409 tests; four-APK `npm run android:build`; Android unit/Lint; API 36 Compose 18/18; targeted visual regression and manual screenshot inspection; `git diff --check`.
+- Outcome: Android Staff Customer 360, warranty and support vertical is complete at emulator level. Physical camera/push certification is not claimed.
+- Next step: implement Android Staff general tasks and FCM routing, then begin the Courier assignment/delivery/COD vertical.
+
+## 2026-07-13
+
 - Task: complete Android Staff barcode/IMEI scanning and Evidence Vault capture/upload.
 - Files changed: Android CameraX/ML Kit dependencies and camera permission; Staff scanner/Evidence Compose screen; staff-specific multipart gateway; JVM and API 36 Compose/camera regressions; Android readme, architecture gap map and backlog tracking.
 - Result: Android Staff now scans EAN-8, EAN-13, Code128 and QR through a lifecycle-bound CameraX analyzer with a bundled offline ML Kit model, accepts manual IMEI/reader input, and maps the value into an Evidence entity. Staff can choose all seven supported entity types, add a label, capture/select a photo and upload it with the stored staff JWT; the existing API validates the entity, derives the actor and writes `evidence.attached` to Event Ledger.
