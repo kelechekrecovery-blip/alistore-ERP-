@@ -59,12 +59,12 @@ import java.util.UUID
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 
-private val StaffInk = Color(0xFF151515)
-private val StaffSurface = Color(0xFF222222)
-private val StaffLine = Color(0xFF373737)
-private val StaffMuted = Color(0xFFA7A7A7)
-private val StaffCoral = Color(0xFFFF6B57)
-private val StaffLime = Color(0xFFC8F04B)
+internal val StaffInk = Color(0xFF151515)
+internal val StaffSurface = Color(0xFF222222)
+internal val StaffLine = Color(0xFF373737)
+internal val StaffMuted = Color(0xFFA7A7A7)
+internal val StaffCoral = Color(0xFFFF6B57)
+internal val StaffLime = Color(0xFFC8F04B)
 
 private data class StaffTab(val label: String, val icon: ImageVector)
 
@@ -85,6 +85,7 @@ fun StaffApp(apiBaseUrl: String) {
       is StaffAuthState.Failed -> StaffLoginScreen(manager, current.message) { state = it }
       is StaffAuthState.SignedIn -> StaffSignedInScreen(
         current.session,
+        api,
         api,
         onLogout = { state = manager.logout() },
       )
@@ -146,6 +147,7 @@ fun StaffLoginScreen(
 fun StaffSignedInScreen(
   session: StaffSession,
   gateway: StaffOperationsGateway,
+  evidenceGateway: StaffEvidenceGateway,
   onLogout: () -> Unit,
 ) {
   var selected by rememberSaveable { mutableStateOf(0) }
@@ -175,7 +177,7 @@ fun StaffSignedInScreen(
     when (selected) {
       0 -> StaffHome(session, Modifier.padding(padding)) { selected = it }
       1 -> StaffOrdersScreen(session, gateway, Modifier.padding(padding))
-      2 -> StaffScannerPending(Modifier.padding(padding))
+      2 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
       else -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding))
     }
   }
@@ -393,11 +395,6 @@ fun StaffShiftScreen(
       }
     }
   }
-}
-
-@Composable
-private fun StaffScannerPending(modifier: Modifier) {
-  StaffEmpty("Сканер", "Камера, EAN, QR и IMEI будут подключены в следующем вертикальном сценарии", modifier.statusBarsPadding().testTag("staff-scanner-pending"))
 }
 
 @Composable

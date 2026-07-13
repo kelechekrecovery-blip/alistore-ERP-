@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
-  StaffAuthGateway, StaffOperationsGateway {
+  StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -179,6 +179,26 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     mimeType: String,
     bytes: ByteArray,
     token: String,
+  ): EvidenceAttachment = uploadEvidenceRequest(entityType, entityId, "Фото клиента", fileName, mimeType, bytes, token)
+
+  override suspend fun uploadStaffEvidence(
+    entityType: String,
+    entityId: String,
+    label: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
+  ): EvidenceAttachment = uploadEvidenceRequest(entityType, entityId, label, fileName, mimeType, bytes, token)
+
+  private suspend fun uploadEvidenceRequest(
+    entityType: String,
+    entityId: String,
+    label: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
   ): EvidenceAttachment = withContext(Dispatchers.IO) {
     val boundary = "AliStore-${UUID.randomUUID()}"
     val connection = open("evidence/images", "POST")
@@ -192,7 +212,7 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
         }
         field("entityType", entityType)
         field("entityId", entityId)
-        field("label", "Фото клиента")
+        field("label", label)
         output.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\nContent-Type: $mimeType\r\n\r\n".toByteArray())
         output.write(bytes)
         output.write("\r\n--$boundary--\r\n".toByteArray())
