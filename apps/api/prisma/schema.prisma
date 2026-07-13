@@ -179,19 +179,76 @@ enum ExpenseStatus {
 
 // ---------- CORE ----------
 model Customer {
-  id         String             @id @default(cuid())
-  phone      String             @unique // PII — маскировать младшим ролям
-  name       String
-  consent    Boolean            @default(false) // маркетинг только при true
-  segments   String[]
-  ltv        Int                @default(0)
-  identities CustomerIdentity[]
-  pushTokens PushToken[]
-  orders     Order[]
-  tradeIns   TradeInDevice[]
-  createdAt  DateTime           @default(now())
+  id             String               @id @default(cuid())
+  phone          String               @unique // PII — маскировать младшим ролям
+  name           String
+  consent        Boolean              @default(false) // маркетинг только при true
+  segments       String[]
+  ltv            Int                  @default(0)
+  identities     CustomerIdentity[]
+  pushTokens     PushToken[]
+  addresses      CustomerAddress[]
+  preferences    CustomerPreferences?
+  loyaltyEntries LoyaltyEntry[]
+  coupons        CustomerCoupon[]
+  orders         Order[]
+  tradeIns       TradeInDevice[]
+  createdAt      DateTime             @default(now())
   // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
   // без @relation, чтобы очистка в тестах не каскадила через FK.
+}
+
+model CustomerAddress {
+  id             String   @id @default(cuid())
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title          String
+  text           String
+  comment        String?
+  isPrimary      Boolean  @default(false)
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([customerId, isPrimary])
+}
+
+model CustomerPreferences {
+  customerId String   @id
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  push       Boolean  @default(true)
+  whatsapp   Boolean  @default(true)
+  service    Boolean  @default(true)
+  promos     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+}
+
+model LoyaltyEntry {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String
+  amount     Int
+  sourceRef  String?   @unique
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId, createdAt])
+}
+
+model CustomerCoupon {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title      String
+  code       String
+  valueLabel String
+  expiresAt  DateTime?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  @@unique([customerId, code])
+  @@index([customerId, active])
 }
 
 model CustomerIdentity {
@@ -417,13 +474,13 @@ model Reservation {
 }
 
 model Return {
-  id        String       @id @default(cuid())
-  orderId   String
-  reason    String
-  status    ReturnStatus @default(requested)
-  refundId  String? // refund → approval, тем же способом
-  idempotencyKey String? @unique
-  createdAt DateTime     @default(now())
+  id             String       @id @default(cuid())
+  orderId        String
+  reason         String
+  status         ReturnStatus @default(requested)
+  refundId       String? // refund → approval, тем же способом
+  idempotencyKey String?      @unique
+  createdAt      DateTime     @default(now())
 
   @@index([orderId])
   @@index([status])
@@ -643,17 +700,17 @@ model Campaign {
 }
 
 model SupportTicket {
-  id         String       @id @default(cuid())
-  customerId String // ссылка строкой, без @relation (см. Customer)
-  channel    String // web | app | whatsapp | telegram | call | store
-  subject    String
-  body       String?
-  priority   String // normal | high | urgent (эскалация повышает уровень)
-  sla        DateTime
-  status     TicketStatus @default(new)
-  assignee   String?
-  idempotencyKey String? @unique
-  createdAt  DateTime     @default(now())
+  id             String       @id @default(cuid())
+  customerId     String // ссылка строкой, без @relation (см. Customer)
+  channel        String // web | app | whatsapp | telegram | call | store
+  subject        String
+  body           String?
+  priority       String // normal | high | urgent (эскалация повышает уровень)
+  sla            DateTime
+  status         TicketStatus @default(new)
+  assignee       String?
+  idempotencyKey String?      @unique
+  createdAt      DateTime     @default(now())
 
   @@index([customerId])
   @@index([status])

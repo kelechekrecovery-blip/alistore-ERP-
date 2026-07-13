@@ -3,12 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import {
-  loadNotificationPrefs,
-  saveNotificationPrefs,
-  type NotificationPrefs,
-} from '@/lib/account-local';
-import { fetchCustomerOverview, setConsent } from '@/lib/crm';
+import { fetchMySettings, updateMySettings, type CustomerSettings } from '@/lib/api';
 
 const notifications = [
   { icon: '📦', title: 'Заказ собирается', text: 'Скоро передадим курьеру', time: '5 мин назад', bg: '#221E19' },
@@ -19,32 +14,26 @@ const notifications = [
 
 export default function NotificationsPage() {
   const { user, authed } = useAuth();
-  const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
-  const [consentState, setConsentState] = useState<'unknown' | 'on' | 'off' | 'saving'>('unknown');
+  const [settings, setSettings] = useState<CustomerSettings | null>(null);
+  const [saving, setSaving] = useState<keyof CustomerSettings | null>(null);
+  const [error, setError] = useState('');
 
-  useEffect(() => setPrefs(loadNotificationPrefs()), []);
-  useEffect(() => { if (prefs) saveNotificationPrefs(prefs); }, [prefs]);
   useEffect(() => {
-    if (!user?.customerId) return;
-    authed((t) => fetchCustomerOverview(user.customerId, t))
-      .then((ov) => setConsentState(ov.customer.consent ? 'on' : 'off'))
-      .catch(() => setConsentState('unknown'));
-  }, [user?.customerId, authed]);
+    if (!user) return;
+    authed(fetchMySettings).then(setSettings).catch(() => setError('Не удалось загрузить настройки связи'));
+  }, [user, authed]);
 
-  function togglePref(key: keyof NotificationPrefs) {
-    setPrefs((p) => (p ? { ...p, [key]: !p[key] } : p));
-  }
-
-  async function toggleConsent() {
-    if (!user?.customerId || consentState === 'saving') return;
-    const next = consentState !== 'on';
-    const prev = consentState;
-    setConsentState('saving');
+  async function toggle(key: 'push' | 'whatsapp' | 'service' | 'promos' | 'consent') {
+    if (!settings || saving) return;
+    const previous = settings;
+    const next = { ...settings, [key]: !settings[key] };
+    setSettings(next); setSaving(key); setError('');
     try {
-      await authed((token) => setConsent(user.customerId, next, token));
-      setConsentState(next ? 'on' : 'off');
+      setSettings(await authed((token) => updateMySettings({ [key]: next[key] }, token)));
     } catch {
-      setConsentState(prev);
+      setSettings(previous); setError('Не удалось сохранить настройку');
+    } finally {
+      setSaving(null);
     }
   }
 
@@ -61,34 +50,38 @@ export default function NotificationsPage() {
         </div>
       ))}
 
+      {!user && <a href="/login?next=/account/notifications" className="mt-4 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-4 text-sm text-[#A79C92]">Войдите по OTP, чтобы синхронизировать каналы.</a>}
+      {error && <div className="mt-3 rounded-[13px] border border-[#FF8A7A]/30 bg-[#221E19] p-4 text-sm text-[#FF8A7A]">{error}</div>}
+
       <div className="mt-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
         <div className="mb-3 text-sm font-semibold">Каналы</div>
-        {prefs && (
+        {settings && (
           <>
-            <Toggle label="Push в приложении" on={prefs.push} onClick={() => togglePref('push')} />
-            <Toggle label="WhatsApp" on={prefs.whatsapp} onClick={() => togglePref('whatsapp')} />
-            <Toggle label="Сервисные статусы" on={prefs.service} onClick={() => togglePref('service')} />
-            <Toggle label="Акции и промокоды" on={prefs.promos} onClick={() => togglePref('promos')} />
+            <Toggle label="Push в приложении" on={settings.push} disabled={Boolean(saving)} onClick={() => toggle('push')} />
+            <Toggle label="WhatsApp" on={settings.whatsapp} disabled={Boolean(saving)} onClick={() => toggle('whatsapp')} />
+            <Toggle label="Сервисные статусы" on={settings.service} disabled={Boolean(saving)} onClick={() => toggle('service')} />
+            <Toggle label="Акции и промокоды" on={settings.promos} disabled={Boolean(saving)} onClick={() => toggle('promos')} />
           </>
         )}
+        {user && !settings && !error && <div className="py-5 text-center text-sm text-[#A79C92]">Загружаем каналы…</div>}
       </div>
 
-      <button type="button" onClick={toggleConsent} className="mt-3 flex w-full items-center justify-between rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
+      <button type="button" disabled={!settings || Boolean(saving)} onClick={() => toggle('consent')} className="mt-3 flex w-full items-center justify-between rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left disabled:opacity-60">
         <span>
           <span className="block text-sm font-semibold">Маркетинговое согласие</span>
           <span className="mt-1 block text-[12px] leading-relaxed text-[#8A7F76]">Выключение останавливает кампании и промо-рассылки.</span>
         </span>
-        <span className={`ml-3 flex-shrink-0 rounded-chip px-3 py-1 text-[11px] font-bold ${consentState === 'on' ? 'bg-lime text-lime-ink' : 'bg-[#2E2822] text-[#8A7F76]'}`}>
-          {consentState === 'saving' ? '...' : consentState === 'on' ? 'ON' : 'OFF'}
+        <span className={`ml-3 flex-shrink-0 rounded-chip px-3 py-1 text-[11px] font-bold ${settings?.consent ? 'bg-lime text-lime-ink' : 'bg-[#2E2822] text-[#8A7F76]'}`}>
+          {saving === 'consent' ? '...' : settings?.consent ? 'ON' : 'OFF'}
         </span>
       </button>
     </MobileAppFrame>
   );
 }
 
-function Toggle({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+function Toggle({ label, on, disabled, onClick }: { label: string; on: boolean; disabled: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-full items-center justify-between border-t border-[#2E2822] py-3 text-left first:border-t-0">
+    <button type="button" disabled={disabled} onClick={onClick} className="flex w-full items-center justify-between border-t border-[#2E2822] py-3 text-left first:border-t-0 disabled:opacity-60">
       <span className="text-[13px] text-[#D8CFC6]">{label}</span>
       <span className={`h-6 w-11 rounded-chip p-0.5 transition ${on ? 'bg-lime' : 'bg-[#3A342E]'}`}>
         <span className={`block h-5 w-5 rounded-full bg-white transition ${on ? 'translate-x-5' : ''}`} />

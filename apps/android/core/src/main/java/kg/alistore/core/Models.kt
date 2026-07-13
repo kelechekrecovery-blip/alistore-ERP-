@@ -149,3 +149,69 @@ data class CustomerReturn(
 data class CreateReturnRequest(val orderId: String, val reason: String)
 
 data class EvidenceAttachment(val key: String, val url: String)
+
+data class LoyaltyCoupon(
+  val id: String,
+  val title: String,
+  val code: String,
+  val valueLabel: String,
+  val expiresAt: String?,
+)
+
+data class LoyaltyEntry(
+  val id: String,
+  val label: String,
+  val amount: Int,
+  val createdAt: String,
+)
+
+data class CustomerLoyalty(
+  val balance: Int,
+  val conversion: Int,
+  val level: String,
+  val nextLevelSpend: Int,
+  val coupons: List<LoyaltyCoupon>,
+  val history: List<LoyaltyEntry>,
+)
+
+data class CustomerAddress(
+  val id: String,
+  val title: String,
+  val text: String,
+  val comment: String?,
+  val isPrimary: Boolean,
+)
+
+data class CreateCustomerAddressRequest(
+  val title: String,
+  val text: String,
+  val comment: String?,
+  val isPrimary: Boolean = false,
+)
+
+data class UpdateCustomerAddressRequest(
+  val title: String? = null,
+  val text: String? = null,
+  val comment: String? = null,
+  val isPrimary: Boolean? = null,
+)
+
+data class CustomerSettings(
+  val id: String,
+  val phone: String,
+  val name: String,
+  val consent: Boolean,
+  val push: Boolean,
+  val whatsapp: Boolean,
+  val service: Boolean,
+  val promos: Boolean,
+)
+
+data class UpdateCustomerSettingsRequest(
+  val name: String? = null,
+  val consent: Boolean? = null,
+  val push: Boolean? = null,
+  val whatsapp: Boolean? = null,
+  val service: Boolean? = null,
+  val promos: Boolean? = null,
+)

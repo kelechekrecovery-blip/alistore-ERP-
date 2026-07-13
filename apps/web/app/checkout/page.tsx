@@ -11,9 +11,11 @@ import {
   createCustomer,
   createOrder,
   createPaymentIntent,
+  fetchMyAddresses,
   fetchGiftCard,
   payOrder,
   type CreatedOrder,
+  type CustomerAddress,
   type GiftCardView,
   type PaymentIntent,
 } from '@/lib/api';
@@ -44,14 +46,14 @@ type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean }
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, total, promoDiscount, bonusDiscount, promoCode, clear, hydrated } = useCart();
-  const { user } = useAuth();
+  const { user, hydrated: authHydrated, authed } = useAuth();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState('pickup');
   const [pickupPoint, setPickupPoint] = useState(PICKUP_POINTS[0].id);
   const [payment, setPayment] = useState<PaymentChoice>('cash');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
-  const [address, setAddress] = useState<SavedAddress | null>(null);
+  const [address, setAddress] = useState<SavedAddress | CustomerAddress | null>(null);
   const [busy, setBusy] = useState(false);
   const [giftBusy, setGiftBusy] = useState(false);
   const [giftCode, setGiftCode] = useState('');
@@ -61,7 +63,16 @@ export default function CheckoutPage() {
   const [done, setDone] = useState<DoneState | null>(null);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
-  useEffect(() => { setAddress(mainAddress(loadAddresses())); }, []);
+  useEffect(() => {
+    if (!authHydrated) return;
+    if (!user) {
+      setAddress(mainAddress(loadAddresses()));
+      return;
+    }
+    authed(fetchMyAddresses)
+      .then((addresses) => setAddress(addresses.find((item) => item.isPrimary) ?? addresses[0] ?? null))
+      .catch(() => setAddress(null));
+  }, [authHydrated, user, authed]);
   const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
   const deliveryFee = DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
   const selectedPickupPoint = PICKUP_POINTS.find((p) => p.id === pickupPoint) ?? PICKUP_POINTS[0];

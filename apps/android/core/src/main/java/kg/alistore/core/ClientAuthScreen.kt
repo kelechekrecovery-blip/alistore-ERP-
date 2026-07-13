@@ -164,6 +164,18 @@ private fun SignedInAccount(
     ClientReturnsScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
   }
+  if (route == "bonuses") {
+    ClientBonusesScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
+  if (route == "addresses") {
+    ClientAddressesScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
+  if (route == "settings") {
+    ClientSettingsScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
   val scope = rememberCoroutineScope()
   var busy by remember { mutableStateOf(false) }
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -176,11 +188,14 @@ private fun SignedInAccount(
         title,
         color = Color.White,
         modifier = Modifier.fillMaxWidth().background(AuthSurface, RoundedCornerShape(8.dp))
-          .clickable(enabled = title in setOf("Мои заказы", "Мои устройства", "Гарантия", "Возвраты", "Поддержка")) {
+          .clickable(enabled = true) {
             onRoute(when (title) {
               "Мои заказы" -> "orders"
               "Возвраты" -> "returns"
               "Поддержка" -> "support"
+              "Бонусы" -> "bonuses"
+              "Адреса" -> "addresses"
+              "Настройки" -> "settings"
               else -> "devices"
             })
           }

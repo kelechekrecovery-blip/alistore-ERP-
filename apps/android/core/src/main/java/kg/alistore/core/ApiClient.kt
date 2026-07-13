@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
-  CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway {
+  CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -109,6 +109,27 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   ): CustomerReturn = this.request(
     "returns/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
   ).customerReturn()
+
+  override suspend fun loyalty(token: String): CustomerLoyalty = request("customers/me/loyalty", "GET", token = token).loyalty()
+
+  override suspend fun addresses(token: String): List<CustomerAddress> = requestArray("customers/me/addresses", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).customerAddress()) }
+  }
+
+  override suspend fun createAddress(request: CreateCustomerAddressRequest, token: String, idempotencyKey: String): CustomerAddress =
+    this.request("customers/me/addresses", "POST", request.toJson(), token, idempotencyKey = idempotencyKey).customerAddress()
+
+  override suspend fun updateAddress(id: String, request: UpdateCustomerAddressRequest, token: String): CustomerAddress =
+    this.request("customers/me/addresses/$id", "PATCH", request.toJson(), token).customerAddress()
+
+  override suspend fun deleteAddress(id: String, token: String) {
+    request("customers/me/addresses/$id", "DELETE", token = token)
+  }
+
+  override suspend fun settings(token: String): CustomerSettings = request("customers/me/settings", "GET", token = token).customerSettings()
+
+  override suspend fun updateSettings(request: UpdateCustomerSettingsRequest, token: String): CustomerSettings =
+    this.request("customers/me/settings", "PATCH", request.toJson(), token).customerSettings()
 
   override suspend fun uploadEvidence(
     entityType: String,
@@ -296,6 +317,31 @@ private fun JSONObject.customerReturn() = CustomerReturn(
       }.orEmpty(),
     )
   },
+)
+
+private fun JSONObject.loyalty() = CustomerLoyalty(
+  balance = getInt("balance"), conversion = getInt("conversion"), level = getString("level"),
+  nextLevelSpend = getInt("nextLevelSpend"),
+  coupons = getJSONArray("coupons").let { array -> buildList {
+    for (index in 0 until array.length()) array.getJSONObject(index).let { row ->
+      add(LoyaltyCoupon(row.getString("id"), row.getString("title"), row.getString("code"), row.getString("valueLabel"), row.nullableString("expiresAt")))
+    }
+  } },
+  history = getJSONArray("history").let { array -> buildList {
+    for (index in 0 until array.length()) array.getJSONObject(index).let { row ->
+      add(LoyaltyEntry(row.getString("id"), row.getString("label"), row.getInt("amount"), row.getString("createdAt")))
+    }
+  } },
+)
+
+private fun JSONObject.customerAddress() = CustomerAddress(
+  id = getString("id"), title = getString("title"), text = getString("text"),
+  comment = nullableString("comment"), isPrimary = getBoolean("isPrimary"),
+)
+
+private fun JSONObject.customerSettings() = CustomerSettings(
+  id = getString("id"), phone = getString("phone"), name = getString("name"), consent = getBoolean("consent"),
+  push = getBoolean("push"), whatsapp = getBoolean("whatsapp"), service = getBoolean("service"), promos = getBoolean("promos"),
 )
 
 private fun JSONObject.nullableString(key: String): String? =

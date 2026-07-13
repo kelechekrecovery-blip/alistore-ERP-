@@ -201,6 +201,74 @@ class ClientAuthScreenTest {
     assertEquals(2, gateway.openKeys.size)
     assertEquals(gateway.openKeys[0], gateway.openKeys[1])
   }
+
+  @Test
+  fun bonusesRenderServerBalanceCouponsAndHistory() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val gateway = UiCustomerAccountGateway()
+    compose.setContent { MaterialTheme { ClientBonusesScreen("https://api.alistore.kg/api", state, {}, providedGateway = gateway) } }
+
+    compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("bonus-balance").fetchSemanticsNode() }.isSuccess }
+    compose.onNodeWithText("4820").assertIsDisplayed()
+    compose.onNodeWithText("Gold-уровень", substring = true).assertIsDisplayed()
+    compose.onNodeWithText("Аксессуары").assertIsDisplayed()
+    compose.onNodeWithText("Покупка iPhone 15").performScrollTo().assertIsDisplayed()
+    val image = compose.onRoot().captureToImage().asAndroidBitmap()
+    assertTrue(image.width > 0 && image.height > 0)
+    if (InstrumentationRegistry.getArguments().getString("visual") == "true") {
+      val context = InstrumentationRegistry.getInstrumentation().targetContext
+      FileOutputStream(File(context.getExternalFilesDir(null), "bonuses-screen.png")).use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+      Thread.sleep(InstrumentationRegistry.getArguments().getString("visualDelay")?.toLongOrNull() ?: 15_000)
+    }
+  }
+
+  @Test
+  fun addressCreateKeepsOneKeyAcrossRefresh() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val gateway = UiCustomerAccountGateway(failFirstAddress = true)
+    compose.setContent {
+      MaterialTheme {
+        ClientAddressesScreen(
+          "https://api.alistore.kg/api", state, {}, providedGateway = gateway,
+          authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
+        )
+      }
+    }
+
+    compose.onNodeWithTag("address-title").performScrollTo().performTextReplacement("Дом")
+    compose.onNodeWithTag("address-text").performTextReplacement("Бишкек, Чуй 154")
+    compose.onNodeWithTag("address-submit").performScrollTo().assertIsEnabled().performClick()
+    compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("address-address-1").fetchSemanticsNode() }.isSuccess }
+    compose.onNodeWithText("основной").assertIsDisplayed()
+    assertEquals(2, gateway.addressKeys.size)
+    assertEquals(gateway.addressKeys[0], gateway.addressKeys[1])
+  }
+
+  @Test
+  fun settingsUpdateRetriesWithOwnerStateAfterRefresh() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val gateway = UiCustomerAccountGateway(failFirstSettings = true)
+    compose.setContent {
+      MaterialTheme {
+        ClientSettingsScreen(
+          "https://api.alistore.kg/api", state, {}, providedGateway = gateway,
+          authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
+        )
+      }
+    }
+
+    compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("settings-name").fetchSemanticsNode() }.isSuccess }
+    compose.onNodeWithTag("settings-name").performTextReplacement("Айбек")
+    compose.onNodeWithText("WhatsApp").performScrollTo().performClick()
+    compose.onNodeWithTag("settings-submit").performScrollTo().performClick()
+    compose.waitUntil(5_000) { runCatching { compose.onNodeWithText("Сохранено").fetchSemanticsNode() }.isSuccess }
+    assertEquals(2, gateway.settingsUpdates.size)
+    assertEquals("Айбек", gateway.settingsUpdates.last().name)
+    assertEquals(false, gateway.settingsUpdates.last().whatsapp)
+  }
 }
 
 private class UiSessionStore(private var tokens: AuthTokens? = null) : SessionStore {
@@ -260,4 +328,39 @@ private class UiReturnsGateway(
   }
   override suspend fun uploadEvidence(entityType: String, entityId: String, fileName: String, mimeType: String, bytes: ByteArray, token: String) =
     EvidenceAttachment("evidence/key.webp", "https://media.alistore.kg/key.webp")
+}
+
+private class UiCustomerAccountGateway(
+  private val failFirstAddress: Boolean = false,
+  private val failFirstSettings: Boolean = false,
+) : CustomerAccountGateway {
+  val addressKeys = mutableListOf<String>()
+  val settingsUpdates = mutableListOf<UpdateCustomerSettingsRequest>()
+  private var settingsValue = CustomerSettings("customer-1", "+996700123456", "Клиент", false, true, true, true, false)
+
+  override suspend fun loyalty(token: String) = CustomerLoyalty(
+    4820, 1, "Gold", 51000,
+    listOf(LoyaltyCoupon("coupon-1", "Аксессуары", "ACCESSORY10", "-10%", null)),
+    listOf(LoyaltyEntry("entry-1", "Покупка iPhone 15", 1099, "2026-07-13T00:00:00.000Z")),
+  )
+  override suspend fun addresses(token: String) = emptyList<CustomerAddress>()
+  override suspend fun createAddress(request: CreateCustomerAddressRequest, token: String, idempotencyKey: String): CustomerAddress {
+    addressKeys += idempotencyKey
+    if (failFirstAddress && addressKeys.size == 1) throw ApiException(401, "expired")
+    return CustomerAddress("address-1", request.title, request.text, request.comment, true)
+  }
+  override suspend fun updateAddress(id: String, request: UpdateCustomerAddressRequest, token: String) =
+    CustomerAddress(id, "Дом", "Бишкек", null, request.isPrimary == true)
+  override suspend fun deleteAddress(id: String, token: String) = Unit
+  override suspend fun settings(token: String) = settingsValue
+  override suspend fun updateSettings(request: UpdateCustomerSettingsRequest, token: String): CustomerSettings {
+    settingsUpdates += request
+    if (failFirstSettings && settingsUpdates.size == 1) throw ApiException(401, "expired")
+    settingsValue = settingsValue.copy(
+      name = request.name ?: settingsValue.name, consent = request.consent ?: settingsValue.consent,
+      push = request.push ?: settingsValue.push, whatsapp = request.whatsapp ?: settingsValue.whatsapp,
+      service = request.service ?: settingsValue.service, promos = request.promos ?: settingsValue.promos,
+    )
+    return settingsValue
+  }
 }

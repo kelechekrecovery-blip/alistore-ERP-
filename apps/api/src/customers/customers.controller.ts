@@ -1,8 +1,11 @@
 import {
   Body,
+  BadRequestException,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Patch,
@@ -20,7 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CustomersService } from './customers.service';
-import { SetConsentDto, UpsertCustomerDto } from './customers.dto';
+import { CreateCustomerAddressDto, SetConsentDto, UpdateCustomerAddressDto, UpdateCustomerSettingsDto, UpsertCustomerDto } from './customers.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
@@ -33,12 +36,70 @@ import { issueGuestCheckoutCapability } from '../auth/guest-capability';
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
 
+  @Get('me/loyalty')
+  @UseGuards(JwtAuthGuard)
+  loyalty(@CurrentUser() user: AuthPrincipal) {
+    this.assertCustomer(user);
+    return this.customers.loyalty(user.customerId);
+  }
+
+  @Get('me/addresses')
+  @UseGuards(JwtAuthGuard)
+  addresses(@CurrentUser() user: AuthPrincipal) {
+    this.assertCustomer(user);
+    return this.customers.addresses(user.customerId);
+  }
+
+  @Post('me/addresses')
+  @UseGuards(JwtAuthGuard)
+  createAddress(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreateCustomerAddressDto,
+  ) {
+    this.assertCustomer(user);
+    return this.customers.createAddress(user.customerId, dto, requireIdempotencyKey(idempotencyKey));
+  }
+
+  @Patch('me/addresses/:addressId')
+  @UseGuards(JwtAuthGuard)
+  updateAddress(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('addressId') addressId: string,
+    @Body() dto: UpdateCustomerAddressDto,
+  ) {
+    this.assertCustomer(user);
+    return this.customers.updateAddress(user.customerId, addressId, dto);
+  }
+
+  @Delete('me/addresses/:addressId')
+  @UseGuards(JwtAuthGuard)
+  deleteAddress(@CurrentUser() user: AuthPrincipal, @Param('addressId') addressId: string) {
+    this.assertCustomer(user);
+    return this.customers.deleteAddress(user.customerId, addressId);
+  }
+
+  @Get('me/settings')
+  @UseGuards(JwtAuthGuard)
+  settings(@CurrentUser() user: AuthPrincipal) {
+    this.assertCustomer(user);
+    return this.customers.settings(user.customerId);
+  }
+
+  @Patch('me/settings')
+  @UseGuards(JwtAuthGuard)
+  updateSettings(@CurrentUser() user: AuthPrincipal, @Body() dto: UpdateCustomerSettingsDto) {
+    this.assertCustomer(user);
+    return this.customers.updateSettings(user.customerId, dto);
+  }
+
   @ApiOperation({ summary: 'Devices the authenticated customer bought (IMEI + warranty)' })
   @ApiBearerAuth()
   @ApiOkResponse({ description: "The current customer's devices." })
   @Get('me/devices')
   @UseGuards(JwtAuthGuard)
   myDevices(@CurrentUser() user: AuthPrincipal) {
+    this.assertCustomer(user);
     return this.customers.devices(user.customerId);
   }
 
@@ -103,6 +164,10 @@ export class CustomersController {
     }
   }
 
+  private assertCustomer(user: AuthPrincipal): void {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+  }
+
   private maskOverview(overview: CustomerOverview, user?: AuthPrincipal): CustomerOverview {
     if (this.canReadPii(user, overview.customer.id)) return overview;
     return {
@@ -131,4 +196,11 @@ export class CustomersController {
     const prefix = phone.startsWith('+') ? `+${digits.slice(0, 3)}` : digits.slice(0, 3);
     return `${prefix}******${digits.slice(-2)}`;
   }
+}
+
+function requireIdempotencyKey(value: string | undefined): string {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

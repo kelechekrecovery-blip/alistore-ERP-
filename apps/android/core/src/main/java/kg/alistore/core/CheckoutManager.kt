@@ -85,3 +85,25 @@ fun OpenSupportTicketRequest.toJson(): JSONObject = JSONObject()
 fun CreateReturnRequest.toJson(): JSONObject = JSONObject()
   .put("orderId", orderId)
   .put("reason", reason)
+
+fun CreateCustomerAddressRequest.toJson(): JSONObject = JSONObject()
+  .put("title", title)
+  .put("text", text)
+  .put("comment", comment ?: JSONObject.NULL)
+  .put("isPrimary", isPrimary)
+
+fun UpdateCustomerAddressRequest.toJson(): JSONObject = JSONObject().apply {
+  title?.let { put("title", it) }
+  text?.let { put("text", it) }
+  comment?.let { put("comment", it) }
+  isPrimary?.let { put("isPrimary", it) }
+}
+
+fun UpdateCustomerSettingsRequest.toJson(): JSONObject = JSONObject().apply {
+  name?.let { put("name", it) }
+  consent?.let { put("consent", it) }
+  push?.let { put("push", it) }
+  whatsapp?.let { put("whatsapp", it) }
+  service?.let { put("service", it) }
+  promos?.let { put("promos", it) }
+}
