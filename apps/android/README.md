@@ -38,3 +38,9 @@ provider URL, handles `alistore://payment-return`, and routes back to a protecte
 history that reloads server-authoritative payment/order statuses. A 401 during intent
 creation or order loading triggers one refresh-token rotation and repeats the same
 idempotent command; the Client never assigns `paid` locally.
+
+The account loads purchased serialized devices from `customers/me/devices`, shows
+coverage and the current service case, and opens warranty cases with a stable
+idempotency key that survives one token refresh. The API verifies that the IMEI is
+linked to an order owned by the authenticated customer, rejects a second active case,
+and writes exactly one `warranty.created` Event Ledger entry for an exact replay.

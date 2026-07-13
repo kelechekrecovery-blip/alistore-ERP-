@@ -2,7 +2,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { WarrantyService } from '../src/warranty/warranty.service';
 import { ReportsService } from '../src/reports/reports.service';
-import { ValidationError } from '../src/common/errors';
+import { ConflictError, ValidationError } from '../src/common/errors';
 
 /**
  * WarrantyCase (Phase 9): open a case for a sold IMEI with an SLA, advance through
@@ -29,6 +29,7 @@ describe('Warranty (integration)', () => {
     // FK-safe wipe (payments/items/orders before customers) so leftover rows from
     // a prior suite — jest suite order varies — never block the customer/product wipe.
     await prisma.auditEvent.deleteMany();
+    await prisma.warrantyOpenCommand.deleteMany();
     await prisma.warrantyCase.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -51,7 +52,10 @@ describe('Warranty (integration)', () => {
       data: { sku: `WR-${seq}`, name: 'x', price: 1, cost: 1, category: 'c', attrs: {} },
     });
     const imei = `WR-${seq}-1`;
-    await prisma.deviceUnit.create({ data: { imei, productId: product.id, status: 'sold', location: 'B' } });
+    const order = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'web', total: 1, status: 'paid' },
+    });
+    await prisma.deviceUnit.create({ data: { imei, productId: product.id, status: 'sold', location: 'B', orderId: order.id } });
     return { customer, imei };
   }
 
@@ -81,6 +85,24 @@ describe('Warranty (integration)', () => {
     expect(err.code).toBe('illegal_warranty_transition');
   });
 
+  it('rejects another customer IMEI and replays an exact idempotent open once', async () => {
+    const { customer, imei } = await device();
+    const other = await prisma.customer.create({ data: { phone: `+9967013${seq.toString().padStart(4, '0')}`, name: 'Other' } });
+
+    const denied = await warranty.open({ imei, customerId: other.id, problem: 'чужое устройство' }, other.id, 'warranty-denied').catch((error) => error);
+    expect(denied).toBeInstanceOf(ValidationError);
+    expect(denied.code).toBe('device_not_owned');
+
+    const first = await warranty.open({ imei, customerId: customer.id, problem: 'экран' }, customer.id, 'warranty-once');
+    const replay = await warranty.open({ imei, customerId: customer.id, problem: 'экран' }, customer.id, 'warranty-once');
+    expect(replay.id).toBe(first.id);
+    const reused = await warranty.open({ imei, customerId: customer.id, problem: 'другая проблема' }, customer.id, 'warranty-once').catch((error) => error);
+    expect(reused).toBeInstanceOf(ConflictError);
+    expect(reused.code).toBe('idempotency_key_reused');
+    expect(await prisma.warrantyCase.count({ where: { imei } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'warranty.created' } })).toBe(1);
+  });
+
   it('surfaces an SLA-breached open case in the Risk Center', async () => {
     const { customer, imei } = await device();
     await prisma.warrantyCase.create({
@@ -88,5 +110,18 @@ describe('Warranty (integration)', () => {
     });
     const r = await reports.risks();
     expect(r.signals.map((s) => s.kind)).toContain('warranty_sla_breach');
+  });
+
+  it('serializes concurrent opens with different keys to one active case', async () => {
+    const { customer, imei } = await device();
+    const attempts = await Promise.allSettled([
+      warranty.open({ imei, customerId: customer.id, problem: 'батарея' }, customer.id, 'warranty-race-a'),
+      warranty.open({ imei, customerId: customer.id, problem: 'батарея' }, customer.id, 'warranty-race-b'),
+    ]);
+
+    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(1);
+    expect(await prisma.warrantyCase.count({ where: { imei } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'warranty.created' } })).toBe(1);
   });
 });

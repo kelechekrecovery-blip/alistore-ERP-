@@ -2,6 +2,15 @@
 
 ## 2026-07-13
 
+- Task: execute Master Plan Android iteration 4, owned devices and idempotent warranty opening.
+- Files changed: warranty ownership/idempotency domain model and migration; warranty controller/service and web client key propagation; API ownership/RBAC/notification regressions; Android device/warranty models, typed API, account routing, Compose loading/empty/error/detail/submission states and device test; architecture/backlog/readme tracking.
+- Result: Android Client now loads only the authenticated customer's sold devices, displays warranty coverage and current case, and opens a new case while preserving one key across 401 refresh/retry. The API now proves `DeviceUnit.orderId → Order.customerId`, rejects cross-customer IMEIs and a second active case, exact-replays one persisted command and rejects changed-payload key reuse. Case creation and `warranty.created` remain atomic in the Event Ledger.
+- Checks run: Prisma validate/generate, dev migration and test DB sync; focused warranty/RBAC/notification API 8/8 including changed-payload replay and concurrent-open serialization; API production build; full API sequential 107/107 suites and 401/401 tests (one earlier parallel protection transport parse failure passed isolated and in both full sequential gates); Web production build across 37 routes; Android core compile/JVM tests; four APK builds; all-module unit tests and Android Lint; Compose instrumentation 5/5 on API 36; original-resolution screenshot `/tmp/alistore-android-device-warranty-fixed.png` inspected, exposing and then confirming the fix for status-bar overlap; `git diff --check`.
+- Outcome: Android owned-device and warranty vertical is accepted. Live physical-device/provider certification remains external; bonuses, addresses, support, returns and settings remain the next Client account slice.
+- Next step: implement Android support and returns with customer JWT ownership, evidence hooks and retry-safe commands, then bonuses/addresses/settings.
+
+## 2026-07-13
+
 - Task: execute Master Plan Android iteration 3, idempotent payment handoff/return and protected order history.
 - Files changed: provider-neutral payment-intent command persistence and migration; deterministic sandbox payment page/confirmation; customer payment API idempotency; Android payment models, checkout methods, deep-link lifecycle, token refresh and order-history UI; API/native regressions and architecture/backlog documentation.
 - Result: Android Client now creates card, MBank, O!Деньги and installment intents with a stable payment idempotency key, opens the server-returned provider handoff, routes `alistore://payment-return` to Orders and reloads JWT-owned server statuses without assigning `paid` locally. The API persists exact owner/payload responses for replay, rejects key reuse with another command, derives sandbox confirmation from trusted stored data and blocks arbitrary redirect targets. Order history has loading, empty, error, retry and one-shot refresh-on-401 states.

@@ -70,3 +70,8 @@ fun CreatePaymentIntentRequest.toJson(): JSONObject = JSONObject()
   .put("method", method.wireValue)
   .put("amount", amount)
   .put("returnUrl", returnUrl)
+
+fun OpenWarrantyRequest.toJson(): JSONObject = JSONObject()
+  .put("imei", imei)
+  .put("customerId", customerId)
+  .put("problem", problem)

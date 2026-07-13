@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway {
+class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -67,6 +67,22 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun orders(token: String): List<CustomerOrder> = requestArray("orders/mine", token).let { array ->
     buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).order()) }
   }
+
+  override suspend fun devices(token: String): List<CustomerDevice> = requestArray("customers/me/devices", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).device()) }
+  }
+
+  override suspend fun openWarranty(
+    request: OpenWarrantyRequest,
+    token: String,
+    idempotencyKey: String,
+  ): WarrantyCase = this.request(
+    "warranty",
+    "POST",
+    request.toJson(),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).warrantyCase()
 
   fun send(mutation: PendingMutation, token: String?): Int {
     val connection = open(mutation.endpoint, mutation.method)
@@ -172,6 +188,26 @@ private fun JSONObject.paymentIntent() = PaymentIntent(
   expiresAt = getString("expiresAt"),
   paymentUrl = getString("paymentUrl"),
   qrPayload = nullableString("qrPayload"),
+)
+
+private fun JSONObject.device() = CustomerDevice(
+  imei = getString("imei"),
+  product = getString("product"),
+  status = getString("status"),
+  warrantyUntil = nullableString("warrantyUntil"),
+  daysLeft = if (isNull("daysLeft")) null else getInt("daysLeft"),
+  warranty = optJSONObject("warranty")?.let {
+    DeviceWarrantySummary(it.getString("id"), it.getString("status"), it.getString("sla"))
+  },
+)
+
+private fun JSONObject.warrantyCase() = WarrantyCase(
+  id = getString("id"),
+  imei = getString("imei"),
+  customerId = getString("customerId"),
+  problem = getString("problem"),
+  status = getString("status"),
+  sla = getString("sla"),
 )
 
 private fun JSONObject.nullableString(key: String): String? =

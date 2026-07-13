@@ -152,6 +152,10 @@ private fun SignedInAccount(
     ClientOrdersScreen(apiBaseUrl, state, orderRefreshRevision, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
   }
+  if (route == "devices") {
+    ClientDevicesScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
   val scope = rememberCoroutineScope()
   var busy by remember { mutableStateOf(false) }
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -164,7 +168,9 @@ private fun SignedInAccount(
         title,
         color = Color.White,
         modifier = Modifier.fillMaxWidth().background(AuthSurface, RoundedCornerShape(8.dp))
-          .clickable(enabled = title == "Мои заказы") { onRoute("orders") }
+          .clickable(enabled = title in setOf("Мои заказы", "Мои устройства", "Гарантия")) {
+            onRoute(if (title == "Мои заказы") "orders" else "devices")
+          }
           .padding(16.dp),
       )
     }

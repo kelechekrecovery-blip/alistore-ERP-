@@ -33,6 +33,7 @@ describe('Transactional customer notifications (integration)', () => {
   beforeEach(async () => {
     await prisma.outboxMessage.deleteMany();
     await prisma.auditEvent.deleteMany();
+    await prisma.warrantyOpenCommand.deleteMany();
     await prisma.warrantyCase.deleteMany();
     await prisma.debtPlan.deleteMany();
     await prisma.reservation.deleteMany();
@@ -115,11 +116,17 @@ describe('Transactional customer notifications (integration)', () => {
     const item = await product();
     const imei = `TN-WR-${seq}`;
     const optedOutImei = `TN-WR-OUT-${seq}`;
-    await prisma.deviceUnit.create({
-      data: { imei, productId: item.id, status: 'sold', location: 'BISHKEK-1' },
+    const optedInOrder = await prisma.order.create({
+      data: { customerId: optedIn.id, channel: 'pos', total: item.price, status: 'paid' },
+    });
+    const optedOutOrder = await prisma.order.create({
+      data: { customerId: optedOut.id, channel: 'pos', total: item.price, status: 'paid' },
     });
     await prisma.deviceUnit.create({
-      data: { imei: optedOutImei, productId: item.id, status: 'sold', location: 'BISHKEK-1' },
+      data: { imei, productId: item.id, status: 'sold', location: 'BISHKEK-1', orderId: optedInOrder.id },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei: optedOutImei, productId: item.id, status: 'sold', location: 'BISHKEK-1', orderId: optedOutOrder.id },
     });
 
     const wc = await warranty.open(

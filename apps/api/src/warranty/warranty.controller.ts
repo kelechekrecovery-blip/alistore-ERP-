@@ -79,6 +79,7 @@ export class WarrantyController {
     @Body() dto: OpenWarrantyDto,
     @CurrentUser() user?: AuthPrincipal,
     @Headers('x-guest-capability') capability?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     if (user?.typ === 'customer' && dto.customerId !== user.customerId) {
       throw new ForbiddenException('Нельзя открыть гарантию от имени другого клиента');
@@ -86,7 +87,11 @@ export class WarrantyController {
     const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
     if (!user) requireGuestCapability(capability, 'warranty:create', customerId);
     if (user?.typ === 'staff') throw new ForbiddenException('Используйте staff warranty workflow');
-    return this.warranty.open({ ...dto, customerId }, user?.typ === 'customer' ? user.customerId : SYSTEM_ACTOR);
+    return this.warranty.open(
+      { ...dto, customerId },
+      user?.typ === 'customer' ? user.customerId : SYSTEM_ACTOR,
+      idempotencyKey,
+    );
   }
 
   @ApiOperation({ summary: 'Advance a warranty case through its status machine' })

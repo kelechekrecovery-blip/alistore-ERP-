@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
 
 class ClientAuthScreenTest {
   @get:Rule val compose = createComposeRule()
@@ -90,6 +91,38 @@ class ClientAuthScreenTest {
     compose.onNodeWithText("Ожидает оплаты").assertIsDisplayed()
     compose.onNodeWithText("1 тов. · 125000 сом").assertIsDisplayed()
   }
+
+  @Test
+  fun ownedDeviceOpensWarrantyWithSameKeyAfterTokenRefresh() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val device = CustomerDevice("123456789012345", "iPhone 16 Pro", "sold", "2027-07-13", 365, null)
+    val gateway = UiDevicesGateway(listOf(device), failFirstOpen = true)
+    compose.setContent {
+      MaterialTheme {
+        ClientDevicesScreen(
+          "https://api.alistore.kg/api",
+          state,
+          {},
+          providedGateway = gateway,
+          authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
+        )
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("device-123456789012345").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("device-123456789012345").performClick()
+    compose.onNodeWithTag("warranty-problem").performTextReplacement("Не держит заряд")
+    compose.onNodeWithTag("warranty-submit").assertIsEnabled().performClick()
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("warranty-status").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithText("Создано").assertIsDisplayed()
+    assertEquals(2, gateway.openKeys.size)
+    assertEquals(gateway.openKeys[0], gateway.openKeys[1])
+  }
 }
 
 private class UiSessionStore(private var tokens: AuthTokens? = null) : SessionStore {
@@ -108,4 +141,17 @@ private class UiAuthGateway : AuthGateway {
 
 private class UiOrdersGateway(private val result: List<CustomerOrder>) : CustomerOrdersGateway {
   override suspend fun orders(token: String) = result
+}
+
+private class UiDevicesGateway(
+  private val result: List<CustomerDevice>,
+  private val failFirstOpen: Boolean = false,
+) : CustomerDevicesGateway {
+  val openKeys = mutableListOf<String>()
+  override suspend fun devices(token: String) = result
+  override suspend fun openWarranty(request: OpenWarrantyRequest, token: String, idempotencyKey: String): WarrantyCase {
+    openKeys += idempotencyKey
+    if (failFirstOpen && openKeys.size == 1) throw ApiException(401, "expired")
+    return WarrantyCase("warranty-1", request.imei, request.customerId, request.problem, "created", "2026-07-27T00:00:00.000Z")
+  }
 }

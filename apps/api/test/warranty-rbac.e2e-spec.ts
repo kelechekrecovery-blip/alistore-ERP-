@@ -61,6 +61,7 @@ describe('Warranty console RBAC', () => {
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
+    await prisma.warrantyOpenCommand.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -88,8 +89,11 @@ describe('Warranty console RBAC', () => {
       },
     });
     const imei = `WR-IMEI-${RUN}-${Math.random()}`;
+    const order = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'web', status: 'paid', total: 100000 },
+    });
     await prisma.deviceUnit.create({
-      data: { imei, productId: product.id, status: 'sold', location: 'BISHKEK-1' },
+      data: { imei, productId: product.id, status: 'sold', location: 'BISHKEK-1', orderId: order.id },
     });
     return { customer, imei };
   }
@@ -107,8 +111,17 @@ describe('Warranty console RBAC', () => {
     const opened = await request(app.getHttpServer())
       .post('/warranty')
       .set('x-guest-capability', issueGuestCheckoutCapability(customer.id))
+      .set('Idempotency-Key', 'guest-warranty-once')
       .send({ customerId: customer.id, imei, problem: 'battery' })
       .expect(201);
+
+    const replayed = await request(app.getHttpServer())
+      .post('/warranty')
+      .set('x-guest-capability', issueGuestCheckoutCapability(customer.id))
+      .set('Idempotency-Key', 'guest-warranty-once')
+      .send({ customerId: customer.id, imei, problem: 'battery' })
+      .expect(201);
+    expect(replayed.body.id).toBe(opened.body.id);
 
     await request(app.getHttpServer())
       .post('/warranty')
@@ -118,15 +131,9 @@ describe('Warranty console RBAC', () => {
 
     await request(app.getHttpServer())
       .post('/warranty')
-      .set('Authorization', `Bearer ${customerToken(customer.id, customer.phone)}`)
-      .send({ customerId: customer.id, imei, problem: 'screen' })
-      .expect(201);
-
-    await request(app.getHttpServer())
-      .post('/warranty')
       .set('Authorization', `Bearer ${customerToken(otherCustomer.id, otherCustomer.phone)}`)
-      .send({ customerId: customer.id, imei, problem: 'spoof' })
-      .expect(403);
+      .send({ customerId: otherCustomer.id, imei, problem: 'cross-customer imei' })
+      .expect(422);
 
     await request(app.getHttpServer()).get('/warranty?status=created').expect(401);
     await request(app.getHttpServer())

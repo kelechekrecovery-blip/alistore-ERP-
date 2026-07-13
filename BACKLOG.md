@@ -3,7 +3,7 @@
 ## Next
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
-- Close remaining native Android feature parity in vertical flows: Client bonuses/addresses/devices/warranty/support/returns and final provider/device smoke; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
+- Close remaining native Android feature parity in vertical flows: Client bonuses/addresses/support/returns/settings and final provider/device smoke; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
 - Complete the new Redis/Meilisearch runtime with a live Docker/staging smoke, automatic index bootstrap and idempotent product reindex jobs.
@@ -21,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add native Android Client owned devices and warranty: JWT-owned inventory, coverage/current-case states, idempotent case opening with stable refresh retry, server-side IMEI ownership enforcement, duplicate-active-case protection, Event Ledger regression and API 36 visual/UI verification.
 - Add native Android Client payment intent/handoff/return and protected order history: stable payment idempotency keys, deterministic sandbox redirects, safe `alistore://payment-return` routing, one-shot token refresh, server-authoritative status reload and API/emulator regression coverage.
 - Add native Android Client cart and authenticated checkout with stock-capped quantities, pickup/courier fulfillment, server-authoritative prices and availability, stable idempotency keys, durable queued/syncing/conflict/failed states, token refresh during WorkManager replay and API regression coverage.
 - Add native Android Client OTP authentication with typed API contracts, Android Keystore encrypted access/refresh tokens, refresh-on-restore, server logout, real signed-in account identity, deterministic session tests and API 36 Compose/device verification.

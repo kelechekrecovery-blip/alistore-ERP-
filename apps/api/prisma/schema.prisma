@@ -441,6 +441,20 @@ model WarrantyCase {
   @@index([status])
 }
 
+model WarrantyOpenCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  customerId     String
+  imei           String
+  problem        String
+  warrantyCaseId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([imei])
+}
+
 // Поставщик техники. Scorecard считается из связанных RMA.
 model Supplier {
   id             String          @id @default(cuid())

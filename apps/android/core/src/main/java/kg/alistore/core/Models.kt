@@ -81,3 +81,33 @@ data class PaymentIntent(
   val paymentUrl: String,
   val qrPayload: String?,
 )
+
+data class DeviceWarrantySummary(
+  val id: String,
+  val status: String,
+  val sla: String,
+)
+
+data class CustomerDevice(
+  val imei: String,
+  val product: String,
+  val status: String,
+  val warrantyUntil: String?,
+  val daysLeft: Int?,
+  val warranty: DeviceWarrantySummary?,
+)
+
+data class OpenWarrantyRequest(
+  val imei: String,
+  val customerId: String,
+  val problem: String,
+)
+
+data class WarrantyCase(
+  val id: String,
+  val imei: String,
+  val customerId: String,
+  val problem: String,
+  val status: String,
+  val sla: String,
+)

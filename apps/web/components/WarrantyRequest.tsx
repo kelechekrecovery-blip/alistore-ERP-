@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { uploadEvidenceImages } from '@/lib/api';
 import { openWarranty } from '@/lib/warranty';
 import { EvidencePicker } from './EvidencePicker';
@@ -14,6 +14,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
   const [files, setFiles] = useState<File[]>([]);
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle');
   const [evidenceCount, setEvidenceCount] = useState(0);
+  const idempotencyKey = useRef(crypto.randomUUID());
 
   async function submit() {
     if (!problem.trim()) return;
@@ -21,7 +22,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
     try {
       const warranty = await authed((accessToken) => openWarranty(
         { imei, customerId, problem: problem.trim() },
-        { accessToken },
+        { accessToken, idempotencyKey: idempotencyKey.current },
       ));
       const evidence = files.length
         ? await uploadEvidenceImages({
