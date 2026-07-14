@@ -33,6 +33,10 @@ p, admin, hr, read
 p, owner, hr, read
 p, admin, hr, manage
 p, owner, hr, manage
+p, admin, logistics, read
+p, owner, logistics, read
+p, admin, logistics, manage
+p, owner, logistics, manage
 p, cashier, pos, sale
 p, seller, pos, sale
 p, senior_seller, pos, sale

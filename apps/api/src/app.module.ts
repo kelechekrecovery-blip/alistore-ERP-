@@ -46,6 +46,7 @@ import { ProcurementModule } from './procurement/procurement.module';
 import { FinanceModule } from './finance/finance.module';
 import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
 import { HrModule } from './hr/hr.module';
+import { LogisticsModule } from './logistics/logistics.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { HrModule } from './hr/hr.module';
     FinanceModule,
     StaffTasksModule,
     HrModule,
+    LogisticsModule,
   ],
 })
 export class AppModule {}

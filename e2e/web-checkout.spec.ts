@@ -43,6 +43,65 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   expect(await prisma.payment.count({ where: { orderId: order?.id, method: 'card' } })).toBe(1);
 });
 
+test('web checkout uses ERP delivery zone fee and reserves an available slot', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('DELIVERY-E2E');
+  const now = new Date();
+  const startsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 16, 0);
+  const endsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
+  const zone = await prisma.deliveryZone.create({
+    data: {
+      code: `web-center-${Date.now().toString(36)}`,
+      name: 'Центр Бишкек',
+      fee: 350,
+      etaMinMinutes: 60,
+      etaMaxMinutes: 120,
+      createdBy: 'e2e',
+      idempotencyKey: `web-zone-${Date.now()}`,
+      slots: {
+        create: {
+          startsAt,
+          endsAt,
+          capacity: 1,
+          createdBy: 'e2e',
+          idempotencyKey: `web-slot-${Date.now()}`,
+        },
+      },
+    },
+    include: { slots: true },
+  });
+  await page.addInitScript((item) => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  }, { id: product.id, sku: product.sku, name: product.name, price: product.price });
+
+  await page.goto('/checkout');
+  await page.getByRole('button', { name: /Курьер/ }).click();
+  await expect(page.getByLabel('Зона доставки')).toHaveValue(zone.id);
+  await expect(page.getByRole('button', { name: /16:00–18:00.*осталось 1/ })).toBeEnabled();
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900351');
+  await page.getByPlaceholder('Имя').fill('Delivery Buyer');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await expect(page.getByText('Центр Бишкек')).toBeVisible();
+  await page.getByRole('button', { name: 'Подтвердить заказ' }).click();
+  await expect(page.getByText('Заказ оформлен!')).toBeVisible();
+
+  const order = await prisma.order.findFirstOrThrow({ orderBy: { createdAt: 'desc' } });
+  expect(order).toMatchObject({
+    fulfillmentType: 'courier',
+    deliveryZoneId: zone.id,
+    deliverySlotId: zone.slots[0].id,
+    deliveryFee: 350,
+    total: product.price + 350,
+  });
+  const availability = await page.request.get(`http://127.0.0.1:4200/api/logistics/availability?date=${startsAt.toISOString().slice(0, 10)}`);
+  expect(availability.ok()).toBeTruthy();
+  const zones = await availability.json() as Array<{ slots: Array<{ id: string; remaining: number; available: boolean }> }>;
+  expect(zones.flatMap((item) => item.slots).find((slot) => slot.id === zone.slots[0].id)).toMatchObject({ remaining: 0, available: false });
+});
+
 test('product page switches between independently stocked variants', async ({ page }) => {
   await resetDb();
   const { product } = await seedProduct('VARIANT-BLACK', 100000);

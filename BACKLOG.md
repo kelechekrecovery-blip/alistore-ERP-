@@ -2,7 +2,7 @@
 
 ## Next
 - Complete the remaining HR handoff contour: owner-editable/cancellable schedules, cash-shift handover between active staff, attendance-derived payroll adjustments and native Staff attendance controls.
-- Implement logistics zones, delivery slots/capacity and the owner dispatch board with atomic capacity reservation, courier assignment, RBAC, Event Ledger and browser E2E.
+- Extend the verified logistics contour with route optimization, multi-stop sequencing, delivery exception rescheduling and live tracking after first-store dispatch UAT.
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
 - Close remaining native Android release certification: final Client provider/device smoke; Staff physical FCM/scanner/camera certification; Courier live FCM and physical maps/camera/network certification; POS physical ESC/POS printer, scanner and bank-terminal certification.
@@ -21,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Integrate logistics across ERP and the customer site: owner-managed zones and capacity slots, public checkout availability and server-priced delivery, row-locked reservation, cancellation release, dispatch board, courier assignment, RBAC, Event Ledger and API/browser acceptance.
 - Add the first authoritative HR vertical: owner/admin weekly schedules, staff-owned attendance, absence request/decision, derived timesheet with lateness/overtime, idempotency, RBAC, Event Ledger and exact ERP browser acceptance.
 - Implement line-level partial returns across customer web, ERP refund approval and warehouse reconciliation: server-calculated discounted line quotes, final-only delivery refund, cumulative quantity caps/rounding, exact refund binding, selected quantity/direct/bundle IMEI restock, proportional quantity-consignment compensation and API/browser acceptance.
 - Add quantity-tracked consignment across ERP and customer sales without a second stock source: idempotent owner lots over `InventoryBalance`, atomic reserve/release/sale attribution, transfer preservation, payout batches, paid-return compensation, ordinary write-off protection, RBAC, Event Ledger and API/browser acceptance.

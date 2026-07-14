@@ -21,6 +21,8 @@ export interface CreatedOrder {
   pickupPoint?: string | null;
   deliveryAddress?: string | null;
   deliverySlot?: string | null;
+  deliveryZoneId?: string | null;
+  deliverySlotId?: string | null;
   pickupCode?: string | null;
 }
 
@@ -43,6 +45,8 @@ export async function createOrder(input: {
   pickupPoint?: string;
   deliveryAddress?: string;
   deliverySlot?: string;
+  deliveryZoneId?: string;
+  deliverySlotId?: string;
   total: number;
   promoCode?: string;
   loyaltyPoints?: number;
@@ -67,6 +71,8 @@ export async function createMyOrder(input: {
   pickupPoint?: string;
   deliveryAddress?: string;
   deliverySlot?: string;
+  deliveryZoneId?: string;
+  deliverySlotId?: string;
   total: number;
   promoCode?: string;
   loyaltyPoints?: number;

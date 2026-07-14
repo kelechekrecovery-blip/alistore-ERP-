@@ -15,11 +15,14 @@ import {
   createPaymentIntent,
   fetchMyAddresses,
   fetchGiftCard,
+  fetchDeliveryAvailability,
   payOrder,
   type CreatedOrder,
   type CustomerAddress,
   type GiftCardView,
   type PaymentIntent,
+  type DeliverySlot,
+  type DeliveryZone,
 } from '@/lib/api';
 import { loadAddresses, mainAddress, type SavedAddress } from '@/lib/account-local';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -45,6 +48,16 @@ type PaymentChoice = (typeof PAYMENT)[number]['id'];
 const STEPS = ['Получение', 'Контакты', 'Оплата', 'Подтверждение'];
 type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean };
 
+function logisticsDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function slotLabel(slot: DeliverySlot) {
+  const format = (value: string) => new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return `${format(slot.startsAt)}–${format(slot.endsAt)}`;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, total, promoDiscount, bonusDiscount, promoCode, clear, hydrated } = useCart();
@@ -56,6 +69,11 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [address, setAddress] = useState<SavedAddress | CustomerAddress | null>(null);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [deliveryZoneId, setDeliveryZoneId] = useState('');
+  const [deliverySlotId, setDeliverySlotId] = useState('');
+  const [deliveryCapacityLoading, setDeliveryCapacityLoading] = useState(true);
+  const [deliveryCapacityError, setDeliveryCapacityError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [giftBusy, setGiftBusy] = useState(false);
   const [giftCode, setGiftCode] = useState('');
@@ -75,8 +93,33 @@ export default function CheckoutPage() {
       .then((addresses) => setAddress(addresses.find((item) => item.isPrimary) ?? addresses[0] ?? null))
       .catch(() => setAddress(null));
   }, [authHydrated, user, authed]);
+  useEffect(() => {
+    let active = true;
+    fetchDeliveryAvailability(logisticsDate())
+      .then((zones) => {
+        if (!active) return;
+        setDeliveryZones(zones);
+        const zone = zones.find((item) => item.slots.some((slot) => slot.available));
+        const slot = zone?.slots.find((item) => item.available);
+        setDeliveryZoneId(zone?.id ?? '');
+        setDeliverySlotId(slot?.id ?? '');
+        setDeliveryCapacityError(false);
+      })
+      .catch(() => {
+        if (active) setDeliveryCapacityError(true);
+      })
+      .finally(() => {
+        if (active) setDeliveryCapacityLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
   const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
-  const deliveryFee = DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
+  const selectedDeliveryZone = deliveryZones.find((zone) => zone.id === deliveryZoneId);
+  const selectedDeliverySlot = selectedDeliveryZone?.slots.find((slot) => slot.id === deliverySlotId);
+  const managedCourierDelivery = delivery === 'courier' && deliveryZones.length > 0;
+  const deliveryFee = delivery === 'courier' && selectedDeliveryZone
+    ? selectedDeliveryZone.fee
+    : DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
   const selectedPickupPoint = PICKUP_POINTS.find((p) => p.id === pickupPoint) ?? PICKUP_POINTS[0];
   const payable = total + deliveryFee;
   const giftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, payable) : 0;
@@ -111,7 +154,11 @@ export default function CheckoutPage() {
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
         pickupPoint: delivery === 'pickup' ? pickupPoint : undefined,
         deliveryAddress: delivery !== 'pickup' ? address?.text : undefined,
-        deliverySlot: delivery === 'pickup' ? selectedPickupPoint.meta : DELIVERY.find((d) => d.id === delivery)?.meta,
+        deliverySlot: delivery === 'pickup'
+          ? selectedPickupPoint.meta
+          : selectedDeliverySlot ? slotLabel(selectedDeliverySlot) : DELIVERY.find((d) => d.id === delivery)?.meta,
+        deliveryZoneId: delivery === 'courier' ? selectedDeliveryZone?.id : undefined,
+        deliverySlotId: delivery === 'courier' ? selectedDeliverySlot?.id : undefined,
         total: payable,
         promoCode: promoCode ?? undefined,
         loyaltyPoints: user ? bonusDiscount : undefined,
@@ -272,15 +319,57 @@ export default function CheckoutPage() {
               </div>
             )}
             {delivery !== 'pickup' && (
-              <Link href="/account/addresses" className="checkout-surface mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
-                <div className="flex items-center justify-between text-[13px] font-semibold">
-                  <span>Адрес доставки</span>
-                  <span className="text-lime">изменить</span>
-                </div>
-                <div className="mt-1.5 text-[12px] leading-relaxed text-[#A79C92]">{address ? `${address.title}: ${address.text}` : 'Добавьте адрес доставки'}</div>
-              </Link>
+              <>
+                <Link href="/account/addresses" className="checkout-surface mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                  <div className="flex items-center justify-between text-[13px] font-semibold">
+                    <span>Адрес доставки</span>
+                    <span className="text-lime">изменить</span>
+                  </div>
+                  <div className="mt-1.5 text-[12px] leading-relaxed text-[#A79C92]">{address ? `${address.title}: ${address.text}` : 'Добавьте адрес доставки'}</div>
+                </Link>
+                {delivery === 'courier' && deliveryCapacityLoading && (
+                  <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5 text-sm text-[#A79C92]">Проверяем доступное время…</div>
+                )}
+                {delivery === 'courier' && deliveryCapacityError && (
+                  <div className="mb-2.5 rounded-[13px] border border-[#6B3B32] bg-[#2A1818] p-3.5 text-sm text-[#FFAA9D]">Не удалось обновить интервалы. Можно продолжить по стандартному тарифу.</div>
+                )}
+                {delivery === 'courier' && deliveryZones.length > 0 && (
+                  <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                    <div className="mb-2 text-[13px] font-semibold">Зона и время доставки</div>
+                    <label className="block text-[11px] text-[#A79C92]" htmlFor="delivery-zone">Зона</label>
+                    <select
+                      id="delivery-zone"
+                      aria-label="Зона доставки"
+                      value={deliveryZoneId}
+                      onChange={(event) => {
+                        const zone = deliveryZones.find((item) => item.id === event.target.value);
+                        setDeliveryZoneId(event.target.value);
+                        setDeliverySlotId(zone?.slots.find((slot) => slot.available)?.id ?? '');
+                      }}
+                      className="checkout-field mt-1 w-full rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
+                    >
+                      {deliveryZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name} · {som(zone.fee)}</option>)}
+                    </select>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {(selectedDeliveryZone?.slots ?? []).map((slot) => (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={!slot.available}
+                          onClick={() => setDeliverySlotId(slot.id)}
+                          className={`checkout-nested rounded-[10px] border p-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45 ${deliverySlotId === slot.id ? 'border-lime bg-lime/5' : 'border-[#3A342E] bg-[#16130F]'}`}
+                        >
+                          <span className="block text-sm font-semibold">{slotLabel(slot)}</span>
+                          <span className="mt-0.5 block text-[11px] text-[#A79C92]">{slot.available ? `осталось ${slot.remaining}` : 'мест нет'}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {(selectedDeliveryZone?.slots.length ?? 0) === 0 && <p className="mt-2 text-xs text-[#FFAA9D]">На сегодня интервалов нет.</p>}
+                  </div>
+                )}
+              </>
             )}
-            <button type="button" onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">Далее</button>
+            <button type="button" disabled={deliveryCapacityLoading || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
           </>
         )}
         {step === 1 && (
@@ -321,6 +410,8 @@ export default function CheckoutPage() {
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
               {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint.name} />}
               {delivery !== 'pickup' && <Row k="Адрес" v={address?.text ?? 'не указан'} />}
+              {delivery === 'courier' && selectedDeliveryZone && <Row k="Зона" v={selectedDeliveryZone.name} />}
+              {delivery === 'courier' && selectedDeliverySlot && <Row k="Интервал" v={slotLabel(selectedDeliverySlot)} />}
               <Row k="Оплата" v={PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
               <Row k="Телефон" v={phone} />
               <Row k="Товаров" v={String(items.reduce((s, i) => s + i.qty, 0))} />

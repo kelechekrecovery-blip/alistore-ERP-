@@ -119,6 +119,8 @@ export const EventType = {
   HrAbsenceRequested: 'hr.absence_requested',
   HrAbsenceApproved: 'hr.absence_approved',
   HrAbsenceRejected: 'hr.absence_rejected',
+  DeliveryZoneCreated: 'logistics.zone_created',
+  DeliverySlotCreated: 'logistics.slot_created',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

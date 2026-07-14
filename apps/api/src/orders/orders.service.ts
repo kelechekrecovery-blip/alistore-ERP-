@@ -93,6 +93,12 @@ export class OrdersService {
     if (dto.fulfillmentType === 'courier' && !dto.deliveryAddress?.trim()) {
       throw new ValidationError('delivery_address_required', 'Укажите адрес доставки');
     }
+    if ((dto.deliveryZoneId && !dto.deliverySlotId) || (!dto.deliveryZoneId && dto.deliverySlotId)) {
+      throw new ValidationError('delivery_selection_incomplete', 'Выберите зону и слот доставки вместе');
+    }
+    if (dto.deliveryZoneId && dto.fulfillmentType !== 'courier') {
+      throw new ValidationError('delivery_selection_forbidden', 'Зона и слот доступны только для курьерской доставки');
+    }
     const quantities = new Map<string, number>();
     for (const item of dto.items) quantities.set(item.sku, (quantities.get(item.sku) ?? 0) + item.qty);
     const skus = [...quantities.keys()];
@@ -129,7 +135,10 @@ export class OrdersService {
       return { sku, qty, price: product.price };
     });
     const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const deliveryFee = fulfillmentFee(dto.fulfillmentType);
+    const deliverySelection = dto.deliveryZoneId && dto.deliverySlotId
+      ? await this.deliverySelection(dto.deliveryZoneId, dto.deliverySlotId)
+      : null;
+    const deliveryFee = deliverySelection?.zone.fee ?? fulfillmentFee(dto.fulfillmentType);
     const promoCode = normalizePromo(dto.promoCode);
     const promoDiscount = promoCode ? Math.min(subtotal, PROMO_DISCOUNTS[promoCode]) : 0;
     const loyaltyPoints = dto.loyaltyPoints ?? 0;
@@ -171,6 +180,17 @@ export class OrdersService {
         if (isDemo && canonical.loyaltyPoints > 0) {
           throw new ConflictError('demo_loyalty_forbidden', 'Демо-заказ не списывает бонусы');
         }
+        if (!isDemo && dto.deliverySlotId && dto.deliveryZoneId) {
+          await tx.$queryRaw`SELECT id FROM "DeliverySlot" WHERE id = ${dto.deliverySlotId} FOR UPDATE`;
+          const slot = await tx.deliverySlot.findUnique({ where: { id: dto.deliverySlotId } });
+          if (!slot?.active || slot.zoneId !== dto.deliveryZoneId || slot.endsAt <= new Date()) {
+            throw new ConflictError('delivery_slot_unavailable', 'Слот доставки больше недоступен');
+          }
+          const booked = await tx.order.count({
+            where: { deliverySlotId: slot.id, isDemo: false, status: { in: ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'courier_assigned', 'out_for_delivery'] } },
+          });
+          if (booked >= slot.capacity) throw new ConflictError('delivery_slot_full', 'Слот доставки уже занят');
+        }
         const baseTotal = canonical.subtotal + canonical.deliveryFee - canonical.promoDiscount;
         const initialOrder = await tx.order.create({
           data: {
@@ -182,6 +202,8 @@ export class OrdersService {
             pickupPoint: dto.pickupPoint,
             deliveryAddress: dto.deliveryAddress,
             deliverySlot: dto.deliverySlot,
+            deliveryZoneId: isDemo ? null : dto.deliveryZoneId,
+            deliverySlotId: isDemo ? null : dto.deliverySlotId,
             pickupCode: pickupCode(),
             subtotal: canonical.subtotal,
             deliveryFee: canonical.deliveryFee,
@@ -265,6 +287,14 @@ export class OrdersService {
       }
       throw error;
     }
+  }
+
+  private async deliverySelection(zoneId: string, slotId: string) {
+    const slot = await this.prisma.deliverySlot.findUnique({ where: { id: slotId }, include: { zone: true } });
+    if (!slot?.active || !slot.zone.active || slot.zoneId !== zoneId || slot.endsAt <= new Date()) {
+      throw new ValidationError('delivery_slot_unavailable', 'Зона или слот доставки недоступны');
+    }
+    return slot;
   }
 
   /**

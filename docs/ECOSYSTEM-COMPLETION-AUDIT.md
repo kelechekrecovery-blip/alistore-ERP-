@@ -1,16 +1,16 @@
 # AliStore ecosystem completion audit
 
 Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, baseline
-`06f6ebf` plus the refund-bound return reconciliation iteration. This is a completion audit, not a marketing status page. `Implemented`
+`ac0805c` plus the logistics capacity/dispatch iteration. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 47 NestJS modules, 37 generated Next routes and 43 Prisma migrations.
-- `mvp:verify`: API/Web production builds, mobile reference typecheck, 116/116 Jest
-  suites with 465/465 tests and 28/28 Playwright flows.
+- 49 NestJS modules including the application root, 37 generated Next routes and 49 Prisma migrations.
+- `mvp:verify`: API/Web production builds, mobile reference typecheck, 118/118 Jest
+  suites with 466/466 tests and 30/30 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
@@ -22,7 +22,7 @@ credentials, legal approval or physical hardware.
 | Handoff source | Status | Current evidence | Missing acceptance evidence / work |
 |---|---|---|---|
 | API Data Contracts | Partial | typed Nest DTO/controllers, Swagger, API integration suites | versioned `/v1` contract, generated client compatibility and every handoff endpoint mapped |
-| ERP 2.0 | Partial | `/erp`, reports, risk, finance, approvals, procurement links | exact acceptance for every ERP tab; HR, logistics, CMS, service, legal and operations surfaces |
+| ERP 2.0 | Partial | `/erp`, reports, risk, finance, approvals, procurement, HR and logistics links | exact acceptance for every ERP tab; CMS, service, legal and operations surfaces |
 | HR | Partial | StaffUser, weekly schedules, staff-owned attendance, absence approval, derived timesheet, tasks, KPI/payroll services and dedicated handoff Playwright | editable/cancellable plans, cash-shift handover, attendance-derived payroll posting and native Staff attendance UI |
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
@@ -33,7 +33,7 @@ credentials, legal approval or physical hardware.
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
 | Client App 2.0 | Partial | SwiftUI/Compose shells and major customer API flows | screen-by-screen pixel matrix, XCUITest, app-level Compose E2E, biometric login, physical push/device gate |
 | Client services | Partial | support, returns, warranty, protection, trade-in APIs/web/native portions | unified native service journey, repair/loaner status, visual and offline acceptance |
-| Logistics management | Partial | courier assignment, route states, Evidence and COD handover | zones, slots/capacity, dispatch board, route optimization and live tracking |
+| Logistics management | MVP implemented | ERP zones/slots/capacity, row-locked checkout reservation, cancellation release, dispatch board, courier assignment, route states, Evidence and COD handover | route optimization, exception rescheduling and live tracking |
 | Marketing CMS | Partial | campaigns, consent and channel transports | banner/collection/navigation draft-review-schedule-publish workflow and storefront consequence E2E |
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
@@ -73,7 +73,7 @@ credentials, legal approval or physical hardware.
 
 ## Ordered remaining work
 
-1. Complete HR handover/payroll posting and logistics zones/slots/dispatch for first-store operations.
+1. Complete HR handover/payroll posting, then run first-store logistics dispatch UAT; route optimization/live tracking remain later scope.
 2. Add service center, store operations, CMS, analytics and legal Waves B.
 3. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.

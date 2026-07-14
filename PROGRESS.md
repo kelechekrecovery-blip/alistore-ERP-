@@ -1336,3 +1336,12 @@
 - Checks run: Prisma validation/generation; 48 migrations applied to dev and isolated test schema synchronization; targeted HR API 2/2; API and Next production builds; targeted owner/staff Playwright; complete `npm run mvp:verify`; `git diff --check`.
 - Outcome: full web/API gate is green with 117/117 API suites and 465/465 tests plus 28/28 Playwright flows. Production readiness remains blocked by the same 12 external credential/manual groups. HR is still partial: schedule edit/cancel, cash-shift handover, payroll posting and native Staff attendance controls remain explicit follow-up work.
 - Next step: implement logistics zones, delivery slots/capacity and the owner dispatch board, then return for the remaining HR handover/payroll contour.
+
+## 2026-07-14
+
+- Task: integrate authoritative delivery capacity from ERP through the customer checkout and courier dispatch flow.
+- Files changed: logistics Prisma schema/migration; NestJS logistics DTO/controller/service/module, order capacity locking, RBAC and Event Ledger; ERP logistics workspace and typed client; customer checkout zone/slot selection and server tariff binding; API and browser regressions; backlog/readiness/completion audit.
+- Result: owner/admin can create priced delivery zones and dated capacity slots, while the public site shows only current availability, submits the selected zone/slot and uses the server-owned tariff. Order creation locks the slot before counting active reservations, rejects over-capacity races and releases capacity through normal cancellation status. The dispatch board groups paid/packed courier orders, assigns an active courier and creates the existing native-compatible Courier run.
+- Checks run: Prisma validation/generation and dev/test schema application; targeted logistics API and ERP browser flows; customer checkout capacity/reservation browser flow; API and Next production builds; complete `npm run mvp:verify`; `git diff --check`.
+- Outcome: full web/API gate is green with 118/118 API suites and 466/466 tests plus 30/30 Playwright flows. ERP-to-site delivery pricing, capacity and order linkage are now executable and tested. Production readiness remains blocked by the same 12 external credential/manual groups; route optimization, exception rescheduling and live tracking remain later logistics scope.
+- Next step: complete HR schedule edit/cancel, cash-shift handover and attendance-derived payroll posting before ERP Wave B service-center work.

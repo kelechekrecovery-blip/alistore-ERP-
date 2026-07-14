@@ -435,6 +435,10 @@ model Order {
   pickupPoint              String?
   deliveryAddress          String?
   deliverySlot             String?
+  deliveryZoneId           String?
+  deliveryZone             DeliveryZone?                   @relation(fields: [deliveryZoneId], references: [id])
+  deliverySlotId           String?
+  logisticsSlot            DeliverySlot?                   @relation(fields: [deliverySlotId], references: [id])
   courierId                String?
   courier                  StaffUser?                      @relation("OrderCourier", fields: [courierId], references: [id])
   courierRunId             String?
@@ -464,6 +468,42 @@ model Order {
   @@index([pickupPoint, status])
   @@index([courierId, status])
   @@index([courierRunId])
+  @@index([deliveryZoneId, status])
+  @@index([deliverySlotId, status])
+}
+
+model DeliveryZone {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  name           String
+  fee            Int
+  etaMinMinutes  Int
+  etaMaxMinutes  Int
+  active         Boolean        @default(true)
+  createdBy      String
+  idempotencyKey String         @unique
+  slots          DeliverySlot[]
+  orders         Order[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model DeliverySlot {
+  id             String       @id @default(cuid())
+  zone           DeliveryZone @relation(fields: [zoneId], references: [id])
+  zoneId         String
+  startsAt       DateTime
+  endsAt         DateTime
+  capacity       Int
+  active         Boolean      @default(true)
+  createdBy      String
+  idempotencyKey String       @unique
+  orders         Order[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([zoneId, startsAt, endsAt])
+  @@index([startsAt, active])
 }
 
 model ConsignmentItem {

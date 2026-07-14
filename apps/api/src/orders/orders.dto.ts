@@ -61,6 +61,16 @@ export class CreateOrderDto {
   @IsString()
   deliverySlot?: string;
 
+  @ApiPropertyOptional({ description: 'Server-managed delivery zone id.' })
+  @IsOptional()
+  @IsString()
+  deliveryZoneId?: string;
+
+  @ApiPropertyOptional({ description: 'Server-managed delivery slot id.' })
+  @IsOptional()
+  @IsString()
+  deliverySlotId?: string;
+
   @ApiProperty({ minimum: 0, example: 109900 })
   @IsInt() @Min(0) total!: number;
 

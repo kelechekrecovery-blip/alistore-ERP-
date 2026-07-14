@@ -113,7 +113,7 @@ and one pilot store completes every required real transaction and reconciliation
 ## Execution order
 
 1. Maintain the generated integration matrix and add cross-surface E2E fixtures.
-2. Complete HR and logistics; retain the verified line-level return and quantity-consignment compensation invariants.
+2. Complete the remaining HR handover/payroll contour and retain the verified logistics capacity/dispatch, line-level return and quantity-consignment invariants.
 3. Add app-specific XCUITest/Compose E2E and close native device certification gaps.
 4. Deliver remaining ERP Waves B/C by handoff acceptance.
 5. Run ecosystem E2E and security/load/restore gates.
