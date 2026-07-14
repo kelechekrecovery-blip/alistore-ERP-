@@ -5,12 +5,15 @@ import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   decideApproval,
+  fetchStaffReturns,
   fetchApprovals,
   requestPaymentRefund,
   staffLogin,
   staffTotpEnable,
   staffTotpSetup,
+  transitionReturn,
   type Approval,
+  type ReturnRequest,
   type StaffTotpSetupResult,
 } from '@/lib/api';
 import { ApprovalList } from '@/components/approvals/ApprovalList';
@@ -36,7 +39,9 @@ export default function ApprovalsPage() {
   const [login, setLogin] = useState({ username: '', password: '' });
   const [totpSetup, setTotpSetup] = useState<StaffTotpSetupResult | null>(null);
   const [totpToken, setTotpToken] = useState('');
-  const [refundForm, setRefundForm] = useState({ paymentId: '', amount: '', reason: '' });
+  const [refundForm, setRefundForm] = useState({ returnId: '', paymentId: '', amount: '', reason: '' });
+  const [returns, setReturns] = useState<ReturnRequest[]>([]);
+  const [restockLocation, setRestockLocation] = useState('RETURNS-BISHKEK');
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -58,6 +63,15 @@ export default function ApprovalsPage() {
     load(tab.status);
   }, [tab, load, session?.accessToken]);
 
+  const loadReturns = useCallback((token = session?.accessToken) => {
+    if (!token) return Promise.resolve();
+    return fetchStaffReturns(token).then(setReturns).catch(() => setReturns([]));
+  }, [session?.accessToken]);
+
+  useEffect(() => {
+    loadReturns();
+  }, [loadReturns]);
+
   function flash(m: string) {
     setToast(m);
     window.setTimeout(() => setToast(''), 1800);
@@ -72,8 +86,31 @@ export default function ApprovalsPage() {
       saveStaffSession(next);
       flash(`Вход: ${next.role}`);
       load(tab.status, next.accessToken);
+      loadReturns(next.accessToken);
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка входа');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function advanceReturn(ret: ReturnRequest, status: 'under_review' | 'approved' | 'rejected' | 'processing' | 'reconciled') {
+    if (!session) return;
+    setBusy(`return-${ret.id}`);
+    try {
+      await transitionReturn(
+        ret.id,
+        status,
+        session.accessToken,
+        status === 'reconciled' ? restockLocation.trim() : undefined,
+      );
+      if (status === 'processing') {
+        setRefundForm((current) => ({ ...current, returnId: ret.id }));
+      }
+      await loadReturns(session.accessToken);
+      flash(status === 'reconciled' ? 'Товар принят и остаток восстановлен' : `Возврат: ${status}`);
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка возврата');
     } finally {
       setBusy(null);
     }
@@ -128,10 +165,14 @@ export default function ApprovalsPage() {
     try {
       const res = await requestPaymentRefund(
         refundForm.paymentId.trim(),
-        { amount: Math.round(amount), reason: refundForm.reason.trim() || 'refund request' },
+        {
+          amount: Math.round(amount),
+          reason: refundForm.reason.trim() || 'refund request',
+          returnId: refundForm.returnId.trim() || undefined,
+        },
         session.accessToken,
       );
-      setRefundForm({ paymentId: '', amount: '', reason: '' });
+      setRefundForm({ returnId: '', paymentId: '', amount: '', reason: '' });
       setTab(TABS[0]);
       load('requested');
       flash(`Refund approval #${res.approvalId.slice(-8)}`);
@@ -241,6 +282,54 @@ export default function ApprovalsPage() {
           )}
           {session && (
             <>
+              <section className="mb-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="font-display text-base font-bold text-ink">Return Desk</div>
+                    <div className="mt-1 text-sm text-ink/55">Проверка, refund и складская приёмка без ручных статусов.</div>
+                  </div>
+                  <input
+                    value={restockLocation}
+                    onChange={(event) => setRestockLocation(event.target.value)}
+                    aria-label="Склад возврата"
+                    className="min-h-10 min-w-48 rounded-btn border border-ink/15 px-3 py-2 font-mono text-sm outline-none focus:border-ink/40"
+                  />
+                </div>
+                <div className="mt-4 space-y-2">
+                  {returns.length === 0 && <div className="rounded-btn bg-sand/70 px-4 py-3 text-sm text-ink/50">Очередь возвратов пуста</div>}
+                  {returns.slice(0, 8).map((ret) => {
+                    const next = ret.status === 'requested' ? 'under_review'
+                      : ret.status === 'under_review' ? 'approved'
+                        : ret.status === 'approved' ? 'processing'
+                          : ret.status === 'paid' ? 'reconciled'
+                            : null;
+                    return (
+                      <div key={ret.id} className="flex flex-wrap items-center gap-3 rounded-btn border border-ink/10 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-mono text-xs text-ink/55">{ret.id}</div>
+                          <div className="mt-1 text-sm font-semibold text-ink">{ret.reason}</div>
+                        </div>
+                        <span className="rounded-chip bg-sand px-3 py-1 text-xs font-semibold text-ink/65">{ret.status}</span>
+                        {ret.status === 'processing' && (
+                          <button type="button" onClick={() => setRefundForm((current) => ({ ...current, returnId: ret.id }))} className="rounded-btn border border-ink/15 px-3 py-2 text-xs font-semibold text-ink">
+                            В refund
+                          </button>
+                        )}
+                        {next && (
+                          <button type="button" disabled={busy === `return-${ret.id}`} onClick={() => advanceReturn(ret, next)} className="rounded-btn bg-ink px-3 py-2 text-xs font-semibold text-sand disabled:opacity-50">
+                            {next === 'under_review' ? 'В работу' : next === 'approved' ? 'Одобрить возврат' : next === 'processing' ? 'К refund' : 'Принять на склад'}
+                          </button>
+                        )}
+                        {(ret.status === 'requested' || ret.status === 'under_review' || ret.status === 'approved') && (
+                          <button type="button" disabled={busy === `return-${ret.id}`} onClick={() => advanceReturn(ret, 'rejected')} className="rounded-btn px-3 py-2 text-xs font-semibold text-danger disabled:opacity-50">
+                            Отклонить
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
               <form onSubmit={requestRefund} className="mb-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -254,7 +343,14 @@ export default function ApprovalsPage() {
                     {busy === 'refund-request' ? '…' : 'Запросить refund'}
                   </button>
                 </div>
-                <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1.5fr)_120px_minmax(0,1.5fr)]">
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  <input
+                    value={refundForm.returnId}
+                    onChange={(e) => setRefundForm((v) => ({ ...v, returnId: e.target.value }))}
+                    placeholder="returnId (для складского возврата)"
+                    aria-label="returnId"
+                    className="min-h-11 min-w-0 rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40"
+                  />
                   <input
                     value={refundForm.paymentId}
                     onChange={(e) => setRefundForm((v) => ({ ...v, paymentId: e.target.value }))}

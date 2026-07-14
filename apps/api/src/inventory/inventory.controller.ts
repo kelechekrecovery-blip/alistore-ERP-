@@ -92,6 +92,14 @@ export class InventoryController {
     return this.inventory.listConsignmentPayouts();
   }
 
+  @ApiOperation({ summary: 'List owner compensation obligations created by paid-item returns' })
+  @Get('consignments/adjustments')
+  @RequirePermission('inventory', 'consignment_payout')
+  async listConsignmentAdjustments(@CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.listConsignmentAdjustments();
+  }
+
   @ApiOperation({ summary: 'Create an owner payout from completed consignment sales' })
   @Post('consignments/payouts')
   @RequirePermission('inventory', 'consignment_payout')

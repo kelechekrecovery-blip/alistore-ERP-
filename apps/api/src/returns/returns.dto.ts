@@ -33,4 +33,7 @@ export class CreateMineReturnDto {
 export class ReturnStatusDto {
   @ApiProperty({ enum: RETURN_STATUSES, example: 'under_review' })
   @IsIn(RETURN_STATUSES) status!: (typeof RETURN_STATUSES)[number];
+
+  @ApiPropertyOptional({ example: 'BISHKEK-1', description: 'Required when status=reconciled.' })
+  @IsOptional() @IsString() location?: string;
 }

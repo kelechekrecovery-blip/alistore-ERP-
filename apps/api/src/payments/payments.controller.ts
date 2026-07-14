@@ -153,6 +153,6 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('payments', 'refund')
   refund(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: RefundDto) {
-    return this.payments.refund(id, dto.amount, dto.reason, user.customerId);
+    return this.payments.refund(id, dto.amount, dto.reason, user.customerId, dto.returnId);
   }
 }

@@ -30,7 +30,7 @@ state machine and pass a cross-surface E2E scenario.
 | Stock reserved/sold | availability | warehouse/POS/procurement | DeviceUnit + Reservation + Movement |
 | Approval requested | customer waits for result | approval inbox/POS retry | Approval + Event Ledger |
 | Pickup/delivery | order status | Staff/Courier/COD | Order + CourierRun |
-| Return/refund | account request/status | ERP/POS approval and refund | Return + Payment + Movement |
+| Return/refund | account request/status | ERP Return Desk, approval, refund and warehouse receipt | Return + Payment + Movement + ConsignmentAdjustment |
 | Warranty/support | customer self-service | Staff/service workflow | WarrantyCase/SupportTicket + Evidence |
 
 Every row must enforce JWT ownership or staff RBAC, stable idempotency for repeated
@@ -63,7 +63,7 @@ exchange and shift close reconcile money, stock and Ledger with no duplicate eff
 ## Phase 2: close ERP Wave A
 
 Implement exact handoffs plus shared APIs for budgets/plan-fact, variants/bundles,
-quantity consignment plus consignment return reversal and quantity return (quantity transfer/adjustment are complete), HR schedules/tasks/KPI/payroll, delivery zones/slots,
+quantity consignment plus line-level partial-return allocation (full-order refund-bound quantity/direct/bundle IMEI restock and consignment compensation are complete), HR schedules/tasks/KPI/payroll, delivery zones/slots,
 routes and dispatch. Product publication must immediately affect customer discovery;
 bundle/component stock and delivery capacity must be validated server-side.
 
@@ -113,7 +113,7 @@ and one pilot store completes every required real transaction and reconciliation
 ## Execution order
 
 1. Maintain the generated integration matrix and add cross-surface E2E fixtures.
-2. Complete quantity consignment, consignment return reversal, quantity/serialized return restock, serialized bundle return/restock, HR and logistics.
+2. Complete quantity consignment, partial-return policy, HR and logistics; retain the verified full-order return compensation invariant.
 3. Add app-specific XCUITest/Compose E2E and close native device certification gaps.
 4. Deliver remaining ERP Waves B/C by handoff acceptance.
 5. Run ecosystem E2E and security/load/restore gates.

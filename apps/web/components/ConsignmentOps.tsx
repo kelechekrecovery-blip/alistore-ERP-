@@ -5,11 +5,13 @@ import {
   createConsignmentPayout,
   fetchCatalog,
   fetchConsignmentPayouts,
+  fetchConsignmentAdjustments,
   fetchConsignments,
   payConsignmentPayout,
   receiveConsignment,
   type CatalogProduct,
   type ConsignmentItem,
+  type ConsignmentAdjustment,
   type ConsignmentPayout,
 } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -19,21 +21,24 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [items, setItems] = useState<ConsignmentItem[]>([]);
   const [payouts, setPayouts] = useState<ConsignmentPayout[]>([]);
+  const [adjustments, setAdjustments] = useState<ConsignmentAdjustment[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({ productId: '', imei: '', location: 'BISHKEK-1', ownerName: '', ownerContact: '', commissionPct: '10', grade: 'B' });
 
   const load = useCallback(async () => {
-    const [catalog, consignments, payoutRows] = await Promise.all([
+    const [catalog, consignments, payoutRows, adjustmentRows] = await Promise.all([
       fetchCatalog({ limit: 100 }),
       fetchConsignments(accessToken),
       canPayout ? fetchConsignmentPayouts(accessToken) : Promise.resolve([]),
+      canPayout ? fetchConsignmentAdjustments(accessToken) : Promise.resolve([]),
     ]);
     const eligible = catalog.items.filter((product) => product.trackingMode === 'serialized' && (product.bundleComponents?.length ?? 0) === 0);
     setProducts(eligible);
     setItems(consignments);
     setPayouts(payoutRows);
+    setAdjustments(adjustmentRows);
     setForm((current) => ({ ...current, productId: current.productId || eligible[0]?.id || '' }));
   }, [accessToken, canPayout]);
 
@@ -151,7 +156,8 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
         </div>
       </div>
 
-      {canPayout && payouts.length > 0 && <div className="mt-5 border-t border-[#2E2822] px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-[#8A7F76]">Выплаты владельцам</h3><div className="flex flex-wrap gap-2">{payouts.map((payout) => <div key={payout.id} className="flex items-center gap-3 rounded-btn border border-[#2E2822] px-3 py-2 text-xs"><span className="text-white">{payout.ownerName}</span><span className="font-mono text-lime">{som(payout.ownerAmount)}</span>{payout.status === 'created' ? <button type="button" onClick={() => markPaid(payout)} disabled={busy === payout.id} className="font-bold text-coral">Провести</button> : <span className="text-[#7FB0EC]">Выплачено</span>}</div>)}</div></div>}
+      {canPayout && payouts.length > 0 && <div className="mt-5 border-t border-[#2E2822] px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-[#8A7F76]">Выплаты владельцам</h3><div className="flex flex-wrap gap-2">{payouts.map((payout) => <div key={payout.id} className="flex items-center gap-3 rounded-btn border border-[#2E2822] px-3 py-2 text-xs"><span className="text-white">{payout.ownerName}</span><span className="font-mono text-lime">{som(payout.ownerAmount)}</span>{payout.status === 'created' ? <button type="button" onClick={() => markPaid(payout)} disabled={busy === payout.id} className="font-bold text-coral">Провести</button> : <span className={payout.status === 'paid' ? 'text-[#7FB0EC]' : 'text-[#8A7F76]'}>{payout.status === 'paid' ? 'Выплачено' : 'Отменено возвратом'}</span>}</div>)}</div></div>}
+      {canPayout && adjustments.length > 0 && <div className="mt-4 border-t border-[#2E2822] px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-coral">Компенсации после возврата</h3><div className="flex flex-wrap gap-2">{adjustments.map((adjustment) => <div key={adjustment.id} className="rounded-btn border border-coral/35 px-3 py-2 text-xs"><span className="text-white">{adjustment.ownerName}</span><span className="ml-3 font-mono text-coral">{som(adjustment.amount)}</span><span className="ml-3 text-[#A79C92]">{adjustment.status === 'open' ? 'к взысканию/зачёту' : 'закрыто'}</span></div>)}</div></div>}
       {message && <p role="status" className="mx-4 mt-3 rounded-btn bg-[#221E19] px-3 py-2 text-sm text-lime">{message}</p>}
     </section>
   );

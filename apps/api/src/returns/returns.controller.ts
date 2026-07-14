@@ -100,7 +100,7 @@ export class ReturnsController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('returns', 'transition')
   transition(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReturnStatusDto) {
-    return this.returns.transition(id, dto.status, user.customerId);
+    return this.returns.transition(id, dto.status, user.customerId, dto.location);
   }
 }
 

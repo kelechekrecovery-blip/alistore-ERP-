@@ -43,4 +43,7 @@ export class RefundDto {
 
   @ApiPropertyOptional({ example: 'senior_seller_azamat' })
   @IsOptional() @IsString() requester?: string;
+
+  @ApiPropertyOptional({ example: 'clx_return_001', description: 'Approved return this refund settles.' })
+  @IsOptional() @IsString() returnId?: string;
 }

@@ -38,7 +38,7 @@ export class PaymentsService {
    * Администратор). Enforces invariant #1: refund needs an existing positive
    * payment and amount ≤ it. Returns an approvalId; money moves only on approve.
    */
-  async refund(paymentId: string, amount: number, reason: string, requester: string) {
+  async refund(paymentId: string, amount: number, reason: string, requester: string, returnId?: string) {
     const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
     if (!payment) {
       throw new ValidationError('payment_not_found', `Платёж ${paymentId} не найден`);
@@ -52,11 +52,24 @@ export class PaymentsService {
         `Сумма возврата должна быть 0 < amount ≤ ${payment.amount}`,
       );
     }
+    if (returnId) {
+      const ret = await this.prisma.return.findUnique({ where: { id: returnId } });
+      if (!ret) throw new ValidationError('return_not_found', `Возврат ${returnId} не найден`);
+      if (!payment.orderId || ret.orderId !== payment.orderId) {
+        throw new ConflictError('refund_return_order_mismatch', 'Возврат и платёж относятся к разным заказам');
+      }
+      if (ret.status !== 'processing') {
+        throw new ConflictError(
+          'return_not_processing',
+          `Refund можно запросить только для возврата processing (сейчас ${ret.status})`,
+        );
+      }
+    }
     return this.approvals.request({
       action: 'refund',
       requester,
       reason,
-      payload: { paymentId, amount },
+      payload: { paymentId, amount, returnId: returnId ?? null },
     });
   }
 

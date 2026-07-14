@@ -32,6 +32,7 @@ handoff experience.
   staff operations require active Staff JWT, RBAC and server-derived actor.
 - Every repeatable mutation has a stable idempotency key across retry/process restart.
 - Critical state and its Ledger event commit atomically. Duplicate/reordered requests apply once.
+- A return reaches `paid` only through an approved refund bound to the same order; reconciliation restores quantity/direct/bundle IMEI once and records consignment owner compensation without erasing payout history.
 - Redis, Meilisearch, R2 and offline stores are projections/transport, never business truth.
 - Final apps are SwiftUI and Kotlin Compose. Expo is behavioral reference only.
 - Release builds fail on localhost, dev OTP, sandbox providers or missing production config.

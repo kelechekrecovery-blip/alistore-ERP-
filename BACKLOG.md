@@ -8,7 +8,8 @@
 - Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
 - Complete the new Redis/Meilisearch runtime with a live Docker/staging smoke, automatic index bootstrap and idempotent product reindex jobs.
 - Add Kubernetes deployment manifests for API, web and workers with migration jobs, secrets, probes, autoscaling and rollback gates.
-- Complete serialized return/restock and exchange handling for regular products and virtual-bundle component allocations, including partial-return policy, approval, stock reconciliation and Ledger regressions.
+- Define and implement line-level partial-return allocation, pricing/refund and restock policy; full-order quantity/direct/bundle IMEI reconciliation is complete.
+- Add quantity-tracked consignment ownership, sale accrual, return compensation and payout reconciliation without creating a second stock source of truth.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
 - Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
 - Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
@@ -20,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Bind return requests to approved refunds and reconcile full-order returns exactly once: strict state machine, quantity/direct/bundle IMEI restock, unpaid payout reversal, paid-owner compensation obligations, Event Ledger, ERP Return Desk, warehouse visibility and API/browser regressions.
 - Add serialized consignment inventory across warehouse, storefront checkout and POS: owner-bound IMEI receiving, basis-point commission, atomic sale accrual, completion/return-gated payout batches, stable payment replay, RBAC, Event Ledger and responsive browser acceptance.
 - Apply approval-gated quantity adjustments to authoritative balances and add idempotent inter-location quantity transfer in ERP.
 - Establish a proof-oriented ecosystem completion process: 23-handoff acceptance audit, role-based black-box gates, reusable master engineering prompt and a root `ecosystem:verify` command that includes web/API plus all iOS and Android software builds/tests while explicitly separating native UI and physical certification.

@@ -67,7 +67,7 @@ export function payOrder(input: {
 
 export function requestPaymentRefund(
   paymentId: string,
-  input: { amount: number; reason: string },
+  input: { amount: number; reason: string; returnId?: string },
   accessToken: string,
 ): Promise<{ approvalId: string; status: 'requested' }> {
   return postAuthJson(`/payments/${encodeURIComponent(paymentId)}/refund`, input, accessToken);

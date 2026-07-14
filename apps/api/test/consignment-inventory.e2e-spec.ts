@@ -51,6 +51,7 @@ describe('Serialized consignment inventory (integration)', () => {
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.approval.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   }
 

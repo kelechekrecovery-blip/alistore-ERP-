@@ -286,6 +286,13 @@ export class InventoryService {
     });
   }
 
+  listConsignmentAdjustments() {
+    return this.prisma.consignmentAdjustment.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
   async createConsignmentPayout(dto: CreateConsignmentPayoutDto, actor: string) {
     const existing = await this.prisma.consignmentPayout.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
@@ -356,6 +363,9 @@ export class InventoryService {
       await tx.$queryRaw`SELECT id FROM "ConsignmentPayout" WHERE id = ${id} FOR UPDATE`;
       const payout = await tx.consignmentPayout.findUnique({ where: { id }, include: { items: true } });
       if (!payout) throw new ValidationError('consignment_payout_not_found', `Выплата ${id} не найдена`);
+      if (payout.status === 'cancelled') {
+        throw new ConflictError('consignment_payout_cancelled', 'Отменённую выплату нельзя провести');
+      }
       if (payout.status === 'paid') {
         if (payout.paymentKey !== dto.paymentKey) throw new ConflictError('consignment_payment_key_reused', 'Выплата уже проведена с другим ключом');
         return { result: payout, events: [] };

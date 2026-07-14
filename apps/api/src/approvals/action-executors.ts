@@ -24,12 +24,24 @@ export type ActionExecutor = (
 const refund: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const paymentId = String(payload['paymentId']);
   const amount = Number(payload['amount']);
+  const returnId = payload['returnId'] ? String(payload['returnId']) : null;
   const original = await tx.payment.findUnique({ where: { id: paymentId } });
   if (!original) {
     throw new ValidationError('payment_not_found', 'Платёж для возврата не найден');
   }
   if (amount <= 0 || amount > original.amount) {
     throw new ValidationError('invalid_refund_amount', 'Некорректная сумма возврата');
+  }
+  if (returnId) {
+    await tx.$queryRaw`SELECT id FROM "Return" WHERE id = ${returnId} FOR UPDATE`;
+    const ret = await tx.return.findUnique({ where: { id: returnId } });
+    if (!ret) throw new ValidationError('return_not_found', 'Связанный возврат не найден');
+    if (!original.orderId || ret.orderId !== original.orderId) {
+      throw new ConflictError('refund_return_order_mismatch', 'Возврат и платёж относятся к разным заказам');
+    }
+    if (ret.status !== 'processing') {
+      throw new ConflictError('return_not_processing', `Возврат уже ${ret.status}`);
+    }
   }
   if (original.orderId) {
     // Serialize concurrent refunds on this order (row lock), then cap total
@@ -59,8 +71,8 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   events.push({
     type: EventType.PaymentRefunded,
     actor: approver,
-    payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, amount },
-    refs: [original.orderId, paymentId, compensating.id].filter((r): r is string => Boolean(r)),
+    payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, returnId, amount },
+    refs: [original.orderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
   });
   if (original.orderId) {
     const order = await tx.order.findUnique({ where: { id: original.orderId } });
@@ -79,6 +91,25 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
         payload: { orderId: order.id, from: order.status },
         refs: [order.id],
       });
+    }
+    if (returnId) {
+      const aggregate = await tx.payment.aggregate({
+        where: { orderId: original.orderId },
+        _sum: { amount: true },
+      });
+      const fullyRefunded = (aggregate._sum.amount ?? 0) <= 0;
+      await tx.return.update({
+        where: { id: returnId },
+        data: { refundId: compensating.id, status: fullyRefunded ? 'paid' : 'processing' },
+      });
+      if (fullyRefunded) {
+        events.push({
+          type: 'return.paid',
+          actor: approver,
+          payload: { returnId, orderId: original.orderId, refundId: compensating.id },
+          refs: [returnId, original.orderId, compensating.id],
+        });
+      }
     }
   }
 };

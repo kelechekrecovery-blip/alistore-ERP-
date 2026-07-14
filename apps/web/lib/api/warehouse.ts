@@ -123,10 +123,23 @@ export interface ConsignmentPayout {
   grossAmount: number;
   commissionAmount: number;
   ownerAmount: number;
-  status: 'created' | 'paid';
+  status: 'created' | 'paid' | 'cancelled';
   paymentKey?: string | null;
   paidAt?: string | null;
   items: Array<{ id: string; ownerAmount?: number | null; saleOrderId?: string | null }>;
+}
+
+export interface ConsignmentAdjustment {
+  id: string;
+  returnId: string;
+  itemId: string;
+  payoutId: string;
+  ownerName: string;
+  ownerContact?: string | null;
+  amount: number;
+  reason: string;
+  status: 'open' | 'settled';
+  createdAt: string;
 }
 
 export function receiveConsignment(input: {
@@ -148,6 +161,10 @@ export function fetchConsignments(accessToken: string): Promise<ConsignmentItem[
 
 export function fetchConsignmentPayouts(accessToken: string): Promise<ConsignmentPayout[]> {
   return getJson('/inventory/consignments/payouts', accessToken);
+}
+
+export function fetchConsignmentAdjustments(accessToken: string): Promise<ConsignmentAdjustment[]> {
+  return getJson('/inventory/consignments/adjustments', accessToken);
 }
 
 export function createConsignmentPayout(
