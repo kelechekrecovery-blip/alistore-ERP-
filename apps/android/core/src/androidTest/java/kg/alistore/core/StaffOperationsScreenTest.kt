@@ -20,6 +20,7 @@ import org.junit.Test
 import java.io.IOException
 import java.io.File
 import java.io.FileOutputStream
+import java.time.LocalDate
 
 class StaffOperationsScreenTest {
   @get:Rule val compose = createComposeRule()
@@ -85,6 +86,19 @@ class StaffOperationsScreenTest {
 
     assertEquals(gateway.closeKeys[0], gateway.closeKeys[1])
   }
+
+  @Test
+  fun attendanceUsesOwnedScheduleAndStableServerCommand() {
+    val gateway = UiStaffGateway(withTodaySchedule = true)
+    compose.setContent { MaterialTheme { StaffShiftScreen(session, gateway, {}) } }
+
+    compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("attendance-open").fetchSemanticsNode() }.isSuccess }
+    compose.onNodeWithTag("attendance-open").performClick()
+    compose.waitUntil(5_000) { gateway.attendanceKeys.size == 1 && gateway.hrLoads >= 2 }
+
+    assertEquals("schedule-today", gateway.attendanceScheduleIds.single())
+    compose.onNodeWithTag("attendance-close").assertIsDisplayed()
+  }
 }
 
 private class UiStaffGateway(
@@ -92,11 +106,16 @@ private class UiStaffGateway(
   private val orders: MutableList<CustomerOrder> = mutableListOf(),
   private val failFirstOpen: Boolean = false,
   private val failFirstClose: Boolean = false,
+  private val withTodaySchedule: Boolean = false,
 ) : StaffOperationsGateway {
   val openKeys = mutableListOf<String>()
   val closeKeys = mutableListOf<String>()
   val transitions = mutableListOf<Pair<String, String>>()
   var orderLoads = 0
+  var hrLoads = 0
+  val attendanceKeys = mutableListOf<String>()
+  val attendanceScheduleIds = mutableListOf<String>()
+  private var attendance: StaffHrAttendance? = null
 
   override suspend fun currentShift(token: String): CashShift? = current
 
@@ -110,6 +129,27 @@ private class UiStaffGateway(
     closeKeys += idempotencyKey
     if (failFirstClose && closeKeys.size == 1) throw IOException("Сеть недоступна")
     return current!!.copy(closeCash = request.closeCash, closeReason = request.reason, diff = request.closeCash - current!!.expectedCash, closedAt = "2026-07-13").also { current = null }
+  }
+
+  override suspend fun staffHrWeek(weekStart: String, token: String): StaffHrWeek {
+    hrLoads += 1
+    val schedules = if (withTodaySchedule) listOf(StaffHrSchedule(
+      id = "schedule-today", staffId = "staff-1", point = "BISHKEK-1",
+      shiftDate = "${LocalDate.now()}T00:00:00.000Z", startsAt = "${LocalDate.now()}T03:00:00.000Z",
+      endsAt = "${LocalDate.now()}T12:00:00.000Z", cancelledAt = null, attendance = attendance,
+    )) else emptyList()
+    return StaffHrWeek(weekStart, weekStart, null, schedules)
+  }
+
+  override suspend fun openAttendance(scheduleId: String, token: String, idempotencyKey: String): StaffHrAttendance {
+    attendanceKeys += idempotencyKey
+    attendanceScheduleIds += scheduleId
+    return StaffHrAttendance("attendance-1", scheduleId, "staff-1", "BISHKEK-1", "${LocalDate.now()}T03:01:00.000Z", null).also { attendance = it }
+  }
+
+  override suspend fun closeAttendance(scheduleId: String, token: String, idempotencyKey: String): StaffHrAttendance {
+    attendanceKeys += idempotencyKey
+    return attendance!!.copy(checkedOutAt = "${LocalDate.now()}T12:00:00.000Z").also { attendance = it }
   }
 
   override suspend fun staffOrders(status: String, token: String): List<CustomerOrder> {

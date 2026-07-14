@@ -79,6 +79,39 @@ public struct CloseShiftRequest: Encodable, Sendable {
     }
 }
 
+public struct StaffHrWeek: Decodable, Sendable {
+    public let weekStart: Date
+    public let weekEnd: Date
+    public let point: String?
+    public let schedules: [StaffHrSchedule]
+}
+
+public struct StaffHrSchedule: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let staffId: String
+    public let point: String
+    public let shiftDate: Date
+    public let startsAt: Date
+    public let endsAt: Date
+    public let cancelledAt: Date?
+    public let attendance: StaffHrAttendance?
+}
+
+public struct StaffHrAttendance: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let scheduleId: String
+    public let staffId: String
+    public let point: String
+    public let checkedInAt: Date
+    public let checkedOutAt: Date?
+}
+
+public struct StaffAttendanceRequest: Codable, Sendable {
+    public let scheduleId: String
+
+    public init(scheduleId: String) { self.scheduleId = scheduleId }
+}
+
 public struct OTPRequest: Encodable, Sendable {
     public let phone: String
 

@@ -1372,3 +1372,12 @@
 - Checks run: Prisma format/validation/generation and test schema sync; targeted HR API 4/4; API and Next production builds; targeted ERP HR Playwright 3/3; repeated complete `npm run mvp:verify`; `git diff --check`.
 - Outcome: full web/API gate is green with 118/118 API suites and 469/469 tests plus 32/32 Playwright flows. The first full run correctly exposed shared staff-login throttling in two late UI tests; they now use signed seeded sessions and the complete gate was rerun successfully. Production readiness remains blocked by the same 12 external credential/manual groups.
 - Next step: expose the verified schedule/attendance contract in native SwiftUI and Compose Staff apps with durable offline replay, then continue ERP Wave B service-center work.
+
+## 2026-07-14
+
+- Task: complete native Staff HR schedule and attendance on SwiftUI and Compose.
+- Files changed: shared iOS/Android HR models and API contracts; SwiftUI Staff shift workspace and SwiftData replay controls; Compose Staff shift workspace, attendance manager, isolated SQLite queue and WorkManager worker; APNs/FCM deep-link routing; XCTest/JVM/Compose regressions; backlog/readiness/completion audit.
+- Result: an authenticated staff member sees only the schedule returned by `GET /hr/me/week`, opens or closes only that schedule through server-authoritative attendance endpoints, and retains the exact idempotency key when connectivity fails. iOS stores the command in SwiftData and replays it on foreground/manual retry; Android stores it in a Staff-only SQLite database and schedules network-constrained WorkManager replay. Rejected ownership/domain commands are not queued, while queued/failed/conflict states remain visible. Attendance notifications route directly to the Shift tab.
+- Checks run: all-target iOS simulator build; 31/31 XCTest; four-APK Android build; Android JVM tests and Lint; 25/25 connected Compose tests on the API 36 emulator; complete `npm run ecosystem:verify` with 118/118 Jest suites, 469/469 API tests and 32/32 Playwright; `git diff --check`.
+- Outcome: the native Staff attendance software contour is complete on both platforms. Physical APNs/FCM delivery, camera/scanner checks and first-store payroll/shift reconciliation remain external device/UAT gates; no production certification is claimed.
+- Next step: run the complete ecosystem gate, then start ERP Wave B with the service-center work-order/diagnostics vertical.

@@ -109,6 +109,9 @@ private object NoopStaffOperations : StaffOperationsGateway {
   override suspend fun currentShift(token: String): CashShift? = null
   override suspend fun openShift(request: OpenShiftRequest, token: String, idempotencyKey: String) = error("unused")
   override suspend fun closeShift(shiftId: String, request: CloseShiftRequest, token: String, idempotencyKey: String) = error("unused")
+  override suspend fun staffHrWeek(weekStart: String, token: String) = StaffHrWeek(weekStart, weekStart, null, emptyList())
+  override suspend fun openAttendance(scheduleId: String, token: String, idempotencyKey: String) = error("unused")
+  override suspend fun closeAttendance(scheduleId: String, token: String, idempotencyKey: String) = error("unused")
   override suspend fun staffOrders(status: String, token: String): List<CustomerOrder> = emptyList()
   override suspend fun fulfillOrder(orderId: String, token: String) = error("unused")
   override suspend fun transitionOrder(orderId: String, to: String, token: String) = error("unused")

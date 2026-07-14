@@ -113,7 +113,7 @@ and one pilot store completes every required real transaction and reconciliation
 ## Execution order
 
 1. Maintain the generated integration matrix and add cross-surface E2E fixtures.
-2. Complete native Staff attendance and retain the verified immutable payroll posting, cash handover, logistics capacity/dispatch, line-level return and quantity-consignment invariants.
+2. Run first-store native Staff attendance/device UAT while retaining the verified immutable payroll posting, cash handover, logistics capacity/dispatch, line-level return and quantity-consignment invariants.
 3. Add app-specific XCUITest/Compose E2E and close native device certification gaps.
 4. Deliver remaining ERP Waves B/C by handoff acceptance.
 5. Run ecosystem E2E and security/load/restore gates.

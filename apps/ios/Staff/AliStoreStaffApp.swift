@@ -104,6 +104,8 @@ private struct StaffRootView: View {
         } else if url.host == "support" {
             selectedTab = .work
             workMode = .support
+        } else if url.host == "shift" || url.host == "attendance" || url.host == "account" {
+            selectedTab = .shift
         }
     }
 
@@ -492,7 +494,16 @@ private struct StaffShiftView: View {
     let pushStatus: String
     let enablePush: () -> Void
     let logout: () -> Void
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+    @Query(sort: \PendingMutation.createdAt) private var pendingMutations: [PendingMutation]
     @State private var shift: CashShift?
+    @State private var hrWeek: StaffHrWeek?
+    @State private var hrLoading = true
+    @State private var hrMessage: String?
+    @State private var attendanceBusy = false
+    @State private var checkInKey = UUID().uuidString
+    @State private var checkOutKey = UUID().uuidString
     @State private var isLoading = true
     @State private var isSubmitting = false
     @State private var errorMessage: String?
@@ -503,6 +514,15 @@ private struct StaffShiftView: View {
 
     private let environment = AppEnvironment.live()
 
+    private var hrMutations: [PendingMutation] {
+        pendingMutations.filter { $0.endpoint.hasPrefix("hr/me/attendance/") }
+    }
+
+    private var activeSchedule: StaffHrSchedule? {
+        let calendar = Calendar(identifier: .gregorian)
+        return hrWeek?.schedules.first { calendar.isDateInToday($0.shiftDate) }
+    }
+
     var body: some View {
         Form {
             Section("Сотрудник") {
@@ -511,6 +531,7 @@ private struct StaffShiftView: View {
                 LabeledContent("Push", value: pushStatus)
                 Button("Включить уведомления", systemImage: "bell.badge", action: enablePush)
             }
+            attendanceSection
             if isLoading {
                 Section { ProgressView("Проверяем смену…") }
             } else if let errorMessage {
@@ -537,8 +558,88 @@ private struct StaffShiftView: View {
             }
         }
         .navigationTitle("Смена")
-        .task { await loadShift() }
-        .refreshable { await loadShift() }
+        .task {
+            await replayAttendanceQueue()
+            async let cash: Void = loadShift()
+            async let attendance: Void = loadAttendance()
+            _ = await (cash, attendance)
+        }
+        .refreshable {
+            await replayAttendanceQueue()
+            await loadAttendance()
+            await loadShift()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await replayAttendanceQueue()
+                await loadAttendance()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var attendanceSection: some View {
+        Section("Рабочее время") {
+            if hrLoading {
+                ProgressView("Загружаем график…")
+            } else if let schedule = activeSchedule {
+                LabeledContent("Точка", value: schedule.point)
+                LabeledContent(
+                    "График",
+                    value: "\(schedule.startsAt.formatted(date: .abbreviated, time: .shortened)) – \(schedule.endsAt.formatted(date: .omitted, time: .shortened))"
+                )
+                if schedule.cancelledAt != nil {
+                    Label("Смена отменена", systemImage: "xmark.circle.fill").foregroundStyle(.red)
+                } else if let attendance = schedule.attendance {
+                    LabeledContent("Начало", value: attendance.checkedInAt.formatted(date: .omitted, time: .shortened))
+                    if let checkedOutAt = attendance.checkedOutAt {
+                        LabeledContent("Завершение", value: checkedOutAt.formatted(date: .omitted, time: .shortened))
+                    } else {
+                        Button("Завершить рабочую смену", systemImage: "stop.circle.fill", role: .destructive) {
+                            Task { await submitAttendance("close", schedule: schedule) }
+                        }
+                        .disabled(attendanceBusy)
+                        .accessibilityIdentifier("staff-attendance-close")
+                    }
+                } else {
+                    Button("Начать рабочую смену", systemImage: "play.circle.fill") {
+                        Task { await submitAttendance("open", schedule: schedule) }
+                    }
+                    .disabled(attendanceBusy)
+                    .accessibilityIdentifier("staff-attendance-open")
+                }
+            } else {
+                ContentUnavailableView("Нет запланированной смены", systemImage: "calendar.badge.clock")
+            }
+            if !hrMutations.isEmpty {
+                LabeledContent("Офлайн-очередь", value: String(hrMutations.count))
+                ForEach(hrMutations) { mutation in
+                    HStack {
+                        Label(queueLabel(mutation.state), systemImage: queueIcon(mutation.state))
+                        Spacer()
+                        if mutation.state == "failed" || mutation.state == "conflict" {
+                            Button("Повторить") {
+                                Task { await retryAttendance(mutation) }
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    if let lastError = mutation.lastError {
+                        Text(lastError).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Button("Синхронизировать", systemImage: "arrow.triangle.2.circlepath") {
+                    Task {
+                        await replayAttendanceQueue()
+                        await loadAttendance()
+                    }
+                }
+            }
+            if let hrMessage {
+                Text(hrMessage).font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 
     @ViewBuilder
@@ -585,6 +686,101 @@ private struct StaffShiftView: View {
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadAttendance() async {
+        hrLoading = true
+        defer { hrLoading = false }
+        do {
+            let start = Calendar(identifier: .iso8601).dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = "yyyy-MM-dd"
+            hrWeek = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "hr/me/week?weekStart=\(formatter.string(from: start))",
+                token: session.accessToken
+            )
+            hrMessage = nil
+        } catch {
+            hrMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func submitAttendance(_ action: String, schedule: StaffHrSchedule) async {
+        attendanceBusy = true
+        defer { attendanceBusy = false }
+        let key = action == "open" ? checkInKey : checkOutKey
+        let request = StaffAttendanceRequest(scheduleId: schedule.id)
+        do {
+            let _: StaffHrAttendance = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "hr/me/attendance/\(action)",
+                body: request,
+                token: session.accessToken,
+                idempotencyKey: key
+            )
+            rotateAttendanceKey(action)
+            await loadAttendance()
+        } catch let error as APIError {
+            hrMessage = error.localizedDescription
+        } catch {
+            do {
+                try OfflineCourierQueue.enqueue(
+                    endpoint: "hr/me/attendance/\(action)",
+                    body: request,
+                    idempotencyKey: key,
+                    context: modelContext
+                )
+                rotateAttendanceKey(action)
+                hrMessage = "Операция сохранена и будет отправлена при появлении сети"
+            } catch {
+                hrMessage = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func replayAttendanceQueue() async {
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        for mutation in hrMutations where mutation.state == "queued" {
+            await OfflineCourierQueue.replay(mutation, api: api, token: session.accessToken, context: modelContext)
+        }
+    }
+
+    @MainActor
+    private func retryAttendance(_ mutation: PendingMutation) async {
+        do {
+            try OfflineCourierQueue.retry(mutation, context: modelContext)
+            await replayAttendanceQueue()
+            await loadAttendance()
+        } catch {
+            hrMessage = error.localizedDescription
+        }
+    }
+
+    private func rotateAttendanceKey(_ action: String) {
+        if action == "open" { checkInKey = UUID().uuidString } else { checkOutKey = UUID().uuidString }
+    }
+
+    private func queueLabel(_ state: String) -> String {
+        switch state {
+        case "syncing": "Отправляется"
+        case "conflict": "Требует проверки"
+        case "failed": "Ошибка отправки"
+        default: "Ожидает сеть"
+        }
+    }
+
+    private func queueIcon(_ state: String) -> String {
+        switch state {
+        case "syncing": "arrow.triangle.2.circlepath"
+        case "conflict": "exclamationmark.triangle.fill"
+        case "failed": "xmark.circle.fill"
+        default: "icloud.and.arrow.up"
         }
     }
 

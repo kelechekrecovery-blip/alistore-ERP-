@@ -154,6 +154,14 @@ public enum OfflineCourierQueue {
             try? context.save()
         }
     }
+
+    @MainActor
+    public static func retry(_ mutation: PendingMutation, context: ModelContext) throws {
+        mutation.state = "queued"
+        mutation.lastError = nil
+        mutation.updatedAt = Date()
+        try context.save()
+    }
 }
 
 public enum OfflinePOSQueue {

@@ -156,7 +156,10 @@ private fun PosWorkspace(session: StaffSession, api: ApiClient, apiBaseUrl: Stri
     when (selected) {
       0 -> PosSaleScreen(products, error, shift, session, api, manager, apiBaseUrl, { selected = 2 }, Modifier.padding(padding))
       1 -> PosOfflineScreen(queue, apiBaseUrl, Modifier.padding(padding))
-      2 -> StaffShiftScreen(session, api, onLogout, Modifier.padding(padding)) { shift = it }
+      2 -> StaffShiftScreen(
+        session, api, onLogout, Modifier.padding(padding),
+        onShiftChanged = { shift = it }, apiBaseUrl = apiBaseUrl,
+      )
       else -> PosAfterSaleScreen(products, session, api, onLogout, Modifier.padding(padding))
     }
   }

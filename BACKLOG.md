@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- Complete the remaining HR handoff contour in native Staff: own schedule, attendance open/close, offline replay, push routing and physical-device certification on SwiftUI and Compose.
+- Run first-store HR acceptance with real schedules, payroll, cash handover and physical Staff devices; certify APNs/FCM delivery plus scanner/camera behavior without changing the now-verified native attendance contracts.
 - Extend the verified logistics contour with route optimization, multi-stop sequencing, delivery exception rescheduling and live tracking after first-store dispatch UAT.
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
@@ -21,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Complete native Staff HR attendance on SwiftUI and Compose: JWT-owned weekly schedule, server-authoritative open/close, stable command keys, durable SwiftData/SQLite queues, explicit replay/conflict states, WorkManager recovery, attendance push routing and simulator/emulator contract/UI gates.
 - Add authoritative period payroll to HR: attendance/absence/sales-derived preview, immutable posting snapshot, payout document, stable replay protection, owner/admin RBAC, Event Ledger and ERP/API/browser acceptance.
 - Implement atomic cash-shift handover: reconcile and close the source drawer, open the recipient drawer with counted cash, preserve historical sale attribution, enforce ownership/manager RBAC and replay safety, append Ledger events and expose the complete ERP HR handover flow.
 - Add replay-safe owner editing/cancellation for planned HR shifts with immutable command responses, attendance lockout, cancelled-shift enforcement, RBAC, Event Ledger and ERP browser acceptance.

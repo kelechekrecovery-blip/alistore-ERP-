@@ -56,7 +56,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 
@@ -99,6 +112,7 @@ fun StaffApp(
         deepLinkRevision = deepLinkRevision,
         pushRegistrar = pushRegistrar,
         onLogout = { state = manager.logout() },
+        apiBaseUrl = apiBaseUrl,
       )
     }
   }
@@ -165,6 +179,7 @@ fun StaffSignedInScreen(
   deepLinkRevision: Long = 0,
   pushRegistrar: StaffPushRegistrar? = null,
   onLogout: () -> Unit,
+  apiBaseUrl: String = "",
 ) {
   var selected by rememberSaveable { mutableStateOf(0) }
   var routedCustomerId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -206,7 +221,7 @@ fun StaffSignedInScreen(
       1 -> StaffOrdersScreen(session, gateway, Modifier.padding(padding))
       2 -> StaffTasksScreen(session, taskGateway, Modifier.padding(padding))
       3 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
-      4 -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding))
+      4 -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding), apiBaseUrl = apiBaseUrl)
       else -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding), routedCustomerId)
     }
   }
@@ -346,8 +361,19 @@ fun StaffShiftScreen(
   onLogout: () -> Unit,
   modifier: Modifier = Modifier,
   onShiftChanged: (CashShift?) -> Unit = {},
+  apiBaseUrl: String = "",
 ) {
+  val context = LocalContext.current.applicationContext
+  val attendanceQueue = remember { OfflineQueueDb(context, STAFF_QUEUE_DB) }
+  val attendanceManager = remember(gateway, attendanceQueue) { StaffAttendanceManager(gateway, attendanceQueue) }
   var shift by remember { mutableStateOf<CashShift?>(null) }
+  var hrWeek by remember { mutableStateOf<StaffHrWeek?>(null) }
+  var hrLoading by remember { mutableStateOf(true) }
+  var hrError by remember { mutableStateOf<String?>(null) }
+  var attendanceBusy by remember { mutableStateOf(false) }
+  var checkInKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
+  var checkOutKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
+  var queueRevision by remember { mutableStateOf(0) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var point by rememberSaveable { mutableStateOf("BISHKEK-1") }
@@ -371,11 +397,90 @@ fun StaffShiftScreen(
       .onFailure { error = it.message ?: "Не удалось загрузить смену" }
     loading = false
   }
+  LaunchedEffect(revision, queueRevision) {
+    hrLoading = true
+    runCatching { gateway.staffHrWeek(currentWeekStart(), session.accessToken) }
+      .onSuccess { hrWeek = it; hrError = null }
+      .onFailure { hrError = it.message ?: "Не удалось загрузить график" }
+    hrLoading = false
+  }
+  val hrPending = remember(queueRevision) { attendanceQueue.pending(includeConflicts = true) }
+    .filter { it.endpoint.startsWith("hr/me/attendance/") }
+  val schedule = hrWeek?.schedules?.firstOrNull { it.shiftDate.take(10) == LocalDate.now().toString() }
   LazyColumn(modifier.fillMaxSize().background(StaffInk).statusBarsPadding(), contentPadding = PaddingValues(18.dp)) {
     item {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Смена", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).testTag("staff-shift-title"))
         TextButton(onClick = onLogout, modifier = Modifier.testTag("staff-logout")) { Text("Выйти", color = StaffCoral) }
+      }
+    }
+    item {
+      Text("Рабочее время", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
+      when {
+        hrLoading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StaffLime) }
+        schedule == null -> Card(colors = CardDefaults.cardColors(containerColor = StaffSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+          Text("Нет запланированной смены", color = StaffMuted, modifier = Modifier.padding(16.dp).testTag("attendance-empty"))
+        }
+        else -> Card(colors = CardDefaults.cardColors(containerColor = StaffSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+          Column(Modifier.padding(16.dp)) {
+            Text(schedule.point, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
+            Text("${formatHrTime(schedule.startsAt)} – ${formatHrTime(schedule.endsAt)}", color = StaffMuted, modifier = Modifier.padding(top = 4.dp))
+            when {
+              schedule.cancelledAt != null -> Text("Смена отменена", color = StaffCoral, modifier = Modifier.padding(top = 12.dp))
+              schedule.attendance?.checkedOutAt != null -> Text("Смена завершена в ${formatHrTime(schedule.attendance.checkedOutAt)}", color = StaffLime, modifier = Modifier.padding(top = 12.dp).testTag("attendance-closed"))
+              schedule.attendance != null -> Button(
+                onClick = {
+                  attendanceBusy = true; hrError = null
+                  scope.launch {
+                    runCatching { attendanceManager.close(schedule.id, session.accessToken, checkOutKey) }
+                      .onSuccess {
+                        checkOutKey = UUID.randomUUID().toString()
+                        if (it is StaffAttendanceResult.Queued && apiBaseUrl.isNotBlank()) scheduleStaffSync(context, apiBaseUrl)
+                        queueRevision += 1; revision += 1
+                      }
+                      .onFailure { hrError = it.message }
+                    attendanceBusy = false
+                  }
+                },
+                enabled = !attendanceBusy,
+                colors = ButtonDefaults.buttonColors(containerColor = StaffCoral),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("attendance-close"),
+              ) { Text(if (attendanceBusy) "Сохраняем..." else "Завершить рабочую смену") }
+              else -> Button(
+                onClick = {
+                  attendanceBusy = true; hrError = null
+                  scope.launch {
+                    runCatching { attendanceManager.open(schedule.id, session.accessToken, checkInKey) }
+                      .onSuccess {
+                        checkInKey = UUID.randomUUID().toString()
+                        if (it is StaffAttendanceResult.Queued && apiBaseUrl.isNotBlank()) scheduleStaffSync(context, apiBaseUrl)
+                        queueRevision += 1; revision += 1
+                      }
+                      .onFailure { hrError = it.message }
+                    attendanceBusy = false
+                  }
+                },
+                enabled = !attendanceBusy,
+                colors = ButtonDefaults.buttonColors(containerColor = StaffLime, contentColor = StaffInk),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("attendance-open"),
+              ) { Text(if (attendanceBusy) "Сохраняем..." else "Начать рабочую смену", fontWeight = FontWeight.Bold) }
+            }
+          }
+        }
+      }
+      hrError?.let { Text(it, color = StaffCoral, modifier = Modifier.padding(top = 10.dp).testTag("attendance-error")) }
+      if (hrPending.isNotEmpty()) {
+        Text("Офлайн-очередь: ${hrPending.size}", color = Color.White, modifier = Modifier.padding(top = 12.dp).testTag("attendance-queue"))
+        hrPending.forEach { mutation ->
+          Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(attendanceQueueLabel(mutation.state), color = StaffMuted, modifier = Modifier.weight(1f))
+            if (mutation.state == "failed" || mutation.state == "conflict") TextButton(onClick = {
+              attendanceQueue.retry(mutation.id)
+              if (apiBaseUrl.isNotBlank()) scheduleStaffSync(context, apiBaseUrl)
+              queueRevision += 1
+            }) { Text("Повторить", color = StaffLime) }
+          }
+        }
       }
     }
     if (loading) item { Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StaffLime) } }
@@ -443,6 +548,29 @@ fun StaffShiftScreen(
       }
     }
   }
+}
+
+private fun currentWeekStart(): String = LocalDate.now()
+  .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
+
+private fun formatHrTime(value: String?): String = value?.let {
+  runCatching { OffsetDateTime.parse(it).format(DateTimeFormatter.ofPattern("HH:mm")) }.getOrDefault(it.take(16).takeLast(5))
+}.orEmpty()
+
+private fun attendanceQueueLabel(state: String): String = when (state) {
+  "syncing" -> "Отправляется"
+  "conflict" -> "Требует проверки"
+  "failed" -> "Ошибка отправки"
+  else -> "Ожидает сеть"
+}
+
+private fun scheduleStaffSync(context: android.content.Context, apiBaseUrl: String) {
+  val request = OneTimeWorkRequestBuilder<StaffSyncWorker>()
+    .setInputData(Data.Builder().putString("apiBaseUrl", apiBaseUrl).build())
+    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+    .build()
+  WorkManager.getInstance(context).enqueueUniqueWork("alistore-staff-sync", ExistingWorkPolicy.KEEP, request)
 }
 
 @Composable

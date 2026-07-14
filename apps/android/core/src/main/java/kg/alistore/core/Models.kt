@@ -162,6 +162,33 @@ data class OpenShiftRequest(val staffId: String, val point: String, val openCash
 
 data class CloseShiftRequest(val closeCash: Int, val reason: String? = null)
 
+data class StaffHrWeek(
+  val weekStart: String,
+  val weekEnd: String,
+  val point: String?,
+  val schedules: List<StaffHrSchedule>,
+)
+
+data class StaffHrSchedule(
+  val id: String,
+  val staffId: String,
+  val point: String,
+  val shiftDate: String,
+  val startsAt: String,
+  val endsAt: String,
+  val cancelledAt: String?,
+  val attendance: StaffHrAttendance?,
+)
+
+data class StaffHrAttendance(
+  val id: String,
+  val scheduleId: String,
+  val staffId: String,
+  val point: String,
+  val checkedInAt: String,
+  val checkedOutAt: String?,
+)
+
 enum class OnlinePaymentMethod(val wireValue: String) {
   CARD("card"),
   MBANK("qr_mbank"),

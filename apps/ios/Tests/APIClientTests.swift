@@ -118,6 +118,54 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
     }
 
+    func testLoadsOwnedHrWeekAndMarksAttendanceWithStableKey() async throws {
+        var session = makeSession(status: 200, body: """
+        {"weekStart":"2026-07-13T00:00:00.000Z","weekEnd":"2026-07-19T00:00:00.000Z","point":null,"staff":[{"id":"staff-1","username":"seller","role":"seller","active":true}],"schedules":[{"id":"schedule-1","staffId":"staff-1","point":"BISHKEK-1","shiftDate":"2026-07-14T00:00:00.000Z","startsAt":"2026-07-14T03:00:00.000Z","endsAt":"2026-07-14T12:00:00.000Z","cancelledAt":null,"attendance":null}],"absences":[],"timesheet":[]}
+        """)
+        var client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let week: StaffHrWeek = try await client.get("hr/me/week?weekStart=2026-07-13", token: "staff-token")
+
+        XCTAssertEqual(week.schedules.first?.id, "schedule-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.query, "weekStart=2026-07-13")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+
+        session = makeSession(status: 201, body: """
+        {"id":"attendance-1","scheduleId":"schedule-1","staffId":"staff-1","point":"BISHKEK-1","checkedInAt":"2026-07-14T03:02:00.000Z","checkedOutAt":null}
+        """)
+        client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let attendance: StaffHrAttendance = try await client.post(
+            "hr/me/attendance/open",
+            body: StaffAttendanceRequest(scheduleId: "schedule-1"),
+            token: "staff-token",
+            idempotencyKey: "staff-attendance-open-1"
+        )
+
+        XCTAssertEqual(attendance.scheduleId, "schedule-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/hr/me/attendance/open")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "staff-attendance-open-1")
+    }
+
+    @MainActor
+    func testQueuesStaffAttendanceWithStableIdempotencyKey() throws {
+        let container = try ModelContainer(
+            for: PendingMutation.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+
+        try OfflineCourierQueue.enqueue(
+            endpoint: "hr/me/attendance/open",
+            body: StaffAttendanceRequest(scheduleId: "schedule-1"),
+            idempotencyKey: "staff-attendance-offline-1",
+            context: container.mainContext
+        )
+
+        let queued = try container.mainContext.fetch(FetchDescriptor<PendingMutation>())
+        XCTAssertEqual(queued.count, 1)
+        XCTAssertEqual(queued.first?.endpoint, "hr/me/attendance/open")
+        XCTAssertEqual(queued.first?.idempotencyKey, "staff-attendance-offline-1")
+    }
+
     func testEncodesStaffShiftOpenAndCloseContracts() throws {
         let open = try JSONEncoder().encode(OpenShiftRequest(staffId: "spoof-ignored", point: "BISHKEK-1", openCash: 5000))
         let openPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: open) as? [String: Any])

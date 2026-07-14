@@ -1,7 +1,7 @@
 # AliStore ecosystem completion audit
 
 Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, including
-the verified HR payroll iteration. This is a completion audit, not a marketing status page. `Implemented`
+the verified native Staff attendance iteration. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
@@ -11,11 +11,11 @@ credentials, legal approval or physical hardware.
 - 49 NestJS modules including the application root, 37 generated Next routes and 52 Prisma migrations.
 - `mvp:verify`: API/Web production builds, mobile reference typecheck, 118/118 Jest
   suites with 469/469 tests and 32/32 Playwright flows.
-- Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
+- Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
-- `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
-  connected Compose tests on the API 36 emulator. Physical-device certification
-  remains outside this software gate.
+- `npm run android:ui` passed on 2026-07-14 with 25/25 connected Compose tests,
+  including owned attendance open/reload. The full `ecosystem:verify:ui` baseline previously passed with 24/24 and is superseded by the current component gates plus the current `ecosystem:verify` run.
+  Physical-device certification remains outside this software gate.
 
 ## Handoff acceptance matrix
 
@@ -23,11 +23,11 @@ credentials, legal approval or physical hardware.
 |---|---|---|---|
 | API Data Contracts | Partial | typed Nest DTO/controllers, Swagger, API integration suites | versioned `/v1` contract, generated client compatibility and every handoff endpoint mapped |
 | ERP 2.0 | Partial | `/erp`, reports, risk, finance, approvals, procurement, HR and logistics links | exact acceptance for every ERP tab; CMS, service, legal and operations surfaces |
-| HR | Partial | StaffUser, replay-safe editable/cancellable schedules, staff-owned attendance, absence approval, derived timesheet, atomic cash-shift handover, immutable period payroll posting/payout, tasks and dedicated API/Playwright acceptance | native Staff attendance UI/offline/device acceptance |
+| HR | Partial | StaffUser, replay-safe editable/cancellable schedules, staff-owned attendance on ERP/SwiftUI/Compose, durable native replay, absence approval, derived timesheet, atomic cash-shift handover, immutable period payroll posting/payout, tasks and API/browser/native acceptance | first-store UAT and physical Staff push/device certification |
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
-| QA Test Scenarios | Partial | 455 API tests and 27 Playwright flows | native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
+| QA Test Scenarios | Partial | 469 API tests, 32 Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
 | Analytics | Partial | reports, margin/KPI, revenue and AI insights | cohorts, retention, funnels, stock aging, delivery/supplier dashboards and exports |
 | Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
@@ -39,7 +39,7 @@ credentials, legal approval or physical hardware.
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
 | Service center | Partial | warranty/support state machines and Evidence | diagnostics, paid repair, parts/work orders, technician SLA and loaner fund |
 | Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, line-level refund-bound quantity/direct/bundle IMEI restock, serialized and quantity consignment ownership/accrual/payout/partial-return compensation, procurement and bundles | completeness, missort and markdown workflows |
-| Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence flows on both platforms | complete visual acceptance, app-level native E2E, physical push/scanner/camera gate |
+| Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence plus owned schedule/attendance/offline replay on both platforms | complete visual acceptance, iOS app-level XCUITest and physical push/scanner/camera gate |
 | Product management | Partial | product CRUD, variants, virtual bundles, explicit serialized/quantity tracking, catalog/search | preorders, channel publishing, pricing history and completeness policy |
 | Finance 2.0 | Partial | expenses, approval/payment, budgets and plan/fact | provider/POS/COD reconciliation, cashflow, collection, settlements, currency and exports |
 | Ecosystem | Partial | common Nest API/Postgres/Ledger and several cross-surface flows | all rows in this matrix accepted together; production/stores not certified |
@@ -73,7 +73,7 @@ credentials, legal approval or physical hardware.
 
 ## Ordered remaining work
 
-1. Complete native Staff attendance and run first-store payroll/logistics/shift UAT; route optimization/live tracking remain later scope.
+1. Run first-store payroll/logistics/shift UAT and physical Staff device certification; native attendance software is complete, while route optimization/live tracking remain later scope.
 2. Add service center, store operations, CMS, analytics and legal Waves B.
 3. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.

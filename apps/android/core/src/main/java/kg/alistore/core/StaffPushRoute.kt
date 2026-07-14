@@ -20,7 +20,7 @@ fun parseStaffPushRoute(value: String?): StaffPushRoute? {
     "orders" -> StaffPushRoute(tab = 1, entityId = entityId)
     "tasks" -> StaffPushRoute(tab = 2, entityId = entityId)
     "scanner" -> StaffPushRoute(tab = 3, entityId = entityId)
-    "shift", "account" -> StaffPushRoute(tab = 4, entityId = entityId)
+    "shift", "attendance", "account" -> StaffPushRoute(tab = 4, entityId = entityId)
     "customers" -> StaffPushRoute(tab = 5, customerId = entityId)
     "warranty", "support" -> StaffPushRoute(tab = 5, entityId = entityId, customerId = customerId)
     else -> null

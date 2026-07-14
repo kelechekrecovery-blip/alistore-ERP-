@@ -17,6 +17,7 @@ class StaffPushRouteTest {
       parseStaffPushRoute("alistore-staff://warranty/case-1?customerId=customer-1"),
     )
     assertEquals(StaffPushRoute(4), parseStaffPushRoute("alistore-staff://account"))
+    assertEquals(StaffPushRoute(4), parseStaffPushRoute("alistore-staff://attendance"))
     assertNull(parseStaffPushRoute("https://example.com/tasks/task-1"))
     assertNull(parseStaffPushRoute("alistore-staff://unknown/item-1"))
   }

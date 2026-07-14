@@ -162,6 +162,27 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     "shifts/$shiftId/close", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
   ).cashShift()
 
+  override suspend fun staffHrWeek(weekStart: String, token: String): StaffHrWeek =
+    request("hr/me/week?weekStart=$weekStart", "GET", token = token).staffHrWeek()
+
+  override suspend fun openAttendance(
+    scheduleId: String,
+    token: String,
+    idempotencyKey: String,
+  ): StaffHrAttendance = request(
+    "hr/me/attendance/open", "POST", JSONObject().put("scheduleId", scheduleId), token,
+    idempotencyKey = idempotencyKey,
+  ).staffHrAttendance()
+
+  override suspend fun closeAttendance(
+    scheduleId: String,
+    token: String,
+    idempotencyKey: String,
+  ): StaffHrAttendance = request(
+    "hr/me/attendance/close", "POST", JSONObject().put("scheduleId", scheduleId), token,
+    idempotencyKey = idempotencyKey,
+  ).staffHrAttendance()
+
   override suspend fun staffOrders(status: String, token: String): List<CustomerOrder> =
     requestArray("orders?status=$status", token).let { array ->
       buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).order()) }
@@ -563,6 +584,27 @@ private fun JSONObject.cashShift() = CashShift(
     }
   } }.orEmpty(),
   expected = if (isNull("expected")) null else optInt("expected"),
+)
+
+private fun JSONObject.staffHrWeek() = StaffHrWeek(
+  weekStart = getString("weekStart"),
+  weekEnd = getString("weekEnd"),
+  point = nullableString("point"),
+  schedules = getJSONArray("schedules").let { array -> buildList {
+    for (index in 0 until array.length()) add(array.getJSONObject(index).staffHrSchedule())
+  } },
+)
+
+private fun JSONObject.staffHrSchedule() = StaffHrSchedule(
+  id = getString("id"), staffId = getString("staffId"), point = getString("point"),
+  shiftDate = getString("shiftDate"), startsAt = getString("startsAt"), endsAt = getString("endsAt"),
+  cancelledAt = nullableString("cancelledAt"),
+  attendance = optJSONObject("attendance")?.staffHrAttendance(),
+)
+
+private fun JSONObject.staffHrAttendance() = StaffHrAttendance(
+  id = getString("id"), scheduleId = getString("scheduleId"), staffId = getString("staffId"),
+  point = getString("point"), checkedInAt = getString("checkedInAt"), checkedOutAt = nullableString("checkedOutAt"),
 )
 
 private fun JSONObject.paymentIntent() = PaymentIntent(
