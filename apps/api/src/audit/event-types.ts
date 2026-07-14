@@ -22,6 +22,7 @@ export const EventType = {
   // stock
   StockReceived: 'stock.received',
   StockReserved: 'stock.reserved',
+  StockSold: 'stock.sold',
   StockReleased: 'stock.released', // compensating: expired reservation returns a held unit to stock
   StockMoved: 'stock.moved',
   StockAdjusted: 'stock.adjusted',

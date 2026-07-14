@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchCatalog, inventoryCount, receiveInventoryBatch, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, inventoryCount, receiveInventoryBatch, receiveQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
 
 /** Transfer + inventory-count operations for the warehouse console. */
@@ -17,6 +17,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [receiveLocation, setReceiveLocation] = useState('BISHKEK-1');
   const [receiveGrade, setReceiveGrade] = useState('A');
   const [receiveImeis, setReceiveImeis] = useState('');
+  const [receiveQuantity, setReceiveQuantity] = useState('');
   const [transferFiles, setTransferFiles] = useState<File[]>([]);
   const [countFiles, setCountFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -91,19 +92,21 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   }
 
   async function doReceive() {
+    const selected = products.find((product) => product.id === receiveProductId);
     const imeis = parseImeis(receiveImeis);
-    if (!receiveProductId || !receiveLocation.trim() || imeis.length === 0) return;
+    const quantity = Number(receiveQuantity);
+    if (!selected || !receiveLocation.trim()) return;
+    if (selected.trackingMode === 'quantity' ? !Number.isInteger(quantity) || quantity < 1 : imeis.length === 0) return;
     setBusy('receive');
     try {
-      const r = await receiveInventoryBatch(
-        receiveProductId,
-        receiveLocation.trim(),
-        imeis,
-        accessToken,
-        receiveGrade,
-      );
+      const r = selected.trackingMode === 'quantity'
+        ? await receiveQuantityInventory(selected.id, receiveLocation.trim(), quantity, accessToken)
+        : await receiveInventoryBatch(selected.id, receiveLocation.trim(), imeis, accessToken, receiveGrade);
       flash(`✓ Принято ${r.received} шт · ${r.location}`);
       setReceiveImeis('');
+      setReceiveQuantity('');
+      const refreshed = await fetchCatalog({ limit: 100 });
+      setProducts(refreshed.items);
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка приёмки');
     } finally {
@@ -120,22 +123,26 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Приёмка партии</p>
           <div className="flex flex-col gap-2">
             <select value={receiveProductId} onChange={(e) => setReceiveProductId(e.target.value)} className="rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-2 text-sm outline-none focus:border-coral">
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {products.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.trackingMode === 'quantity' ? 'количество' : 'IMEI'}</option>)}
             </select>
             <div className="flex gap-2">
               <input value={receiveLocation} onChange={(e) => setReceiveLocation(e.target.value)} placeholder="склад" className="min-w-0 flex-1 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
-              <select value={receiveGrade} onChange={(e) => setReceiveGrade(e.target.value)} className="w-20 rounded-btn border border-[#2E2822] bg-[#1A1611] px-2 py-2 text-sm outline-none focus:border-coral">
+              <select disabled={products.find((product) => product.id === receiveProductId)?.trackingMode === 'quantity'} value={receiveGrade} onChange={(e) => setReceiveGrade(e.target.value)} className="w-20 rounded-btn border border-[#2E2822] bg-[#1A1611] px-2 py-2 text-sm outline-none focus:border-coral disabled:text-[#6E645C]">
                 <option value="A">A</option>
                 <option value="B">B</option>
                 <option value="C">C</option>
               </select>
             </div>
-            <textarea
-              value={receiveImeis}
-              onChange={(e) => setReceiveImeis(e.target.value)}
-              placeholder="IMEI / SN, каждый с новой строки"
-              className="min-h-[86px] resize-none rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-[#6E645C] focus:border-coral"
-            />
+            {products.find((product) => product.id === receiveProductId)?.trackingMode === 'quantity' ? (
+              <input value={receiveQuantity} onChange={(e) => setReceiveQuantity(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="Количество, шт." className="rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+            ) : (
+              <textarea
+                value={receiveImeis}
+                onChange={(e) => setReceiveImeis(e.target.value)}
+                placeholder="IMEI / SN, каждый с новой строки"
+                className="min-h-[86px] resize-none rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-[#6E645C] focus:border-coral"
+              />
+            )}
             <button type="button" disabled={busy === 'receive'} onClick={doReceive} className="rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-[#2E2822]">Принять</button>
           </div>
         </div>

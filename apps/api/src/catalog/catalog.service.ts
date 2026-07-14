@@ -25,10 +25,12 @@ type ProductWithStockCount = Prisma.ProductGetPayload<{
         };
       };
     };
+    balances: true;
     bundleComponents: {
       include: {
         componentProduct: {
           include: {
+            balances: true;
             _count: {
               select: {
                 units: { where: { status: 'in_stock' } };
@@ -121,6 +123,7 @@ export class CatalogService {
           OR: [
             { updatedAt: { gt: since } },
             { units: { some: { updatedAt: { gt: since } } } },
+            { balances: { some: { updatedAt: { gt: since } } } },
           ],
         }
       : {};
@@ -240,6 +243,24 @@ export class CatalogService {
     warning?: string,
   ): Promise<CatalogSearchResponseDto> {
     const where = this.sourceOfTruthWhere(query);
+    if (query.stockOnly) {
+      const candidates = await this.prisma.product.findMany({
+        where,
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        include: this.stockCountInclude(),
+      });
+      const available = candidates
+        .map((product) => this.toCatalogProduct(product))
+        .filter((product) => product.availableUnits > 0);
+      return {
+        source,
+        warning,
+        total: available.length,
+        limit: query.limit,
+        offset: query.offset,
+        items: available.slice(query.offset, query.offset + query.limit),
+      };
+    }
     const [total, products] = await this.prisma.$transaction([
       this.prisma.product.count({ where }),
       this.prisma.product.findMany({
@@ -268,9 +289,6 @@ export class CatalogService {
     return {
       archived: false,
       ...(query.category ? { category: query.category } : {}),
-      ...(query.stockOnly
-        ? { units: { some: { status: 'in_stock' } } }
-        : {}),
       ...(q
         ? {
             OR: [
@@ -307,6 +325,7 @@ export class CatalogService {
       name: product.name,
       price: product.price,
       category: product.category,
+      trackingMode: product.trackingMode,
       attrs: product.attrs,
       bundleComponents: product.bundleComponents.map((component) => ({
         productId: component.componentProductId,
@@ -316,9 +335,9 @@ export class CatalogService {
       })),
       availableUnits: product.bundleComponents.length > 0
         ? Math.min(...product.bundleComponents.map((component) =>
-            Math.floor(component.componentProduct._count.units / component.qty),
+            Math.floor(this.directAvailability(component.componentProduct) / component.qty),
           ))
-        : product._count.units,
+        : this.directAvailability(product),
       updatedAt: product.updatedAt.toISOString(),
     };
   }
@@ -335,6 +354,7 @@ export class CatalogService {
         include: {
           componentProduct: {
             include: {
+              balances: true,
               _count: {
                 select: {
                   units: { where: { status: 'in_stock' as const } },
@@ -344,7 +364,17 @@ export class CatalogService {
           },
         },
       },
+      balances: true,
     };
+  }
+
+  private directAvailability(product: {
+    trackingMode: 'serialized' | 'quantity';
+    _count: { units: number };
+    balances: Array<{ onHand: number; reserved: number }>;
+  }): number {
+    if (product.trackingMode === 'serialized') return product._count.units;
+    return product.balances.reduce((sum, balance) => sum + balance.onHand - balance.reserved, 0);
   }
 
   private async requireMeiliClient(): Promise<MeiliClient> {

@@ -10,6 +10,7 @@ export interface ProductForm {
   price: string;
   cost: string;
   category: string;
+  trackingMode: 'serialized' | 'quantity';
   attrsText: string;
 }
 
@@ -22,6 +23,7 @@ export const emptyForm: ProductForm = {
   price: '',
   cost: '',
   category: '',
+  trackingMode: 'serialized',
   attrsText: '{\n  "description": ""\n}',
 };
 
@@ -45,6 +47,7 @@ export function formFromProduct(product: AdminProduct): ProductForm {
     price: String(product.price),
     cost: String(product.cost),
     category: product.category,
+    trackingMode: product.trackingMode,
     attrsText: attrsToText(product.attrs),
   };
 }

@@ -248,6 +248,41 @@ export class PaymentsService {
         });
       }
 
+      const quantityAllocations = await tx.orderQuantityAllocation.findMany({
+        where: { orderId: order.id, active: true },
+      });
+      for (const allocation of quantityAllocations) {
+        const consumed = await tx.inventoryBalance.updateMany({
+          where: {
+            id: allocation.balanceId,
+            onHand: { gte: allocation.qty },
+            reserved: { gte: allocation.qty },
+          },
+          data: {
+            onHand: { decrement: allocation.qty },
+            reserved: { decrement: allocation.qty },
+          },
+        });
+        if (consumed.count !== 1) {
+          throw new ConflictError('quantity_allocation_invalid', `Резерв ${allocation.id} больше недоступен`);
+        }
+        await tx.orderQuantityAllocation.update({
+          where: { id: allocation.id },
+          data: { active: false, consumedAt: new Date() },
+        });
+        events.push({
+          type: EventType.StockSold,
+          actor,
+          payload: {
+            orderId: order.id,
+            sku: allocation.sku,
+            qty: allocation.qty,
+            allocationId: allocation.id,
+          },
+          refs: [order.id, allocation.productId, allocation.id],
+        });
+      }
+
       await tx.reservation.updateMany({
         where: { orderId: order.id, active: true },
         data: { active: false },

@@ -99,7 +99,7 @@ test('product page displays bundle composition and component-derived availabilit
     },
   });
 
-  await page.goto(`/product/${bundle.id}`);
+  await page.goto(`/product/${bundle.id}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: bundle.name })).toBeVisible();
   await expect(page.getByRole('main').getByText('В комплекте')).toBeVisible();
   await expect(page.getByRole('main').getByText(phone.name)).toBeVisible();
@@ -107,7 +107,7 @@ test('product page displays bundle composition and component-derived availabilit
   await expect(page.getByText(/В наличии · 1 шт/)).toBeVisible();
 
   await page.setViewportSize({ width: 402, height: 858 });
-  await page.goto(`/product/${bundle.id}`);
+  await page.goto(`/product/${bundle.id}`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.md\\:hidden').getByText('В комплекте')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });
@@ -133,7 +133,7 @@ test('authenticated checkout redeems server loyalty and canonical promo exactly 
     localStorage.removeItem('alistore.cart.pricing.v1');
   }, { auth: tokens, item: { id: product.id, sku: product.sku, name: product.name, price: product.price } });
 
-  await page.goto('/cart');
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('Введите промокод').fill('ALI10');
   await page.getByRole('button', { name: 'Применить' }).click();
   await expect(page.getByText(/Списать до 725 бонусов/)).toBeVisible();

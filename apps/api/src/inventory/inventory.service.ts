@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
-import { CountDto, MovementDto, ReceiveDto, TransferDto } from './inventory.dto';
+import { CountDto, MovementDto, ReceiveDto, ReceiveQuantityDto, TransferDto } from './inventory.dto';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -44,6 +44,9 @@ export class InventoryService {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product) {
       throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+    }
+    if (product.trackingMode !== 'serialized') {
+      throw new ValidationError('serialized_product_required', 'Для этого товара используется количественный учёт');
     }
 
     const imeis = dto.imeis.map((imei) => imei.trim()).filter(Boolean);
@@ -112,6 +115,65 @@ export class InventoryService {
     });
   }
 
+  /** Receive non-serialized stock into the authoritative balance for a location. */
+  async receiveQuantity(dto: ReceiveQuantityDto, actor: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      include: { _count: { select: { bundleComponents: true } } },
+    });
+    if (!product) {
+      throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+    }
+    if (product.trackingMode !== 'quantity') {
+      throw new ValidationError('quantity_product_required', 'Для этого товара используется серийный учёт');
+    }
+    if (product._count.bundleComponents > 0) {
+      throw new ValidationError('virtual_bundle_receive_forbidden', 'Виртуальный набор принимается по его компонентам');
+    }
+    const location = dto.location.trim();
+    if (!location) throw new ValidationError('location_required', 'Укажите склад приёмки');
+
+    return this.audit.transaction(async (tx) => {
+      const balance = await tx.inventoryBalance.upsert({
+        where: { productId_location: { productId: dto.productId, location } },
+        create: { productId: dto.productId, location, onHand: dto.quantity },
+        update: { onHand: { increment: dto.quantity } },
+      });
+      const movement = await tx.inventoryMovement.create({
+        data: {
+          productId: dto.productId,
+          qty: dto.quantity,
+          type: 'received',
+          to: location,
+          reason: dto.reason?.trim() || null,
+        },
+      });
+      return {
+        result: {
+          productId: dto.productId,
+          location,
+          received: dto.quantity,
+          onHand: balance.onHand,
+          reserved: balance.reserved,
+          available: balance.onHand - balance.reserved,
+          movementId: movement.id,
+        },
+        events: [{
+          type: EventType.StockReceived,
+          actor,
+          payload: {
+            productId: dto.productId,
+            location,
+            qty: dto.quantity,
+            trackingMode: 'quantity',
+            movementId: movement.id,
+          },
+          refs: [dto.productId, movement.id],
+        }],
+      };
+    });
+  }
+
   /**
    * Take inventory for one product at a location: compare counted vs the in_stock
    * units on record (inventory.counted). A non-zero diff is recorded for follow-up;
@@ -122,9 +184,13 @@ export class InventoryService {
     if (!product) {
       throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
     }
-    const expected = await this.prisma.deviceUnit.count({
-      where: { productId: dto.productId, location: dto.location, status: 'in_stock' },
-    });
+    const expected = product.trackingMode === 'quantity'
+      ? (await this.prisma.inventoryBalance.findUnique({
+          where: { productId_location: { productId: dto.productId, location: dto.location } },
+        }))?.onHand ?? 0
+      : await this.prisma.deviceUnit.count({
+          where: { productId: dto.productId, location: dto.location, status: 'in_stock' },
+        });
     const diff = dto.counted - expected;
     return this.audit.transaction(async (tx) => {
       const movement = await tx.inventoryMovement.create({

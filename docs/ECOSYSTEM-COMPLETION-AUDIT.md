@@ -1,16 +1,16 @@
 # AliStore ecosystem completion audit
 
 Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, baseline
-`68568ad`. This is a completion audit, not a marketing status page. `Implemented`
+`9f3554a` plus the quantity-inventory iteration. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 47 NestJS modules, 37 generated Next routes and 38 Prisma migrations.
-- `mvp:verify`: API/Web production builds, mobile reference typecheck, 112/112 Jest
-  suites with 440/440 tests and 25/25 Playwright flows.
+- 47 NestJS modules, 37 generated Next routes and 40 Prisma migrations.
+- `mvp:verify`: API/Web production builds, mobile reference typecheck, 113/113 Jest
+  suites with 448/448 tests and 26/26 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
@@ -27,7 +27,7 @@ credentials, legal approval or physical hardware.
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
-| QA Test Scenarios | Partial | 440 API tests and 25 Playwright flows | native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
+| QA Test Scenarios | Partial | 448 API tests and 26 Playwright flows | native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
 | Analytics | Partial | reports, margin/KPI, revenue and AI insights | cohorts, retention, funnels, stock aging, delivery/supplier dashboards and exports |
 | Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
@@ -38,9 +38,9 @@ credentials, legal approval or physical hardware.
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
 | Service center | Partial | warranty/support state machines and Evidence | diagnostics, paid repair, parts/work orders, technician SLA and loaner fund |
-| Warehouse accounting | Partial | serialized IMEI receive/transfer/count, procurement, bundles | quantity stock, consignment ownership/payout, completeness, missort and markdown workflows |
+| Warehouse accounting | Partial | serialized IMEI plus quantity receive/count, atomic quantity reservation/sale/release, procurement and bundles | consignment ownership/payout, quantity transfer/adjustment/return, completeness, missort and markdown workflows |
 | Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence flows on both platforms | complete visual acceptance, app-level native E2E, physical push/scanner/camera gate |
-| Product management | Partial | product CRUD, variants, virtual bundles, catalog/search | preorders, channel publishing, pricing history, completeness policy and quantity tracking mode |
+| Product management | Partial | product CRUD, variants, virtual bundles, explicit serialized/quantity tracking, catalog/search | preorders, channel publishing, pricing history and completeness policy |
 | Finance 2.0 | Partial | expenses, approval/payment, budgets and plan/fact | provider/POS/COD reconciliation, cashflow, collection, settlements, currency and exports |
 | Ecosystem | Partial | common Nest API/Postgres/Ledger and several cross-surface flows | all rows in this matrix accepted together; production/stores not certified |
 | Legal | Partial | documents, consent timestamps and customer data controls | immutable policy/template versions, retention jobs, contracts and Kyrgyz legal approval |
@@ -52,7 +52,7 @@ credentials, legal approval or physical hardware.
 | Anonymous customer | browse/search/product/cart/demo checkout without foreign data access | Web covered; native not applicable |
 | Authenticated customer | OTP, checkout/payment return, order tracking, return, warranty, support and logout | API/web substantial; native app-level E2E missing |
 | Seller/cashier | login, shift, scan, split sale, approval, receipt, refund/exchange, offline restart | software vertical exists; native E2E and hardware external |
-| Warehouse | PO receive, serialized/quantity stock, count, transfer, picking, discrepancy | serialized core covered; quantity/consignment and full role E2E missing |
+| Warehouse | PO receive, serialized/quantity stock, count, transfer, picking, discrepancy | quantity receive-to-sale browser/API flow covered; consignment, quantity transfer/return and full role E2E remain |
 | Courier | assignment, map/call, failure/retry, Evidence, COD handover, offline restart | API/native software covered; live device/push gate external |
 | Support/service | ticket escalation, warranty diagnosis/repair/loaner/close | support/warranty partial; service-center workflow missing |
 | Manager/owner | budgets, approvals, reconciliation, risk, analytics and audit export | partial ERP coverage; reconciliation/expanded modules missing |
@@ -73,7 +73,7 @@ credentials, legal approval or physical hardware.
 
 ## Ordered remaining work
 
-1. Complete warehouse quantity/consignment and serialized return/restock invariants.
+1. Complete consignment ownership/payout, quantity transfer/adjustment/return and serialized bundle return/restock invariants.
 2. Complete HR schedules and logistics zones/slots/dispatch for first-store operations.
 3. Add service center, store operations, CMS, analytics and legal Waves B.
 4. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.

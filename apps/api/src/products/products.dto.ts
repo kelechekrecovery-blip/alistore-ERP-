@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -100,6 +101,11 @@ export class CreateProductDto {
   @MaxLength(80)
   category!: string;
 
+  @ApiPropertyOptional({ enum: ['serialized', 'quantity'], default: 'serialized' })
+  @IsOptional()
+  @IsIn(['serialized', 'quantity'])
+  trackingMode?: 'serialized' | 'quantity';
+
   @ApiPropertyOptional({
     type: 'object',
     additionalProperties: true,
@@ -149,6 +155,11 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(80)
   category?: string;
+
+  @ApiPropertyOptional({ enum: ['serialized', 'quantity'] })
+  @IsOptional()
+  @IsIn(['serialized', 'quantity'])
+  trackingMode?: 'serialized' | 'quantity';
 
   @ApiPropertyOptional({
     type: 'object',

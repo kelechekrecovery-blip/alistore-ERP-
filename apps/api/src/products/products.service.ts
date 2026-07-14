@@ -28,10 +28,12 @@ type ProductWithStockCount = Prisma.ProductGetPayload<{
         };
       };
     };
+    balances: true;
     bundleComponents: {
       include: {
         componentProduct: {
           include: {
+            balances: true;
             _count: {
               select: {
                 units: {
@@ -133,6 +135,7 @@ export class ProductsService {
           price: dto.price,
           cost: dto.cost,
           category,
+          trackingMode: dto.trackingMode ?? 'serialized',
           attrs: (dto.attrs ?? {}) as Prisma.InputJsonValue,
           ...(bundleComponents.length > 0
             ? { bundleComponents: { create: bundleComponents } }
@@ -155,6 +158,7 @@ export class ProductsService {
               price: dto.price,
               cost: dto.cost,
               category,
+              trackingMode: product.trackingMode,
             },
             refs: [product.id, sku],
           },
@@ -191,6 +195,20 @@ export class ProductsService {
       const category = dto.category.trim();
       if (!category) throw new ValidationError('product_category_required', 'Категория обязательна');
       data.category = category;
+    }
+    if (dto.trackingMode !== undefined && dto.trackingMode !== product.trackingMode) {
+      const [unitCount, balanceCount, bundleUse] = await Promise.all([
+        this.prisma.deviceUnit.count({ where: { productId } }),
+        this.prisma.inventoryBalance.count({ where: { productId, onHand: { gt: 0 } } }),
+        this.prisma.productBundleComponent.count({ where: { componentProductId: productId } }),
+      ]);
+      if (unitCount > 0 || balanceCount > 0 || bundleUse > 0) {
+        throw new ConflictError(
+          'tracking_mode_in_use',
+          'Тип складского учёта нельзя менять при наличии остатков или использовании в наборе',
+        );
+      }
+      data.trackingMode = dto.trackingMode;
     }
     if (dto.attrs !== undefined) data.attrs = dto.attrs as Prisma.InputJsonValue;
 
@@ -392,6 +410,7 @@ export class ProductsService {
       price: product.price,
       cost: product.cost,
       category: product.category,
+      trackingMode: product.trackingMode,
       attrs: product.attrs,
       bundleComponents: product.bundleComponents.map((component) => ({
         productId: component.componentProductId,
@@ -416,6 +435,7 @@ export class ProductsService {
         include: {
           componentProduct: {
             include: {
+              balances: true,
               _count: {
                 select: {
                   units: { where: { status: 'in_stock' as const } },
@@ -425,16 +445,26 @@ export class ProductsService {
           },
         },
       },
+      balances: true,
     };
   }
 
   private availableUnits(product: ProductWithStockCount): number {
-    if (product.bundleComponents.length === 0) return product._count.units;
+    if (product.bundleComponents.length === 0) return this.directAvailability(product);
     return Math.min(
       ...product.bundleComponents.map((component) =>
-        Math.floor(component.componentProduct._count.units / component.qty),
+        Math.floor(this.directAvailability(component.componentProduct) / component.qty),
       ),
     );
+  }
+
+  private directAvailability(product: {
+    trackingMode: 'serialized' | 'quantity';
+    _count: { units: number };
+    balances: Array<{ onHand: number; reserved: number }>;
+  }): number {
+    if (product.trackingMode === 'serialized') return product._count.units;
+    return product.balances.reduce((sum, balance) => sum + balance.onHand - balance.reserved, 0);
   }
 
   private async resolveBundleComponents(

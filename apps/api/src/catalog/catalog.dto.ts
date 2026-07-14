@@ -63,6 +63,7 @@ export class CatalogProductDto {
   @ApiProperty() name!: string;
   @ApiProperty({ example: 109900 }) price!: number;
   @ApiProperty({ example: 'phones' }) category!: string;
+  @ApiProperty({ enum: ['serialized', 'quantity'] }) trackingMode!: 'serialized' | 'quantity';
   @ApiProperty({ type: 'object', additionalProperties: true }) attrs!: Prisma.JsonValue;
   @ApiProperty({ type: 'array', items: { type: 'object' } })
   bundleComponents!: Array<{ productId: string; sku: string; name: string; qty: number }>;

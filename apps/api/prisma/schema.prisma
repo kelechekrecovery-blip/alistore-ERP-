@@ -79,6 +79,11 @@ enum UnitStatus {
   written_off
 }
 
+enum StockTrackingMode {
+  serialized
+  quantity
+}
+
 enum Grade {
   A
   B
@@ -293,27 +298,45 @@ model PushToken {
 }
 
 model Product {
-  id                 String                   @id @default(cuid())
-  sku                String                   @unique
-  barcode            String?                  @unique
-  variantGroup       String?
-  name               String
-  price              Int
-  cost               Int
-  category           String
-  attrs              Json
-  archived           Boolean                  @default(false) // soft-delete: НЕ удалять физически
-  updatedAt          DateTime                 @default(now()) @updatedAt
-  units              DeviceUnit[]
-  movements          InventoryMovement[]
-  purchaseOrderItems PurchaseOrderItem[]
-  bundleComponents   ProductBundleComponent[] @relation("BundleProduct")
-  includedInBundles  ProductBundleComponent[] @relation("BundleComponentProduct")
-  bundleAllocations  OrderBundleAllocation[]
+  id                  String                    @id @default(cuid())
+  sku                 String                    @unique
+  barcode             String?                   @unique
+  variantGroup        String?
+  name                String
+  price               Int
+  cost                Int
+  category            String
+  trackingMode        StockTrackingMode         @default(serialized)
+  attrs               Json
+  archived            Boolean                   @default(false) // soft-delete: НЕ удалять физически
+  updatedAt           DateTime                  @default(now()) @updatedAt
+  units               DeviceUnit[]
+  movements           InventoryMovement[]
+  balances            InventoryBalance[]
+  quantityAllocations OrderQuantityAllocation[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  bundleComponents    ProductBundleComponent[]  @relation("BundleProduct")
+  includedInBundles   ProductBundleComponent[]  @relation("BundleComponentProduct")
+  bundleAllocations   OrderBundleAllocation[]
 
   @@index([category])
   @@index([variantGroup])
   @@index([archived])
+  @@index([updatedAt])
+}
+
+model InventoryBalance {
+  id          String                    @id @default(cuid())
+  product     Product                   @relation(fields: [productId], references: [id])
+  productId   String
+  location    String
+  onHand      Int                       @default(0)
+  reserved    Int                       @default(0)
+  updatedAt   DateTime                  @default(now()) @updatedAt
+  allocations OrderQuantityAllocation[]
+
+  @@unique([productId, location])
+  @@index([location])
   @@index([updatedAt])
 }
 
@@ -365,33 +388,34 @@ model DeviceUnit {
 }
 
 model Order {
-  id                String                  @id @default(cuid())
-  idempotencyKey    String?                 @unique
-  isDemo            Boolean                 @default(false)
-  customer          Customer                @relation(fields: [customerId], references: [id])
-  customerId        String
-  status            OrderStatus             @default(draft)
-  channel           String // web | app | mobile | pos | telegram
-  fulfillmentType   String                  @default("pickup") // pickup | courier | express | store
-  pickupPoint       String?
-  deliveryAddress   String?
-  deliverySlot      String?
-  courierId         String?
-  courier           StaffUser?              @relation("OrderCourier", fields: [courierId], references: [id])
-  courierRunId      String?
-  courierRun        CourierRun?             @relation(fields: [courierRunId], references: [id])
-  pickupCode        String?
-  subtotal          Int                     @default(0)
-  deliveryFee       Int                     @default(0)
-  promoCode         String?
-  promoDiscount     Int                     @default(0)
-  loyaltyRedeemed   Int                     @default(0)
-  loyaltyEarned     Int                     @default(0)
-  total             Int
-  items             OrderItem[]
-  bundleAllocations OrderBundleAllocation[]
-  payments          Payment[]
-  createdAt         DateTime                @default(now())
+  id                  String                    @id @default(cuid())
+  idempotencyKey      String?                   @unique
+  isDemo              Boolean                   @default(false)
+  customer            Customer                  @relation(fields: [customerId], references: [id])
+  customerId          String
+  status              OrderStatus               @default(draft)
+  channel             String // web | app | mobile | pos | telegram
+  fulfillmentType     String                    @default("pickup") // pickup | courier | express | store
+  pickupPoint         String?
+  deliveryAddress     String?
+  deliverySlot        String?
+  courierId           String?
+  courier             StaffUser?                @relation("OrderCourier", fields: [courierId], references: [id])
+  courierRunId        String?
+  courierRun          CourierRun?               @relation(fields: [courierRunId], references: [id])
+  pickupCode          String?
+  subtotal            Int                       @default(0)
+  deliveryFee         Int                       @default(0)
+  promoCode           String?
+  promoDiscount       Int                       @default(0)
+  loyaltyRedeemed     Int                       @default(0)
+  loyaltyEarned       Int                       @default(0)
+  total               Int
+  items               OrderItem[]
+  bundleAllocations   OrderBundleAllocation[]
+  quantityAllocations OrderQuantityAllocation[]
+  payments            Payment[]
+  createdAt           DateTime                  @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
   @@index([customerId])
@@ -401,6 +425,27 @@ model Order {
   @@index([pickupPoint, status])
   @@index([courierId, status])
   @@index([courierRunId])
+}
+
+model OrderQuantityAllocation {
+  id          String           @id @default(cuid())
+  order       Order            @relation(fields: [orderId], references: [id])
+  orderId     String
+  orderItemId String
+  product     Product          @relation(fields: [productId], references: [id])
+  productId   String
+  balance     InventoryBalance @relation(fields: [balanceId], references: [id])
+  balanceId   String
+  sku         String
+  qty         Int
+  active      Boolean          @default(true)
+  consumedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  reservation Reservation?
+
+  @@index([orderId, active])
+  @@index([productId])
+  @@index([balanceId])
 }
 
 model OrderBundleAllocation {
@@ -518,11 +563,13 @@ model InventoryMovement {
 }
 
 model Reservation {
-  id        String   @id @default(cuid())
-  orderId   String
-  imei      String?
-  expiresAt DateTime // зависший резерв → Risk
-  active    Boolean  @default(true)
+  id                   String                   @id @default(cuid())
+  orderId              String
+  imei                 String?
+  quantityAllocationId String?                  @unique
+  quantityAllocation   OrderQuantityAllocation? @relation(fields: [quantityAllocationId], references: [id])
+  expiresAt            DateTime // зависший резерв → Risk
+  active               Boolean                  @default(true)
 
   @@index([orderId])
   @@index([imei])

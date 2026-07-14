@@ -52,6 +52,20 @@ export class ReceiveDto {
   @IsOptional() @IsString() reason?: string;
 }
 
+export class ReceiveQuantityDto {
+  @ApiProperty({ example: 'clx_product_accessory' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1', description: 'Receiving branch/location' })
+  @IsString() location!: string;
+
+  @ApiProperty({ minimum: 1, example: 25 })
+  @IsInt() @Min(1) quantity!: number;
+
+  @ApiPropertyOptional({ example: 'поставка #INV-001' })
+  @IsOptional() @IsString() reason?: string;
+}
+
 export class MovementDto {
   @ApiProperty({ example: 'clx_product_001' })
   @IsString() productId!: string;

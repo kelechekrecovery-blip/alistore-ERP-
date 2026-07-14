@@ -9,7 +9,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import { CountDto, MovementDto, ReceiveDto, TransferDto } from './inventory.dto';
+import { CountDto, MovementDto, ReceiveDto, ReceiveQuantityDto, TransferDto } from './inventory.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -48,6 +48,15 @@ export class InventoryController {
   @RequirePermission('inventory', 'receive')
   async receive(@CurrentUser() user: AuthPrincipal, @Body() dto: ReceiveDto) {
     return this.inventory.receive(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'Receive quantity-tracked stock into a location (stock.received)' })
+  @ApiCreatedResponse({ description: 'Authoritative location balance incremented; movement and ledger event written.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown, serialized, or virtual bundle product.' })
+  @Post('receive-quantity')
+  @RequirePermission('inventory', 'receive')
+  async receiveQuantity(@CurrentUser() user: AuthPrincipal, @Body() dto: ReceiveQuantityDto) {
+    return this.inventory.receiveQuantity(dto, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({ summary: 'Transfer an in_stock unit to another branch (stock.moved)' })

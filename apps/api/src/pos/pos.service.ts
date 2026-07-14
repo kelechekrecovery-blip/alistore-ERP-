@@ -127,7 +127,7 @@ export class PosService {
       );
     }
 
-    // Assign concrete IMEI units per line; accessories (no units) sell as plain lines.
+    // Serialized products require concrete units; quantity products reserve balances later.
     const items: OrderLine[] = [];
     for (const line of dto.lines) {
       if (line.imei) {
@@ -144,13 +144,22 @@ export class PosService {
         items.push({ sku: line.sku, qty: 1, price: line.price, imei: line.imei });
         continue;
       }
+      const product = await this.prisma.product.findUnique({
+        where: { id: line.productId },
+        include: { _count: { select: { bundleComponents: true } } },
+      });
+      if (!product || product.sku !== line.sku) {
+        throw new ValidationError('product_not_found', `Товар ${line.sku} не найден`);
+      }
+      if (product.trackingMode === 'quantity' || product._count.bundleComponents > 0) {
+        items.push({ sku: line.sku, qty: line.qty, price: line.price });
+        continue;
+      }
       const available = await this.units.listAvailable(line.productId, line.qty);
       if (available.length >= line.qty) {
         for (const unit of available.slice(0, line.qty)) {
           items.push({ sku: line.sku, qty: 1, price: line.price, imei: unit.imei });
         }
-      } else if (available.length === 0) {
-        items.push({ sku: line.sku, qty: line.qty, price: line.price });
       } else {
         throw new ConflictError(
           'insufficient_stock',
@@ -160,7 +169,7 @@ export class PosService {
     }
 
     const order = await this.orders.create(
-      { customerId: customer.id, channel: 'pos', total, items },
+      { customerId: customer.id, channel: 'pos', fulfillmentType: 'store', pickupPoint: dto.point, total, items },
       actor,
     );
     const containsBundle = await this.prisma.product.count({

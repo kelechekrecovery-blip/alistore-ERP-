@@ -33,6 +33,16 @@ export interface ReceiveResult {
   movementId: string;
 }
 
+export interface ReceiveQuantityResult {
+  productId: string;
+  location: string;
+  received: number;
+  onHand: number;
+  reserved: number;
+  available: number;
+  movementId: string;
+}
+
 export function receiveInventoryBatch(
   productId: string,
   location: string,
@@ -41,6 +51,15 @@ export function receiveInventoryBatch(
   grade?: string,
 ): Promise<ReceiveResult> {
   return postAuthJson('/inventory/receive', { productId, location, imeis, grade }, accessToken);
+}
+
+export function receiveQuantityInventory(
+  productId: string,
+  location: string,
+  quantity: number,
+  accessToken: string,
+): Promise<ReceiveQuantityResult> {
+  return postAuthJson('/inventory/receive-quantity', { productId, location, quantity }, accessToken);
 }
 
 export function inventoryCount(

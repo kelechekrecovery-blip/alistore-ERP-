@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
@@ -94,10 +94,14 @@ export class OrdersService {
       where: { sku: { in: skus }, archived: false },
       include: {
         units: { where: { status: 'in_stock' }, select: { id: true } },
+        balances: { select: { onHand: true, reserved: true } },
         bundleComponents: {
           include: {
             componentProduct: {
-              include: { units: { where: { status: 'in_stock' }, select: { id: true } } },
+              include: {
+                units: { where: { status: 'in_stock' }, select: { id: true } },
+                balances: { select: { onHand: true, reserved: true } },
+              },
             },
           },
         },
@@ -110,9 +114,9 @@ export class OrdersService {
       const qty = quantities.get(sku)!;
       const available = product.bundleComponents.length > 0
         ? Math.min(...product.bundleComponents.map((component) =>
-            Math.floor(component.componentProduct.units.length / component.qty),
+            Math.floor(directAvailability(component.componentProduct) / component.qty),
           ))
-        : product.units.length;
+        : directAvailability(product);
       if (available < qty) {
         throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: доступно ${available}`);
       }
@@ -278,17 +282,26 @@ export class OrdersService {
       const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
       const events: AuditInput[] = [];
       for (const item of order.items) {
-        if (!item.imei) continue;
-        await this.units.reserveOnTx(tx, item.imei, orderId);
-        await tx.reservation.create({
-          data: { orderId, imei: item.imei, expiresAt, active: true },
-        });
-        events.push({
-          type: EventType.StockReserved,
-          actor,
-          payload: { orderId, imei: item.imei },
-          refs: [orderId, item.imei],
-        });
+        if (item.imei) {
+          await this.units.reserveOnTx(tx, item.imei, orderId);
+          await tx.reservation.create({
+            data: { orderId, imei: item.imei, expiresAt, active: true },
+          });
+          events.push({
+            type: EventType.StockReserved,
+            actor,
+            payload: { orderId, imei: item.imei },
+            refs: [orderId, item.imei],
+          });
+          continue;
+        }
+        const product = await tx.product.findUnique({ where: { sku: item.sku } });
+        if (product?.trackingMode === 'quantity') {
+          await this.reserveQuantityOnTx(
+            tx, orderId, item.id, product.id, product.sku, item.qty,
+            order.pickupPoint, expiresAt, actor, events,
+          );
+        }
       }
 
       const updated = await tx.order.update({
@@ -321,11 +334,55 @@ export class OrdersService {
       this.assertNotDemo(order);
       assertTransition(order.status, to);
       if (to === 'completed') assertOrderMoneyReconciled(order);
+      const releaseEvents: AuditInput[] = [];
+      if (to === 'cancelled') {
+        const reservations = await tx.reservation.findMany({
+          where: { orderId, active: true },
+          include: { quantityAllocation: true },
+        });
+        for (const reservation of reservations) {
+          if (reservation.imei) {
+            const released = await this.units.releaseOnTx(tx, reservation.imei, orderId);
+            if (released) {
+              releaseEvents.push({
+                type: EventType.StockReleased,
+                actor,
+                payload: { orderId, imei: reservation.imei, reason: 'order_cancelled' },
+                refs: [orderId, reservation.imei],
+              });
+            }
+          }
+          const allocation = reservation.quantityAllocation;
+          if (allocation?.active) {
+            const released = await tx.inventoryBalance.updateMany({
+              where: { id: allocation.balanceId, reserved: { gte: allocation.qty } },
+              data: { reserved: { decrement: allocation.qty } },
+            });
+            if (released.count === 1) {
+              await tx.orderQuantityAllocation.update({
+                where: { id: allocation.id },
+                data: { active: false },
+              });
+              releaseEvents.push({
+                type: EventType.StockReleased,
+                actor,
+                payload: { orderId, sku: allocation.sku, qty: allocation.qty, reason: 'order_cancelled' },
+                refs: [orderId, allocation.productId, allocation.id],
+              });
+            }
+          }
+        }
+        await tx.reservation.updateMany({
+          where: { orderId, active: true },
+          data: { active: false },
+        });
+      }
       let updated = await tx.order.update({
         where: { id: orderId },
         data: { status: to },
       });
       const events: AuditInput[] = [
+        ...releaseEvents,
         {
           type: `order.${to}`,
           actor,
@@ -427,6 +484,14 @@ export class OrdersService {
         if (product.bundleComponents.length > 0) {
           for (const component of product.bundleComponents) {
             const required = component.qty * item.qty;
+            if (component.componentProduct.trackingMode === 'quantity') {
+              await this.reserveQuantityOnTx(
+                tx, orderId, item.id, component.componentProductId,
+                component.componentProduct.sku, required, order.pickupPoint,
+                expiresAt, actor, events,
+              );
+              continue;
+            }
             const units = await tx.deviceUnit.findMany({
               where: { productId: component.componentProductId, status: 'in_stock' },
               take: required,
@@ -452,6 +517,14 @@ export class OrdersService {
               });
             }
           }
+          continue;
+        }
+
+        if (product.trackingMode === 'quantity') {
+          await this.reserveQuantityOnTx(
+            tx, orderId, item.id, product.id, product.sku, item.qty,
+            order.pickupPoint, expiresAt, actor, events,
+          );
           continue;
         }
 
@@ -502,6 +575,7 @@ export class OrdersService {
             refs: [orderId, imei],
           });
         }
+        await this.consumeQuantityOnTx(tx, order.id, actor, events);
         await tx.reservation.updateMany({
           where: { orderId, active: true },
           data: { active: false },
@@ -531,6 +605,90 @@ export class OrdersService {
       );
     }
   }
+
+  private async reserveQuantityOnTx(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    orderItemId: string,
+    productId: string,
+    sku: string,
+    quantity: number,
+    preferredLocation: string | null,
+    expiresAt: Date,
+    actor: string,
+    events: AuditInput[],
+  ): Promise<void> {
+    const balances = await tx.inventoryBalance.findMany({
+      where: { productId },
+      orderBy: { location: 'asc' },
+    });
+    balances.sort((a, b) => Number(b.location === preferredLocation) - Number(a.location === preferredLocation));
+    let remaining = quantity;
+    for (const balance of balances) {
+      if (remaining === 0) break;
+      const desired = Math.min(remaining, Math.max(0, balance.onHand - balance.reserved));
+      if (desired === 0) continue;
+      const claimed = await tx.$executeRaw`
+        UPDATE "InventoryBalance"
+        SET "reserved" = "reserved" + ${desired}, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${balance.id} AND ("onHand" - "reserved") >= ${desired}
+      `;
+      if (claimed === 0) continue;
+      const allocation = await tx.orderQuantityAllocation.create({
+        data: { orderId, orderItemId, productId, balanceId: balance.id, sku, qty: desired },
+      });
+      await tx.reservation.create({
+        data: { orderId, quantityAllocationId: allocation.id, expiresAt, active: true },
+      });
+      events.push({
+        type: EventType.StockReserved,
+        actor,
+        payload: { orderId, sku, qty: desired, location: balance.location, allocationId: allocation.id },
+        refs: [orderId, productId, allocation.id],
+      });
+      remaining -= desired;
+    }
+    if (remaining > 0) {
+      throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: не хватает ${remaining}`);
+    }
+  }
+
+  private async consumeQuantityOnTx(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    actor: string,
+    events: AuditInput[],
+  ): Promise<void> {
+    const allocations = await tx.orderQuantityAllocation.findMany({ where: { orderId, active: true } });
+    for (const allocation of allocations) {
+      const consumed = await tx.inventoryBalance.updateMany({
+        where: { id: allocation.balanceId, onHand: { gte: allocation.qty }, reserved: { gte: allocation.qty } },
+        data: { onHand: { decrement: allocation.qty }, reserved: { decrement: allocation.qty } },
+      });
+      if (consumed.count !== 1) {
+        throw new ConflictError('quantity_allocation_invalid', `Резерв ${allocation.id} больше недоступен`);
+      }
+      await tx.orderQuantityAllocation.update({
+        where: { id: allocation.id },
+        data: { active: false, consumedAt: new Date() },
+      });
+      events.push({
+        type: EventType.StockSold,
+        actor,
+        payload: { orderId, sku: allocation.sku, qty: allocation.qty, allocationId: allocation.id },
+        refs: [orderId, allocation.productId, allocation.id],
+      });
+    }
+  }
+}
+
+function directAvailability(product: {
+  trackingMode: 'serialized' | 'quantity';
+  units: unknown[];
+  balances: Array<{ onHand: number; reserved: number }>;
+}): number {
+  if (product.trackingMode === 'serialized') return product.units.length;
+  return product.balances.reduce((sum, balance) => sum + balance.onHand - balance.reserved, 0);
 }
 
 function normalizePromo(value?: string): string | null {

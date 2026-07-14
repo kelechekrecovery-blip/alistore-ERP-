@@ -9,6 +9,7 @@ export interface AdminProduct {
   price: number;
   cost: number;
   category: string;
+  trackingMode: 'serialized' | 'quantity';
   attrs: Record<string, unknown> | null;
   bundleComponents: Array<{ productId: string; sku: string; name: string; qty: number }>;
   archived: boolean;
@@ -30,6 +31,7 @@ export interface ProductFormInput {
   price: number;
   cost: number;
   category: string;
+  trackingMode?: 'serialized' | 'quantity';
   attrs?: Record<string, unknown>;
   bundleComponents?: Array<{ sku: string; qty: number }>;
 }
@@ -40,6 +42,7 @@ export interface ProductUpdateInput {
   name?: string;
   cost?: number;
   category?: string;
+  trackingMode?: 'serialized' | 'quantity';
   attrs?: Record<string, unknown>;
   bundleComponents?: Array<{ sku: string; qty: number }>;
 }

@@ -158,6 +158,27 @@ export function ProductEditor({
               />
             </div>
             <div className="md:col-span-2">
+              <label className={labelCls}>Тип складского учёта</label>
+              <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-[#2E2822] bg-[#16130F] p-1">
+                {([
+                  ['serialized', 'Серийный / IMEI'],
+                  ['quantity', 'Количественный'],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => onUpdateForm({ trackingMode: value })}
+                    className={`rounded-[8px] px-3 py-2.5 text-sm font-semibold transition ${
+                      form.trackingMode === value ? 'bg-lime text-lime-ink' : 'text-[#8A7F76] hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-[#6E645C]">Тип блокируется сервером после появления остатка или включения товара в набор.</p>
+            </div>
+            <div className="md:col-span-2">
               <label htmlFor="product-bundle" className={labelCls}>Состав набора</label>
               <textarea
                 id="product-bundle"

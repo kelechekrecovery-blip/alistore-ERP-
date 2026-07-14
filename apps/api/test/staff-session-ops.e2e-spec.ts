@@ -76,11 +76,13 @@ describe('Staff session rollout for operational endpoints', () => {
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
     await prisma.reservation.deleteMany();
+    await prisma.orderQuantityAllocation.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.inventoryMovement.deleteMany();
+    await prisma.inventoryBalance.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
@@ -308,6 +310,37 @@ describe('Staff session rollout for operational endpoints', () => {
     const unitEvents = await prisma.auditEvent.findMany({ where: { type: 'unit.received' } });
     expect(unitEvents).toHaveLength(2);
     expect(unitEvents.every((event) => event.actor === warehouseId)).toBe(true);
+  });
+
+  it('receives quantity stock with warehouse RBAC and exposes the JWT actor', async () => {
+    const product = await prisma.product.create({
+      data: {
+        sku: `OPS-RCV-QTY-${RUN}`,
+        name: 'USB-C cable',
+        price: 1500,
+        cost: 700,
+        category: 'accessories',
+        trackingMode: 'quantity',
+        attrs: {},
+      },
+    });
+    const payload = { productId: product.id, location: 'BISHKEK-1', quantity: 12, requester: 'spoof' };
+
+    await request(app.getHttpServer()).post('/inventory/receive-quantity').send(payload).expect(401);
+    await request(app.getHttpServer())
+      .post('/inventory/receive-quantity')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send(payload)
+      .expect(403);
+    const received = await request(app.getHttpServer())
+      .post('/inventory/receive-quantity')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send(payload)
+      .expect(201);
+
+    expect(received.body).toMatchObject({ onHand: 12, reserved: 0, available: 12 });
+    const event = await prisma.auditEvent.findFirst({ where: { type: 'stock.received' } });
+    expect(event?.actor).toBe(warehouseId);
   });
 
   it('requires staff JWT for order queue and fulfillment operations', async () => {

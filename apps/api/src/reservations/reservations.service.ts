@@ -73,6 +73,34 @@ export class ReservationsService {
             });
           }
         }
+        if (fresh.quantityAllocationId) {
+          const allocation = await tx.orderQuantityAllocation.findUnique({
+            where: { id: fresh.quantityAllocationId },
+          });
+          if (allocation?.active) {
+            const releasedBalance = await tx.inventoryBalance.updateMany({
+              where: { id: allocation.balanceId, reserved: { gte: allocation.qty } },
+              data: { reserved: { decrement: allocation.qty } },
+            });
+            if (releasedBalance.count === 1) {
+              await tx.orderQuantityAllocation.update({
+                where: { id: allocation.id },
+                data: { active: false },
+              });
+              events.push({
+                type: EventType.StockReleased,
+                actor: 'system',
+                payload: {
+                  orderId: fresh.orderId,
+                  sku: allocation.sku,
+                  qty: allocation.qty,
+                  reason: 'reservation_expired',
+                },
+                refs: [fresh.orderId, allocation.productId, allocation.id],
+              });
+            }
+          }
+        }
         events.push({
           type: EventType.ReservationExpired,
           actor: 'system',
@@ -81,7 +109,11 @@ export class ReservationsService {
             orderId: fresh.orderId,
             expiresAt: fresh.expiresAt.toISOString(),
           },
-          refs: fresh.imei ? [fresh.orderId, fresh.imei] : [fresh.orderId],
+          refs: fresh.imei
+            ? [fresh.orderId, fresh.imei]
+            : fresh.quantityAllocationId
+              ? [fresh.orderId, fresh.quantityAllocationId]
+              : [fresh.orderId],
         });
 
         // Notify the customer that their hold was released. Enqueued in the SAME

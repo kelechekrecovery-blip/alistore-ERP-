@@ -63,7 +63,7 @@ exchange and shift close reconcile money, stock and Ledger with no duplicate eff
 ## Phase 2: close ERP Wave A
 
 Implement exact handoffs plus shared APIs for budgets/plan-fact, variants/bundles,
-quantity and consignment stock, HR schedules/tasks/KPI/payroll, delivery zones/slots,
+consignment stock plus quantity transfer/return, HR schedules/tasks/KPI/payroll, delivery zones/slots,
 routes and dispatch. Product publication must immediately affect customer discovery;
 bundle/component stock and delivery capacity must be validated server-side.
 
@@ -113,7 +113,7 @@ and one pilot store completes every required real transaction and reconciliation
 ## Execution order
 
 1. Maintain the generated integration matrix and add cross-surface E2E fixtures.
-2. Complete quantity/consignment warehouse, serialized return/restock, HR and logistics.
+2. Complete consignment ownership/payout, quantity transfer/return, serialized bundle return/restock, HR and logistics.
 3. Add app-specific XCUITest/Compose E2E and close native device certification gaps.
 4. Deliver remaining ERP Waves B/C by handoff acceptance.
 5. Run ecosystem E2E and security/load/restore gates.
