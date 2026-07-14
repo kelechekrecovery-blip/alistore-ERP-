@@ -64,6 +64,7 @@ export const EventType = {
   WarrantyCreated: 'warranty.created',
   WarrantyClosed: 'warranty.closed',
   ServiceWorkOrderCreated: 'service.work_order_created',
+  ServicePaidRepairReceived: 'service.paid_repair_received',
   ServiceDiagnosticsCompleted: 'service.diagnostics_completed',
   ServiceEstimateApproved: 'service.estimate_approved',
   // supplier RMA

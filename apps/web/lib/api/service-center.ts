@@ -16,6 +16,8 @@ export interface ServiceWorkOrder {
     customerId: string;
     problem: string;
     status: string;
+    serviceType: 'warranty' | 'paid';
+    deviceName: string | null;
     sla: string;
   };
 }
@@ -26,6 +28,8 @@ export interface ServiceQueueItem {
   customerId: string;
   problem: string;
   status: string;
+  serviceType: 'warranty' | 'paid';
+  deviceName: string | null;
   sla: string;
   assignee: string | null;
   productName: string;
@@ -43,6 +47,14 @@ export function createServiceWorkOrder(
   idempotencyKey: string,
 ) {
   return postAuthJson<ServiceWorkOrder>('/service-center/work-orders', input, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function createPaidRepair(
+  input: { phone: string; customerName: string; deviceName: string; serial: string; problem: string; technicianId?: string },
+  accessToken: string,
+  idempotencyKey: string,
+) {
+  return postAuthJson<ServiceWorkOrder>('/service-center/paid-repairs', input, accessToken, { 'idempotency-key': idempotencyKey });
 }
 
 export function diagnoseServiceWorkOrder(

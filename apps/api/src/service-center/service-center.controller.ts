@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto } from './service-center.dto';
+import { CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto } from './service-center.dto';
 import { ServiceCenterService } from './service-center.service';
 
 @ApiTags('service-center')
@@ -29,6 +29,15 @@ export class ServiceCenterController {
     @Headers('idempotency-key') key: string | undefined,
     @Body() dto: CreateServiceWorkOrderDto,
   ) { return this.serviceCenter.create(dto, user.customerId, key); }
+
+  @Post('paid-repairs')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('warranty', 'transition')
+  createPaidRepair(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CreatePaidRepairDto,
+  ) { return this.serviceCenter.createPaidRepair(dto, user.customerId, key); }
 
   @Post('work-orders/:id/diagnose')
   @UseGuards(ActiveStaffGuard, PermissionGuard)

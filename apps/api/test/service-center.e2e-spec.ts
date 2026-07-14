@@ -141,4 +141,54 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     expect(mine.body.map((item: { id: string }) => item.id)).toContain(created.body.id);
     expect(otherMine.body).toEqual([]);
   });
+
+  it('accepts a third-party device without adding sellable inventory and reuses customer approval', async () => {
+    const phone = `+99677${run}8`;
+    const payload = {
+      phone,
+      customerName: 'Paid Repair Customer',
+      deviceName: 'Xiaomi 13',
+      serial: `paid-${run}-serial`,
+      problem: 'Замена экрана',
+      technicianId: ownerId,
+    };
+    await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `paid-denied-${run}`).send(payload).expect(403);
+    await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${ownerToken}`).send(payload).expect(422);
+    await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-invalid-tech-${run}`).send({ ...payload, technicianId: 'missing-staff' }).expect(422);
+
+    const created = await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-create-${run}`).send(payload).expect(201);
+    const replayed = await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-create-${run}`).send(payload).expect(201);
+    expect(replayed.body.id).toBe(created.body.id);
+    expect(created.body.warrantyCase).toMatchObject({
+      status: 'received',
+      serviceType: 'paid',
+      deviceName: 'Xiaomi 13',
+      imei: `PAID-${run}-SERIAL`,
+    });
+    await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-create-${run}`).send({ ...payload, problem: 'Другая проблема' }).expect(409);
+    await request(app.getHttpServer()).post('/service-center/paid-repairs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-duplicate-${run}`).send(payload).expect(409);
+
+    const customer = await prisma.customer.findUniqueOrThrow({ where: { phone } });
+    expect(customer.name).toBe('Paid Repair Customer');
+    expect(await prisma.deviceUnit.count({ where: { imei: `PAID-${run}-SERIAL` } })).toBe(0);
+    const queue = await request(app.getHttpServer()).get('/service-center/queue').set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(queue.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.warrantyCaseId, serviceType: 'paid', productName: 'Xiaomi 13' })]));
+
+    const diagnosed = await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/diagnose`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-diagnose-${run}`).send({ summary: 'Нужна замена дисплея', estimateAmount: 6500, diagnosticFee: 500 }).expect(201);
+    expect(diagnosed.body.warrantyCase.status).toBe('diagnostics');
+    const mine = await request(app.getHttpServer()).get('/service-center/me/work-orders').set('Authorization', `Bearer ${customerToken(customer)}`).expect(200);
+    expect(mine.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id })]));
+    const approved = await request(app.getHttpServer()).post(`/service-center/me/work-orders/${created.body.id}/approve-estimate`).set('Authorization', `Bearer ${customerToken(customer)}`).set('Idempotency-Key', `paid-approve-${run}`).expect(201);
+    expect(approved.body.warrantyCase.status).toBe('approved');
+
+    const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
+    expect(events.map((event) => event.type)).toEqual([
+      'service.paid_repair_received',
+      'service.work_order_created',
+      'service.diagnostics_completed',
+      'service.estimate_approved',
+    ]);
+    expect(events.some((event) => event.type.startsWith('warranty.'))).toBe(false);
+    expect(await prisma.serviceWorkOrderCommand.count({ where: { workOrderId: created.body.id } })).toBe(3);
+  });
 });

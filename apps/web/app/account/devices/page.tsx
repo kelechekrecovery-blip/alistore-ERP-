@@ -51,6 +51,8 @@ export default function DevicesPage() {
     return <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
   }
 
+  const paidRepairs = workOrders.filter((item) => item.warrantyCase.serviceType === 'paid');
+
   return (
     <AccountDetailFrame>
         <div className="flex items-center gap-3 px-4 pb-3 pt-5">
@@ -60,7 +62,7 @@ export default function DevicesPage() {
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           {devices === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
-          {devices && devices.length === 0 && (
+          {devices && devices.length === 0 && paidRepairs.length === 0 && (
             <div className="py-12 text-center">
               <div className="text-5xl">📱</div>
               <div className="mt-3.5 font-display text-[17px] font-bold">Пока нет устройств</div>
@@ -118,6 +120,18 @@ export default function DevicesPage() {
               </div>
             );
           })}
+          {paidRepairs.length > 0 && <div className="mb-2 mt-5 font-display text-[15px] font-bold">Платный ремонт</div>}
+          {paidRepairs.map((workOrder) => <div key={workOrder.id} data-testid={`paid-service-account-${workOrder.id}`} className="mb-3 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div><div className="text-[15px] font-bold">{workOrder.warrantyCase.deviceName ?? 'Устройство'}</div><div className="mt-0.5 font-mono text-[11px] text-[#8A7F76]">SN {workOrder.warrantyCase.imei}</div><div className="mt-2 text-[12px] text-[#A79C92]">{workOrder.warrantyCase.problem}</div></div>
+              <span className="h-fit rounded-md bg-[#7FB0EC]/15 px-2 py-0.5 text-[11px] text-[#7FB0EC]">{WSTATUS[workOrder.warrantyCase.status] ?? workOrder.warrantyCase.status}</span>
+            </div>
+            {workOrder.estimatePreparedAt ? <div data-testid={`service-estimate-${workOrder.id}`} className="mt-3 rounded-[8px] border border-[#3B342D] bg-[#16130F] p-3">
+              <div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-semibold text-[#D8CFC6]">Смета сервис-центра</div><div className="mt-1 text-[12px] text-[#8A7F76]">{workOrder.diagnosticSummary}</div></div><div className="whitespace-nowrap font-mono text-[13px] font-bold text-lime">{workOrder.estimateAmount?.toLocaleString('ru-RU')} с</div></div>
+              {workOrder.estimateApprovedAt ? <div className="mt-3 text-[12px] font-semibold text-lime">Смета подтверждена · устройство в работе</div> : <button type="button" disabled={approving === workOrder.id} onClick={() => void approveEstimate(workOrder)} className="mt-3 w-full rounded-[8px] bg-coral px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-50">{approving === workOrder.id ? 'Подтверждаем…' : 'Подтвердить смету'}</button>}
+            </div> : <div className="mt-3 text-[12px] text-[#8A7F76]">Устройство принято, ожидается диагностика</div>}
+            {serviceError && approving === '' && <p role="alert" className="mt-2 text-[12px] text-danger">{serviceError}</p>}
+          </div>)}
         </div>
     </AccountDetailFrame>
   );

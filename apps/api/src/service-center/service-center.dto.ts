@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreateServiceWorkOrderDto {
   @ApiProperty()
@@ -29,4 +29,41 @@ export class DiagnoseServiceWorkOrderDto {
   @IsInt()
   @Min(0)
   diagnosticFee?: number;
+}
+
+export class CreatePaidRepairDto {
+  @ApiProperty({ example: '+996700000001' })
+  @IsString()
+  @Matches(/^\+?[0-9]{9,15}$/, { message: 'phone must be 9-15 digits, optional leading +' })
+  phone!: string;
+
+  @ApiProperty({ example: 'Айбек' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  customerName!: string;
+
+  @ApiProperty({ example: 'Xiaomi 13' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  deviceName!: string;
+
+  @ApiProperty({ example: 'SN-123456789' })
+  @IsString()
+  @MinLength(4)
+  @MaxLength(80)
+  serial!: string;
+
+  @ApiProperty({ example: 'Требуется замена экрана' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(1000)
+  problem!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  technicianId?: string;
 }

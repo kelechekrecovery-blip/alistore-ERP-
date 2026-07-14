@@ -19,6 +19,7 @@ Read before selecting work:
 3. The exact related `design_handoff_alistore/screens/*.dc.html` for appearance/behavior.
 4. Current `apps/api/prisma/schema.prisma`, domain code and tests for implemented truth.
 5. `docs/ECOSYSTEM-COMPLETION-AUDIT.md`, `BACKLOG.md` and latest `PROGRESS.md`.
+6. `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` for route/API/RBAC/Ledger/test/visual evidence.
 
 Documentation intent never overrides current executable evidence. If sources disagree,
 record the discrepancy and implement the safer business invariant while preserving the
@@ -92,6 +93,13 @@ API/models, role permissions, Ledger events, tests and visual artifacts. A hando
 accepted only when every interactive control is functional or explicitly excluded by
 the specification, every relevant state exists, and desktop/native rendering has been
 visually verified at its target dimensions.
+
+Every linked handoff reference must also exist or be explicitly retired with owner
+approval. A missing linked `.dc.html` is missing design evidence. Keep committed visual
+goldens for desktop, phone, iOS and Android states. Shared-core XCTest/Compose tests do
+not count as app acceptance: use XCUITest targets and connected tests in each app module.
+The browser role suite must exercise all distinct customer and staff roles, not only an
+owner session with broad permissions.
 
 ## Definition of done
 

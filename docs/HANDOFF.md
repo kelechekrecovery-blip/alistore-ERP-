@@ -1,4 +1,4 @@
-# AliStore ERP — Хендофф (готовый проект)
+# AliStore ERP — инженерный хендофф
 
 Операционная система для магазина электроники в Кыргызстане: витрина + клиент-апп + POS +
 склад + ERP владельца — всё поверх единого **Event Ledger** (append-only книга событий).
@@ -43,9 +43,11 @@ npm run launch:preflight               # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness               # secret-safe отчёт по apps/api/.env.production
 npm run launch:check                   # strict preflight + strict external readiness
 npm run launch:readiness:strict        # падает, пока production-блокеры не закрыты
-npm run api:test                       # 89 сьютов / 316 тестов (jest)
+npm run api:test                       # 119 suites / 472 tests (jest)
 npm run api:build                      # прод-сборка API
-npm run build -w @alistore/web         # прод-сборка веб (32 роута)
+npm run build -w @alistore/web         # прод-сборка веб (37 routes)
+npm run e2e                            # 34 browser flows after current full gate
+npm run ecosystem:verify               # web/API + iOS/Android software component gate
 ```
 
 `mvp:verify` печатает внешний readiness без раскрытия секретов. Добавьте `--strict-external`,
@@ -80,5 +82,7 @@ npm run build -w @alistore/web         # прод-сборка веб (32 роу
 - **Command Center** — сигнал Risk Center кликабелен → переход на экран решения.
 
 ## Статус
-Полный статус по фазам, что готово / что за параллельным агентом (Codex) / что за внешними
-блокерами (AI-ключи, Telegram/WhatsApp, hardware) — см. [`PHASES.md`](./PHASES.md).
+Полный доказательный статус, включая незакрытые ERP/native/design/provider gates, см. в
+[`ECOSYSTEM-COMPLETION-AUDIT.md`](./ECOSYSTEM-COMPLETION-AUDIT.md) и
+[`ECOSYSTEM-TRACEABILITY-MATRIX.md`](./ECOSYSTEM-TRACEABILITY-MATRIX.md). Фазовый план:
+[`PHASES.md`](./PHASES.md).

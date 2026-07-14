@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, WarrantyStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertWarrantyTransition } from '../warranty/warranty-state';
-import { CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto } from './service-center.dto';
+import { CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto } from './service-center.dto';
 
 type CommandInput = Record<string, string | number | null>;
+const ACTIVE_SERVICE_STATUSES: WarrantyStatus[] = ['created', 'received', 'diagnostics', 'waiting_supplier', 'approved'];
+const PAID_REPAIR_SLA_MS = 3 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class ServiceCenterService {
@@ -33,7 +35,7 @@ export class ServiceCenterService {
     const customerById = new Map(customers.map((customer) => [customer.id, customer]));
     return cases.map((warrantyCase) => ({
       ...warrantyCase,
-      productName: unitByImei.get(warrantyCase.imei)?.product.name ?? 'Устройство',
+      productName: warrantyCase.deviceName ?? unitByImei.get(warrantyCase.imei)?.product.name ?? 'Устройство',
       customer: customerById.get(warrantyCase.customerId) ?? null,
     }));
   }
@@ -68,6 +70,7 @@ export class ServiceCenterService {
         if (!['created', 'received'].includes(warrantyCase.status)) {
           throw new ConflictError('service_intake_closed', 'Приём доступен только для нового обращения');
         }
+        await assertActiveTechnician(tx, dto.technicianId);
         const workOrder = await tx.serviceWorkOrder.create({
           data: {
             warrantyCaseId: warrantyCase.id,
@@ -106,6 +109,97 @@ export class ServiceCenterService {
       if (isUniqueViolation(error)) {
         const command = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
         if (command) return replay(command, 'create', request);
+      }
+      throw error;
+    }
+  }
+
+  async createPaidRepair(dto: CreatePaidRepairDto, actor: string, rawKey?: string) {
+    const key = requiredKey(rawKey);
+    const request: CommandInput = {
+      phone: dto.phone.trim(),
+      customerName: dto.customerName.trim(),
+      deviceName: dto.deviceName.trim(),
+      serial: dto.serial.trim().toUpperCase(),
+      problem: dto.problem.trim(),
+      technicianId: dto.technicianId?.trim() || null,
+    };
+    const existing = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+    if (existing) return replay(existing, 'create_paid', request);
+
+    try {
+      return await this.audit.transaction<unknown>(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'service-paid:' + request.serial}))::text AS locked`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'service-customer:' + request.phone}))::text AS locked`;
+        const raced = await tx.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+        if (raced) return { result: replay(raced, 'create_paid', request), events: [] };
+        const active = await tx.warrantyCase.findFirst({
+          where: { imei: request.serial as string, serviceType: 'paid', status: { in: ACTIVE_SERVICE_STATUSES } },
+        });
+        if (active) throw new ConflictError('paid_repair_already_open', 'По устройству уже открыт платный ремонт');
+        await assertActiveTechnician(tx, dto.technicianId);
+
+        let customer = await tx.customer.findUnique({ where: { phone: request.phone as string } });
+        if (!customer) {
+          customer = await tx.customer.create({ data: { phone: request.phone as string, name: request.customerName as string } });
+        } else if (!customer.name.trim()) {
+          customer = await tx.customer.update({ where: { id: customer.id }, data: { name: request.customerName as string } });
+        }
+        const warrantyCase = await tx.warrantyCase.create({
+          data: {
+            imei: request.serial as string,
+            customerId: customer.id,
+            problem: request.problem as string,
+            status: 'received',
+            serviceType: 'paid',
+            deviceName: request.deviceName as string,
+            sla: new Date(Date.now() + PAID_REPAIR_SLA_MS),
+            assignee: dto.technicianId?.trim() || null,
+          },
+        });
+        const workOrder = await tx.serviceWorkOrder.create({
+          data: {
+            warrantyCaseId: warrantyCase.id,
+            technicianId: dto.technicianId?.trim() || null,
+            createdBy: actor,
+          },
+        });
+        const result = await tx.serviceWorkOrder.findUniqueOrThrow({
+          where: { id: workOrder.id },
+          include: { warrantyCase: true },
+        });
+        await tx.serviceWorkOrderCommand.create({
+          data: { idempotencyKey: key, workOrderId: workOrder.id, action: 'create_paid', request, response: json(result) },
+        });
+        return {
+          result,
+          events: [
+            {
+              type: EventType.ServicePaidRepairReceived,
+              actor,
+              payload: {
+                workOrderId: workOrder.id,
+                serviceCaseId: warrantyCase.id,
+                customerId: customer.id,
+                deviceName: warrantyCase.deviceName,
+                serial: warrantyCase.imei,
+                technicianId: workOrder.technicianId,
+              },
+              refs: [workOrder.id, warrantyCase.id, customer.id, warrantyCase.imei],
+            },
+            {
+              type: EventType.ServiceWorkOrderCreated,
+              actor,
+              payload: { workOrderId: workOrder.id, warrantyId: warrantyCase.id, serviceType: 'paid' },
+              refs: [workOrder.id, warrantyCase.id, customer.id, warrantyCase.imei],
+            },
+          ],
+        };
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        const command = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+        if (command) return replay(command, 'create_paid', request);
       }
       throw error;
     }
@@ -157,14 +251,14 @@ export class ServiceCenterService {
       return {
         result: updated,
         events: [
-          ...(moved ? [{
+          ...(moved && workOrder.warrantyCase.serviceType === 'warranty' ? [{
             type: 'warranty.diagnostics', actor,
             payload: { warrantyId: workOrder.warrantyCaseId, from: 'received', to: 'diagnostics' },
             refs: [workOrder.warrantyCaseId, workOrder.warrantyCase.imei],
           }] : []),
           {
             type: EventType.ServiceDiagnosticsCompleted, actor,
-            payload: { workOrderId: id, estimateAmount: dto.estimateAmount, diagnosticFee: dto.diagnosticFee ?? 0 },
+            payload: { workOrderId: id, serviceType: workOrder.warrantyCase.serviceType, estimateAmount: dto.estimateAmount, diagnosticFee: dto.diagnosticFee ?? 0 },
             refs: [id, workOrder.warrantyCaseId, workOrder.warrantyCase.imei],
           },
         ],
@@ -216,14 +310,14 @@ export class ServiceCenterService {
         events: [
           {
             type: EventType.ServiceEstimateApproved, actor: customerId,
-            payload: { workOrderId: id, warrantyId: workOrder.warrantyCaseId, estimateAmount: workOrder.estimateAmount },
+            payload: { workOrderId: id, warrantyId: workOrder.warrantyCaseId, serviceType: workOrder.warrantyCase.serviceType, estimateAmount: workOrder.estimateAmount },
             refs: [id, workOrder.warrantyCaseId, workOrder.warrantyCase.imei],
           },
-          {
+          ...(workOrder.warrantyCase.serviceType === 'warranty' ? [{
             type: 'warranty.approved', actor: customerId,
             payload: { warrantyId: workOrder.warrantyCaseId, from: 'diagnostics', to: 'approved', source: 'customer_estimate' },
             refs: [workOrder.warrantyCaseId, workOrder.warrantyCase.imei],
-          },
+          }] : []),
         ],
       };
       });
@@ -267,4 +361,13 @@ function canonical(value: unknown): string {
 
 function isUniqueViolation(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+async function assertActiveTechnician(tx: Prisma.TransactionClient, technicianId?: string) {
+  const id = technicianId?.trim();
+  if (!id) return;
+  const technician = await tx.staffUser.findUnique({ where: { id }, select: { active: true } });
+  if (!technician?.active) {
+    throw new ValidationError('service_technician_inactive', 'Мастер не найден или отключён');
+  }
 }

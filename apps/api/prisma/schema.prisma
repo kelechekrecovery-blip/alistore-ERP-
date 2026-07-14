@@ -136,6 +136,11 @@ enum WarrantyStatus {
   closed
 }
 
+enum ServiceCaseType {
+  warranty
+  paid
+}
+
 enum TicketStatus {
   new
   in_progress
@@ -864,17 +869,20 @@ model ReturnItem {
 }
 
 model WarrantyCase {
-  id         String         @id @default(cuid())
-  imei       String
-  customerId String
-  problem    String
-  status     WarrantyStatus @default(created)
-  sla        DateTime
-  assignee   String?
-  workOrder  ServiceWorkOrder?
+  id          String          @id @default(cuid())
+  imei        String
+  customerId  String
+  problem     String
+  status      WarrantyStatus  @default(created)
+  serviceType ServiceCaseType @default(warranty)
+  deviceName  String?
+  sla         DateTime
+  assignee    String?
+  workOrder   ServiceWorkOrder?
 
   @@index([imei])
   @@index([status])
+  @@index([serviceType, status])
 }
 
 model ServiceWorkOrder {

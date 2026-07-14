@@ -1,14 +1,14 @@
 # Codex Handoff — остаток до конца MVP
 
-> Составлено Claude. Claude-лана (Event Ledger ядро, деньги, витрина, POS, склад,
-> approval-цикл, возвраты/обмены, owner ERP + Risk/Command Center, весь keyless AI-слой)
-> закрыта и зелёная. Ниже — то, что осталось до полного MVP и относится к **лане Codex**,
-> требует **миграции схемы**, либо ждёт **внешнего ключа/аккаунта**. Каждый пункт — с
-> критерием приёмки. Коммитить явными путями, не переписывать историю.
+> Исторический handoff Claude, сохранённый как контекст. Он не является текущим отчётом
+> готовности. Актуальные доказательства и остаток находятся в `BACKLOG.md`,
+> `ECOSYSTEM-COMPLETION-AUDIT.md` и `ECOSYSTEM-TRACEABILITY-MATRIX.md`.
 
 ## A. Лана Codex — можно делать сейчас (без внешних блокеров)
 
-Открытых пунктов без внешних блокеров в старой лане A и greenfield-полосе B нет на 2026-07-08.
+Старая фраза об отсутствии открытых software-задач больше не применима: Service Center,
+Store Operations, CMS, Analytics, Legal, all-role E2E, native app-level E2E и visual
+acceptance имеют незаблокированный объём работ.
 
 Закрыто Codex-итерациями: transactional outbox + Novu/email/realtime/channel transport switch,
 consent-filtered transactional templates for orders/warranty/reservations/debt reminders,
