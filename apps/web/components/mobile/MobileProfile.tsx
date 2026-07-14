@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { som } from '@/lib/format';
-import type { MyOrder } from '@/lib/api';
+import type { CustomerLoyalty, MyOrder } from '@/lib/api';
 
 const MENU: { href: string; icon: string; label: string; meta?: string }[] = [
   { href: '/account/devices', icon: '📱', label: 'Устройства', meta: 'Гарантия' },
   { href: '/account/returns', icon: '↩️', label: 'Возвраты' },
-  { href: '/account/bonuses', icon: '🎁', label: 'Бонусы', meta: '4 820' },
+  { href: '/account/bonuses', icon: '🎁', label: 'Бонусы' },
   { href: '/account/addresses', icon: '📍', label: 'Адреса' },
   { href: '/account/notifications', icon: '🔔', label: 'Уведомления' },
   { href: '/support', icon: '💬', label: 'Поддержка' },
@@ -30,10 +30,12 @@ const STATUS_RU: Record<string, string> = {
 export default function MobileProfile({
   phone,
   orders,
+  loyalty,
   onLogout,
 }: {
   phone: string;
   orders: MyOrder[] | null;
+  loyalty: CustomerLoyalty | null;
   onLogout: () => void;
 }) {
   return (
@@ -56,13 +58,13 @@ export default function MobileProfile({
         {/* level */}
         <div className="mb-3.5 rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
           <div className="mb-2 flex justify-between text-[13px]">
-            <span className="text-[#D8CFC6]">Уровень Gold</span>
-            <span className="font-mono text-lime">4 820 бонусов</span>
+            <span className="text-[#D8CFC6]">Уровень {loyalty?.level ?? '...'}</span>
+            <span className="font-mono text-lime">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : 'Загрузка...'}</span>
           </div>
           <div className="h-[7px] overflow-hidden rounded-full bg-[#16130F]">
-            <div className="h-full w-[72%] rounded-full bg-gradient-to-r from-lime to-[#8FD40F]" />
+            <div className="h-full rounded-full bg-gradient-to-r from-lime to-[#8FD40F]" style={{ width: loyalty ? `${Math.max(4, Math.min(100, 100 - loyalty.nextLevelSpend / 1000))}%` : '4%' }} />
           </div>
-          <div className="mt-1.5 text-[11px] text-[#8A7F76]">До Platinum осталось 51 000 сом покупок</div>
+          <div className="mt-1.5 text-[11px] text-[#8A7F76]">{loyalty ? `До следующего уровня осталось ${som(loyalty.nextLevelSpend)}` : 'Загружаем программу лояльности'}</div>
         </div>
 
         {/* menu */}

@@ -67,6 +67,14 @@ export class PaymentsService {
     return this.prisma.payment.findUnique({ where: { txnId } });
   }
 
+  async payForCustomer(customerId: string, dto: PayDto, actor: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: dto.orderId, customerId }, select: { id: true } });
+    if (!order) {
+      throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
+    }
+    return this.pay(dto, actor);
+  }
+
   async pay(dto: PayDto, actor: string) {
     // Idempotent dedup by txnId (webhook may fire twice) — checked before the tx.
     if (dto.txnId) {

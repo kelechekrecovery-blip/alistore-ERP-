@@ -4,9 +4,9 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **33 миграции**
-- **110 API test suites / 420 тестов — зелёные** (`jest`)
-- **22 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle, customer account synchronization и exact desktop customer routes (`npm run e2e`)
+- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **34 миграции**
+- **110 API test suites / 428 тестов — зелёные** (`jest`)
+- **23 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle, customer account synchronization, server-authoritative loyalty checkout и exact desktop customer routes (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API tests pass **17/17** on iPhone 17 Pro Simulator; Android unit test/Lint and the Client/Staff/Courier/POS Compose UI suite pass on API 36. Android Staff has real staff-JWT orders, shifts, scanner/Evidence, Customer 360, support/warranty, tasks and FCM routing. Android Courier has owner-bound assignments, route actions, order Evidence, scoped FCM routing, idempotent offline replay and COD handover. Android POS has server-bound shifts, SKU/IMEI scanner input, approval recovery, split tender, server receipts, refunds/exchanges and idempotent offline replay. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -70,10 +70,10 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest                 # 110 suites / 423 теста ✓
+cd apps/api && npx jest                 # 110 suites / 428 тестов ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (37 роутов)
-npm run e2e                           # 22/22 ✓
+npm run e2e                           # 23/23 ✓
 npm run mobile:store-preflight        # 0 failures; production env warnings only
 cd apps/mobile && npx expo-doctor     # 20/20 ✓
 npm run ios:generate                  # regenerates AliStoreNative.xcodeproj

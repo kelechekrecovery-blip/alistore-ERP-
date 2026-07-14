@@ -11,6 +11,12 @@ export interface CreatedOrder {
   id: string;
   status: string;
   total: number;
+  subtotal?: number;
+  deliveryFee?: number;
+  promoCode?: string | null;
+  promoDiscount?: number;
+  loyaltyRedeemed?: number;
+  loyaltyEarned?: number;
   fulfillmentType?: string;
   pickupPoint?: string | null;
   deliveryAddress?: string | null;
@@ -38,6 +44,8 @@ export async function createOrder(input: {
   deliveryAddress?: string;
   deliverySlot?: string;
   total: number;
+  promoCode?: string;
+  loyaltyPoints?: number;
   items: OrderLine[];
 }, guestCapability: string, idempotencyKey: string): Promise<CreatedOrder> {
   const res = await fetch(`${API_BASE}/orders`, {
@@ -51,6 +59,20 @@ export async function createOrder(input: {
   });
   if (!res.ok) throw new Error(`orders responded ${res.status}`);
   return (await res.json()) as CreatedOrder;
+}
+
+export async function createMyOrder(input: {
+  channel: 'web' | 'mobile';
+  fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
+  pickupPoint?: string;
+  deliveryAddress?: string;
+  deliverySlot?: string;
+  total: number;
+  promoCode?: string;
+  loyaltyPoints?: number;
+  items: OrderLine[];
+}, accessToken: string, idempotencyKey: string): Promise<CreatedOrder> {
+  return postAuthJson('/orders/mine', input, accessToken, { 'idempotency-key': idempotencyKey });
 }
 
 export interface MyOrder {

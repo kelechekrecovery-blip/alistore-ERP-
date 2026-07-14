@@ -28,8 +28,8 @@ describe('public endpoint rate limits', () => {
       controllers: [CustomersController, OrdersController, PaymentsController, SupportController],
       providers: [
         { provide: CustomersService, useValue: { upsert: async () => ({ id: 'customer-1' }) } },
-        { provide: OrdersService, useValue: { create: async () => ({ id: 'order-1' }) } },
-        { provide: PaymentsService, useValue: { find: async () => [], pay: async () => ({ id: 'pay-1' }) } },
+        { provide: OrdersService, useValue: { createFromCatalog: async () => ({ id: 'order-1' }) } },
+        { provide: PaymentsService, useValue: { find: async () => [], pay: async () => ({ id: 'pay-1' }), payForCustomer: async () => ({ id: 'pay-1' }) } },
         { provide: PaymentIntentsService, useValue: { create: async () => ({ id: 'intent-1' }), webhook: async () => ({ ok: true }) } },
         { provide: SupportService, useValue: { open: async () => ({ id: 'ticket-1' }), list: async () => [] } },
         { provide: StaffAuthService, useValue: { me: async () => ({ id: 'staff-1' }) } },

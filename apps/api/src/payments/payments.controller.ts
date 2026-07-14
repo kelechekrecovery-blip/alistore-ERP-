@@ -36,6 +36,8 @@ import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { requireGuestCapability } from '../auth/guest-capability';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireActiveStaff } from '../auth/staff-principal';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -43,6 +45,7 @@ export class PaymentsController {
   constructor(
     private readonly payments: PaymentsService,
     private readonly intents: PaymentIntentsService,
+    private readonly staffAuth: StaffAuthService,
   ) {}
 
   @ApiOperation({ summary: 'List payments by order or cash shift' })
@@ -65,16 +68,27 @@ export class PaymentsController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
-  pay(@CurrentUser() user: AuthPrincipal | undefined, @Body() dto: PayDto) {
+  async pay(
+    @CurrentUser() user: AuthPrincipal | undefined,
+    @Headers('x-guest-capability') capability: string | undefined,
+    @Body() dto: PayDto,
+  ) {
     // Cash/card/installment must be taken by staff (counter/POS) or confirmed by the
     // provider webhook — an unauthenticated caller may only pay by gift card, which is
     // self-validating (redeemOnTx checks the code + balance). Closes the "mark any order
     // paid for free" hole while keeping guest gift-card checkout working.
-    if (!user && dto.method !== 'gift_card') {
+    if ((!user || user.typ === 'customer') && dto.method !== 'gift_card') {
       throw new UnauthorizedException('payment_requires_auth');
     }
-    const actor = user ? (user.typ === 'staff' ? `staff:${user.customerId}` : user.customerId) : 'guest';
-    return this.payments.pay(dto, actor);
+    if (user?.typ === 'customer') {
+      return this.payments.payForCustomer(user.customerId, dto, user.customerId);
+    }
+    if (user?.typ === 'staff') {
+      const staffId = await requireActiveStaff(user, this.staffAuth);
+      return this.payments.pay(dto, `staff:${staffId}`);
+    }
+    const guest = requireGuestCapability(capability, 'payments:gift_card');
+    return this.payments.payForCustomer(guest.sub, dto, `guest:${guest.sub}`);
   }
 
   @ApiOperation({

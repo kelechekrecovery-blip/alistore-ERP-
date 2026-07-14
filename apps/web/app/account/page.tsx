@@ -8,7 +8,7 @@ import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import MobileProfile from '@/components/mobile/MobileProfile';
 import { useAuth } from '@/lib/auth';
-import { fetchMyOrders, type MyOrder } from '@/lib/api';
+import { fetchMyLoyalty, fetchMyOrders, type CustomerLoyalty, type MyOrder } from '@/lib/api';
 import { som } from '@/lib/format';
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -23,7 +23,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 const MENU: Array<{ href: string; icon: LucideIcon; label: string; meta: string }> = [
   { href: '/account/devices', icon: Smartphone, label: 'Мои устройства', meta: 'Гарантии и сервис' },
   { href: '/account/returns', icon: RotateCcw, label: 'Возвраты', meta: 'Заявки и статусы' },
-  { href: '/account/bonuses', icon: Gift, label: 'Бонусы', meta: '4 820 доступно' },
+  { href: '/account/bonuses', icon: Gift, label: 'Бонусы', meta: 'История начислений' },
   { href: '/account/addresses', icon: MapPin, label: 'Адреса', meta: 'Доставка и самовывоз' },
   { href: '/account/notifications', icon: Bell, label: 'Уведомления', meta: 'Заказы и акции' },
   { href: '/support', icon: MessageCircle, label: 'Поддержка', meta: 'Чат с AliStore' },
@@ -37,14 +37,16 @@ export default function AccountPage() {
   const { user, hydrated, authed, logout } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
+  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
 
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account'); }, [hydrated, user, router]);
   useEffect(() => { if (user) authed(fetchMyOrders).then(setOrders).catch(() => setOrders([])); }, [user, authed]);
+  useEffect(() => { if (user) authed(fetchMyLoyalty).then(setLoyalty).catch(() => setLoyalty(null)); }, [user, authed]);
 
   if (!hydrated || !user) return <div className="min-h-screen bg-[#f5f5f7] text-[#4a4a4a]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
   return <>
-    <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} onLogout={async () => { await logout(); router.push('/'); }} /></div>
+    <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} loyalty={loyalty} onLogout={async () => { await logout(); router.push('/'); }} /></div>
     <div className="hidden min-h-screen bg-[#f5f5f7] text-[#0f0f0f] [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
     <SiteHeader />
     <main className="mx-auto max-w-[1400px] px-5 py-10">
@@ -53,7 +55,7 @@ export default function AccountPage() {
 
       <section className="mt-9 grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
         <div className="flex items-center gap-5 rounded-[22px] border border-[#E7DDD3] bg-tint p-6 shadow-soft sm:p-8"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-[16px] bg-coral font-display text-xl font-bold text-white">{user.phone.slice(-2)}</span><div><div className="flex flex-wrap items-center gap-3"><h2 className="font-display text-2xl font-bold">Клиент AliStore</h2><span className="rounded-full border border-coral/25 bg-white px-2.5 py-1 text-[11px] font-semibold text-deep">GOLD</span></div><p className="mt-1 font-mono text-sm text-[#6E645C]">{user.phone}</p></div></div>
-        <div className="rounded-[22px] border border-[#E7DDD3] bg-white p-6 shadow-soft sm:p-8"><div className="flex items-center justify-between"><span className="text-sm text-[#6E645C]">Уровень Gold</span><strong className="font-display text-xl text-deep">4 820 бонусов</strong></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-[#E7DDD3]"><div className="h-full w-[72%] rounded-full bg-coral" /></div><p className="mt-3 text-xs text-[#8A7F76]">До Platinum осталось 51 000 сом покупок</p></div>
+        <div className="rounded-[22px] border border-[#E7DDD3] bg-white p-6 shadow-soft sm:p-8"><div className="flex items-center justify-between"><span className="text-sm text-[#6E645C]">Уровень {loyalty?.level ?? '...'}</span><strong className="font-display text-xl text-deep">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : 'Загрузка...'}</strong></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-[#E7DDD3]"><div className="h-full rounded-full bg-coral" style={{ width: loyalty ? `${Math.max(4, Math.min(100, 100 - loyalty.nextLevelSpend / 1000))}%` : '4%' }} /></div><p className="mt-3 text-xs text-[#8A7F76]">{loyalty ? `До следующего уровня осталось ${som(loyalty.nextLevelSpend)}` : 'Загружаем программу лояльности'}</p></div>
       </section>
 
       <section className="pt-14"><h2 className="font-display text-2xl font-bold">Сервисы кабинета</h2><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{MENU.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className="group rounded-[18px] border border-[#E7DDD3] bg-white p-5 shadow-soft transition hover:-translate-y-1 hover:border-coral/35"><span className="grid h-11 w-11 place-items-center rounded-[12px] border border-coral/20 bg-tint text-deep"><Icon size={20} /></span><h3 className="mt-4 font-display font-semibold group-hover:text-deep">{item.label}</h3><p className="mt-1 text-xs text-[#8A7F76]">{item.meta}</p></Link>; })}</div></section>

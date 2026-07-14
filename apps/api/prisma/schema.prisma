@@ -227,13 +227,18 @@ model LoyaltyEntry {
   id         String    @id @default(cuid())
   customerId String
   customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  kind       String    @default("adjustment") // earn | redeem | refund_restore | refund_clawback | adjustment
   label      String
   amount     Int
   sourceRef  String?   @unique
+  orderId    String?
+  paymentId  String?
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([customerId, createdAt])
+  @@index([orderId])
+  @@index([paymentId])
 }
 
 model CustomerCoupon {
@@ -358,6 +363,12 @@ model Order {
   courierRunId    String?
   courierRun      CourierRun? @relation(fields: [courierRunId], references: [id])
   pickupCode      String?
+  subtotal        Int         @default(0)
+  deliveryFee     Int         @default(0)
+  promoCode       String?
+  promoDiscount   Int         @default(0)
+  loyaltyRedeemed Int         @default(0)
+  loyaltyEarned   Int         @default(0)
   total           Int
   items           OrderItem[]
   payments        Payment[]

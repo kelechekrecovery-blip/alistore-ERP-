@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { sign } from 'jsonwebtoken';
 import { prisma, resetDb, seedProduct } from './helpers';
 
 test('web checkout pays a cart by sandbox card', async ({ page }) => {
@@ -40,6 +41,57 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   });
   expect(order?.pickupCode).toMatch(/^PU-/);
   expect(await prisma.payment.count({ where: { orderId: order?.id, method: 'card' } })).toBe(1);
+});
+
+test('authenticated checkout redeems server loyalty and canonical promo exactly once', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('LOYALTY-E2E');
+  const customer = await prisma.customer.create({ data: { phone: '+996700900725', name: 'Loyalty Buyer' } });
+  await prisma.loyaltyEntry.create({
+    data: { customerId: customer.id, label: 'E2E balance', amount: 725, sourceRef: 'loyalty-e2e-seed' },
+  });
+  const tokens = {
+    accessToken: sign(
+      { sub: customer.id, phone: customer.phone, typ: 'customer' },
+      'dev-secret-alistore-local',
+      { expiresIn: '1h' },
+    ),
+    refreshToken: 'loyalty-e2e-refresh',
+  };
+  await page.addInitScript(({ auth, item }) => {
+    localStorage.setItem('alistore.auth.v1', JSON.stringify(auth));
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  }, { auth: tokens, item: { id: product.id, sku: product.sku, name: product.name, price: product.price } });
+
+  await page.goto('/cart');
+  await page.getByPlaceholder('Введите промокод').fill('ALI10');
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect(page.getByText(/Списать до 725 бонусов/)).toBeVisible();
+  await page.getByRole('button', { name: /Списать до 725 бонусов/ }).click();
+  await expect(page.locator('span:visible').filter({ hasText: '−725 с' }).first()).toBeVisible();
+  await page.getByRole('link', { name: 'Перейти к оформлению' }).click();
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await expect(page.getByPlaceholder('+996 700 12 34 56')).toHaveValue(customer.phone);
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: /Картой/ }).click();
+  await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
+  await expect(page.getByText('Ожидаем оплату')).toBeVisible();
+  await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
+  await expect(page.getByText('Заказ оформлен!')).toBeVisible();
+
+  const order = await prisma.order.findFirstOrThrow({ where: { customerId: customer.id }, orderBy: { createdAt: 'desc' } });
+  expect(order).toMatchObject({
+    subtotal: product.price,
+    promoCode: 'ALI10',
+    promoDiscount: 3000,
+    loyaltyRedeemed: 725,
+    total: product.price - 3725,
+    status: 'paid',
+  });
+  expect(await prisma.loyaltyEntry.count({ where: { orderId: order.id, kind: 'redeem', amount: -725 } })).toBe(1);
+  expect(await prisma.auditEvent.count({ where: { type: 'loyalty.redeemed', refs: { has: order.id } } })).toBe(1);
 });
 
 test('phone checkout preserves the dark Client App handoff theme', async ({ page }) => {

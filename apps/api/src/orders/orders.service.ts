@@ -11,9 +11,19 @@ import { assertTransition } from './order-state-machine';
 import { CreateOrderDto } from './orders.dto';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
+import { earnLoyaltyOnTx, redeemLoyaltyOnTx } from '../customers/loyalty-ledger';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
+const PROMO_DISCOUNTS: Record<string, number> = { SALE5000: 5000, ALI10: 3000 };
+
+interface CanonicalPricing {
+  subtotal: number;
+  deliveryFee: number;
+  promoCode: string | null;
+  promoDiscount: number;
+  loyaltyPoints: number;
+}
 
 function defaultFulfillment(channel: string): string {
   if (channel === 'pos' || channel === 'staff_mobile') return 'store';
@@ -60,7 +70,7 @@ export class OrdersService {
   }
 
   /** Create an order (status `created`) and write order.created to the ledger. */
-  async createFromCatalog(dto: CreateOrderDto, actor: string, idempotencyKey?: string) {
+  async createFromCatalog(dto: CreateOrderDto, actor: string, idempotencyKey?: string, allowLoyalty = false) {
     if (idempotencyKey) {
       const existing = await this.prisma.order.findUnique({
         where: { idempotencyKey },
@@ -94,11 +104,24 @@ export class OrdersService {
       }
       return { sku, qty, price: product.price };
     });
-    const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    return this.create({ ...dto, channel: 'mobile', total, items }, actor, idempotencyKey);
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    const deliveryFee = fulfillmentFee(dto.fulfillmentType);
+    const promoCode = normalizePromo(dto.promoCode);
+    const promoDiscount = promoCode ? Math.min(subtotal, PROMO_DISCOUNTS[promoCode]) : 0;
+    const loyaltyPoints = dto.loyaltyPoints ?? 0;
+    if (loyaltyPoints > 0 && !allowLoyalty) {
+      throw new ConflictError('loyalty_auth_required', 'Списание бонусов доступно только после входа в аккаунт');
+    }
+    const pricing: CanonicalPricing = { subtotal, deliveryFee, promoCode, promoDiscount, loyaltyPoints };
+    return this.create(
+      { ...dto, total: subtotal + deliveryFee - promoDiscount, items },
+      actor,
+      idempotencyKey,
+      pricing,
+    );
   }
 
-  async create(dto: CreateOrderDto, actor: string, idempotencyKey?: string) {
+  async create(dto: CreateOrderDto, actor: string, idempotencyKey?: string, pricing?: CanonicalPricing) {
     const isDemo = this.config?.get<string>('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
     try {
       return await this.audit.transaction(async (tx) => {
@@ -114,7 +137,18 @@ export class OrdersService {
             return { result: existing, events: [] };
           }
         }
-        const order = await tx.order.create({
+        const canonical = pricing ?? {
+          subtotal: dto.total,
+          deliveryFee: 0,
+          promoCode: null,
+          promoDiscount: 0,
+          loyaltyPoints: 0,
+        };
+        if (isDemo && canonical.loyaltyPoints > 0) {
+          throw new ConflictError('demo_loyalty_forbidden', 'Демо-заказ не списывает бонусы');
+        }
+        const baseTotal = canonical.subtotal + canonical.deliveryFee - canonical.promoDiscount;
+        const initialOrder = await tx.order.create({
           data: {
             idempotencyKey,
             isDemo,
@@ -125,7 +159,11 @@ export class OrdersService {
             deliveryAddress: dto.deliveryAddress,
             deliverySlot: dto.deliverySlot,
             pickupCode: pickupCode(),
-            total: dto.total,
+            subtotal: canonical.subtotal,
+            deliveryFee: canonical.deliveryFee,
+            promoCode: canonical.promoCode,
+            promoDiscount: canonical.promoDiscount,
+            total: baseTotal,
             status: 'created',
             items: {
               create: dto.items.map((i) => ({
@@ -138,6 +176,21 @@ export class OrdersService {
           },
           include: { items: true },
         });
+        const events: AuditInput[] = [];
+        const loyaltyRedeemed = await redeemLoyaltyOnTx(tx, {
+          customerId: dto.customerId,
+          orderId: initialOrder.id,
+          requested: canonical.loyaltyPoints,
+          maximum: Math.max(0, canonical.subtotal - canonical.promoDiscount),
+          actor,
+        }, events);
+        const order = loyaltyRedeemed > 0
+          ? await tx.order.update({
+              where: { id: initialOrder.id },
+              data: { loyaltyRedeemed, total: baseTotal - loyaltyRedeemed },
+              include: { items: true },
+            })
+          : initialOrder;
         if (this.outbox && !order.isDemo) {
           await enqueueConsentedCustomerNotice(tx, this.outbox, {
             customerId: order.customerId,
@@ -145,26 +198,32 @@ export class OrdersService {
             payload: { orderId: order.id, channel: order.channel, total: order.total },
           });
         }
+        events.unshift(
+          {
+            type: EventType.OrderCreated,
+            actor,
+            payload: {
+              orderId: order.id,
+              channel: order.channel,
+              fulfillmentType: order.fulfillmentType,
+              pickupPoint: order.pickupPoint,
+              deliveryAddress: order.deliveryAddress,
+              deliverySlot: order.deliverySlot,
+              pickupCode: order.pickupCode,
+              subtotal: order.subtotal,
+              deliveryFee: order.deliveryFee,
+              promoCode: order.promoCode,
+              promoDiscount: order.promoDiscount,
+              loyaltyRedeemed: order.loyaltyRedeemed,
+              total: order.total,
+              isDemo: order.isDemo,
+            },
+            refs: [order.id],
+          },
+        );
         return {
           result: order,
-          events: [
-            {
-              type: EventType.OrderCreated,
-              actor,
-              payload: {
-                orderId: order.id,
-                channel: order.channel,
-                fulfillmentType: order.fulfillmentType,
-                pickupPoint: order.pickupPoint,
-                deliveryAddress: order.deliveryAddress,
-                deliverySlot: order.deliverySlot,
-                pickupCode: order.pickupCode,
-                total: order.total,
-                isDemo: order.isDemo,
-              },
-              refs: [order.id],
-            },
-          ],
+          events,
         };
       });
     } catch (error) {
@@ -235,16 +294,42 @@ export class OrdersService {
   /** Generic guarded status transition (writes an order.* ledger event). */
   async transition(orderId: string, to: OrderStatus, actor: string) {
     return this.audit.transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { id: orderId } });
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          payments: { where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } }, orderBy: { createdAt: 'asc' } },
+          courierRun: true,
+        },
+      });
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
       this.assertNotDemo(order);
       assertTransition(order.status, to);
-      const updated = await tx.order.update({
+      if (to === 'completed') assertOrderMoneyReconciled(order);
+      let updated = await tx.order.update({
         where: { id: orderId },
         data: { status: to },
       });
+      const events: AuditInput[] = [
+        {
+          type: `order.${to}`,
+          actor,
+          payload: { orderId, from: order.status, to },
+          refs: [orderId],
+        },
+      ];
+      if (to === 'completed') {
+        const loyaltyEarned = await earnLoyaltyOnTx(tx, {
+          customerId: order.customerId,
+          orderId,
+          paidTotal: order.total,
+          paymentId: order.payments[0]?.id,
+          actor,
+        }, events);
+        updated = await tx.order.update({ where: { id: orderId }, data: { loyaltyEarned } });
+        await tx.customer.update({ where: { id: order.customerId }, data: { ltv: { increment: order.total } } });
+      }
       if (this.outbox && (to === 'confirmed' || to === 'ready_for_pickup')) {
         await enqueueConsentedCustomerNotice(tx, this.outbox, {
           customerId: order.customerId,
@@ -254,14 +339,7 @@ export class OrdersService {
       }
       return {
         result: updated,
-        events: [
-          {
-            type: `order.${to}`,
-            actor,
-            payload: { orderId, from: order.status, to },
-            refs: [orderId],
-          },
-        ],
+        events,
       };
     });
   }
@@ -355,15 +433,43 @@ export class OrdersService {
         }
       }
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: { status: 'reserved' },
-      });
+      let nextStatus: OrderStatus = 'reserved';
       events.push({
         type: EventType.OrderReserved,
         actor,
         payload: { orderId, assigned: assigned.length },
         refs: [orderId],
+      });
+
+      // A fully loyalty-funded order has no external tender to trigger PaymentsService.
+      // Fulfillment is therefore the authoritative point where its reserved units become
+      // sold and the order becomes paid. No synthetic Payment row is created.
+      if (order.total === 0) {
+        for (const imei of assigned) {
+          await this.units.sellOnTx(tx, imei, order.id);
+          events.push({
+            type: EventType.UnitSold,
+            actor,
+            payload: { orderId, imei, method: 'loyalty' },
+            refs: [orderId, imei],
+          });
+        }
+        await tx.reservation.updateMany({
+          where: { orderId, active: true },
+          data: { active: false },
+        });
+        nextStatus = 'paid';
+        events.push({
+          type: EventType.OrderPaid,
+          actor,
+          payload: { orderId, amount: 0, method: 'loyalty' },
+          refs: [orderId],
+        });
+      }
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: { status: nextStatus },
       });
       return { result: { order: updated, assigned }, events };
     });
@@ -376,5 +482,34 @@ export class OrdersService {
         `Демо-заказ ${order.id} нельзя передавать в оплату, склад или исполнение`,
       );
     }
+  }
+}
+
+function normalizePromo(value?: string): string | null {
+  if (!value?.trim()) return null;
+  const normalized = value.trim().toUpperCase();
+  if (!(normalized in PROMO_DISCOUNTS)) {
+    throw new ValidationError('promo_not_found', 'Промокод не найден или больше не действует');
+  }
+  return normalized;
+}
+
+function fulfillmentFee(type?: string): number {
+  if (type === 'courier') return 200;
+  if (type === 'express') return 400;
+  return 0;
+}
+
+function assertOrderMoneyReconciled(order: {
+  id: string;
+  total: number;
+  payments: { amount: number }[];
+  courierRun: { collectedTotal: number; handedOver: boolean } | null;
+}): void {
+  if (order.total <= 0) return;
+  const received = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const handedOverCod = order.courierRun?.handedOver ? order.courierRun.collectedTotal : 0;
+  if (received + handedOverCod < order.total) {
+    throw new ConflictError('order_money_unreconciled', `Заказ ${order.id} нельзя завершить до сверки оплаты/COD`);
   }
 }

@@ -181,6 +181,23 @@ describe('Gift cards / store credit (integration)', () => {
     expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('reserved');
   });
 
+  it('does not let a customer or guest capability spend a gift card on another customer order', async () => {
+    const owner = await reservedOrder(30000);
+    const attacker = await prisma.customer.create({
+      data: { phone: `+9967055${(++seq).toString().padStart(4, '0')}`, name: 'Attacker' },
+    });
+    const card = await giftcards.issue({ code: 'gc-owner-bound', amount: 30000 }, 'cashier');
+
+    await expect(payments.payForCustomer(attacker.id, {
+      orderId: owner.order.id,
+      method: 'gift_card',
+      amount: 30000,
+      giftCardCode: card.code,
+    }, attacker.id)).rejects.toMatchObject({ code: 'order_not_found' });
+    expect(await prisma.payment.count({ where: { orderId: owner.order.id } })).toBe(0);
+    expect(await prisma.giftCard.findUnique({ where: { code: card.code } })).toMatchObject({ balance: 30000 });
+  });
+
   it('is race-safe: two concurrent redemptions cannot over-draw one card', async () => {
     const a = await reservedOrder(30000);
     const b = await reservedOrder(30000);

@@ -1,9 +1,10 @@
 import { PrismaService } from '../src/prisma/prisma.service';
-import { AuditService } from '../src/audit/audit.service';
+import { AuditInput, AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { ConfigService } from '@nestjs/config';
 import { ConflictError } from '../src/common/errors';
+import { reconcileRefundLoyaltyOnTx } from '../src/customers/loyalty-ledger';
 
 /**
  * Personal account: listByCustomer returns only the caller's orders, newest first.
@@ -28,6 +29,9 @@ describe('Orders by customer (account)', () => {
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
+    await prisma.loyaltyEntry.deleteMany();
+    await prisma.payment.deleteMany();
+    await prisma.reservation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.deviceUnit.deleteMany();
@@ -116,6 +120,137 @@ describe('Orders by customer (account)', () => {
       items: [{ sku: product.sku, qty: 1, price: 1 }],
     }, owner.id, 'native-server-quote-1');
     expect(replay.id).toBe(order.id);
+  });
+
+  it('prices checkout on the server and redeems loyalty exactly once on replay', async () => {
+    const owner = await customer();
+    await prisma.loyaltyEntry.create({
+      data: { customerId: owner.id, label: 'Стартовые бонусы', amount: 1000, sourceRef: 'loyalty-pricing-seed' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: 'LOYALTY-PRICE', name: 'Server priced phone', price: 10000, cost: 8000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei: 'LOYALTY-PRICE-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+    });
+    const input = {
+      customerId: owner.id,
+      channel: 'web' as const,
+      fulfillmentType: 'courier' as const,
+      deliveryAddress: 'Бишкек, Киевская 95',
+      total: 1,
+      promoCode: 'ali10',
+      loyaltyPoints: 700,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    };
+
+    const first = await orders.createFromCatalog(input, owner.id, 'loyalty-price-order', true);
+    const replay = await orders.createFromCatalog(input, owner.id, 'loyalty-price-order', true);
+
+    expect(replay.id).toBe(first.id);
+    expect(first).toMatchObject({
+      subtotal: 10000,
+      deliveryFee: 200,
+      promoCode: 'ALI10',
+      promoDiscount: 3000,
+      loyaltyRedeemed: 700,
+      total: 6500,
+    });
+    expect(await prisma.loyaltyEntry.count({ where: { kind: 'redeem', orderId: first.id } })).toBe(1);
+    const balance = await prisma.loyaltyEntry.aggregate({ where: { customerId: owner.id }, _sum: { amount: true } });
+    expect(balance._sum.amount).toBe(300);
+    expect(await prisma.auditEvent.count({ where: { type: 'loyalty.redeemed', refs: { has: first.id } } })).toBe(1);
+  });
+
+  it('serializes concurrent loyalty redemption for one customer', async () => {
+    const owner = await customer();
+    await prisma.loyaltyEntry.create({
+      data: { customerId: owner.id, label: 'Баланс', amount: 1000, sourceRef: 'loyalty-race-seed' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: 'LOYALTY-RACE', name: 'Race phone', price: 5000, cost: 4000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.createMany({ data: [
+      { imei: 'LOYALTY-RACE-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+      { imei: 'LOYALTY-RACE-2', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+    ] });
+    const create = (key: string) => orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'mobile',
+      total: 1,
+      loyaltyPoints: 800,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, key, true);
+
+    const results = await Promise.allSettled([create('loyalty-race-a'), create('loyalty-race-b')]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(await prisma.loyaltyEntry.count({ where: { customerId: owner.id, kind: 'redeem' } })).toBe(1);
+    const balance = await prisma.loyaltyEntry.aggregate({ where: { customerId: owner.id }, _sum: { amount: true } });
+    expect(balance._sum.amount).toBe(200);
+  });
+
+  it('earns cashback only after reconciled completion and compensates a full refund', async () => {
+    const owner = await customer();
+    await prisma.loyaltyEntry.create({
+      data: { customerId: owner.id, label: 'Баланс', amount: 1000, sourceRef: 'loyalty-refund-seed' },
+    });
+    const order = await orders.create(
+      { customerId: owner.id, channel: 'web', total: 9000, items: [{ sku: 'LOYALTY-REFUND', qty: 1, price: 9000 }] },
+      owner.id,
+      undefined,
+      { subtotal: 10000, deliveryFee: 0, promoCode: null, promoDiscount: 0, loyaltyPoints: 1000 },
+    );
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'ready_for_pickup' } });
+    const payment = await prisma.payment.create({
+      data: { orderId: order.id, amount: 9000, method: 'card', status: 'received', txnId: 'loyalty-refund-payment' },
+    });
+    const completed = await orders.transition(order.id, 'completed', 'staff:test');
+    expect(completed.loyaltyEarned).toBe(90);
+
+    const refund = await prisma.payment.create({
+      data: { orderId: order.id, amount: -9000, method: 'card', status: 'refunded', txnId: 'loyalty-refund-full' },
+    });
+    await new AuditService(prisma).transaction(async (tx) => {
+      const events: AuditInput[] = [];
+      await reconcileRefundLoyaltyOnTx(tx, {
+        order: { ...completed, customerId: owner.id },
+        refundPaymentId: refund.id,
+        actor: 'staff:test',
+      }, events);
+      return { result: null, events };
+    });
+
+    expect(await prisma.loyaltyEntry.findUnique({ where: { sourceRef: `loyalty:earn:${order.id}` } })).toMatchObject({ amount: 90, paymentId: payment.id });
+    expect(await prisma.loyaltyEntry.findUnique({ where: { sourceRef: `loyalty:refund-restore:${refund.id}` } })).toMatchObject({ amount: 1000 });
+    expect(await prisma.loyaltyEntry.findUnique({ where: { sourceRef: `loyalty:refund-clawback:${refund.id}` } })).toMatchObject({ amount: -90 });
+  });
+
+  it('fulfills a fully loyalty-funded order without a synthetic payment', async () => {
+    const owner = await customer();
+    await prisma.loyaltyEntry.create({
+      data: { customerId: owner.id, label: 'Баланс', amount: 5000, sourceRef: 'loyalty-zero-seed' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: 'LOYALTY-ZERO', name: 'Bonus phone', price: 5000, cost: 4000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei: 'LOYALTY-ZERO-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+    });
+    const order = await orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      total: 1,
+      loyaltyPoints: 5000,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, 'loyalty-zero-order', true);
+
+    expect(order.total).toBe(0);
+    const fulfilled = await orders.fulfill(order.id, 'staff:test');
+    expect(fulfilled.order.status).toBe('paid');
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: 'LOYALTY-ZERO-1' } })).toMatchObject({ status: 'sold', orderId: order.id });
+    expect(await prisma.auditEvent.count({ where: { type: 'order.paid', refs: { has: order.id } } })).toBe(1);
   });
 
   it('rejects native checkout when catalog stock is insufficient', async () => {

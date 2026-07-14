@@ -4,7 +4,6 @@
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
 - Close remaining native Android release certification: final Client provider/device smoke; Staff physical FCM/scanner/camera certification; Courier live FCM and physical maps/camera/network certification; POS physical ESC/POS printer, scanner and bank-terminal certification.
-- Make loyalty earning and checkout redemption server-authoritative: validate available balance under a row lock, write atomic debit/credit entries with order/payment references, prevent replay/double spend, remove the web cart's fixed demo balance and add reconciliation E2E.
 - Close native iOS feature parity in vertical flows: Client OTP/cart/checkout/account; Staff queues/scanner/shift; Courier delivery/COD; POS ticket/split payment/approval/offline replay.
 - Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
 - Complete the new Redis/Meilisearch runtime with a live Docker/staging smoke, automatic index bootstrap and idempotent product reindex jobs.
@@ -22,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Make loyalty earning, checkout redemption and refund compensation server-authoritative: lock each customer ledger, atomically debit/credit order-linked entries, reject overspend and replay, derive promo/price totals on the server, remove fixed web balances and cover authenticated checkout plus reconciliation in API/browser E2E.
 - Complete Android Courier Evidence and push routing: courier-staff JWT photo/gallery uploads into the private order Evidence Vault, transactional assignment outbox notification, FCM token rotation/notification channel, scoped delivery deep links and API 36 Compose verification.
 - Complete the Android POS software vertical: server-bound shifts, keyboard/camera SKU/IMEI scanning, exact serialized-unit sale, queued approval recovery with stable idempotency, server-rendered ESC/POS receipt, payment lookup, return workflow, approval-gated refund and atomic idempotent exchange.
 - Replace the Android POS placeholder with a secure counter-sale vertical: cashier JWT ownership, live catalog/cart, server-canonical price/SKU validation, discount approval retry, cash/card/MBank split tender, stable sale idempotency, isolated SQLite/WorkManager replay and API 36 Compose coverage.

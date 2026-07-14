@@ -17,6 +17,9 @@ export default function MobileCart() {
     promoCode,
     promoDiscount,
     bonusApplied,
+    bonusBalance,
+    bonusLoading,
+    bonusError,
     bonusDiscount,
     setQty,
     remove,
@@ -116,6 +119,7 @@ export default function MobileCart() {
                 <button
                   type="button"
                   onClick={toggleBonus}
+                  disabled={bonusLoading || bonusBalance <= 0}
                   className="mt-2 flex w-full items-center gap-2.5 rounded-[11px] border border-[#2E2822] bg-[#221E19] p-3 text-left"
                 >
                   <span
@@ -125,9 +129,10 @@ export default function MobileCart() {
                   >
                     {bonusApplied ? '✓' : ''}
                   </span>
-                  <span className="text-[13px] text-[#D8CFC6]">Списать бонусы</span>
-                  <span className="ml-auto text-[12px] text-lime">{bonusApplied ? `−${som(bonusDiscount)}` : 'доступно'}</span>
+                  <span className="text-[13px] text-[#D8CFC6]">{bonusLoading ? 'Проверяем бонусы…' : `Списать до ${bonusBalance.toLocaleString('ru-RU')}`}</span>
+                  <span className="ml-auto text-[12px] text-lime">{bonusApplied ? `−${som(bonusDiscount)}` : bonusBalance > 0 ? 'доступно' : 'войдите'}</span>
                 </button>
+                {bonusError && <div className="mt-1.5 text-[11px] text-coral">{bonusError}</div>}
 
                 {/* totals */}
                 <div className="mt-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">

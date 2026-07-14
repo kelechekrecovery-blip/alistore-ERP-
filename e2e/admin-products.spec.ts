@@ -6,7 +6,7 @@ test('admin manages products with AI enrichment and approval-gated danger action
   const { username, password } = await seedStaffCredentials('owner', 'e2e-products');
 
   const sku = `UI-PRODUCT-${Date.now().toString(36)}`.toUpperCase();
-  await page.goto('/admin/products');
+  await page.goto('/admin/products', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('username').fill(username);
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();

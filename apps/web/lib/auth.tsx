@@ -22,6 +22,7 @@ import {
   type AuthTokens,
   type AuthUser,
 } from './api';
+import { ApiError } from './api/http';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -78,15 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const me = await authMe(stored.accessToken);
           if (!cancelled) setUser(me);
-        } catch {
-          // access expired → try one refresh
-          try {
-            const fresh = await authRefresh(stored.refreshToken);
-            persist(fresh);
-            const me = await authMe(fresh.accessToken);
-            if (!cancelled) setUser(me);
-          } catch {
-            persist(null);
+        } catch (error) {
+          // Only an actual authentication failure consumes the refresh token. A
+          // validation, server, or network error must not silently log the user out.
+          if (error instanceof ApiError && error.status === 401) {
+            try {
+              const fresh = await authRefresh(stored.refreshToken);
+              persist(fresh);
+              const me = await authMe(fresh.accessToken);
+              if (!cancelled) setUser(me);
+            } catch {
+              persist(null);
+            }
           }
         }
       }
@@ -147,7 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!stored) throw new Error('not-authenticated');
       try {
         return await fn(stored.accessToken);
-      } catch {
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401) throw error;
         const fresh = await authRefresh(stored.refreshToken).catch(() => null);
         if (!fresh) {
           persist(null);

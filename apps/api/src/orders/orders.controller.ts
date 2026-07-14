@@ -24,7 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, TransitionDto } from './orders.dto';
+import { CreateMyOrderDto, CreateOrderDto, TransitionDto } from './orders.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
@@ -61,12 +61,13 @@ export class OrdersController {
   createMine(
     @CurrentUser() user: AuthPrincipal,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() dto: CreateOrderDto,
+    @Body() dto: CreateMyOrderDto,
   ) {
     return this.orders.createFromCatalog(
-      { ...dto, customerId: user.customerId, channel: 'mobile' },
+      { ...dto, customerId: user.customerId, channel: dto.channel === 'web' ? 'web' : 'mobile' },
       user.customerId,
       idempotencyKey,
+      true,
     );
   }
 
@@ -140,7 +141,7 @@ export class OrdersController {
     @Body() dto: CreateOrderDto,
   ) {
     const guest = requireGuestCapability(capability, 'orders:create', dto.customerId);
-    return this.orders.create(dto, `guest:${guest.sub}`, idempotencyKey);
+    return this.orders.createFromCatalog(dto, `guest:${guest.sub}`, idempotencyKey, false);
   }
 
   @ApiOperation({

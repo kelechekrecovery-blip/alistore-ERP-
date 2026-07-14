@@ -1,6 +1,18 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000/api';
 
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+async function responseError(res: Response): Promise<ApiError> {
+  const detail = await res.json().catch(() => ({}));
+  return new ApiError(res.status, (detail as { message?: string }).message ?? `request failed ${res.status}`);
+}
+
 /** POST JSON and unwrap the response, surfacing the API's error message on failure. */
 export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -8,10 +20,7 @@ export async function postJson<T>(path: string, body: unknown, headers?: Record<
     headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
-  }
+  if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }
 
@@ -31,10 +40,7 @@ export async function postAuthJson<T>(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
-  }
+  if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }
 
@@ -52,10 +58,7 @@ export async function patchAuthJson<T>(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
-  }
+  if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }
 
@@ -73,10 +76,7 @@ export async function putAuthJson<T>(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
-  }
+  if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }
 
@@ -94,10 +94,7 @@ export async function deleteAuthJson<T>(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error((detail as { message?: string }).message ?? `request failed ${res.status}`);
-  }
+  if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }
 
@@ -107,6 +104,6 @@ export async function getJson<T>(path: string, accessToken: string): Promise<T> 
     headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`request failed ${res.status}`);
+  if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }

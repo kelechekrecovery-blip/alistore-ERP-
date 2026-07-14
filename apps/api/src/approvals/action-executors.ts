@@ -4,6 +4,7 @@ import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { canTransition } from '../orders/order-state-machine';
 import { insertDebt } from '../debts/debt-insert';
+import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
 
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
@@ -63,6 +64,13 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   });
   if (original.orderId) {
     const order = await tx.order.findUnique({ where: { id: original.orderId } });
+    if (order) {
+      await reconcileRefundLoyaltyOnTx(tx, {
+        order,
+        refundPaymentId: compensating.id,
+        actor: approver,
+      }, events);
+    }
     if (order && canTransition(order.status, 'refunded')) {
       await tx.order.update({ where: { id: order.id }, data: { status: 'refunded' } });
       events.push({

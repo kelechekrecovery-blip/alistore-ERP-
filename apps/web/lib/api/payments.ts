@@ -36,6 +36,15 @@ export function createPaymentIntent(input: {
   });
 }
 
+export function createMyPaymentIntent(input: {
+  orderId: string;
+  method: OnlinePaymentMethod;
+  amount: number;
+  returnUrl?: string;
+}, accessToken: string, idempotencyKey: string): Promise<PaymentIntent> {
+  return postAuthJson('/payments/intents/mine', input, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
 export function confirmSandboxPayment(input: {
   orderId: string;
   method: OnlinePaymentMethod;
@@ -51,8 +60,9 @@ export function payOrder(input: {
   amount: number;
   txnId?: string;
   giftCardCode?: string;
-}): Promise<PaymentConfirmResult> {
-  return postJson('/payments', input);
+}, authorization: { accessToken?: string; guestCapability?: string }): Promise<PaymentConfirmResult> {
+  if (authorization.accessToken) return postAuthJson('/payments', input, authorization.accessToken);
+  return postJson('/payments', input, { 'x-guest-capability': authorization.guestCapability ?? '' });
 }
 
 export function requestPaymentRefund(

@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 
 const CHANNELS = ['web', 'app', 'mobile', 'staff_mobile', 'pos', 'telegram'] as const;
 const FULFILLMENT_TYPES = ['pickup', 'courier', 'express', 'store'] as const;
@@ -64,6 +64,17 @@ export class CreateOrderDto {
   @ApiProperty({ minimum: 0, example: 109900 })
   @IsInt() @Min(0) total!: number;
 
+  @ApiPropertyOptional({ example: 'SALE5000' })
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
+
+  @ApiPropertyOptional({ minimum: 0, example: 4820, description: 'Authenticated checkout only; validated against the server ledger.' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  loyaltyPoints?: number;
+
   @ApiProperty({ type: () => [OrderItemDto] })
   @IsArray()
   @ArrayMinSize(1)
@@ -71,6 +82,9 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   items!: OrderItemDto[];
 }
+
+/** Customer identity is always derived from JWT on `/orders/mine`. */
+export class CreateMyOrderDto extends OmitType(CreateOrderDto, ['customerId'] as const) {}
 
 export class TransitionDto {
   @ApiProperty({ enum: OrderStatus, example: OrderStatus.paid })

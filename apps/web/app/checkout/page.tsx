@@ -9,6 +9,8 @@ import { som } from '@/lib/format';
 import {
   confirmSandboxPayment,
   createCustomer,
+  createMyOrder,
+  createMyPaymentIntent,
   createOrder,
   createPaymentIntent,
   fetchMyAddresses,
@@ -104,29 +106,45 @@ export default function CheckoutPage() {
   async function place() {
     setBusy(true); setError(null);
     try {
-      const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
-      const order = await createOrder({
-        customerId: customer.id,
+      const orderInput = {
         channel: 'web',
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
         pickupPoint: delivery === 'pickup' ? pickupPoint : undefined,
         deliveryAddress: delivery !== 'pickup' ? address?.text : undefined,
         deliverySlot: delivery === 'pickup' ? selectedPickupPoint.meta : DELIVERY.find((d) => d.id === delivery)?.meta,
         total: payable,
+        promoCode: promoCode ?? undefined,
+        loyaltyPoints: user ? bonusDiscount : undefined,
         items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })),
-      }, customer.guestCapability, crypto.randomUUID());
+      } as const;
+      const orderKey = crypto.randomUUID();
+      let guestCapability: string | null = null;
+      let order: CreatedOrder;
+      if (user) {
+        order = await authed((token) => createMyOrder(orderInput, token, orderKey));
+      } else {
+        const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
+        guestCapability = customer.guestCapability;
+        order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
+      }
+      const serverTotal = order.total;
+      const serverGiftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, serverTotal) : 0;
+      const serverDue = Math.max(serverTotal - serverGiftAmount, 0);
       let currentOrder: CreatedOrder = order;
-      if (giftCard && giftAmount > 0) {
-        const paid = await payOrder({
+      if (giftCard && serverGiftAmount > 0) {
+        const giftPayment = {
           orderId: order.id,
           method: 'gift_card',
-          amount: giftAmount,
+          amount: serverGiftAmount,
           giftCardCode: giftCard.code,
-        });
+        } as const;
+        const paid = user
+          ? await authed((token) => payOrder(giftPayment, { accessToken: token }))
+          : await payOrder(giftPayment, { guestCapability: guestCapability! });
         currentOrder = { ...order, status: paid.order?.status ?? order.status };
       }
-      if (dueAfterGift === 0) {
-        setDone({ order: currentOrder, paid: true });
+      if (serverDue === 0) {
+        setDone({ order: currentOrder, paid: currentOrder.status === 'paid' });
         clear();
         return;
       }
@@ -135,14 +153,19 @@ export default function CheckoutPage() {
         clear();
         return;
       }
-      const intent = await createPaymentIntent({
+      const intentInput = {
         orderId: order.id,
         method: payment,
-        amount: dueAfterGift,
-        actor: 'web_checkout',
-      }, customer.guestCapability, crypto.randomUUID());
+        amount: serverDue,
+      } as const;
+      const intentKey = crypto.randomUUID();
+      const intent = user
+        ? await authed((token) => createMyPaymentIntent(intentInput, token, intentKey))
+        : await createPaymentIntent({ ...intentInput, actor: 'web_checkout' }, guestCapability!, intentKey);
       setDone({ order: { ...currentOrder, status: intent.orderStatus }, intent });
-    } catch { setError('Не удалось оформить заказ.'); } finally { setBusy(false); }
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Не удалось оформить заказ.');
+    } finally { setBusy(false); }
   }
 
   async function confirmPayment() {

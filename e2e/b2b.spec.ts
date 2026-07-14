@@ -16,7 +16,7 @@ test('business buyer submits an invoice quote request from the catalog', async (
   await page.addInitScript((auth) => {
     localStorage.setItem('alistore.auth.v1', JSON.stringify(auth));
   }, tokens);
-  await page.goto('/b2b');
+  await page.goto('/b2b', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText('AliStore для бизнеса')).toBeVisible();
 
   await page.getByTestId('b2b-company').fill('ОсОО E2E Business');

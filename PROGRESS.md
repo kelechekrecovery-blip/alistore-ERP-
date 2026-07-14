@@ -1201,3 +1201,12 @@
 - Checks run: API build; web production build; capability and public-rate-limit Jest 6/6; Playwright desktop/phone checkout 2/2; Telegram Mini App checkout 1/1; `git diff --check`.
 - Outcome: valid checkout and Telegram flows remain green; missing/tampered/wrong-owner capabilities fail closed in the capability contract. Support, warranty, trade-in and Evidence entity ownership remain the next Phase 0 security iteration.
 - Next step: extend capability scopes and server-side ownership checks to support, warranty, trade-in and Evidence Vault before generating managed-cloud deployment manifests.
+
+## 2026-07-14
+
+- Task: make loyalty checkout, earning and refund compensation server-authoritative.
+- Files changed: Prisma loyalty/order schema and migration, customer loyalty ledger, order/payment/approval services and guards, web cart/account/checkout API clients and session error handling, API/browser regressions, readiness/gap-map/backlog documentation.
+- Result: checkout now calculates canonical catalog prices, delivery fees and promo discounts on the API; authenticated orders redeem points atomically under a per-customer PostgreSQL advisory lock, completion earns one percent exactly once, and refunds restore redeemed points while clawing back earned points. Gift-card and payment paths are owner-scoped, the web no longer exposes a fixed demo balance, and zero-total loyalty orders complete without creating a fake payment.
+- Checks run: Prisma schema validation/generation and isolated test DB reset; targeted loyalty/payment/IDOR Jest; API and Next production builds; targeted Playwright; full `npm run mvp:verify`; `git diff --check`.
+- Outcome: full gate passed with 110/110 API suites and 428/428 tests, 23/23 Playwright flows, API/Web builds and mobile typecheck. External readiness correctly remains blocked by 12 credential/manual certification groups and no certification flag was claimed.
+- Next step: close the remaining native iOS Staff support/task/push parity, then implement the complete iOS Courier vertical.
