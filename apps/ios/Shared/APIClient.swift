@@ -70,6 +70,23 @@ public actor APIClient {
         return try await request(path, method: "POST", token: token, body: encoded, idempotencyKey: idempotencyKey, as: type)
     }
 
+    public func postEncoded<Response: Decodable & Sendable>(
+        _ path: String,
+        body: Data,
+        token: String,
+        idempotencyKey: String,
+        as type: Response.Type = Response.self
+    ) async throws -> Response {
+        try await request(
+            path,
+            method: "POST",
+            token: token,
+            body: body,
+            idempotencyKey: idempotencyKey,
+            as: type
+        )
+    }
+
     public func postNoContent<Body: Encodable & Sendable>(
         _ path: String,
         body: Body,

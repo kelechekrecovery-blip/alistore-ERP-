@@ -88,6 +88,8 @@ targets:
         CFBundleDisplayName: AliStore Courier
         UILaunchScreen: {}
         API_BASE_URL: $(API_BASE_URL)
+        NSCameraUsageDescription: Фото подтверждения доставки для Evidence Vault
+        NSPhotoLibraryUsageDescription: Выбор фото подтверждения доставки
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.courier
             CFBundleURLSchemes: [alistore-courier]
@@ -98,6 +100,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.courier
         PRODUCT_NAME: AliStoreCourier
         TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: Courier/Courier.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
       configs:
         Release:

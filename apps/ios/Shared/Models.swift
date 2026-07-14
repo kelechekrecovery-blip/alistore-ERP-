@@ -444,3 +444,68 @@ public struct SupportTransitionRequest: Encodable, Sendable {
 public struct EmptyMutationRequest: Encodable, Sendable {
     public init() {}
 }
+
+public struct CourierCustomer: Decodable, Sendable {
+    public let name: String
+    public let phone: String
+}
+
+public struct CourierPayment: Decodable, Sendable {
+    public let amount: Int
+    public let status: String
+}
+
+public struct CourierRunSummary: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let codTotal: Int
+    public let collectedTotal: Int
+    public let handedOver: Bool
+}
+
+public struct CourierDelivery: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let status: String
+    public let total: Int
+    public let deliveryAddress: String?
+    public let deliverySlot: String?
+    public let customer: CourierCustomer
+    public let items: [CustomerOrderItem]
+    public let payments: [CourierPayment]
+    public let courierRun: CourierRunSummary?
+
+    public var outstandingCOD: Int {
+        let settled = payments
+            .filter { $0.status == "received" || $0.status == "reconciled" }
+            .reduce(0) { $0 + max(0, $1.amount) }
+        return max(0, total - settled)
+    }
+}
+
+public struct CompleteCourierDeliveryRequest: Codable, Sendable {
+    public let codAmount: Int
+    public init(codAmount: Int) { self.codAmount = codAmount }
+}
+
+public struct FailCourierDeliveryRequest: Codable, Sendable {
+    public let reason: String
+    public init(reason: String) { self.reason = reason }
+}
+
+public struct CourierCommandResponse: Decodable, Sendable {
+    public let id: String?
+    public let orderId: String?
+    public let status: String
+    public let recorded: Bool?
+}
+
+public struct CourierHandoverRequest: Encodable, Sendable {
+    public let runId: String
+    public let amount: Int
+    public let reason: String?
+
+    public init(runId: String, amount: Int, reason: String? = nil) {
+        self.runId = runId
+        self.amount = amount
+        self.reason = reason
+    }
+}

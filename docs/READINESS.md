@@ -4,11 +4,11 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **34 миграции**
-- **110 API test suites / 428 тестов — зелёные** (`jest`)
+- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **35 миграций**
+- **111 API test suites / 433 теста — зелёные** (`jest`)
 - **23 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle, customer account synchronization, server-authoritative loyalty checkout и exact desktop customer routes (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
-- Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API tests pass **20/20** on iPhone 17 Pro Simulator. iOS Staff has real staff-JWT orders, shifts, scanner/Evidence, Customer 360, support/warranty, assigned tasks and APNs/deep-link routing. Android unit test/Lint and the Client/Staff/Courier/POS Compose UI suite pass on API 36. Android Staff, Courier and POS have their shared ERP/API software flows. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
+- Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **23/23** on iPhone 17 Pro Simulator; Courier installs and launches on that simulator. iOS Staff and Courier have real staff-JWT operations, Evidence, offline recovery and APNs/deep-link routing. Android four-APK build, unit tests and Lint pass after the shared stable COD handover-key extension. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
 
 Легенда: ✅ готово · 🟡 частично · ⛔ ждёт внешних доступов (ключи/аккаунты/железо)
@@ -70,7 +70,7 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest                 # 110 suites / 428 тестов ✓
+cd apps/api && npx jest                 # 111 suites / 433 теста ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (37 роутов)
 npm run e2e                           # 23/23 ✓

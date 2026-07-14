@@ -85,6 +85,81 @@ public enum OfflineOrderQueue {
     }
 }
 
+public enum OfflineCourierQueue {
+    @MainActor
+    public static func enqueue<Body: Encodable>(
+        endpoint: String,
+        body: Body,
+        idempotencyKey: String,
+        context: ModelContext
+    ) throws {
+        let encoded = try JSONEncoder().encode(body)
+        try enqueueEncoded(endpoint: endpoint, body: encoded, idempotencyKey: idempotencyKey, context: context)
+    }
+
+    @MainActor
+    public static func enqueueEncoded(
+        endpoint: String,
+        body: Data,
+        idempotencyKey: String,
+        context: ModelContext
+    ) throws {
+        let descriptor = FetchDescriptor<PendingMutation>(
+            predicate: #Predicate { $0.idempotencyKey == idempotencyKey }
+        )
+        if try !context.fetch(descriptor).isEmpty { return }
+        context.insert(PendingMutation(
+            endpoint: endpoint,
+            method: "POST",
+            body: body,
+            idempotencyKey: idempotencyKey
+        ))
+        try context.save()
+    }
+
+    @MainActor
+    public static func replay(
+        _ mutation: PendingMutation,
+        api: APIClient,
+        token: String,
+        context: ModelContext
+    ) async {
+        mutation.state = "syncing"
+        mutation.attempts += 1
+        mutation.updatedAt = Date()
+        try? context.save()
+        do {
+            let _: IgnoredMutationResponse = try await api.postEncoded(
+                mutation.endpoint,
+                body: mutation.body,
+                token: token,
+                idempotencyKey: mutation.idempotencyKey
+            )
+            context.delete(mutation)
+            try context.save()
+        } catch let error as APIError {
+            if case let .rejected(status, message) = error {
+                mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
+                mutation.lastError = message
+            } else {
+                mutation.state = "failed"
+                mutation.lastError = error.localizedDescription
+            }
+            mutation.updatedAt = Date()
+            try? context.save()
+        } catch {
+            mutation.state = "queued"
+            mutation.lastError = error.localizedDescription
+            mutation.updatedAt = Date()
+            try? context.save()
+        }
+    }
+}
+
+private struct IgnoredMutationResponse: Decodable, Sendable {
+    init(from decoder: Decoder) throws {}
+}
+
 @MainActor
 public enum OfflineStore {
     public static func container() -> ModelContainer {

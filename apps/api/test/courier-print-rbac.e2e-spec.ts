@@ -109,6 +109,7 @@ describe('Courier and print/export RBAC', () => {
     await request(app.getHttpServer())
       .post('/courier/handover')
       .set('Authorization', `Bearer ${sellerToken}`)
+      .set('Idempotency-Key', `seller-handover-${RUN}`)
       .send({ runId: run.body.id, amount: 1000 })
       .expect(403);
 
@@ -116,7 +117,29 @@ describe('Courier and print/export RBAC', () => {
       .post('/courier/handover')
       .set('Authorization', `Bearer ${cashierToken}`)
       .send({ runId: run.body.id, amount: 1000 })
+      .expect(400);
+
+    const handoverKey = `cashier-handover-${RUN}`;
+    await request(app.getHttpServer())
+      .post('/courier/handover')
+      .set('Authorization', `Bearer ${secondCourierToken}`)
+      .set('Idempotency-Key', handoverKey)
+      .send({ runId: run.body.id, amount: 1000 })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/courier/handover')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .set('Idempotency-Key', handoverKey)
+      .send({ runId: run.body.id, amount: 1000 })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/courier/handover')
+      .set('Authorization', `Bearer ${secondCourierToken}`)
+      .set('Idempotency-Key', handoverKey)
+      .send({ runId: run.body.id, amount: 1000 })
+      .expect(403);
 
     const handover = await prisma.auditEvent.findFirst({ where: { type: 'cash.handover' } });
     expect(handover?.actor).toBe(cashierId);

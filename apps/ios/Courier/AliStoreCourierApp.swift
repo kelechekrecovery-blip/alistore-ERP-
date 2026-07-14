@@ -1,47 +1,61 @@
 import AliStoreCore
 import SwiftData
 import SwiftUI
+import UIKit
+import UserNotifications
+
+extension Notification.Name {
+    static let courierAPNsToken = Notification.Name("alistore.courier.apns.token")
+    static let courierAPNsFailure = Notification.Name("alistore.courier.apns.failure")
+    static let courierNotificationRoute = Notification.Name("alistore.courier.notification.route")
+}
+
+final class CourierAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(name: .courierAPNsToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .courierAPNsFailure, object: error.localizedDescription)
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let raw = response.notification.request.content.userInfo["deepLink"] as? String,
+              let url = URL(string: raw) else { return }
+        NotificationCenter.default.post(name: .courierNotificationRoute, object: url)
+    }
+}
 
 @main
 struct AliStoreCourierApp: App {
+    @UIApplicationDelegateAdaptor(CourierAppDelegate.self) private var appDelegate
     @State private var auth = StaffAuthStore(environment: .live(), keychainService: "kg.alistore.courier")
 
     var body: some Scene {
         WindowGroup {
             if let session = auth.session {
-                CourierRootView(session: session, logout: auth.logout)
+                if session.role == "courier" {
+                    CourierRootView(session: session, logout: auth.logout)
+                } else {
+                    ContentUnavailableView(
+                        "Нет доступа курьера",
+                        systemImage: "person.crop.circle.badge.xmark",
+                        description: Text("Войдите под активной учётной записью с ролью courier.")
+                    )
+                    .safeAreaInset(edge: .bottom) {
+                        Button("Выйти", role: .destructive, action: auth.logout).padding()
+                    }
+                }
             } else {
                 StaffLoginView(auth: auth, title: "AliStore Courier")
             }
         }
         .modelContainer(OfflineStore.container())
-    }
-}
-
-private struct CourierRootView: View {
-    let session: StaffSession
-    let logout: () -> Void
-
-    var body: some View {
-        TabView {
-            NavigationStack {
-                List {
-                    NativeStatusCard(title: "Маршрут", value: "Назначенные доставки", symbol: "map", tint: .blue)
-                    NativeStatusCard(title: "Следующая точка", value: "Ожидает синхронизации", symbol: "location", tint: .orange)
-                }
-                .navigationTitle("Доставки")
-            }
-            .tabItem { Label("Маршрут", systemImage: "map") }
-            EmptyStateView(title: "COD не принят", detail: "Сданные наличные и расхождения появятся здесь.", symbol: "banknote")
-                .tabItem { Label("COD", systemImage: "banknote") }
-            NavigationStack {
-                Form {
-                    LabeledContent("Курьер", value: session.username)
-                    Button("Выйти", role: .destructive, action: logout)
-                }
-                .navigationTitle("Профиль")
-            }
-            .tabItem { Label("Профиль", systemImage: "person") }
-        }
     }
 }

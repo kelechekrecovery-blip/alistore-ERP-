@@ -50,5 +50,5 @@ private class FakeCourierGateway(private val failure: Exception) : CourierGatewa
   override suspend fun startDelivery(orderId: String, token: String, idempotencyKey: String): CourierDelivery = throw failure
   override suspend fun completeDelivery(orderId: String, codAmount: Int, token: String, idempotencyKey: String): CourierDelivery = throw failure
   override suspend fun failDelivery(orderId: String, reason: String, token: String, idempotencyKey: String) = throw failure
-  override suspend fun handoverCourierRun(runId: String, amount: Int, token: String): CourierRunSummary = throw failure
+  override suspend fun handoverCourierRun(runId: String, amount: Int, token: String, idempotencyKey: String): CourierRunSummary = throw failure
 }

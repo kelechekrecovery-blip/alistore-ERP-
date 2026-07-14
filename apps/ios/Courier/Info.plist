@@ -38,6 +38,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Фото подтверждения доставки для Evidence Vault</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Выбор фото подтверждения доставки</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

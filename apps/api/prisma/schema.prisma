@@ -671,13 +671,16 @@ model TradeInDevice {
 }
 
 model CourierRun {
-  id             String   @id @default(cuid())
-  courierId      String
-  codTotal       Int // COD не сдан >24ч → Risk
-  handedOver     Boolean  @default(false)
-  collectedTotal Int      @default(0)
-  orders         Order[]
-  createdAt      DateTime @default(now())
+  id                     String   @id @default(cuid())
+  courierId              String
+  codTotal               Int // COD не сдан >24ч → Risk
+  handedOver             Boolean  @default(false)
+  collectedTotal         Int      @default(0)
+  handoverIdempotencyKey String?  @unique
+  handoverAmount         Int?
+  handoverReason         String?
+  orders                 Order[]
+  createdAt              DateTime @default(now())
 
   @@index([courierId])
   @@index([handedOver])

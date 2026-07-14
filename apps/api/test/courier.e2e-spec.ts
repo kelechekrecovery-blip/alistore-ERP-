@@ -62,7 +62,7 @@ describe('Courier COD handover (integration)', () => {
   it('reconciles an exact handover to diff 0 without a shortage', async () => {
     const staff = await createCourier();
     const run = await courier.createRun({ courierId: staff.id, codTotal: 154900 }, 'dispatcher');
-    const settled = await courier.handover({ runId: run.id, amount: 154900 }, 'cashier');
+    const settled = await courier.handover({ runId: run.id, amount: 154900 }, 'cashier', undefined, `handover-exact-${run.id}`);
     expect(settled.handedOver).toBe(true);
     expect(settled.diff).toBe(0);
     const shortage = await prisma.auditEvent.findFirst({
@@ -76,7 +76,7 @@ describe('Courier COD handover (integration)', () => {
     const run = await courier.createRun({ courierId: staff.id, codTotal: 154900 }, 'dispatcher');
 
     const err = await courier
-      .handover({ runId: run.id, amount: 150000 }, 'cashier')
+      .handover({ runId: run.id, amount: 150000 }, 'cashier', undefined, `handover-missing-reason-${run.id}`)
       .catch((e) => e);
     expect(err).toBeInstanceOf(ValidationError);
     expect(err.getStatus()).toBe(422);
@@ -85,6 +85,8 @@ describe('Courier COD handover (integration)', () => {
     const settled = await courier.handover(
       { runId: run.id, amount: 150000, reason: 'клиент доплатил картой' },
       'cashier',
+      undefined,
+      `handover-short-${run.id}`,
     );
     expect(settled.diff).toBe(-4900);
     const shortage = await prisma.auditEvent.findFirst({
@@ -93,11 +95,17 @@ describe('Courier COD handover (integration)', () => {
     expect(shortage).not.toBeNull();
   });
 
-  it('cannot hand over the same run twice (409)', async () => {
+  it('replays the same handover key and rejects a different one', async () => {
     const staff = await createCourier();
     const run = await courier.createRun({ courierId: staff.id, codTotal: 0 }, 'dispatcher');
-    await courier.handover({ runId: run.id, amount: 0 }, 'cashier');
-    const err = await courier.handover({ runId: run.id, amount: 0 }, 'cashier').catch((e) => e);
+    const key = `handover-replay-${run.id}`;
+    const [first, replay] = await Promise.all([
+      courier.handover({ runId: run.id, amount: 0 }, 'cashier', undefined, key),
+      courier.handover({ runId: run.id, amount: 0 }, 'cashier', undefined, key),
+    ]);
+    expect(replay).toMatchObject({ id: first.id, handedOver: true, diff: 0 });
+    expect(await prisma.auditEvent.count({ where: { type: 'cash.handover', refs: { has: run.id } } })).toBe(1);
+    const err = await courier.handover({ runId: run.id, amount: 0 }, 'cashier', undefined, `${key}-other`).catch((e) => e);
     expect(err).toBeInstanceOf(ConflictError);
     expect(err.getStatus()).toBe(409);
     expect(err.code).toBe('cod_already_handed_over');
@@ -171,7 +179,7 @@ describe('Courier COD handover (integration)', () => {
     expect(await prisma.auditEvent.count({ where: { type: 'delivery.out', refs: { has: order.id } } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'delivery.delivered', refs: { has: order.id } } })).toBe(1);
 
-    const settled = await courier.handover({ runId: run.id, amount: 2500 }, 'cashier');
+    const settled = await courier.handover({ runId: run.id, amount: 2500 }, 'cashier', undefined, `handover-delivery-${run.id}`);
     expect(settled).toMatchObject({ handedOver: true, collectedTotal: 2500, diff: 0 });
   });
 

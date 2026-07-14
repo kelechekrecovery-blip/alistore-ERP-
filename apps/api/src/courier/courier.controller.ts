@@ -97,8 +97,17 @@ export class CourierController {
   })
   @Post('handover')
   @RequirePermission('courier', 'handover')
-  handover(@CurrentUser() user: AuthPrincipal, @Body() dto: HandoverDto) {
-    return this.courier.handover(dto, user.customerId, user.role === 'courier' ? user.customerId : undefined);
+  handover(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: HandoverDto,
+  ) {
+    return this.courier.handover(
+      dto,
+      user.customerId,
+      user.role === 'courier' ? user.customerId : undefined,
+      requireIdempotencyKey(key),
+    );
   }
 }
 

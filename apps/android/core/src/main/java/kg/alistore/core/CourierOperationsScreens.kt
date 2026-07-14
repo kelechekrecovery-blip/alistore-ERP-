@@ -421,7 +421,7 @@ private fun CourierCod(
           Text("Рейс ${run.id.takeLast(6)}", color = Color.White, fontWeight = FontWeight.Bold)
           Text("Собрано ${run.collectedTotal} из ${run.codTotal} сом", color = CourierMuted, modifier = Modifier.padding(top = 5.dp))
           if (!run.handedOver) Button(
-            onClick = { scope.launch { runCatching { api.handoverCourierRun(run.id, run.collectedTotal, session.accessToken) }.onSuccess { message = "Наличные сданы"; onRefresh() }.onFailure { message = it.message } } },
+            onClick = { scope.launch { runCatching { api.handoverCourierRun(run.id, run.collectedTotal, session.accessToken, "courier-handover-${run.id}") }.onSuccess { message = "Наличные сданы"; onRefresh() }.onFailure { message = it.message } } },
             enabled = run.collectedTotal == run.codTotal,
             colors = ButtonDefaults.buttonColors(containerColor = CourierLime, contentColor = CourierInk),
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp),

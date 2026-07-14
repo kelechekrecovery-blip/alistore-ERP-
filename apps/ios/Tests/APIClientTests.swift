@@ -378,6 +378,69 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(payload["scope"] as? String, "staff")
     }
 
+    func testDecodesCourierRouteAndOutstandingCOD() async throws {
+        let session = makeSession(status: 200, body: """
+        [{"id":"order-1","status":"courier_assigned","total":109900,"deliveryAddress":"Бишкек, Киевская 77","deliverySlot":"12:00–14:00","customer":{"name":"Айжан","phone":"+996555000000"},"items":[{"sku":"IP-1","qty":1,"price":109900,"imei":"123456789012345"}],"payments":[{"amount":50000,"status":"received"},{"amount":1000,"status":"pending"}],"courierRun":{"id":"run-1","codTotal":59900,"collectedTotal":0,"handedOver":false}}]
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let deliveries: [CourierDelivery] = try await client.get("courier/me/deliveries", token: "courier-access")
+
+        XCTAssertEqual(deliveries.first?.customer.name, "Айжан")
+        XCTAssertEqual(deliveries.first?.outstandingCOD, 59900)
+        XCTAssertEqual(deliveries.first?.courierRun?.id, "run-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer courier-access")
+    }
+
+    func testSendsCourierDeliveryAndHandoverWithStableKeys() async throws {
+        var session = makeSession(status: 201, body: "{\"id\":\"order-1\",\"status\":\"out_for_delivery\"}")
+        var client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let started: CourierCommandResponse = try await client.post(
+            "courier/orders/order-1/start",
+            body: EmptyMutationRequest(),
+            token: "courier-access",
+            idempotencyKey: "courier-start-1"
+        )
+        XCTAssertEqual(started.status, "out_for_delivery")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "courier-start-1")
+
+        session = makeSession(status: 201, body: "{\"id\":\"run-1\",\"codTotal\":59900,\"collectedTotal\":59900,\"handedOver\":true}")
+        client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let run: CourierRunSummary = try await client.post(
+            "courier/handover",
+            body: CourierHandoverRequest(runId: "run-1", amount: 59900),
+            token: "courier-access",
+            idempotencyKey: "courier-handover-run-1"
+        )
+        XCTAssertTrue(run.handedOver)
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "courier-handover-run-1")
+        let encoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 59900))
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        XCTAssertEqual(payload["codAmount"] as? Int, 59900)
+    }
+
+    @MainActor
+    func testReplaysQueuedCourierCommandWithOriginalIdempotencyKey() async throws {
+        let container = try ModelContainer(
+            for: PendingMutation.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        try OfflineCourierQueue.enqueue(
+            endpoint: "courier/orders/order-1/start",
+            body: EmptyMutationRequest(),
+            idempotencyKey: "offline-courier-start-1",
+            context: container.mainContext
+        )
+        let queued = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<PendingMutation>()).first)
+        let session = makeSession(status: 201, body: "{\"id\":\"order-1\",\"status\":\"out_for_delivery\"}")
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        await OfflineCourierQueue.replay(queued, api: client, token: "courier-access", context: container.mainContext)
+
+        XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<PendingMutation>()).isEmpty)
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "offline-courier-start-1")
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)

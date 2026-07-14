@@ -4,7 +4,7 @@
 
 ## Общие правила
 - **Auth:** JWT + роль; опасные действия требуют 2FA. Права проверяются НА СЕРВЕРЕ по Role Permission Matrix.
-- **Идемпотентность:** заголовок `Idempotency-Key` на POST заказов/платежей; webhook-платежи дедуп по `txnId`.
+- **Идемпотентность:** постоянный заголовок `Idempotency-Key` обязателен на POST, меняющих деньги, склад или статус; offline replay повторяет исходные body и key. Webhook-платежи дедуп по `txnId`.
 - **Approval-gated** действия возвращают `202 { approvalId }` вместо выполнения, если превышен порог (Approval Rules Matrix). Выполняются после `approval.approved`.
 - **Ошибки:** `409` конфликт (двойная продажа IMEI, оплата без резерва), `403` нет прав, `422` валидация, `402` оплата не прошла.
 
@@ -37,7 +37,7 @@ PATCH /warranty/:id                   переход статуса
 POST  /tickets ; PATCH /tickets/:id   Support Inbox
 # Курьер
 GET   /courier/runs/:id
-POST  /courier/handover               сверка COD, расхождение → Risk
+POST  /courier/handover               Idempotency-Key; сверка COD, расхождение → Risk
 POST  /deliveries/:id/fail            { reason, evidence }  Failed Delivery
 # Approvals
 POST  /approvals ; PATCH /approvals/:id/decide   { status, reason }

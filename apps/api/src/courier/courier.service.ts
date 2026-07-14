@@ -6,6 +6,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
 import { OutboxService } from '../outbox/outbox.service';
+import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
@@ -170,36 +171,65 @@ export class CourierService {
     });
   }
 
-  async handover(dto: HandoverDto, actor: string, expectedCourierId?: string) {
-    return this.audit.transaction(async (tx) => {
-      const run = await tx.courierRun.findUnique({ where: { id: dto.runId } });
-      if (!run) throw new ValidationError('run_not_found', `Курьерский рейс ${dto.runId} не найден`);
-      if (expectedCourierId && run.courierId !== expectedCourierId) {
-        throw new ForbiddenError('courier_run_forbidden', 'Рейс назначен другому курьеру');
-      }
-      if (run.handedOver) throw new ConflictError('cod_already_handed_over', `COD по рейсу ${dto.runId} уже сдан`);
-      if (run.collectedTotal !== run.codTotal) {
-        throw new ConflictError('run_delivery_incomplete', `Собрано ${run.collectedTotal} из ${run.codTotal} сом`);
-      }
-      const diff = dto.amount - run.codTotal;
-      if (diff !== 0 && !dto.reason?.trim()) {
-        throw new ValidationError('handover_reason_required', `Расхождение COD ${diff} сом требует причину`);
-      }
-      const settled = await tx.courierRun.update({ where: { id: dto.runId }, data: { handedOver: true } });
-      const events: AuditInput[] = [{
-        type: EventType.CashHandover,
-        actor,
-        payload: { runId: dto.runId, codTotal: run.codTotal, amount: dto.amount, diff, reason: dto.reason ?? null },
-        refs: [dto.runId],
-      }];
-      if (diff !== 0) events.push({
-        type: EventType.CashShortage,
-        actor,
-        payload: { runId: dto.runId, diff, reason: dto.reason },
-        refs: [dto.runId],
+  async handover(dto: HandoverDto, actor: string, expectedCourierId: string | undefined, idempotencyKey: string) {
+    const key = idempotencyKey.trim();
+    if (!key || key.length > 128) throw new ValidationError('invalid_idempotency_key', 'Нужен Idempotency-Key до 128 символов');
+    const normalized = { amount: dto.amount, reason: dto.reason?.trim() || null };
+    const replay = await this.prisma.courierRun.findUnique({ where: { handoverIdempotencyKey: key } });
+    if (replay) {
+      assertCourierRunOwner(replay, expectedCourierId);
+      return replayCourierHandover(replay, dto.runId, normalized);
+    }
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${dto.runId}))`;
+        const run = await tx.courierRun.findUnique({ where: { id: dto.runId } });
+        if (!run) throw new ValidationError('run_not_found', `Курьерский рейс ${dto.runId} не найден`);
+        assertCourierRunOwner(run, expectedCourierId);
+        if (run.handedOver) {
+          if (run.handoverIdempotencyKey === key) {
+            return { result: replayCourierHandover(run, dto.runId, normalized), events: [] };
+          }
+          throw new ConflictError('cod_already_handed_over', `COD по рейсу ${dto.runId} уже сдан`);
+        }
+        if (run.collectedTotal !== run.codTotal) {
+          throw new ConflictError('run_delivery_incomplete', `Собрано ${run.collectedTotal} из ${run.codTotal} сом`);
+        }
+        const diff = dto.amount - run.codTotal;
+        if (diff !== 0 && !normalized.reason) {
+          throw new ValidationError('handover_reason_required', `Расхождение COD ${diff} сом требует причину`);
+        }
+        const settled = await tx.courierRun.update({
+          where: { id: dto.runId },
+          data: {
+            handedOver: true,
+            handoverIdempotencyKey: key,
+            handoverAmount: dto.amount,
+            handoverReason: normalized.reason,
+          },
+        });
+        const events: AuditInput[] = [{
+          type: EventType.CashHandover,
+          actor,
+          payload: { runId: dto.runId, codTotal: run.codTotal, amount: dto.amount, diff, reason: normalized.reason },
+          refs: [dto.runId],
+        }];
+        if (diff !== 0) events.push({
+          type: EventType.CashShortage,
+          actor,
+          payload: { runId: dto.runId, diff, reason: normalized.reason },
+          refs: [dto.runId],
+        });
+        return { result: { ...settled, diff }, events };
       });
-      return { result: { ...settled, diff }, events };
-    });
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        const raced = await this.prisma.courierRun.findUniqueOrThrow({ where: { handoverIdempotencyKey: key } });
+        assertCourierRunOwner(raced, expectedCourierId);
+        return replayCourierHandover(raced, dto.runId, normalized);
+      }
+      throw error;
+    }
   }
 
   private async executeCommand<T>(
