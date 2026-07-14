@@ -10,7 +10,7 @@ import { OrdersService } from '../orders/orders.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
 import { PayDto } from './payments.dto';
-import { accrueConsignmentSalesOnTx } from '../inventory/consignment-accounting';
+import { accrueConsignmentSalesOnTx, accrueQuantityConsignmentSalesOnTx } from '../inventory/consignment-accounting';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -302,6 +302,12 @@ export class PaymentsService {
           refs: [order.id, allocation.productId, allocation.id],
         });
       }
+      await accrueQuantityConsignmentSalesOnTx(tx, {
+        orderId: order.id,
+        orderQuantityAllocationIds: quantityAllocations.map((allocation) => allocation.id),
+        actor,
+        events,
+      });
 
       await tx.reservation.updateMany({
         where: { orderId: order.id, active: true },

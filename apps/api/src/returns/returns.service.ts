@@ -170,6 +170,72 @@ export class ReturnsService {
       });
     }
 
+    const quantityConsignments = await tx.quantityConsignmentAllocation.findMany({
+      where: { saleOrderId: order.id, status: { in: ['sold', 'settled'] } },
+      include: { lot: true, payout: true },
+    });
+    for (const allocation of quantityConsignments) {
+      const targetBalance = await tx.inventoryBalance.findUniqueOrThrow({
+        where: { productId_location: { productId: allocation.lot.productId, location } },
+      });
+      await tx.quantityConsignmentLot.create({
+        data: {
+          idempotencyKey: `return:${ret.id}:quantity-consignment:${allocation.id}`,
+          productId: allocation.lot.productId,
+          balanceId: targetBalance.id,
+          location,
+          ownerName: allocation.lot.ownerName,
+          ownerContact: allocation.lot.ownerContact,
+          commissionBps: allocation.lot.commissionBps,
+          receivedQty: allocation.qty,
+          availableQty: allocation.qty,
+          createdBy: actor,
+        },
+      });
+      if (allocation.payout?.status === 'paid') {
+        await tx.quantityConsignmentAdjustment.create({
+          data: {
+            returnId: ret.id,
+            allocationId: allocation.id,
+            payoutId: allocation.payout.id,
+            ownerName: allocation.lot.ownerName,
+            ownerContact: allocation.lot.ownerContact,
+            amount: allocation.ownerAmount ?? 0,
+            reason: `Возврат заказа ${order.id} после выплаты владельцу`,
+            createdBy: actor,
+          },
+        });
+        events.push({
+          type: EventType.ConsignmentAdjustmentCreated,
+          actor,
+          payload: { returnId: ret.id, quantityConsignmentAllocationId: allocation.id, payoutId: allocation.payout.id, amount: allocation.ownerAmount ?? 0 },
+          refs: [ret.id, allocation.id, allocation.payout.id, allocation.lot.id],
+        });
+      } else if (allocation.payout) {
+        const currentPayout = await tx.consignmentPayout.findUniqueOrThrow({ where: { id: allocation.payout.id } });
+        const ownerAmount = Math.max(0, currentPayout.ownerAmount - (allocation.ownerAmount ?? 0));
+        await tx.consignmentPayout.update({
+          where: { id: allocation.payout.id },
+          data: {
+            grossAmount: Math.max(0, currentPayout.grossAmount - (allocation.salePrice ?? 0)),
+            commissionAmount: Math.max(0, currentPayout.commissionAmount - (allocation.commissionAmount ?? 0)),
+            ownerAmount,
+            status: ownerAmount === 0 ? 'cancelled' : 'created',
+          },
+        });
+      }
+      await tx.quantityConsignmentAllocation.update({
+        where: { id: allocation.id },
+        data: { status: 'withdrawn', returnedAt: new Date(), payoutId: allocation.payout?.status === 'paid' ? allocation.payout.id : null },
+      });
+      events.push({
+        type: EventType.ConsignmentReturned,
+        actor,
+        payload: { returnId: ret.id, quantityConsignmentAllocationId: allocation.id, qty: allocation.qty, location, payoutStatus: allocation.payout?.status ?? null },
+        refs: [ret.id, allocation.id, allocation.lot.id, order.id],
+      });
+    }
+
     const imeis = [
       ...order.items.flatMap((item) => item.imei ? [item.imei] : []),
       ...order.bundleAllocations.map((allocation) => allocation.imei),

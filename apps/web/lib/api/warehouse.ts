@@ -127,6 +127,7 @@ export interface ConsignmentPayout {
   paymentKey?: string | null;
   paidAt?: string | null;
   items: Array<{ id: string; ownerAmount?: number | null; saleOrderId?: string | null }>;
+  quantityAllocations: Array<{ id: string; ownerAmount?: number | null; saleOrderId?: string | null; qty: number }>;
 }
 
 export interface ConsignmentAdjustment {
@@ -155,6 +156,46 @@ export function receiveConsignment(input: {
   return postAuthJson('/inventory/consignments/receive', input, accessToken);
 }
 
+export interface QuantityConsignmentAllocation {
+  id: string;
+  qty: number;
+  status: 'active' | 'sold' | 'settled' | 'withdrawn';
+  salePrice?: number | null;
+  commissionAmount?: number | null;
+  ownerAmount?: number | null;
+  saleOrder?: { id: string; status: string; createdAt: string } | null;
+  payout?: { id: string; status: string; paidAt?: string | null } | null;
+}
+
+export interface QuantityConsignmentLot {
+  id: string;
+  location: string;
+  ownerName: string;
+  ownerContact?: string | null;
+  commissionBps: number;
+  receivedQty: number;
+  availableQty: number;
+  reservedQty: number;
+  product: { id: string; sku: string; name: string; price: number };
+  allocations: QuantityConsignmentAllocation[];
+}
+
+export function receiveQuantityConsignment(input: {
+  idempotencyKey: string;
+  productId: string;
+  location: string;
+  quantity: number;
+  ownerName: string;
+  ownerContact?: string;
+  commissionBps: number;
+}, accessToken: string): Promise<QuantityConsignmentLot> {
+  return postAuthJson('/inventory/consignments/receive-quantity', input, accessToken);
+}
+
+export function fetchQuantityConsignments(accessToken: string): Promise<QuantityConsignmentLot[]> {
+  return getJson('/inventory/consignments/quantity', accessToken);
+}
+
 export function fetchConsignments(accessToken: string): Promise<ConsignmentItem[]> {
   return getJson('/inventory/consignments', accessToken);
 }
@@ -170,9 +211,10 @@ export function fetchConsignmentAdjustments(accessToken: string): Promise<Consig
 export function createConsignmentPayout(
   idempotencyKey: string,
   itemIds: string[],
+  quantityAllocationIds: string[],
   accessToken: string,
 ): Promise<ConsignmentPayout> {
-  return postAuthJson('/inventory/consignments/payouts', { idempotencyKey, itemIds }, accessToken);
+  return postAuthJson('/inventory/consignments/payouts', { idempotencyKey, itemIds, quantityAllocationIds }, accessToken);
 }
 
 export function payConsignmentPayout(

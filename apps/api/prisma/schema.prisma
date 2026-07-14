@@ -316,27 +316,28 @@ model PushToken {
 }
 
 model Product {
-  id                  String                    @id @default(cuid())
-  sku                 String                    @unique
-  barcode             String?                   @unique
-  variantGroup        String?
-  name                String
-  price               Int
-  cost                Int
-  category            String
-  trackingMode        StockTrackingMode         @default(serialized)
-  attrs               Json
-  archived            Boolean                   @default(false) // soft-delete: НЕ удалять физически
-  updatedAt           DateTime                  @default(now()) @updatedAt
-  units               DeviceUnit[]
-  movements           InventoryMovement[]
-  balances            InventoryBalance[]
-  quantityAllocations OrderQuantityAllocation[]
-  purchaseOrderItems  PurchaseOrderItem[]
-  bundleComponents    ProductBundleComponent[]  @relation("BundleProduct")
-  includedInBundles   ProductBundleComponent[]  @relation("BundleComponentProduct")
-  bundleAllocations   OrderBundleAllocation[]
-  consignmentItems    ConsignmentItem[]
+  id                      String                    @id @default(cuid())
+  sku                     String                    @unique
+  barcode                 String?                   @unique
+  variantGroup            String?
+  name                    String
+  price                   Int
+  cost                    Int
+  category                String
+  trackingMode            StockTrackingMode         @default(serialized)
+  attrs                   Json
+  archived                Boolean                   @default(false) // soft-delete: НЕ удалять физически
+  updatedAt               DateTime                  @default(now()) @updatedAt
+  units                   DeviceUnit[]
+  movements               InventoryMovement[]
+  balances                InventoryBalance[]
+  quantityAllocations     OrderQuantityAllocation[]
+  purchaseOrderItems      PurchaseOrderItem[]
+  bundleComponents        ProductBundleComponent[]  @relation("BundleProduct")
+  includedInBundles       ProductBundleComponent[]  @relation("BundleComponentProduct")
+  bundleAllocations       OrderBundleAllocation[]
+  consignmentItems        ConsignmentItem[]
+  quantityConsignmentLots QuantityConsignmentLot[]
 
   @@index([category])
   @@index([variantGroup])
@@ -345,14 +346,15 @@ model Product {
 }
 
 model InventoryBalance {
-  id          String                    @id @default(cuid())
-  product     Product                   @relation(fields: [productId], references: [id])
-  productId   String
-  location    String
-  onHand      Int                       @default(0)
-  reserved    Int                       @default(0)
-  updatedAt   DateTime                  @default(now()) @updatedAt
-  allocations OrderQuantityAllocation[]
+  id                      String                    @id @default(cuid())
+  product                 Product                   @relation(fields: [productId], references: [id])
+  productId               String
+  location                String
+  onHand                  Int                       @default(0)
+  reserved                Int                       @default(0)
+  updatedAt               DateTime                  @default(now()) @updatedAt
+  allocations             OrderQuantityAllocation[]
+  quantityConsignmentLots QuantityConsignmentLot[]
 
   @@unique([productId, location])
   @@index([location])
@@ -408,35 +410,36 @@ model DeviceUnit {
 }
 
 model Order {
-  id                  String                    @id @default(cuid())
-  idempotencyKey      String?                   @unique
-  isDemo              Boolean                   @default(false)
-  customer            Customer                  @relation(fields: [customerId], references: [id])
-  customerId          String
-  status              OrderStatus               @default(draft)
-  channel             String // web | app | mobile | pos | telegram
-  fulfillmentType     String                    @default("pickup") // pickup | courier | express | store
-  pickupPoint         String?
-  deliveryAddress     String?
-  deliverySlot        String?
-  courierId           String?
-  courier             StaffUser?                @relation("OrderCourier", fields: [courierId], references: [id])
-  courierRunId        String?
-  courierRun          CourierRun?               @relation(fields: [courierRunId], references: [id])
-  pickupCode          String?
-  subtotal            Int                       @default(0)
-  deliveryFee         Int                       @default(0)
-  promoCode           String?
-  promoDiscount       Int                       @default(0)
-  loyaltyRedeemed     Int                       @default(0)
-  loyaltyEarned       Int                       @default(0)
-  total               Int
-  items               OrderItem[]
-  bundleAllocations   OrderBundleAllocation[]
-  quantityAllocations OrderQuantityAllocation[]
-  consignmentSales    ConsignmentItem[]         @relation("ConsignmentSaleOrder")
-  payments            Payment[]
-  createdAt           DateTime                  @default(now())
+  id                       String                          @id @default(cuid())
+  idempotencyKey           String?                         @unique
+  isDemo                   Boolean                         @default(false)
+  customer                 Customer                        @relation(fields: [customerId], references: [id])
+  customerId               String
+  status                   OrderStatus                     @default(draft)
+  channel                  String // web | app | mobile | pos | telegram
+  fulfillmentType          String                          @default("pickup") // pickup | courier | express | store
+  pickupPoint              String?
+  deliveryAddress          String?
+  deliverySlot             String?
+  courierId                String?
+  courier                  StaffUser?                      @relation("OrderCourier", fields: [courierId], references: [id])
+  courierRunId             String?
+  courierRun               CourierRun?                     @relation(fields: [courierRunId], references: [id])
+  pickupCode               String?
+  subtotal                 Int                             @default(0)
+  deliveryFee              Int                             @default(0)
+  promoCode                String?
+  promoDiscount            Int                             @default(0)
+  loyaltyRedeemed          Int                             @default(0)
+  loyaltyEarned            Int                             @default(0)
+  total                    Int
+  items                    OrderItem[]
+  bundleAllocations        OrderBundleAllocation[]
+  quantityAllocations      OrderQuantityAllocation[]
+  consignmentSales         ConsignmentItem[]               @relation("ConsignmentSaleOrder")
+  quantityConsignmentSales QuantityConsignmentAllocation[] @relation("QuantityConsignmentSaleOrder")
+  payments                 Payment[]
+  createdAt                DateTime                        @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
   @@index([customerId])
@@ -478,23 +481,95 @@ model ConsignmentItem {
 }
 
 model ConsignmentPayout {
-  id               String                  @id @default(cuid())
-  idempotencyKey   String                  @unique
-  ownerName        String
-  ownerContact     String?
-  grossAmount      Int
-  commissionAmount Int
-  ownerAmount      Int
-  status           ConsignmentPayoutStatus @default(created)
-  paymentKey       String?                 @unique
-  createdBy        String
-  paidBy           String?
-  paidAt           DateTime?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  items            ConsignmentItem[]
+  id                  String                          @id @default(cuid())
+  idempotencyKey      String                          @unique
+  ownerName           String
+  ownerContact        String?
+  grossAmount         Int
+  commissionAmount    Int
+  ownerAmount         Int
+  status              ConsignmentPayoutStatus         @default(created)
+  paymentKey          String?                         @unique
+  createdBy           String
+  paidBy              String?
+  paidAt              DateTime?
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+  items               ConsignmentItem[]
+  quantityAllocations QuantityConsignmentAllocation[]
 
   @@index([status, createdAt])
+  @@index([ownerName, ownerContact])
+}
+
+model QuantityConsignmentLot {
+  id             String                          @id @default(cuid())
+  idempotencyKey String                          @unique
+  product        Product                         @relation(fields: [productId], references: [id])
+  productId      String
+  balance        InventoryBalance                @relation(fields: [balanceId], references: [id])
+  balanceId      String
+  location       String
+  ownerName      String
+  ownerContact   String?
+  commissionBps  Int
+  receivedQty    Int
+  availableQty   Int
+  reservedQty    Int                             @default(0)
+  createdBy      String
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  allocations    QuantityConsignmentAllocation[]
+
+  @@index([productId, location, createdAt])
+  @@index([balanceId, availableQty])
+  @@index([ownerName, ownerContact])
+}
+
+model QuantityConsignmentAllocation {
+  id                        String                  @id @default(cuid())
+  lot                       QuantityConsignmentLot  @relation(fields: [lotId], references: [id])
+  lotId                     String
+  orderQuantityAllocation   OrderQuantityAllocation @relation(fields: [orderQuantityAllocationId], references: [id])
+  orderQuantityAllocationId String
+  saleOrder                 Order?                  @relation("QuantityConsignmentSaleOrder", fields: [saleOrderId], references: [id])
+  saleOrderId               String?
+  qty                       Int
+  status                    ConsignmentStatus       @default(active)
+  salePrice                 Int?
+  commissionAmount          Int?
+  ownerAmount               Int?
+  soldAt                    DateTime?
+  returnedAt                DateTime?
+  payout                    ConsignmentPayout?      @relation(fields: [payoutId], references: [id])
+  payoutId                  String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  @@unique([orderQuantityAllocationId, lotId])
+  @@index([saleOrderId, status])
+  @@index([payoutId])
+  @@index([lotId, status])
+}
+
+model QuantityConsignmentAdjustment {
+  id           String                      @id @default(cuid())
+  returnId     String
+  allocationId String
+  payoutId     String
+  ownerName    String
+  ownerContact String?
+  amount       Int
+  reason       String
+  status       ConsignmentAdjustmentStatus @default(open)
+  createdBy    String
+  settledBy    String?
+  settledAt    DateTime?
+  createdAt    DateTime                    @default(now())
+
+  @@unique([returnId, allocationId])
+  @@index([status, createdAt])
+  @@index([payoutId])
   @@index([ownerName, ownerContact])
 }
 
@@ -520,20 +595,21 @@ model ConsignmentAdjustment {
 }
 
 model OrderQuantityAllocation {
-  id          String           @id @default(cuid())
-  order       Order            @relation(fields: [orderId], references: [id])
-  orderId     String
-  orderItemId String
-  product     Product          @relation(fields: [productId], references: [id])
-  productId   String
-  balance     InventoryBalance @relation(fields: [balanceId], references: [id])
-  balanceId   String
-  sku         String
-  qty         Int
-  active      Boolean          @default(true)
-  consumedAt  DateTime?
-  createdAt   DateTime         @default(now())
-  reservation Reservation?
+  id                     String                          @id @default(cuid())
+  order                  Order                           @relation(fields: [orderId], references: [id])
+  orderId                String
+  orderItemId            String
+  product                Product                         @relation(fields: [productId], references: [id])
+  productId              String
+  balance                InventoryBalance                @relation(fields: [balanceId], references: [id])
+  balanceId              String
+  sku                    String
+  qty                    Int
+  active                 Boolean                         @default(true)
+  consumedAt             DateTime?
+  createdAt              DateTime                        @default(now())
+  reservation            Reservation?
+  consignmentAllocations QuantityConsignmentAllocation[]
 
   @@index([orderId, active])
   @@index([productId])

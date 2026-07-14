@@ -5,6 +5,7 @@ import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
+import { releaseQuantityConsignmentOnTx } from '../inventory/consignment-accounting';
 
 /**
  * Reservation lifecycle — enforces Business Invariant #7:
@@ -83,6 +84,7 @@ export class ReservationsService {
               data: { reserved: { decrement: allocation.qty } },
             });
             if (releasedBalance.count === 1) {
+              await releaseQuantityConsignmentOnTx(tx, allocation.id);
               await tx.orderQuantityAllocation.update({
                 where: { id: allocation.id },
                 data: { active: false },

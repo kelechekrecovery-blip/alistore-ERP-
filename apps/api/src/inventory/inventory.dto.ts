@@ -112,12 +112,38 @@ export class ReceiveConsignmentDto {
   @IsOptional() @IsIn(['A', 'B', 'C']) grade?: 'A' | 'B' | 'C';
 }
 
+export class ReceiveQuantityConsignmentDto {
+  @ApiProperty({ example: 'quantity-consignment-receive-01' })
+  @IsString() @MaxLength(128) idempotencyKey!: string;
+
+  @ApiProperty({ example: 'clx_product_accessory' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @MaxLength(64) location!: string;
+
+  @ApiProperty({ minimum: 1, example: 20 })
+  @IsInt() @Min(1) quantity!: number;
+
+  @ApiProperty({ example: 'Поставщик А.' })
+  @IsString() @MaxLength(160) ownerName!: string;
+
+  @ApiPropertyOptional({ example: '+996555123456' })
+  @IsOptional() @IsString() @MaxLength(160) ownerContact?: string;
+
+  @ApiProperty({ minimum: 0, maximum: 10000, example: 1500 })
+  @IsInt() @Min(0) @Max(10000) commissionBps!: number;
+}
+
 export class CreateConsignmentPayoutDto {
   @ApiProperty({ example: 'consignment-payout-01' })
   @IsString() @MaxLength(128) idempotencyKey!: string;
 
-  @ApiProperty({ type: [String], example: ['clx_consignment_01'] })
-  @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsString({ each: true }) itemIds!: string[];
+  @ApiPropertyOptional({ type: [String], example: ['clx_consignment_01'] })
+  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) itemIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['clx_quantity_consignment_01'] })
+  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) quantityAllocationIds?: string[];
 }
 
 export class PayConsignmentPayoutDto {

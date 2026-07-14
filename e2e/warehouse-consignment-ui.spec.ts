@@ -18,6 +18,17 @@ test('owner receives consignment stock and reconciles a completed owner payout',
       attrs: {},
     },
   });
+  const quantityProduct = await prisma.product.create({
+    data: {
+      sku: `E2E-QCONS-${Date.now().toString(36)}`.toUpperCase(),
+      name: 'E2E Consignment Cases',
+      price: 1_500,
+      cost: 0,
+      category: 'accessories',
+      trackingMode: 'quantity',
+      attrs: {},
+    },
+  });
 
   await page.addInitScript((staff) => {
     localStorage.setItem('alistore.staff.auth.v1', JSON.stringify({
@@ -39,6 +50,16 @@ test('owner receives consignment stock and reconciles a completed owner payout',
   await page.getByRole('button', { name: 'Принять на комиссию' }).click();
   await expect(page.getByRole('status')).toContainText('Комиссионный товар принят');
   await expect(page.getByText('E2E-CONSIGN-RECEIVED')).toBeVisible();
+
+  await page.getByLabel('Тип комиссионного учёта').selectOption('quantity');
+  await page.getByLabel('Комиссионный товар').selectOption(quantityProduct.id);
+  await page.getByLabel('Количество в комиссионной партии').fill('12');
+  await page.getByLabel('Владелец комиссионного товара').fill('Поставщик К.');
+  await page.getByLabel('Контакт владельца').fill('+996555000333');
+  await page.getByRole('button', { name: 'Принять на комиссию' }).click();
+  await expect(page.getByRole('status')).toContainText('Комиссионная партия принята');
+  await expect(page.locator('span.font-semibold', { hasText: 'E2E Consignment Cases' })).toBeVisible();
+  await expect(page.getByText('12 свободно · 0 резерв')).toBeVisible();
 
   const customer = await prisma.customer.create({ data: { phone: '+996700900001', name: 'Buyer' } });
   const order = await prisma.order.create({

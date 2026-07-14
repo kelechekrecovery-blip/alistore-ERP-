@@ -12,7 +12,12 @@ import { CreateOrderDto } from './orders.dto';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { earnLoyaltyOnTx, redeemLoyaltyOnTx } from '../customers/loyalty-ledger';
-import { accrueConsignmentSalesOnTx } from '../inventory/consignment-accounting';
+import {
+  accrueConsignmentSalesOnTx,
+  accrueQuantityConsignmentSalesOnTx,
+  releaseQuantityConsignmentOnTx,
+  reserveQuantityConsignmentOnTx,
+} from '../inventory/consignment-accounting';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -360,6 +365,7 @@ export class OrdersService {
               data: { reserved: { decrement: allocation.qty } },
             });
             if (released.count === 1) {
+              await releaseQuantityConsignmentOnTx(tx, allocation.id);
               await tx.orderQuantityAllocation.update({
                 where: { id: allocation.id },
                 data: { active: false },
@@ -639,6 +645,11 @@ export class OrdersService {
       const allocation = await tx.orderQuantityAllocation.create({
         data: { orderId, orderItemId, productId, balanceId: balance.id, sku, qty: desired },
       });
+      await reserveQuantityConsignmentOnTx(tx, {
+        orderQuantityAllocationId: allocation.id,
+        balanceId: balance.id,
+        qty: desired,
+      });
       await tx.reservation.create({
         data: { orderId, quantityAllocationId: allocation.id, expiresAt, active: true },
       });
@@ -681,6 +692,12 @@ export class OrdersService {
         refs: [orderId, allocation.productId, allocation.id],
       });
     }
+    await accrueQuantityConsignmentSalesOnTx(tx, {
+      orderId,
+      orderQuantityAllocationIds: allocations.map((allocation) => allocation.id),
+      actor,
+      events,
+    });
   }
 }
 

@@ -140,6 +140,7 @@ const write_off: ActionExecutor = async (tx, payload, approver, approvalId, even
   if (balance.onHand - balance.reserved < qty) {
     throw new ConflictError('insufficient_available_stock', 'Списание превышает свободный остаток');
   }
+  await assertStoreOwnedAvailable(tx, balance.id, balance.onHand - balance.reserved, qty);
   await tx.inventoryBalance.update({ where: { id: balance.id }, data: { onHand: { decrement: qty } } });
   const movement = await tx.inventoryMovement.create({
     data: { productId, qty: -Math.abs(qty), type: 'write_off', from: location, reason },
@@ -169,6 +170,7 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
     if (balance.onHand - balance.reserved < Math.abs(delta)) {
       throw new ConflictError('insufficient_available_stock', 'Корректировка превышает свободный остаток');
     }
+    await assertStoreOwnedAvailable(tx, balance.id, balance.onHand - balance.reserved, Math.abs(delta));
     await tx.inventoryBalance.update({ where: { id: balance.id }, data: { onHand: { decrement: Math.abs(delta) } } });
   } else {
     await tx.inventoryBalance.upsert({
@@ -193,6 +195,25 @@ async function lockQuantityBalance(tx: Prisma.TransactionClient, productId: stri
   const balance = await tx.inventoryBalance.findUnique({ where: { productId_location: { productId, location } } });
   if (!balance) throw new ConflictError('inventory_balance_not_found', `На складе ${location} нет остатка товара`);
   return balance;
+}
+
+async function assertStoreOwnedAvailable(
+  tx: Prisma.TransactionClient,
+  balanceId: string,
+  aggregateAvailable: number,
+  qty: number,
+) {
+  const ownerStock = await tx.quantityConsignmentLot.aggregate({
+    where: { balanceId },
+    _sum: { availableQty: true },
+  });
+  const storeOwnedAvailable = aggregateAvailable - (ownerStock._sum.availableQty ?? 0);
+  if (storeOwnedAvailable < qty) {
+    throw new ConflictError(
+      'consignment_stock_requires_owner_process',
+      'Обычное списание не может уменьшать чужой товар; используйте комиссионный процесс владельца',
+    );
+  }
 }
 
 /** delete — soft-delete a product (archived = true). */

@@ -10,11 +10,13 @@ import {
   MovementDto,
   PayConsignmentPayoutDto,
   ReceiveConsignmentDto,
+  ReceiveQuantityConsignmentDto,
   ReceiveDto,
   ReceiveQuantityDto,
   TransferDto,
   TransferQuantityDto,
 } from './inventory.dto';
+import { transferQuantityConsignmentOnTx } from './consignment-accounting';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -265,6 +267,76 @@ export class InventoryService {
     });
   }
 
+  /** Receive homogeneous third-party stock while InventoryBalance remains authoritative. */
+  async receiveQuantityConsignment(dto: ReceiveQuantityConsignmentDto, actor: string) {
+    const normalized = {
+      location: dto.location.trim(),
+      ownerName: dto.ownerName.trim(),
+      ownerContact: dto.ownerContact?.trim() || null,
+    };
+    if (!normalized.location || !normalized.ownerName) {
+      throw new ValidationError('consignment_fields_required', 'Заполните владельца и склад');
+    }
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      include: { _count: { select: { includedInBundles: true, bundleComponents: true } } },
+    });
+    if (!product) throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+    if (product.trackingMode !== 'quantity') {
+      throw new ValidationError('quantity_product_required', 'Для серийного товара используйте приёмку по IMEI');
+    }
+    if (product._count.includedInBundles > 0 || product._count.bundleComponents > 0) {
+      throw new ValidationError('consignment_bundle_forbidden', 'Комиссионный товар нельзя использовать в виртуальном наборе');
+    }
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'quantity-consignment:' + dto.idempotencyKey}))::text AS locked`;
+      const existing = await tx.quantityConsignmentLot.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+      if (existing) {
+        const same = existing.productId === dto.productId
+          && existing.location === normalized.location
+          && existing.ownerName === normalized.ownerName
+          && existing.ownerContact === normalized.ownerContact
+          && existing.commissionBps === dto.commissionBps
+          && existing.receivedQty === dto.quantity;
+        if (!same) throw new ConflictError('consignment_idempotency_mismatch', 'Ключ приёмки уже использован с другими данными');
+        return { result: existing, events: [] };
+      }
+      const balance = await tx.inventoryBalance.upsert({
+        where: { productId_location: { productId: dto.productId, location: normalized.location } },
+        create: { productId: dto.productId, location: normalized.location, onHand: dto.quantity },
+        update: { onHand: { increment: dto.quantity } },
+      });
+      const lot = await tx.quantityConsignmentLot.create({
+        data: {
+          idempotencyKey: dto.idempotencyKey,
+          productId: dto.productId,
+          balanceId: balance.id,
+          location: normalized.location,
+          ownerName: normalized.ownerName,
+          ownerContact: normalized.ownerContact,
+          commissionBps: dto.commissionBps,
+          receivedQty: dto.quantity,
+          availableQty: dto.quantity,
+          createdBy: actor,
+        },
+        include: { product: { select: { id: true, sku: true, name: true, price: true } } },
+      });
+      const movement = await tx.inventoryMovement.create({
+        data: { productId: dto.productId, qty: dto.quantity, type: 'consignment_received', to: normalized.location, reason: normalized.ownerName },
+      });
+      return {
+        result: lot,
+        events: [{
+          type: EventType.ConsignmentReceived,
+          actor,
+          payload: { lotId: lot.id, productId: dto.productId, location: normalized.location, qty: dto.quantity, ownerName: normalized.ownerName, commissionBps: dto.commissionBps },
+          refs: [lot.id, dto.productId, movement.id],
+        }],
+      };
+    });
+  }
+
   listConsignments() {
     return this.prisma.consignmentItem.findMany({
       include: {
@@ -278,81 +350,128 @@ export class InventoryService {
     });
   }
 
+  listQuantityConsignments() {
+    return this.prisma.quantityConsignmentLot.findMany({
+      include: {
+        product: { select: { id: true, sku: true, name: true, price: true } },
+        allocations: {
+          include: {
+            saleOrder: { select: { id: true, status: true, createdAt: true } },
+            payout: { select: { id: true, status: true, paidAt: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
   listConsignmentPayouts() {
     return this.prisma.consignmentPayout.findMany({
-      include: { items: { select: { id: true, ownerAmount: true, saleOrderId: true } } },
+      include: {
+        items: { select: { id: true, ownerAmount: true, saleOrderId: true } },
+        quantityAllocations: { select: { id: true, ownerAmount: true, saleOrderId: true, qty: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
   }
 
   listConsignmentAdjustments() {
-    return this.prisma.consignmentAdjustment.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    return Promise.all([
+      this.prisma.consignmentAdjustment.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma.quantityConsignmentAdjustment.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }),
+    ]).then(([serialized, quantity]) => [...serialized, ...quantity].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
   }
 
   async createConsignmentPayout(dto: CreateConsignmentPayoutDto, actor: string) {
     const existing = await this.prisma.consignmentPayout.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
-      include: { items: true },
+      include: { items: true, quantityAllocations: true },
     });
     if (existing) {
-      const requested = [...new Set(dto.itemIds)].sort();
-      const recorded = existing.items.map((item) => item.id).sort();
-      if (requested.length !== recorded.length || requested.some((id, index) => id !== recorded[index])) {
+      const requestedItems = [...new Set(dto.itemIds ?? [])].sort();
+      const requestedQuantity = [...new Set(dto.quantityAllocationIds ?? [])].sort();
+      if (!sameIds(requestedItems, existing.items.map((item) => item.id).sort())
+        || !sameIds(requestedQuantity, existing.quantityAllocations.map((item) => item.id).sort())) {
         throw new ConflictError('consignment_idempotency_mismatch', 'Ключ выплаты уже использован с другим набором позиций');
       }
       return existing;
     }
 
     return this.audit.transaction(async (tx) => {
-      const ids = [...new Set(dto.itemIds)];
+      const ids = [...new Set(dto.itemIds ?? [])];
+      const quantityIds = [...new Set(dto.quantityAllocationIds ?? [])];
+      if (ids.length + quantityIds.length === 0) {
+        throw new ValidationError('consignment_items_required', 'Выберите хотя бы одну комиссионную продажу');
+      }
       for (const itemId of [...ids].sort()) {
         await tx.$queryRaw`SELECT id FROM "ConsignmentItem" WHERE id = ${itemId} FOR UPDATE`;
+      }
+      for (const allocationId of [...quantityIds].sort()) {
+        await tx.$queryRaw`SELECT id FROM "QuantityConsignmentAllocation" WHERE id = ${allocationId} FOR UPDATE`;
       }
       const items = await tx.consignmentItem.findMany({
         where: { id: { in: ids } },
         include: { saleOrder: { select: { id: true, status: true } } },
       });
       if (items.length !== ids.length) throw new ValidationError('consignment_not_found', 'Часть комиссионных позиций не найдена');
-      const first = items[0];
-      if (items.some((item) => item.ownerName !== first.ownerName || item.ownerContact !== first.ownerContact)) {
+      const quantityAllocations = await tx.quantityConsignmentAllocation.findMany({
+        where: { id: { in: quantityIds } },
+        include: { lot: true, saleOrder: { select: { id: true, status: true } } },
+      });
+      if (quantityAllocations.length !== quantityIds.length) {
+        throw new ValidationError('consignment_not_found', 'Часть количественных комиссионных продаж не найдена');
+      }
+      const owners = [
+        ...items.map((item) => ({ name: item.ownerName, contact: item.ownerContact })),
+        ...quantityAllocations.map((item) => ({ name: item.lot.ownerName, contact: item.lot.ownerContact })),
+      ];
+      const first = owners[0];
+      if (owners.some((owner) => owner.name !== first.name || owner.contact !== first.contact)) {
         throw new ValidationError('consignment_owner_mismatch', 'Одна выплата может содержать позиции только одного владельца');
       }
       if (items.some((item) => item.status !== 'sold' || item.payoutId || item.saleOrder?.status !== 'completed')) {
         throw new ConflictError('consignment_not_settleable', 'Выплата доступна только для завершённых продаж без предыдущей выплаты');
       }
-      const orderIds = items.flatMap((item) => item.saleOrderId ? [item.saleOrderId] : []);
+      if (quantityAllocations.some((item) => item.status !== 'sold' || item.payoutId || item.saleOrder?.status !== 'completed')) {
+        throw new ConflictError('consignment_not_settleable', 'Выплата доступна только для завершённых продаж без предыдущей выплаты');
+      }
+      const orderIds = [
+        ...items.flatMap((item) => item.saleOrderId ? [item.saleOrderId] : []),
+        ...quantityAllocations.flatMap((item) => item.saleOrderId ? [item.saleOrderId] : []),
+      ];
       const blockedReturn = await tx.return.findFirst({
         where: { orderId: { in: orderIds }, status: { not: 'rejected' } },
         select: { id: true },
       });
       if (blockedReturn) throw new ConflictError('consignment_return_pending', 'Нельзя выплатить владельцу при активном или согласованном возврате');
-      const grossAmount = items.reduce((sum, item) => sum + (item.salePrice ?? 0), 0);
-      const commissionAmount = items.reduce((sum, item) => sum + (item.commissionAmount ?? 0), 0);
-      const ownerAmount = items.reduce((sum, item) => sum + (item.ownerAmount ?? 0), 0);
+      const positions = [...items, ...quantityAllocations];
+      const grossAmount = positions.reduce((sum, item) => sum + (item.salePrice ?? 0), 0);
+      const commissionAmount = positions.reduce((sum, item) => sum + (item.commissionAmount ?? 0), 0);
+      const ownerAmount = positions.reduce((sum, item) => sum + (item.ownerAmount ?? 0), 0);
       const payout = await tx.consignmentPayout.create({
         data: {
           idempotencyKey: dto.idempotencyKey,
-          ownerName: first.ownerName,
-          ownerContact: first.ownerContact,
+          ownerName: first.name,
+          ownerContact: first.contact,
           grossAmount,
           commissionAmount,
           ownerAmount,
           createdBy: actor,
           items: { connect: ids.map((id) => ({ id })) },
+          quantityAllocations: { connect: quantityIds.map((id) => ({ id })) },
         },
-        include: { items: true },
+        include: { items: true, quantityAllocations: true },
       });
       return {
         result: payout,
         events: [{
           type: EventType.ConsignmentPayoutCreated,
           actor,
-          payload: { payoutId: payout.id, ownerName: payout.ownerName, grossAmount, commissionAmount, ownerAmount, items: ids.length },
-          refs: [payout.id, ...ids, ...orderIds],
+          payload: { payoutId: payout.id, ownerName: payout.ownerName, grossAmount, commissionAmount, ownerAmount, items: ids.length, quantityAllocations: quantityIds.length },
+          refs: [payout.id, ...ids, ...quantityIds, ...orderIds],
         }],
       };
     });
@@ -361,7 +480,7 @@ export class InventoryService {
   async payConsignmentPayout(id: string, dto: PayConsignmentPayoutDto, actor: string) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ConsignmentPayout" WHERE id = ${id} FOR UPDATE`;
-      const payout = await tx.consignmentPayout.findUnique({ where: { id }, include: { items: true } });
+      const payout = await tx.consignmentPayout.findUnique({ where: { id }, include: { items: true, quantityAllocations: true } });
       if (!payout) throw new ValidationError('consignment_payout_not_found', `Выплата ${id} не найдена`);
       if (payout.status === 'cancelled') {
         throw new ConflictError('consignment_payout_cancelled', 'Отменённую выплату нельзя провести');
@@ -375,16 +494,17 @@ export class InventoryService {
       const paid = await tx.consignmentPayout.update({
         where: { id },
         data: { status: 'paid', paymentKey: dto.paymentKey, paidBy: actor, paidAt: new Date() },
-        include: { items: true },
+        include: { items: true, quantityAllocations: true },
       });
       await tx.consignmentItem.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
+      await tx.quantityConsignmentAllocation.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
       return {
         result: paid,
         events: [{
           type: EventType.ConsignmentPayoutPaid,
           actor,
           payload: { payoutId: id, ownerName: paid.ownerName, ownerAmount: paid.ownerAmount, paymentKey: dto.paymentKey },
-          refs: [id, ...paid.items.map((item) => item.id)],
+          refs: [id, ...paid.items.map((item) => item.id), ...paid.quantityAllocations.map((item) => item.id)],
         }],
       };
     });
@@ -496,7 +616,7 @@ export class InventoryService {
         where: { id: source.id },
         data: { onHand: { decrement: dto.qty } },
       });
-      await tx.inventoryBalance.upsert({
+      const destination = await tx.inventoryBalance.upsert({
         where: { productId_location: { productId: dto.productId, location: to } },
         create: { productId: dto.productId, location: to, onHand: dto.qty },
         update: { onHand: { increment: dto.qty } },
@@ -512,6 +632,14 @@ export class InventoryService {
           reason: dto.reason?.trim() || null,
         },
       });
+      const consignmentQty = await transferQuantityConsignmentOnTx(tx, {
+        movementId: movement.id,
+        sourceBalanceId: source.id,
+        destinationBalanceId: destination.id,
+        destination: to,
+        qty: dto.qty,
+        actor,
+      });
       return {
         result: {
           movementId: movement.id,
@@ -519,17 +647,22 @@ export class InventoryService {
           from,
           to,
           qty: dto.qty,
+          consignmentQty,
           idempotent: false,
         },
         events: [{
           type: EventType.StockMoved,
           actor,
-          payload: { movementId: movement.id, productId: dto.productId, trackingMode: 'quantity', from, to, qty: dto.qty },
+          payload: { movementId: movement.id, productId: dto.productId, trackingMode: 'quantity', from, to, qty: dto.qty, consignmentQty },
           refs: [movement.id, dto.productId],
         }],
       };
     });
   }
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
 }
 
 function replayQuantityTransfer(movement: { id: string; productId: string; qty: number; type: string; from: string | null; to: string | null }, dto: TransferQuantityDto) {

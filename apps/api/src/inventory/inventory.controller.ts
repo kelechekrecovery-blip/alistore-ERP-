@@ -15,6 +15,7 @@ import {
   MovementDto,
   PayConsignmentPayoutDto,
   ReceiveConsignmentDto,
+  ReceiveQuantityConsignmentDto,
   ReceiveDto,
   ReceiveQuantityDto,
   TransferDto,
@@ -76,12 +77,27 @@ export class InventoryController {
     return this.inventory.receiveConsignment(dto, await requireActiveStaff(user, this.staffAuth));
   }
 
+  @ApiOperation({ summary: 'Receive a quantity-tracked third-party-owned consignment lot' })
+  @Post('consignments/receive-quantity')
+  @RequirePermission('inventory', 'consignment_receive')
+  async receiveQuantityConsignment(@CurrentUser() user: AuthPrincipal, @Body() dto: ReceiveQuantityConsignmentDto) {
+    return this.inventory.receiveQuantityConsignment(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
   @ApiOperation({ summary: 'List consignment stock and accrued owner liabilities' })
   @Get('consignments')
   @RequirePermission('inventory', 'consignment_read')
   async listConsignments(@CurrentUser() user: AuthPrincipal) {
     await requireActiveStaff(user, this.staffAuth);
     return this.inventory.listConsignments();
+  }
+
+  @ApiOperation({ summary: 'List quantity consignment lots and owner liabilities' })
+  @Get('consignments/quantity')
+  @RequirePermission('inventory', 'consignment_read')
+  async listQuantityConsignments(@CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.listQuantityConsignments();
   }
 
   @ApiOperation({ summary: 'List consignment payout batches' })

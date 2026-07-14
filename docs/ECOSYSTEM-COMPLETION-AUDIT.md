@@ -9,8 +9,8 @@ credentials, legal approval or physical hardware.
 ## Verified baseline
 
 - 47 NestJS modules, 37 generated Next routes and 43 Prisma migrations.
-- `mvp:verify`: API/Web production builds, mobile reference typecheck, 115/115 Jest
-  suites with 458/458 tests and 27/27 Playwright flows.
+- `mvp:verify`: API/Web production builds, mobile reference typecheck, 116/116 Jest
+  suites with 460/460 tests and 27/27 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
@@ -38,7 +38,7 @@ credentials, legal approval or physical hardware.
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
 | Service center | Partial | warranty/support state machines and Evidence | diagnostics, paid repair, parts/work orders, technician SLA and loaner fund |
-| Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, refund-bound quantity/direct/bundle IMEI restock, serialized consignment ownership/accrual/payout/return compensation, procurement and bundles | quantity consignment, partial-return line policy, completeness, missort and markdown workflows |
+| Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, refund-bound quantity/direct/bundle IMEI restock, serialized and quantity consignment ownership/accrual/payout/return compensation, procurement and bundles | partial-return line policy, completeness, missort and markdown workflows |
 | Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence flows on both platforms | complete visual acceptance, app-level native E2E, physical push/scanner/camera gate |
 | Product management | Partial | product CRUD, variants, virtual bundles, explicit serialized/quantity tracking, catalog/search | preorders, channel publishing, pricing history and completeness policy |
 | Finance 2.0 | Partial | expenses, approval/payment, budgets and plan/fact | provider/POS/COD reconciliation, cashflow, collection, settlements, currency and exports |
@@ -52,7 +52,7 @@ credentials, legal approval or physical hardware.
 | Anonymous customer | browse/search/product/cart/demo checkout without foreign data access | Web covered; native not applicable |
 | Authenticated customer | OTP, checkout/payment return, order tracking, return, warranty, support and logout | API/web substantial; native app-level E2E missing |
 | Seller/cashier | login, shift, scan, split sale, approval, receipt, refund/exchange, offline restart | software vertical exists; native E2E and hardware external |
-| Warehouse | PO receive, serialized/quantity stock, consignment, count, transfer, picking, discrepancy | quantity receive/transfer/adjust-to-sale, consignment receive-to-payout and refund-bound restock/owner-compensation browser/API flows covered; quantity consignment and full role E2E remain |
+| Warehouse | PO receive, serialized/quantity stock, consignment, count, transfer, picking, discrepancy | quantity receive/transfer/adjust-to-sale, serialized/quantity consignment receive-to-payout and refund-bound restock/owner-compensation browser/API flows covered; full role E2E remains |
 | Courier | assignment, map/call, failure/retry, Evidence, COD handover, offline restart | API/native software covered; live device/push gate external |
 | Support/service | ticket escalation, warranty diagnosis/repair/loaner/close | support/warranty partial; service-center workflow missing |
 | Manager/owner | budgets, approvals, reconciliation, risk, analytics and audit export | partial ERP coverage; reconciliation/expanded modules missing |
@@ -73,7 +73,7 @@ credentials, legal approval or physical hardware.
 
 ## Ordered remaining work
 
-1. Complete quantity consignment and define line-level partial-return allocation/restock policy; full-order quantity/direct/bundle IMEI return compensation is implemented.
+1. Define and implement line-level partial-return allocation/refund/restock policy; full-order quantity/direct/bundle IMEI and serialized/quantity consignment compensation are implemented.
 2. Complete HR schedules and logistics zones/slots/dispatch for first-store operations.
 3. Add service center, store operations, CMS, analytics and legal Waves B.
 4. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
