@@ -152,9 +152,9 @@ export class CatalogService {
     }));
 
     await index.updateSettings({
-      displayedAttributes: ['id', 'sku', 'name', 'price', 'category', 'attrs', 'availableUnits'],
-      searchableAttributes: ['name', 'sku', 'category'],
-      filterableAttributes: ['category', 'archived', 'availableUnits'],
+      displayedAttributes: ['id', 'sku', 'barcode', 'variantGroup', 'name', 'price', 'category', 'attrs', 'availableUnits'],
+      searchableAttributes: ['name', 'sku', 'barcode', 'variantGroup', 'category'],
+      filterableAttributes: ['category', 'variantGroup', 'archived', 'availableUnits'],
       sortableAttributes: ['price', 'availableUnits', 'name'],
     });
 
@@ -263,6 +263,8 @@ export class CatalogService {
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               { sku: { contains: q, mode: 'insensitive' } },
+              { barcode: { contains: q, mode: 'insensitive' } },
+              { variantGroup: { contains: q, mode: 'insensitive' } },
               { category: { contains: q, mode: 'insensitive' } },
             ],
           }
@@ -287,6 +289,8 @@ export class CatalogService {
     return {
       id: product.id,
       sku: product.sku,
+      barcode: product.barcode,
+      variantGroup: product.variantGroup,
       name: product.name,
       price: product.price,
       category: product.category,

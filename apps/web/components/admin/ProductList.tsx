@@ -44,7 +44,7 @@ export function ProductList({
           onKeyDown={(event) => {
             if (event.key === 'Enter') onSearch();
           }}
-          placeholder="SKU, название, категория"
+          placeholder="SKU, штрихкод, семья, название"
           className={inputCls}
         />
         <button
@@ -94,6 +94,11 @@ export function ProductList({
                   <div className="truncate text-sm font-bold text-white">{product.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <span className="font-mono text-[11px] text-[#8A7F76]">{product.sku}</span>
+                    {product.variantGroup && (
+                      <span className="rounded-chip bg-[#2B271D] px-2 py-0.5 text-[11px] font-semibold text-[#E5B23C]">
+                        {product.variantGroup}
+                      </span>
+                    )}
                     <span className="rounded-chip bg-[#16130F] px-2 py-0.5 text-[11px] font-semibold text-lime">
                       {product.category}
                     </span>

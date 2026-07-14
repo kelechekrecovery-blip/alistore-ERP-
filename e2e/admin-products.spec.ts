@@ -13,6 +13,8 @@ test('admin manages products with AI enrichment and approval-gated danger action
 
   await expect(page.getByText('Админ · Товары')).toBeVisible();
   await page.getByPlaceholder('IPHONE-15-128-BLK').fill(sku);
+  await page.getByLabel('Штрихкод варианта').fill(`194253${Date.now()}`);
+  await page.getByLabel('Семья вариантов').fill('iphone-15-ui');
   await page.getByPlaceholder('iPhone 15 128GB Black').fill('iPhone 15 128GB UI');
   await page.getByPlaceholder('109900').fill('120000');
   await page.getByPlaceholder('92000').fill('90000');
@@ -28,7 +30,12 @@ test('admin manages products with AI enrichment and approval-gated danger action
   await expect(page.getByText(sku).first()).toBeVisible();
 
   const created = await prisma.product.findUniqueOrThrow({ where: { sku } });
-  expect(created).toMatchObject({ price: 120000, cost: 90000, category: 'Смартфоны' });
+  expect(created).toMatchObject({
+    price: 120000,
+    cost: 90000,
+    category: 'Смартфоны',
+    variantGroup: 'iphone-15-ui',
+  });
   expect(created.attrs).toEqual(
     expect.objectContaining({
       storage: '128GB',
@@ -60,7 +67,7 @@ test('admin manages products with AI enrichment and approval-gated danger action
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText('Админ · Товары')).toBeVisible();
-  await expect(page.getByPlaceholder('SKU, название, категория')).toBeVisible();
+  await expect(page.getByPlaceholder('SKU, штрихкод, семья, название')).toBeVisible();
   await page.locator('main section').nth(1).evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });

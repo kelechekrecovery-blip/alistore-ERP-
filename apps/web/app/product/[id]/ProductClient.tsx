@@ -22,6 +22,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const { user, hydrated, authed } = useAuth();
   const [product, setProduct] = useState<CatalogProduct | null | 'missing'>(null);
   const [similar, setSimilar] = useState<CatalogProduct[]>([]);
+  const [variants, setVariants] = useState<CatalogProduct[]>([]);
   const [reviews, setReviews] = useState<ProductReviews | null>(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, text: '' });
   const [reviewMsg, setReviewMsg] = useState('');
@@ -34,6 +35,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       if (!active) return;
       setProduct(detail.product ?? 'missing');
       setSimilar(detail.related);
+      setVariants(detail.variants);
       setReviews(nextReviews);
     }).catch(() => active && setProduct('missing'));
     return () => { active = false; };
@@ -69,7 +71,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   }
 
   return <>
-    <div className="md:hidden"><MobileProduct product={product} similar={similar} reviews={reviews} /></div>
+    <div className="md:hidden"><MobileProduct product={product} variants={variants} similar={similar} reviews={reviews} /></div>
     <div className="hidden min-h-screen bg-[#f5f5f7] text-[#0f0f0f] [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
     <SiteHeader />
     <main className="mx-auto max-w-[1400px] px-5 py-8">
@@ -90,6 +92,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           <div className="mt-7 font-display text-4xl font-extrabold text-ink">{som(product.price)}</div>
           <div className="mt-2 text-sm text-deep">Рассрочка 0-0-12 · от {som(Math.round(product.price / 12))} в месяц</div>
           <div className={`mt-5 flex items-center gap-2 text-sm ${inStock ? 'text-[#7ee2a0]' : 'text-[#f4c27d]'}`}><span className={`h-2 w-2 rounded-full ${inStock ? 'bg-[#22c55e] shadow-[0_0_10px_#22c55e]' : 'bg-[#e5b23c]'}`} />{inStock ? `В наличии · ${product.availableUnits} шт.` : 'Доступен под заказ'}</div>
+
+          {variants.length > 0 && <div className="mt-6"><div className="mb-2 text-xs font-semibold uppercase text-[#8A7F76]">Другие варианты</div><div className="flex flex-wrap gap-2"><span className="rounded-[10px] border border-coral bg-tint px-3 py-2 text-sm font-semibold text-deep">{variantLabel(product)}</span>{variants.map((variant) => <Link key={variant.id} href={`/product/${variant.id}`} className="rounded-[10px] border border-[#DED3C8] bg-white px-3 py-2 text-sm text-[#6E645C] hover:border-coral">{variantLabel(variant)} · {som(variant.price)}</Link>)}</div></div>}
 
           <div className="mt-7 grid grid-cols-[auto_1fr] gap-3">
             <div className="flex items-center rounded-[12px] border border-[#DED3C8] bg-white p-1"><button type="button" onClick={() => setQty((value) => Math.max(1, value - 1))} className="grid h-10 w-10 place-items-center rounded-[9px] hover:bg-sand" aria-label="Уменьшить количество">−</button><span className="min-w-8 text-center font-display font-semibold">{qty}</span><button type="button" onClick={() => setQty((value) => Math.min(99, value + 1))} className="grid h-10 w-10 place-items-center rounded-[9px] hover:bg-sand" aria-label="Увеличить количество">+</button></div>
@@ -128,3 +132,4 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
 function Perk({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) { return <div className="flex items-center gap-3 py-2 text-sm text-[#6E645C]"><span className="text-deep">{icon}</span><span>{children}</span></div>; }
 function StoreMessage({ children }: { children: React.ReactNode }) { return <div className="min-h-screen bg-sand text-[#6E645C]"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">{children}</div></div>; }
+function variantLabel(product: CatalogProduct): string { const attrs = product.attrs ?? {}; return [attrs.color ?? attrs['цвет'], attrs.storage ?? attrs.memory ?? attrs['память']].filter(Boolean).map(String).join(' · ') || product.sku; }

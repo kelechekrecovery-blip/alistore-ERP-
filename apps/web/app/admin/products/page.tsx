@@ -124,6 +124,8 @@ export default function AdminProductsPage() {
         const updated = await updateAdminProduct(
           selected.id,
           {
+            barcode: form.barcode.trim(),
+            variantGroup: form.variantGroup.trim(),
             name: form.name.trim(),
             cost: parseSom(form.cost, 'Себестоимость'),
             category: form.category.trim(),
@@ -139,6 +141,8 @@ export default function AdminProductsPage() {
         const created = await createAdminProduct(
           {
             sku: form.sku.trim(),
+            barcode: form.barcode.trim(),
+            variantGroup: form.variantGroup.trim(),
             name: form.name.trim(),
             price: parseSom(form.price, 'Цена'),
             cost: parseSom(form.cost, 'Себестоимость'),

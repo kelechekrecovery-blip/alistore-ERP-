@@ -3,6 +3,8 @@ import type { AdminProduct } from '@/lib/api';
 /** Editable string-backed shape of the admin product form (raw inputs before parsing). */
 export interface ProductForm {
   sku: string;
+  barcode: string;
+  variantGroup: string;
   name: string;
   price: string;
   cost: string;
@@ -12,6 +14,8 @@ export interface ProductForm {
 
 export const emptyForm: ProductForm = {
   sku: '',
+  barcode: '',
+  variantGroup: '',
   name: '',
   price: '',
   cost: '',
@@ -32,6 +36,8 @@ export function attrsToText(attrs: AdminProduct['attrs'] | undefined): string {
 export function formFromProduct(product: AdminProduct): ProductForm {
   return {
     sku: product.sku,
+    barcode: product.barcode ?? '',
+    variantGroup: product.variantGroup ?? '',
     name: product.name,
     price: String(product.price),
     cost: String(product.cost),

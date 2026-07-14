@@ -58,6 +58,8 @@ export class CatalogSearchQueryDto {
 export class CatalogProductDto {
   @ApiProperty() id!: string;
   @ApiProperty() sku!: string;
+  @ApiPropertyOptional({ nullable: true }) barcode!: string | null;
+  @ApiPropertyOptional({ nullable: true }) variantGroup!: string | null;
   @ApiProperty() name!: string;
   @ApiProperty({ example: 109900 }) price!: number;
   @ApiProperty({ example: 'phones' }) category!: string;

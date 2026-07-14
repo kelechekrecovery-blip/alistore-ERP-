@@ -3,6 +3,8 @@ import { deleteAuthJson, getJson, patchAuthJson, postAuthJson } from './http';
 export interface AdminProduct {
   id: string;
   sku: string;
+  barcode: string | null;
+  variantGroup: string | null;
   name: string;
   price: number;
   cost: number;
@@ -21,6 +23,8 @@ export interface AdminProductList {
 
 export interface ProductFormInput {
   sku: string;
+  barcode?: string;
+  variantGroup?: string;
   name: string;
   price: number;
   cost: number;
@@ -29,6 +33,8 @@ export interface ProductFormInput {
 }
 
 export interface ProductUpdateInput {
+  barcode?: string;
+  variantGroup?: string;
   name?: string;
   cost?: number;
   category?: string;

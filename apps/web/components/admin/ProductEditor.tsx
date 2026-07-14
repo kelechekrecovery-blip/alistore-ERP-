@@ -89,6 +89,26 @@ export function ProductEditor({
               />
             </div>
             <div>
+              <label htmlFor="product-barcode" className={labelCls}>Штрихкод варианта</label>
+              <input
+                id="product-barcode"
+                value={form.barcode}
+                onChange={(event) => onUpdateForm({ barcode: event.target.value })}
+                placeholder="194253404842"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label htmlFor="product-variant-group" className={labelCls}>Семья вариантов</label>
+              <input
+                id="product-variant-group"
+                value={form.variantGroup}
+                onChange={(event) => onUpdateForm({ variantGroup: event.target.value })}
+                placeholder="iphone-15"
+                className={inputCls}
+              />
+            </div>
+            <div>
               <label className={labelCls}>Категория</label>
               <div className="flex gap-2">
                 <input

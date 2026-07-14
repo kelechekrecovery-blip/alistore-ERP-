@@ -93,6 +93,8 @@ describe('Product management API', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         sku: `ADMIN-CREATE-${RUN}`,
+        barcode: `194253${RUN}`,
+        variantGroup: `iphone-15-${RUN}`,
         name: 'Admin Created Phone',
         price: 120000,
         cost: 90000,
@@ -103,6 +105,8 @@ describe('Product management API', () => {
 
     expect(created.body).toMatchObject({
       sku: `ADMIN-CREATE-${RUN}`,
+      barcode: `194253${RUN}`,
+      variantGroup: `iphone-15-${RUN}`,
       name: 'Admin Created Phone',
       price: 120000,
       cost: 90000,
@@ -112,17 +116,36 @@ describe('Product management API', () => {
     });
 
     const listed = await request(app.getHttpServer())
-      .get('/products?q=admin-create')
+      .get(`/products?q=${encodeURIComponent(`194253${RUN}`)}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(listed.body.total).toBe(1);
     expect(listed.body.items[0].sku).toBe(`ADMIN-CREATE-${RUN}`);
+    expect(listed.body.items[0]).toMatchObject({
+      barcode: `194253${RUN}`,
+      variantGroup: `iphone-15-${RUN}`,
+    });
+
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        sku: `DUPLICATE-BARCODE-${RUN}`,
+        barcode: `194253${RUN}`,
+        name: 'Duplicate Barcode Phone',
+        price: 120000,
+        cost: 90000,
+        category: 'phones',
+      })
+      .expect(409);
 
     const updated = await request(app.getHttpServer())
       .patch(`/products/${created.body.id}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         name: 'Admin Updated Phone',
+        barcode: `194254${RUN}`,
+        variantGroup: `iphone-15-pro-${RUN}`,
         price: 10,
         cost: 88000,
         category: 'premium phones',
@@ -132,6 +155,8 @@ describe('Product management API', () => {
 
     expect(updated.body).toMatchObject({
       name: 'Admin Updated Phone',
+      barcode: `194254${RUN}`,
+      variantGroup: `iphone-15-pro-${RUN}`,
       price: 120000,
       cost: 88000,
       category: 'premium phones',

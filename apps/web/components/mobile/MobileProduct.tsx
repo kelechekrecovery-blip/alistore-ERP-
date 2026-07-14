@@ -20,10 +20,12 @@ function stars(n: number) {
 
 export default function MobileProduct({
   product,
+  variants: siblingVariants,
   similar,
   reviews,
 }: {
   product: CatalogProduct;
+  variants: CatalogProduct[];
   similar: CatalogProduct[];
   reviews: ProductReviews | null;
 }) {
@@ -37,7 +39,7 @@ export default function MobileProduct({
   const inStock = product.availableUnits > 0;
   const oldPrice = Number(attrs.oldPrice ?? attrs.old_price ?? 0) || 0;
   const monthly = Math.round(product.price / 12);
-  const variants = Object.entries(attrs)
+  const optionValues = Object.entries(attrs)
     .filter(([k]) => VARIANT_KEYS.some((vk) => k.toLowerCase().includes(vk)))
     .map(([, v]) => String(v))
     .filter(Boolean);
@@ -109,19 +111,21 @@ export default function MobileProduct({
         </div>
 
         {/* variants */}
-        {variants.length > 0 && (
+        {(siblingVariants.length > 0 || optionValues.length > 0) && (
           <>
             <div className="mb-2 mt-[18px] text-[12px] text-[#A79C92]">Цвет / память</div>
             <div className="flex flex-wrap gap-2">
-              {variants.map((v, i) => (
-                <span
-                  key={v}
-                  className={`rounded-[10px] border px-3.5 py-2.5 text-[13px] ${
-                    i === 0 ? 'border-lime bg-lime/10 text-lime' : 'border-[#2E2822] bg-[#221E19] text-[#D8CFC6]'
-                  }`}
+              <span className="rounded-[10px] border border-lime bg-lime/10 px-3.5 py-2.5 text-[13px] text-lime">
+                {optionValues.join(' · ') || product.sku}
+              </span>
+              {siblingVariants.map((variant) => (
+                <Link
+                  key={variant.id}
+                  href={`/product/${variant.id}`}
+                  className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3.5 py-2.5 text-[13px] text-[#D8CFC6]"
                 >
-                  {v}
-                </span>
+                  {variantOptionLabel(variant)}
+                </Link>
               ))}
             </div>
           </>
@@ -209,4 +213,12 @@ export default function MobileProduct({
     </div>
     </MobileFrame>
   );
+}
+
+function variantOptionLabel(product: CatalogProduct): string {
+  const attrs = product.attrs ?? {};
+  return [attrs.color ?? attrs['цвет'], attrs.storage ?? attrs.memory ?? attrs['память']]
+    .filter(Boolean)
+    .map(String)
+    .join(' · ') || product.sku;
 }

@@ -51,6 +51,18 @@ export class CreateProductDto {
   @MaxLength(80)
   sku!: string;
 
+  @ApiPropertyOptional({ example: '194253404842' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  barcode?: string;
+
+  @ApiPropertyOptional({ example: 'iphone-15' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  variantGroup?: string;
+
   @ApiProperty({ example: 'iPhone 15 128GB Black' })
   @IsString()
   @MaxLength(160)
@@ -82,6 +94,18 @@ export class CreateProductDto {
 }
 
 export class UpdateProductDto {
+  @ApiPropertyOptional({ example: '194253404842', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  barcode?: string;
+
+  @ApiPropertyOptional({ example: 'iphone-15', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  variantGroup?: string;
+
   @ApiPropertyOptional({ example: 'iPhone 15 128GB Black' })
   @IsOptional()
   @IsString()

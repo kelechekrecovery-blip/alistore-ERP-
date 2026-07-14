@@ -43,6 +43,41 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   expect(await prisma.payment.count({ where: { orderId: order?.id, method: 'card' } })).toBe(1);
 });
 
+test('product page switches between independently stocked variants', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('VARIANT-BLACK', 100000);
+  await prisma.product.update({
+    where: { id: product.id },
+    data: { variantGroup: 'iphone-variant-e2e', attrs: { color: 'Black', storage: '128GB' } },
+  });
+  const sibling = await prisma.product.create({
+    data: {
+      sku: `VARIANT-BLUE-${Date.now()}`,
+      barcode: `BAR-${Date.now()}`,
+      variantGroup: 'iphone-variant-e2e',
+      name: 'Variant Blue iPhone',
+      price: 110000,
+      cost: 85000,
+      category: 'phones',
+      attrs: { color: 'Blue', storage: '256GB' },
+    },
+  });
+  await prisma.deviceUnit.create({
+    data: { imei: `VARIANT-BLUE-${Date.now()}-IMEI`, productId: sibling.id, status: 'in_stock', location: 'BISHKEK-1' },
+  });
+
+  await page.goto(`/product/${product.id}`);
+  const variantLink = page.getByRole('link', { name: /Blue · 256GB/ }).first();
+  await expect(variantLink).toBeVisible();
+  await variantLink.click();
+  await expect(page.getByRole('heading', { name: sibling.name })).toBeVisible();
+
+  await page.setViewportSize({ width: 402, height: 858 });
+  await page.goto(`/product/${product.id}`);
+  await expect(page.getByRole('link', { name: /Blue · 256GB/ }).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
+});
+
 test('authenticated checkout redeems server loyalty and canonical promo exactly once', async ({ page }) => {
   await resetDb();
   const { product } = await seedProduct('LOYALTY-E2E');

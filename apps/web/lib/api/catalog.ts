@@ -3,6 +3,8 @@ import { API_BASE, postAuthJson } from './http';
 export interface CatalogProduct {
   id: string;
   sku: string;
+  barcode?: string | null;
+  variantGroup?: string | null;
   name: string;
   price: number;
   category: string;
@@ -193,6 +195,7 @@ export async function fetchProduct(id: string): Promise<CatalogProduct | null> {
 
 export interface ProductWithRelated {
   product: CatalogProduct | null;
+  variants: CatalogProduct[];
   related: CatalogProduct[];
 }
 
@@ -234,7 +237,13 @@ export async function fetchProductWithRelated(id: string, relatedLimit = 6): Pro
 async function fetchProductWithRelatedUncached(id: string, relatedLimit: number): Promise<ProductWithRelated> {
   const catalog = await fetchCatalog({ limit: 100 });
   const product = catalog.items.find((p) => p.id === id) ?? null;
-  if (!product) return { product: null, related: [] };
+  if (!product) return { product: null, variants: [], related: [] };
+
+  const variants = product.variantGroup
+    ? catalog.items
+        .filter((item) => item.id !== product.id && item.variantGroup === product.variantGroup)
+        .sort((a, b) => a.price - b.price || a.name.localeCompare(b.name, 'ru'))
+    : [];
 
   const related = catalog.items
     .filter((p) => p.id !== product.id && p.category === product.category)
@@ -247,7 +256,7 @@ async function fetchProductWithRelatedUncached(id: string, relatedLimit: number)
     })
     .slice(0, relatedLimit);
 
-  return { product, related };
+  return { product, variants, related };
 }
 
 export async function fetchProductReviews(id: string): Promise<ProductReviews> {

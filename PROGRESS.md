@@ -1246,3 +1246,12 @@
 - Checks run: Prisma format/validation/generation; API and Next production builds; targeted Finance API 4/4 including RBAC, replay and concurrent updates; targeted Playwright Finance flow; browser screenshot inspection at 1280x720; full `npm run mvp:verify`; `git diff --check`.
 - Outcome: API 111/111 suites and 435/435 tests, Playwright 23/23, API/Web builds and mobile typecheck are green. This closes period budgets/plan-fact only; cashflow forecast, cash collection, supplier calendar and currency/branch settlement remain later Finance 2.0 scope.
 - Next step: implement product variants and bundles with atomic component-stock validation across catalog, checkout and POS.
+
+## 2026-07-14
+
+- Task: implement first-class product variants across ERP, catalog and customer product pages.
+- Files changed: Product Prisma schema/migration; product and catalog DTO/services/search indexing; ERP product form/list and typed clients; desktop/mobile product detail; API and Playwright regressions; backlog/readiness/gap-map documentation.
+- Result: each sellable variant remains an independent SKU with its own server-authoritative price and DeviceUnit stock, while optional `variantGroup` links sibling colors/storage options and optional `barcode` is globally unique. Owner/admin ERP can create and edit both fields, Postgres/Meilisearch can discover them, and desktop/mobile storefront cards switch to the actual sibling SKU instead of presenting inert attribute chips. Product create/update remains RBAC-protected and Ledger-backed.
+- Checks run: Prisma validation/generation and isolated test DB sync; API/Next production builds; targeted product/catalog Jest 6/6; targeted ERP/storefront Playwright 5/5; desktop/mobile screenshot inspection at 1440px and 402px with mobile `scrollWidth=402`; full `npm run mvp:verify`; `git diff --check`.
+- Outcome: API 111/111 suites and 435/435 tests, Playwright 24/24, API/Web builds and mobile typecheck are green. External readiness remains blocked by the same 12 credential/manual certification groups. This iteration completes variant families only; bundles still require explicit component expansion, atomic reservation/deduction and bundle-aware returns.
+- Next step: implement product bundles with atomic component availability/reservation/sale across checkout and POS, then expose bundle composition in ERP and storefront.

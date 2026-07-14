@@ -61,6 +61,8 @@ export class ProductsService {
             OR: [
               { name: { contains: normalized.q, mode: 'insensitive' } },
               { sku: { contains: normalized.q, mode: 'insensitive' } },
+              { barcode: { contains: normalized.q, mode: 'insensitive' } },
+              { variantGroup: { contains: normalized.q, mode: 'insensitive' } },
               { category: { contains: normalized.q, mode: 'insensitive' } },
             ],
           }
@@ -90,6 +92,8 @@ export class ProductsService {
     const sku = dto.sku.trim();
     const name = dto.name.trim();
     const category = dto.category.trim();
+    const barcode = this.optionalValue(dto.barcode);
+    const variantGroup = this.optionalValue(dto.variantGroup);
     if (!sku || !name || !category) {
       throw new ValidationError('product_fields_required', 'SKU, название и категория обязательны');
     }
@@ -98,11 +102,16 @@ export class ProductsService {
     if (existing) {
       throw new ConflictError('product_sku_exists', `SKU ${sku} уже существует`);
     }
+    if (barcode && await this.prisma.product.findUnique({ where: { barcode } })) {
+      throw new ConflictError('product_barcode_exists', `Штрихкод ${barcode} уже существует`);
+    }
 
     return this.audit.transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
           sku,
+          barcode,
+          variantGroup,
           name,
           price: dto.price,
           cost: dto.cost,
@@ -120,6 +129,8 @@ export class ProductsService {
             payload: {
               productId: product.id,
               sku,
+              barcode,
+              variantGroup,
               name,
               price: dto.price,
               cost: dto.cost,
@@ -139,6 +150,17 @@ export class ProductsService {
     }
 
     const data: Prisma.ProductUpdateInput = {};
+    if (dto.barcode !== undefined) {
+      const barcode = this.optionalValue(dto.barcode);
+      if (barcode) {
+        const existing = await this.prisma.product.findUnique({ where: { barcode } });
+        if (existing && existing.id !== productId) {
+          throw new ConflictError('product_barcode_exists', `Штрихкод ${barcode} уже существует`);
+        }
+      }
+      data.barcode = barcode;
+    }
+    if (dto.variantGroup !== undefined) data.variantGroup = this.optionalValue(dto.variantGroup);
     if (dto.name !== undefined) {
       const name = dto.name.trim();
       if (!name) throw new ValidationError('product_name_required', 'Название товара обязательно');
@@ -322,6 +344,8 @@ export class ProductsService {
     return {
       id: product.id,
       sku: product.sku,
+      barcode: product.barcode,
+      variantGroup: product.variantGroup,
       name: product.name,
       price: product.price,
       cost: product.cost,
@@ -340,5 +364,9 @@ export class ProductsService {
         },
       },
     };
+  }
+
+  private optionalValue(value: string | undefined): string | null {
+    return value?.trim() || null;
   }
 }
