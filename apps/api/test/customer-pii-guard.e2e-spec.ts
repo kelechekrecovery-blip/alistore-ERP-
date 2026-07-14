@@ -31,7 +31,7 @@ describe('Customer PII read policy (required JWT + masking)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
-    await app.init();
+    await app.listen(0, '127.0.0.1');
     prisma = moduleRef.get(PrismaService);
     jwt = moduleRef.get(JwtService);
     await Promise.all(['seller', 'admin'].map((role) => prisma.staffUser.upsert({

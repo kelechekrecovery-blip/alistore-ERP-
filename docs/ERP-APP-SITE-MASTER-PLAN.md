@@ -12,10 +12,11 @@ state machine and pass a cross-surface E2E scenario.
 
 - Storefront and ERP share the NestJS API, PostgreSQL catalog, customers, orders,
   payments, stock, procurement, warranty, support, approvals and reporting data.
-- Android Client, Staff, Courier and the first POS sale vertical use typed forms of
-  those contracts. Four APKs build; API and emulator gates are green.
-- Web POS/ERP covers more operations than native POS. iOS and Android role parity,
-  some 95-screen ERP modules, live providers and physical hardware are incomplete.
+- Android Client, Staff, Courier and POS use typed forms of those contracts. Four
+  APKs build; JVM/Lint and selected API 36 Compose gates are green.
+- Web and both native platforms implement the first POS/Staff/Courier software
+  verticals. App-level native E2E, some 95-screen ERP modules, live providers and
+  physical hardware remain incomplete.
 - Therefore ERP App/site integration is functional for implemented verticals, but
   the complete ecosystem and production certification are not finished.
 
@@ -111,10 +112,10 @@ and one pilot store completes every required real transaction and reconciliation
 
 ## Execution order
 
-1. Finish Android POS scanner/shift/receipt/refund and queued approval recovery.
-2. Add the generated integration matrix and cross-surface E2E fixtures.
-3. Complete iOS role parity and Android device certification gaps.
-4. Deliver ERP Wave A, then Waves B/C by handoff acceptance.
+1. Maintain the generated integration matrix and add cross-surface E2E fixtures.
+2. Complete quantity/consignment warehouse, serialized return/restock, HR and logistics.
+3. Add app-specific XCUITest/Compose E2E and close native device certification gaps.
+4. Deliver remaining ERP Waves B/C by handoff acceptance.
 5. Run ecosystem E2E and security/load/restore gates.
 6. Activate staging, live providers, store releases and the first-store pilot.
 

@@ -4,9 +4,9 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **36 миграций**
+- **47 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **38 миграций**
 - **112 API test suites / 440 тестов — зелёные** (`jest`)
-- **23 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle, customer account synchronization, server-authoritative loyalty checkout и exact desktop customer routes (`npm run e2e`)
+- **25 Playwright smoke-flow — зелёные**, включая Purchase Order, Finance expense lifecycle, product variants/bundles, customer account synchronization, server-authoritative loyalty checkout и exact desktop customer routes (`npm run e2e`)
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **29/29** on iPhone 17 Pro Simulator; Courier and POS install and launch on that simulator. iOS Staff, Courier and POS now use real staff-JWT operations; Courier and POS include persistent offline recovery, while Staff/Courier retain Evidence and APNs/deep-link routing. Android four-APK build, unit tests and Lint pass after the shared stable COD handover-key extension. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -73,7 +73,8 @@ npm run launch:readiness:strict       # strict external gate
 cd apps/api && npx jest                 # 112 suites / 440 тестов ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (37 роутов)
-npm run e2e                           # 23/23 ✓
+npm run e2e                           # 25/25 ✓
+npm run ecosystem:verify              # web/API + all iOS targets/XCTest + four Android APKs/JVM/Lint
 npm run mobile:store-preflight        # 0 failures; production env warnings only
 cd apps/mobile && npx expo-doctor     # 20/20 ✓
 npm run ios:generate                  # regenerates AliStoreNative.xcodeproj

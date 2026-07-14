@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Establish a proof-oriented ecosystem completion process: 23-handoff acceptance audit, role-based black-box gates, reusable master engineering prompt and a root `ecosystem:verify` command that includes web/API plus all iOS and Android software builds/tests while explicitly separating native UI and physical certification.
 - Add virtual product bundles across ERP, catalog, checkout and POS: explicit component composition, component-derived availability, atomic serialized reservation/sale, bundle-aware margin, replay/concurrency protection, direct-stock/procurement/nesting guards, Event Ledger traceability and API/browser regression coverage.
 - Add first-class product variants: optional unique barcode and variant-family identity per SKU, independent DeviceUnit stock/price, ERP create/edit/list presentation, Postgres and Meilisearch discovery, desktop/mobile storefront switching and API/browser/visual regression coverage.
 - Extend Finance 2.0 with period and point budgets plus paid-expense plan-vs-actual reporting: atomic versioned upsert, stable idempotency command journal, concurrent-update serialization, owner/admin RBAC, Event Ledger, responsive ERP controls and API/browser regression coverage.

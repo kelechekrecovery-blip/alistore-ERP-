@@ -42,7 +42,7 @@ describe('Courier and print/export RBAC', () => {
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await app.init();
+    await app.listen(0, '127.0.0.1');
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
 
