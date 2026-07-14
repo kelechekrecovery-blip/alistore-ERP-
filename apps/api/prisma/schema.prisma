@@ -717,18 +717,25 @@ model OrderItem {
 }
 
 model Payment {
-  id        String        @id @default(cuid())
-  order     Order?        @relation(fields: [orderId], references: [id])
-  orderId   String?
-  amount    Int // отрицательное = возврат
-  method    PaymentMethod
-  status    PaymentStatus @default(pending)
-  shift     CashShift?    @relation(fields: [shiftId], references: [id])
-  shiftId   String?
-  txnId     String?       @unique // идемпотентность webhook (dedup)
-  createdAt DateTime      @default(now())
+  id                 String            @id @default(cuid())
+  order              Order?            @relation(fields: [orderId], references: [id])
+  orderId            String?
+  serviceWorkOrder   ServiceWorkOrder? @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
+  serviceWorkOrderId String?
+  originalPayment    Payment?          @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPaymentId  String?
+  refunds            Payment[]         @relation("PaymentRefunds")
+  amount             Int // отрицательное = возврат
+  method             PaymentMethod
+  status             PaymentStatus     @default(pending)
+  shift              CashShift?        @relation(fields: [shiftId], references: [id])
+  shiftId            String?
+  txnId              String?           @unique // идемпотентность webhook (dedup)
+  createdAt          DateTime          @default(now())
 
   @@index([orderId])
+  @@index([serviceWorkOrderId])
+  @@index([originalPaymentId])
   @@index([shiftId])
   @@index([status, createdAt]) // dashboards/KPI/payroll filter by status + date window
 }
@@ -897,11 +904,14 @@ model ServiceWorkOrder {
   estimateApprovedAt DateTime?
   estimateApprovedBy String?
   createdBy          String
+  point              String
+  payments           Payment[]
   commands           ServiceWorkOrderCommand[]
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 
   @@index([technicianId, createdAt])
+  @@index([point, createdAt])
   @@index([estimateApprovedAt, createdAt])
 }
 
@@ -1324,6 +1334,7 @@ model StaffUser {
   username       String          @unique
   passwordHash   String
   role           Role
+  point          String          @default("BISHKEK-1")
   active         Boolean         @default(true)
   totpSecret     String?
   totpEnabled    Boolean         @default(false)

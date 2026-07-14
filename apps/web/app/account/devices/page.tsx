@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { approveMyServiceEstimate, fetchMyDevices, fetchMyServiceWorkOrders, type MyDevice, type ServiceWorkOrder } from '@/lib/api';
+import { approveMyServiceEstimate, fetchMyDevices, fetchMyServiceWorkOrders, receivedServiceTotal, type MyDevice, type ServiceWorkOrder } from '@/lib/api';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
 import { AccountDetailFrame } from '@/components/AccountDetailFrame';
 
@@ -128,11 +128,23 @@ export default function DevicesPage() {
             </div>
             {workOrder.estimatePreparedAt ? <div data-testid={`service-estimate-${workOrder.id}`} className="mt-3 rounded-[8px] border border-[#3B342D] bg-[#16130F] p-3">
               <div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-semibold text-[#D8CFC6]">Смета сервис-центра</div><div className="mt-1 text-[12px] text-[#8A7F76]">{workOrder.diagnosticSummary}</div></div><div className="whitespace-nowrap font-mono text-[13px] font-bold text-lime">{workOrder.estimateAmount?.toLocaleString('ru-RU')} с</div></div>
-              {workOrder.estimateApprovedAt ? <div className="mt-3 text-[12px] font-semibold text-lime">Смета подтверждена · устройство в работе</div> : <button type="button" disabled={approving === workOrder.id} onClick={() => void approveEstimate(workOrder)} className="mt-3 w-full rounded-[8px] bg-coral px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-50">{approving === workOrder.id ? 'Подтверждаем…' : 'Подтвердить смету'}</button>}
+              {workOrder.estimateApprovedAt ? <ServicePaymentState workOrder={workOrder} /> : <button type="button" disabled={approving === workOrder.id} onClick={() => void approveEstimate(workOrder)} className="mt-3 w-full rounded-[8px] bg-coral px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-50">{approving === workOrder.id ? 'Подтверждаем…' : 'Подтвердить смету'}</button>}
             </div> : <div className="mt-3 text-[12px] text-[#8A7F76]">Устройство принято, ожидается диагностика</div>}
             {serviceError && approving === '' && <p role="alert" className="mt-2 text-[12px] text-danger">{serviceError}</p>}
           </div>)}
         </div>
     </AccountDetailFrame>
   );
+}
+
+function ServicePaymentState({ workOrder }: { workOrder: ServiceWorkOrder }) {
+  const paid = receivedServiceTotal(workOrder);
+  const estimate = workOrder.estimateAmount ?? 0;
+  if (estimate > 0 && paid >= estimate) {
+    return <div data-testid={`service-payment-status-${workOrder.id}`} className="mt-3 text-[12px] font-semibold text-lime">Оплачено · {paid.toLocaleString('ru-RU')} с</div>;
+  }
+  if (paid > 0) {
+    return <div data-testid={`service-payment-status-${workOrder.id}`} className="mt-3 text-[12px] font-semibold text-warn">Частичный возврат · осталось оплачено {paid.toLocaleString('ru-RU')} с</div>;
+  }
+  return <div data-testid={`service-payment-status-${workOrder.id}`} className="mt-3 text-[12px] font-semibold text-lime">Смета подтверждена · оплатите на кассе</div>;
 }

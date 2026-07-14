@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- Complete Service Center Wave B beyond verified warranty and paid external intake/diagnostics/customer-estimate approval: POS-linked service payment, parts consumption, technician execution/SLA transitions, loaner-device custody and the 30-day post-repair warranty.
+- Complete Service Center Wave B beyond verified intake/diagnostics/approval/POS settlement: parts consumption, technician execution/SLA transitions, loaner-device custody and the 30-day post-repair warranty.
 - Restore or explicitly retire the 64 missing `.dc.html` files linked by the 23 committed handoffs; maintain `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` until every row has route/app, API/model, RBAC, Ledger, role E2E and visual evidence.
 - Add one reconciled all-role ecosystem E2E and packaged-app acceptance: customer-to-payment-to-stock-to-pickup/courier/POS/refund, all staff roles, iOS XCUITest targets, connected tests in each Android app module and committed visual goldens.
 - Run first-store HR acceptance with real schedules, payroll, cash handover and physical Staff devices; certify APNs/FCM delivery plus scanner/camera behavior without changing the now-verified native attendance contracts.
@@ -24,6 +24,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Link paid Service Center estimates to POS and finance: cashier-owned open shift, exact/split tender, work-order locking, stable replay, refund provenance, Event Ledger, ERP handoff, customer payment state and concurrent API/browser acceptance without synthetic orders or inventory mutation.
 - Add third-party paid repair intake across ERP and the customer account: customer reuse/creation, external serial isolation from sellable DeviceUnit stock, technician validation, diagnosis/estimate, customer-owned approval, stable replay, paid-service Ledger events and API/browser acceptance.
 - Add the first authoritative Service Center vertical across ERP and the customer site: warranty work-order intake, technician assignment, diagnostics and estimate, customer-owned approval, durable staff/customer idempotency keys, RBAC/ownership, Event Ledger and API/browser acceptance.
 - Complete native Staff HR attendance on SwiftUI and Compose: JWT-owned weekly schedule, server-authoritative open/close, stable command keys, durable SwiftData/SQLite queues, explicit replay/conflict states, WorkManager recovery, attendance push routing and simulator/emulator contract/UI gates.

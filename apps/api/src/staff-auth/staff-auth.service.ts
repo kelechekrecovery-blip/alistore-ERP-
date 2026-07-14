@@ -11,6 +11,7 @@ export interface StaffTokens {
   staffId: string;
   username: string;
   role: Role;
+  point: string;
   totpEnabled: boolean;
 }
 
@@ -29,10 +30,10 @@ export class StaffAuthService {
   ) {}
 
   /** Provision a staff account (owner tooling / seed). Password stored via argon2. */
-  async createStaff(username: string, password: string, role: Role) {
+  async createStaff(username: string, password: string, role: Role, point = 'BISHKEK-1') {
     const passwordHash = await argon2.hash(password);
     return this.prisma.staffUser.create({
-      data: { username, passwordHash, role },
+      data: { username, passwordHash, role, point: point.trim() || 'BISHKEK-1' },
     });
   }
 
@@ -70,6 +71,7 @@ export class StaffAuthService {
       staffId: staff.id,
       username: staff.username,
       role: staff.role,
+      point: staff.point,
       totpEnabled: staff.totpEnabled,
     };
   }
@@ -175,6 +177,7 @@ export class StaffAuthService {
       id: staff.id,
       username: staff.username,
       role: staff.role,
+      point: staff.point,
       active: staff.active,
       totpEnabled: staff.totpEnabled,
     };

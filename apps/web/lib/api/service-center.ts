@@ -10,6 +10,8 @@ export interface ServiceWorkOrder {
   estimatePreparedAt: string | null;
   estimateApprovedAt: string | null;
   estimateApprovedBy: string | null;
+  point: string;
+  payments: ServicePayment[];
   warrantyCase: {
     id: string;
     imei: string;
@@ -20,6 +22,32 @@ export interface ServiceWorkOrder {
     deviceName: string | null;
     sla: string;
   };
+}
+
+export interface ServicePayment {
+  id: string;
+  amount: number;
+  method: string;
+  status: string;
+  shiftId: string | null;
+  createdAt: string;
+}
+
+export interface ServicePaymentContext {
+  id: string;
+  warrantyCaseId: string;
+  diagnosticSummary: string | null;
+  estimateAmount: number | null;
+  estimateApprovedAt: string | null;
+  point: string;
+  warrantyCase: Pick<ServiceWorkOrder['warrantyCase'], 'id' | 'imei' | 'customerId' | 'deviceName'>;
+  customer: { id: string; name: string; phone: string } | null;
+  paidTotal: number;
+}
+
+export interface ServicePaymentResult extends ServiceWorkOrder {
+  paidTotal: number;
+  shiftId: string;
 }
 
 export interface ServiceQueueItem {
@@ -72,4 +100,27 @@ export function fetchMyServiceWorkOrders(accessToken: string) {
 
 export function approveMyServiceEstimate(id: string, accessToken: string, idempotencyKey: string) {
   return postAuthJson<ServiceWorkOrder>(`/service-center/me/work-orders/${encodeURIComponent(id)}/approve-estimate`, {}, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function fetchServicePaymentContext(id: string, accessToken: string) {
+  return getJson<ServicePaymentContext>(`/service-center/work-orders/${encodeURIComponent(id)}/payment-context`, accessToken);
+}
+
+export function payServiceWorkOrder(
+  id: string,
+  payments: Array<{ method: string; amount: number }>,
+  accessToken: string,
+  idempotencyKey: string,
+) {
+  return postAuthJson<ServicePaymentResult>(
+    `/service-center/work-orders/${encodeURIComponent(id)}/pay`,
+    { payments },
+    accessToken,
+    { 'idempotency-key': idempotencyKey },
+  );
+}
+
+export function receivedServiceTotal(workOrder: Pick<ServiceWorkOrder, 'payments'>) {
+  return (workOrder.payments ?? [])
+    .reduce((sum, payment) => sum + payment.amount, 0);
 }

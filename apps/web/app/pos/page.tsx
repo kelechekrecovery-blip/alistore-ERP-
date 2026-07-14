@@ -28,6 +28,7 @@ import {
 import { PosCatalog } from '@/components/pos/PosCatalog';
 import { PosCheckout } from '@/components/pos/PosCheckout';
 import { PosTicket } from '@/components/pos/PosTicket';
+import { ServicePosPayment } from '@/components/pos/ServicePosPayment';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
   clearStaffSession,
@@ -60,9 +61,11 @@ export default function PosPage() {
   const [terminalMessage, setTerminalMessage] = useState('Терминал готов к проверке');
   const [catalogSync, setCatalogSync] = useState('Каталог готов к delta sync');
   const [session, setSession] = useState<StaffSession | null>(null);
+  const [serviceWorkOrderId, setServiceWorkOrderId] = useState('');
 
   useEffect(() => {
     setSession(loadStaffSession());
+    setServiceWorkOrderId(new URLSearchParams(window.location.search).get('serviceWorkOrderId') ?? '');
   }, []);
 
   useEffect(() => {
@@ -304,6 +307,13 @@ export default function PosPage() {
         />
       </div>
     );
+  }
+
+  if (serviceWorkOrderId) {
+    return <ServicePosPayment workOrderId={serviceWorkOrderId} session={session} onBack={() => {
+      window.history.replaceState({}, '', '/pos');
+      setServiceWorkOrderId('');
+    }} />;
   }
 
   return (

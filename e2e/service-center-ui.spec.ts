@@ -97,18 +97,54 @@ test('ERP accepts a third-party paid repair and the customer approves its estima
   const estimate = accountRepair.locator('[data-testid^="service-estimate-"]');
   await expect(estimate).toContainText('Требуется модуль дисплея');
   await estimate.getByRole('button', { name: 'Подтвердить смету' }).click();
-  await expect(estimate).toContainText('Смета подтверждена · устройство в работе');
+  await expect(estimate).toContainText('Смета подтверждена · оплатите на кассе');
 
   const warrantyCase = await prisma.warrantyCase.findFirstOrThrow({ where: { customerId: customer.id, imei: serial } });
   expect(warrantyCase).toMatchObject({ serviceType: 'paid', deviceName: 'Xiaomi 13 Pro', status: 'approved' });
   expect(await prisma.deviceUnit.count({ where: { imei: serial } })).toBe(0);
   const workOrder = await prisma.serviceWorkOrder.findUniqueOrThrow({ where: { warrantyCaseId: warrantyCase.id } });
   expect(workOrder).toMatchObject({ estimateAmount: 6500, diagnosticFee: 500, estimateApprovedBy: customer.id });
+  const shift = await prisma.cashShift.create({ data: { staffId: owner.staffId, point: 'BISHKEK-1', openCash: 1000, openIdempotencyKey: `paid-ui-shift-${Date.now()}` } });
+
+  await page.goto(`/pos?serviceWorkOrderId=${encodeURIComponent(workOrder.id)}`);
+  await expect(page.getByTestId('service-payment-ticket')).toContainText('Xiaomi 13 Pro');
+  await expect(page.getByTestId('service-payment-ticket')).toContainText('6 500');
+  await page.getByTestId('service-payment-open').click();
+  await page.getByRole('button', { name: 'Split' }).click();
+  await page.getByTestId('split-payment-amount-0').fill('2500');
+  await page.getByTestId('split-payment-amount-1').fill('4000');
+  await page.getByTestId('service-payment-submit').click();
+  await expect(page.getByTestId('service-payment-success')).toContainText('6 500');
+
+  const payments = await prisma.payment.findMany({ where: { serviceWorkOrderId: workOrder.id }, orderBy: { amount: 'asc' } });
+  expect(payments.map(({ amount, method, shiftId, orderId }) => ({ amount, method, shiftId, orderId }))).toEqual([
+    { amount: 2500, method: 'cash', shiftId: shift.id, orderId: null },
+    { amount: 4000, method: 'card', shiftId: shift.id, orderId: null },
+  ]);
+  expect(await prisma.deviceUnit.count({ where: { imei: serial } })).toBe(0);
+
+  await page.goto('/account/devices');
+  await expect(page.getByTestId(`service-payment-status-${workOrder.id}`)).toContainText('Оплачено · 6 500 с');
+  await prisma.payment.create({
+    data: {
+      serviceWorkOrderId: workOrder.id,
+      originalPaymentId: payments[0].id,
+      amount: -1000,
+      method: payments[0].method,
+      status: 'refunded',
+    },
+  });
+  await page.reload();
+  await expect(page.getByTestId(`service-payment-status-${workOrder.id}`)).toContainText('Частичный возврат · осталось оплачено 5 500 с');
   const eventTypes = (await prisma.auditEvent.findMany({ where: { refs: { has: workOrder.id } }, orderBy: { ts: 'asc' } })).map((event) => event.type);
-  expect(eventTypes).toEqual([
+  expect(eventTypes).toHaveLength(7);
+  expect(eventTypes).toEqual(expect.arrayContaining([
     'service.paid_repair_received',
     'service.work_order_created',
     'service.diagnostics_completed',
     'service.estimate_approved',
-  ]);
+    'payment.received',
+    'payment.received',
+    'service.payment_completed',
+  ]));
 });

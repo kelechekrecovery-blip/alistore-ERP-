@@ -33,6 +33,7 @@ export async function resetDb() {
   await prisma.productReview.deleteMany();
   await prisma.campaign.deleteMany();
   await prisma.serviceWorkOrderCommand.deleteMany();
+  await prisma.payment.deleteMany();
   await prisma.serviceWorkOrder.deleteMany();
   await prisma.warrantyCase.deleteMany();
   await prisma.debtPlan.deleteMany();
@@ -52,7 +53,6 @@ export async function resetDb() {
   await prisma.consignmentAdjustment.deleteMany();
   await prisma.consignmentItem.deleteMany();
   await prisma.consignmentPayout.deleteMany();
-  await prisma.payment.deleteMany();
   await prisma.returnItem.deleteMany();
   await prisma.return.deleteMany();
   await prisma.orderItem.deleteMany();

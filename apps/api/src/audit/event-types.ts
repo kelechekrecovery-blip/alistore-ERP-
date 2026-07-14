@@ -67,6 +67,7 @@ export const EventType = {
   ServicePaidRepairReceived: 'service.paid_repair_received',
   ServiceDiagnosticsCompleted: 'service.diagnostics_completed',
   ServiceEstimateApproved: 'service.estimate_approved',
+  ServicePaymentCompleted: 'service.payment_completed',
   // supplier RMA
   RmaOpened: 'rma.opened',
   RmaShipped: 'rma.shipped',

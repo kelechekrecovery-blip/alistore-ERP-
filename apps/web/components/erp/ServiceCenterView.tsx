@@ -1,12 +1,14 @@
 'use client';
 
 import { CheckCircle2, Clock3, RefreshCw, Smartphone, Stethoscope, UserRound, Wrench } from 'lucide-react';
+import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createPaidRepair,
   createServiceWorkOrder,
   diagnoseServiceWorkOrder,
   fetchServiceQueue,
+  receivedServiceTotal,
   type ServiceQueueItem,
 } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -233,6 +235,9 @@ function PaidRepairPanel({
         <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-white">{item.productName}</div><div className="font-mono text-[10px] text-[#8A7F76]">{item.imei} · {item.customer?.phone}</div></div>
         <div className="text-right"><div className="text-xs font-semibold text-lime">{STATUS[item.status] ?? item.status}</div>{item.workOrder?.estimateAmount != null && <div className="font-mono text-[11px] text-white">{som(item.workOrder.estimateAmount)}</div>}</div>
         {item.workOrder && ['received', 'diagnostics'].includes(item.status) && <button type="button" onClick={() => onDiagnose(item)} className="rounded-[8px] border border-[#3B342D] px-3 py-2 text-xs font-semibold text-white"><Stethoscope className="mr-1.5 inline" size={13} />{item.status === 'received' ? 'Диагностика' : 'Смета'}</button>}
+        {item.workOrder && item.status === 'approved' && receivedServiceTotal(item.workOrder) <= 0 && <Link href={`/pos?serviceWorkOrderId=${encodeURIComponent(item.workOrder.id)}`} className="rounded-[8px] bg-lime px-3 py-2 text-xs font-bold text-lime-ink">Оплатить на POS</Link>}
+        {item.workOrder && item.workOrder.estimateAmount != null && receivedServiceTotal(item.workOrder) >= item.workOrder.estimateAmount && <span data-testid={`service-payment-status-${item.workOrder.id}`} className="rounded-[8px] bg-lime/10 px-3 py-2 text-xs font-semibold text-lime">Оплачено</span>}
+        {item.workOrder && item.workOrder.estimateAmount != null && receivedServiceTotal(item.workOrder) > 0 && receivedServiceTotal(item.workOrder) < item.workOrder.estimateAmount && <span data-testid={`service-payment-status-${item.workOrder.id}`} className="rounded-[8px] bg-warn/10 px-3 py-2 text-xs font-semibold text-warn">Частичный возврат · {som(receivedServiceTotal(item.workOrder))}</span>}
       </div>)}</div>
     </div>
   </div>;

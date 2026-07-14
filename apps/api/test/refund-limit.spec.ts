@@ -46,7 +46,7 @@ describe('Refund cumulative limit (invariant #1)', () => {
 
     const err = await doRefund(100000).catch((e) => e); // second — over the limit
     expect(err).toBeInstanceOf(ValidationError);
-    expect((err as ValidationError).code).toBe('refund_exceeds_paid');
+    expect((err as ValidationError).code).toBe('refund_exceeds_tender');
 
     // Net paid for the order is exactly zero (100k in, 100k refunded) — not -100k.
     const agg = await prisma.payment.aggregate({
@@ -88,5 +88,60 @@ describe('Refund cumulative limit (invariant #1)', () => {
       _sum: { amount: true },
     });
     expect(agg._sum.amount).toBe(0);
+  });
+
+  it('caps service refunds by original tender and preserves refund provenance', async () => {
+    const customer = await prisma.customer.create({
+      data: { phone: `+9968${RUN}2`, name: 'Возврат ремонта' },
+    });
+    const warrantyCase = await prisma.warrantyCase.create({
+      data: {
+        imei: `REFUND-SERVICE-${RUN}`,
+        customerId: customer.id,
+        problem: 'Платный ремонт',
+        serviceType: 'paid',
+        deviceName: 'iPhone 15',
+        status: 'approved',
+        sla: new Date(Date.now() + 86_400_000),
+      },
+    });
+    const workOrder = await prisma.serviceWorkOrder.create({
+      data: {
+        warrantyCaseId: warrantyCase.id,
+        createdBy: 'owner-1',
+        point: 'BISHKEK-1',
+        estimateAmount: 6500,
+        estimatePreparedAt: new Date(),
+        estimateApprovedAt: new Date(),
+      },
+    });
+    const cash = await prisma.payment.create({
+      data: { serviceWorkOrderId: workOrder.id, amount: 2500, method: 'cash', status: 'received' },
+    });
+    await prisma.payment.create({
+      data: { serviceWorkOrderId: workOrder.id, amount: 4000, method: 'card', status: 'received' },
+    });
+    const events: Parameters<typeof ACTION_EXECUTORS.refund>[4] = [];
+    const refundCash = (amount: number) => prisma.$transaction((tx) =>
+      ACTION_EXECUTORS.refund(tx, { paymentId: cash.id, amount }, 'owner-1', `service-refund-${amount}`, events),
+    );
+
+    await refundCash(2000);
+    const err = await refundCash(600).catch((error) => error);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('refund_exceeds_tender');
+    await refundCash(500);
+
+    const cashRefunds = await prisma.payment.findMany({
+      where: { originalPaymentId: cash.id },
+      orderBy: { amount: 'asc' },
+    });
+    expect(cashRefunds.map(({ amount, method, serviceWorkOrderId, originalPaymentId }) => ({ amount, method, serviceWorkOrderId, originalPaymentId }))).toEqual([
+      { amount: -2000, method: 'cash', serviceWorkOrderId: workOrder.id, originalPaymentId: cash.id },
+      { amount: -500, method: 'cash', serviceWorkOrderId: workOrder.id, originalPaymentId: cash.id },
+    ]);
+    const net = await prisma.payment.aggregate({ where: { serviceWorkOrderId: workOrder.id }, _sum: { amount: true } });
+    expect(net._sum.amount).toBe(4000);
+    expect(events).toHaveLength(2);
   });
 });

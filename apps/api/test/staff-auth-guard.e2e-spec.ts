@@ -50,11 +50,12 @@ describe('Staff management guard (owner-only, casbin)', () => {
     const seller = await login('seller');
     const server = app.getHttpServer();
 
-    await request(server)
+    const created = await request(server)
       .post('/staff-auth/staff')
       .set('Authorization', `Bearer ${owner}`)
-      .send({ username: `new-${RUN}`, password: 'p', role: 'cashier' })
+      .send({ username: `new-${RUN}`, password: 'p', role: 'cashier', point: 'OSH-1' })
       .expect(201);
+    expect(created.body).toMatchObject({ role: 'cashier', point: 'OSH-1' });
 
     await request(server)
       .post('/staff-auth/staff')

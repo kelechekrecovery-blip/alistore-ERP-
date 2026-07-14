@@ -24,6 +24,9 @@ describe('Trade-ins (integration)', () => {
     await prisma.supplierRma.deleteMany();
     await prisma.supplier.deleteMany();
     await prisma.supportTicket.deleteMany();
+    await prisma.payment.deleteMany({ where: { serviceWorkOrderId: { not: null } } });
+    await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.serviceWorkOrder.deleteMany();
     await prisma.warrantyCase.deleteMany();
     await prisma.debtPlan.deleteMany();
     await prisma.returnItem.deleteMany();

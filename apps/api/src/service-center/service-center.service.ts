@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, WarrantyStatus } from '@prisma/client';
+import { PaymentMethod, Prisma, WarrantyStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertWarrantyTransition } from '../warranty/warranty-state';
-import { CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto } from './service-center.dto';
+import { CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto, PayServiceWorkOrderDto } from './service-center.dto';
 
-type CommandInput = Record<string, string | number | null>;
+type CommandInput = Prisma.InputJsonObject;
 const ACTIVE_SERVICE_STATUSES: WarrantyStatus[] = ['created', 'received', 'diagnostics', 'waiting_supplier', 'approved'];
 const PAID_REPAIR_SLA_MS = 3 * 24 * 60 * 60 * 1000;
+const SERVICE_PAYMENT_METHODS = new Set<PaymentMethod>(['cash', 'card', 'qr_mbank', 'qr_odengi', 'bakai_pos', 'obank']);
 
 @Injectable()
 export class ServiceCenterService {
@@ -17,7 +18,7 @@ export class ServiceCenterService {
 
   async queue() {
     const cases = await this.prisma.warrantyCase.findMany({
-      include: { workOrder: true },
+      include: { workOrder: { include: { payments: { orderBy: { createdAt: 'asc' } } } } },
       orderBy: { sla: 'asc' },
       take: 100,
     });
@@ -43,9 +44,139 @@ export class ServiceCenterService {
   mine(customerId: string) {
     return this.prisma.serviceWorkOrder.findMany({
       where: { warrantyCase: { customerId } },
-      include: { warrantyCase: true },
+      include: { warrantyCase: true, payments: { orderBy: { createdAt: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async paymentContext(id: string, actor: string) {
+    const workOrder = await this.prisma.serviceWorkOrder.findUnique({
+      where: { id },
+      include: {
+        warrantyCase: true,
+        payments: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!workOrder) throw new ValidationError('service_work_order_not_found', 'Заказ-наряд не найден');
+    if (workOrder.warrantyCase.serviceType !== 'paid') {
+      throw new ConflictError('service_payment_not_required', 'Гарантийный ремонт не оплачивается на кассе');
+    }
+    const shift = await this.prisma.cashShift.findFirst({ where: { staffId: actor, closedAt: null } });
+    if (!shift) throw new ConflictError('cash_shift_not_open', 'Сначала откройте кассовую смену');
+    if (shift.point !== workOrder.point) throw new ConflictError('service_payment_wrong_point', 'Ремонт относится к другой точке');
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: workOrder.warrantyCase.customerId },
+      select: { id: true, name: true, phone: true },
+    });
+    const paidTotal = workOrder.payments.reduce((sum, payment) => sum + payment.amount, 0);
+    return {
+      id: workOrder.id,
+      warrantyCaseId: workOrder.warrantyCaseId,
+      diagnosticSummary: workOrder.diagnosticSummary,
+      estimateAmount: workOrder.estimateAmount,
+      estimateApprovedAt: workOrder.estimateApprovedAt,
+      point: workOrder.point,
+      warrantyCase: {
+        id: workOrder.warrantyCase.id,
+        imei: workOrder.warrantyCase.imei,
+        customerId: workOrder.warrantyCase.customerId,
+        status: workOrder.warrantyCase.status,
+        serviceType: workOrder.warrantyCase.serviceType,
+        deviceName: workOrder.warrantyCase.deviceName,
+      },
+      customer,
+      paidTotal,
+    };
+  }
+
+  async pay(id: string, dto: PayServiceWorkOrderDto, actor: string, rawKey?: string) {
+    const key = requiredKey(rawKey);
+    const payments = dto.payments.map((payment) => ({ method: payment.method, amount: payment.amount }));
+    const request: CommandInput = { workOrderId: id, payments };
+    const existing = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+    if (existing) return replay(existing, 'pay', request);
+    if (payments.some((payment) => !SERVICE_PAYMENT_METHODS.has(payment.method))) {
+      throw new ValidationError('service_payment_method_unsupported', 'Этот способ оплаты недоступен для ремонта');
+    }
+
+    try {
+      return await this.audit.transaction<unknown>(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'service-payment:' + id}))::text AS locked`;
+        const raced = await tx.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+        if (raced) return { result: replay(raced, 'pay', request), events: [] };
+        const workOrder = await tx.serviceWorkOrder.findUnique({ where: { id }, include: { warrantyCase: true } });
+        if (!workOrder) throw new ValidationError('service_work_order_not_found', 'Заказ-наряд не найден');
+        if (workOrder.warrantyCase.serviceType !== 'paid') {
+          throw new ConflictError('service_payment_not_required', 'Гарантийный ремонт не оплачивается на кассе');
+        }
+        if (!workOrder.estimateApprovedAt || workOrder.warrantyCase.status !== 'approved' || !workOrder.estimateAmount || workOrder.estimateAmount < 1) {
+          throw new ConflictError('service_estimate_not_payable', 'Сначала клиент должен подтвердить ненулевую смету');
+        }
+        const existingPaid = await tx.payment.aggregate({
+          where: { serviceWorkOrderId: id },
+          _sum: { amount: true },
+        });
+        if ((existingPaid._sum.amount ?? 0) > 0) {
+          throw new ConflictError('service_payment_already_completed', 'Ремонт уже оплачен');
+        }
+        const paidTotal = payments.reduce((sum, payment) => sum + payment.amount, 0);
+        if (paidTotal !== workOrder.estimateAmount) {
+          throw new ValidationError('service_payment_total_mismatch', 'Сумма оплат должна точно совпадать со сметой');
+        }
+        const shift = await tx.cashShift.findFirst({ where: { staffId: actor, closedAt: null } });
+        if (!shift) throw new ConflictError('cash_shift_not_open', 'Сначала откройте кассовую смену');
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-close:' + shift.id}))::text AS locked`;
+        await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shift.id} FOR UPDATE`;
+        const activeShift = await tx.cashShift.findUniqueOrThrow({ where: { id: shift.id } });
+        if (activeShift.closedAt) throw new ConflictError('cash_shift_closed', 'Кассовая смена уже закрыта');
+        if (activeShift.point !== workOrder.point) throw new ConflictError('service_payment_wrong_point', 'Ремонт относится к другой точке');
+
+        const createdPayments = [];
+        for (const [index, payment] of payments.entries()) {
+          createdPayments.push(await tx.payment.create({
+            data: {
+            serviceWorkOrderId: id,
+            amount: payment.amount,
+            method: payment.method,
+            status: 'received',
+            shiftId: shift.id,
+            txnId: `service:${key}:${index}`,
+            },
+          }));
+        }
+        const updated = await tx.serviceWorkOrder.findUniqueOrThrow({
+          where: { id },
+          include: { warrantyCase: true, payments: { orderBy: { createdAt: 'asc' } } },
+        });
+        const result = { ...updated, paidTotal, shiftId: shift.id };
+        await tx.serviceWorkOrderCommand.create({
+          data: { idempotencyKey: key, workOrderId: id, action: 'pay', request: json(request), response: json(result) },
+        });
+        return {
+          result,
+          events: [
+            ...createdPayments.map((payment) => ({
+              type: EventType.PaymentReceived,
+              actor,
+              payload: { paymentId: payment.id, serviceWorkOrderId: id, shiftId: shift.id, amount: payment.amount, method: payment.method },
+              refs: [payment.id, id, workOrder.warrantyCaseId, shift.id, workOrder.warrantyCase.customerId],
+            })),
+            {
+              type: EventType.ServicePaymentCompleted,
+              actor,
+              payload: { workOrderId: id, serviceCaseId: workOrder.warrantyCaseId, shiftId: shift.id, paidTotal },
+              refs: [id, workOrder.warrantyCaseId, shift.id, workOrder.warrantyCase.customerId],
+            },
+          ],
+        };
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        const command = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+        if (command) return replay(command, 'pay', request);
+      }
+      throw error;
+    }
   }
 
   async create(dto: CreateServiceWorkOrderDto, actor: string, rawKey?: string) {
@@ -71,11 +202,13 @@ export class ServiceCenterService {
           throw new ConflictError('service_intake_closed', 'Приём доступен только для нового обращения');
         }
         await assertActiveTechnician(tx, dto.technicianId);
+        const point = await resolveStaffPoint(tx, actor);
         const workOrder = await tx.serviceWorkOrder.create({
           data: {
             warrantyCaseId: warrantyCase.id,
             technicianId: dto.technicianId?.trim() || null,
             createdBy: actor,
+            point,
           },
         });
         if (warrantyCase.status === 'created') {
@@ -84,7 +217,7 @@ export class ServiceCenterService {
         }
         const result = await tx.serviceWorkOrder.findUniqueOrThrow({
           where: { id: workOrder.id },
-          include: { warrantyCase: true },
+          include: { warrantyCase: true, payments: true },
         });
         await tx.serviceWorkOrderCommand.create({
           data: { idempotencyKey: key, workOrderId: workOrder.id, action: 'create', request, response: json(result) },
@@ -138,6 +271,7 @@ export class ServiceCenterService {
         });
         if (active) throw new ConflictError('paid_repair_already_open', 'По устройству уже открыт платный ремонт');
         await assertActiveTechnician(tx, dto.technicianId);
+        const point = await resolveStaffPoint(tx, actor);
 
         let customer = await tx.customer.findUnique({ where: { phone: request.phone as string } });
         if (!customer) {
@@ -162,11 +296,12 @@ export class ServiceCenterService {
             warrantyCaseId: warrantyCase.id,
             technicianId: dto.technicianId?.trim() || null,
             createdBy: actor,
+            point,
           },
         });
         const result = await tx.serviceWorkOrder.findUniqueOrThrow({
           where: { id: workOrder.id },
-          include: { warrantyCase: true },
+          include: { warrantyCase: true, payments: true },
         });
         await tx.serviceWorkOrderCommand.create({
           data: { idempotencyKey: key, workOrderId: workOrder.id, action: 'create_paid', request, response: json(result) },
@@ -243,7 +378,7 @@ export class ServiceCenterService {
           estimateApprovedAt: null,
           estimateApprovedBy: null,
         },
-        include: { warrantyCase: true },
+        include: { warrantyCase: true, payments: true },
       });
       await tx.serviceWorkOrderCommand.create({
         data: { idempotencyKey: key, workOrderId: id, action: 'diagnose', request, response: json(updated) },
@@ -300,7 +435,7 @@ export class ServiceCenterService {
       const updated = await tx.serviceWorkOrder.update({
         where: { id },
         data: { estimateApprovedAt: approvedAt, estimateApprovedBy: customerId },
-        include: { warrantyCase: true },
+        include: { warrantyCase: true, payments: true },
       });
       await tx.serviceWorkOrderCommand.create({
         data: { idempotencyKey: key, workOrderId: id, action: 'approve_estimate', request, response: json(updated) },
@@ -370,4 +505,16 @@ async function assertActiveTechnician(tx: Prisma.TransactionClient, technicianId
   if (!technician?.active) {
     throw new ValidationError('service_technician_inactive', 'Мастер не найден или отключён');
   }
+}
+
+async function resolveStaffPoint(tx: Prisma.TransactionClient, actor: string) {
+  const activeShift = await tx.cashShift.findFirst({
+    where: { staffId: actor, closedAt: null },
+    orderBy: { openedAt: 'desc' },
+    select: { point: true },
+  });
+  if (activeShift) return activeShift.point;
+  const staff = await tx.staffUser.findUnique({ where: { id: actor }, select: { active: true, point: true } });
+  if (!staff?.active) throw new ValidationError('service_intake_staff_inactive', 'Сотрудник не найден или отключён');
+  return staff.point;
 }

@@ -32,6 +32,15 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   if (amount <= 0 || amount > original.amount) {
     throw new ValidationError('invalid_refund_amount', 'Некорректная сумма возврата');
   }
+  await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${paymentId} FOR UPDATE`;
+  const tenderRefunds = await tx.payment.aggregate({
+    where: { originalPaymentId: paymentId },
+    _sum: { amount: true },
+  });
+  const tenderRemaining = original.amount + (tenderRefunds._sum.amount ?? 0);
+  if (amount > tenderRemaining) {
+    throw new ValidationError('refund_exceeds_tender', 'Сумма возвратов превышает остаток исходного платежа');
+  }
   if (returnId) {
     await tx.$queryRaw`SELECT id FROM "Return" WHERE id = ${returnId} FOR UPDATE`;
     const ret = await tx.return.findUnique({ where: { id: returnId } });
@@ -62,10 +71,21 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
         'Сумма возвратов превышает оплаченную по заказу',
       );
     }
+  } else if (original.serviceWorkOrderId) {
+    await tx.$queryRaw`SELECT id FROM "ServiceWorkOrder" WHERE id = ${original.serviceWorkOrderId} FOR UPDATE`;
+    const agg = await tx.payment.aggregate({
+      where: { serviceWorkOrderId: original.serviceWorkOrderId },
+      _sum: { amount: true },
+    });
+    if (amount > (agg._sum.amount ?? 0)) {
+      throw new ValidationError('refund_exceeds_paid', 'Сумма возвратов превышает оплату ремонта');
+    }
   }
   const compensating = await tx.payment.create({
     data: {
       orderId: original.orderId,
+      serviceWorkOrderId: original.serviceWorkOrderId,
+      originalPaymentId: original.id,
       amount: -Math.abs(amount),
       method: original.method,
       status: 'refunded',
@@ -75,7 +95,7 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
     type: EventType.PaymentRefunded,
     actor: approver,
     payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, returnId, amount },
-    refs: [original.orderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
+    refs: [original.orderId, original.serviceWorkOrderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
   });
   if (original.orderId) {
     const order = await tx.order.findUnique({ where: { id: original.orderId } });

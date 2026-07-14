@@ -43,7 +43,7 @@ npm run launch:preflight               # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness               # secret-safe отчёт по apps/api/.env.production
 npm run launch:check                   # strict preflight + strict external readiness
 npm run launch:readiness:strict        # падает, пока production-блокеры не закрыты
-npm run api:test                       # 119 suites / 472 tests (jest)
+npm run api:test                       # 119 suites / 473 tests (jest)
 npm run api:build                      # прод-сборка API
 npm run build -w @alistore/web         # прод-сборка веб (37 routes)
 npm run e2e                            # 34 browser flows after current full gate

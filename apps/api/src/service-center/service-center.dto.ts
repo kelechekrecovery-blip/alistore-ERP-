@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator';
+import { PaymentMethod } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsEnum, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 export class CreateServiceWorkOrderDto {
   @ApiProperty()
@@ -66,4 +68,24 @@ export class CreatePaidRepairDto {
   @IsString()
   @MaxLength(100)
   technicianId?: string;
+}
+
+export class ServicePaymentTenderDto {
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.cash })
+  @IsEnum(PaymentMethod)
+  method!: PaymentMethod;
+
+  @ApiProperty({ example: 5000 })
+  @IsInt()
+  @Min(1)
+  amount!: number;
+}
+
+export class PayServiceWorkOrderDto {
+  @ApiProperty({ type: [ServicePaymentTenderDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ServicePaymentTenderDto)
+  payments!: ServicePaymentTenderDto[];
 }

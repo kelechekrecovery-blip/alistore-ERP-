@@ -37,7 +37,7 @@ export class StaffAuthController {
   @RequirePermission('staff', 'manage')
   async createStaff(@Body() dto: CreateStaffDto) {
     return this.publicView(
-      await this.staffAuth.createStaff(dto.username, dto.password, dto.role),
+      await this.staffAuth.createStaff(dto.username, dto.password, dto.role, dto.point),
     );
   }
 

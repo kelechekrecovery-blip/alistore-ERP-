@@ -136,6 +136,9 @@ p, cashier, payments, refund
 p, senior_seller, payments, refund
 p, admin, payments, refund
 p, owner, payments, refund
+p, cashier, payments, take_service
+p, admin, payments, take_service
+p, owner, payments, take_service
 p, cashier, giftcards, issue
 p, senior_seller, giftcards, issue
 p, admin, giftcards, issue

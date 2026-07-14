@@ -17,6 +17,9 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
   let ownerToken: string;
   let ownerId: string;
   let sellerToken: string;
+  let sellerId: string;
+  let cashierToken: string;
+  let cashierId: string;
   const run = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
@@ -38,12 +41,18 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     const auth = moduleRef.get(StaffAuthService);
     const owner = await auth.createStaff(`owner-service-${run}`, 'pass', 'owner');
     ownerId = owner.id;
+    await prisma.staffUser.update({ where: { id: owner.id }, data: { point: 'BISHKEK-2' } });
     ownerToken = (await auth.login(owner.username, 'pass')).accessToken;
     const seller = await auth.createStaff(`seller-service-${run}`, 'pass', 'seller');
+    sellerId = seller.id;
     sellerToken = (await auth.login(seller.username, 'pass')).accessToken;
+    const cashier = await auth.createStaff(`cashier-service-${run}`, 'pass', 'cashier');
+    cashierId = cashier.id;
+    cashierToken = (await auth.login(cashier.username, 'pass')).accessToken;
   });
 
   beforeEach(async () => {
+    await prisma.payment.deleteMany({ where: { serviceWorkOrderId: { not: null } } });
     await prisma.serviceWorkOrderCommand.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
     await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'service.' } }, { type: { startsWith: 'warranty.' } }] } });
@@ -56,6 +65,7 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
   });
 
   afterAll(async () => {
+    await prisma.payment.deleteMany({ where: { serviceWorkOrderId: { not: null } } });
     await prisma.serviceWorkOrderCommand.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
     await prisma.warrantyCase.deleteMany({ where: { imei: { startsWith: `SERVICE-${run}` } } });
@@ -63,6 +73,7 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     await prisma.order.deleteMany({ where: { customer: { phone: { startsWith: `+99677${run}` } } } });
     await prisma.product.deleteMany({ where: { sku: { startsWith: `SERVICE-${run}` } } });
     await prisma.customer.deleteMany({ where: { phone: { startsWith: `+99677${run}` } } });
+    await prisma.cashShift.deleteMany({ where: { staffId: { in: [sellerId, cashierId] } } });
     await prisma.staffUser.deleteMany({ where: { username: { contains: `-service-${run}` } } });
     await app.close();
   });
@@ -180,15 +191,80 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     expect(mine.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id })]));
     const approved = await request(app.getHttpServer()).post(`/service-center/me/work-orders/${created.body.id}/approve-estimate`).set('Authorization', `Bearer ${customerToken(customer)}`).set('Idempotency-Key', `paid-approve-${run}`).expect(201);
     expect(approved.body.warrantyCase.status).toBe('approved');
+    expect(approved.body.point).toBe('BISHKEK-2');
+
+    const tenders = { payments: [{ method: 'cash', amount: 2500 }, { method: 'card', amount: 4000 }] };
+    await request(app.getHttpServer()).get(`/service-center/work-orders/${created.body.id}/payment-context`).set('Authorization', `Bearer ${sellerToken}`).expect(403);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `paid-seller-denied-${run}`).send(tenders).expect(403);
+    await request(app.getHttpServer()).get(`/service-center/work-orders/${created.body.id}/payment-context`).set('Authorization', `Bearer ${cashierToken}`).expect(409);
+    const shift = await prisma.cashShift.create({ data: { staffId: cashierId, point: 'BISHKEK-1', openCash: 1000, openIdempotencyKey: `paid-shift-${run}` } });
+    await request(app.getHttpServer()).get(`/service-center/work-orders/${created.body.id}/payment-context`).set('Authorization', `Bearer ${cashierToken}`).expect(409);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', `paid-wrong-point-${run}`).send(tenders).expect(409);
+    await prisma.cashShift.update({ where: { id: shift.id }, data: { point: 'BISHKEK-2' } });
+    const context = await request(app.getHttpServer()).get(`/service-center/work-orders/${created.body.id}/payment-context`).set('Authorization', `Bearer ${cashierToken}`).expect(200);
+    expect(context.body).toMatchObject({ id: created.body.id, customer: { id: customer.id }, paidTotal: 0, point: 'BISHKEK-2' });
+    expect(context.body).not.toHaveProperty('payments');
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).send(tenders).expect(422);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', `paid-wrong-total-${run}`).send({ payments: [{ method: 'cash', amount: 6400 }] }).expect(422);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', `paid-gift-${run}`).send({ payments: [{ method: 'gift_card', amount: 6500 }] }).expect(422);
+
+    const competingKeys = [`paid-settle-a-${run}`, `paid-settle-b-${run}`];
+    const competing = await Promise.all(competingKeys.map((key) => request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', key).send(tenders)));
+    expect(competing.map((response) => response.status).sort()).toEqual([201, 409]);
+    const winningKey = competingKeys[competing.findIndex((response) => response.status === 201)];
+    const replay = await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', winningKey).send(tenders).expect(201);
+    expect(replay.body.paidTotal).toBe(6500);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', winningKey).send({ payments: [{ method: 'cash', amount: 6500 }] }).expect(409);
+
+    const recordedPayments = await prisma.payment.findMany({ where: { serviceWorkOrderId: created.body.id }, orderBy: { amount: 'asc' } });
+    expect(recordedPayments).toHaveLength(2);
+    expect(recordedPayments.map(({ amount, method, orderId, shiftId, status }) => ({ amount, method, orderId, shiftId, status }))).toEqual([
+      { amount: 2500, method: 'cash', orderId: null, shiftId: shift.id, status: 'received' },
+      { amount: 4000, method: 'card', orderId: null, shiftId: shift.id, status: 'received' },
+    ]);
+    const cash = await prisma.payment.aggregate({ where: { shiftId: shift.id, method: 'cash' }, _sum: { amount: true } });
+    expect(shift.openCash + (cash._sum.amount ?? 0)).toBe(3500);
+    expect(await prisma.deviceUnit.count({ where: { imei: `PAID-${run}-SERIAL` } })).toBe(0);
 
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
-    expect(events.map((event) => event.type)).toEqual([
+    expect(events).toHaveLength(7);
+    expect(events.map((event) => event.type)).toEqual(expect.arrayContaining([
       'service.paid_repair_received',
       'service.work_order_created',
       'service.diagnostics_completed',
       'service.estimate_approved',
-    ]);
+      'payment.received',
+      'payment.received',
+      'service.payment_completed',
+    ]));
+    expect(events.filter((event) => event.type === 'payment.received')).toHaveLength(2);
     expect(events.some((event) => event.type.startsWith('warranty.'))).toBe(false);
-    expect(await prisma.serviceWorkOrderCommand.count({ where: { workOrderId: created.body.id } })).toBe(3);
+    expect(await prisma.serviceWorkOrderCommand.count({ where: { workOrderId: created.body.id } })).toBe(4);
+
+    await prisma.payment.createMany({
+      data: recordedPayments.map((payment) => ({
+        serviceWorkOrderId: created.body.id,
+        originalPaymentId: payment.id,
+        amount: -payment.amount,
+        method: payment.method,
+        status: 'refunded',
+      })),
+    });
+    const refundedMine = await request(app.getHttpServer()).get('/service-center/me/work-orders').set('Authorization', `Bearer ${customerToken(customer)}`).expect(200);
+    const refundedWorkOrder = refundedMine.body.find((item: { id: string }) => item.id === created.body.id);
+    expect(refundedWorkOrder.payments.reduce((sum: number, payment: { amount: number }) => sum + payment.amount, 0)).toBe(0);
+    const refundedContext = await request(app.getHttpServer()).get(`/service-center/work-orders/${created.body.id}/payment-context`).set('Authorization', `Bearer ${cashierToken}`).expect(200);
+    expect(refundedContext.body.paidTotal).toBe(0);
+    const repaid = await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/pay`).set('Authorization', `Bearer ${cashierToken}`).set('Idempotency-Key', `paid-after-refund-${run}`).send(tenders).expect(201);
+    expect(repaid.body.paidTotal).toBe(6500);
+    const repaymentRows = await prisma.payment.findMany({ where: { txnId: { startsWith: `service:paid-after-refund-${run}:` } } });
+    expect(repaymentRows).toHaveLength(2);
+    const allPaymentEvents = await prisma.auditEvent.findMany({ where: { type: 'payment.received', refs: { has: created.body.id } } });
+    expect(allPaymentEvents).toHaveLength(4);
+    const repaymentIds = new Set(repaymentRows.map((payment) => payment.id));
+    const repaymentEvents = allPaymentEvents.filter((event) => repaymentIds.has(String((event.payload as { paymentId?: string }).paymentId)));
+    expect(repaymentEvents).toHaveLength(2);
+    expect(repaymentEvents.every((event) => Number((event.payload as { amount?: number }).amount) > 0)).toBe(true);
+    expect(await prisma.auditEvent.count({ where: { type: 'service.payment_completed', refs: { has: created.body.id } } })).toBe(2);
   });
 });
