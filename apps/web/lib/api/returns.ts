@@ -6,6 +6,15 @@ export interface ReturnRequest {
   reason: string;
   status: string;
   refundId?: string | null;
+  refundAmount: number;
+  isFullOrder: boolean;
+  items: { id: string; orderItemId: string; qty: number; refundAmount: number }[];
+  order?: {
+    id: string;
+    total: number;
+    items: { id: string; sku: string; qty: number; price: number }[];
+    payments: { id: string; amount: number; method: string }[];
+  };
   restockLocation?: string | null;
   restockedAt?: string | null;
   createdAt: string;
@@ -28,6 +37,7 @@ export function openReturnRequest(input: {
   orderId: string;
   reason: string;
   requester?: string;
+  items?: { orderItemId: string; qty: number }[];
 }, accessToken: string): Promise<ReturnRequest> {
   return postAuthJson('/returns', input, accessToken);
 }

@@ -86,7 +86,7 @@ export interface MyOrder {
   status: string;
   total: number;
   createdAt: string;
-  items: { sku: string; qty: number; price: number }[];
+  items: { id: string; sku: string; qty: number; price: number; imei?: string | null }[];
 }
 
 export function fetchMyOrders(accessToken: string): Promise<MyOrder[]> {

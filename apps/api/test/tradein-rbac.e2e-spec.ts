@@ -62,6 +62,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     await prisma.supportTicket.deleteMany();
     await prisma.warrantyCase.deleteMany();
     await prisma.debtPlan.deleteMany();
+    await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();

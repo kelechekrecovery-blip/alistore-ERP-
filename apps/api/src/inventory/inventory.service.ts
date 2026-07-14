@@ -371,7 +371,7 @@ export class InventoryService {
     return this.prisma.consignmentPayout.findMany({
       include: {
         items: { select: { id: true, ownerAmount: true, saleOrderId: true } },
-        quantityAllocations: { select: { id: true, ownerAmount: true, saleOrderId: true, qty: true } },
+        quantityAllocations: { select: { id: true, ownerAmount: true, returnedOwnerAmount: true, saleOrderId: true, qty: true, returnedQty: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -443,14 +443,16 @@ export class InventoryService {
         ...quantityAllocations.flatMap((item) => item.saleOrderId ? [item.saleOrderId] : []),
       ];
       const blockedReturn = await tx.return.findFirst({
-        where: { orderId: { in: orderIds }, status: { not: 'rejected' } },
+        where: { orderId: { in: orderIds }, status: { notIn: ['rejected', 'reconciled'] } },
         select: { id: true },
       });
       if (blockedReturn) throw new ConflictError('consignment_return_pending', 'Нельзя выплатить владельцу при активном или согласованном возврате');
-      const positions = [...items, ...quantityAllocations];
-      const grossAmount = positions.reduce((sum, item) => sum + (item.salePrice ?? 0), 0);
-      const commissionAmount = positions.reduce((sum, item) => sum + (item.commissionAmount ?? 0), 0);
-      const ownerAmount = positions.reduce((sum, item) => sum + (item.ownerAmount ?? 0), 0);
+      const grossAmount = items.reduce((sum, item) => sum + (item.salePrice ?? 0), 0)
+        + quantityAllocations.reduce((sum, item) => sum + (item.salePrice ?? 0) - item.returnedSaleAmount, 0);
+      const commissionAmount = items.reduce((sum, item) => sum + (item.commissionAmount ?? 0), 0)
+        + quantityAllocations.reduce((sum, item) => sum + (item.commissionAmount ?? 0) - item.returnedCommissionAmount, 0);
+      const ownerAmount = items.reduce((sum, item) => sum + (item.ownerAmount ?? 0), 0)
+        + quantityAllocations.reduce((sum, item) => sum + (item.ownerAmount ?? 0) - item.returnedOwnerAmount, 0);
       const payout = await tx.consignmentPayout.create({
         data: {
           idempotencyKey: dto.idempotencyKey,

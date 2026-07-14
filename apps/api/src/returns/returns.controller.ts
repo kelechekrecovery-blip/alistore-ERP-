@@ -56,7 +56,7 @@ export class ReturnsController {
   ) {
     if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
     const key = requireIdempotencyKey(idempotencyKey);
-    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId, key);
+    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId, key, dto.items);
   }
 
   @ApiOperation({ summary: 'List returns by status' })
@@ -90,7 +90,7 @@ export class ReturnsController {
     if (user.typ !== 'customer') {
       throw new ForbiddenException('Требуется customer JWT');
     }
-    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId);
+    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId, undefined, dto.items);
   }
 
   @ApiOperation({ summary: 'Advance a return through its status machine' })

@@ -34,6 +34,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await prisma.reservation.deleteMany();
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
+    await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany();
@@ -63,6 +64,126 @@ describe('Refund-bound return reconciliation (integration)', () => {
       approverRole: 'owner',
     });
   }
+
+  it('quotes and reconciles partial line returns without refunding delivery twice', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const customer = await prisma.customer.create({ data: { phone: `+996700${suffix.slice(-6)}`, name: 'Partial Return QA' } });
+    const product = await prisma.product.create({
+      data: { sku: `PART-${suffix}`, name: 'Cases', price: 1000, cost: 400, category: 'accessories', trackingMode: 'quantity', attrs: {} },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        status: 'paid',
+        subtotal: 3000,
+        deliveryFee: 300,
+        total: 2900,
+        items: { create: { sku: product.sku, qty: 3, price: 1000 } },
+      },
+      include: { items: true },
+    });
+    const balance = await prisma.inventoryBalance.create({ data: { productId: product.id, location: 'SALE', onHand: 0 } });
+    const allocation = await prisma.orderQuantityAllocation.create({
+      data: {
+        orderId: order.id,
+        orderItemId: order.items[0].id,
+        productId: product.id,
+        balanceId: balance.id,
+        sku: product.sku,
+        qty: 3,
+        active: false,
+        consumedAt: new Date(),
+      },
+    });
+    const payment = await prisma.payment.create({ data: { orderId: order.id, amount: 2900, method: 'card', status: 'received' } });
+
+    const first = await returns.request(
+      order.id,
+      'one item',
+      customer.id,
+      customer.id,
+      `partial-1-${suffix}`,
+      [{ orderItemId: order.items[0].id, qty: 1 }],
+    );
+    expect(first).toMatchObject({ refundAmount: 866, isFullOrder: false });
+    await moveToProcessing(first.id);
+    await expect(payments.refund(payment.id, 867, 'wrong quote', 'staff:returns', first.id)).rejects.toMatchObject({
+      code: 'refund_return_amount_mismatch',
+    });
+    await refundReturn(first.id, payment.id, 866);
+    await returns.transition(first.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+    expect(await prisma.order.findUnique({ where: { id: order.id } })).toMatchObject({ status: 'paid' });
+    expect(await prisma.orderQuantityAllocation.findUnique({ where: { id: allocation.id } })).toMatchObject({ returnedQty: 1 });
+    expect(await prisma.inventoryBalance.findUnique({ where: { productId_location: { productId: product.id, location: 'RETURNS' } } })).toMatchObject({ onHand: 1 });
+
+    const second = await returns.request(
+      order.id,
+      'remaining items',
+      customer.id,
+      customer.id,
+      `partial-2-${suffix}`,
+      [{ orderItemId: order.items[0].id, qty: 2 }],
+    );
+    expect(second).toMatchObject({ refundAmount: 2034, isFullOrder: false });
+    await moveToProcessing(second.id);
+    await refundReturn(second.id, payment.id, 2034);
+    await returns.transition(second.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+
+    expect(await prisma.order.findUnique({ where: { id: order.id } })).toMatchObject({ status: 'refunded' });
+    expect(await prisma.orderQuantityAllocation.findUnique({ where: { id: allocation.id } })).toMatchObject({ returnedQty: 3 });
+    expect(await prisma.inventoryBalance.findUnique({ where: { productId_location: { productId: product.id, location: 'RETURNS' } } })).toMatchObject({ onHand: 3 });
+    expect((await prisma.payment.aggregate({ where: { orderId: order.id }, _sum: { amount: true } }))._sum.amount).toBe(0);
+  });
+
+  it('restocks different serialized bundle components across repeated partial returns', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const customer = await prisma.customer.create({ data: { phone: `+996704${suffix.slice(-6)}`, name: 'Bundle Partial QA' } });
+    const component = await prisma.product.create({
+      data: { sku: `BC-${suffix}`, name: 'Bundle component', price: 10000, cost: 5000, category: 'devices', attrs: {} },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        status: 'paid',
+        subtotal: 20000,
+        total: 20000,
+        items: { create: { sku: `BUNDLE-${suffix}`, qty: 2, price: 10000 } },
+      },
+      include: { items: true },
+    });
+    const bundleImeis = [`BUNDLE-A-${suffix}`, `BUNDLE-B-${suffix}`];
+    await prisma.deviceUnit.createMany({
+      data: bundleImeis.map((imei) => ({ imei, productId: component.id, status: 'sold', location: 'SALE', orderId: order.id })),
+    });
+    await prisma.orderBundleAllocation.createMany({
+      data: bundleImeis.map((imei) => ({
+        orderId: order.id,
+        orderItemId: order.items[0].id,
+        bundleSku: order.items[0].sku,
+        componentProductId: component.id,
+        componentSku: component.sku,
+        imei,
+      })),
+    });
+
+    for (let index = 0; index < 2; index += 1) {
+      const ret = await prisma.return.create({
+        data: {
+          orderId: order.id,
+          reason: `bundle partial ${index + 1}`,
+          status: 'paid',
+          refundAmount: 10000,
+          isFullOrder: false,
+          items: { create: { orderItemId: order.items[0].id, qty: 1, refundAmount: 10000 } },
+        },
+      });
+      await returns.transition(ret.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+      expect(await prisma.deviceUnit.count({ where: { imei: { in: bundleImeis }, status: 'in_stock' } })).toBe(index + 1);
+    }
+    expect(await prisma.deviceUnit.count({ where: { imei: { in: bundleImeis }, orderId: null, location: 'RETURNS' } })).toBe(2);
+  });
 
   it('restores quantity, direct IMEI and bundle IMEI exactly once after the full refund', async () => {
     const suffix = `${Date.now()}-${++seq}`;

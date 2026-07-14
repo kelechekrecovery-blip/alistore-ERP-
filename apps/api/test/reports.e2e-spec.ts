@@ -23,6 +23,7 @@ describe('Reports (integration)', () => {
   beforeEach(async () => {
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();

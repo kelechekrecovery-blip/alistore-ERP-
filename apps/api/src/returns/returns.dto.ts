@@ -1,5 +1,6 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 const RETURN_STATUSES = [
   'requested',
@@ -20,6 +21,10 @@ export class CreateReturnDto {
 
   @ApiPropertyOptional({ example: 'customer or staff id' })
   @IsOptional() @IsString() requester?: string;
+
+  @ApiPropertyOptional({ type: () => [ReturnSelectionDto], description: 'Omit to return the full order.' })
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique((item: ReturnSelectionDto) => item.orderItemId)
+  @ValidateNested({ each: true }) @Type(() => ReturnSelectionDto) items?: ReturnSelectionDto[];
 }
 
 export class CreateMineReturnDto {
@@ -28,6 +33,18 @@ export class CreateMineReturnDto {
 
   @ApiProperty({ example: 'не подошёл, возврат в 14 дней' })
   @IsString() reason!: string;
+
+  @ApiPropertyOptional({ type: () => [ReturnSelectionDto], description: 'Omit to return the full order.' })
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique((item: ReturnSelectionDto) => item.orderItemId)
+  @ValidateNested({ each: true }) @Type(() => ReturnSelectionDto) items?: ReturnSelectionDto[];
+}
+
+export class ReturnSelectionDto {
+  @ApiProperty({ example: 'clx_order_item_001' })
+  @IsString() orderItemId!: string;
+
+  @ApiProperty({ minimum: 1, example: 1 })
+  @IsInt() @Min(1) qty!: number;
 }
 
 export class ReturnStatusDto {

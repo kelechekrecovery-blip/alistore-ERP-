@@ -17,6 +17,7 @@ export default function ReturnsPage() {
   const { user, hydrated, authed } = useAuth();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
   const [orderId, setOrderId] = useState('');
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
   const [photoNote, setPhotoNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -30,12 +31,21 @@ export default function ReturnsPage() {
     authed(fetchMyOrders).then((list) => {
       setOrders(list);
       const first = list.find((o) => !BLOCKED.has(o.status));
-      if (first) setOrderId(first.id);
+      if (first) selectOrder(first);
     }).catch(() => setOrders([]));
   }, [user, authed]);
 
   const eligible = useMemo(() => (orders ?? []).filter((o) => !BLOCKED.has(o.status)), [orders]);
   const selected = eligible.find((o) => o.id === orderId) ?? null;
+
+  function selectOrder(order: MyOrder) {
+    setOrderId(order.id);
+    setQuantities(Object.fromEntries(order.items.map((item) => [item.id, item.qty])));
+  }
+
+  function setItemQty(itemId: string, qty: number, max: number) {
+    setQuantities((current) => ({ ...current, [itemId]: Math.max(0, Math.min(max, qty)) }));
+  }
 
   async function submit() {
     if (!orderId || !reason) return;
@@ -46,6 +56,9 @@ export default function ReturnsPage() {
         orderId,
         reason: photoNote.trim() ? `${reason}; фото/комментарий: ${photoNote.trim()}` : reason,
         requester: user?.customerId ?? 'customer_app',
+        items: selected?.items
+          .filter((item) => (quantities[item.id] ?? 0) > 0)
+          .map((item) => ({ orderItemId: item.id, qty: quantities[item.id] })) ?? [],
       }, token));
       const evidence = files.length
         ? await uploadEvidenceImages({
@@ -103,7 +116,7 @@ export default function ReturnsPage() {
           <div className="mb-2 text-[13px] text-[#A79C92]">Заказ</div>
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
             {eligible.map((o) => (
-              <button key={o.id} type="button" onClick={() => setOrderId(o.id)} className={`w-[170px] flex-shrink-0 rounded-[13px] border bg-[#221E19] p-3 text-left ${orderId === o.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={o.id} type="button" onClick={() => selectOrder(o)} className={`w-[170px] flex-shrink-0 rounded-[13px] border bg-[#221E19] p-3 text-left ${orderId === o.id ? 'border-lime' : 'border-[#2E2822]'}`}>
                 <div className="font-mono text-[12px] font-bold">#{o.id.slice(-8)}</div>
                 <div className="mt-1 text-[11px] text-[#8A7F76]">{o.status} · {o.items.length} поз.</div>
                 <div className="mt-2 font-display text-[15px] font-extrabold">{som(o.total)}</div>
@@ -114,7 +127,27 @@ export default function ReturnsPage() {
           {selected && (
             <div className="mb-3 rounded-[14px] border border-lime bg-[#221E19] p-3">
               <div className="text-[12px] text-[#A79C92]">Выбран заказ #{selected.id.slice(-8)}</div>
-              <div className="mt-1 text-[13px] font-semibold">{selected.items.map((i) => i.sku).join(', ')}</div>
+              <div className="mt-3 space-y-2">
+                {selected.items.map((item) => {
+                  const qty = quantities[item.id] ?? 0;
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 rounded-[10px] border border-[#3A342E] p-2.5">
+                      <button type="button" aria-label={`Выбрать ${item.sku}`} onClick={() => setItemQty(item.id, qty > 0 ? 0 : item.qty, item.qty)} className={`h-5 w-5 flex-none rounded border ${qty > 0 ? 'border-lime bg-lime text-lime-ink' : 'border-[#6E645C]'}`}>
+                        {qty > 0 ? '✓' : ''}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px] font-semibold">{item.sku}</div>
+                        <div className="text-[11px] text-[#8A7F76]">{som(item.price)} · куплено {item.qty}</div>
+                      </div>
+                      <div className="flex h-8 items-center overflow-hidden rounded-[8px] border border-[#3A342E]">
+                        <button type="button" aria-label={`Уменьшить ${item.sku}`} onClick={() => setItemQty(item.id, qty - 1, item.qty)} className="h-full w-8 text-[#A79C92]">−</button>
+                        <span className="w-7 text-center font-mono text-xs">{qty}</span>
+                        <button type="button" aria-label={`Увеличить ${item.sku}`} onClick={() => setItemQty(item.id, qty + 1, item.qty)} className="h-full w-8 text-[#A79C92]">+</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -130,7 +163,7 @@ export default function ReturnsPage() {
             <EvidencePicker files={files} onChange={setFiles} label="Фото товара/чека" hint="Фото дефекта, комплекта, упаковки или чека" />
           </div>
           {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
-          <button type="button" disabled={busy || !reason || !orderId} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Отправляем…' : 'Отправить заявку'}</button>
+          <button type="button" disabled={busy || !reason || !orderId || !Object.values(quantities).some((qty) => qty > 0)} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Отправляем…' : 'Отправить заявку'}</button>
         </>
       )}
     </MobileAppFrame>

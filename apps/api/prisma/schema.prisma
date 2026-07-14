@@ -439,6 +439,7 @@ model Order {
   consignmentSales         ConsignmentItem[]               @relation("ConsignmentSaleOrder")
   quantityConsignmentSales QuantityConsignmentAllocation[] @relation("QuantityConsignmentSaleOrder")
   payments                 Payment[]
+  returns                  Return[]
   createdAt                DateTime                        @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
@@ -535,10 +536,14 @@ model QuantityConsignmentAllocation {
   saleOrder                 Order?                  @relation("QuantityConsignmentSaleOrder", fields: [saleOrderId], references: [id])
   saleOrderId               String?
   qty                       Int
+  returnedQty               Int                     @default(0)
   status                    ConsignmentStatus       @default(active)
   salePrice                 Int?
   commissionAmount          Int?
   ownerAmount               Int?
+  returnedSaleAmount        Int                     @default(0)
+  returnedCommissionAmount  Int                     @default(0)
+  returnedOwnerAmount       Int                     @default(0)
   soldAt                    DateTime?
   returnedAt                DateTime?
   payout                    ConsignmentPayout?      @relation(fields: [payoutId], references: [id])
@@ -607,6 +612,7 @@ model OrderQuantityAllocation {
   qty                    Int
   active                 Boolean                         @default(true)
   consumedAt             DateTime?
+  returnedQty            Int                             @default(0)
   createdAt              DateTime                        @default(now())
   reservation            Reservation?
   consignmentAllocations QuantityConsignmentAllocation[]
@@ -634,13 +640,14 @@ model OrderBundleAllocation {
 }
 
 model OrderItem {
-  id      String  @id @default(cuid())
-  order   Order   @relation(fields: [orderId], references: [id])
-  orderId String
-  sku     String
-  qty     Int
-  price   Int
-  imei    String?
+  id          String       @id @default(cuid())
+  order       Order        @relation(fields: [orderId], references: [id])
+  orderId     String
+  sku         String
+  qty         Int
+  price       Int
+  imei        String?
+  returnItems ReturnItem[]
 
   @@index([orderId])
 }
@@ -747,17 +754,35 @@ model Reservation {
 
 model Return {
   id              String       @id @default(cuid())
+  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId         String
   reason          String
   status          ReturnStatus @default(requested)
   refundId        String? // refund → approval, тем же способом
+  refundAmount    Int          @default(0)
+  isFullOrder     Boolean      @default(true)
   idempotencyKey  String?      @unique
   restockLocation String?
   restockedAt     DateTime?
   createdAt       DateTime     @default(now())
+  items           ReturnItem[]
 
   @@index([orderId])
   @@index([status])
+}
+
+model ReturnItem {
+  id           String    @id @default(cuid())
+  return       Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  returnId     String
+  orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderItemId  String
+  qty          Int
+  refundAmount Int
+  createdAt    DateTime  @default(now())
+
+  @@unique([returnId, orderItemId])
+  @@index([orderItemId])
 }
 
 model WarrantyCase {

@@ -45,6 +45,7 @@ describe('Quantity consignment inventory (integration)', () => {
     await prisma.consignmentAdjustment.deleteMany();
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
+    await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -150,5 +151,38 @@ describe('Quantity consignment inventory (integration)', () => {
     expect(await prisma.quantityConsignmentAdjustment.findUnique({ where: { returnId_allocationId: { returnId: ret.id, allocationId: allocation.id } } })).toMatchObject({ amount: 1_800, status: 'open' });
     expect(await prisma.quantityConsignmentLot.count({ where: { productId: product.id } })).toBe(2);
     expect(await prisma.auditEvent.count({ where: { type: 'consignment.returned', refs: { has: allocation.id } } })).toBe(1);
+  });
+
+  it('keeps the unreturned quantity payable after a partial return is reconciled', async () => {
+    const { product, customer } = await setup();
+    const order = await reserve(product, customer.id, 2);
+    await payments.pay({ orderId: order.id, amount: 2_000, method: 'cash', txnId: `qcons-partial-${seq}` }, 'cashier:qcons');
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'completed' } });
+    const orderItem = await prisma.orderItem.findFirstOrThrow({ where: { orderId: order.id } });
+    const allocation = await prisma.quantityConsignmentAllocation.findFirstOrThrow({ where: { saleOrderId: order.id } });
+    const ret = await prisma.return.create({
+      data: {
+        orderId: order.id,
+        reason: 'Частичный возврат',
+        status: 'paid',
+        refundAmount: 1_000,
+        isFullOrder: false,
+        items: { create: { orderItemId: orderItem.id, qty: 1, refundAmount: 1_000 } },
+      },
+    });
+
+    await returns.transition(ret.id, 'reconciled', 'returns:qcons', 'BISHKEK-1');
+    expect(await prisma.quantityConsignmentAllocation.findUnique({ where: { id: allocation.id } })).toMatchObject({
+      status: 'sold',
+      returnedQty: 1,
+      returnedSaleAmount: 1_000,
+      returnedCommissionAmount: 100,
+      returnedOwnerAmount: 900,
+    });
+    const payout = await inventory.createConsignmentPayout({
+      idempotencyKey: `qcons-partial-payout-${seq}`,
+      quantityAllocationIds: [allocation.id],
+    }, 'owner:qcons');
+    expect(payout).toMatchObject({ grossAmount: 1_000, commissionAmount: 100, ownerAmount: 900 });
   });
 });

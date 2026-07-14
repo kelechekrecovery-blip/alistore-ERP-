@@ -42,6 +42,9 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
     if (ret.status !== 'processing') {
       throw new ConflictError('return_not_processing', `Возврат уже ${ret.status}`);
     }
+    if (amount !== ret.refundAmount) {
+      throw new ValidationError('refund_return_amount_mismatch', `Сумма refund должна быть ${ret.refundAmount}`);
+    }
   }
   if (original.orderId) {
     // Serialize concurrent refunds on this order (row lock), then cap total
@@ -83,7 +86,12 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
         actor: approver,
       }, events);
     }
-    if (order && canTransition(order.status, 'refunded')) {
+    const aggregate = await tx.payment.aggregate({
+      where: { orderId: original.orderId },
+      _sum: { amount: true },
+    });
+    const fullyRefunded = (aggregate._sum.amount ?? 0) <= 0;
+    if (order && fullyRefunded && canTransition(order.status, 'refunded')) {
       await tx.order.update({ where: { id: order.id }, data: { status: 'refunded' } });
       events.push({
         type: 'order.refunded',
@@ -93,23 +101,16 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
       });
     }
     if (returnId) {
-      const aggregate = await tx.payment.aggregate({
-        where: { orderId: original.orderId },
-        _sum: { amount: true },
-      });
-      const fullyRefunded = (aggregate._sum.amount ?? 0) <= 0;
       await tx.return.update({
         where: { id: returnId },
-        data: { refundId: compensating.id, status: fullyRefunded ? 'paid' : 'processing' },
+        data: { refundId: compensating.id, status: 'paid' },
       });
-      if (fullyRefunded) {
-        events.push({
-          type: 'return.paid',
-          actor: approver,
-          payload: { returnId, orderId: original.orderId, refundId: compensating.id },
-          refs: [returnId, original.orderId, compensating.id],
-        });
-      }
+      events.push({
+        type: 'return.paid',
+        actor: approver,
+        payload: { returnId, orderId: original.orderId, refundId: compensating.id, amount },
+        refs: [returnId, original.orderId, compensating.id],
+      });
     }
   }
 };

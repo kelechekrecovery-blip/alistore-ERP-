@@ -40,6 +40,7 @@ describe('Evidence Vault (integration)', () => {
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
     await prisma.supportTicket.deleteMany();
+    await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();

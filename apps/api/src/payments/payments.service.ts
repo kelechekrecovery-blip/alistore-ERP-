@@ -64,6 +64,12 @@ export class PaymentsService {
           `Refund можно запросить только для возврата processing (сейчас ${ret.status})`,
         );
       }
+      if (amount !== ret.refundAmount) {
+        throw new ValidationError(
+          'refund_return_amount_mismatch',
+          `Сумма refund должна совпадать с расчётом возврата: ${ret.refundAmount}`,
+        );
+      }
     }
     return this.approvals.request({
       action: 'refund',

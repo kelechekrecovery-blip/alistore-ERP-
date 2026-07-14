@@ -43,6 +43,7 @@ describe('Serialized consignment inventory (integration)', () => {
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();

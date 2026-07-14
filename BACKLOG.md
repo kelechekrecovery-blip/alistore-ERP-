@@ -8,7 +8,6 @@
 - Complete BullMQ migration for reservation/debt schedulers after parity tests, then add dead-letter visibility, queue metrics and staging soak; PostgreSQL/Event Ledger remain authoritative.
 - Complete the new Redis/Meilisearch runtime with a live Docker/staging smoke, automatic index bootstrap and idempotent product reindex jobs.
 - Add Kubernetes deployment manifests for API, web and workers with migration jobs, secrets, probes, autoscaling and rollback gates.
-- Define and implement line-level partial-return allocation, pricing/refund and restock policy; full-order quantity/direct/bundle IMEI reconciliation is complete.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
 - Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
 - Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
@@ -20,6 +19,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Implement line-level partial returns across customer web, ERP refund approval and warehouse reconciliation: server-calculated discounted line quotes, final-only delivery refund, cumulative quantity caps/rounding, exact refund binding, selected quantity/direct/bundle IMEI restock, proportional quantity-consignment compensation and API/browser acceptance.
 - Add quantity-tracked consignment across ERP and customer sales without a second stock source: idempotent owner lots over `InventoryBalance`, atomic reserve/release/sale attribution, transfer preservation, payout batches, paid-return compensation, ordinary write-off protection, RBAC, Event Ledger and API/browser acceptance.
 - Bind return requests to approved refunds and reconcile full-order returns exactly once: strict state machine, quantity/direct/bundle IMEI restock, unpaid payout reversal, paid-owner compensation obligations, Event Ledger, ERP Return Desk, warehouse visibility and API/browser regressions.
 - Add serialized consignment inventory across warehouse, storefront checkout and POS: owner-bound IMEI receiving, basis-point commission, atomic sale accrual, completion/return-gated payout batches, stable payment replay, RBAC, Event Ledger and responsive browser acceptance.
