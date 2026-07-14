@@ -171,6 +171,12 @@ p, service, service_center, execute
 p, technician, service_center, execute
 p, admin, service_center, execute
 p, owner, service_center, execute
+p, service, service_center, loaners_manage
+p, admin, service_center, loaners_manage
+p, owner, service_center, loaners_manage
+p, service, service_center, loaners_issue
+p, admin, service_center, loaners_issue
+p, owner, service_center, loaners_issue
 p, admin, support, read
 p, owner, support, read
 p, admin, support, transition

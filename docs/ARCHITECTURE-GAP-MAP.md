@@ -62,7 +62,7 @@ Shared Android foundation:
 ## ERP and storefront integration
 
 - Service Center now shares one `WarrantyCase` status source between ERP and the customer account. ERP creates the associated work order, records diagnostics and an estimate, while only the owning customer can approve that estimate through a customer JWT.
-- Intake, diagnosis and estimate approval use immutable command records with stable idempotency keys and append domain events in the same transaction. Paid external repairs, parts, loaners and repair payment remain Wave B work.
+- Intake, diagnosis, estimate approval, paid settlement, repair execution and loaner custody use immutable command records with stable idempotency keys and append domain events in the same transaction. The loaner fund reuses serialized `DeviceUnit` inventory, requires Evidence on issue/return, blocks repair closure while custody is active and escalates overdue loans through the outbox. Exact linked case-detail pixel acceptance remains blocked by absent handoff files.
 
 ## Execution order
 

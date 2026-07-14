@@ -9,6 +9,7 @@ export const EVIDENCE_ENTITY_TYPES = [
   'order',
   'support',
   'shift',
+  'loaner',
 ] as const;
 
 export type EvidenceEntityType = (typeof EVIDENCE_ENTITY_TYPES)[number];

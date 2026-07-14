@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { approveMyServiceEstimate, fetchMyDevices, fetchMyServiceWorkOrders, receivedServiceTotal, type MyDevice, type ServiceWorkOrder } from '@/lib/api';
+import { approveMyServiceEstimate, fetchMyDevices, fetchMyServiceLoaners, fetchMyServiceWorkOrders, receivedServiceTotal, type MyDevice, type ServiceLoanerLoan, type ServiceWorkOrder } from '@/lib/api';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
 import { AccountDetailFrame } from '@/components/AccountDetailFrame';
 
@@ -19,15 +19,20 @@ export default function DevicesPage() {
   const router = useRouter();
   const [devices, setDevices] = useState<MyDevice[] | null>(null);
   const [workOrders, setWorkOrders] = useState<ServiceWorkOrder[]>([]);
+  const [loaners, setLoaners] = useState<ServiceLoanerLoan[]>([]);
   const [approving, setApproving] = useState('');
   const [serviceError, setServiceError] = useState('');
 
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account/devices'); }, [hydrated, user, router]);
   useEffect(() => {
     if (!user) return;
-    Promise.all([authed(fetchMyDevices), authed(fetchMyServiceWorkOrders)])
-      .then(([nextDevices, nextWorkOrders]) => { setDevices(nextDevices); setWorkOrders(nextWorkOrders); })
-      .catch(() => { setDevices([]); setWorkOrders([]); });
+    Promise.allSettled([authed(fetchMyDevices), authed(fetchMyServiceWorkOrders), authed(fetchMyServiceLoaners)])
+      .then(([nextDevices, nextWorkOrders, nextLoaners]) => {
+        setDevices(nextDevices.status === 'fulfilled' ? nextDevices.value : []);
+        setWorkOrders(nextWorkOrders.status === 'fulfilled' ? nextWorkOrders.value : []);
+        setLoaners(nextLoaners.status === 'fulfilled' ? nextLoaners.value : []);
+        if (nextLoaners.status === 'rejected') setServiceError('Статус подменного устройства временно недоступен.');
+      });
   }, [user, authed]);
 
   async function approveEstimate(workOrder: ServiceWorkOrder) {
@@ -62,13 +67,19 @@ export default function DevicesPage() {
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           {devices === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
-          {devices && devices.length === 0 && paidRepairs.length === 0 && (
+          {devices && devices.length === 0 && paidRepairs.length === 0 && !loaners.some((loan) => ['prepared', 'issued', 'overdue'].includes(loan.status)) && (
             <div className="py-12 text-center">
               <div className="text-5xl">📱</div>
               <div className="mt-3.5 font-display text-[17px] font-bold">Пока нет устройств</div>
               <div className="mt-2 text-[13px] text-[#A79C92]">Купленная техника появится здесь с гарантией</div>
             </div>
           )}
+          {loaners.some((loan) => ['prepared', 'issued', 'overdue'].includes(loan.status)) && <div className="mb-2 font-display text-[15px] font-bold">Подменное устройство</div>}
+          {loaners.filter((loan) => ['prepared', 'issued', 'overdue'].includes(loan.status)).map((loan) => <div key={loan.id} data-testid={`customer-loaner-${loan.id}`} className={`mb-3 rounded-[16px] border p-4 ${loan.status === 'overdue' ? 'border-danger/40 bg-danger/5' : 'border-[#2E2822] bg-[#221E19]'}`}>
+            <div className="flex items-start justify-between gap-3"><div><div className="text-[15px] font-bold">{loan.device?.unit.product.name ?? 'Подменное устройство'}</div><div className="mt-1 font-mono text-[11px] text-[#8A7F76]">IMEI •••• {loan.device?.unit.imei.slice(-4)}</div></div><span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${loan.status === 'overdue' ? 'bg-danger/15 text-danger' : 'bg-warn/15 text-warn'}`}>{loan.status === 'overdue' ? 'Просрочено' : loan.status === 'prepared' ? 'Оформляется' : 'Выдано'}</span></div>
+            <div className="mt-3 border-t border-[#2E2822] pt-3 text-[12px] text-[#A79C92]">Вернуть до <strong className="text-white">{new Date(loan.dueAt).toLocaleDateString('ru-RU')}</strong>{loan.agreementRef ? ` · расписка ${loan.agreementRef}` : ''}</div>
+            <div className="mt-1 text-[11px] text-[#8A7F76]">Состояние при выдаче: {loan.issueCondition}</div>
+          </div>)}
           {(devices ?? []).map((d) => {
             const w = d.warranty;
             const workOrder = workOrders.find((item) => item.warrantyCase.imei === d.imei);

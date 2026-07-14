@@ -47,8 +47,8 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   await resetDb();
   const { product } = await seedProduct('DELIVERY-E2E');
   const now = new Date();
-  const startsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 16, 0);
-  const endsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0);
+  const startsAt = new Date(now.getTime() + 60 * 60 * 1000);
+  const endsAt = new Date(now.getTime() + 3 * 60 * 60 * 1000);
   const zone = await prisma.deliveryZone.create({
     data: {
       code: `web-center-${Date.now().toString(36)}`,
@@ -78,7 +78,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   await page.goto('/checkout');
   await page.getByRole('button', { name: /Курьер/ }).click();
   await expect(page.getByLabel('Зона доставки')).toHaveValue(zone.id);
-  await expect(page.getByRole('button', { name: /16:00–18:00.*осталось 1/ })).toBeEnabled();
+  await expect(page.getByRole('button', { name: /осталось 1/ })).toBeEnabled();
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900351');
   await page.getByPlaceholder('Имя').fill('Delivery Buyer');

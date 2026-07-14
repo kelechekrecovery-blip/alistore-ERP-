@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 export class CreateServiceWorkOrderDto {
   @ApiProperty()
@@ -129,4 +129,66 @@ export class ReplaceServiceDeviceDto {
   @MinLength(3)
   @MaxLength(2000)
   summary!: string;
+}
+
+export class RegisterLoanerDeviceDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(4)
+  @MaxLength(80)
+  imei!: string;
+
+  @ApiProperty({ example: 'Без повреждений, аккумулятор 92%' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(1000)
+  condition!: string;
+}
+
+export class PrepareLoanerLoanDto {
+  @ApiProperty()
+  @IsString()
+  loanerDeviceId!: string;
+
+  @ApiProperty({ example: '2026-07-20T12:00:00.000Z' })
+  @IsDateString()
+  dueAt!: string;
+
+  @ApiProperty({ example: 'Без повреждений, комплект с кабелем' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(1000)
+  issueCondition!: string;
+
+  @ApiPropertyOptional({ example: 5000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  depositAmount?: number;
+
+  @ApiPropertyOptional({ example: 'LN-2026-001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  agreementRef?: string;
+}
+
+export class ReturnLoanerLoanDto {
+  @ApiProperty({ example: 'Возвращено в исправном состоянии' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(1000)
+  returnCondition!: string;
+
+  @ApiPropertyOptional({ example: 'Царапина на рамке' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  damageNote?: string;
+}
+
+export class ResolveLoanerDisputeDto {
+  @ApiProperty({ enum: ['available', 'written_off'] })
+  @IsIn(['available', 'written_off'])
+  disposition!: 'available' | 'written_off';
 }

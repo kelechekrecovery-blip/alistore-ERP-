@@ -83,8 +83,66 @@ export interface ServiceQueueItem {
   workOrder: Omit<ServiceWorkOrder, 'warrantyCase'> | null;
 }
 
+export interface ServiceLoanerLoan {
+  id: string;
+  deviceId: string;
+  workOrderId: string;
+  customerId: string;
+  status: 'prepared' | 'issued' | 'overdue' | 'returned' | 'disputed' | 'cancelled';
+  issueCondition: string;
+  returnCondition: string | null;
+  damageNote: string | null;
+  depositAmount: number;
+  agreementRef: string | null;
+  dueAt: string;
+  issuedAt: string | null;
+  returnedAt: string | null;
+  workOrder: { id: string; warrantyCase: ServiceWorkOrder['warrantyCase'] };
+  device?: { id: string; unit: { id: string; imei: string; status: string; location: string; product: { id: string; name: string; sku: string } } };
+}
+
+export interface ServiceLoanerDevice {
+  id: string;
+  active: boolean;
+  condition: string;
+  unit: { id: string; imei: string; status: string; location: string; product: { id: string; name: string; sku: string } };
+  loans: ServiceLoanerLoan[];
+}
+
 export function fetchServiceQueue(accessToken: string) {
   return getJson<ServiceQueueItem[]>('/service-center/queue', accessToken);
+}
+
+export function fetchServiceLoaners(accessToken: string) {
+  return getJson<ServiceLoanerDevice[]>('/service-center/loaners', accessToken);
+}
+
+export function fetchMyServiceLoaners(accessToken: string) {
+  return getJson<ServiceLoanerLoan[]>('/service-center/me/loaners', accessToken);
+}
+
+export function registerServiceLoaner(imei: string, condition: string, accessToken: string, idempotencyKey: string) {
+  return postAuthJson<ServiceLoanerDevice>('/service-center/loaners/register', { imei, condition }, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function prepareServiceLoaner(workOrderId: string, input: { loanerDeviceId: string; dueAt: string; issueCondition: string; depositAmount: number; agreementRef?: string }, accessToken: string, idempotencyKey: string) {
+  return postAuthJson<ServiceLoanerLoan>(`/service-center/work-orders/${encodeURIComponent(workOrderId)}/loaner/prepare`, input, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function issueServiceLoaner(loanId: string, accessToken: string, idempotencyKey: string) {
+  return postAuthJson<ServiceLoanerLoan>(`/service-center/loaner-loans/${encodeURIComponent(loanId)}/issue`, {}, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function cancelServiceLoaner(loanId: string, accessToken: string, idempotencyKey: string) {
+  return postAuthJson<ServiceLoanerLoan>(`/service-center/loaner-loans/${encodeURIComponent(loanId)}/cancel`, {}, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function returnServiceLoaner(loanId: string, input: { returnCondition: string; damageNote?: string }, accessToken: string, idempotencyKey: string) {
+  return postAuthJson<ServiceLoanerLoan>(`/service-center/loaner-loans/${encodeURIComponent(loanId)}/return`, input, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function resolveServiceLoanerDispute(loanId: string, disposition: 'available' | 'written_off', accessToken: string, idempotencyKey: string) {
+  return postAuthJson<ServiceLoanerLoan>(`/service-center/loaner-loans/${encodeURIComponent(loanId)}/resolve-dispute`, { disposition }, accessToken, { 'idempotency-key': idempotencyKey });
 }
 
 export function createServiceWorkOrder(

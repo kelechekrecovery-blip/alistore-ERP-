@@ -1,7 +1,6 @@
 # BACKLOG
 
 ## Next
-- Complete Service Center Wave B loaner-device custody: authoritative issue/return/condition/evidence lifecycle, availability, overdue escalation and customer/ERP surfaces. Exact work-order detail visual acceptance remains blocked by the missing linked detail handoffs.
 - Restore or explicitly retire the 64 missing `.dc.html` files linked by the 23 committed handoffs; maintain `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` until every row has route/app, API/model, RBAC, Ledger, role E2E and visual evidence.
 - Add one reconciled all-role ecosystem E2E and packaged-app acceptance: customer-to-payment-to-stock-to-pickup/courier/POS/refund, all staff roles, iOS XCUITest targets, connected tests in each Android app module and committed visual goldens.
 - Run first-store HR acceptance with real schedules, payroll, cash handover and physical Staff devices; certify APNs/FCM delivery plus scanner/camera behavior without changing the now-verified native attendance contracts.
@@ -24,6 +23,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Complete Service Center Wave B loaner-device custody over authoritative `DeviceUnit` inventory: registration, prepare/issue/return/dispute states, issue/return Evidence, deposit/agreement metadata, customer ownership, overdue outbox escalation, repair-close guard, Event Ledger and ERP/customer browser acceptance. Exact work-order detail visual acceptance remains blocked by missing linked detail handoffs.
 - Complete the authoritative Service Center repair lifecycle: dedicated service/technician roles, point/assignee guards and explicit assignment, store-owned parts reserve/release/consume, paid-start funding, repair or same-model replacement execution/closure, automatic SLA escalation, 30-day repair warranty, customer-safe projections, generic-warranty bypass protection, post-start refund guard, Event Ledger and API/ERP/browser acceptance.
 - Link paid Service Center estimates to POS and finance: cashier-owned open shift, exact/split tender, work-order locking, stable replay, refund provenance, Event Ledger, ERP handoff, customer payment state and concurrent API/browser acceptance without synthetic orders or inventory mutation.
 - Add third-party paid repair intake across ERP and the customer account: customer reuse/creation, external serial isolation from sellable DeviceUnit stock, technician validation, diagnosis/estimate, customer-owned approval, stable replay, paid-service Ledger events and API/browser acceptance.

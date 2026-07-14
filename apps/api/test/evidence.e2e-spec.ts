@@ -10,6 +10,7 @@ import { EvidenceService } from '../src/evidence/evidence.service';
 import { MediaService } from '../src/media/media.service';
 import { LocalDiskStorage } from '../src/media/storage/local-disk.storage';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { AuthzService } from '../src/authz/authz.service';
 
 describe('Evidence Vault (integration)', () => {
   let prisma: PrismaService;
@@ -29,6 +30,7 @@ describe('Evidence Vault (integration)', () => {
       prisma,
       new AuditService(prisma),
       new MediaService(new LocalDiskStorage(config)),
+      { can: async () => true } as unknown as AuthzService,
     );
   });
 
@@ -49,6 +51,8 @@ describe('Evidence Vault (integration)', () => {
     await prisma.customer.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.inventoryMovement.deleteMany();
+    await prisma.loanerLoan.deleteMany();
+    await prisma.loanerDevice.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
   });

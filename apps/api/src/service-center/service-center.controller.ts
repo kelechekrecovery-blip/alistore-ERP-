@@ -6,9 +6,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { AssignServiceTechnicianDto, CompleteServiceRepairDto, CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto, PayServiceWorkOrderDto, ReplaceServiceDeviceDto, ReserveServicePartDto } from './service-center.dto';
+import { AssignServiceTechnicianDto, CompleteServiceRepairDto, CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto, PayServiceWorkOrderDto, PrepareLoanerLoanDto, RegisterLoanerDeviceDto, ReplaceServiceDeviceDto, ReserveServicePartDto, ResolveLoanerDisputeDto, ReturnLoanerLoanDto } from './service-center.dto';
 import { ServiceCenterService } from './service-center.service';
 import { ServiceExecutionService } from './service-execution.service';
+import { ServiceLoanerService } from './service-loaner.service';
 
 @ApiTags('service-center')
 @ApiBearerAuth()
@@ -18,7 +19,55 @@ export class ServiceCenterController {
   constructor(
     private readonly serviceCenter: ServiceCenterService,
     private readonly execution: ServiceExecutionService,
+    private readonly loaners: ServiceLoanerService,
   ) {}
+
+  @Get('loaners')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'read')
+  loanerFund(@CurrentUser() user: AuthPrincipal) { return this.loaners.list(user.customerId); }
+
+  @Post('loaners/register')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'loaners_manage')
+  registerLoaner(@CurrentUser() user: AuthPrincipal, @Headers('idempotency-key') key: string | undefined, @Body() dto: RegisterLoanerDeviceDto) {
+    return this.loaners.register(dto, user.customerId, key);
+  }
+
+  @Post('work-orders/:id/loaner/prepare')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'loaners_issue')
+  prepareLoaner(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: PrepareLoanerLoanDto) {
+    return this.loaners.prepare(id, dto, user.customerId, key);
+  }
+
+  @Post('loaner-loans/:id/issue')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'loaners_issue')
+  issueLoaner(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined) {
+    return this.loaners.issue(id, user.customerId, key);
+  }
+
+  @Post('loaner-loans/:id/cancel')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'loaners_issue')
+  cancelLoaner(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined) {
+    return this.loaners.cancel(id, user.customerId, key);
+  }
+
+  @Post('loaner-loans/:id/return')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'loaners_issue')
+  returnLoaner(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: ReturnLoanerLoanDto) {
+    return this.loaners.returnLoan(id, dto, user.customerId, key);
+  }
+
+  @Post('loaner-loans/:id/resolve-dispute')
+  @UseGuards(ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('service_center', 'loaners_manage')
+  resolveLoanerDispute(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: ResolveLoanerDisputeDto) {
+    return this.loaners.resolveDispute(id, dto.disposition, user.customerId, key);
+  }
 
   @Get('queue')
   @UseGuards(ActiveStaffGuard, PermissionGuard)
@@ -152,6 +201,12 @@ export class ServiceCenterController {
   mine(@CurrentUser() user: AuthPrincipal) {
     if (user.typ !== 'customer') throw new ForbiddenException('Доступно только клиенту');
     return this.serviceCenter.mine(user.customerId);
+  }
+
+  @Get('me/loaners')
+  myLoaners(@CurrentUser() user: AuthPrincipal) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Доступно только клиенту');
+    return this.loaners.mine(user.customerId);
   }
 
   @Post('me/work-orders/:id/approve-estimate')

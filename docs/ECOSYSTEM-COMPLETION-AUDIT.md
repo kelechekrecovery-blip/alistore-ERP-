@@ -9,8 +9,8 @@ credentials, legal approval or physical hardware.
 ## Verified baseline
 
 - 50 NestJS modules including the application root, 37 generated Next routes and 56 Prisma migrations.
-- `mvp:verify`: API/Web production builds, mobile reference typecheck, 119/119 Jest
-  suites with 477/477 tests and 34/34 Playwright flows.
+- `mvp:verify`: API/Web production builds, mobile reference typecheck, 120/120 Jest
+  suites with 478/478 tests and 35/35 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run android:ui` passed on 2026-07-14 with 25/25 connected Compose tests,
@@ -37,7 +37,7 @@ credentials, legal approval or physical hardware.
 | Marketing CMS | Partial | campaigns, consent and channel transports | banner/collection/navigation draft-review-schedule-publish workflow and storefront consequence E2E |
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
-| Service center | Partial | warranty/paid intake, dedicated service/technician roles, diagnostics/customer approval, point-scoped POS settlement, store-owned parts, assigned repair lifecycle, automatic SLA breach Ledger, closure and 30-day repair warranty | loaner fund; exact detail pixel acceptance remains blocked by absent linked handoffs |
+| Service center | Partial | warranty/paid intake, dedicated service/technician roles, diagnostics/customer approval, point-scoped POS settlement, store-owned parts, assigned repair lifecycle, automatic SLA breach Ledger, closure, 30-day repair warranty and DeviceUnit-backed loaner issue/return/Evidence/overdue custody | exact detail pixel acceptance remains blocked by absent linked handoffs; physical first-store service UAT remains |
 | Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, line-level refund-bound quantity/direct/bundle IMEI restock, serialized and quantity consignment ownership/accrual/payout/partial-return compensation, procurement and bundles | completeness, missort and markdown workflows |
 | Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence plus owned schedule/attendance/offline replay on both platforms | complete visual acceptance, iOS app-level XCUITest and physical push/scanner/camera gate |
 | Product management | Partial | product CRUD, variants, virtual bundles, explicit serialized/quantity tracking, catalog/search | preorders, channel publishing, pricing history and completeness policy |
@@ -54,7 +54,7 @@ credentials, legal approval or physical hardware.
 | Seller/cashier | login, shift, scan, split sale, approval, receipt, refund/exchange, offline restart | software vertical exists; native E2E and hardware external |
 | Warehouse | PO receive, serialized/quantity stock, consignment, count, transfer, picking, discrepancy | quantity receive/transfer/adjust-to-sale, serialized/quantity consignment receive-to-payout and refund-bound restock/owner-compensation browser/API flows covered; full role E2E remains |
 | Courier | assignment, map/call, failure/retry, Evidence, COD handover, offline restart | API/native software covered; live device/push gate external |
-| Support/service | ticket escalation, warranty diagnosis/repair/loaner/close | ticket escalation plus warranty intake/diagnosis/customer estimate approval and paid POS settlement are covered; repair execution and loaner remain partial |
+| Support/service | ticket escalation, warranty diagnosis/repair/loaner/close | ticket escalation, warranty/paid intake, diagnosis, customer estimate approval, POS settlement, repair execution and loaner custody are covered at web/API software level; unified native and physical UAT remain |
 | Manager/owner | budgets, approvals, reconciliation, risk, analytics and audit export | partial ERP coverage; reconciliation/expanded modules missing |
 | Security auditor | revoked role, IDOR, dangerous action, 2FA, immutable Ledger and access audit | automated core coverage; external pentest/retention audit missing |
 

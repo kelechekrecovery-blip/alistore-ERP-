@@ -78,6 +78,8 @@ export class ServiceSlaScheduler implements OnModuleInit, OnModuleDestroy {
 
   private async runSweep() {
     const { escalated } = await this.sla.escalateOverdue();
+    const { escalated: overdueLoaners } = await this.sla.escalateOverdueLoaners();
     if (escalated > 0) this.logger.warn(`Escalated ${escalated} overdue service case(s)`);
+    if (overdueLoaners > 0) this.logger.warn(`Escalated ${overdueLoaners} overdue loaner device(s)`);
   }
 }

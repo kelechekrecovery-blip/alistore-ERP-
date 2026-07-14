@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { sign } from 'jsonwebtoken';
+import { readFileSync } from 'node:fs';
 import { prisma, resetDb, seedStaffCredentials } from './helpers';
 
 test.afterEach(async () => resetDb());
@@ -166,4 +167,52 @@ test('ERP accepts a third-party paid repair and the customer approves its estima
     'payment.received',
     'service.payment_completed',
   ]));
+});
+
+test('ERP issues and returns a loaner while the customer sees custody on the site', async ({ page }) => {
+  await resetDb();
+  const owner = await seedStaffCredentials('owner', 'e2e-loaner-owner');
+  const phone = '+996700950003';
+  const customer = await prisma.customer.create({ data: { phone, name: 'Loaner E2E Customer' } });
+  const product = await prisma.product.create({ data: { sku: `LOANER-UI-${Date.now()}`, name: 'iPhone 15 Loaner', price: 90000, cost: 70000, category: 'phones', attrs: {} } });
+  const repairImei = `LOANER-UI-${Date.now()}-REPAIR`;
+  const loanerImei = `LOANER-UI-${Date.now()}-DEVICE`;
+  await prisma.deviceUnit.create({ data: { imei: repairImei, productId: product.id, status: 'in_repair', location: 'BISHKEK-1' } });
+  await prisma.deviceUnit.create({ data: { imei: loanerImei, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
+  const warrantyCase = await prisma.warrantyCase.create({ data: { imei: repairImei, customerId: customer.id, problem: 'Не включается', status: 'received', sla: new Date(Date.now() + 7 * 86400000) } });
+  const workOrder = await prisma.serviceWorkOrder.create({ data: { warrantyCaseId: warrantyCase.id, technicianId: owner.staffId, createdBy: owner.staffId, point: 'BISHKEK-1' } });
+  const png = readFileSync('node_modules/@jest/reporters/assets/jest_logo.png');
+
+  await page.addInitScript((session) => localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(session)), { accessToken: owner.accessToken, staffId: owner.staffId, username: owner.username, role: 'owner', totpEnabled: false });
+  await page.goto('/erp');
+  await page.getByRole('button', { name: /Сервис-центр/ }).click();
+  await page.getByRole('tab', { name: 'Подменный фонд' }).click();
+  await page.getByLabel('IMEI').fill(loanerImei);
+  await page.getByRole('button', { name: 'Добавить в фонд' }).click();
+  await expect(page.getByTestId('loaner-fund')).toContainText('Свободен');
+  await page.getByLabel('Подменное устройство').selectOption({ index: 1 });
+  await page.getByLabel('Заказ-наряд').selectOption(workOrder.id);
+  await page.getByLabel('Номер расписки').fill('LN-E2E-001');
+  await page.getByLabel('Фото при выдаче').setInputFiles({ name: 'issue.png', mimeType: 'image/png', buffer: png });
+  await page.getByRole('button', { name: 'Оформить и выдать' }).click();
+  const loanerCard = page.locator('[data-testid^="loaner-device-"]').filter({ hasText: 'iPhone 15 Loaner' });
+  await expect(loanerCard).toContainText('Выдан');
+
+  const tokens = { accessToken: sign({ sub: customer.id, phone, typ: 'customer' }, 'dev-secret-alistore-local', { expiresIn: '1h' }), refreshToken: 'loaner-e2e-refresh' };
+  await page.evaluate((auth) => localStorage.setItem('alistore.auth.v1', JSON.stringify(auth)), tokens);
+  await page.goto('/account/devices');
+  const customerLoaner = page.locator('[data-testid^="customer-loaner-"]');
+  await expect(customerLoaner).toContainText('iPhone 15 Loaner');
+  await expect(customerLoaner).toContainText('LN-E2E-001');
+
+  await page.goto('/erp');
+  await page.getByRole('button', { name: /Сервис-центр/ }).click();
+  await page.getByRole('tab', { name: 'Подменный фонд' }).click();
+  await page.locator('[data-testid^="loaner-device-"]').getByRole('button', { name: 'Принять возврат' }).click();
+  await page.getByLabel('Фото при возврате').setInputFiles({ name: 'return.png', mimeType: 'image/png', buffer: png });
+  await page.getByRole('button', { name: 'Принять возврат' }).last().click();
+  await expect(page.getByRole('status')).toContainText('Устройство возвращено');
+  await expect(page.locator('[data-testid^="loaner-device-"]')).toContainText('Свободен');
+  await expect(prisma.deviceUnit.findUniqueOrThrow({ where: { imei: loanerImei } })).resolves.toMatchObject({ status: 'loaner_available' });
+  expect((await prisma.loanerLoan.findFirstOrThrow({ where: { workOrderId: workOrder.id } })).status).toBe('returned');
 });

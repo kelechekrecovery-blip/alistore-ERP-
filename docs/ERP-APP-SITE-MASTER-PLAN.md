@@ -72,7 +72,7 @@ and visual evidence exist for every Wave A module.
 
 ## Phase 3: close ERP Waves B and C
 
-Complete Service Center parts, technician lifecycle, 30-day repair warranty and loaner fund after the verified intake/diagnostics/customer-estimate/POS-settlement vertical; add store opening/closing and incidents, CMS publishing,
+Accept the completed Service Center software lifecycle, including parts, technician execution, 30-day repair warranty and loaner custody, against restored detail handoffs and physical first-store UAT; add store opening/closing and incidents, CMS publishing,
 analytics, legal document/version retention, franchise audits, advertising, referrals,
 Q&A, loyalty, Telegram/WhatsApp storefronts and production AI evaluation. AI can only
 recommend; verified domain services perform money, stock and status mutations.

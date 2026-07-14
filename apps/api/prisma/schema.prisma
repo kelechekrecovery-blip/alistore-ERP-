@@ -78,7 +78,18 @@ enum UnitStatus {
   sold
   returned
   in_repair
+  loaner_available
+  loaner_issued
   written_off
+}
+
+enum LoanerLoanStatus {
+  prepared
+  issued
+  overdue
+  returned
+  disputed
+  cancelled
 }
 
 enum StockTrackingMode {
@@ -437,6 +448,7 @@ model DeviceUnit {
   updatedAt          DateTime          @default(now()) @updatedAt
   consignmentItem    ConsignmentItem?
   serviceReplacement ServiceWorkOrder? @relation("ServiceReplacementUnit")
+  loanerProfile      LoanerDevice?
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -930,12 +942,58 @@ model ServiceWorkOrder {
   payments            Payment[]
   parts               ServicePart[]
   commands            ServiceWorkOrderCommand[]
+  loanerLoans         LoanerLoan[]
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
   @@index([technicianId, createdAt])
   @@index([point, createdAt])
   @@index([estimateApprovedAt, createdAt])
+}
+
+model LoanerDevice {
+  id                         String       @id @default(cuid())
+  unit                       DeviceUnit   @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unitId                     String       @unique
+  active                     Boolean      @default(true)
+  condition                  String
+  registeredBy               String
+  registrationIdempotencyKey String       @unique
+  loans                      LoanerLoan[]
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+
+  @@index([active, createdAt])
+}
+
+model LoanerLoan {
+  id                 String           @id @default(cuid())
+  device             LoanerDevice     @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  deviceId           String
+  workOrder          ServiceWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  workOrderId        String
+  customerId         String
+  status             LoanerLoanStatus @default(prepared)
+  issueCondition     String
+  returnCondition    String?
+  damageNote         String?
+  depositAmount      Int              @default(0)
+  agreementRef       String?
+  dueAt              DateTime
+  preparedBy         String
+  preparedAt         DateTime         @default(now())
+  issuedBy           String?
+  issuedAt           DateTime?
+  returnedBy         String?
+  returnedAt         DateTime?
+  overdueEscalatedAt DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([deviceId, status])
+  @@index([workOrderId, status])
+  @@index([customerId, createdAt])
+  @@index([status, dueAt])
 }
 
 model ServicePart {

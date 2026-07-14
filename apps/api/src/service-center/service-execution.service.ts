@@ -333,6 +333,8 @@ export class ServiceExecutionService {
         if (action === 'close_repair') {
           const unresolved = await tx.servicePart.count({ where: { workOrderId: id, status: 'reserved' } });
           if (unresolved > 0) throw new ConflictError('service_parts_unresolved', 'Сначала спишите или освободите все запчасти');
+          const activeLoan = await tx.loanerLoan.count({ where: { workOrderId: id, status: { in: ['prepared', 'issued', 'overdue'] } } });
+          if (activeLoan > 0) throw new ConflictError('service_loaner_unreturned', 'Сначала верните или отмените подменное устройство');
         }
         assertWarrantyTransition(workOrder.warrantyCase.status, to);
         const now = new Date();

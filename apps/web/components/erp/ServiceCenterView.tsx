@@ -1,23 +1,32 @@
 'use client';
 
-import { CheckCircle2, Clock3, PackageCheck, Play, RefreshCw, Smartphone, Stethoscope, UserRound, Wrench, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, Clock3, PackageCheck, Play, Plus, RefreshCw, RotateCcw, Smartphone, Stethoscope, UserRound, Wrench, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createPaidRepair,
   createServiceWorkOrder,
   assignServiceTechnician,
+  cancelServiceLoaner,
   diagnoseServiceWorkOrder,
   closeServiceRepair,
   completeServiceRepair,
   consumeServicePart,
   fetchServiceQueue,
+  fetchServiceLoaners,
+  issueServiceLoaner,
+  prepareServiceLoaner,
+  registerServiceLoaner,
+  returnServiceLoaner,
+  resolveServiceLoanerDispute,
+  uploadEvidenceImage,
   releaseServicePart,
   reserveServicePart,
   receivedServiceTotal,
   replaceServiceDevice,
   startServiceRepair,
   type ServiceQueueItem,
+  type ServiceLoanerDevice,
 } from '@/lib/api';
 import { som } from '@/lib/format';
 
@@ -51,9 +60,10 @@ function serviceCommandKey(action: string, entityId: string) {
   return { storageKey, idempotencyKey };
 }
 
-export function ServiceCenterView({ accessToken, staffId }: { accessToken: string; staffId: string }) {
+export function ServiceCenterView({ accessToken, staffId, role }: { accessToken: string; staffId: string; role: string }) {
   const [tab, setTab] = useState<Tab>('queue');
   const [items, setItems] = useState<ServiceQueueItem[] | null>(null);
+  const [loaners, setLoaners] = useState<ServiceLoanerDevice[] | null>(null);
   const [selected, setSelected] = useState<ServiceQueueItem | null>(null);
   const [execution, setExecution] = useState<ServiceQueueItem | null>(null);
   const [partProductId, setPartProductId] = useState('');
@@ -68,11 +78,15 @@ export function ServiceCenterView({ accessToken, staffId }: { accessToken: strin
 
   const load = useCallback(async () => {
     setItems(null);
+    setLoaners(null);
     try {
-      setItems(await fetchServiceQueue(accessToken));
+      const [queue, fund] = await Promise.all([fetchServiceQueue(accessToken), fetchServiceLoaners(accessToken)]);
+      setItems(queue);
+      setLoaners(fund);
       setError('');
     } catch {
       setItems([]);
+      setLoaners([]);
       setError('Не удалось загрузить очередь сервис-центра');
     }
   }, [accessToken]);
@@ -184,7 +198,7 @@ export function ServiceCenterView({ accessToken, staffId }: { accessToken: strin
         </>
       )}
 
-      {tab === 'loaner' && <EmptyModule title="Подменный фонд" body="Нет выданных подменных устройств." />}
+          {tab === 'loaner' && <LoanerFundPanel accessToken={accessToken} staffId={staffId} role={role} devices={loaners} workOrders={(items ?? []).filter((item) => item.workOrder && !['closed', 'rejected'].includes(item.status))} onChanged={load} />}
       {tab === 'paid' && <PaidRepairPanel accessToken={accessToken} staffId={staffId} items={(items ?? []).filter((item) => item.serviceType === 'paid')} onCreated={load} onDiagnose={openDiagnostics} />}
       {tab === 'price' && <div className="overflow-hidden rounded-[8px] border border-[#2E2822]"><table className="w-full text-left text-xs"><thead className="bg-[#1A1611] text-[#8A7F76]"><tr><th className="px-4 py-3">Услуга</th><th className="px-4 py-3">Срок</th><th className="px-4 py-3 text-right">От</th></tr></thead><tbody className="divide-y divide-[#2E2822]">{PRICE_ROWS.map(([name, duration, price]) => <tr key={name}><td className="px-4 py-3 font-semibold text-white">{name}</td><td className="px-4 py-3 text-[#A79C92]">{duration}</td><td className="px-4 py-3 text-right font-mono text-lime">{som(price)}</td></tr>)}</tbody></table></div>}
 
@@ -201,6 +215,129 @@ export function ServiceCenterView({ accessToken, staffId }: { accessToken: strin
       </div></div>}
     </section>
   );
+}
+
+function LoanerFundPanel({ accessToken, staffId, role, devices, workOrders, onChanged }: { accessToken: string; staffId: string; role: string; devices: ServiceLoanerDevice[] | null; workOrders: ServiceQueueItem[]; onChanged: () => Promise<void> }) {
+  const [imei, setImei] = useState('');
+  const [condition, setCondition] = useState('Без повреждений');
+  const [selectedDevice, setSelectedDevice] = useState('');
+  const [workOrderId, setWorkOrderId] = useState('');
+  const [dueAt, setDueAt] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
+  const [deposit, setDeposit] = useState('0');
+  const [agreementRef, setAgreementRef] = useState('');
+  const [issueCondition, setIssueCondition] = useState('Без повреждений, комплект проверен');
+  const [issueFile, setIssueFile] = useState<File | null>(null);
+  const [returnLoanId, setReturnLoanId] = useState('');
+  const [returnCondition, setReturnCondition] = useState('Возвращено в исправном состоянии');
+  const [damageNote, setDamageNote] = useState('');
+  const [returnFile, setReturnFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const available = (devices ?? []).filter((device) => device.unit.status === 'loaner_available' && device.loans.length === 0);
+  const selectedLoan = (devices ?? []).flatMap((device) => device.loans).find((loan) => loan.id === returnLoanId);
+
+  async function register(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalized = imei.trim().toUpperCase();
+    const command = serviceCommandKey('loaner-register', normalized);
+    setBusy(true); setMessage('');
+    try {
+      await registerServiceLoaner(normalized, condition.trim(), accessToken, command.idempotencyKey);
+      window.localStorage.removeItem(command.storageKey); setImei(''); setMessage('Устройство добавлено в подменный фонд.'); await onChanged();
+    } catch { setMessage('Не удалось добавить IMEI. Проверьте склад, точку и статус устройства.'); }
+    finally { setBusy(false); }
+  }
+
+  async function prepareAndIssue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!issueFile) return;
+    const prepareKey = serviceCommandKey('loaner-prepare', workOrderId);
+    setBusy(true); setMessage('');
+    try {
+      const loan = await prepareServiceLoaner(workOrderId, { loanerDeviceId: selectedDevice, dueAt: new Date(`${dueAt}T18:00:00`).toISOString(), issueCondition: issueCondition.trim(), depositAmount: Number(deposit || 0), agreementRef: agreementRef.trim() || undefined }, accessToken, prepareKey.idempotencyKey);
+      window.localStorage.removeItem(prepareKey.storageKey);
+      await uploadEvidenceImage({ file: issueFile, entityType: 'loaner', entityId: loan.id, label: 'loaner_issue', actor: staffId, accessToken });
+      const issueKey = serviceCommandKey('loaner-issue', loan.id);
+      await issueServiceLoaner(loan.id, accessToken, issueKey.idempotencyKey);
+      window.localStorage.removeItem(issueKey.storageKey);
+      setSelectedDevice(''); setWorkOrderId(''); setIssueFile(null); setAgreementRef(''); setMessage('Подменное устройство выдано под расписку.'); await onChanged();
+    } catch { setMessage('Выдача не завершена. Подготовленный договор можно продолжить с карточки устройства.'); await onChanged(); }
+    finally { setBusy(false); }
+  }
+
+  async function finishPrepared(loanId: string) {
+    if (!issueFile) { setReturnLoanId(loanId); setMessage('Выберите фото выдачи, затем повторите действие.'); return; }
+    setBusy(true); setMessage('');
+    try {
+      await uploadEvidenceImage({ file: issueFile, entityType: 'loaner', entityId: loanId, label: 'loaner_issue', actor: staffId, accessToken });
+      const command = serviceCommandKey('loaner-issue', loanId);
+      await issueServiceLoaner(loanId, accessToken, command.idempotencyKey); window.localStorage.removeItem(command.storageKey);
+      setIssueFile(null); setMessage('Выдача завершена.'); await onChanged();
+    } catch { setMessage('Не удалось завершить выдачу.'); }
+    finally { setBusy(false); }
+  }
+
+  async function cancelPrepared(loanId: string) {
+    const command = serviceCommandKey('loaner-cancel', loanId);
+    setBusy(true); setMessage('');
+    try {
+      await cancelServiceLoaner(loanId, accessToken, command.idempotencyKey);
+      window.localStorage.removeItem(command.storageKey); setMessage('Подготовка выдачи отменена.'); await onChanged();
+    } catch { setMessage('Не удалось отменить подготовку выдачи.'); }
+    finally { setBusy(false); }
+  }
+
+  async function resolveDispute(loanId: string, disposition: 'available' | 'written_off') {
+    const command = serviceCommandKey(`loaner-dispute-${disposition}`, loanId);
+    setBusy(true); setMessage('');
+    try {
+      await resolveServiceLoanerDispute(loanId, disposition, accessToken, command.idempotencyKey);
+      window.localStorage.removeItem(command.storageKey);
+      setMessage(disposition === 'available' ? 'Диагностика завершена, устройство возвращено в фонд.' : 'Устройство списано из подменного фонда.');
+      await onChanged();
+    } catch { setMessage('Не удалось закрыть расхождение возврата.'); }
+    finally { setBusy(false); }
+  }
+
+  async function returnDevice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedLoan || !returnFile) return;
+    setBusy(true); setMessage('');
+    try {
+      await uploadEvidenceImage({ file: returnFile, entityType: 'loaner', entityId: selectedLoan.id, label: 'loaner_return', actor: staffId, accessToken });
+      const command = serviceCommandKey('loaner-return', selectedLoan.id);
+      await returnServiceLoaner(selectedLoan.id, { returnCondition: returnCondition.trim(), damageNote: damageNote.trim() || undefined }, accessToken, command.idempotencyKey);
+      window.localStorage.removeItem(command.storageKey); setReturnLoanId(''); setReturnFile(null); setDamageNote(''); setMessage(damageNote.trim() ? 'Возврат принят с расхождением и передан в ремонт.' : 'Устройство возвращено в подменный фонд.'); await onChanged();
+    } catch { setMessage('Не удалось оформить возврат. Проверьте фото и состояние выдачи.'); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="space-y-4" data-testid="loaner-fund">
+    <div><h3 className="font-display text-base font-bold text-white">Подменный фонд</h3><p className="mt-1 text-xs text-[#8A7F76]">Устройства на выдачу клиенту на время ремонта.</p></div>
+    {message && <div role="status" className="rounded-[8px] border border-[#3B342D] bg-[#16130F] px-4 py-3 text-xs text-[#A79C92]">{message}</div>}
+    <div className="grid gap-3 md:grid-cols-2">
+      {devices === null && <div className="col-span-full py-12 text-center font-mono text-xs text-[#8A7F76]">Загрузка…</div>}
+      {devices?.map((device) => {
+        const loan = device.loans[0];
+        const issued = loan && ['issued', 'overdue'].includes(loan.status);
+        const disputed = loan?.status === 'disputed' || device.unit.status === 'in_repair';
+        return <article key={device.id} data-testid={`loaner-device-${device.id}`} className="rounded-[8px] border border-[#2E2822] bg-[#16130F] p-4">
+          <div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-[8px] bg-[#221E19] text-coral"><Smartphone size={19} /></div><div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-white">{device.unit.product.name}</div><div className="mt-1 font-mono text-[10px] text-[#8A7F76]">{device.unit.imei.replace(/.(?=.{4})/g, '•')}</div></div><span className={`rounded-[6px] px-2 py-1 text-[10px] font-bold ${disputed ? 'bg-danger/10 text-danger' : issued ? loan.status === 'overdue' ? 'bg-danger/10 text-danger' : 'bg-warn/10 text-warn' : loan?.status === 'prepared' ? 'bg-[#7FB0EC]/10 text-[#7FB0EC]' : 'bg-lime/10 text-lime'}`}>{disputed ? 'На диагностике' : loan?.status === 'overdue' ? 'Просрочен' : issued ? `Выдан (#${loan.workOrderId.slice(-6)})` : loan?.status === 'prepared' ? 'Оформляется' : 'Свободен'}</span></div>
+          <p className="mt-3 text-xs text-[#A79C92]">{device.condition}</p>
+          {loan && loan.status !== 'disputed' && <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#2E2822] pt-3 text-[11px] text-[#8A7F76]"><span>до {new Date(loan.dueAt).toLocaleDateString('ru-RU')}</span>{loan.status === 'prepared' ? <span className="flex gap-3"><button type="button" disabled={busy} onClick={() => void cancelPrepared(loan.id)} className="font-semibold text-[#A79C92]">Отменить</button><button type="button" disabled={busy} onClick={() => void finishPrepared(loan.id)} className="font-semibold text-[#7FB0EC]"><Camera className="mr-1 inline" size={13} />Завершить</button></span> : <button type="button" onClick={() => setReturnLoanId(loan.id)} className="font-semibold text-coral"><RotateCcw className="mr-1 inline" size={13} />Принять возврат</button>}</div>}
+          {disputed && loan && <div className="mt-3 border-t border-[#2E2822] pt-3 text-[11px]"><p className="text-danger">{loan.damageNote ?? 'Требуется диагностика после возврата'}</p><div className="mt-2 flex gap-3"><button type="button" disabled={busy} onClick={() => void resolveDispute(loan.id, 'available')} className="font-semibold text-lime">Вернуть в фонд</button>{role === 'owner' && <button type="button" disabled={busy} onClick={() => void resolveDispute(loan.id, 'written_off')} className="font-semibold text-[#A79C92]">Списать</button>}</div></div>}
+        </article>;
+      })}
+      {devices?.length === 0 && <div className="col-span-full rounded-[8px] border border-dashed border-[#2E2822] py-12 text-center text-sm text-[#8A7F76]">Подменный фонд пока пуст</div>}
+    </div>
+    <div className="grid gap-4 xl:grid-cols-2">
+      <form onSubmit={register} className="rounded-[8px] border border-[#2E2822] bg-[#16130F] p-4"><h4 className="text-sm font-semibold text-white"><Plus className="mr-2 inline text-coral" size={16} />Добавить устройство</h4><div className="mt-3 grid gap-3 sm:grid-cols-2"><PaidInput label="IMEI" value={imei} onChange={setImei} placeholder="IMEI со склада" /><PaidInput label="Состояние" value={condition} onChange={setCondition} placeholder="Без повреждений" /></div><button type="submit" disabled={busy || imei.trim().length < 4 || condition.trim().length < 3} className="mt-3 rounded-[8px] bg-coral px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">Добавить в фонд</button></form>
+      <form onSubmit={prepareAndIssue} className="rounded-[8px] border border-[#2E2822] bg-[#16130F] p-4"><h4 className="text-sm font-semibold text-white"><Camera className="mr-2 inline text-coral" size={16} />Выдать под расписку</h4><div className="mt-3 grid gap-3 sm:grid-cols-2"><select aria-label="Подменное устройство" value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} className="rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-xs text-white"><option value="">Выберите устройство</option>{available.map((device) => <option key={device.id} value={device.id}>{device.unit.product.name} · {device.unit.imei.slice(-4)}</option>)}</select><select aria-label="Заказ-наряд" value={workOrderId} onChange={(event) => setWorkOrderId(event.target.value)} className="rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-xs text-white"><option value="">Выберите ремонт</option>{workOrders.map((item) => <option key={item.workOrder!.id} value={item.workOrder!.id}>#{item.id.slice(-6)} · {item.productName}</option>)}</select><input aria-label="Срок возврата" type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} className="rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-xs text-white" /><input aria-label="Залог" type="number" min="0" value={deposit} onChange={(event) => setDeposit(event.target.value)} placeholder="Залог" className="rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-xs text-white" /><input aria-label="Номер расписки" value={agreementRef} onChange={(event) => setAgreementRef(event.target.value)} placeholder="Номер расписки" className="rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-xs text-white" /><input aria-label="Состояние при выдаче" value={issueCondition} onChange={(event) => setIssueCondition(event.target.value)} placeholder="Состояние" className="rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-xs text-white" /><input aria-label="Фото при выдаче" type="file" accept="image/*" onChange={(event) => setIssueFile(event.target.files?.[0] ?? null)} className="col-span-full text-xs text-[#A79C92] file:mr-3 file:rounded-[6px] file:border-0 file:bg-[#221E19] file:px-3 file:py-2 file:text-white" /></div><button type="submit" disabled={busy || !selectedDevice || !workOrderId || !issueFile || issueCondition.trim().length < 3} className="mt-3 rounded-[8px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink disabled:opacity-40">Оформить и выдать</button></form>
+    </div>
+    {selectedLoan && <form onSubmit={returnDevice} className="rounded-[8px] border border-coral/40 bg-[#16130F] p-4"><h4 className="text-sm font-semibold text-white">Возврат устройства · #{selectedLoan.id.slice(-6)}</h4><div className="mt-3 grid gap-3 sm:grid-cols-2"><PaidInput label="Состояние при возврате" value={returnCondition} onChange={setReturnCondition} placeholder="Исправно" /><PaidInput label="Повреждение (если есть)" value={damageNote} onChange={setDamageNote} placeholder="Оставьте пустым, если нет" required={false} /><input aria-label="Фото при возврате" type="file" accept="image/*" onChange={(event) => setReturnFile(event.target.files?.[0] ?? null)} className="col-span-full text-xs text-[#A79C92] file:mr-3 file:rounded-[6px] file:border-0 file:bg-[#221E19] file:px-3 file:py-2 file:text-white" /></div><div className="mt-3 flex gap-2"><button type="button" onClick={() => setReturnLoanId('')} className="rounded-[8px] border border-[#3B342D] px-4 py-2 text-xs text-[#A79C92]">Отмена</button><button type="submit" disabled={busy || !returnFile || returnCondition.trim().length < 3} className="rounded-[8px] bg-coral px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">Принять возврат</button></div></form>}
+    <p className="text-[11px] text-[#6E645C]">Выдача привязана к заказ-наряду, фото Evidence Vault и клиентскому кабинету. Ремонт нельзя закрыть до возврата.</p>
+  </div>;
 }
 
 function PaidRepairPanel({
@@ -285,8 +422,8 @@ function PaidRepairPanel({
   </div>;
 }
 
-function PaidInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return <label className="text-xs text-[#A79C92]">{label}<input aria-label={label} required value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-sm text-white outline-none placeholder:text-[#554D46] focus:border-coral" /></label>;
+function PaidInput({ label, value, onChange, placeholder, required = true }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; required?: boolean }) {
+  return <label className="text-xs text-[#A79C92]">{label}<input aria-label={label} required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-[8px] border border-[#2E2822] bg-[#0E0C0A] px-3 py-2 text-sm text-white outline-none placeholder:text-[#554D46] focus:border-coral" /></label>;
 }
 
 function EmptyModule({ title, body }: { title: string; body: string }) {

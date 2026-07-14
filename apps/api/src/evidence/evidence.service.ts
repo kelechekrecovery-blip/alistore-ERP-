@@ -6,6 +6,7 @@ import { MediaService, type IngestedImage } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceEntityType, EvidenceImageDto } from './evidence.dto';
 import { ForbiddenException } from '@nestjs/common';
+import { AuthzService } from '../authz/authz.service';
 
 export interface EvidenceAttachment {
   entityType: EvidenceEntityType;
@@ -20,9 +21,10 @@ export class EvidenceService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly media: MediaService,
+    private readonly authz: AuthzService,
   ) {}
 
-  async attachImage(input: Buffer, dto: EvidenceImageDto): Promise<EvidenceAttachment> {
+  async attachImage(input: Buffer, dto: EvidenceImageDto, trustedStaffEvidence = false): Promise<EvidenceAttachment> {
     await this.assertEntityExists(dto.entityType, dto.entityId);
     const label = dto.label?.trim() || null;
     const asset = await this.media.ingestImage(
@@ -41,11 +43,26 @@ export class EvidenceService {
             entityId: dto.entityId,
             label,
             asset,
+            trustedStaffEvidence,
           },
           refs: [dto.entityId, asset.key],
         },
       ],
     }));
+  }
+
+  async assertStaffCanAttachLoanerCustody(staffId: string, loanId: string): Promise<void> {
+    const [staff, loan] = await Promise.all([
+      this.prisma.staffUser.findUnique({ where: { id: staffId }, select: { active: true, role: true, point: true } }),
+      this.prisma.loanerLoan.findUnique({ where: { id: loanId }, select: { workOrder: { select: { point: true } } } }),
+    ]);
+    if (!staff?.active || !(await this.authz.can(staff.role, 'service_center', 'loaners_issue'))) {
+      throw new ForbiddenException('loaner_evidence_permission_denied');
+    }
+    if (!loan) throw new ValidationError('evidence_entity_not_found', `loaner ${loanId} не найден`);
+    if (!['admin', 'owner'].includes(staff.role) && staff.point !== loan.workOrder.point) {
+      throw new ForbiddenException('loaner_evidence_point_mismatch');
+    }
   }
 
   async assertCustomerOwnsEntity(customerId: string, type: EvidenceEntityType, id: string): Promise<void> {
@@ -62,6 +79,9 @@ export class EvidenceService {
         break;
       case 'order':
         ownerId = (await this.prisma.order.findUnique({ where: { id }, select: { customerId: true } }))?.customerId ?? null;
+        break;
+      case 'loaner':
+        ownerId = (await this.prisma.loanerLoan.findUnique({ where: { id }, select: { customerId: true } }))?.customerId ?? null;
         break;
       case 'return': {
         const item = await this.prisma.return.findUnique({ where: { id }, select: { orderId: true } });
@@ -101,6 +121,8 @@ export class EvidenceService {
         return this.prisma.supportTicket.findUnique({ where: { id } });
       case 'shift':
         return this.prisma.cashShift.findUnique({ where: { id } });
+      case 'loaner':
+        return this.prisma.loanerLoan.findUnique({ where: { id } });
     }
   }
 }

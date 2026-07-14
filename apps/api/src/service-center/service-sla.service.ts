@@ -64,4 +64,42 @@ export class ServiceSlaService {
     }
     return { escalated };
   }
+
+  async escalateOverdueLoaners(now = new Date()): Promise<{ escalated: number }> {
+    const candidates = await this.prisma.loanerLoan.findMany({
+      where: { status: 'issued', dueAt: { lt: now }, overdueEscalatedAt: null },
+      select: { id: true },
+      take: 100,
+    });
+    let escalated = 0;
+    for (const candidate of candidates) {
+      const applied = await this.audit.transaction<boolean>(async (tx) => {
+        const updated = await tx.loanerLoan.updateMany({
+          where: { id: candidate.id, status: 'issued', dueAt: { lt: now }, overdueEscalatedAt: null },
+          data: { status: 'overdue', overdueEscalatedAt: now },
+        });
+        if (updated.count !== 1) return { result: false, events: [] };
+        const loan = await tx.loanerLoan.findUniqueOrThrow({
+          where: { id: candidate.id },
+          include: { device: { include: { unit: true } }, workOrder: { select: { point: true, warrantyCaseId: true } } },
+        });
+        const recipients = await tx.staffUser.findMany({
+          where: { active: true, point: loan.workOrder.point, role: { in: ['service', 'admin', 'owner'] } },
+          select: { id: true },
+        });
+        await tx.outboxMessage.createMany({
+          data: [loan.customerId, ...recipients.map((recipient) => recipient.id)].map((recipient) => ({
+            channel: 'push', recipient, template: 'service_loaner_overdue',
+            payload: { loanId: loan.id, workOrderId: loan.workOrderId, dueAt: loan.dueAt.toISOString() },
+          })),
+        });
+        return {
+          result: true,
+          events: [{ type: EventType.ServiceLoanerOverdue, actor: 'system', payload: { loanId: loan.id, workOrderId: loan.workOrderId, dueAt: loan.dueAt.toISOString() }, refs: [loan.id, loan.workOrderId, loan.workOrder.warrantyCaseId, loan.customerId, loan.device.unit.imei] }],
+        };
+      });
+      if (applied) escalated += 1;
+    }
+    return { escalated };
+  }
 }

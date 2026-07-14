@@ -267,7 +267,7 @@ export default function ErpPage() {
           {route === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
           {route === 'hr' && <HrView accessToken={session.accessToken} />}
           {route === 'logistics' && <LogisticsView accessToken={session.accessToken} />}
-          {route === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} />}
+          {route === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} role={session.role} />}
           {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}

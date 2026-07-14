@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Headers, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -53,10 +53,13 @@ export class EvidenceController {
     if (!file) {
       throw new ValidationError('no_file', 'Файл не приложен (поле "file")');
     }
+    const custodyEvidence = dto.entityType === 'loaner' && ['loaner_issue', 'loaner_return'].includes(dto.label?.trim() ?? '');
     let guestCustomerId: string | undefined;
     if (user?.typ === 'staff') {
       await this.staffAuth.me(user.customerId);
+      if (custodyEvidence) await this.evidence.assertStaffCanAttachLoanerCustody(user.customerId, dto.entityId);
     } else {
+      if (custodyEvidence) throw new ForbiddenException('loaner_evidence_staff_only');
       guestCustomerId = user?.typ === 'customer'
         ? undefined
         : requireGuestCapability(capability, 'evidence:write').sub;
@@ -64,6 +67,6 @@ export class EvidenceController {
       await this.evidence.assertCustomerOwnsEntity(customerId, dto.entityType, dto.entityId);
     }
     const actor = user?.typ === 'staff' ? `staff:${user.customerId}` : user?.customerId ?? guestCustomerId!;
-    return this.evidence.attachImage(file.buffer, { ...dto, actor });
+    return this.evidence.attachImage(file.buffer, { ...dto, actor }, custodyEvidence && user?.typ === 'staff');
   }
 }
