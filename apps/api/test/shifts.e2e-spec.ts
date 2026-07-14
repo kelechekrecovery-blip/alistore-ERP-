@@ -48,7 +48,9 @@ describe('Cash shift reconciliation (integration)', () => {
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
+    await prisma.cashShiftHandover.deleteMany();
     await prisma.cashShift.deleteMany();
+    await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'handover-test-' } } });
   });
 
   const staff = () => {
@@ -209,5 +211,26 @@ describe('Cash shift reconciliation (integration)', () => {
     const closed = await shifts.close(shift.id, { closeCash: 100000 }, 'cashier');
     expect(closed.expected).toBe(100000);
     expect(closed.diff).toBe(0);
+  });
+
+  it('atomically hands counted cash to a new staff shift without rewriting old sales', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const sourceStaff = await prisma.staffUser.create({ data: { username: `handover-test-source-${suffix}`, passwordHash: 'x', role: 'seller' } });
+    const targetStaff = await prisma.staffUser.create({ data: { username: `handover-test-target-${suffix}`, passwordHash: 'x', role: 'cashier' } });
+    const source = await shifts.open({ staffId: sourceStaff.id, point: 'BISHKEK-1', openCash: 5000 }, sourceStaff.id, `handover-open-${suffix}`);
+    await prisma.payment.create({ data: { amount: 100000, method: 'cash', status: 'received', shiftId: source.id } });
+
+    const command = { toStaffId: targetStaff.id, countedCash: 105000 };
+    const [first, replay] = await Promise.all([
+      shifts.handover(source.id, command, sourceStaff.id, 'seller', `handover-${suffix}`),
+      shifts.handover(source.id, command, sourceStaff.id, 'seller', `handover-${suffix}`),
+    ]);
+    expect(replay.handover.id).toBe(first.handover.id);
+    expect(first.handover).toMatchObject({ expectedCash: 105000, countedCash: 105000, diff: 0, fromStaffId: sourceStaff.id, toStaffId: targetStaff.id });
+    expect(await prisma.cashShift.findUniqueOrThrow({ where: { id: source.id } })).toMatchObject({ staffId: sourceStaff.id, closeCash: 105000 });
+    expect(first.targetShift).toMatchObject({ staffId: targetStaff.id, point: 'BISHKEK-1', openCash: 105000, closedAt: null });
+    expect((await prisma.payment.findFirstOrThrow({ where: { shiftId: source.id } })).shiftId).toBe(source.id);
+    expect(await prisma.cashShiftHandover.count({ where: { fromShiftId: source.id } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'cash.handover', refs: { has: first.handover.id } } })).toBe(1);
   });
 });

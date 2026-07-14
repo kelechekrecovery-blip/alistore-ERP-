@@ -21,7 +21,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { ShiftsService } from './shifts.service';
-import { CloseShiftDto, OpenShiftDto } from './shifts.dto';
+import { CloseShiftDto, HandoverShiftDto, OpenShiftDto } from './shifts.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -47,6 +47,13 @@ export class ShiftsController {
   async current(@CurrentUser() user: AuthPrincipal, @Query('staffId') _staffId?: string) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
     return this.shifts.currentOpen(staffId);
+  }
+
+  @Get('open')
+  @RequirePermission('shift', 'handover')
+  async openShifts(@CurrentUser() user: AuthPrincipal, @Query('point') point?: string) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.shifts.openShifts(point);
   }
 
   @ApiOperation({ summary: 'Get a cash shift with its payments' })
@@ -95,5 +102,17 @@ export class ShiftsController {
   ) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
     return this.shifts.close(id, dto, staffId, idempotencyKey);
+  }
+
+  @Post(':id/handover')
+  @RequirePermission('shift', 'handover')
+  async handover(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: HandoverShiftDto,
+  ) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.shifts.handover(id, dto, staffId, user.role, idempotencyKey);
   }
 }

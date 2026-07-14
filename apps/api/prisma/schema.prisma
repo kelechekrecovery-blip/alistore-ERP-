@@ -775,6 +775,25 @@ model CashShift {
   @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy
 }
 
+model CashShiftHandover {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  fromShiftId    String   @unique
+  toShiftId      String   @unique
+  fromStaffId    String
+  toStaffId      String
+  point          String
+  expectedCash   Int
+  countedCash    Int
+  diff           Int
+  reason         String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@index([point, createdAt])
+  @@index([toStaffId, createdAt])
+}
+
 model InventoryMovement {
   id             String   @id @default(cuid())
   idempotencyKey String?  @unique

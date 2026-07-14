@@ -62,6 +62,7 @@ export async function resetDb() {
   await prisma.refreshToken.deleteMany();
   await prisma.otpChallenge.deleteMany();
   await prisma.customer.deleteMany();
+  await prisma.cashShiftHandover.deleteMany();
   await prisma.cashShift.deleteMany();
   await prisma.courierRun.deleteMany();
   await prisma.approval.deleteMany();

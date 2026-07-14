@@ -16,6 +16,8 @@ export type HrWeek = {
   weekStart: string; weekEnd: string; point: string | null; staff: HrStaff[]; schedules: HrSchedule[];
   absences: HrAbsence[]; timesheet: HrTimesheetRow[];
 };
+export type HrCashShift = { id: string; staffId: string; point: string; openCash: number; openedAt: string; expectedCash: number; staff: HrStaff | null };
+export type HrHandoverOverview = { shifts: HrCashShift[]; staff: HrStaff[] };
 
 export function fetchHrWeek(weekStart: string, point: string, token: string) {
   const query = new URLSearchParams({ weekStart });
@@ -37,4 +39,13 @@ export function cancelHrSchedule(id: string, reason: string, token: string) {
 
 export function decideHrAbsence(id: string, status: 'approved' | 'rejected', token: string) {
   return postAuthJson<HrAbsence>(`/hr/absences/${encodeURIComponent(id)}/decide`, { status }, token);
+}
+
+export function fetchHrHandovers(point: string, token: string) {
+  const query = point.trim() ? `?point=${encodeURIComponent(point.trim())}` : '';
+  return getJson<HrHandoverOverview>(`/shifts/open${query}`, token);
+}
+
+export function handoverHrShift(id: string, input: { toStaffId: string; countedCash: number; reason?: string }, token: string) {
+  return postAuthJson<{ handover: { id: string; diff: number }; targetShift: HrCashShift }>(`/shifts/${encodeURIComponent(id)}/handover`, input, token, { 'idempotency-key': crypto.randomUUID() });
 }

@@ -65,3 +65,30 @@ test('owner schedules staff, approves absence and sees attendance in HR timeshee
 
   expect(await prisma.auditEvent.count({ where: { type: { startsWith: 'hr.' }, refs: { has: seller.staffId } } })).toBe(8);
 });
+
+test('owner reconciles and transfers an open cash shift to another active employee', async ({ page, request }) => {
+  await resetDb();
+  const owner = await seedStaffCredentials('owner', 'e2e-handover-owner');
+  const seller = await seedStaffCredentials('seller', 'e2e-handover-seller');
+  const cashier = await seedStaffCredentials('cashier', 'e2e-handover-cashier');
+  const source = await postJson<{ id: string }>(request, '/shifts/open', { staffId: seller.staffId, point: 'BISHKEK-1', openCash: 5000 }, seller.accessToken, { 'idempotency-key': `e2e-handover-open-${Date.now()}` });
+  await prisma.payment.create({ data: { amount: 1000, method: 'cash', status: 'received', shiftId: source.id } });
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(owner.username);
+  await page.getByPlaceholder('password').fill(owner.password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /HR · Смены/ }).click();
+  await page.getByRole('tab', { name: 'Передача смены' }).click();
+  await expect(page.getByRole('button', { name: new RegExp(seller.username) })).toContainText('6 000');
+  await page.getByLabel('Получатель смены').selectOption(cashier.staffId);
+  await expect(page.getByLabel('Сумма передачи')).toHaveValue('6000');
+  await page.getByRole('button', { name: 'Сверить и передать' }).click();
+  await expect(page.getByRole('button', { name: new RegExp(cashier.username) })).toContainText('6 000');
+
+  await expect.poll(async () => (await prisma.cashShift.findUniqueOrThrow({ where: { id: source.id } })).closedAt).not.toBeNull();
+  const target = await prisma.cashShift.findFirstOrThrow({ where: { staffId: cashier.staffId, closedAt: null } });
+  expect(target).toMatchObject({ point: 'BISHKEK-1', openCash: 6000 });
+  expect(await prisma.cashShiftHandover.count({ where: { fromShiftId: source.id, toShiftId: target.id } })).toBe(1);
+  expect(await prisma.auditEvent.count({ where: { type: 'cash.handover', refs: { has: source.id } } })).toBe(1);
+});

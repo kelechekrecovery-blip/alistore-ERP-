@@ -23,3 +23,14 @@ export class CloseShiftDto {
   })
   @IsOptional() @IsString() reason?: string;
 }
+
+export class HandoverShiftDto {
+  @ApiProperty({ description: 'Active staff member receiving the drawer.' })
+  @IsString() toStaffId!: string;
+
+  @ApiProperty({ minimum: 0, description: 'Cash physically counted before handover.' })
+  @IsInt() @Min(0) countedCash!: number;
+
+  @ApiPropertyOptional({ description: 'Required when counted cash differs from expected.' })
+  @IsOptional() @IsString() reason?: string;
+}

@@ -1354,3 +1354,12 @@
 - Checks run: Prisma format/validation/generation and dev/test schema application; targeted HR API 3/3; API and Next production builds; full owner edit/cancel/attendance Playwright journey; complete `npm run mvp:verify`; `git diff --check`.
 - Outcome: full web/API gate is green with 118/118 API suites and 467/467 tests plus 30/30 Playwright flows. Production readiness remains blocked by the same 12 external credential/manual groups. Cash-shift handover, attendance-derived payroll posting and native Staff attendance remain explicit follow-up work.
 - Next step: implement cash-shift handover as a CashShift-owned transaction without creating a second drawer source of truth.
+
+## 2026-07-14
+
+- Task: replace the empty ERP HR handover tab with an authoritative cash-shift transfer flow.
+- Files changed: CashShiftHandover Prisma model/migration; shift DTO/controller/service and RBAC; typed HR web client and operational ERP handover UI; shift concurrency and owner browser E2E; shared cleanup, backlog/readiness/completion audit and master plan.
+- Result: a handover never rewrites the old shift owner. One PostgreSQL transaction locks the command/source/recipient, reconciles expected versus counted cash, closes the source shift, opens the recipient shift with the counted drawer, persists an immutable handover and appends `shift.closed`, optional `cash.shortage`, `cash.handover` and `shift.opened`. Exact retries return one result; changed reuse fails. Non-manager staff can transfer only their own shift, while owner/admin can supervise the operation.
+- Checks run: Prisma format/validation/generation and 51 migrations applied; targeted shift integration 8/8 including concurrent replay and historical payment attribution; API and Next production builds; ERP owner handover browser E2E; complete `npm run mvp:verify`; `git diff --check`.
+- Outcome: full web/API gate is green with 118/118 API suites and 468/468 tests plus 31/31 Playwright flows. The ERP HR handover screen is now functional rather than a placeholder. Production readiness remains blocked by the same 12 external credential/manual groups.
+- Next step: implement attendance-derived payroll adjustments and immutable payroll posting, then expose attendance controls in native Staff apps.

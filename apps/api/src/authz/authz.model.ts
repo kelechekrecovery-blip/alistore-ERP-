@@ -61,6 +61,12 @@ p, senior_seller, shift, close
 p, franchise, shift, close
 p, admin, shift, close
 p, owner, shift, close
+p, cashier, shift, handover
+p, seller, shift, handover
+p, senior_seller, shift, handover
+p, franchise, shift, handover
+p, admin, shift, handover
+p, owner, shift, handover
 p, warehouse, inventory, movement
 p, admin, inventory, movement
 p, owner, inventory, movement

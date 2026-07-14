@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- Complete the remaining HR handoff contour: cash-shift handover between active staff, attendance-derived payroll adjustments/posting and native Staff attendance controls.
+- Complete the remaining HR handoff contour: attendance-derived payroll adjustments/posting and native Staff attendance controls.
 - Extend the verified logistics contour with route optimization, multi-stop sequencing, delivery exception rescheduling and live tracking after first-store dispatch UAT.
 - Create owner-controlled Cloudflare, Render Pro, R2 EU, Sentry, GitHub Organization and `alistore.kg` registrar accounts with 2FA; import staging Blueprint, enable authenticated Render Key Value, configure Access/WAF/DNS and complete live container/backup/restore smoke.
 - Complete the handoff-only visual migration after the customer purchase path: POS, Staff, ERP modules and native SwiftUI/Compose screens, each accepted against its exact `.dc.html` reference.
@@ -21,6 +21,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Implement atomic cash-shift handover: reconcile and close the source drawer, open the recipient drawer with counted cash, preserve historical sale attribution, enforce ownership/manager RBAC and replay safety, append Ledger events and expose the complete ERP HR handover flow.
 - Add replay-safe owner editing/cancellation for planned HR shifts with immutable command responses, attendance lockout, cancelled-shift enforcement, RBAC, Event Ledger and ERP browser acceptance.
 - Integrate logistics across ERP and the customer site: owner-managed zones and capacity slots, public checkout availability and server-priced delivery, row-locked reservation, cancellation release, dispatch board, courier assignment, RBAC, Event Ledger and API/browser acceptance.
 - Add the first authoritative HR vertical: owner/admin weekly schedules, staff-owned attendance, absence request/decision, derived timesheet with lateness/overtime, idempotency, RBAC, Event Ledger and exact ERP browser acceptance.

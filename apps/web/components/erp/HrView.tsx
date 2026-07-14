@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrWeek, updateHrSchedule, type HrSchedule, type HrWeek } from '@/lib/api';
+import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrHandovers, fetchHrWeek, handoverHrShift, updateHrSchedule, type HrHandoverOverview, type HrSchedule, type HrWeek } from '@/lib/api';
+import { som } from '@/lib/format';
 
 type Tab = 'schedule' | 'timesheet' | 'profile' | 'handover';
 const TABS: { id: Tab; label: string }[] = [
@@ -40,6 +41,11 @@ export function HrView({ accessToken }: { accessToken: string }) {
   const [editingId, setEditingId] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  const [handovers, setHandovers] = useState<HrHandoverOverview | null>(null);
+  const [sourceShiftId, setSourceShiftId] = useState('');
+  const [targetStaffId, setTargetStaffId] = useState('');
+  const [countedCash, setCountedCash] = useState('0');
+  const [handoverReason, setHandoverReason] = useState('');
 
   const reload = useCallback(() => {
     setMessage('');
@@ -49,6 +55,17 @@ export function HrView({ accessToken }: { accessToken: string }) {
     }).catch((error) => { setData(null); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить HR'); });
   }, [accessToken, point, weekStart]);
   useEffect(() => reload(), [reload]);
+  const reloadHandovers = useCallback(() => {
+    fetchHrHandovers(point, accessToken).then((result) => {
+      setHandovers(result);
+      const source = result.shifts.find((shift) => shift.id === sourceShiftId) ?? result.shifts[0];
+      setSourceShiftId(source?.id ?? '');
+      setCountedCash(String(source?.expectedCash ?? 0));
+      const occupied = new Set(result.shifts.map((shift) => shift.staffId));
+      setTargetStaffId((current) => result.staff.some((staff) => staff.id === current && !occupied.has(staff.id)) ? current : result.staff.find((staff) => !occupied.has(staff.id))?.id ?? '');
+    }).catch(() => setHandovers(null));
+  }, [accessToken, point, sourceShiftId]);
+  useEffect(() => { if (tab === 'handover') reloadHandovers(); }, [reloadHandovers, tab]);
   useEffect(() => setShiftDate(weekStart), [weekStart]);
 
   const chosen = data?.staff.find((person) => person.id === selectedStaff);
@@ -78,6 +95,17 @@ export function HrView({ accessToken }: { accessToken: string }) {
     setBusy(row.id); setMessage('');
     try { await cancelHrSchedule(row.id, 'Отменено менеджером', accessToken); if (editingId === row.id) setEditingId(''); reload(); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Не удалось отменить смену'); }
+    finally { setBusy(''); }
+  }
+
+  async function submitHandover(event: FormEvent) {
+    event.preventDefault();
+    if (!sourceShiftId || !targetStaffId) return;
+    setBusy('handover'); setMessage('');
+    try {
+      await handoverHrShift(sourceShiftId, { toStaffId: targetStaffId, countedCash: Number(countedCash), reason: handoverReason.trim() || undefined }, accessToken);
+      setHandoverReason(''); reloadHandovers();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Не удалось передать смену'); }
     finally { setBusy(''); }
   }
 
@@ -129,7 +157,20 @@ export function HrView({ accessToken }: { accessToken: string }) {
         <section className="rounded-[7px] border border-[#2E2822] bg-[#16130F] p-5"><h3 className="font-display text-sm font-bold">Отсутствия</h3><div className="mt-3 space-y-2">{chosenAbsences.map((absence) => <article key={absence.id} className="flex flex-wrap items-center gap-3 border-t border-[#2E2822] py-3 text-xs"><div className="min-w-0 flex-1"><strong>{ABSENCE_LABEL[absence.type] ?? absence.type}</strong><div className="mt-1 text-[#8A7F76]">{absence.startsOn.slice(0, 10)} — {absence.endsOn.slice(0, 10)} · {absence.status}</div>{absence.reason && <p className="mt-1 text-[#B9ADA2]">{absence.reason}</p>}</div>{absence.status === 'requested' && <div className="flex gap-2"><button disabled={busy === absence.id} onClick={() => decide(absence.id, 'rejected')} className="text-[#FF8A7A]">Отклонить</button><button disabled={busy === absence.id} onClick={() => decide(absence.id, 'approved')} className="rounded-[5px] bg-[#26351B] px-3 py-1.5 font-semibold text-[#C6FF3D]">Одобрить</button></div>}</article>)}{!chosenAbsences.length && <div className="border-t border-[#2E2822] py-8 text-center text-sm text-[#8A7F76]">Запросов нет</div>}</div></section>
       </div>}
 
-      {tab === 'handover' && <div className="grid min-h-52 place-items-center rounded-[7px] border border-[#2E2822] bg-[#16130F] text-sm text-[#8A7F76]">Нет активной передачи смены</div>}
+      {tab === 'handover' && <div className="grid gap-4 lg:grid-cols-[1fr_330px]">
+        <section className="overflow-hidden rounded-[7px] border border-[#2E2822] bg-[#16130F]">
+          <div className="grid grid-cols-[minmax(130px,1fr)_100px_110px] bg-[#1A1611] px-4 py-3 text-[10px] uppercase text-[#8A7F76]"><span>Открытая касса</span><span>Точка</span><span>Ожидается</span></div>
+          {handovers?.shifts.map((shift) => <button key={shift.id} type="button" onClick={() => { setSourceShiftId(shift.id); setCountedCash(String(shift.expectedCash)); }} className={`grid w-full grid-cols-[minmax(130px,1fr)_100px_110px] border-t px-4 py-3 text-left text-xs ${sourceShiftId === shift.id ? 'border-[#FF6B55] bg-[#251B16]' : 'border-[#2E2822]'}`}><span><strong className="block truncate">{shift.staff?.username ?? shift.staffId}</strong><small className="text-[#8A7F76]">с {new Date(shift.openedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</small></span><span>{shift.point}</span><span className="font-mono text-[#C6FF3D]">{som(shift.expectedCash)}</span></button>)}
+          {!handovers?.shifts.length && <div className="grid min-h-44 place-items-center text-sm text-[#8A7F76]">Открытых кассовых смен нет</div>}
+        </section>
+        <form onSubmit={submitHandover} className="rounded-[7px] border border-[#2E2822] bg-[#1A1611] p-5">
+          <h3 className="font-display text-sm font-bold">Передать кассу</h3>
+          <label className="mt-4 block text-[10px] text-[#8A7F76]">Получатель<select aria-label="Получатель смены" value={targetStaffId} onChange={(event) => setTargetStaffId(event.target.value)} className="mt-1 h-10 w-full rounded-[6px] border border-[#3A332C] bg-[#16130F] px-3 text-sm"><option value="">Выберите сотрудника</option>{handovers?.staff.filter((staff) => !handovers.shifts.some((shift) => shift.staffId === staff.id)).map((staff) => <option key={staff.id} value={staff.id}>{staff.username} · {staff.role}</option>)}</select></label>
+          <label className="mt-3 block text-[10px] text-[#8A7F76]">Фактически в кассе<input aria-label="Сумма передачи" type="number" min="0" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} className="mt-1 h-10 w-full rounded-[6px] border border-[#3A332C] bg-[#16130F] px-3 font-mono text-sm" /></label>
+          {sourceShiftId && Number(countedCash) !== (handovers?.shifts.find((shift) => shift.id === sourceShiftId)?.expectedCash ?? 0) && <label className="mt-3 block text-[10px] text-[#FF8A7A]">Причина расхождения<input aria-label="Причина передачи" value={handoverReason} onChange={(event) => setHandoverReason(event.target.value)} className="mt-1 h-10 w-full rounded-[6px] border border-[#6B3B32] bg-[#16130F] px-3 text-sm" /></label>}
+          <button disabled={busy === 'handover' || !sourceShiftId || !targetStaffId} className="mt-4 h-10 w-full rounded-[6px] bg-[#FF6B55] text-sm font-bold text-white disabled:opacity-50">{busy === 'handover' ? 'Передаём…' : 'Сверить и передать'}</button>
+        </form>
+      </div>}
     </div>
   );
 }
