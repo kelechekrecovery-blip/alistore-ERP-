@@ -14,6 +14,7 @@
 		252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */; };
 		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		652FDF2063F51338694979A9 /* StaffWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7596CAED282254008F7309B8 /* StaffWorkView.swift */; };
 		72577A15EB13D14CB354087E /* CustomerAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */; };
 		77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */; };
 		8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */; };
@@ -144,6 +145,7 @@
 		48457E88937519CA203EA7DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		524C0236048CC4F9188201E1 /* AliStoreCourier.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreCourier.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerAuthStore.swift; sourceTree = "<group>"; };
+		7596CAED282254008F7309B8 /* StaffWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffWorkView.swift; sourceTree = "<group>"; };
 		7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStorePOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -154,6 +156,7 @@
 		942E788E79F852B2161181F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStorePOSApp.swift; sourceTree = "<group>"; };
 		A9EBC4D5C06A5630E3B7D69D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Staff.entitlements; sourceTree = "<group>"; };
 		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
@@ -224,7 +227,9 @@
 			children = (
 				92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */,
 				942E788E79F852B2161181F9 /* Info.plist */,
+				AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */,
 				3DDD9376D59012178E0570F2 /* StaffScannerView.swift */,
+				7596CAED282254008F7309B8 /* StaffWorkView.swift */,
 			);
 			path = Staff;
 			sourceTree = "<group>";
@@ -477,6 +482,7 @@
 			files = (
 				252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */,
 				A80FCD2AA45BA0E8B994C5C6 /* StaffScannerView.swift in Sources */,
+				652FDF2063F51338694979A9 /* StaffWorkView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -742,6 +748,7 @@
 			buildSettings = {
 				API_BASE_URL = "http://127.0.0.1:4000/api";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Staff/Staff.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Staff/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -760,6 +767,7 @@
 			buildSettings = {
 				API_BASE_URL = "$(ALISTORE_API_BASE_URL)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Staff/Staff.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Staff/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

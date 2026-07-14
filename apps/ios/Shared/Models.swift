@@ -377,11 +377,11 @@ public struct RegisterPushTokenRequest: Encodable, Sendable {
     public let deviceId: String
     public let scope: String
 
-    public init(token: String, deviceId: String) {
+    public init(token: String, deviceId: String, scope: String = "customer") {
         self.token = token
         self.platform = "ios"
         self.deviceId = deviceId
-        self.scope = "customer"
+        self.scope = scope
     }
 }
 
@@ -392,6 +392,55 @@ public struct RegisteredPushToken: Decodable, Sendable {
     public let deviceId: String
     public let scope: String
     public let customerId: String?
+    public let staffId: String?
     public let enabled: Bool
     public let lastSeenAt: Date
+}
+
+public struct StaffTask: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let description: String?
+    public let status: String
+    public let priority: String
+    public let assigneeId: String
+    public let dueAt: Date?
+    public let relatedType: String?
+    public let relatedId: String?
+    public let createdAt: Date
+    public let updatedAt: Date
+    public let completedAt: Date?
+}
+
+public struct UpdateStaffTaskRequest: Encodable, Sendable {
+    public let status: String
+
+    public init(status: String) { self.status = status }
+}
+
+public struct StaffSupportTicket: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let customerId: String
+    public let channel: String
+    public let subject: String
+    public let body: String?
+    public let priority: String
+    public let sla: Date
+    public let status: String
+    public let assignee: String?
+    public let createdAt: Date
+}
+
+public struct SupportTransitionRequest: Encodable, Sendable {
+    public let to: String
+    public let assignee: String?
+
+    public init(to: String, assignee: String? = nil) {
+        self.to = to
+        self.assignee = assignee
+    }
+}
+
+public struct EmptyMutationRequest: Encodable, Sendable {
+    public init() {}
 }

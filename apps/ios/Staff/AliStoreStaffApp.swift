@@ -1,9 +1,40 @@
 import AliStoreCore
 import SwiftData
 import SwiftUI
+import UIKit
+import UserNotifications
+
+private extension Notification.Name {
+    static let staffAPNsToken = Notification.Name("alistore.staff.apns.token")
+    static let staffAPNsFailure = Notification.Name("alistore.staff.apns.failure")
+    static let staffNotificationRoute = Notification.Name("alistore.staff.notification.route")
+}
+
+private final class StaffAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(name: .staffAPNsToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .staffAPNsFailure, object: error.localizedDescription)
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let value = response.notification.request.content.userInfo["deepLink"] as? String,
+              let url = URL(string: value) else { return }
+        NotificationCenter.default.post(name: .staffNotificationRoute, object: url)
+    }
+}
 
 @main
 struct AliStoreStaffApp: App {
+    @UIApplicationDelegateAdaptor(StaffAppDelegate.self) private var appDelegate
     @State private var auth = StaffAuthStore(environment: .live(), keychainService: "kg.alistore.staff")
 
     var body: some Scene {
@@ -21,28 +52,97 @@ struct AliStoreStaffApp: App {
 private struct StaffRootView: View {
     let session: StaffSession
     let logout: () -> Void
+    @State private var selectedTab = StaffTab.work
+    @State private var workMode = StaffWorkMode.orders
+    @State private var routedTaskId: String?
+    @State private var pushStatus = "Push не настроен"
+    private let environment = AppEnvironment.live()
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack {
-                StaffOrdersView(session: session)
+                StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
             }
             .tabItem { Label("Задачи", systemImage: "checklist") }
+            .tag(StaffTab.work)
             NavigationStack {
                 StaffScannerView(session: session)
             }
-                .tabItem { Label("Сканер", systemImage: "barcode.viewfinder") }
+            .tabItem { Label("Сканер", systemImage: "barcode.viewfinder") }
+            .tag(StaffTab.scanner)
             NavigationStack {
                 Customer360View(session: session)
             }
             .tabItem { Label("Клиенты", systemImage: "person.2") }
+            .tag(StaffTab.customers)
             NavigationStack {
-                StaffShiftView(session: session, logout: logout)
+                StaffShiftView(session: session, pushStatus: pushStatus, enablePush: enablePush, logout: logout)
             }
             .tabItem { Label("Смена", systemImage: "clock") }
+            .tag(StaffTab.shift)
+        }
+        .onOpenURL(perform: route)
+        .onReceive(NotificationCenter.default.publisher(for: .staffNotificationRoute)) { notification in
+            guard let url = notification.object as? URL else { return }
+            route(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .staffAPNsToken)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await registerPushToken(token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .staffAPNsFailure)) { notification in
+            pushStatus = notification.object as? String ?? "APNs registration failed"
         }
     }
+
+    private func route(_ url: URL) {
+        guard url.scheme == "alistore-staff" else { return }
+        if url.host == "tasks" {
+            selectedTab = .work
+            workMode = .tasks
+            routedTaskId = url.pathComponents.dropFirst().first
+        } else if url.host == "support" {
+            selectedTab = .work
+            workMode = .support
+        }
+    }
+
+    private func enablePush() {
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+                guard granted else { pushStatus = "Уведомления отключены"; return }
+                pushStatus = "Регистрация APNs…"
+                await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+            } catch {
+                pushStatus = error.localizedDescription
+            }
+        }
+    }
+
+    private func registerPushToken(_ token: String) async {
+        do {
+            let registered: RegisteredPushToken = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "notifications/push-tokens",
+                body: RegisterPushTokenRequest(token: token, deviceId: installationId(), scope: "staff"),
+                token: session.accessToken
+            )
+            pushStatus = registered.enabled ? "Push подключён" : "Push отключён"
+        } catch {
+            pushStatus = error.localizedDescription
+        }
+    }
+
+    private func installationId() -> String {
+        let key = "alistore.staff.installation-id"
+        if let value = UserDefaults.standard.string(forKey: key) { return value }
+        let value = "ios-staff-\(UUID().uuidString.lowercased())"
+        UserDefaults.standard.set(value, forKey: key)
+        return value
+    }
 }
+
+private enum StaffTab: Hashable { case work, scanner, customers, shift }
 
 private struct Customer360View: View {
     let session: StaffSession
@@ -204,7 +304,7 @@ private struct Customer360View: View {
     }
 }
 
-private struct StaffOrdersView: View {
+struct StaffOrdersView: View {
     let session: StaffSession
     @State private var status = "created"
     @State private var orders: [CustomerOrder] = []
@@ -389,6 +489,8 @@ private struct StaffOrdersView: View {
 
 private struct StaffShiftView: View {
     let session: StaffSession
+    let pushStatus: String
+    let enablePush: () -> Void
     let logout: () -> Void
     @State private var shift: CashShift?
     @State private var isLoading = true
@@ -406,6 +508,8 @@ private struct StaffShiftView: View {
             Section("Сотрудник") {
                 LabeledContent("Логин", value: session.username)
                 LabeledContent("Роль", value: session.role)
+                LabeledContent("Push", value: pushStatus)
+                Button("Включить уведомления", systemImage: "bell.badge", action: enablePush)
             }
             if isLoading {
                 Section { ProgressView("Проверяем смену…") }

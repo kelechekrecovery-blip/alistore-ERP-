@@ -1210,3 +1210,12 @@
 - Checks run: Prisma schema validation/generation and isolated test DB reset; targeted loyalty/payment/IDOR Jest; API and Next production builds; targeted Playwright; full `npm run mvp:verify`; `git diff --check`.
 - Outcome: full gate passed with 110/110 API suites and 428/428 tests, 23/23 Playwright flows, API/Web builds and mobile typecheck. External readiness correctly remains blocked by 12 credential/manual certification groups and no certification flag was claimed.
 - Next step: close the remaining native iOS Staff support/task/push parity, then implement the complete iOS Courier vertical.
+
+## 2026-07-14
+
+- Task: complete native SwiftUI Staff tasks, support operations and APNs/deep-link routing.
+- Files changed: iOS Staff work surface and app delegate, shared native DTOs, APNs entitlement/project generation, API contract tests, backlog and readiness/gap-map documentation.
+- Result: authenticated Staff now switches between fulfillment orders, PostgreSQL-assigned tasks and the support queue; task transitions, ticket transitions and escalation always use the stored staff JWT and reload server-authoritative state. The app registers an APNs token with `scope=staff`, routes task/support notifications into the correct work mode and preserves the canonical four-tab shell.
+- Checks run: `git diff --check`; `npm run ios:generate`; all-target `npm run ios:build`; `npm run ios:test` on iPhone 17 Pro Simulator; install/launch/screenshot smoke for `kg.alistore.staff` on the booted iPhone 17 Pro Simulator.
+- Outcome: Client, Staff, Courier and POS targets built; AliStoreCore XCTest passed 20/20; Staff installed and launched to its login screen without crash or overflow. Live APNs delivery and physical camera/scanner behavior remain device/credential certification gates and are not claimed complete.
+- Next step: replace the iOS Courier route/COD shell with the complete owner-bound delivery, Evidence, offline replay and push-routing vertical.

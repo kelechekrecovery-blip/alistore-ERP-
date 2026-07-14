@@ -315,6 +315,69 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
     }
 
+    func testLoadsAndTransitionsOwnedStaffTask() async throws {
+        let session = makeSession(status: 200, body: """
+        [{"id":"task-1","title":"Проверить витрину","description":"Фото после открытия","status":"open","priority":"high","assigneeId":"staff-1","dueAt":"2026-07-14T12:00:00Z","relatedType":"shift","relatedId":"shift-1","createdAt":"2026-07-14T08:00:00Z","updatedAt":"2026-07-14T08:00:00Z","completedAt":null}]
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let tasks: [StaffTask] = try await client.get("staff-tasks/mine", token: "staff-access")
+
+        XCTAssertEqual(tasks.first?.id, "task-1")
+        XCTAssertEqual(tasks.first?.priority, "high")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/staff-tasks/mine")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-access")
+
+        MockURLProtocol.body = Data("""
+        {"id":"task-1","title":"Проверить витрину","description":"Фото после открытия","status":"in_progress","priority":"high","assigneeId":"staff-1","dueAt":"2026-07-14T12:00:00Z","relatedType":"shift","relatedId":"shift-1","createdAt":"2026-07-14T08:00:00Z","updatedAt":"2026-07-14T08:05:00Z","completedAt":null}
+        """.utf8)
+        let updated: StaffTask = try await client.patch(
+            "staff-tasks/mine/task-1",
+            body: UpdateStaffTaskRequest(status: "in_progress"),
+            token: "staff-access"
+        )
+
+        XCTAssertEqual(updated.status, "in_progress")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "PATCH")
+    }
+
+    func testTransitionsSupportTicketWithStaffSession() async throws {
+        let session = makeSession(status: 200, body: """
+        {"id":"ticket-1","customerId":"customer-1","channel":"app","subject":"Не пришёл чек","body":"После оплаты","priority":"high","sla":"2026-07-14T12:00:00Z","status":"in_progress","assignee":"staff-1","createdAt":"2026-07-14T08:00:00Z"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let ticket: StaffSupportTicket = try await client.patch(
+            "support/tickets/ticket-1/transition",
+            body: SupportTransitionRequest(to: "in_progress", assignee: "staff-1"),
+            token: "staff-access"
+        )
+
+        XCTAssertEqual(ticket.assignee, "staff-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/support/tickets/ticket-1/transition")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-access")
+    }
+
+    func testRegistersNativeAPNsTokenForStaff() async throws {
+        let token = String(repeating: "cd", count: 32)
+        let session = makeSession(status: 201, body: """
+        {"id":"push-staff-1","token":"\(token)","platform":"ios","deviceId":"ios-staff-install-1","scope":"staff","customerId":null,"staffId":"staff-1","enabled":true,"lastSeenAt":"2026-07-14T12:00:00Z"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let registered: RegisteredPushToken = try await client.post(
+            "notifications/push-tokens",
+            body: RegisterPushTokenRequest(token: token, deviceId: "ios-staff-install-1", scope: "staff"),
+            token: "staff-access"
+        )
+
+        XCTAssertEqual(registered.scope, "staff")
+        XCTAssertEqual(registered.staffId, "staff-1")
+        let body = try JSONEncoder().encode(RegisterPushTokenRequest(token: token, deviceId: "ios-staff-install-1", scope: "staff"))
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["scope"] as? String, "staff")
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)
