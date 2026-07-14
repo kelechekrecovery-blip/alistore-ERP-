@@ -10,7 +10,7 @@ credentials, legal approval or physical hardware.
 
 - 47 NestJS modules, 37 generated Next routes and 43 Prisma migrations.
 - `mvp:verify`: API/Web production builds, mobile reference typecheck, 116/116 Jest
-  suites with 463/463 tests and 27/27 Playwright flows.
+  suites with 465/465 tests and 28/28 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
@@ -23,7 +23,7 @@ credentials, legal approval or physical hardware.
 |---|---|---|---|
 | API Data Contracts | Partial | typed Nest DTO/controllers, Swagger, API integration suites | versioned `/v1` contract, generated client compatibility and every handoff endpoint mapped |
 | ERP 2.0 | Partial | `/erp`, reports, risk, finance, approvals, procurement links | exact acceptance for every ERP tab; HR, logistics, CMS, service, legal and operations surfaces |
-| HR | Partial | StaffUser, shifts, tasks, KPI/payroll services | schedules, leave/absence, payroll workflow UI, dedicated handoff Playwright |
+| HR | Partial | StaffUser, weekly schedules, staff-owned attendance, absence approval, derived timesheet, tasks, KPI/payroll services and dedicated handoff Playwright | editable/cancellable plans, cash-shift handover, attendance-derived payroll posting and native Staff attendance UI |
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
@@ -73,7 +73,7 @@ credentials, legal approval or physical hardware.
 
 ## Ordered remaining work
 
-1. Complete HR schedules and logistics zones/slots/dispatch for first-store operations.
+1. Complete HR handover/payroll posting and logistics zones/slots/dispatch for first-store operations.
 2. Add service center, store operations, CMS, analytics and legal Waves B.
 3. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.

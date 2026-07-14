@@ -29,6 +29,10 @@ p, admin, pii, approve
 p, owner, staff, manage
 p, admin, staff_tasks, manage
 p, owner, staff_tasks, manage
+p, admin, hr, read
+p, owner, hr, read
+p, admin, hr, manage
+p, owner, hr, manage
 p, cashier, pos, sale
 p, seller, pos, sale
 p, senior_seller, pos, sale

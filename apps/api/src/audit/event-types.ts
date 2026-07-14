@@ -113,6 +113,12 @@ export const EventType = {
   ProtectionUpdated: 'protection.updated',
   StaffTaskCreated: 'staff_task.created',
   StaffTaskUpdated: 'staff_task.updated',
+  HrScheduleCreated: 'hr.schedule_created',
+  HrAttendanceOpened: 'hr.attendance_opened',
+  HrAttendanceClosed: 'hr.attendance_closed',
+  HrAbsenceRequested: 'hr.absence_requested',
+  HrAbsenceApproved: 'hr.absence_approved',
+  HrAbsenceRejected: 'hr.absence_rejected',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

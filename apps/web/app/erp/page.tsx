@@ -36,14 +36,16 @@ import { RiskCenterView } from '@/components/erp/RiskCenterView';
 import { StockView } from '@/components/erp/StockView';
 import { FinanceView } from '@/components/erp/FinanceView';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { HrView } from '@/components/erp/HrView';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
-type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'readiness' | 'ledger';
+type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'readiness' | 'ledger';
 
 const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
   { id: 'stock', icon: '📦', label: 'Склад' },
   { id: 'finance', icon: '💰', label: 'Финансы' },
+  { id: 'hr', icon: '◫', label: 'HR · Смены' },
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
   { id: 'crm', icon: '💬', label: 'CRM · Инбокс' },
   { id: 'ai', icon: '🧠', label: 'Ассистент' },
@@ -62,6 +64,7 @@ const TITLES: Record<Route, [string, string]> = {
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
   reorder: ['Закупки', 'Что дозаказать по спросу/остатку'],
   finance: ['Финансы', 'Деньги · P&L'],
+  hr: ['Команда', 'График смен · табель · отсутствия'],
   kpi: ['Маржа · KPI', 'Валовая маржа, средний чек, топ-товары'],
   stock: ['Склад', 'Остатки по статусам'],
   crm: ['CRM · Поддержка', 'Инбокс обращений + Customer 360'],
@@ -256,6 +259,7 @@ export default function ErpPage() {
           {route === 'pricing' && <PricingView accessToken={session.accessToken} />}
           {route === 'reorder' && <ReorderView accessToken={session.accessToken} />}
           {route === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
+          {route === 'hr' && <HrView accessToken={session.accessToken} />}
           {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}

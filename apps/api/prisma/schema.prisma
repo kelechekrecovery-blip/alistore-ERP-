@@ -200,6 +200,20 @@ enum ExpenseStatus {
   paid
 }
 
+enum HrAbsenceType {
+  annual_leave
+  sick_leave
+  unpaid_leave
+  other
+}
+
+enum HrAbsenceStatus {
+  requested
+  approved
+  rejected
+  cancelled
+}
+
 // ---------- CORE ----------
 model Customer {
   id             String               @id @default(cuid())
@@ -1200,21 +1214,81 @@ model OutboxMessage {
 // Staff login carries a role in the JWT so dangerous actions are authorized on
 // the server (Role Permission Matrix), not trusted from the request body.
 model StaffUser {
-  id            String      @id @default(cuid())
-  username      String      @unique
+  id            String         @id @default(cuid())
+  username      String         @unique
   passwordHash  String
   role          Role
-  active        Boolean     @default(true)
+  active        Boolean        @default(true)
   totpSecret    String?
-  totpEnabled   Boolean     @default(false)
+  totpEnabled   Boolean        @default(false)
   totpLastToken String? // last used TOTP code — single-use guard (anti-replay)
   pushTokens    PushToken[]
-  assignedTasks StaffTask[] @relation("StaffTaskAssignee")
-  createdTasks  StaffTask[] @relation("StaffTaskCreator")
-  courierOrders Order[]     @relation("OrderCourier")
-  createdAt     DateTime    @default(now())
+  assignedTasks StaffTask[]    @relation("StaffTaskAssignee")
+  createdTasks  StaffTask[]    @relation("StaffTaskCreator")
+  courierOrders Order[]        @relation("OrderCourier")
+  hrSchedules   HrSchedule[]
+  hrAttendances HrAttendance[]
+  hrAbsences    HrAbsence[]
+  createdAt     DateTime       @default(now())
 
   @@index([role])
+}
+
+model HrSchedule {
+  id             String        @id @default(cuid())
+  staff          StaffUser     @relation(fields: [staffId], references: [id])
+  staffId        String
+  point          String
+  shiftDate      DateTime      @db.Date
+  startsAt       DateTime
+  endsAt         DateTime
+  createdBy      String
+  idempotencyKey String        @unique
+  attendance     HrAttendance?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([staffId, shiftDate])
+  @@index([point, shiftDate])
+}
+
+model HrAttendance {
+  id           String     @id @default(cuid())
+  schedule     HrSchedule @relation(fields: [scheduleId], references: [id])
+  scheduleId   String     @unique
+  staff        StaffUser  @relation(fields: [staffId], references: [id])
+  staffId      String
+  point        String
+  checkedInAt  DateTime
+  checkedOutAt DateTime?
+  checkInKey   String     @unique
+  checkOutKey  String?    @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([staffId, checkedInAt])
+  @@index([point, checkedInAt])
+}
+
+model HrAbsence {
+  id             String          @id @default(cuid())
+  staff          StaffUser       @relation(fields: [staffId], references: [id])
+  staffId        String
+  type           HrAbsenceType
+  startsOn       DateTime        @db.Date
+  endsOn         DateTime        @db.Date
+  reason         String?
+  status         HrAbsenceStatus @default(requested)
+  createdBy      String
+  decidedBy      String?
+  decidedAt      DateTime?
+  decisionNote   String?
+  idempotencyKey String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([staffId, startsOn, endsOn])
+  @@index([status, startsOn])
 }
 
 enum StaffTaskStatus {
