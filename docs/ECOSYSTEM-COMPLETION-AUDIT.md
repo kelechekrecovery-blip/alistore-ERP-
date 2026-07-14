@@ -1,16 +1,16 @@
 # AliStore ecosystem completion audit
 
 Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, including
-the verified native Staff attendance iteration. This is a completion audit, not a marketing status page. `Implemented`
+the verified Service Center diagnostics iteration. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 49 NestJS modules including the application root, 37 generated Next routes and 52 Prisma migrations.
-- `mvp:verify`: API/Web production builds, mobile reference typecheck, 118/118 Jest
-  suites with 469/469 tests and 32/32 Playwright flows.
+- 50 NestJS modules including the application root, 37 generated Next routes and 53 Prisma migrations.
+- `mvp:verify`: API/Web production builds, mobile reference typecheck, 119/119 Jest
+  suites with 471/471 tests and 33/33 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run android:ui` passed on 2026-07-14 with 25/25 connected Compose tests,
@@ -27,7 +27,7 @@ credentials, legal approval or physical hardware.
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
-| QA Test Scenarios | Partial | 469 API tests, 32 Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
+| QA Test Scenarios | Partial | 471 API tests, 33 Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
 | Analytics | Partial | reports, margin/KPI, revenue and AI insights | cohorts, retention, funnels, stock aging, delivery/supplier dashboards and exports |
 | Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
@@ -37,7 +37,7 @@ credentials, legal approval or physical hardware.
 | Marketing CMS | Partial | campaigns, consent and channel transports | banner/collection/navigation draft-review-schedule-publish workflow and storefront consequence E2E |
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
-| Service center | Partial | warranty/support state machines and Evidence | diagnostics, paid repair, parts/work orders, technician SLA and loaner fund |
+| Service center | Partial | warranty work-order intake, technician assignment, diagnostics/estimate, customer-owned approval, RBAC, replay-safe commands, Event Ledger and ERP/customer browser acceptance | paid external repair, parts consumption, full technician/SLA lifecycle, payment/POS linkage, post-repair warranty and loaner fund |
 | Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, line-level refund-bound quantity/direct/bundle IMEI restock, serialized and quantity consignment ownership/accrual/payout/partial-return compensation, procurement and bundles | completeness, missort and markdown workflows |
 | Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence plus owned schedule/attendance/offline replay on both platforms | complete visual acceptance, iOS app-level XCUITest and physical push/scanner/camera gate |
 | Product management | Partial | product CRUD, variants, virtual bundles, explicit serialized/quantity tracking, catalog/search | preorders, channel publishing, pricing history and completeness policy |
@@ -54,7 +54,7 @@ credentials, legal approval or physical hardware.
 | Seller/cashier | login, shift, scan, split sale, approval, receipt, refund/exchange, offline restart | software vertical exists; native E2E and hardware external |
 | Warehouse | PO receive, serialized/quantity stock, consignment, count, transfer, picking, discrepancy | quantity receive/transfer/adjust-to-sale, serialized/quantity consignment receive-to-payout and refund-bound restock/owner-compensation browser/API flows covered; full role E2E remains |
 | Courier | assignment, map/call, failure/retry, Evidence, COD handover, offline restart | API/native software covered; live device/push gate external |
-| Support/service | ticket escalation, warranty diagnosis/repair/loaner/close | support/warranty partial; service-center workflow missing |
+| Support/service | ticket escalation, warranty diagnosis/repair/loaner/close | ticket escalation plus warranty intake/diagnosis/customer estimate approval are covered; repair execution, payment and loaner remain partial |
 | Manager/owner | budgets, approvals, reconciliation, risk, analytics and audit export | partial ERP coverage; reconciliation/expanded modules missing |
 | Security auditor | revoked role, IDOR, dangerous action, 2FA, immutable Ledger and access audit | automated core coverage; external pentest/retention audit missing |
 
@@ -74,7 +74,7 @@ credentials, legal approval or physical hardware.
 ## Ordered remaining work
 
 1. Run first-store payroll/logistics/shift UAT and physical Staff device certification; native attendance software is complete, while route optimization/live tracking remain later scope.
-2. Add service center, store operations, CMS, analytics and legal Waves B.
+2. Complete the remaining service-center lifecycle, then add store operations, CMS, analytics and legal Waves B.
 3. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.
 5. Add one cross-surface ecosystem E2E with database/Ledger reconciliation assertions.

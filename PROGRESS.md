@@ -1381,3 +1381,12 @@
 - Checks run: all-target iOS simulator build; 31/31 XCTest; four-APK Android build; Android JVM tests and Lint; 25/25 connected Compose tests on the API 36 emulator; complete `npm run ecosystem:verify` with 118/118 Jest suites, 469/469 API tests and 32/32 Playwright; `git diff --check`.
 - Outcome: the native Staff attendance software contour is complete on both platforms. Physical APNs/FCM delivery, camera/scanner checks and first-store payroll/shift reconciliation remain external device/UAT gates; no production certification is claimed.
 - Next step: run the complete ecosystem gate, then start ERP Wave B with the service-center work-order/diagnostics vertical.
+
+## 2026-07-14
+
+- Task: implement the first authoritative Service Center vertical across ERP and the customer account.
+- Files changed: ServiceWorkOrder and immutable command Prisma models/migration; Service Center DTO/controller/service/module and Ledger events; typed web API; ERP queue, intake and diagnostics/estimate workspace; customer-owned estimate approval; deterministic API/browser fixtures and regressions; backlog/readiness/completion audit and integration master plan.
+- Result: authorized staff can accept a warranty case, assign a technician and publish a diagnostic estimate without creating a second warranty status source. Only the owning customer can read and approve the estimate. Intake, diagnostics and approval keep stable idempotency keys, reject changed replay/cross-customer access and append atomic Event Ledger events. Paid external repair, parts, payment/POS linkage, full technician lifecycle and the loaner fund remain explicitly tracked Wave B scope.
+- Checks run: Prisma validation/generation and dev/test schema application; targeted Service Center API and browser tests; API and Next production builds; complete `npm run ecosystem:verify` with 119/119 Jest suites, 471/471 API tests, 33/33 Playwright, four SwiftUI target builds, 31/31 XCTest, four Android APK builds, JVM tests and Android Lint; production external-readiness report; `git diff --check`.
+- Outcome: the ERP-to-customer diagnostics and estimate-approval flow is executable and fully covered. Production readiness remains blocked by the same 12 owner-controlled credential/manual groups; no complete Service Center or production certification is claimed.
+- Next step: run the complete native ecosystem gate, commit this vertical, then implement paid repair, parts/technician execution and loaner custody.

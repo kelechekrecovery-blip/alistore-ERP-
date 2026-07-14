@@ -26,5 +26,6 @@ export * from './api/customer-account';
 export * from './api/staff-tasks';
 export * from './api/hr';
 export * from './api/logistics';
+export * from './api/service-center';
 export * from './pos-offline';
 export * from './pos-hardware';

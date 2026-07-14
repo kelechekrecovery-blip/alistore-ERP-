@@ -11,7 +11,7 @@ state machine and pass a cross-surface E2E scenario.
 ## Current baseline
 
 - Storefront and ERP share the NestJS API, PostgreSQL catalog, customers, orders,
-  payments, stock, procurement, warranty, support, approvals and reporting data.
+  payments, stock, procurement, warranty, Service Center work orders, support, approvals and reporting data.
 - Android Client, Staff, Courier and POS use typed forms of those contracts. Four
   APKs build; JVM/Lint and selected API 36 Compose gates are green.
 - Web and both native platforms implement the first POS/Staff/Courier software
@@ -31,7 +31,7 @@ state machine and pass a cross-surface E2E scenario.
 | Approval requested | customer waits for result | approval inbox/POS retry | Approval + Event Ledger |
 | Pickup/delivery | order status | Staff/Courier/COD | Order + CourierRun |
 | Return/refund | account request/status | ERP Return Desk, approval, refund and warehouse receipt | Return + Payment + Movement + ConsignmentAdjustment |
-| Warranty/support | customer self-service | Staff/service workflow | WarrantyCase/SupportTicket + Evidence |
+| Warranty/support | customer self-service and estimate approval | Staff/service intake and diagnostics | WarrantyCase + ServiceWorkOrder/SupportTicket + Evidence |
 
 Every row must enforce JWT ownership or staff RBAC, stable idempotency for repeated
 mutations, atomic critical writes and an Event Ledger record. Clients may display but
@@ -72,7 +72,7 @@ and visual evidence exist for every Wave A module.
 
 ## Phase 3: close ERP Waves B and C
 
-Add service center and loaner fund, store opening/closing and incidents, CMS publishing,
+Complete Service Center paid repair, parts, technician lifecycle and loaner fund after the verified intake/diagnostics/customer-estimate vertical; add store opening/closing and incidents, CMS publishing,
 analytics, legal document/version retention, franchise audits, advertising, referrals,
 Q&A, loyalty, Telegram/WhatsApp storefronts and production AI evaluation. AI can only
 recommend; verified domain services perform money, stock and status mutations.

@@ -8,9 +8,9 @@ been built or tested; it does not mean external production certification is comp
 
 | Target | Current implementation | Status | Acceptance gate |
 |---|---|---|---|
-| Next.js storefront + ERP/admin | 37 routes, production build and 25-flow Playwright coverage | Ready | `npm run build -w @alistore/web`, full Playwright |
-| NestJS modular monolith | 47 domain modules behind one API | Ready | API build and 112 Jest suites |
-| PostgreSQL + Prisma | 38 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
+| Next.js storefront + ERP/admin | 37 routes, production build and 33-flow Playwright coverage | Ready | `npm run build -w @alistore/web`, full Playwright |
+| NestJS modular monolith | 50 modules including the application root behind one API | Ready | API build and 119 Jest suites |
+| PostgreSQL + Prisma | 53 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
 | Append-only Event Ledger | `AuditService.transaction` commits mutations and events together | Ready | ledger/invariant/concurrency suites |
 | Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
 | Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |
@@ -58,6 +58,11 @@ Shared Android foundation:
 - Courier assignment ownership, route listing, start/deliver/fail, exact command replay, COD collection/handover, offline persistence, staff-authorized Evidence upload and scoped FCM deep-link routing are verified through API integration/RBAC tests plus Android JVM and API 36 Compose gates. Live FCM delivery and physical maps/camera/network certification remain open.
 - POS login, catalog/cart, stock-capped quantity, keyboard/camera scanning, exact server-validated IMEI sale, cash/card/MBank split tender, explicit shift reconciliation, approval parking/retry, exact offline command retention, server-rendered receipt, return/refund operations and idempotent exchange are verified through API integration, Android JVM/Lint and API 36 Compose gates. Silent physical printing and scanner/payment-terminal certification remain open.
 - Customer loyalty balance/coupons/history, address book and profile/preferences are shared by web and Android through owner-scoped NestJS endpoints. Loyalty redemption, earning and refund compensation use an order-linked atomic ledger under a per-customer PostgreSQL lock; a browser regression proves canonical promo pricing and a repeated authenticated checkout cannot double-spend points.
+
+## ERP and storefront integration
+
+- Service Center now shares one `WarrantyCase` status source between ERP and the customer account. ERP creates the associated work order, records diagnostics and an estimate, while only the owning customer can approve that estimate through a customer JWT.
+- Intake, diagnosis and estimate approval use immutable command records with stable idempotency keys and append domain events in the same transaction. Paid external repairs, parts, loaners and repair payment remain Wave B work.
 
 ## Execution order
 

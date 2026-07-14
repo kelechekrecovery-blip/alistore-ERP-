@@ -871,9 +871,43 @@ model WarrantyCase {
   status     WarrantyStatus @default(created)
   sla        DateTime
   assignee   String?
+  workOrder  ServiceWorkOrder?
 
   @@index([imei])
   @@index([status])
+}
+
+model ServiceWorkOrder {
+  id                 String                    @id @default(cuid())
+  warrantyCase       WarrantyCase              @relation(fields: [warrantyCaseId], references: [id], onDelete: Cascade)
+  warrantyCaseId     String                    @unique
+  technicianId       String?
+  diagnosticSummary String?
+  diagnosticFee      Int                       @default(0)
+  estimateAmount     Int?
+  estimatePreparedAt DateTime?
+  estimateApprovedAt DateTime?
+  estimateApprovedBy String?
+  createdBy          String
+  commands           ServiceWorkOrderCommand[]
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  @@index([technicianId, createdAt])
+  @@index([estimateApprovedAt, createdAt])
+}
+
+model ServiceWorkOrderCommand {
+  id             String           @id @default(cuid())
+  idempotencyKey String           @unique
+  workOrder      ServiceWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrderId    String
+  action         String
+  request        Json
+  response       Json
+  createdAt      DateTime         @default(now())
+
+  @@index([workOrderId, createdAt])
 }
 
 model WarrantyOpenCommand {

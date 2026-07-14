@@ -141,7 +141,15 @@ describe('Reports (integration)', () => {
 
     await prisma.inventoryMovement.createMany({
       data: [
-        { productId: product.id, qty: -6, type: 'write_off', reason: 'current spike' },
+        {
+          productId: product.id,
+          qty: -6,
+          type: 'write_off',
+          reason: 'current spike',
+          // Keep this strictly behind ReportsService's captured clock. A database
+          // default timestamp can be a few milliseconds ahead on busy full-suite runs.
+          createdAt: new Date(Date.now() - 60_000),
+        },
         {
           productId: product.id,
           qty: -2,

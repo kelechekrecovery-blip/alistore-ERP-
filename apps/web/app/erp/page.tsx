@@ -38,9 +38,10 @@ import { FinanceView } from '@/components/erp/FinanceView';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { HrView } from '@/components/erp/HrView';
 import { LogisticsView } from '@/components/erp/LogisticsView';
+import { ServiceCenterView } from '@/components/erp/ServiceCenterView';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
-type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'readiness' | 'ledger';
+type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'service' | 'kpi' | 'crm' | 'campaigns' | 'risks' | 'readiness' | 'ledger';
 
 const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
@@ -48,6 +49,7 @@ const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'hr', icon: '◫', label: 'HR · Смены' },
   { id: 'logistics', icon: '⌖', label: 'Логистика' },
+  { id: 'service', icon: '⚒', label: 'Сервис-центр' },
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
   { id: 'crm', icon: '💬', label: 'CRM · Инбокс' },
   { id: 'ai', icon: '🧠', label: 'Ассистент' },
@@ -68,6 +70,7 @@ const TITLES: Record<Route, [string, string]> = {
   finance: ['Финансы', 'Деньги · P&L'],
   hr: ['Команда', 'График смен · табель · отсутствия'],
   logistics: ['Логистика', 'Зоны · слоты · маршруты'],
+  service: ['Сервис-центр', 'Очередь · диагностика · сметы'],
   kpi: ['Маржа · KPI', 'Валовая маржа, средний чек, топ-товары'],
   stock: ['Склад', 'Остатки по статусам'],
   crm: ['CRM · Поддержка', 'Инбокс обращений + Customer 360'],
@@ -83,7 +86,7 @@ const SIGNAL_ACTION: Record<string, { tab?: Route; href?: string }> = {
   cash_discrepancy: { tab: 'finance' },
   cod_outstanding: { tab: 'finance' },
   stale_reservations: { tab: 'stock' },
-  warranty_sla_breach: { href: '/warranty' },
+  warranty_sla_breach: { tab: 'service' },
   rma_sla_breach: { href: '/warehouse' },
   ticket_sla_breach: { tab: 'crm' },
   debt_overdue: { tab: 'crm' },
@@ -264,6 +267,7 @@ export default function ErpPage() {
           {route === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
           {route === 'hr' && <HrView accessToken={session.accessToken} />}
           {route === 'logistics' && <LogisticsView accessToken={session.accessToken} />}
+          {route === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} />}
           {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}
