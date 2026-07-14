@@ -10,6 +10,7 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { WarehouseOps } from '@/components/WarehouseOps';
+import { ConsignmentOps } from '@/components/ConsignmentOps';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
   clearStaffSession,
@@ -147,6 +148,7 @@ export default function WarehousePage() {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-4xl">
           <WarehouseOps accessToken={session.accessToken} actor={session.staffId} />
+          <ConsignmentOps accessToken={session.accessToken} role={session.role} />
           {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
           {orders && orders.length === 0 && (
             <div className="rounded-card border border-dashed border-[#2E2822] bg-[#1A1611] px-6 py-16 text-center">

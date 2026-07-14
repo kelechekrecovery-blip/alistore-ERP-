@@ -42,7 +42,11 @@ test('customer account data is shared by API, web cabinet and checkout', async (
   await expect(page.getByText('Бишкек, улица Синхронизации 7', { exact: true })).toBeVisible();
   await expect(page.getByText('основной', { exact: true })).toBeVisible();
 
-  await page.goto('/checkout');
+  const addressesLoaded = page.waitForResponse((response) =>
+    response.url().includes('/customers/me/addresses') && response.status() === 200,
+  );
+  await page.goto('/checkout', { waitUntil: 'domcontentloaded' });
+  await addressesLoaded;
   await page.getByRole('button', { name: /Курьер/ }).click();
   await expect(page.getByText('E2E дом: Бишкек, улица Синхронизации 7', { exact: true })).toBeVisible();
 

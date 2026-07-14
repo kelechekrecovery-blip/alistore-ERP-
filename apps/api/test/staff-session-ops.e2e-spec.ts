@@ -70,6 +70,8 @@ describe('Staff session rollout for operational endpoints', () => {
   });
 
   afterAll(async () => {
+    await prisma.consignmentItem.deleteMany();
+    await prisma.consignmentPayout.deleteMany();
     await app.close();
   });
 
@@ -77,6 +79,8 @@ describe('Staff session rollout for operational endpoints', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany();
+    await prisma.consignmentItem.deleteMany();
+    await prisma.consignmentPayout.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -341,6 +345,51 @@ describe('Staff session rollout for operational endpoints', () => {
     expect(received.body).toMatchObject({ onHand: 12, reserved: 0, available: 12 });
     const event = await prisma.auditEvent.findFirst({ where: { type: 'stock.received' } });
     expect(event?.actor).toBe(warehouseId);
+  });
+
+  it('separates consignment receiving/read permissions from owner/admin payouts', async () => {
+    const product = await productOnly('OPS-CONSIGN');
+    const payload = {
+      idempotencyKey: `ops-consignment-${RUN}`,
+      productId: product.id,
+      imei: `OPS-CONSIGN-IMEI-${RUN}`,
+      location: 'BISHKEK-1',
+      ownerName: 'Клиент Б.',
+      ownerContact: '+996555000111',
+      commissionBps: 1000,
+      grade: 'B',
+    };
+
+    await request(app.getHttpServer()).post('/inventory/consignments/receive').send(payload).expect(401);
+    await request(app.getHttpServer())
+      .post('/inventory/consignments/receive')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send(payload)
+      .expect(403);
+    const received = await request(app.getHttpServer())
+      .post('/inventory/consignments/receive')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send(payload)
+      .expect(201);
+    expect(received.body).toMatchObject({ ownerName: 'Клиент Б.', commissionBps: 1000, status: 'active' });
+
+    const rows = await request(app.getHttpServer())
+      .get('/inventory/consignments')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .expect(200);
+    expect(rows.body).toHaveLength(1);
+    expect((await prisma.auditEvent.findFirst({ where: { type: 'consignment.received' } }))?.actor).toBe(warehouseId);
+
+    await request(app.getHttpServer())
+      .post('/inventory/consignments/payouts')
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ idempotencyKey: `forbidden-payout-${RUN}`, itemIds: [received.body.id] })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/inventory/consignments/payouts')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ idempotencyKey: `premature-payout-${RUN}`, itemIds: [received.body.id] })
+      .expect(409);
   });
 
   it('requires staff JWT for order queue and fulfillment operations', async () => {

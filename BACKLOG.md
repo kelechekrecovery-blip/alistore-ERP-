@@ -20,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Add serialized consignment inventory across warehouse, storefront checkout and POS: owner-bound IMEI receiving, basis-point commission, atomic sale accrual, completion/return-gated payout batches, stable payment replay, RBAC, Event Ledger and responsive browser acceptance.
 - Establish a proof-oriented ecosystem completion process: 23-handoff acceptance audit, role-based black-box gates, reusable master engineering prompt and a root `ecosystem:verify` command that includes web/API plus all iOS and Android software builds/tests while explicitly separating native UI and physical certification.
 - Add virtual product bundles across ERP, catalog, checkout and POS: explicit component composition, component-derived availability, atomic serialized reservation/sale, bundle-aware margin, replay/concurrency protection, direct-stock/procurement/nesting guards, Event Ledger traceability and API/browser regression coverage.
 - Add first-class product variants: optional unique barcode and variant-family identity per SKU, independent DeviceUnit stock/price, ERP create/edit/list presentation, Postgres and Meilisearch discovery, desktop/mobile storefront switching and API/browser/visual regression coverage.

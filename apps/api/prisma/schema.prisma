@@ -84,6 +84,18 @@ enum StockTrackingMode {
   quantity
 }
 
+enum ConsignmentStatus {
+  active
+  sold
+  settled
+  withdrawn
+}
+
+enum ConsignmentPayoutStatus {
+  created
+  paid
+}
+
 enum Grade {
   A
   B
@@ -318,6 +330,7 @@ model Product {
   bundleComponents    ProductBundleComponent[]  @relation("BundleProduct")
   includedInBundles   ProductBundleComponent[]  @relation("BundleComponentProduct")
   bundleAllocations   OrderBundleAllocation[]
+  consignmentItems    ConsignmentItem[]
 
   @@index([category])
   @@index([variantGroup])
@@ -370,15 +383,16 @@ model ProductReview {
 }
 
 model DeviceUnit {
-  id        String     @id @default(cuid())
-  imei      String     @unique // один IMEI нельзя продать дважды
-  product   Product    @relation(fields: [productId], references: [id])
-  productId String
-  status    UnitStatus @default(in_stock)
-  grade     Grade?
-  location  String
-  orderId   String?
-  updatedAt DateTime   @default(now()) @updatedAt
+  id              String           @id @default(cuid())
+  imei            String           @unique // один IMEI нельзя продать дважды
+  product         Product          @relation(fields: [productId], references: [id])
+  productId       String
+  status          UnitStatus       @default(in_stock)
+  grade           Grade?
+  location        String
+  orderId         String?
+  updatedAt       DateTime         @default(now()) @updatedAt
+  consignmentItem ConsignmentItem?
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -414,6 +428,7 @@ model Order {
   items               OrderItem[]
   bundleAllocations   OrderBundleAllocation[]
   quantityAllocations OrderQuantityAllocation[]
+  consignmentSales    ConsignmentItem[]         @relation("ConsignmentSaleOrder")
   payments            Payment[]
   createdAt           DateTime                  @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
@@ -425,6 +440,56 @@ model Order {
   @@index([pickupPoint, status])
   @@index([courierId, status])
   @@index([courierRunId])
+}
+
+model ConsignmentItem {
+  id               String             @id @default(cuid())
+  idempotencyKey   String             @unique
+  unit             DeviceUnit         @relation(fields: [unitId], references: [id])
+  unitId           String             @unique
+  product          Product            @relation(fields: [productId], references: [id])
+  productId        String
+  ownerName        String
+  ownerContact     String?
+  commissionBps    Int
+  status           ConsignmentStatus  @default(active)
+  saleOrder        Order?             @relation("ConsignmentSaleOrder", fields: [saleOrderId], references: [id])
+  saleOrderId      String?
+  salePrice        Int?
+  commissionAmount Int?
+  ownerAmount      Int?
+  soldAt           DateTime?
+  payout           ConsignmentPayout? @relation(fields: [payoutId], references: [id])
+  payoutId         String?
+  createdBy        String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([ownerName, ownerContact])
+  @@index([saleOrderId])
+  @@index([payoutId])
+}
+
+model ConsignmentPayout {
+  id               String                  @id @default(cuid())
+  idempotencyKey   String                  @unique
+  ownerName        String
+  ownerContact     String?
+  grossAmount      Int
+  commissionAmount Int
+  ownerAmount      Int
+  status           ConsignmentPayoutStatus @default(created)
+  paymentKey       String?                 @unique
+  createdBy        String
+  paidBy           String?
+  paidAt           DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  items            ConsignmentItem[]
+
+  @@index([status, createdAt])
+  @@index([ownerName, ownerContact])
 }
 
 model OrderQuantityAllocation {

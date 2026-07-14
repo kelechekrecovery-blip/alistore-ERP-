@@ -166,6 +166,14 @@ p, admin, procurement, receive
 p, owner, procurement, receive
 p, admin, procurement, cancel
 p, owner, procurement, cancel
+p, warehouse, inventory, consignment_receive
+p, admin, inventory, consignment_receive
+p, owner, inventory, consignment_receive
+p, warehouse, inventory, consignment_read
+p, admin, inventory, consignment_read
+p, owner, inventory, consignment_read
+p, admin, inventory, consignment_payout
+p, owner, inventory, consignment_payout
 p, admin, finance, read
 p, owner, finance, read
 p, admin, finance, create

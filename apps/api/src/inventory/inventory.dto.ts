@@ -1,4 +1,4 @@
-import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CountDto {
@@ -64,6 +64,45 @@ export class ReceiveQuantityDto {
 
   @ApiPropertyOptional({ example: 'поставка #INV-001' })
   @IsOptional() @IsString() reason?: string;
+}
+
+export class ReceiveConsignmentDto {
+  @ApiProperty({ example: 'consignment-receive-01' })
+  @IsString() @MaxLength(128) idempotencyKey!: string;
+
+  @ApiProperty({ example: 'clx_product_used_phone' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'USED-IP12-001' })
+  @IsString() @MaxLength(64) imei!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @MaxLength(64) location!: string;
+
+  @ApiProperty({ example: 'Клиент Б.' })
+  @IsString() @MaxLength(160) ownerName!: string;
+
+  @ApiPropertyOptional({ example: '+996555123456' })
+  @IsOptional() @IsString() @MaxLength(160) ownerContact?: string;
+
+  @ApiProperty({ minimum: 0, maximum: 10000, example: 1000, description: 'Commission in basis points; 1000 = 10%' })
+  @IsInt() @Min(0) @Max(10000) commissionBps!: number;
+
+  @ApiPropertyOptional({ enum: ['A', 'B', 'C'], example: 'B' })
+  @IsOptional() @IsIn(['A', 'B', 'C']) grade?: 'A' | 'B' | 'C';
+}
+
+export class CreateConsignmentPayoutDto {
+  @ApiProperty({ example: 'consignment-payout-01' })
+  @IsString() @MaxLength(128) idempotencyKey!: string;
+
+  @ApiProperty({ type: [String], example: ['clx_consignment_01'] })
+  @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsString({ each: true }) itemIds!: string[];
+}
+
+export class PayConsignmentPayoutDto {
+  @ApiProperty({ example: 'bank-transfer-2026-001' })
+  @IsString() @MaxLength(128) paymentKey!: string;
 }
 
 export class MovementDto {

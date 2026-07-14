@@ -12,6 +12,7 @@ import { CreateOrderDto } from './orders.dto';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { earnLoyaltyOnTx, redeemLoyaltyOnTx } from '../customers/loyalty-ledger';
+import { accrueConsignmentSalesOnTx } from '../inventory/consignment-accounting';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -575,6 +576,7 @@ export class OrdersService {
             refs: [orderId, imei],
           });
         }
+        await accrueConsignmentSalesOnTx(tx, { orderId: order.id, imeis: assigned, actor, events });
         await this.consumeQuantityOnTx(tx, order.id, actor, events);
         await tx.reservation.updateMany({
           where: { orderId, active: true },

@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -9,7 +9,16 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import { CountDto, MovementDto, ReceiveDto, ReceiveQuantityDto, TransferDto } from './inventory.dto';
+import {
+  CountDto,
+  CreateConsignmentPayoutDto,
+  MovementDto,
+  PayConsignmentPayoutDto,
+  ReceiveConsignmentDto,
+  ReceiveDto,
+  ReceiveQuantityDto,
+  TransferDto,
+} from './inventory.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -57,6 +66,47 @@ export class InventoryController {
   @RequirePermission('inventory', 'receive')
   async receiveQuantity(@CurrentUser() user: AuthPrincipal, @Body() dto: ReceiveQuantityDto) {
     return this.inventory.receiveQuantity(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'Receive a serialized third-party-owned consignment unit' })
+  @Post('consignments/receive')
+  @RequirePermission('inventory', 'consignment_receive')
+  async receiveConsignment(@CurrentUser() user: AuthPrincipal, @Body() dto: ReceiveConsignmentDto) {
+    return this.inventory.receiveConsignment(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'List consignment stock and accrued owner liabilities' })
+  @Get('consignments')
+  @RequirePermission('inventory', 'consignment_read')
+  async listConsignments(@CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.listConsignments();
+  }
+
+  @ApiOperation({ summary: 'List consignment payout batches' })
+  @Get('consignments/payouts')
+  @RequirePermission('inventory', 'consignment_payout')
+  async listConsignmentPayouts(@CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.listConsignmentPayouts();
+  }
+
+  @ApiOperation({ summary: 'Create an owner payout from completed consignment sales' })
+  @Post('consignments/payouts')
+  @RequirePermission('inventory', 'consignment_payout')
+  async createConsignmentPayout(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateConsignmentPayoutDto) {
+    return this.inventory.createConsignmentPayout(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'Mark a consignment payout paid with an idempotent external payment key' })
+  @Post('consignments/payouts/:id/pay')
+  @RequirePermission('inventory', 'consignment_payout')
+  async payConsignmentPayout(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Body() dto: PayConsignmentPayoutDto,
+  ) {
+    return this.inventory.payConsignmentPayout(id, dto, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({ summary: 'Transfer an in_stock unit to another branch (stock.moved)' })

@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { TerminusModule } from '@nestjs/terminus';
+import { MemoryHealthIndicator, TerminusModule } from '@nestjs/terminus';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { HealthController } from '../src/health/health.controller';
@@ -13,6 +13,9 @@ import { HealthController } from '../src/health/health.controller';
 describe('Health (terminus)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  const memory = {
+    checkHeap: jest.fn().mockResolvedValue({ memory_heap: { status: 'up' } }),
+  };
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -24,7 +27,10 @@ describe('Health (terminus)', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: (name: string) => process.env[name] } },
       ],
-    }).compile();
+    })
+      .overrideProvider(MemoryHealthIndicator)
+      .useValue(memory)
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
   });
@@ -50,6 +56,7 @@ describe('Health (terminus)', () => {
   it('GET /health/ready → DB and heap readiness', async () => {
     const response = await request(app.getHttpServer()).get('/health/ready').expect(200);
     expect(response.body.status).toBe('ok');
+    expect(memory.checkHeap).toHaveBeenCalledWith('memory_heap', 1536 * 1024 * 1024);
   });
 
   it('GET /health/integrations → external readiness without secret values', async () => {

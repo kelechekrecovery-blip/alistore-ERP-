@@ -1,4 +1,4 @@
-import { postAuthJson } from './http';
+import { getJson, postAuthJson } from './http';
 
 export interface TransferResult {
   imei: string;
@@ -69,4 +69,69 @@ export function inventoryCount(
   accessToken: string,
 ): Promise<CountResult> {
   return postAuthJson('/inventory/count', { productId, location, counted }, accessToken);
+}
+
+export interface ConsignmentItem {
+  id: string;
+  ownerName: string;
+  ownerContact?: string | null;
+  commissionBps: number;
+  status: 'active' | 'sold' | 'settled' | 'withdrawn';
+  salePrice?: number | null;
+  commissionAmount?: number | null;
+  ownerAmount?: number | null;
+  unit: { imei: string; location: string; status: string };
+  product: { id: string; sku: string; name: string; price: number };
+  saleOrder?: { id: string; status: string; createdAt: string } | null;
+  payout?: { id: string; status: string; paidAt?: string | null } | null;
+}
+
+export interface ConsignmentPayout {
+  id: string;
+  ownerName: string;
+  ownerContact?: string | null;
+  grossAmount: number;
+  commissionAmount: number;
+  ownerAmount: number;
+  status: 'created' | 'paid';
+  paymentKey?: string | null;
+  paidAt?: string | null;
+  items: Array<{ id: string; ownerAmount?: number | null; saleOrderId?: string | null }>;
+}
+
+export function receiveConsignment(input: {
+  idempotencyKey: string;
+  productId: string;
+  imei: string;
+  location: string;
+  ownerName: string;
+  ownerContact?: string;
+  commissionBps: number;
+  grade?: string;
+}, accessToken: string): Promise<ConsignmentItem> {
+  return postAuthJson('/inventory/consignments/receive', input, accessToken);
+}
+
+export function fetchConsignments(accessToken: string): Promise<ConsignmentItem[]> {
+  return getJson('/inventory/consignments', accessToken);
+}
+
+export function fetchConsignmentPayouts(accessToken: string): Promise<ConsignmentPayout[]> {
+  return getJson('/inventory/consignments/payouts', accessToken);
+}
+
+export function createConsignmentPayout(
+  idempotencyKey: string,
+  itemIds: string[],
+  accessToken: string,
+): Promise<ConsignmentPayout> {
+  return postAuthJson('/inventory/consignments/payouts', { idempotencyKey, itemIds }, accessToken);
+}
+
+export function payConsignmentPayout(
+  payoutId: string,
+  paymentKey: string,
+  accessToken: string,
+): Promise<ConsignmentPayout> {
+  return postAuthJson(`/inventory/consignments/payouts/${payoutId}/pay`, { paymentKey }, accessToken);
 }
