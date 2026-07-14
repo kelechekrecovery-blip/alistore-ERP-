@@ -1,9 +1,10 @@
-import { getJson, postAuthJson } from './http';
+import { getJson, patchAuthJson, postAuthJson } from './http';
 
 export type HrStaff = { id: string; username: string; role: string; active: boolean };
 export type HrAttendance = { id: string; checkedInAt: string; checkedOutAt: string | null };
 export type HrSchedule = {
   id: string; staffId: string; point: string; shiftDate: string; startsAt: string; endsAt: string;
+  cancelledAt: string | null; cancelledBy: string | null; cancelReason: string | null;
   attendance: HrAttendance | null;
 };
 export type HrAbsence = {
@@ -24,6 +25,14 @@ export function fetchHrWeek(weekStart: string, point: string, token: string) {
 
 export function createHrSchedule(input: { staffId: string; point: string; shiftDate: string; startsAt: string; endsAt: string }, token: string) {
   return postAuthJson<HrSchedule>('/hr/schedules', input, token, { 'idempotency-key': crypto.randomUUID() });
+}
+
+export function updateHrSchedule(id: string, input: { point: string; shiftDate: string; startsAt: string; endsAt: string }, token: string) {
+  return patchAuthJson<HrSchedule>(`/hr/schedules/${encodeURIComponent(id)}`, input, token, { 'idempotency-key': crypto.randomUUID() });
+}
+
+export function cancelHrSchedule(id: string, reason: string, token: string) {
+  return postAuthJson<HrSchedule>(`/hr/schedules/${encodeURIComponent(id)}/cancel`, { reason }, token, { 'idempotency-key': crypto.randomUUID() });
 }
 
 export function decideHrAbsence(id: string, status: 'approved' | 'rejected', token: string) {

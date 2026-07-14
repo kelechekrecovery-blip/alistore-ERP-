@@ -1345,3 +1345,12 @@
 - Checks run: Prisma validation/generation and dev/test schema application; targeted logistics API and ERP browser flows; customer checkout capacity/reservation browser flow; API and Next production builds; complete `npm run mvp:verify`; `git diff --check`.
 - Outcome: full web/API gate is green with 118/118 API suites and 466/466 tests plus 30/30 Playwright flows. ERP-to-site delivery pricing, capacity and order linkage are now executable and tested. Production readiness remains blocked by the same 12 external credential/manual groups; route optimization, exception rescheduling and live tracking remain later logistics scope.
 - Next step: complete HR schedule edit/cancel, cash-shift handover and attendance-derived payroll posting before ERP Wave B service-center work.
+
+## 2026-07-14
+
+- Task: make planned HR schedules safely editable and cancellable from ERP.
+- Files changed: HR schedule Prisma fields and immutable command journal migration; HR DTO/controller/service and Ledger events; typed web client and ERP schedule controls; API/browser regressions and shared database cleanup; backlog/readiness/completion audit.
+- Result: owner/admin can edit point/date/time or cancel an unstarted planned shift. Every command has a stable replay record and exact response snapshot, RBAC rejects staff edits, started shifts cannot change, approved absences and same-day conflicts remain enforced, and cancelled shifts cannot be opened by the employee. ERP exposes edit/save/cancel states and keeps cancelled plans visible for audit.
+- Checks run: Prisma format/validation/generation and dev/test schema application; targeted HR API 3/3; API and Next production builds; full owner edit/cancel/attendance Playwright journey; complete `npm run mvp:verify`; `git diff --check`.
+- Outcome: full web/API gate is green with 118/118 API suites and 467/467 tests plus 30/30 Playwright flows. Production readiness remains blocked by the same 12 external credential/manual groups. Cash-shift handover, attendance-derived payroll posting and native Staff attendance remain explicit follow-up work.
+- Next step: implement cash-shift handover as a CashShift-owned transaction without creating a second drawer source of truth.

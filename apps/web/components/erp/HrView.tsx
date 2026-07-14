@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { createHrSchedule, decideHrAbsence, fetchHrWeek, type HrWeek } from '@/lib/api';
+import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrWeek, updateHrSchedule, type HrSchedule, type HrWeek } from '@/lib/api';
 
 type Tab = 'schedule' | 'timesheet' | 'profile' | 'handover';
 const TABS: { id: Tab; label: string }[] = [
@@ -25,6 +25,7 @@ function dayIso(start: string, offset: number) {
 }
 
 function time(value: string) { return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bishkek' }); }
+function clock(value: string) { return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Bishkek' }); }
 function hours(minutes: number) { return `${Math.floor(minutes / 60)}ч ${minutes % 60}м`; }
 
 export function HrView({ accessToken }: { accessToken: string }) {
@@ -36,6 +37,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
   const [shiftDate, setShiftDate] = useState(mondayIso);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('21:00');
+  const [editingId, setEditingId] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
 
@@ -58,9 +60,24 @@ export function HrView({ accessToken }: { accessToken: string }) {
     setBusy('schedule'); setMessage('');
     try {
       const localIso = (clock: string) => new Date(`${shiftDate}T${clock}:00+06:00`).toISOString();
-      await createHrSchedule({ staffId: selectedStaff, point: point.trim(), shiftDate, startsAt: localIso(startTime), endsAt: localIso(endTime) }, accessToken);
+      const input = { point: point.trim(), shiftDate, startsAt: localIso(startTime), endsAt: localIso(endTime) };
+      if (editingId) await updateHrSchedule(editingId, input, accessToken);
+      else await createHrSchedule({ staffId: selectedStaff, ...input }, accessToken);
+      setEditingId('');
       reload();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Не удалось назначить смену'); }
+    finally { setBusy(''); }
+  }
+
+  function editSchedule(row: HrSchedule) {
+    setEditingId(row.id); setSelectedStaff(row.staffId); setPoint(row.point);
+    setShiftDate(row.shiftDate.slice(0, 10)); setStartTime(clock(row.startsAt)); setEndTime(clock(row.endsAt));
+  }
+
+  async function cancelSchedule(row: HrSchedule) {
+    setBusy(row.id); setMessage('');
+    try { await cancelHrSchedule(row.id, 'Отменено менеджером', accessToken); if (editingId === row.id) setEditingId(''); reload(); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Не удалось отменить смену'); }
     finally { setBusy(''); }
   }
 
@@ -89,7 +106,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
           <div className="grid min-w-[780px] grid-cols-[150px_repeat(7,minmax(86px,1fr))] bg-[#1A1611] text-[10px] uppercase text-[#8A7F76]"><span className="p-3">Сотрудник</span>{DAYS.map((day, index) => <span key={day} className="border-l border-[#2E2822] p-3 text-center">{day}<small className="ml-1 text-[#5F5750]">{dayIso(weekStart, index).slice(8)}</small></span>)}</div>
           {(data?.staff ?? []).map((person) => <div key={person.id} data-testid={`hr-row-${person.id}`} className="grid min-w-[780px] grid-cols-[150px_repeat(7,minmax(86px,1fr))] border-t border-[#2E2822] bg-[#16130F] text-xs">
             <button type="button" onClick={() => { setSelectedStaff(person.id); setTab('profile'); }} className="min-w-0 p-3 text-left"><strong className="block truncate">{person.username}</strong><span className="text-[10px] text-[#8A7F76]">{person.role}</span></button>
-            {DAYS.map((_, index) => { const date = dayIso(weekStart, index); const row = data?.schedules.find((item) => item.staffId === person.id && item.shiftDate.slice(0, 10) === date); const absence = data?.absences.find((item) => item.staffId === person.id && item.status === 'approved' && item.startsOn.slice(0, 10) <= date && item.endsOn.slice(0, 10) >= date); return <div key={date} className="grid min-h-16 place-items-center border-l border-[#2E2822] p-1.5">{absence ? <span className="rounded-[5px] bg-[#593127] px-2 py-1 text-center text-[10px] text-[#FFB5AA]">{ABSENCE_LABEL[absence.type]}</span> : row ? <span className="rounded-[5px] bg-[#26351B] px-2 py-1 text-center font-mono text-[11px] text-[#C6FF3D]">{time(row.startsAt)}–{time(row.endsAt)}{row.attendance && <small className="mt-0.5 block text-[#7FD3A0]">{row.attendance.checkedOutAt ? 'закрыта' : 'на смене'}</small>}</span> : <span className="text-[#5F5750]">выходной</span>}</div>; })}
+            {DAYS.map((_, index) => { const date = dayIso(weekStart, index); const row = data?.schedules.find((item) => item.staffId === person.id && item.shiftDate.slice(0, 10) === date); const absence = data?.absences.find((item) => item.staffId === person.id && item.status === 'approved' && item.startsOn.slice(0, 10) <= date && item.endsOn.slice(0, 10) >= date); return <div key={date} className="grid min-h-16 place-items-center border-l border-[#2E2822] p-1.5">{absence ? <span className="rounded-[5px] bg-[#593127] px-2 py-1 text-center text-[10px] text-[#FFB5AA]">{ABSENCE_LABEL[absence.type]}</span> : row ? <div className={`w-full rounded-[5px] px-1.5 py-1 text-center font-mono text-[10px] ${row.cancelledAt ? 'bg-[#302A25] text-[#8A7F76]' : 'bg-[#26351B] text-[#C6FF3D]'}`}><span className="block">{row.cancelledAt ? 'отменена' : `${time(row.startsAt)}–${time(row.endsAt)}`}</span>{row.attendance ? <small className="mt-0.5 block text-[#7FD3A0]">{row.attendance.checkedOutAt ? 'закрыта' : 'на смене'}</small> : <span className="mt-1 flex justify-center gap-2 font-sans"><button type="button" aria-label={`Изменить смену ${person.username} ${date}`} onClick={() => editSchedule(row)} className="text-[#D8CFC6]">изменить</button>{!row.cancelledAt && <button type="button" aria-label={`Отменить смену ${person.username} ${date}`} disabled={busy === row.id} onClick={() => cancelSchedule(row)} className="text-[#FF8A7A]">отменить</button>}</span>}</div> : <span className="text-[#5F5750]">выходной</span>}</div>; })}
           </div>)}
           {!data?.staff.length && <div className="p-10 text-center text-sm text-[#8A7F76]">Сотрудников пока нет</div>}
         </div>
@@ -98,7 +115,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
           <input aria-label="Дата смены" type="date" value={shiftDate} onChange={(event) => setShiftDate(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
           <input aria-label="Начало смены" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
           <input aria-label="Конец смены" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
-          <button disabled={busy === 'schedule' || !selectedStaff} className="h-10 rounded-[6px] bg-[#FF6B55] px-4 text-sm font-bold text-white disabled:opacity-50">Назначить</button>
+          <button disabled={busy === 'schedule' || !selectedStaff} className="h-10 rounded-[6px] bg-[#FF6B55] px-4 text-sm font-bold text-white disabled:opacity-50">{editingId ? 'Сохранить' : 'Назначить'}</button>
         </form>
       </>}
 

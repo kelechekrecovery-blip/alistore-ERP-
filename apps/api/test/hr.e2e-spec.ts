@@ -42,6 +42,7 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
 
   beforeEach(async () => {
     await prisma.hrAttendance.deleteMany();
+    await prisma.hrScheduleCommand.deleteMany();
     await prisma.hrSchedule.deleteMany();
     await prisma.hrAbsence.deleteMany();
     await prisma.auditEvent.deleteMany({ where: { type: { startsWith: 'hr.' } } });
@@ -49,6 +50,7 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
 
   afterAll(async () => {
     await prisma.hrAttendance.deleteMany();
+    await prisma.hrScheduleCommand.deleteMany();
     await prisma.hrSchedule.deleteMany();
     await prisma.hrAbsence.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { contains: `-hr-` } } });
@@ -96,5 +98,25 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     await request(app.getHttpServer()).post('/hr/schedules').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-plan-absence-${run}`).send({ staffId: sellerId, point: 'BISHKEK-1', shiftDate: '2026-07-16', startsAt: '2026-07-16T03:00:00.000Z', endsAt: '2026-07-16T15:00:00.000Z' }).expect(409);
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: absence.body.id } }, orderBy: { ts: 'asc' } });
     expect(events.map((event) => event.type)).toEqual(['hr.absence_requested', 'hr.absence_approved']);
+  });
+
+  it('lets owner edit or cancel an unstarted plan with replay protection', async () => {
+    const created = await request(app.getHttpServer()).post('/hr/schedules').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-edit-plan-${run}`).send({
+      staffId: sellerId, point: 'BISHKEK-1', shiftDate: '2026-07-14', startsAt: '2026-07-14T03:00:00.000Z', endsAt: '2026-07-14T15:00:00.000Z',
+    }).expect(201);
+    const update = { point: 'BISHKEK-2', shiftDate: '2026-07-14', startsAt: '2026-07-14T04:00:00.000Z', endsAt: '2026-07-14T14:00:00.000Z' };
+    await request(app.getHttpServer()).patch(`/hr/schedules/${created.body.id}`).set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `hr-edit-${run}`).send(update).expect(403);
+    const edited = await request(app.getHttpServer()).patch(`/hr/schedules/${created.body.id}`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-edit-${run}`).send(update).expect(200);
+    const replay = await request(app.getHttpServer()).patch(`/hr/schedules/${created.body.id}`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-edit-${run}`).send(update).expect(200);
+    expect(edited.body).toMatchObject({ point: 'BISHKEK-2', startsAt: update.startsAt, cancelledAt: null });
+    expect(replay.body.id).toBe(created.body.id);
+
+    const cancelled = await request(app.getHttpServer()).post(`/hr/schedules/${created.body.id}/cancel`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-cancel-${run}`).send({ reason: 'Изменение загрузки' }).expect(201);
+    await request(app.getHttpServer()).post(`/hr/schedules/${created.body.id}/cancel`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-cancel-${run}`).send({ reason: 'Изменение загрузки' }).expect(201);
+    expect(cancelled.body).toMatchObject({ cancelReason: 'Изменение загрузки' });
+    await request(app.getHttpServer()).post('/hr/me/attendance/open').set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `hr-open-cancelled-${run}`).send({ scheduleId: created.body.id }).expect(409);
+    expect(await prisma.hrScheduleCommand.count({ where: { scheduleId: created.body.id } })).toBe(2);
+    const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
+    expect(events.map((event) => event.type)).toEqual(['hr.schedule_created', 'hr.schedule_updated', 'hr.schedule_cancelled']);
   });
 });

@@ -114,6 +114,8 @@ export const EventType = {
   StaffTaskCreated: 'staff_task.created',
   StaffTaskUpdated: 'staff_task.updated',
   HrScheduleCreated: 'hr.schedule_created',
+  HrScheduleUpdated: 'hr.schedule_updated',
+  HrScheduleCancelled: 'hr.schedule_cancelled',
   HrAttendanceOpened: 'hr.attendance_opened',
   HrAttendanceClosed: 'hr.attendance_closed',
   HrAbsenceRequested: 'hr.absence_requested',

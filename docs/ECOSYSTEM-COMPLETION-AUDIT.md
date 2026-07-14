@@ -8,9 +8,9 @@ credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 49 NestJS modules including the application root, 37 generated Next routes and 49 Prisma migrations.
+- 49 NestJS modules including the application root, 37 generated Next routes and 50 Prisma migrations.
 - `mvp:verify`: API/Web production builds, mobile reference typecheck, 118/118 Jest
-  suites with 466/466 tests and 30/30 Playwright flows.
+  suites with 467/467 tests and 30/30 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
@@ -23,7 +23,7 @@ credentials, legal approval or physical hardware.
 |---|---|---|---|
 | API Data Contracts | Partial | typed Nest DTO/controllers, Swagger, API integration suites | versioned `/v1` contract, generated client compatibility and every handoff endpoint mapped |
 | ERP 2.0 | Partial | `/erp`, reports, risk, finance, approvals, procurement, HR and logistics links | exact acceptance for every ERP tab; CMS, service, legal and operations surfaces |
-| HR | Partial | StaffUser, weekly schedules, staff-owned attendance, absence approval, derived timesheet, tasks, KPI/payroll services and dedicated handoff Playwright | editable/cancellable plans, cash-shift handover, attendance-derived payroll posting and native Staff attendance UI |
+| HR | Partial | StaffUser, replay-safe editable/cancellable schedules, staff-owned attendance, absence approval, derived timesheet, tasks, KPI/payroll services and dedicated handoff Playwright | cash-shift handover, attendance-derived payroll posting and native Staff attendance UI |
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |

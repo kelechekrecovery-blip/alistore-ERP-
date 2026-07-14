@@ -12,6 +12,7 @@ test('owner schedules staff, approves absence and sees attendance in HR timeshee
   const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day + 1));
   const weekStart = monday.toISOString().slice(0, 10);
   const tuesday = new Date(monday.getTime() + 86_400_000).toISOString().slice(0, 10);
+  const wednesday = new Date(monday.getTime() + 2 * 86_400_000).toISOString().slice(0, 10);
 
   await postJson(request, '/hr/me/absences', {
     type: 'annual_leave', startsOn: tuesday, endsOn: tuesday, reason: 'Семейный день',
@@ -30,6 +31,15 @@ test('owner schedules staff, approves absence and sees attendance in HR timeshee
   await page.getByLabel('Конец смены').fill('21:00');
   await page.getByRole('button', { name: 'Назначить' }).click();
   await expect(page.getByTestId(`hr-row-${seller.staffId}`)).toContainText('09:00–21:00');
+  await page.getByRole('button', { name: `Изменить смену ${seller.username} ${weekStart}` }).click();
+  await page.getByLabel('Начало смены').fill('10:00');
+  await page.getByLabel('Конец смены').fill('20:00');
+  await page.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(page.getByTestId(`hr-row-${seller.staffId}`)).toContainText('10:00–20:00');
+  await page.getByLabel('Дата смены').fill(wednesday);
+  await page.getByRole('button', { name: 'Назначить' }).click();
+  await page.getByRole('button', { name: `Отменить смену ${seller.username} ${wednesday}` }).click();
+  await expect(page.getByTestId(`hr-row-${seller.staffId}`)).toContainText('отменена');
 
   await page.getByRole('tab', { name: 'Профиль' }).click();
   await page.getByLabel('Профиль сотрудника').selectOption(seller.staffId);
@@ -51,7 +61,7 @@ test('owner schedules staff, approves absence and sees attendance in HR timeshee
   await page.getByRole('tab', { name: 'Табель' }).click();
   await expect(page.getByTestId(`timesheet-${seller.staffId}`)).toContainText('12м');
   await expect(page.getByTestId(`timesheet-${seller.staffId}`)).toContainText('+25м');
-  await expect(page.getByTestId(`timesheet-${seller.staffId}`)).toContainText('12ч 13м');
+  await expect(page.getByTestId(`timesheet-${seller.staffId}`)).toContainText('10ч 13м');
 
-  expect(await prisma.auditEvent.count({ where: { type: { startsWith: 'hr.' }, refs: { has: seller.staffId } } })).toBe(5);
+  expect(await prisma.auditEvent.count({ where: { type: { startsWith: 'hr.' }, refs: { has: seller.staffId } } })).toBe(8);
 });

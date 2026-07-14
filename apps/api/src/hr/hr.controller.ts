@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreateHrScheduleDto, DecideHrAbsenceDto, HrWeekQueryDto, OpenHrAttendanceDto, RequestHrAbsenceDto } from './hr.dto';
+import { CancelHrScheduleDto, CreateHrScheduleDto, DecideHrAbsenceDto, HrWeekQueryDto, OpenHrAttendanceDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 import { HrService } from './hr.service';
 
 @ApiTags('hr')
@@ -29,6 +29,20 @@ export class HrController {
   @RequirePermission('hr', 'manage')
   createSchedule(@CurrentUser() user: AuthPrincipal, @Headers('idempotency-key') key: string | undefined, @Body() dto: CreateHrScheduleDto) {
     return this.hr.createSchedule(dto, user.customerId, key);
+  }
+
+  @Patch('schedules/:id')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr', 'manage')
+  updateSchedule(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: UpdateHrScheduleDto) {
+    return this.hr.updateSchedule(id, dto, user.customerId, key);
+  }
+
+  @Post('schedules/:id/cancel')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr', 'manage')
+  cancelSchedule(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: CancelHrScheduleDto) {
+    return this.hr.cancelSchedule(id, dto.reason, user.customerId, key);
   }
 
   @Post('me/attendance/open')

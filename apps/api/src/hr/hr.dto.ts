@@ -18,6 +18,17 @@ export class CreateHrScheduleDto {
   @ApiProperty({ example: '2026-07-15T15:00:00.000Z' }) @IsISO8601() endsAt!: string;
 }
 
+export class UpdateHrScheduleDto {
+  @ApiProperty() @IsString() @MaxLength(120) point!: string;
+  @ApiProperty({ example: '2026-07-15' }) @IsISO8601({ strict: true }) shiftDate!: string;
+  @ApiProperty({ example: '2026-07-15T03:00:00.000Z' }) @IsISO8601() startsAt!: string;
+  @ApiProperty({ example: '2026-07-15T15:00:00.000Z' }) @IsISO8601() endsAt!: string;
+}
+
+export class CancelHrScheduleDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
+}
+
 export class OpenHrAttendanceDto {
   @ApiProperty() @IsString() scheduleId!: string;
 }

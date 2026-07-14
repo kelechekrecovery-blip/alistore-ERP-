@@ -70,7 +70,7 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest                 # 118 suites / 466 тестов ✓
+cd apps/api && npx jest                 # 118 suites / 467 тестов ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (37 роутов)
 npm run e2e                           # 30/30 ✓

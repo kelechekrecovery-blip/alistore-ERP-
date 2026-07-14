@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateHrScheduleDto, RequestHrAbsenceDto } from './hr.dto';
+import { CreateHrScheduleDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 
 const DAY_MS = 86_400_000;
 
@@ -22,6 +22,26 @@ function weekBounds(weekStart: string) {
 function requireKey(key?: string) {
   if (!key?.trim()) throw new ValidationError('idempotency_key_required', 'Требуется Idempotency-Key');
   return key.trim();
+}
+
+function scheduleWindow(shiftDateValue: string, startsAtValue: string, endsAtValue: string) {
+  const shiftDate = dateOnly(shiftDateValue, 'shiftDate');
+  const startsAt = new Date(startsAtValue);
+  const endsAt = new Date(endsAtValue);
+  if (endsAt <= startsAt || startsAt.toISOString().slice(0, 10) !== shiftDateValue.slice(0, 10) || endsAt.toISOString().slice(0, 10) !== shiftDateValue.slice(0, 10)) {
+    throw new ValidationError('hr_invalid_schedule_window', 'Смена должна начинаться и заканчиваться в выбранную дату');
+  }
+  return { shiftDate, startsAt, endsAt };
+}
+
+function jsonValue<T>(value: T): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(',')}}`;
+  return JSON.stringify(value) ?? 'undefined';
 }
 
 @Injectable()
@@ -65,12 +85,7 @@ export class HrService {
 
   async createSchedule(dto: CreateHrScheduleDto, actor: string, rawKey?: string) {
     const key = requireKey(rawKey);
-    const shiftDate = dateOnly(dto.shiftDate, 'shiftDate');
-    const startsAt = new Date(dto.startsAt);
-    const endsAt = new Date(dto.endsAt);
-    if (endsAt <= startsAt || startsAt.toISOString().slice(0, 10) !== dto.shiftDate.slice(0, 10) || endsAt.toISOString().slice(0, 10) !== dto.shiftDate.slice(0, 10)) {
-      throw new ValidationError('hr_invalid_schedule_window', 'Смена должна начинаться и заканчиваться в выбранную дату');
-    }
+    const { shiftDate, startsAt, endsAt } = scheduleWindow(dto.shiftDate, dto.startsAt, dto.endsAt);
     return this.audit.transaction(async (tx) => {
       const replay = await tx.hrSchedule.findUnique({ where: { idempotencyKey: key } });
       if (replay) {
@@ -88,6 +103,52 @@ export class HrService {
     });
   }
 
+  async updateSchedule(id: string, dto: UpdateHrScheduleDto, actor: string, rawKey?: string) {
+    const key = requireKey(rawKey);
+    const window = scheduleWindow(dto.shiftDate, dto.startsAt, dto.endsAt);
+    const request = { point: dto.point.trim(), shiftDate: dto.shiftDate.slice(0, 10), startsAt: window.startsAt.toISOString(), endsAt: window.endsAt.toISOString() };
+    return this.audit.transaction(async (tx) => {
+      const replay = await tx.hrScheduleCommand.findUnique({ where: { idempotencyKey: key } });
+      if (replay) {
+        if (replay.scheduleId !== id || replay.action !== 'update' || stableJson(replay.request) !== stableJson(request)) throw new ConflictError('hr_idempotency_mismatch', 'Ключ уже использован для другой команды графика');
+        return { result: replay.response, events: [] };
+      }
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'hr-schedule:' + id}))::text AS locked`;
+      const schedule = await tx.hrSchedule.findUnique({ where: { id }, include: { attendance: true } });
+      if (!schedule) throw new ValidationError('hr_schedule_not_found', 'Плановая смена не найдена');
+      if (schedule.attendance) throw new ConflictError('hr_schedule_started', 'Начатую смену нельзя менять');
+      const absence = await tx.hrAbsence.findFirst({ where: { staffId: schedule.staffId, status: 'approved', startsOn: { lte: window.shiftDate }, endsOn: { gte: window.shiftDate } } });
+      if (absence) throw new ConflictError('hr_approved_absence', 'На эту дату утверждено отсутствие');
+      const conflict = await tx.hrSchedule.findFirst({ where: { staffId: schedule.staffId, shiftDate: window.shiftDate, id: { not: id } } });
+      if (conflict) throw new ConflictError('hr_schedule_exists', 'На эту дату смена уже назначена');
+      const updated = await tx.hrSchedule.update({ where: { id }, data: { point: request.point, shiftDate: window.shiftDate, startsAt: window.startsAt, endsAt: window.endsAt, cancelledAt: null, cancelledBy: null, cancelReason: null } });
+      const response = jsonValue(updated);
+      await tx.hrScheduleCommand.create({ data: { idempotencyKey: key, scheduleId: id, action: 'update', request, response } });
+      return { result: response, events: [{ type: EventType.HrScheduleUpdated, actor, payload: { scheduleId: id, staffId: schedule.staffId, ...request }, refs: [id, schedule.staffId] }] };
+    });
+  }
+
+  async cancelSchedule(id: string, reason: string | undefined, actor: string, rawKey?: string) {
+    const key = requireKey(rawKey);
+    const request = { reason: reason?.trim() || null };
+    return this.audit.transaction(async (tx) => {
+      const replay = await tx.hrScheduleCommand.findUnique({ where: { idempotencyKey: key } });
+      if (replay) {
+        if (replay.scheduleId !== id || replay.action !== 'cancel' || stableJson(replay.request) !== stableJson(request)) throw new ConflictError('hr_idempotency_mismatch', 'Ключ уже использован для другой команды графика');
+        return { result: replay.response, events: [] };
+      }
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'hr-schedule:' + id}))::text AS locked`;
+      const schedule = await tx.hrSchedule.findUnique({ where: { id }, include: { attendance: true } });
+      if (!schedule) throw new ValidationError('hr_schedule_not_found', 'Плановая смена не найдена');
+      if (schedule.attendance) throw new ConflictError('hr_schedule_started', 'Начатую смену нельзя отменить');
+      if (schedule.cancelledAt) throw new ConflictError('hr_schedule_cancelled', 'Смена уже отменена');
+      const updated = await tx.hrSchedule.update({ where: { id }, data: { cancelledAt: new Date(), cancelledBy: actor, cancelReason: request.reason } });
+      const response = jsonValue(updated);
+      await tx.hrScheduleCommand.create({ data: { idempotencyKey: key, scheduleId: id, action: 'cancel', request, response } });
+      return { result: response, events: [{ type: EventType.HrScheduleCancelled, actor, payload: { scheduleId: id, staffId: schedule.staffId, reason: request.reason }, refs: [id, schedule.staffId] }] };
+    });
+  }
+
   async openAttendance(scheduleId: string, staffId: string, rawKey?: string) {
     const key = requireKey(rawKey);
     return this.audit.transaction(async (tx) => {
@@ -99,6 +160,7 @@ export class HrService {
       const schedule = await tx.hrSchedule.findUnique({ where: { id: scheduleId }, include: { attendance: true } });
       if (!schedule) throw new ValidationError('hr_schedule_not_found', 'Плановая смена не найдена');
       if (schedule.staffId !== staffId) throw new ForbiddenError('hr_schedule_owner_mismatch', 'Нельзя открыть чужую смену');
+      if (schedule.cancelledAt) throw new ConflictError('hr_schedule_cancelled', 'Отменённую смену нельзя открыть');
       if (schedule.attendance) throw new ConflictError('hr_attendance_open', 'Смена уже отмечена');
       const absence = await tx.hrAbsence.findFirst({ where: { staffId, status: 'approved', startsOn: { lte: schedule.shiftDate }, endsOn: { gte: schedule.shiftDate } } });
       if (absence) throw new ConflictError('hr_approved_absence', 'Нельзя открыть смену во время утверждённого отсутствия');

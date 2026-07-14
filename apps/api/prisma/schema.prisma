@@ -1285,11 +1285,26 @@ model HrSchedule {
   createdBy      String
   idempotencyKey String        @unique
   attendance     HrAttendance?
+  cancelledAt    DateTime?
+  cancelledBy    String?
+  cancelReason   String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@unique([staffId, shiftDate])
   @@index([point, shiftDate])
+}
+
+model HrScheduleCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  scheduleId     String
+  action         String
+  request        Json
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([scheduleId, createdAt])
 }
 
 model HrAttendance {
