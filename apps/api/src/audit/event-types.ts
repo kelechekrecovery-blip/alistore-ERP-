@@ -43,6 +43,7 @@ export const EventType = {
   ExpenseApproved: 'expense.approved',
   ExpenseRejected: 'expense.rejected',
   ExpensePaid: 'expense.paid',
+  FinanceBudgetSet: 'finance.budget_set',
   // delivery
   DeliveryAssigned: 'delivery.assigned',
   DeliveryOut: 'delivery.out',

@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { approveExpense, createExpense, fetchExpenses, payExpense, rejectExpense, type Expense } from '@/lib/api';
+import {
+  approveExpense,
+  createExpense,
+  fetchExpenses,
+  fetchFinancePlanFact,
+  payExpense,
+  rejectExpense,
+  setFinanceBudget,
+  type Expense,
+  type FinancePlanFact,
+} from '@/lib/api';
 import { som } from '@/lib/format';
 import type { Dashboard } from '@/lib/reports';
 import { Card } from './Card';
@@ -13,6 +23,7 @@ const CATEGORIES: Record<string, string> = {
 const STATUS: Record<string, string> = {
   submitted: 'На согласовании', approved: 'Согласовано', rejected: 'Отклонено', paid: 'Выплачено',
 };
+const CURRENT_PERIOD = new Date().toISOString().slice(0, 7);
 
 export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessToken: string }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -22,11 +33,30 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const [point, setPoint] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  const [period, setPeriod] = useState(CURRENT_PERIOD);
+  const [planPoint, setPlanPoint] = useState('');
+  const [planFact, setPlanFact] = useState<FinancePlanFact | null>(null);
+  const [budgetCategory, setBudgetCategory] = useState('rent');
+  const [budgetAmount, setBudgetAmount] = useState('');
+  const [planningBusy, setPlanningBusy] = useState(false);
+  const [planningMessage, setPlanningMessage] = useState('');
   const reload = useCallback(() => {
     fetchExpenses(accessToken).then(setExpenses).catch(() => setMessage('Не удалось загрузить расходы'));
   }, [accessToken]);
 
   useEffect(() => reload(), [reload]);
+
+  const reloadPlanning = useCallback(() => {
+    setPlanningMessage('');
+    fetchFinancePlanFact(period, planPoint, accessToken)
+      .then(setPlanFact)
+      .catch(() => {
+        setPlanFact(null);
+        setPlanningMessage('Не удалось загрузить план-факт');
+      });
+  }, [accessToken, period, planPoint]);
+
+  useEffect(() => reloadPlanning(), [reloadPlanning]);
 
   async function run(id: string, action: () => Promise<Expense>) {
     setBusy(id);
@@ -34,6 +64,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
     try {
       await action();
       reload();
+      reloadPlanning();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Операция не выполнена');
     } finally {
@@ -62,6 +93,28 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
     }
   }
 
+  async function submitBudget(event: FormEvent) {
+    event.preventDefault();
+    const numericAmount = Math.round(Number(budgetAmount));
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || !Number.isFinite(numericAmount) || numericAmount < 1) return;
+    setPlanningBusy(true);
+    setPlanningMessage('');
+    try {
+      await setFinanceBudget({
+        period,
+        category: budgetCategory,
+        amount: numericAmount,
+        ...(planPoint.trim() ? { point: planPoint.trim() } : {}),
+      }, accessToken);
+      setBudgetAmount('');
+      reloadPlanning();
+    } catch (error) {
+      setPlanningMessage(error instanceof Error ? error.message : 'Не удалось сохранить бюджет');
+    } finally {
+      setPlanningBusy(false);
+    }
+  }
+
   const rows = d ? [
     { label: 'Выручка', value: som(d.money.salesGross), color: '#fff' },
     { label: 'Возвраты', value: `-${som(d.money.refunds)}`, color: '#FF8A7A' },
@@ -70,7 +123,50 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   ] : [];
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.75fr)_minmax(560px,1.65fr)]">
+    <div className="space-y-5">
+      <section aria-labelledby="finance-plan-title" className="border-b border-[#2E2822] pb-5">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="finance-plan-title" className="font-display text-[15px] font-bold">Бюджет и план-факт</h2>
+            <p className="mt-1 text-xs text-[#8A7F76]">Факт включает только выплаченные расходы выбранного периода</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <label className="text-[11px] text-[#8A7F76]">Период
+              <input aria-label="Период бюджета" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} className="mt-1 block h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-xs text-white" />
+            </label>
+            <label className="text-[11px] text-[#8A7F76]">Точка
+              <input aria-label="Точка бюджета" value={planPoint} onChange={(event) => setPlanPoint(event.target.value)} maxLength={100} placeholder="Все точки" className="mt-1 block h-9 w-36 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-xs text-white" />
+            </label>
+          </div>
+        </div>
+        {planningMessage && <div className="mb-3 rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-[#FFB5AA]">{planningMessage}</div>}
+        <div className="grid gap-3 md:grid-cols-3">
+          <div data-testid="finance-plan" className="rounded-[7px] border border-[#2E2822] bg-[#16130F] p-4"><div className="text-xs text-[#8A7F76]">План</div><strong className="mt-1 block font-mono text-xl text-white">{som(planFact?.plan ?? 0)}</strong></div>
+          <div data-testid="finance-actual" className="rounded-[7px] border border-[#2E2822] bg-[#16130F] p-4"><div className="text-xs text-[#8A7F76]">Факт</div><strong className="mt-1 block font-mono text-xl text-[#FFB86B]">{som(planFact?.actual ?? 0)}</strong></div>
+          <div className="rounded-[7px] border border-[#2E2822] bg-[#16130F] p-4"><div className="text-xs text-[#8A7F76]">Остаток</div><strong className={`mt-1 block font-mono text-xl ${(planFact?.variance ?? 0) < 0 ? 'text-[#FF8A7A]' : 'text-[#C6FF3D]'}`}>{som(planFact?.variance ?? 0)}</strong></div>
+        </div>
+        <div className="mt-3 overflow-hidden rounded-[7px] border border-[#2E2822] bg-[#16130F]">
+          {(planFact?.rows ?? []).map((row) => (
+            <div key={row.category} data-testid={`finance-row-${row.category}`} className="grid grid-cols-[minmax(100px,1fr)_80px_80px] items-center gap-3 border-b border-[#221E19] px-4 py-3 text-xs last:border-b-0 md:grid-cols-[minmax(140px,1fr)_120px_120px_120px]">
+              <div className="min-w-0">
+                <div className="font-semibold text-[#E5DCD3]">{CATEGORIES[row.category] ?? row.category}</div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#2E2822]"><div className={`h-full rounded-full ${(row.usagePct ?? 0) > 100 ? 'bg-[#FF8A7A]' : 'bg-[#C6FF3D]'}`} style={{ width: `${Math.min(row.usagePct ?? 0, 100)}%` }} /></div>
+              </div>
+              <span className="font-mono text-[#A79C92]">{som(row.plan)}</span>
+              <span className="font-mono text-[#FFB86B]">{som(row.actual)}</span>
+              <span className={`hidden font-mono md:block ${row.variance < 0 ? 'text-[#FF8A7A]' : 'text-[#7FD3A0]'}`}>{row.usagePct === null ? 'без плана' : `${row.usagePct}%`}</span>
+            </div>
+          ))}
+        </div>
+        <form onSubmit={submitBudget} className="mt-3 grid gap-2 sm:grid-cols-[minmax(150px,1fr)_minmax(150px,1fr)_auto]">
+          <select aria-label="Категория бюджета" value={budgetCategory} onChange={(event) => setBudgetCategory(event.target.value)} className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
+            {Object.entries(CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <input aria-label="Сумма бюджета" value={budgetAmount} onChange={(event) => setBudgetAmount(event.target.value)} inputMode="numeric" placeholder="Бюджет, сом" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+          <button disabled={planningBusy} className="h-10 rounded-[6px] bg-[#C6FF3D] px-4 text-sm font-bold text-[#111] disabled:opacity-50">{planningBusy ? 'Сохраняем...' : 'Установить бюджет'}</button>
+        </form>
+      </section>
+      <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.75fr)_minmax(560px,1.65fr)]">
       <div className="space-y-5">
         <Card>
           <div className="mb-4 font-display text-[15px] font-bold">P&amp;L</div>
@@ -90,7 +186,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
         <form onSubmit={submit} className="border-t border-[#2E2822] pt-5">
           <div className="mb-3 font-display text-sm font-bold">Новый расход</div>
           <div className="grid gap-2">
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
+            <select aria-label="Категория расхода" value={category} onChange={(e) => setCategory(e.target.value)} className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
               {Object.entries(CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} placeholder="Назначение" className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
@@ -130,6 +226,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
           {!expenses.length && <div className="border-t border-[#2E2822] py-10 text-center text-sm text-[#8A7F76]">Расходов пока нет</div>}
         </div>
       </section>
+      </div>
     </div>
   );
 }

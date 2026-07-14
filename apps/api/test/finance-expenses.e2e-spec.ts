@@ -46,8 +46,10 @@ describe('Finance expenses (integration + RBAC)', () => {
   });
 
   async function clean() {
+    await prisma.financeBudgetCommand.deleteMany();
+    await prisma.financeBudget.deleteMany();
     await prisma.expense.deleteMany();
-    await prisma.auditEvent.deleteMany({ where: { type: { startsWith: 'expense.' } } });
+    await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'expense.' } }, { type: 'finance.budget_set' }] } });
   }
 
   beforeEach(clean);
@@ -136,5 +138,123 @@ describe('Finance expenses (integration + RBAC)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ idempotencyKey: `expense-payment-${run}-reject` })
       .expect(409);
+  });
+
+  it('sets an idempotent period budget and reports paid plan-vs-actual by point', async () => {
+    const first = {
+      idempotencyKey: `budget-${run}-1`,
+      period: '2026-07',
+      category: 'rent',
+      point: 'BISHKEK-1',
+      amount: 100_000,
+    };
+    await request(app.getHttpServer()).post('/finance/budgets').send(first).expect(401);
+    await request(app.getHttpServer())
+      .post('/finance/budgets')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send(first)
+      .expect(403);
+
+    const created = await request(app.getHttpServer())
+      .post('/finance/budgets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(first)
+      .expect(201);
+    expect(created.body).toMatchObject({ period: '2026-07', category: 'rent', point: 'BISHKEK-1', amount: 100_000, version: 1, idempotent: false });
+
+    const replay = await request(app.getHttpServer())
+      .post('/finance/budgets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(first)
+      .expect(201);
+    expect(replay.body).toMatchObject({ id: created.body.id, version: 1, idempotent: true });
+    await request(app.getHttpServer())
+      .post('/finance/budgets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...first, amount: 101_000 })
+      .expect(409);
+
+    const updated = await request(app.getHttpServer())
+      .post('/finance/budgets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...first, idempotencyKey: `budget-${run}-2`, amount: 110_000 })
+      .expect(201);
+    expect(updated.body).toMatchObject({ id: created.body.id, amount: 110_000, version: 2, idempotent: false });
+
+    const expense = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        idempotencyKey: `expense-${run}-plan-fact`,
+        category: 'rent',
+        description: 'Аренда точки за июль',
+        amount: 120_000,
+        point: 'BISHKEK-1',
+        incurredAt: '2026-07-10T00:00:00.000Z',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${expense.body.id}/approve`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${expense.body.id}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `expense-payment-${run}-plan-fact` })
+      .expect(201);
+
+    const report = await request(app.getHttpServer())
+      .get('/finance/plan-fact?period=2026-07&point=BISHKEK-1')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(report.body).toMatchObject({
+      period: '2026-07',
+      point: 'BISHKEK-1',
+      plan: 110_000,
+      actual: 120_000,
+      variance: -10_000,
+      usagePct: 109.1,
+    });
+    expect(report.body.rows.find((row: { category: string }) => row.category === 'rent')).toMatchObject({
+      plan: 110_000,
+      actual: 120_000,
+      variance: -10_000,
+      usagePct: 109.1,
+    });
+
+    const budgets = await request(app.getHttpServer())
+      .get('/finance/budgets?period=2026-07&point=BISHKEK-1')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(budgets.body).toHaveLength(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'finance.budget_set', refs: { has: created.body.id } } })).toBe(2);
+  });
+
+  it('serializes concurrent updates to the same budget without losing a version', async () => {
+    const base = { period: '2026-08', category: 'marketing', point: 'BISHKEK-1' };
+    const created = await request(app.getHttpServer())
+      .post('/finance/budgets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...base, idempotencyKey: `budget-${run}-race-0`, amount: 10_000 })
+      .expect(201);
+
+    const updates = await Promise.all([
+      request(app.getHttpServer())
+        .post('/finance/budgets')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ ...base, idempotencyKey: `budget-${run}-race-1`, amount: 20_000 }),
+      request(app.getHttpServer())
+        .post('/finance/budgets')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ ...base, idempotencyKey: `budget-${run}-race-2`, amount: 30_000 }),
+    ]);
+    expect(updates.map((response) => response.status)).toEqual([201, 201]);
+    expect(updates.map((response) => response.body.version).sort()).toEqual([2, 3]);
+
+    const stored = await prisma.financeBudget.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(stored.version).toBe(3);
+    expect([20_000, 30_000]).toContain(stored.amount);
+    expect(await prisma.financeBudgetCommand.count({ where: { budgetId: stored.id } })).toBe(3);
+    expect(await prisma.auditEvent.count({ where: { type: 'finance.budget_set', refs: { has: stored.id } } })).toBe(3);
   });
 });

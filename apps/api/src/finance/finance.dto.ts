@@ -27,3 +27,14 @@ export class RejectExpenseDto {
 export class PayExpenseDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
 }
+
+export class FinancePeriodQueryDto {
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
+  @IsOptional() @IsString() @MaxLength(100) point?: string;
+}
+
+export class SetFinanceBudgetDto extends FinancePeriodQueryDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsIn(EXPENSE_CATEGORIES) category!: (typeof EXPENSE_CATEGORIES)[number];
+  @IsInt() @Min(1) amount!: number;
+}

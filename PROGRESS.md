@@ -1237,3 +1237,12 @@
 - Checks run: targeted AliStorePOS build; all-target `npm run ios:build`; `npm run ios:test`; POS install/launch/relaunch and screenshot inspection on iPhone 17 Pro Simulator; full `npm run mvp:verify`; `git diff --check`.
 - Outcome: Client, Staff, Courier and POS SwiftUI targets build; AliStoreCore XCTest passes 29/29; POS launches in the prototype-aligned dark shell without crash or visible overflow; API 111/111 suites and 433/433 tests, web/API production builds, mobile typecheck and Playwright 23/23 are green. Live scanner, ESC/POS printer and bank-terminal behavior remain physical certification gates and are not claimed complete.
 - Next step: implement the first unblocked ERP Wave A vertical, Finance 2.0 period budgets and plan-vs-actual reporting, while owner-controlled cloud and device certification remain external.
+
+## 2026-07-14
+
+- Task: add Finance 2.0 period budgets and server-authoritative plan-vs-actual reporting to ERP.
+- Files changed: Prisma finance budget state/command models and migration; Finance DTO/controller/service and Event Ledger catalogue; API integration/concurrency tests; web Finance API, responsive ERP planning surface and Playwright flow; shared E2E reset helper; backlog/readiness/gap-map documentation.
+- Result: owner/admin can set or revise a category budget for a month and optional point using a stable idempotency command. PostgreSQL serializes concurrent changes, increments the budget version and records `finance.budget_set`; the report aggregates only paid expenses incurred in the selected period and returns plan, fact, remaining amount and usage by category. ERP exposes month/point filters, summary totals, progress rows and a budget form without replacing the existing P&L and expense lifecycle.
+- Checks run: Prisma format/validation/generation; API and Next production builds; targeted Finance API 4/4 including RBAC, replay and concurrent updates; targeted Playwright Finance flow; browser screenshot inspection at 1280x720; full `npm run mvp:verify`; `git diff --check`.
+- Outcome: API 111/111 suites and 435/435 tests, Playwright 23/23, API/Web builds and mobile typecheck are green. This closes period budgets/plan-fact only; cashflow forecast, cash collection, supplier calendar and currency/branch settlement remain later Finance 2.0 scope.
+- Next step: implement product variants and bundles with atomic component-stock validation across catalog, checkout and POS.

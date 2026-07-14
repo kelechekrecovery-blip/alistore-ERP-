@@ -9,7 +9,6 @@
 - Complete the new Redis/Meilisearch runtime with a live Docker/staging smoke, automatic index bootstrap and idempotent product reindex jobs.
 - Add Kubernetes deployment manifests for API, web and workers with migration jobs, secrets, probes, autoscaling and rollback gates.
 - Add product variants and bundles with component stock validation, catalog/POS presentation, RBAC, Event Ledger and E2E coverage.
-- Extend Finance 2.0 with period budgets and plan-vs-actual reporting on top of the paid expense ledger.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
 - Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
 - Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
@@ -21,6 +20,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- Extend Finance 2.0 with period and point budgets plus paid-expense plan-vs-actual reporting: atomic versioned upsert, stable idempotency command journal, concurrent-update serialization, owner/admin RBAC, Event Ledger, responsive ERP controls and API/browser regression coverage.
 - Complete the native iOS POS software vertical: cashier-scoped staff session, live catalog and stock-capped cart, keyboard/camera SKU and exact IMEI scanning, shift reconciliation, cash/card/MBank/O!Money split tender, approval parking/retry with stable sale identity, SwiftData offline replay/conflict states, server receipt printing abstraction, returns, approval-gated refunds and atomic exchange; verify 29/29 XCTest, four-target build, dark prototype-aligned iPhone simulator smoke and the full MVP gate.
 - Complete the native iOS Courier software vertical: courier-only staff session, owner-bound route, map/call handoff, server-only start/deliver/fail, order Evidence, COD reconciliation, SwiftData offline replay/conflict states, APNs delivery routing and race-safe handover idempotency shared with Android; verify 23/23 XCTest, four-target build, iPhone simulator smoke and the full MVP gate.
 - Complete the native iOS Staff software vertical: server-owned fulfillment, assigned tasks, support transition/escalation, Customer 360, warranty, shifts, scanner/Evidence, staff-scoped APNs registration and task/support deep-link routing, with all-target build, 20 XCTest contracts and simulator launch smoke.

@@ -19,6 +19,34 @@ export interface Expense {
   createdAt: string;
 }
 
+export interface FinancePlanFactRow {
+  category: string;
+  plan: number;
+  actual: number;
+  variance: number;
+  usagePct: number | null;
+}
+
+export interface FinancePlanFact {
+  period: string;
+  point: string | null;
+  plan: number;
+  actual: number;
+  variance: number;
+  usagePct: number | null;
+  rows: FinancePlanFactRow[];
+}
+
+export interface FinanceBudget {
+  id: string;
+  period: string;
+  category: string;
+  point: string | null;
+  amount: number;
+  version: number;
+  idempotent: boolean;
+}
+
 export const fetchExpenses = (accessToken: string) => getJson<Expense[]>('/finance/expenses', accessToken);
 
 export const createExpense = (
@@ -34,3 +62,14 @@ export const rejectExpense = (id: string, note: string, accessToken: string) =>
 
 export const payExpense = (id: string, accessToken: string) =>
   postAuthJson<Expense>(`/finance/expenses/${encodeURIComponent(id)}/pay`, { idempotencyKey: crypto.randomUUID() }, accessToken);
+
+export const fetchFinancePlanFact = (period: string, point: string, accessToken: string) => {
+  const query = new URLSearchParams({ period });
+  if (point.trim()) query.set('point', point.trim());
+  return getJson<FinancePlanFact>(`/finance/plan-fact?${query.toString()}`, accessToken);
+};
+
+export const setFinanceBudget = (
+  input: { period: string; category: string; amount: number; point?: string },
+  accessToken: string,
+) => postAuthJson<FinanceBudget>('/finance/budgets', { ...input, idempotencyKey: crypto.randomUUID() }, accessToken);

@@ -572,6 +572,37 @@ model Expense {
   @@index([supplierId])
 }
 
+model FinanceBudget {
+  id        String   @id @default(cuid())
+  period    String
+  category  String
+  point     String   @default("")
+  amount    Int
+  version   Int      @default(1)
+  createdBy String
+  updatedBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([period, category, point])
+  @@index([period, point])
+}
+
+model FinanceBudgetCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  period         String
+  category       String
+  point          String
+  amount         Int
+  budgetId       String
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([period, point, createdAt])
+  @@index([budgetId])
+}
+
 model PurchaseOrder {
   id             String              @id @default(cuid())
   number         String              @unique
