@@ -22,6 +22,8 @@ enum Role {
   senior_seller
   cashier
   warehouse
+  service
+  technician
   courier
   marketer
   admin
@@ -130,6 +132,7 @@ enum WarrantyStatus {
   diagnostics
   waiting_supplier
   approved
+  repairing
   rejected
   repaired
   replaced
@@ -139,6 +142,12 @@ enum WarrantyStatus {
 enum ServiceCaseType {
   warranty
   paid
+}
+
+enum ServicePartStatus {
+  reserved
+  consumed
+  released
 }
 
 enum TicketStatus {
@@ -362,6 +371,7 @@ model Product {
   bundleAllocations       OrderBundleAllocation[]
   consignmentItems        ConsignmentItem[]
   quantityConsignmentLots QuantityConsignmentLot[]
+  serviceParts            ServicePart[]
 
   @@index([category])
   @@index([variantGroup])
@@ -379,6 +389,7 @@ model InventoryBalance {
   updatedAt               DateTime                  @default(now()) @updatedAt
   allocations             OrderQuantityAllocation[]
   quantityConsignmentLots QuantityConsignmentLot[]
+  serviceParts            ServicePart[]
 
   @@unique([productId, location])
   @@index([location])
@@ -415,16 +426,17 @@ model ProductReview {
 }
 
 model DeviceUnit {
-  id              String           @id @default(cuid())
-  imei            String           @unique // один IMEI нельзя продать дважды
-  product         Product          @relation(fields: [productId], references: [id])
-  productId       String
-  status          UnitStatus       @default(in_stock)
-  grade           Grade?
-  location        String
-  orderId         String?
-  updatedAt       DateTime         @default(now()) @updatedAt
-  consignmentItem ConsignmentItem?
+  id                 String            @id @default(cuid())
+  imei               String            @unique // один IMEI нельзя продать дважды
+  product            Product           @relation(fields: [productId], references: [id])
+  productId          String
+  status             UnitStatus        @default(in_stock)
+  grade              Grade?
+  location           String
+  orderId            String?
+  updatedAt          DateTime          @default(now()) @updatedAt
+  consignmentItem    ConsignmentItem?
+  serviceReplacement ServiceWorkOrder? @relation("ServiceReplacementUnit")
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -812,16 +824,17 @@ model CashShiftHandover {
 }
 
 model InventoryMovement {
-  id             String   @id @default(cuid())
-  idempotencyKey String?  @unique
-  product        Product  @relation(fields: [productId], references: [id])
+  id             String       @id @default(cuid())
+  idempotencyKey String?      @unique
+  product        Product      @relation(fields: [productId], references: [id])
   productId      String
   qty            Int
   type           String // received | moved | write_off | adjust | count
   from           String?
   to             String?
   reason         String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
+  servicePart    ServicePart?
   // write_off / adjust → owner approval + evidence
 
   @@index([productId])
@@ -876,43 +889,78 @@ model ReturnItem {
 }
 
 model WarrantyCase {
-  id          String          @id @default(cuid())
-  imei        String
-  customerId  String
-  problem     String
-  status      WarrantyStatus  @default(created)
-  serviceType ServiceCaseType @default(warranty)
-  deviceName  String?
-  sla         DateTime
-  assignee    String?
-  workOrder   ServiceWorkOrder?
+  id             String            @id @default(cuid())
+  imei           String
+  customerId     String
+  problem        String
+  status         WarrantyStatus    @default(created)
+  serviceType    ServiceCaseType   @default(warranty)
+  deviceName     String?
+  sla            DateTime
+  slaEscalatedAt DateTime?
+  assignee       String?
+  workOrder      ServiceWorkOrder?
 
   @@index([imei])
   @@index([status])
+  @@index([status, sla])
   @@index([serviceType, status])
 }
 
 model ServiceWorkOrder {
-  id                 String                    @id @default(cuid())
-  warrantyCase       WarrantyCase              @relation(fields: [warrantyCaseId], references: [id], onDelete: Cascade)
-  warrantyCaseId     String                    @unique
-  technicianId       String?
-  diagnosticSummary String?
-  diagnosticFee      Int                       @default(0)
-  estimateAmount     Int?
-  estimatePreparedAt DateTime?
-  estimateApprovedAt DateTime?
-  estimateApprovedBy String?
-  createdBy          String
-  point              String
-  payments           Payment[]
-  commands           ServiceWorkOrderCommand[]
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  id                  String                    @id @default(cuid())
+  warrantyCase        WarrantyCase              @relation(fields: [warrantyCaseId], references: [id], onDelete: Cascade)
+  warrantyCaseId      String                    @unique
+  technicianId        String?
+  diagnosticSummary   String?
+  diagnosticFee       Int                       @default(0)
+  estimateAmount      Int?
+  estimatePreparedAt  DateTime?
+  estimateApprovedAt  DateTime?
+  estimateApprovedBy  String?
+  repairStartedAt     DateTime?
+  repairCompletedAt   DateTime?
+  repairClosedAt      DateTime?
+  repairWarrantyUntil DateTime?
+  completionSummary   String?
+  replacementUnit     DeviceUnit?               @relation("ServiceReplacementUnit", fields: [replacementImei], references: [imei], onDelete: Restrict)
+  replacementImei     String?                   @unique
+  createdBy           String
+  point               String
+  payments            Payment[]
+  parts               ServicePart[]
+  commands            ServiceWorkOrderCommand[]
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
 
   @@index([technicianId, createdAt])
   @@index([point, createdAt])
   @@index([estimateApprovedAt, createdAt])
+}
+
+model ServicePart {
+  id          String             @id @default(cuid())
+  workOrder   ServiceWorkOrder   @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  workOrderId String
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId   String
+  balance     InventoryBalance   @relation(fields: [balanceId], references: [id], onDelete: Restrict)
+  balanceId   String
+  location    String
+  qty         Int
+  status      ServicePartStatus  @default(reserved)
+  reservedBy  String
+  reservedAt  DateTime           @default(now())
+  consumedBy  String?
+  consumedAt  DateTime?
+  releasedBy  String?
+  releasedAt  DateTime?
+  movement    InventoryMovement? @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  movementId  String?            @unique
+
+  @@index([workOrderId, status])
+  @@index([balanceId, status])
+  @@index([productId, status])
 }
 
 model ServiceWorkOrderCommand {

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MIGRATIONS="$ROOT/apps/api/prisma/migrations"
-TARGET="20260715142000_scope_service_payments_and_refunds"
+TARGET="20260715150000_add_service_parts_and_execution"
 DB="alistore_service_migration_${RANDOM}_$$"
 
 cleanup() {
@@ -28,13 +28,13 @@ VALUES ('shift-legacy', 'staff-legacy', 'OSH-1', 0, NOW() - INTERVAL '1 hour');
 INSERT INTO "Customer" ("id", "phone", "name")
 VALUES ('customer-legacy', '+996700000099', 'Legacy Customer');
 INSERT INTO "WarrantyCase" ("id", "imei", "customerId", "problem", "status", "serviceType", "deviceName", "sla")
-VALUES ('case-legacy', 'LEGACY-SERVICE-SN', 'customer-legacy', 'Legacy repair', 'approved', 'paid', 'Legacy Phone', NOW() + INTERVAL '1 day');
-INSERT INTO "ServiceWorkOrder" ("id", "warrantyCaseId", "createdBy", "updatedAt")
-VALUES ('work-order-legacy', 'case-legacy', 'staff-legacy', NOW());
-INSERT INTO "Payment" ("id", "serviceWorkOrderId", "amount", "method", "status")
+VALUES ('case-legacy', 'LEGACY-SERVICE-SN', 'customer-legacy', 'Legacy repair', 'repaired', 'paid', 'Legacy Phone', NOW() + INTERVAL '1 day');
+INSERT INTO "ServiceWorkOrder" ("id", "warrantyCaseId", "createdBy", "point", "updatedAt")
+VALUES ('work-order-legacy', 'case-legacy', 'staff-legacy', 'OSH-1', NOW());
+INSERT INTO "Payment" ("id", "serviceWorkOrderId", "originalPaymentId", "amount", "method", "status")
 VALUES
-  ('payment-legacy', 'work-order-legacy', 5000, 'cash', 'received'),
-  ('refund-legacy', 'work-order-legacy', -1000, 'cash', 'refunded');
+  ('payment-legacy', 'work-order-legacy', NULL, 5000, 'cash', 'received'),
+  ('refund-legacy', 'work-order-legacy', 'payment-legacy', -1000, 'cash', 'refunded');
 INSERT INTO "AuditEvent" ("id", "type", "actor", "payload", "refs")
 VALUES (
   'event-legacy-refund',
@@ -47,15 +47,15 @@ SQL
 
 psql -U alistore -d "$DB" -v ON_ERROR_STOP=1 -f "$MIGRATIONS/$TARGET/migration.sql" >/dev/null
 actual="$(psql -U alistore -d "$DB" -At <<'SQL'
-SELECT concat_ws('|', refund."originalPaymentId", work_order."point")
+SELECT concat_ws('|', refund."originalPaymentId", work_order."point", work_order."repairStartedAt" IS NOT NULL, work_order."repairCompletedAt" IS NOT NULL)
 FROM "Payment" refund
 JOIN "ServiceWorkOrder" work_order ON work_order."id" = refund."serviceWorkOrderId"
 WHERE refund."id" = 'refund-legacy';
 SQL
 )"
 
-if [[ "$actual" != "payment-legacy|OSH-1" ]]; then
-  echo "service payment migration regression: expected payment-legacy|OSH-1, got $actual" >&2
+if [[ "$actual" != "payment-legacy|OSH-1|t|t" ]]; then
+  echo "service payment migration regression: expected payment-legacy|OSH-1|t|t, got $actual" >&2
   exit 1
 fi
 

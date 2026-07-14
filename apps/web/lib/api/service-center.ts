@@ -10,8 +10,15 @@ export interface ServiceWorkOrder {
   estimatePreparedAt: string | null;
   estimateApprovedAt: string | null;
   estimateApprovedBy: string | null;
+  repairStartedAt: string | null;
+  repairCompletedAt: string | null;
+  repairClosedAt: string | null;
+  repairWarrantyUntil: string | null;
+  completionSummary: string | null;
+  replacementImei: string | null;
   point: string;
   payments: ServicePayment[];
+  parts: ServicePart[];
   warrantyCase: {
     id: string;
     imei: string;
@@ -22,6 +29,16 @@ export interface ServiceWorkOrder {
     deviceName: string | null;
     sla: string;
   };
+}
+
+export interface ServicePart {
+  id: string;
+  productId: string;
+  balanceId: string;
+  location: string;
+  qty: number;
+  status: 'reserved' | 'consumed' | 'released';
+  product: { id: string; sku: string; name: string; cost?: number };
 }
 
 export interface ServicePayment {
@@ -59,6 +76,7 @@ export interface ServiceQueueItem {
   serviceType: 'warranty' | 'paid';
   deviceName: string | null;
   sla: string;
+  slaState: 'on_track' | 'warning' | 'overdue' | 'met' | 'missed' | 'closed';
   assignee: string | null;
   productName: string;
   customer: { id: string; name: string; phone: string } | null;
@@ -94,6 +112,10 @@ export function diagnoseServiceWorkOrder(
   return postAuthJson<ServiceWorkOrder>(`/service-center/work-orders/${encodeURIComponent(id)}/diagnose`, input, accessToken, { 'idempotency-key': idempotencyKey });
 }
 
+export function assignServiceTechnician(id: string, technicianId: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/assign`, accessToken, idempotencyKey, { technicianId });
+}
+
 export function fetchMyServiceWorkOrders(accessToken: string) {
   return getJson<ServiceWorkOrder[]>('/service-center/me/work-orders', accessToken);
 }
@@ -118,6 +140,38 @@ export function payServiceWorkOrder(
     accessToken,
     { 'idempotency-key': idempotencyKey },
   );
+}
+
+function serviceMutation(path: string, accessToken: string, idempotencyKey: string, body: object = {}) {
+  return postAuthJson<ServiceWorkOrder>(path, body, accessToken, { 'idempotency-key': idempotencyKey });
+}
+
+export function reserveServicePart(id: string, productId: string, qty: number, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/parts`, accessToken, idempotencyKey, { productId, qty });
+}
+
+export function releaseServicePart(id: string, partId: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/parts/${encodeURIComponent(partId)}/release`, accessToken, idempotencyKey);
+}
+
+export function consumeServicePart(id: string, partId: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/parts/${encodeURIComponent(partId)}/consume`, accessToken, idempotencyKey);
+}
+
+export function startServiceRepair(id: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/start`, accessToken, idempotencyKey);
+}
+
+export function completeServiceRepair(id: string, summary: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/complete`, accessToken, idempotencyKey, { summary });
+}
+
+export function replaceServiceDevice(id: string, replacementImei: string, summary: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/replace`, accessToken, idempotencyKey, { replacementImei, summary });
+}
+
+export function closeServiceRepair(id: string, accessToken: string, idempotencyKey: string) {
+  return serviceMutation(`/service-center/work-orders/${encodeURIComponent(id)}/close`, accessToken, idempotencyKey);
 }
 
 export function receivedServiceTotal(workOrder: Pick<ServiceWorkOrder, 'payments'>) {

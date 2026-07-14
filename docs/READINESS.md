@@ -5,8 +5,8 @@
 и не должны смешиваться с готовностью первого магазина к запуску.
 
 - **50 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **56 миграций**
-- **119 API test suites / 473 теста — зелёные** (`jest`)
-- **34/34 Playwright flow — зелёные**, включая warranty и paid Service Center intake/diagnostics/customer estimate approval/POS split settlement
+- **119 API test suites / 477 тестов — зелёные** (`jest`)
+- **34/34 Playwright flow — зелёные**, включая Service Center intake/diagnostics/approval/POS settlement/parts/repair/closure
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **31/31** on iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **25/25** connected Compose tests pass on API 36, including Staff attendance with SQLite/WorkManager replay. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -71,7 +71,7 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest                 # 119 suites / 473 теста ✓
+cd apps/api && npx jest                 # 119 suites / 477 тестов ✓
 npm run migration:test:service-payment # legacy refund/point migration regression ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (37 роутов)

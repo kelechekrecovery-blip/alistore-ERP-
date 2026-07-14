@@ -141,9 +141,15 @@ export class WarrantyService {
   /** Advance a warranty case through its guarded state machine. */
   async transition(id: string, to: WarrantyStatus, actor: string) {
     return this.audit.transaction(async (tx) => {
-      const wc = await tx.warrantyCase.findUnique({ where: { id } });
+      const wc = await tx.warrantyCase.findUnique({ where: { id }, include: { workOrder: { select: { id: true } } } });
       if (!wc) {
         throw new ValidationError('warranty_not_found', `Гарантия ${id} не найдена`);
+      }
+      if (wc.workOrder) {
+        throw new ValidationError(
+          'service_work_order_managed',
+          'Кейс с заказ-нарядом изменяется только через Service Center',
+        );
       }
       assertWarrantyTransition(wc.status, to);
       const updated = await tx.warrantyCase.update({ where: { id }, data: { status: to } });

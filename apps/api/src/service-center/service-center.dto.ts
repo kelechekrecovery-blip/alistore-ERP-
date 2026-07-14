@@ -89,3 +89,44 @@ export class PayServiceWorkOrderDto {
   @Type(() => ServicePaymentTenderDto)
   payments!: ServicePaymentTenderDto[];
 }
+
+export class ReserveServicePartDto {
+  @ApiProperty()
+  @IsString()
+  productId!: string;
+
+  @ApiProperty({ example: 1 })
+  @IsInt()
+  @Min(1)
+  qty!: number;
+}
+
+export class CompleteServiceRepairDto {
+  @ApiProperty({ example: 'Экран заменён, устройство прошло контроль качества' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2000)
+  summary!: string;
+}
+
+export class AssignServiceTechnicianDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  technicianId!: string;
+}
+
+export class ReplaceServiceDeviceDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(4)
+  @MaxLength(80)
+  replacementImei!: string;
+
+  @ApiProperty({ example: 'Устройство заменено после подтверждённого гарантийного случая' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2000)
+  summary!: string;
+}

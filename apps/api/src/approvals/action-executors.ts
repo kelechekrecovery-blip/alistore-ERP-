@@ -73,6 +73,16 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
     }
   } else if (original.serviceWorkOrderId) {
     await tx.$queryRaw`SELECT id FROM "ServiceWorkOrder" WHERE id = ${original.serviceWorkOrderId} FOR UPDATE`;
+    const workOrder = await tx.serviceWorkOrder.findUnique({
+      where: { id: original.serviceWorkOrderId },
+      select: { repairStartedAt: true },
+    });
+    if (workOrder?.repairStartedAt) {
+      throw new ConflictError(
+        'service_refund_after_start_forbidden',
+        'После начала ремонта возврат проводится только отдельной компенсацией с актом',
+      );
+    }
     const agg = await tx.payment.aggregate({
       where: { serviceWorkOrderId: original.serviceWorkOrderId },
       _sum: { amount: true },

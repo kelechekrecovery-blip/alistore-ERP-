@@ -10,7 +10,7 @@ import { AccountDetailFrame } from '@/components/AccountDetailFrame';
 
 const WSTATUS: Record<string, string> = {
   created: 'Обращение принято', received: 'Принято в сервис', diagnostics: 'Диагностика',
-  waiting_supplier: 'Ждём поставщика', approved: 'Ремонт одобрен', repaired: 'Отремонтировано',
+  waiting_supplier: 'Ждём поставщика', approved: 'Ремонт одобрен', repairing: 'Ремонт выполняется', repaired: 'Отремонтировано',
   replaced: 'Замена', rejected: 'Отклонено', closed: 'Закрыто',
 };
 

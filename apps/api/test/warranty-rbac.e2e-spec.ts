@@ -64,6 +64,9 @@ describe('Warranty console RBAC', () => {
     await prisma.warrantyOpenCommand.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.servicePart.deleteMany();
+    await prisma.serviceWorkOrder.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.warrantyCase.deleteMany();
@@ -161,6 +164,15 @@ describe('Warranty console RBAC', () => {
       .set('Authorization', `Bearer ${warehouseToken}`)
       .send({ status: 'received' })
       .expect(200);
+
+    await prisma.serviceWorkOrder.create({
+      data: { warrantyCaseId: opened.body.id, createdBy: warehouseId, point: 'BISHKEK-1' },
+    });
+    await request(app.getHttpServer())
+      .patch(`/warranty/${opened.body.id}`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ status: 'diagnostics' })
+      .expect(422);
 
     const event = await prisma.auditEvent.findFirst({ where: { type: 'warranty.received' } });
     expect(event?.actor).toBe(warehouseId);

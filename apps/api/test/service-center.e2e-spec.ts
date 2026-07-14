@@ -7,6 +7,7 @@ import { AuditModule } from '../src/audit/audit.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ServiceCenterModule } from '../src/service-center/service-center.module';
+import { ServiceSlaService } from '../src/service-center/service-sla.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 
@@ -20,6 +21,10 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
   let sellerId: string;
   let cashierToken: string;
   let cashierId: string;
+  let technicianToken: string;
+  let technicianId: string;
+  let foreignTechnicianToken: string;
+  let serviceSla: ServiceSlaService;
   const run = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
@@ -39,6 +44,7 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     prisma = moduleRef.get(PrismaService);
     jwt = moduleRef.get(JwtService);
     const auth = moduleRef.get(StaffAuthService);
+    serviceSla = moduleRef.get(ServiceSlaService);
     const owner = await auth.createStaff(`owner-service-${run}`, 'pass', 'owner');
     ownerId = owner.id;
     await prisma.staffUser.update({ where: { id: owner.id }, data: { point: 'BISHKEK-2' } });
@@ -49,12 +55,24 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     const cashier = await auth.createStaff(`cashier-service-${run}`, 'pass', 'cashier');
     cashierId = cashier.id;
     cashierToken = (await auth.login(cashier.username, 'pass')).accessToken;
+    const technician = await auth.createStaff(`technician-service-${run}`, 'pass', 'technician');
+    technicianId = technician.id;
+    await prisma.staffUser.update({ where: { id: technician.id }, data: { point: 'BISHKEK-2' } });
+    technicianToken = (await auth.login(technician.username, 'pass')).accessToken;
+    const foreignTechnician = await auth.createStaff(`technician-foreign-service-${run}`, 'pass', 'technician');
+    await prisma.staffUser.update({ where: { id: foreignTechnician.id }, data: { point: 'OSH-1' } });
+    foreignTechnicianToken = (await auth.login(foreignTechnician.username, 'pass')).accessToken;
   });
 
   beforeEach(async () => {
+    await prisma.outboxMessage.deleteMany({ where: { template: 'service_sla_breached' } });
     await prisma.payment.deleteMany({ where: { serviceWorkOrderId: { not: null } } });
     await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.servicePart.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
+    await prisma.quantityConsignmentLot.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
+    await prisma.inventoryMovement.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
+    await prisma.inventoryBalance.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'service.' } }, { type: { startsWith: 'warranty.' } }] } });
     await prisma.warrantyCase.deleteMany();
     await prisma.deviceUnit.deleteMany({ where: { imei: { startsWith: `SERVICE-${run}` } } });
@@ -65,9 +83,14 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
   });
 
   afterAll(async () => {
+    await prisma.outboxMessage.deleteMany({ where: { template: 'service_sla_breached' } });
     await prisma.payment.deleteMany({ where: { serviceWorkOrderId: { not: null } } });
     await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.servicePart.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
+    await prisma.quantityConsignmentLot.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
+    await prisma.inventoryMovement.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
+    await prisma.inventoryBalance.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.warrantyCase.deleteMany({ where: { imei: { startsWith: `SERVICE-${run}` } } });
     await prisma.deviceUnit.deleteMany({ where: { imei: { startsWith: `SERVICE-${run}` } } });
     await prisma.order.deleteMany({ where: { customer: { phone: { startsWith: `+99677${run}` } } } });
@@ -91,7 +114,7 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     const warrantyCase = await prisma.warrantyCase.create({
       data: { imei, customerId: customer.id, problem: 'Не заряжается', sla: new Date(Date.now() + 86_400_000) },
     });
-    return { customer, warrantyCase };
+    return { customer, warrantyCase, product, order, imei };
   }
 
   const customerToken = (customer: { id: string; phone: string }) =>
@@ -151,6 +174,211 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     const otherMine = await request(app.getHttpServer()).get('/service-center/me/work-orders').set('Authorization', `Bearer ${customerToken(second.customer)}`).expect(200);
     expect(mine.body.map((item: { id: string }) => item.id)).toContain(created.body.id);
     expect(otherMine.body).toEqual([]);
+    expect(JSON.stringify(mine.body)).not.toContain('"cost"');
+  });
+
+  it('serializes diagnosis edits with customer approval', async () => {
+    const { customer, warrantyCase } = await fixture('6');
+    const created = await request(app.getHttpServer()).post('/service-center/work-orders').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `service-race-create-${run}`).send({ warrantyCaseId: warrantyCase.id, technicianId: ownerId }).expect(201);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/diagnose`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `service-race-first-${run}`).send({ summary: 'Первая смета', estimateAmount: 1000 }).expect(201);
+    const [edited, approved] = await Promise.all([
+      request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/diagnose`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `service-race-edit-${run}`).send({ summary: 'Уточнённая смета', estimateAmount: 1200 }),
+      request(app.getHttpServer()).post(`/service-center/me/work-orders/${created.body.id}/approve-estimate`).set('Authorization', `Bearer ${customerToken(customer)}`).set('Idempotency-Key', `service-race-approve-${run}`),
+    ]);
+    expect([201, 409]).toContain(edited.status);
+    expect(approved.status).toBe(201);
+    const final = await prisma.serviceWorkOrder.findUniqueOrThrow({ where: { id: created.body.id }, include: { warrantyCase: true } });
+    expect(final.warrantyCase.status).toBe('approved');
+    expect(final.estimateApprovedAt).not.toBeNull();
+  });
+
+  it('escalates an overdue SLA once and records it in the Ledger', async () => {
+    const { warrantyCase } = await fixture('5');
+    await prisma.warrantyCase.update({ where: { id: warrantyCase.id }, data: { sla: new Date(Date.now() - 60_000) } });
+    await expect(serviceSla.escalateOverdue()).resolves.toEqual({ escalated: 1 });
+    await expect(serviceSla.escalateOverdue()).resolves.toEqual({ escalated: 0 });
+    const updated = await prisma.warrantyCase.findUniqueOrThrow({ where: { id: warrantyCase.id } });
+    expect(updated.slaEscalatedAt).not.toBeNull();
+    expect(await prisma.auditEvent.count({ where: { type: 'service.sla_breached', refs: { has: warrantyCase.id } } })).toBe(1);
+    expect(await prisma.outboxMessage.count({ where: { template: 'service_sla_breached', recipient: updated.customerId } })).toBe(1);
+  });
+
+  it('reserves store-owned parts and runs an idempotent technician repair lifecycle', async () => {
+    const { customer, warrantyCase } = await fixture('4');
+    const created = await request(app.getHttpServer())
+      .post('/service-center/work-orders')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `service-exec-create-${run}`)
+      .send({ warrantyCaseId: warrantyCase.id })
+      .expect(201);
+    const assigned = await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/assign`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `service-exec-assign-${run}`)
+      .send({ technicianId })
+      .expect(201);
+    expect(assigned.body.technicianId).toBe(technicianId);
+    const assignedQueue = await request(app.getHttpServer()).get('/service-center/queue').set('Authorization', `Bearer ${technicianToken}`).expect(200);
+    expect(assignedQueue.body.map((item: { id: string }) => item.id)).toContain(warrantyCase.id);
+    const foreignQueue = await request(app.getHttpServer()).get('/service-center/queue').set('Authorization', `Bearer ${foreignTechnicianToken}`).expect(200);
+    expect(foreignQueue.body.map((item: { id: string }) => item.id)).not.toContain(warrantyCase.id);
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/diagnose`)
+      .set('Authorization', `Bearer ${foreignTechnicianToken}`)
+      .set('Idempotency-Key', `service-exec-foreign-diagnose-${run}`)
+      .send({ summary: 'Чужая диагностика', estimateAmount: 0 })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/diagnose`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-exec-diagnose-${run}`)
+      .send({ summary: 'Замена контроллера питания', estimateAmount: 0 })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/service-center/me/work-orders/${created.body.id}/approve-estimate`)
+      .set('Authorization', `Bearer ${customerToken(customer)}`)
+      .set('Idempotency-Key', `service-exec-approve-${run}`)
+      .expect(201);
+
+    const partProduct = await prisma.product.create({
+      data: { sku: `SERVICE-${run}-PART`, name: 'Контроллер питания', price: 2500, cost: 1200, category: 'parts', trackingMode: 'quantity', attrs: {} },
+    });
+    const balance = await prisma.inventoryBalance.create({
+      data: { productId: partProduct.id, location: 'BISHKEK-2', onHand: 2 },
+    });
+    await prisma.quantityConsignmentLot.create({
+      data: {
+        idempotencyKey: `service-consignment-${run}`,
+        productId: partProduct.id,
+        balanceId: balance.id,
+        location: 'BISHKEK-2',
+        ownerName: 'Комитент',
+        commissionBps: 1000,
+        receivedQty: 1,
+        availableQty: 1,
+        createdBy: ownerId,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/parts`)
+      .set('Authorization', `Bearer ${foreignTechnicianToken}`)
+      .set('Idempotency-Key', `service-part-foreign-${run}`)
+      .send({ productId: partProduct.id, qty: 1 })
+      .expect(409);
+
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/parts`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-part-too-many-${run}`)
+      .send({ productId: partProduct.id, qty: 2 })
+      .expect(409);
+    const competingReservations = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/service-center/work-orders/${created.body.id}/parts`)
+        .set('Authorization', `Bearer ${technicianToken}`)
+        .set('Idempotency-Key', `service-part-race-a-${run}`)
+        .send({ productId: partProduct.id, qty: 1 }),
+      request(app.getHttpServer())
+        .post(`/service-center/work-orders/${created.body.id}/parts`)
+        .set('Authorization', `Bearer ${technicianToken}`)
+        .set('Idempotency-Key', `service-part-race-b-${run}`)
+        .send({ productId: partProduct.id, qty: 1 }),
+    ]);
+    expect(competingReservations.map((response) => response.status).sort()).toEqual([201, 409]);
+    const winningReservation = competingReservations.find((response) => response.status === 201)!;
+    const racedPartId = winningReservation.body.parts.find((part: { status: string }) => part.status === 'reserved').id;
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/parts/${racedPartId}/release`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-part-race-release-${run}`)
+      .expect(201);
+    const reserveKey = `service-part-reserve-${run}`;
+    const reserved = await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/parts`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', reserveKey)
+      .send({ productId: partProduct.id, qty: 1 })
+      .expect(201);
+    const replay = await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/parts`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', reserveKey)
+      .send({ productId: partProduct.id, qty: 1 })
+      .expect(201);
+    expect(replay.body.parts.filter((part: { status: string }) => part.status === 'reserved')).toHaveLength(1);
+    const partId = reserved.body.parts.find((part: { status: string }) => part.status === 'reserved').id;
+    const customerView = await request(app.getHttpServer()).get('/service-center/me/work-orders').set('Authorization', `Bearer ${customerToken(customer)}`).expect(200);
+    expect(JSON.stringify(customerView.body)).not.toContain('"cost"');
+
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/start`)
+      .set('Authorization', `Bearer ${foreignTechnicianToken}`)
+      .set('Idempotency-Key', `service-start-foreign-${run}`)
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/start`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-start-${run}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/complete`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-complete-early-${run}`)
+      .send({ summary: 'Устройство проверено' })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/parts/${partId}/consume`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-consume-${run}`)
+      .expect(201);
+    const completed = await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/complete`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-complete-${run}`)
+      .send({ summary: 'Контроллер заменён, тесты пройдены' })
+      .expect(201);
+    expect(completed.body.warrantyCase.status).toBe('repaired');
+    const closed = await request(app.getHttpServer())
+      .post(`/service-center/work-orders/${created.body.id}/close`)
+      .set('Authorization', `Bearer ${technicianToken}`)
+      .set('Idempotency-Key', `service-close-${run}`)
+      .expect(201);
+    expect(closed.body.warrantyCase.status).toBe('closed');
+    expect(new Date(closed.body.repairWarrantyUntil).getTime()).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+
+    const stock = await prisma.inventoryBalance.findUniqueOrThrow({ where: { id: balance.id } });
+    expect(stock).toMatchObject({ onHand: 1, reserved: 0 });
+    expect(await prisma.inventoryMovement.count({ where: { type: 'service_consumed', productId: partProduct.id } })).toBe(1);
+    const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } } });
+    expect(events.map((event) => event.type)).toEqual(expect.arrayContaining([
+      'service.technician_assigned',
+      'service.part_reserved',
+      'service.repair_started',
+      'service.part_consumed',
+      'service.repair_completed',
+      'service.work_order_closed',
+    ]));
+  });
+
+  it('replaces an approved warranty device from same-model store stock exactly once', async () => {
+    const { customer, warrantyCase, product, order, imei } = await fixture('7');
+    const replacementImei = `SERVICE-${run}-7-REPLACEMENT`;
+    await prisma.deviceUnit.create({ data: { imei: replacementImei, productId: product.id, status: 'in_stock', location: 'BISHKEK-2' } });
+    const created = await request(app.getHttpServer()).post('/service-center/work-orders').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `service-replace-create-${run}`).send({ warrantyCaseId: warrantyCase.id, technicianId }).expect(201);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/diagnose`).set('Authorization', `Bearer ${technicianToken}`).set('Idempotency-Key', `service-replace-diagnose-${run}`).send({ summary: 'Ремонт невозможен', estimateAmount: 0 }).expect(201);
+    await request(app.getHttpServer()).post(`/service-center/me/work-orders/${created.body.id}/approve-estimate`).set('Authorization', `Bearer ${customerToken(customer)}`).set('Idempotency-Key', `service-replace-approve-${run}`).expect(201);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/start`).set('Authorization', `Bearer ${technicianToken}`).set('Idempotency-Key', `service-replace-start-${run}`).expect(201);
+    const key = `service-replace-device-${run}`;
+    const replaced = await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/replace`).set('Authorization', `Bearer ${technicianToken}`).set('Idempotency-Key', key).send({ replacementImei, summary: 'Выдано новое устройство той же модели' }).expect(201);
+    expect(replaced.body).toMatchObject({ replacementImei, warrantyCase: { status: 'replaced' } });
+    const replay = await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/replace`).set('Authorization', `Bearer ${technicianToken}`).set('Idempotency-Key', key).send({ replacementImei, summary: 'Выдано новое устройство той же модели' }).expect(201);
+    expect(replay.body.replacementImei).toBe(replacementImei);
+    const unit = await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: replacementImei } });
+    expect(unit).toMatchObject({ status: 'sold', orderId: order.id });
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei } })).toMatchObject({ status: 'in_repair', orderId: order.id });
+    expect(await prisma.auditEvent.count({ where: { type: 'service.device_replaced', refs: { has: created.body.id } } })).toBe(1);
+    await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/close`).set('Authorization', `Bearer ${technicianToken}`).set('Idempotency-Key', `service-replace-close-${run}`).expect(201);
   });
 
   it('accepts a third-party device without adding sellable inventory and reuses customer approval', async () => {

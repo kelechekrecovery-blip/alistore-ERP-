@@ -110,6 +110,7 @@ envVarGroups:
       - { key: PAYMENT_PROVIDER, value: sandbox }
       - { key: JOB_BACKEND, value: bullmq }
       - { key: RESERVATION_SWEEP_ENABLED, value: "true" }
+      - { key: SERVICE_SLA_SWEEP_ENABLED, value: "true" }
       - { key: OUTBOX_RELAY_ENABLED, value: "true" }
       - { key: MEILI_HOST, value: "http://alistore-meilisearch-staging:7700" }
       - { key: MEDIA_STORAGE, value: s3 }

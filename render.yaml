@@ -187,6 +187,8 @@ envVarGroups:
         value: bullmq
       - key: RESERVATION_SWEEP_ENABLED
         value: "true"
+      - key: SERVICE_SLA_SWEEP_ENABLED
+        value: "true"
       - key: OUTBOX_RELAY_ENABLED
         value: "true"
       - key: MEILI_HOST

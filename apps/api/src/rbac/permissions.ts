@@ -4,15 +4,15 @@
  * action, the thresholds beyond which an action becomes approval-gated, and each
  * role's direct (no-approval) discount limit.
  *
- * Role is defined here (not imported from Prisma): the schema's Role enum isn't
- * referenced by any model, so Prisma doesn't generate it. This is the single
- * source of truth for staff roles until auth carries them.
+ * Kept as a framework-independent mirror of Prisma Role for pure policy tests.
  */
 export const Role = {
   seller: 'seller',
   senior_seller: 'senior_seller',
   cashier: 'cashier',
   warehouse: 'warehouse',
+  service: 'service',
+  technician: 'technician',
   courier: 'courier',
   marketer: 'marketer',
   admin: 'admin',
@@ -46,6 +46,8 @@ export const ROLE_DISCOUNT_LIMIT_PCT: Record<Role, number> = {
   senior_seller: 15,
   cashier: 5,
   warehouse: 0,
+  service: 0,
+  technician: 0,
   courier: 0,
   marketer: 0,
   admin: 100,

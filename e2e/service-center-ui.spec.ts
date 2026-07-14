@@ -48,11 +48,30 @@ test('ERP diagnoses a device and the customer approves the estimate on the site'
   await estimate.getByRole('button', { name: 'Подтвердить смету' }).click();
   await expect(estimate).toContainText('Смета подтверждена · устройство в работе');
 
+  const partProduct = await prisma.product.create({
+    data: { sku: `SERVICE-PART-UI-${Date.now()}`, name: 'Аккумулятор сервисный', price: 3000, cost: 1800, category: 'parts', trackingMode: 'quantity', attrs: {} },
+  });
+  await prisma.inventoryBalance.create({ data: { productId: partProduct.id, location: 'BISHKEK-1', onHand: 2 } });
+  await page.goto('/erp');
+  await page.getByRole('button', { name: /Сервис-центр/ }).click();
+  const approvedRow = page.getByTestId(`service-case-${warrantyCase.id}`);
+  await approvedRow.getByRole('button', { name: 'Заказ-наряд' }).click();
+  await page.getByLabel('ID запчасти').fill(partProduct.id);
+  await page.getByRole('button', { name: 'Резерв' }).click();
+  await expect(page.getByRole('dialog', { name: 'Заказ-наряд ремонта' })).toContainText('Аккумулятор сервисный');
+  await page.getByRole('button', { name: 'Начать ремонт' }).click();
+  await page.getByRole('button', { name: 'Установить' }).click();
+  await page.getByLabel('Результат ремонта').fill('Аккумулятор заменён, контроль заряда пройден');
+  await page.getByRole('button', { name: 'Завершить ремонт' }).click();
+  await page.getByRole('button', { name: /Выдать и закрыть/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Заказ-наряд ремонта' })).toContainText('Закрыто');
+
   const workOrder = await prisma.serviceWorkOrder.findUniqueOrThrow({ where: { warrantyCaseId: warrantyCase.id } });
-  expect(workOrder).toMatchObject({ diagnosticSummary: 'Износ аккумулятора 71%', estimateAmount: 4500, diagnosticFee: 500, estimateApprovedBy: customer.id });
+  expect(workOrder).toMatchObject({ diagnosticSummary: 'Износ аккумулятора 71%', estimateAmount: 4500, diagnosticFee: 500, estimateApprovedBy: customer.id, completionSummary: 'Аккумулятор заменён, контроль заряда пройден' });
   expect(workOrder.estimateApprovedAt).not.toBeNull();
-  await expect(prisma.warrantyCase.findUniqueOrThrow({ where: { id: warrantyCase.id } })).resolves.toMatchObject({ status: 'approved' });
-  expect(await prisma.auditEvent.count({ where: { type: { startsWith: 'service.' }, refs: { has: workOrder.id } } })).toBe(3);
+  expect(workOrder.repairWarrantyUntil).not.toBeNull();
+  await expect(prisma.warrantyCase.findUniqueOrThrow({ where: { id: warrantyCase.id } })).resolves.toMatchObject({ status: 'closed' });
+  expect(await prisma.auditEvent.count({ where: { type: { startsWith: 'service.' }, refs: { has: workOrder.id } } })).toBe(8);
 });
 
 test('ERP accepts a third-party paid repair and the customer approves its estimate', async ({ page }) => {
