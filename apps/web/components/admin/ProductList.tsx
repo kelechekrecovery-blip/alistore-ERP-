@@ -99,6 +99,11 @@ export function ProductList({
                         {product.variantGroup}
                       </span>
                     )}
+                    {product.bundleComponents.length > 0 && (
+                      <span className="rounded-chip bg-lime/10 px-2 py-0.5 text-[11px] font-semibold text-lime">
+                        набор · {product.bundleComponents.length}
+                      </span>
+                    )}
                     <span className="rounded-chip bg-[#16130F] px-2 py-0.5 text-[11px] font-semibold text-lime">
                       {product.category}
                     </span>

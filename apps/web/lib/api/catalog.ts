@@ -9,6 +9,7 @@ export interface CatalogProduct {
   price: number;
   category: string;
   attrs: Record<string, unknown> | null;
+  bundleComponents?: Array<{ productId: string; sku: string; name: string; qty: number }>;
   availableUnits: number;
   updatedAt?: string;
 }

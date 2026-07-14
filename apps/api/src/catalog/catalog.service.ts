@@ -25,6 +25,19 @@ type ProductWithStockCount = Prisma.ProductGetPayload<{
         };
       };
     };
+    bundleComponents: {
+      include: {
+        componentProduct: {
+          include: {
+            _count: {
+              select: {
+                units: { where: { status: 'in_stock' } };
+              };
+            };
+          };
+        };
+      };
+    };
   };
 }>;
 
@@ -152,7 +165,7 @@ export class CatalogService {
     }));
 
     await index.updateSettings({
-      displayedAttributes: ['id', 'sku', 'barcode', 'variantGroup', 'name', 'price', 'category', 'attrs', 'availableUnits'],
+      displayedAttributes: ['id', 'sku', 'barcode', 'variantGroup', 'name', 'price', 'category', 'attrs', 'bundleComponents', 'availableUnits'],
       searchableAttributes: ['name', 'sku', 'barcode', 'variantGroup', 'category'],
       filterableAttributes: ['category', 'variantGroup', 'archived', 'availableUnits'],
       sortableAttributes: ['price', 'availableUnits', 'name'],
@@ -295,7 +308,17 @@ export class CatalogService {
       price: product.price,
       category: product.category,
       attrs: product.attrs,
-      availableUnits: product._count.units,
+      bundleComponents: product.bundleComponents.map((component) => ({
+        productId: component.componentProductId,
+        sku: component.componentProduct.sku,
+        name: component.componentProduct.name,
+        qty: component.qty,
+      })),
+      availableUnits: product.bundleComponents.length > 0
+        ? Math.min(...product.bundleComponents.map((component) =>
+            Math.floor(component.componentProduct._count.units / component.qty),
+          ))
+        : product._count.units,
       updatedAt: product.updatedAt.toISOString(),
     };
   }
@@ -305,6 +328,20 @@ export class CatalogService {
       _count: {
         select: {
           units: { where: { status: 'in_stock' as const } },
+        },
+      },
+      bundleComponents: {
+        orderBy: { componentProductId: 'asc' as const },
+        include: {
+          componentProduct: {
+            include: {
+              _count: {
+                select: {
+                  units: { where: { status: 'in_stock' as const } },
+                },
+              },
+            },
+          },
         },
       },
     };

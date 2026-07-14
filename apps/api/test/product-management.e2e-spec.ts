@@ -60,6 +60,8 @@ describe('Product management API', () => {
   });
 
   beforeEach(async () => {
+    await prisma.orderBundleAllocation.deleteMany();
+    await prisma.productBundleComponent.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.inventoryMovement.deleteMany();

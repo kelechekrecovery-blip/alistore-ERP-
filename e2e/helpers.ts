@@ -14,6 +14,8 @@ export const prisma = new PrismaClient({
 export const API_BASE = `http://127.0.0.1:${Number(process.env.E2E_API_PORT ?? 4200)}/api`;
 
 export async function resetDb() {
+  await prisma.orderBundleAllocation.deleteMany();
+  await prisma.productBundleComponent.deleteMany();
   await prisma.staffTask.deleteMany();
   await prisma.deviceProtectionPolicy.deleteMany();
   await prisma.b2BQuote.deleteMany();

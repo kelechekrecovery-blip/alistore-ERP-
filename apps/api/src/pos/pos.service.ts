@@ -163,7 +163,11 @@ export class PosService {
       { customerId: customer.id, channel: 'pos', total, items },
       actor,
     );
-    await this.orders.reserve(order.id, actor);
+    const containsBundle = await this.prisma.product.count({
+      where: { sku: { in: items.map((item) => item.sku) }, bundleComponents: { some: {} } },
+    });
+    if (containsBundle > 0) await this.orders.fulfill(order.id, actor);
+    else await this.orders.reserve(order.id, actor);
     const paid = await this.payments.payMany(
       {
         orderId: order.id,
@@ -238,7 +242,15 @@ export class PosService {
     const productIds = [...new Set(dto.lines.map((line) => line.productId))];
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, sku: true, price: true, cost: true },
+      select: {
+        id: true,
+        sku: true,
+        price: true,
+        cost: true,
+        bundleComponents: {
+          select: { qty: true, componentProduct: { select: { cost: true } } },
+        },
+      },
     });
     const catalog = new Map(products.map((product) => [product.id, product]));
     const missing = productIds.find((id) => !catalog.has(id));
@@ -263,7 +275,16 @@ export class PosService {
         sku: line.sku,
         qty: line.qty,
         price: line.price,
-        cost: catalog.get(line.productId)?.cost ?? 0,
+        cost: (() => {
+          const product = catalog.get(line.productId);
+          if (!product) return 0;
+          return product.bundleComponents.length > 0
+            ? product.bundleComponents.reduce(
+                (sum, component) => sum + component.qty * component.componentProduct.cost,
+                0,
+              )
+            : product.cost;
+        })(),
       })),
       pct,
       APPROVAL_THRESHOLDS.minMarginSom,

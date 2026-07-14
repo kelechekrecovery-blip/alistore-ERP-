@@ -92,15 +92,29 @@ export class OrdersService {
     const skus = [...quantities.keys()];
     const products = await this.prisma.product.findMany({
       where: { sku: { in: skus }, archived: false },
-      include: { units: { where: { status: 'in_stock' }, select: { id: true } } },
+      include: {
+        units: { where: { status: 'in_stock' }, select: { id: true } },
+        bundleComponents: {
+          include: {
+            componentProduct: {
+              include: { units: { where: { status: 'in_stock' }, select: { id: true } } },
+            },
+          },
+        },
+      },
     });
     const bySku = new Map(products.map((product) => [product.sku, product]));
     const items = skus.map((sku) => {
       const product = bySku.get(sku);
       if (!product) throw new ValidationError('product_not_found', `Товар ${sku} не найден`);
       const qty = quantities.get(sku)!;
-      if (product.units.length < qty) {
-        throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: доступно ${product.units.length}`);
+      const available = product.bundleComponents.length > 0
+        ? Math.min(...product.bundleComponents.map((component) =>
+            Math.floor(component.componentProduct.units.length / component.qty),
+          ))
+        : product.units.length;
+      if (available < qty) {
+        throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: доступно ${available}`);
       }
       return { sku, qty, price: product.price };
     });
@@ -404,8 +418,42 @@ export class OrdersService {
           if (unit?.status === 'in_stock') await reserveUnit(item.imei, item.sku);
           continue;
         }
-        const product = await tx.product.findUnique({ where: { sku: item.sku } });
+        const product = await tx.product.findUnique({
+          where: { sku: item.sku },
+          include: { bundleComponents: { include: { componentProduct: true } } },
+        });
         if (!product) continue; // non-serialized line (accessory) — nothing to assign
+
+        if (product.bundleComponents.length > 0) {
+          for (const component of product.bundleComponents) {
+            const required = component.qty * item.qty;
+            const units = await tx.deviceUnit.findMany({
+              where: { productId: component.componentProductId, status: 'in_stock' },
+              take: required,
+              orderBy: { id: 'asc' },
+            });
+            if (units.length < required) {
+              throw new ConflictError(
+                'insufficient_bundle_stock',
+                `Для набора ${item.sku} недостаточно ${component.componentProduct.sku}: нужно ${required}, в наличии ${units.length}`,
+              );
+            }
+            for (const unit of units) {
+              await reserveUnit(unit.imei, component.componentProduct.sku);
+              await tx.orderBundleAllocation.create({
+                data: {
+                  orderId,
+                  orderItemId: item.id,
+                  bundleSku: item.sku,
+                  componentProductId: component.componentProductId,
+                  componentSku: component.componentProduct.sku,
+                  imei: unit.imei,
+                },
+              });
+            }
+          }
+          continue;
+        }
 
         const units = await tx.deviceUnit.findMany({
           where: { productId: product.id, status: 'in_stock' },

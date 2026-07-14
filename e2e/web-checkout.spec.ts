@@ -78,6 +78,40 @@ test('product page switches between independently stocked variants', async ({ pa
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });
 
+test('product page displays bundle composition and component-derived availability', async ({ page }) => {
+  await resetDb();
+  const { product: phone } = await seedProduct('BUNDLE-PHONE');
+  const { product: accessory } = await seedProduct('BUNDLE-CASE');
+  const bundle = await prisma.product.create({
+    data: {
+      sku: `WEB-BUNDLE-${Date.now()}`,
+      name: 'AliStore Starter Bundle',
+      price: 125000,
+      cost: 0,
+      category: 'bundles',
+      attrs: { description: 'Готовый комплект' },
+      bundleComponents: {
+        create: [
+          { componentProductId: phone.id, qty: 1 },
+          { componentProductId: accessory.id, qty: 1 },
+        ],
+      },
+    },
+  });
+
+  await page.goto(`/product/${bundle.id}`);
+  await expect(page.getByRole('heading', { name: bundle.name })).toBeVisible();
+  await expect(page.getByRole('main').getByText('В комплекте')).toBeVisible();
+  await expect(page.getByRole('main').getByText(phone.name)).toBeVisible();
+  await expect(page.getByRole('main').getByText(accessory.name)).toBeVisible();
+  await expect(page.getByText(/В наличии · 1 шт/)).toBeVisible();
+
+  await page.setViewportSize({ width: 402, height: 858 });
+  await page.goto(`/product/${bundle.id}`);
+  await expect(page.locator('.md\\:hidden').getByText('В комплекте')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
+});
+
 test('authenticated checkout redeems server loyalty and canonical promo exactly once', async ({ page }) => {
   await resetDb();
   const { product } = await seedProduct('LOYALTY-E2E');

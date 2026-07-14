@@ -293,25 +293,40 @@ model PushToken {
 }
 
 model Product {
-  id                 String              @id @default(cuid())
-  sku                String              @unique
-  barcode            String?             @unique
+  id                 String                   @id @default(cuid())
+  sku                String                   @unique
+  barcode            String?                  @unique
   variantGroup       String?
   name               String
   price              Int
   cost               Int
   category           String
   attrs              Json
-  archived           Boolean             @default(false) // soft-delete: НЕ удалять физически
-  updatedAt          DateTime            @default(now()) @updatedAt
+  archived           Boolean                  @default(false) // soft-delete: НЕ удалять физически
+  updatedAt          DateTime                 @default(now()) @updatedAt
   units              DeviceUnit[]
   movements          InventoryMovement[]
   purchaseOrderItems PurchaseOrderItem[]
+  bundleComponents   ProductBundleComponent[] @relation("BundleProduct")
+  includedInBundles  ProductBundleComponent[] @relation("BundleComponentProduct")
+  bundleAllocations  OrderBundleAllocation[]
 
   @@index([category])
   @@index([variantGroup])
   @@index([archived])
   @@index([updatedAt])
+}
+
+model ProductBundleComponent {
+  id                 String  @id @default(cuid())
+  bundleProduct      Product @relation("BundleProduct", fields: [bundleProductId], references: [id])
+  bundleProductId    String
+  componentProduct   Product @relation("BundleComponentProduct", fields: [componentProductId], references: [id])
+  componentProductId String
+  qty                Int
+
+  @@unique([bundleProductId, componentProductId])
+  @@index([componentProductId])
 }
 
 model ProductReview {
@@ -350,32 +365,33 @@ model DeviceUnit {
 }
 
 model Order {
-  id              String      @id @default(cuid())
-  idempotencyKey  String?     @unique
-  isDemo          Boolean     @default(false)
-  customer        Customer    @relation(fields: [customerId], references: [id])
-  customerId      String
-  status          OrderStatus @default(draft)
-  channel         String // web | app | mobile | pos | telegram
-  fulfillmentType String      @default("pickup") // pickup | courier | express | store
-  pickupPoint     String?
-  deliveryAddress String?
-  deliverySlot    String?
-  courierId       String?
-  courier         StaffUser?  @relation("OrderCourier", fields: [courierId], references: [id])
-  courierRunId    String?
-  courierRun      CourierRun? @relation(fields: [courierRunId], references: [id])
-  pickupCode      String?
-  subtotal        Int         @default(0)
-  deliveryFee     Int         @default(0)
-  promoCode       String?
-  promoDiscount   Int         @default(0)
-  loyaltyRedeemed Int         @default(0)
-  loyaltyEarned   Int         @default(0)
-  total           Int
-  items           OrderItem[]
-  payments        Payment[]
-  createdAt       DateTime    @default(now())
+  id                String                  @id @default(cuid())
+  idempotencyKey    String?                 @unique
+  isDemo            Boolean                 @default(false)
+  customer          Customer                @relation(fields: [customerId], references: [id])
+  customerId        String
+  status            OrderStatus             @default(draft)
+  channel           String // web | app | mobile | pos | telegram
+  fulfillmentType   String                  @default("pickup") // pickup | courier | express | store
+  pickupPoint       String?
+  deliveryAddress   String?
+  deliverySlot      String?
+  courierId         String?
+  courier           StaffUser?              @relation("OrderCourier", fields: [courierId], references: [id])
+  courierRunId      String?
+  courierRun        CourierRun?             @relation(fields: [courierRunId], references: [id])
+  pickupCode        String?
+  subtotal          Int                     @default(0)
+  deliveryFee       Int                     @default(0)
+  promoCode         String?
+  promoDiscount     Int                     @default(0)
+  loyaltyRedeemed   Int                     @default(0)
+  loyaltyEarned     Int                     @default(0)
+  total             Int
+  items             OrderItem[]
+  bundleAllocations OrderBundleAllocation[]
+  payments          Payment[]
+  createdAt         DateTime                @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
   @@index([customerId])
@@ -385,6 +401,23 @@ model Order {
   @@index([pickupPoint, status])
   @@index([courierId, status])
   @@index([courierRunId])
+}
+
+model OrderBundleAllocation {
+  id                 String   @id @default(cuid())
+  order              Order    @relation(fields: [orderId], references: [id])
+  orderId            String
+  orderItemId        String
+  bundleSku          String
+  componentProduct   Product  @relation(fields: [componentProductId], references: [id])
+  componentProductId String
+  componentSku       String
+  imei               String   @unique
+  createdAt          DateTime @default(now())
+
+  @@index([orderId])
+  @@index([orderItemId])
+  @@index([componentProductId])
 }
 
 model OrderItem {

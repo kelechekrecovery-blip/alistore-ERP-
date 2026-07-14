@@ -61,11 +61,21 @@ export class ProcurementService {
 
     const [supplier, products] = await Promise.all([
       this.prisma.supplier.findUnique({ where: { id: dto.supplierId } }),
-      this.prisma.product.findMany({ where: { id: { in: productIds }, archived: false }, select: { id: true } }),
+      this.prisma.product.findMany({
+        where: { id: { in: productIds }, archived: false },
+        select: { id: true, sku: true, _count: { select: { bundleComponents: true } } },
+      }),
     ]);
     if (!supplier) throw new ValidationError('supplier_not_found', `Поставщик ${dto.supplierId} не найден`);
     if (products.length !== productIds.length) {
       throw new ValidationError('purchase_order_product_not_found', 'Один или несколько товаров не найдены');
+    }
+    const virtualBundle = products.find((product) => product._count.bundleComponents > 0);
+    if (virtualBundle) {
+      throw new ValidationError(
+        'purchase_order_virtual_bundle_forbidden',
+        `Виртуальный набор ${virtualBundle.sku} нельзя оприходовать напрямую; добавьте его компоненты`,
+      );
     }
     const number = purchaseOrderNumber();
     try {

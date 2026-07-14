@@ -131,6 +131,17 @@ export default function MobileProduct({
           </>
         )}
 
+        {Boolean(product.bundleComponents?.length) && (
+          <div className="mt-[18px] rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <div className="mb-2 text-[13px] font-semibold text-white">В комплекте</div>
+            {product.bundleComponents?.map((component) => (
+              <div key={component.productId} className="flex justify-between py-1 text-[12px] text-[#A79C92]">
+                <span>{component.name}</span><span>× {component.qty}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* trust row */}
         <div className="mt-[18px] grid grid-cols-2 gap-2">
           {['🛡 Гарантия 12 мес', '⚡ Доставка 1–2 ч', '🏬 Самовывоз сегодня', '↩️ Возврат 14 дней'].map((t) => (

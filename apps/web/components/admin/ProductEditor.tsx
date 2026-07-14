@@ -158,8 +158,20 @@ export function ProductEditor({
               />
             </div>
             <div className="md:col-span-2">
+              <label htmlFor="product-bundle" className={labelCls}>Состав набора</label>
+              <textarea
+                id="product-bundle"
+                value={form.bundleText}
+                onChange={(event) => onUpdateForm({ bundleText: event.target.value })}
+                rows={4}
+                placeholder={'IPHONE-15-128-BLK × 1\nCASE-IP15-BLK × 1'}
+                className={`${inputCls} resize-y font-mono`}
+              />
+              <p className="mt-1.5 text-xs text-[#6E645C]">Пусто для обычного товара. Вложенные наборы запрещены.</p>
+            </div>
+            <div className="md:col-span-2">
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <label className={`${labelCls} mb-0`}>Attrs JSON</label>
+                <label htmlFor="product-attrs" className={`${labelCls} mb-0`}>Attrs JSON</label>
                 <button
                   type="button"
                   onClick={onAutoDescription}
@@ -170,6 +182,7 @@ export function ProductEditor({
                 </button>
               </div>
               <textarea
+                id="product-attrs"
                 value={form.attrsText}
                 onChange={(event) => onUpdateForm({ attrsText: event.target.value })}
                 rows={12}

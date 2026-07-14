@@ -1,5 +1,8 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsInt,
   IsObject,
@@ -8,6 +11,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -43,6 +47,19 @@ export class ProductListQueryDto {
   @Min(0)
   @Type(() => Number)
   offset = 0;
+}
+
+export class ProductBundleComponentDto {
+  @ApiProperty({ example: 'IPHONE-15-128-BLK' })
+  @IsString()
+  @MaxLength(80)
+  sku!: string;
+
+  @ApiProperty({ minimum: 1, maximum: 100, example: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  qty!: number;
 }
 
 export class CreateProductDto {
@@ -91,6 +108,15 @@ export class CreateProductDto {
   @IsOptional()
   @IsObject()
   attrs?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ type: () => [ProductBundleComponentDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ProductBundleComponentDto)
+  bundleComponents?: ProductBundleComponentDto[];
 }
 
 export class UpdateProductDto {
@@ -132,6 +158,14 @@ export class UpdateProductDto {
   @IsOptional()
   @IsObject()
   attrs?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ type: () => [ProductBundleComponentDto], description: 'Send [] to turn a bundle back into a regular product.' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ProductBundleComponentDto)
+  bundleComponents?: ProductBundleComponentDto[];
 }
 
 export class ChangePriceDto {

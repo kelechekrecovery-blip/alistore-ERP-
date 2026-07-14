@@ -64,6 +64,8 @@ export class CatalogProductDto {
   @ApiProperty({ example: 109900 }) price!: number;
   @ApiProperty({ example: 'phones' }) category!: string;
   @ApiProperty({ type: 'object', additionalProperties: true }) attrs!: Prisma.JsonValue;
+  @ApiProperty({ type: 'array', items: { type: 'object' } })
+  bundleComponents!: Array<{ productId: string; sku: string; name: string; qty: number }>;
   @ApiProperty({ example: 3 }) availableUnits!: number;
   @ApiProperty({ example: '2026-07-08T09:30:00.000Z' }) updatedAt!: string;
 }

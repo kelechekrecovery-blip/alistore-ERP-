@@ -10,6 +10,7 @@ export interface AdminProduct {
   cost: number;
   category: string;
   attrs: Record<string, unknown> | null;
+  bundleComponents: Array<{ productId: string; sku: string; name: string; qty: number }>;
   archived: boolean;
   availableUnits: number;
 }
@@ -30,6 +31,7 @@ export interface ProductFormInput {
   cost: number;
   category: string;
   attrs?: Record<string, unknown>;
+  bundleComponents?: Array<{ sku: string; qty: number }>;
 }
 
 export interface ProductUpdateInput {
@@ -39,6 +41,7 @@ export interface ProductUpdateInput {
   cost?: number;
   category?: string;
   attrs?: Record<string, unknown>;
+  bundleComponents?: Array<{ sku: string; qty: number }>;
 }
 
 export interface ApprovalRequestResult {

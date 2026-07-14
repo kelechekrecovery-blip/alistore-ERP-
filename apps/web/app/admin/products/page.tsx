@@ -16,6 +16,7 @@ import {
   emptyForm,
   formFromProduct,
   parseAttrs,
+  parseBundleComponents,
   parseSom,
   type ProductForm,
 } from '@/lib/admin-product-form';
@@ -120,6 +121,7 @@ export default function AdminProductsPage() {
     if (!session) return;
     await withBusy('save', async () => {
       const attrs = parseAttrs(form.attrsText);
+      const bundleComponents = parseBundleComponents(form.bundleText);
       if (selected) {
         const updated = await updateAdminProduct(
           selected.id,
@@ -130,6 +132,7 @@ export default function AdminProductsPage() {
             cost: parseSom(form.cost, 'Себестоимость'),
             category: form.category.trim(),
             attrs,
+            bundleComponents,
           },
           session.accessToken,
         );
@@ -148,6 +151,7 @@ export default function AdminProductsPage() {
             cost: parseSom(form.cost, 'Себестоимость'),
             category: form.category.trim(),
             attrs,
+            bundleComponents,
           },
           session.accessToken,
         );

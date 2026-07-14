@@ -9,6 +9,7 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 import {
   CreateProductDto,
   CreateProductReviewDto,
+  ProductBundleComponentDto,
   ProductListQueryDto,
   UpdateProductDto,
 } from './products.dto';
@@ -23,6 +24,21 @@ type ProductWithStockCount = Prisma.ProductGetPayload<{
         units: {
           where: {
             status: 'in_stock';
+          };
+        };
+      };
+    };
+    bundleComponents: {
+      include: {
+        componentProduct: {
+          include: {
+            _count: {
+              select: {
+                units: {
+                  where: { status: 'in_stock' };
+                };
+              };
+            };
           };
         };
       };
@@ -107,6 +123,7 @@ export class ProductsService {
     }
 
     return this.audit.transaction(async (tx) => {
+      const bundleComponents = await this.resolveBundleComponents(tx, sku, dto.bundleComponents);
       const product = await tx.product.create({
         data: {
           sku,
@@ -117,6 +134,9 @@ export class ProductsService {
           cost: dto.cost,
           category,
           attrs: (dto.attrs ?? {}) as Prisma.InputJsonValue,
+          ...(bundleComponents.length > 0
+            ? { bundleComponents: { create: bundleComponents } }
+            : {}),
         },
         include: this.stockCountInclude(),
       });
@@ -175,6 +195,28 @@ export class ProductsService {
     if (dto.attrs !== undefined) data.attrs = dto.attrs as Prisma.InputJsonValue;
 
     return this.audit.transaction(async (tx) => {
+      if (dto.bundleComponents !== undefined) {
+        const components = await this.resolveBundleComponents(tx, product.sku, dto.bundleComponents);
+        if (components.length > 0) {
+          const [directStock, componentUse] = await Promise.all([
+            tx.deviceUnit.count({ where: { productId } }),
+            tx.productBundleComponent.count({ where: { componentProductId: productId } }),
+          ]);
+          if (directStock > 0) {
+            throw new ValidationError(
+              'bundle_has_direct_stock',
+              'Товар с собственными складскими единицами нельзя превратить в виртуальный набор',
+            );
+          }
+          if (componentUse > 0) {
+            throw new ValidationError(
+              'bundle_component_in_use',
+              'Компонент существующего набора нельзя превратить во вложенный набор',
+            );
+          }
+        }
+        data.bundleComponents = { deleteMany: {}, create: components };
+      }
       const updated = await tx.product.update({
         where: { id: productId },
         data,
@@ -351,8 +393,14 @@ export class ProductsService {
       cost: product.cost,
       category: product.category,
       attrs: product.attrs,
+      bundleComponents: product.bundleComponents.map((component) => ({
+        productId: component.componentProductId,
+        sku: component.componentProduct.sku,
+        name: component.componentProduct.name,
+        qty: component.qty,
+      })),
       archived: product.archived,
-      availableUnits: product._count.units,
+      availableUnits: this.availableUnits(product),
     };
   }
 
@@ -363,7 +411,63 @@ export class ProductsService {
           units: { where: { status: 'in_stock' as const } },
         },
       },
+      bundleComponents: {
+        orderBy: { componentProductId: 'asc' as const },
+        include: {
+          componentProduct: {
+            include: {
+              _count: {
+                select: {
+                  units: { where: { status: 'in_stock' as const } },
+                },
+              },
+            },
+          },
+        },
+      },
     };
+  }
+
+  private availableUnits(product: ProductWithStockCount): number {
+    if (product.bundleComponents.length === 0) return product._count.units;
+    return Math.min(
+      ...product.bundleComponents.map((component) =>
+        Math.floor(component.componentProduct._count.units / component.qty),
+      ),
+    );
+  }
+
+  private async resolveBundleComponents(
+    tx: Prisma.TransactionClient,
+    bundleSku: string,
+    input: ProductBundleComponentDto[] | undefined,
+  ): Promise<Array<{ componentProductId: string; qty: number }>> {
+    if (!input?.length) return [];
+    const normalized = input.map((component) => ({ sku: component.sku.trim(), qty: component.qty }));
+    if (normalized.some((component) => !component.sku || component.sku === bundleSku)) {
+      throw new ValidationError('bundle_component_invalid', 'Набор не может содержать пустой SKU или самого себя');
+    }
+    if (new Set(normalized.map((component) => component.sku)).size !== normalized.length) {
+      throw new ValidationError('bundle_component_duplicate', 'Компоненты набора не должны повторяться');
+    }
+    const products = await tx.product.findMany({
+      where: { sku: { in: normalized.map((component) => component.sku) }, archived: false },
+      include: { _count: { select: { bundleComponents: true } } },
+    });
+    if (products.length !== normalized.length) {
+      const found = new Set(products.map((component) => component.sku));
+      const missing = normalized.find((component) => !found.has(component.sku))?.sku;
+      throw new ValidationError('bundle_component_not_found', `Компонент ${missing} не найден`);
+    }
+    const nested = products.find((component) => component._count.bundleComponents > 0);
+    if (nested) {
+      throw new ValidationError('nested_bundle_forbidden', `Набор ${nested.sku} нельзя вложить в другой набор`);
+    }
+    const bySku = new Map(products.map((component) => [component.sku, component]));
+    return normalized.map((component) => ({
+      componentProductId: bySku.get(component.sku)!.id,
+      qty: component.qty,
+    }));
   }
 
   private optionalValue(value: string | undefined): string | null {

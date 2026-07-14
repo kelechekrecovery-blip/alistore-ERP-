@@ -54,6 +54,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     await prisma.supplierRma.deleteMany();
     await prisma.supplier.deleteMany();
     await prisma.inventoryMovement.deleteMany();
+    await prisma.productBundleComponent.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
   }
@@ -278,5 +279,34 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .set('Authorization', `Bearer ${warehouseToken}`)
       .send({ idempotencyKey: `receipt-${RUN}-empty-line`, lines: [{ itemId: created.body.items[0].id, imeis: ['   '] }] })
       .expect(422);
+  });
+
+  it('rejects direct procurement of a virtual bundle', async () => {
+    const { supplier, product: component } = await fixture();
+    const bundle = await prisma.product.create({
+      data: {
+        sku: `PO-BUNDLE-${RUN}-${Math.random()}`,
+        name: 'Virtual kit',
+        price: 90000,
+        cost: 0,
+        category: 'bundles',
+        attrs: {},
+        bundleComponents: { create: { componentProductId: component.id, qty: 1 } },
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        idempotencyKey: `create-${RUN}-virtual-bundle`,
+        supplierId: supplier.id,
+        location: 'BISHKEK-1',
+        items: [{ productId: bundle.id, qty: 1, unitCost: 70000 }],
+      })
+      .expect(422);
+
+    expect(response.body.code).toBe('purchase_order_virtual_bundle_forbidden');
+    expect(await prisma.purchaseOrder.count()).toBe(0);
   });
 });

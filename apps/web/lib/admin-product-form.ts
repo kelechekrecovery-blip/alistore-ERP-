@@ -5,6 +5,7 @@ export interface ProductForm {
   sku: string;
   barcode: string;
   variantGroup: string;
+  bundleText: string;
   name: string;
   price: string;
   cost: string;
@@ -16,6 +17,7 @@ export const emptyForm: ProductForm = {
   sku: '',
   barcode: '',
   variantGroup: '',
+  bundleText: '',
   name: '',
   price: '',
   cost: '',
@@ -38,6 +40,7 @@ export function formFromProduct(product: AdminProduct): ProductForm {
     sku: product.sku,
     barcode: product.barcode ?? '',
     variantGroup: product.variantGroup ?? '',
+    bundleText: product.bundleComponents.map((component) => `${component.sku} × ${component.qty}`).join('\n'),
     name: product.name,
     price: String(product.price),
     cost: String(product.cost),
@@ -62,6 +65,17 @@ export function parseSom(value: string, label: string): number {
     throw new Error(`${label}: укажите целое число >= 0`);
   }
   return parsed;
+}
+
+export function parseBundleComponents(text: string): Array<{ sku: string; qty: number }> {
+  if (!text.trim()) return [];
+  return text.split('\n').filter((line) => line.trim()).map((line) => {
+    const match = line.trim().match(/^(.+?)\s*(?:×|x|:)\s*(\d+)$/i);
+    if (!match) throw new Error(`Состав набора: используйте формат SKU × 1 (${line.trim()})`);
+    const qty = Number(match[2]);
+    if (!Number.isInteger(qty) || qty < 1) throw new Error('Количество компонента должно быть >= 1');
+    return { sku: match[1].trim(), qty };
+  });
 }
 
 export function productMargin(product: AdminProduct): number {

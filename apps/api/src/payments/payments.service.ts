@@ -231,15 +231,20 @@ export class PaymentsService {
         return { result: { order, payment: payments[0], payments, idempotent: false }, events };
       }
 
-      // Convert every reserved IMEI unit to sold (double-sale guard lives here too).
-      for (const item of order.items) {
-        if (!item.imei) continue;
-        await this.units.sellOnTx(tx, item.imei, order.id);
+      // Convert every active reservation to sold. This includes the concrete component
+      // units allocated behind a bundle line while the customer-facing order stays compact.
+      const reservedUnits = await tx.reservation.findMany({
+        where: { orderId: order.id, active: true, imei: { not: null } },
+        select: { imei: true },
+      });
+      for (const reservation of reservedUnits) {
+        if (!reservation.imei) continue;
+        await this.units.sellOnTx(tx, reservation.imei, order.id);
         events.push({
           type: EventType.UnitSold,
           actor,
-          payload: { orderId: order.id, imei: item.imei },
-          refs: [order.id, item.imei],
+          payload: { orderId: order.id, imei: reservation.imei },
+          refs: [order.id, reservation.imei],
         });
       }
 

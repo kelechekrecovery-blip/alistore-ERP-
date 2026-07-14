@@ -4,6 +4,12 @@ import { prisma, resetDb, seedStaffCredentials } from './helpers';
 test('admin manages products with AI enrichment and approval-gated danger actions', async ({ page }) => {
   await resetDb();
   const { username, password } = await seedStaffCredentials('owner', 'e2e-products');
+  const bundlePhone = await prisma.product.create({
+    data: { sku: `UI-COMP-PHONE-${Date.now()}`, name: 'Bundle phone', price: 90000, cost: 70000, category: 'phones', attrs: {} },
+  });
+  const bundleCase = await prisma.product.create({
+    data: { sku: `UI-COMP-CASE-${Date.now()}`, name: 'Bundle case', price: 3000, cost: 1000, category: 'accessories', attrs: {} },
+  });
 
   const sku = `UI-PRODUCT-${Date.now().toString(36)}`.toUpperCase();
   await page.goto('/admin/products', { waitUntil: 'networkidle' });
@@ -12,18 +18,19 @@ test('admin manages products with AI enrichment and approval-gated danger action
   await page.getByRole('button', { name: 'Войти' }).click();
 
   await expect(page.getByText('Админ · Товары')).toBeVisible();
-  await page.getByPlaceholder('IPHONE-15-128-BLK').fill(sku);
+  await page.locator('input[placeholder="IPHONE-15-128-BLK"]').fill(sku);
   await page.getByLabel('Штрихкод варианта').fill(`194253${Date.now()}`);
   await page.getByLabel('Семья вариантов').fill('iphone-15-ui');
+  await page.getByLabel('Состав набора').fill(`${bundlePhone.sku} × 1\n${bundleCase.sku} × 2`);
   await page.getByPlaceholder('iPhone 15 128GB Black').fill('iPhone 15 128GB UI');
   await page.getByPlaceholder('109900').fill('120000');
   await page.getByPlaceholder('92000').fill('90000');
-  await page.locator('textarea').fill('{"storage":"128GB","color":"black"}');
+  await page.getByLabel('Attrs JSON').fill('{"storage":"128GB","color":"black"}');
 
   await page.getByRole('button', { name: 'Авто-категория' }).click();
   await expect(page.getByPlaceholder('phones')).toHaveValue('Смартфоны');
   await page.getByRole('button', { name: 'Сгенерировать описание' }).click();
-  await expect(page.locator('textarea')).toHaveValue(/"description"/);
+  await expect(page.getByLabel('Attrs JSON')).toHaveValue(/"description"/);
 
   await page.getByRole('button', { name: 'Создать товар' }).click();
   await expect(page.getByText(`Создан товар: ${sku}`)).toBeVisible();
@@ -36,6 +43,7 @@ test('admin manages products with AI enrichment and approval-gated danger action
     category: 'Смартфоны',
     variantGroup: 'iphone-15-ui',
   });
+  expect(await prisma.productBundleComponent.findMany({ where: { bundleProductId: created.id } })).toHaveLength(2);
   expect(created.attrs).toEqual(
     expect.objectContaining({
       storage: '128GB',
