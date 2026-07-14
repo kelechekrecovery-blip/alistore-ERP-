@@ -1,0 +1,334 @@
+import AliStoreCore
+@preconcurrency import AVFoundation
+import SwiftData
+import SwiftUI
+import UIKit
+
+struct POSSaleView: View {
+    let session: StaffSession
+    let openShift: () -> Void
+    @Environment(\.modelContext) private var modelContext
+    @State private var products: [Product] = []
+    @State private var shift: CashShift?
+    @State private var cart: [String: Int] = [:]
+    @State private var selectedIMEI: [String: String] = [:]
+    @State private var scannerCode = ""
+    @State private var showScanner = false
+    @State private var discount = "0"
+    @State private var paymentMethod = "cash"
+    @State private var splitCash = ""
+    @State private var activeSaleId = UUID().uuidString
+    @State private var approvalId: String?
+    @State private var receipt: POSReceipt?
+    @State private var isBusy = false
+    @State private var message: String?
+    @State private var errorMessage: String?
+    private let api = APIClient(baseURL: AppEnvironment.live().apiBaseURL)
+
+    private var discountPct: Int { min(100, max(0, Int(discount) ?? 0)) }
+    private var gross: Int {
+        products.reduce(0) { $0 + ($1.price * (cart[$1.id] ?? 0)) }
+    }
+    private var total: Int { max(0, gross - gross * discountPct / 100) }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    header
+                    scanner
+                    if let errorMessage { POSNotice(text: errorMessage, isError: true) }
+                    if products.isEmpty && errorMessage == nil { ProgressView("Загружаем каталог…") }
+                    productGrid
+                    receiptPanel
+                }
+                .padding(16)
+            }
+            .background(POSPalette.ink.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .task { await refresh() }
+            .refreshable { await refresh() }
+            .sheet(isPresented: $showScanner) {
+                POSBarcodeScanner { value in
+                    showScanner = false
+                    Task { await applyScanner(value) }
+                }
+                .ignoresSafeArea()
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("POS · Касса").font(.headline.weight(.bold))
+                Text(shift.map { "Смена открыта · \(session.username) · \($0.point)" } ?? "Смена не открыта")
+                    .font(.caption).foregroundStyle(POSPalette.muted)
+            }
+            Spacer()
+            Circle().fill(shift == nil ? POSPalette.coral : POSPalette.lime).frame(width: 10, height: 10)
+        }
+    }
+
+    private var scanner: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Image(systemName: "barcode.viewfinder").foregroundStyle(POSPalette.lime)
+                TextField("SKU или IMEI", text: $scannerCode)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .onSubmit { Task { await applyScanner(scannerCode) } }
+                Button { showScanner = true } label: { Image(systemName: "camera.fill") }
+                    .buttonStyle(.borderedProminent).tint(POSPalette.coral)
+                    .accessibilityLabel("Сканировать камерой")
+            }
+            if let message { Text(message).font(.caption).foregroundStyle(POSPalette.lime).frame(maxWidth: .infinity, alignment: .leading) }
+        }
+        .posSurface()
+    }
+
+    private var productGrid: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 10)], spacing: 10) {
+            ForEach(products) { product in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(product.name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                    Text(product.sku).font(.caption2).foregroundStyle(POSPalette.muted)
+                    HStack {
+                        Text("\(product.price) сом").font(.caption.weight(.bold))
+                        Spacer()
+                        Text("\(product.availableUnits) шт.").font(.caption2).foregroundStyle(POSPalette.muted)
+                    }
+                    if let imei = selectedIMEI[product.id] {
+                        Text("IMEI …\(imei.suffix(6))").font(.caption2).foregroundStyle(POSPalette.lime)
+                    }
+                    HStack {
+                        Button { change(product, by: -1) } label: { Image(systemName: "minus") }
+                            .disabled((cart[product.id] ?? 0) == 0)
+                        Text("\(cart[product.id] ?? 0)").frame(minWidth: 24)
+                        Button { change(product, by: 1) } label: { Image(systemName: "plus") }
+                            .disabled((cart[product.id] ?? 0) >= product.availableUnits)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .posSurface()
+            }
+        }
+    }
+
+    private var receiptPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Чек").font(.headline.weight(.bold))
+                Spacer()
+                Text("\(cart.values.reduce(0, +)) поз.").font(.caption).foregroundStyle(POSPalette.muted)
+            }
+            if cart.isEmpty {
+                Text("Добавьте товар или отсканируйте IMEI").font(.caption).foregroundStyle(POSPalette.muted)
+            } else {
+                ForEach(products.filter { (cart[$0.id] ?? 0) > 0 }) { product in
+                    HStack {
+                        Text("\(product.name) × \(cart[product.id] ?? 0)").font(.caption).lineLimit(1)
+                        Spacer()
+                        Text("\(product.price * (cart[product.id] ?? 0))")
+                    }
+                }
+            }
+            TextField("Скидка, %", text: $discount).keyboardType(.numberPad)
+                .textFieldStyle(.roundedBorder)
+            Picker("Оплата", selection: $paymentMethod) {
+                Text("Наличные").tag("cash")
+                Text("Карта").tag("card")
+                Text("MBank").tag("qr_mbank")
+                Text("О!Деньги").tag("qr_odengi")
+            }
+            .pickerStyle(.segmented)
+            TextField("Наличные в split (необязательно)", text: $splitCash)
+                .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
+            if let approvalId {
+                Text("Approval #\(approvalId.suffix(8)). После одобрения повторите оплату.")
+                    .font(.caption).foregroundStyle(POSPalette.coral)
+            }
+            HStack {
+                Text("Итого").font(.headline)
+                Spacer()
+                Text("\(total) сом").font(.title3.weight(.black)).foregroundStyle(POSPalette.lime)
+            }
+            if shift == nil {
+                Button("Открыть смену", systemImage: "clock.badge.checkmark", action: openShift)
+                    .buttonStyle(.bordered).frame(maxWidth: .infinity)
+            }
+            Button {
+                Task { await submit() }
+            } label: {
+                if isBusy { ProgressView().frame(maxWidth: .infinity) }
+                else { Label("Оплатить \(total) сом", systemImage: "creditcard.fill").frame(maxWidth: .infinity) }
+            }
+            .buttonStyle(.borderedProminent).tint(POSPalette.lime).foregroundStyle(POSPalette.ink)
+            .disabled(isBusy || shift == nil || cart.isEmpty || total <= 0)
+            if let receipt {
+                Divider()
+                Text("Чек с сервера").font(.subheadline.weight(.bold))
+                Text(receipt.markup).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                Button("Печать", systemImage: "printer.fill") { POSReceiptPrinter.print(receipt.markup) }
+                    .buttonStyle(.bordered)
+                Text("ESC/POS сформирован; устройство требует отдельной сертификации")
+                    .font(.caption2).foregroundStyle(POSPalette.muted)
+            }
+        }
+        .posSurface()
+    }
+
+    @MainActor private func refresh() async {
+        errorMessage = nil
+        do {
+            async let catalog: CatalogResponse = api.get("catalog/products")
+            async let currentShift: CashShift? = api.get("shifts/current", token: session.accessToken)
+            products = try await catalog.items
+            shift = try await currentShift
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func applyScanner(_ raw: String) async {
+        let code = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return }
+        if let product = products.first(where: { $0.sku.caseInsensitiveCompare(code) == .orderedSame }) {
+            change(product, by: 1)
+            message = "\(product.name) добавлен"
+            scannerCode = ""
+            return
+        }
+        do {
+            let encoded = code.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? code
+            let unit: POSUnit = try await api.get("units/\(encoded)", token: session.accessToken)
+            guard unit.status == "in_stock" else { throw POSLocalError.message("IMEI недоступен: \(unit.status)") }
+            guard let product = products.first(where: { $0.id == unit.productId }) else { throw POSLocalError.message("Товар IMEI отсутствует в каталоге") }
+            cart[product.id] = 1
+            selectedIMEI[product.id] = unit.imei
+            scannerCode = ""
+            message = "IMEI …\(unit.imei.suffix(6)) привязан"
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func submit() async {
+        guard let shift else { return }
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        let cash = min(total, max(0, Int(splitCash) ?? 0))
+        let payments: [POSTender]
+        if cash > 0 && cash < total {
+            payments = [POSTender(method: "cash", amount: cash), POSTender(method: paymentMethod == "cash" ? "card" : paymentMethod, amount: total - cash)]
+        } else {
+            payments = [POSTender(method: paymentMethod, amount: total)]
+        }
+        let request = POSSaleRequest(
+            point: shift.point,
+            lines: products.compactMap { product in
+                guard let qty = cart[product.id], qty > 0 else { return nil }
+                return POSLine(productId: product.id, sku: product.sku, price: product.price, qty: qty, imei: selectedIMEI[product.id])
+            },
+            payments: payments,
+            discountPct: discountPct,
+            clientSaleId: activeSaleId,
+            approvalId: approvalId
+        )
+        do {
+            let result: POSSaleResult = try await api.post(
+                "pos/sale", body: request, token: session.accessToken, idempotencyKey: activeSaleId
+            )
+            await consume(result)
+        } catch let error as APIError {
+            errorMessage = error.localizedDescription
+        } catch {
+            do {
+                try OfflinePOSQueue.enqueue(request, context: modelContext)
+                message = "Продажа сохранена офлайн"
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    @MainActor private func consume(_ result: POSSaleResult) async {
+        switch result {
+        case let .approvalRequired(id, reason):
+            approvalId = id
+            message = "Требуется одобрение: \(reason)"
+        case let .completed(orderId, receiptNo, paidTotal, _, _, _):
+            message = "\(receiptNo) · оплачено \(paidTotal) сом · Event Ledger"
+            receipt = try? await api.get("receipts/order/\(orderId)", token: session.accessToken)
+            cart = [:]
+            selectedIMEI = [:]
+            approvalId = nil
+            activeSaleId = UUID().uuidString
+            splitCash = ""
+            await refresh()
+        }
+    }
+
+    private func change(_ product: Product, by delta: Int) {
+        let next = min(product.availableUnits, max(0, (cart[product.id] ?? 0) + delta))
+        cart[product.id] = next
+        if next == 0 { selectedIMEI[product.id] = nil }
+    }
+}
+
+private enum POSLocalError: LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case let .message(value) = self { return value }; return nil }
+}
+
+struct POSNotice: View {
+    let text: String
+    let isError: Bool
+    var body: some View {
+        Label(text, systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+            .font(.caption).foregroundStyle(isError ? POSPalette.coral : POSPalette.lime).posSurface()
+    }
+}
+
+enum POSReceiptPrinter {
+    @MainActor static func print(_ text: String) {
+        let controller = UIPrintInteractionController.shared
+        let formatter = UISimpleTextPrintFormatter(text: text)
+        formatter.perPageContentInsets = UIEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+        controller.printFormatter = formatter
+        controller.present(animated: true)
+    }
+}
+
+struct POSBarcodeScanner: UIViewControllerRepresentable {
+    let onCode: (String) -> Void
+    func makeUIViewController(context: Context) -> POSScannerController {
+        let controller = POSScannerController()
+        controller.onCode = onCode
+        return controller
+    }
+    func updateUIViewController(_ uiViewController: POSScannerController, context: Context) {}
+}
+
+final class POSScannerController: UIViewController, @preconcurrency AVCaptureMetadataOutputObjectsDelegate {
+    var onCode: ((String) -> Void)?
+    private let captureSession = AVCaptureSession()
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        guard let device = AVCaptureDevice.default(for: .video),
+              let input = try? AVCaptureDeviceInput(device: device), captureSession.canAddInput(input) else { return }
+        captureSession.addInput(input)
+        let output = AVCaptureMetadataOutput()
+        guard captureSession.canAddOutput(output) else { return }
+        captureSession.addOutput(output)
+        output.setMetadataObjectsDelegate(self, queue: .main)
+        output.metadataObjectTypes = [.ean8, .ean13, .code128, .qr]
+        let preview = AVCaptureVideoPreviewLayer(session: captureSession)
+        preview.videoGravity = .resizeAspectFill
+        preview.frame = view.bounds
+        view.layer.addSublayer(preview)
+        Task.detached { [captureSession] in captureSession.startRunning() }
+    }
+    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        guard let value = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue else { return }
+        captureSession.stopRunning()
+        onCode?(value)
+    }
+}

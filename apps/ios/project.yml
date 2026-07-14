@@ -117,6 +117,7 @@ targets:
         CFBundleDisplayName: AliStore POS
         UILaunchScreen: {}
         API_BASE_URL: $(API_BASE_URL)
+        NSCameraUsageDescription: Сканирование штрихкодов и IMEI на кассе
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.pos
             CFBundleURLSchemes: [alistore-pos]

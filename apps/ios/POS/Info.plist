@@ -38,6 +38,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Сканирование штрихкодов и IMEI на кассе</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

@@ -441,6 +441,151 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "offline-courier-start-1")
     }
 
+    func testCompletesPOSSaleWithStableClientSaleId() async throws {
+        let session = makeSession(status: 201, body: """
+        {"pendingApproval":false,"orderId":"order-pos-1","receiptNo":"POS-000001","total":95000,"status":"paid","shiftId":"shift-1","imeis":["123456789012345"]}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let request = POSSaleRequest(
+            point: "BISHKEK-1",
+            lines: [POSLine(productId: "product-1", sku: "IP-1", price: 100000, qty: 1, imei: "123456789012345")],
+            payments: [POSTender(method: "cash", amount: 50000), POSTender(method: "card", amount: 45000)],
+            discountPct: 5,
+            clientSaleId: "ios-pos-sale-1"
+        )
+
+        let result: POSSaleResult = try await client.post(
+            "pos/sale", body: request, token: "cashier-token", idempotencyKey: request.clientSaleId
+        )
+
+        guard case let .completed(orderId, receiptNo, total, status, shiftId, imeis) = result else {
+            return XCTFail("Expected completed sale")
+        }
+        XCTAssertEqual(orderId, "order-pos-1")
+        XCTAssertEqual(receiptNo, "POS-000001")
+        XCTAssertEqual(total, 95000)
+        XCTAssertEqual(status, "paid")
+        XCTAssertEqual(shiftId, "shift-1")
+        XCTAssertEqual(imeis, ["123456789012345"])
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer cashier-token")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "ios-pos-sale-1")
+        let body = try JSONEncoder().encode(request)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["clientSaleId"] as? String, "ios-pos-sale-1")
+        XCTAssertEqual((payload["payments"] as? [[String: Any]])?.count, 2)
+    }
+
+    func testDecodesPOSApprovalWithoutChangingSaleIdentity() throws {
+        let data = Data("""
+        {"pendingApproval":true,"approvalId":"approval-1","reason":"margin_and_discount"}
+        """.utf8)
+        let result = try JSONDecoder().decode(POSSaleResult.self, from: data)
+        guard case let .approvalRequired(approvalId, reason) = result else {
+            return XCTFail("Expected approval")
+        }
+        XCTAssertEqual(approvalId, "approval-1")
+        XCTAssertEqual(reason, "margin_and_discount")
+
+        let request = POSSaleRequest(
+            point: "BISHKEK-1",
+            lines: [POSLine(productId: "p1", sku: "SKU-1", price: 100, qty: 1)],
+            payments: [POSTender(method: "cash", amount: 90)],
+            discountPct: 10,
+            clientSaleId: "stable-sale"
+        ).approved(with: approvalId)
+        XCTAssertEqual(request.clientSaleId, "stable-sale")
+        XCTAssertEqual(request.approvalId, "approval-1")
+    }
+
+    @MainActor
+    func testPOSOfflineQueueDeduplicatesAndRetainsApproval() throws {
+        let container = try ModelContainer(
+            for: PendingMutation.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let request = POSSaleRequest(
+            point: "BISHKEK-1",
+            lines: [POSLine(productId: "p1", sku: "SKU-1", price: 100, qty: 1)],
+            payments: [POSTender(method: "cash", amount: 90)],
+            discountPct: 10,
+            clientSaleId: "offline-pos-1"
+        )
+        try OfflinePOSQueue.enqueue(request, context: container.mainContext)
+        try OfflinePOSQueue.enqueue(request, context: container.mainContext)
+        let mutation = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<PendingMutation>()).first)
+        XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<PendingMutation>()).count, 1)
+        mutation.lastError = "approval:approval-1|discount"
+        mutation.state = "conflict"
+        try OfflinePOSQueue.attachApproval(mutation, context: container.mainContext)
+        let approved = try JSONDecoder().decode(POSSaleRequest.self, from: mutation.body)
+        XCTAssertEqual(approved.approvalId, "approval-1")
+        XCTAssertEqual(approved.clientSaleId, "offline-pos-1")
+        XCTAssertEqual(mutation.state, "queued")
+    }
+
+    @MainActor
+    func testReplaysPOSSaleWithOriginalIdempotencyKey() async throws {
+        let container = try ModelContainer(
+            for: PendingMutation.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let request = POSSaleRequest(
+            point: "BISHKEK-1",
+            lines: [POSLine(productId: "p1", sku: "SKU-1", price: 100, qty: 1)],
+            payments: [POSTender(method: "cash", amount: 100)],
+            discountPct: 0,
+            clientSaleId: "offline-pos-replay-1"
+        )
+        try OfflinePOSQueue.enqueue(request, context: container.mainContext)
+        let mutation = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<PendingMutation>()).first)
+        let session = makeSession(status: 201, body: """
+        {"pendingApproval":false,"orderId":"order-1","receiptNo":"POS-000001","total":100,"status":"paid","shiftId":"shift-1","imeis":[]}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        await OfflinePOSQueue.replay(mutation, api: client, token: "cashier-token", context: container.mainContext)
+
+        XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<PendingMutation>()).isEmpty)
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "offline-pos-replay-1")
+    }
+
+    func testPOSRefundAndExchangeUseStaffAuthorization() async throws {
+        var session = makeSession(status: 201, body: "{\"approvalId\":\"approval-refund-1\"}")
+        var client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let approval: POSRefundApproval = try await client.post(
+            "payments/payment-1/refund",
+            body: POSRefundRequest(amount: 5000, reason: "Возврат товара"),
+            token: "cashier-token"
+        )
+        XCTAssertEqual(approval.approvalId, "approval-refund-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer cashier-token")
+
+        session = makeSession(status: 201, body: """
+        {"exchangeOrderId":"exchange-1","returnId":"return-1","surcharge":10000,"oldImei":"111111111111111","newImei":"222222222222222"}
+        """)
+        client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let result: POSExchangeResult = try await client.post(
+            "exchanges",
+            body: POSExchangeRequest(originalOrderId: "order-1", oldImei: "111111111111111", newProductId: "product-2", method: "card"),
+            token: "cashier-token",
+            idempotencyKey: "exchange-key-1"
+        )
+        XCTAssertEqual(result.newImei, "222222222222222")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "exchange-key-1")
+    }
+
+    func testDecodesPOSReturnWithFractionalServerDate() async throws {
+        let session = makeSession(status: 200, body: """
+        [{"id":"return-1","orderId":"order-1","reason":"Не подошёл","status":"requested","createdAt":"2026-07-14T05:30:12.345Z"}]
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let returns: [POSReturn] = try await client.get("returns", token: "cashier-token")
+
+        XCTAssertEqual(returns.first?.status, "requested")
+        XCTAssertNotNil(returns.first?.createdAt)
+    }
+
     private func makeSession(status: Int, body: String) -> URLSession {
         MockURLProtocol.status = status
         MockURLProtocol.body = Data(body.utf8)

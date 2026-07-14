@@ -156,6 +156,97 @@ public enum OfflineCourierQueue {
     }
 }
 
+public enum OfflinePOSQueue {
+    private static let approvalPrefix = "approval:"
+
+    @MainActor
+    public static func enqueue(
+        _ request: POSSaleRequest,
+        context: ModelContext
+    ) throws {
+        let descriptor = FetchDescriptor<PendingMutation>(
+            predicate: #Predicate { $0.idempotencyKey == request.clientSaleId }
+        )
+        if try !context.fetch(descriptor).isEmpty { return }
+        context.insert(PendingMutation(
+            endpoint: "pos/sale",
+            method: "POST",
+            body: try JSONEncoder().encode(request),
+            idempotencyKey: request.clientSaleId
+        ))
+        try context.save()
+    }
+
+    @MainActor
+    public static func replay(
+        _ mutation: PendingMutation,
+        api: APIClient,
+        token: String,
+        context: ModelContext
+    ) async {
+        mutation.state = "syncing"
+        mutation.attempts += 1
+        mutation.updatedAt = Date()
+        try? context.save()
+        do {
+            let result: POSSaleResult = try await api.postEncoded(
+                mutation.endpoint,
+                body: mutation.body,
+                token: token,
+                idempotencyKey: mutation.idempotencyKey
+            )
+            switch result {
+            case .completed:
+                context.delete(mutation)
+            case let .approvalRequired(approvalId, reason):
+                mutation.state = "conflict"
+                mutation.lastError = "\(approvalPrefix)\(approvalId)|\(reason)"
+                mutation.updatedAt = Date()
+            }
+            try context.save()
+        } catch let error as APIError {
+            if case let .rejected(status, message) = error {
+                mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
+                mutation.lastError = message
+            } else {
+                mutation.state = "failed"
+                mutation.lastError = error.localizedDescription
+            }
+            mutation.updatedAt = Date()
+            try? context.save()
+        } catch {
+            mutation.state = "queued"
+            mutation.lastError = error.localizedDescription
+            mutation.updatedAt = Date()
+            try? context.save()
+        }
+    }
+
+    @MainActor
+    public static func retry(_ mutation: PendingMutation, context: ModelContext) throws {
+        mutation.state = "queued"
+        mutation.lastError = nil
+        mutation.updatedAt = Date()
+        try context.save()
+    }
+
+    @MainActor
+    public static func attachApproval(_ mutation: PendingMutation, context: ModelContext) throws {
+        guard let approvalId = approvalId(from: mutation.lastError) else { return }
+        let request = try JSONDecoder().decode(POSSaleRequest.self, from: mutation.body)
+        mutation.body = try JSONEncoder().encode(request.approved(with: approvalId))
+        mutation.state = "queued"
+        mutation.lastError = nil
+        mutation.updatedAt = Date()
+        try context.save()
+    }
+
+    public static func approvalId(from error: String?) -> String? {
+        guard let error, error.hasPrefix(approvalPrefix) else { return nil }
+        return error.dropFirst(approvalPrefix.count).split(separator: "|", maxSplits: 1).first.map(String.init)
+    }
+}
+
 private struct IgnoredMutationResponse: Decodable, Sendable {
     init(from decoder: Decoder) throws {}
 }

@@ -48,7 +48,18 @@ public actor APIClient {
         self.baseURL = baseURL
         self.session = session
         self.decoder = JSONDecoder()
-        self.decoder.dateDecodingStrategy = .iso8601
+        self.decoder.dateDecodingStrategy = .custom { decoder in
+            let rawValue = try decoder.singleValueContainer().decode(String.self)
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = fractional.date(from: rawValue) { return date }
+            let standard = ISO8601DateFormatter()
+            if let date = standard.date(from: rawValue) { return date }
+            throw DecodingError.dataCorruptedError(
+                in: try decoder.singleValueContainer(),
+                debugDescription: "Invalid ISO-8601 date: \(rawValue)"
+            )
+        }
     }
 
     public func get<Response: Decodable & Sendable>(

@@ -509,3 +509,169 @@ public struct CourierHandoverRequest: Encodable, Sendable {
         self.reason = reason
     }
 }
+
+public struct POSLine: Codable, Sendable {
+    public let productId: String
+    public let sku: String
+    public let price: Int
+    public let qty: Int
+    public let imei: String?
+
+    public init(productId: String, sku: String, price: Int, qty: Int, imei: String? = nil) {
+        self.productId = productId
+        self.sku = sku
+        self.price = price
+        self.qty = qty
+        self.imei = imei
+    }
+}
+
+public struct POSTender: Codable, Sendable {
+    public let method: String
+    public let amount: Int
+
+    public init(method: String, amount: Int) {
+        self.method = method
+        self.amount = amount
+    }
+}
+
+public struct POSSaleRequest: Codable, Sendable {
+    public let point: String
+    public let lines: [POSLine]
+    public let payments: [POSTender]
+    public let discountPct: Int
+    public let clientSaleId: String
+    public let approvalId: String?
+    public let reason: String?
+
+    public init(
+        point: String,
+        lines: [POSLine],
+        payments: [POSTender],
+        discountPct: Int,
+        clientSaleId: String,
+        approvalId: String? = nil,
+        reason: String? = nil
+    ) {
+        self.point = point
+        self.lines = lines
+        self.payments = payments
+        self.discountPct = discountPct
+        self.clientSaleId = clientSaleId
+        self.approvalId = approvalId
+        self.reason = reason
+    }
+
+    public func approved(with approvalId: String) -> POSSaleRequest {
+        POSSaleRequest(
+            point: point,
+            lines: lines,
+            payments: payments,
+            discountPct: discountPct,
+            clientSaleId: clientSaleId,
+            approvalId: approvalId,
+            reason: reason
+        )
+    }
+}
+
+public enum POSSaleResult: Decodable, Sendable {
+    case completed(orderId: String, receiptNo: String, total: Int, status: String, shiftId: String, imeis: [String])
+    case approvalRequired(approvalId: String, reason: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case pendingApproval, approvalId, reason, orderId, receiptNo, total, status, shiftId, imeis
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        if try values.decodeIfPresent(Bool.self, forKey: .pendingApproval) == true {
+            self = .approvalRequired(
+                approvalId: try values.decode(String.self, forKey: .approvalId),
+                reason: try values.decodeIfPresent(String.self, forKey: .reason) ?? "discount"
+            )
+            return
+        }
+        self = .completed(
+            orderId: try values.decode(String.self, forKey: .orderId),
+            receiptNo: try values.decode(String.self, forKey: .receiptNo),
+            total: try values.decode(Int.self, forKey: .total),
+            status: try values.decode(String.self, forKey: .status),
+            shiftId: try values.decode(String.self, forKey: .shiftId),
+            imeis: try values.decodeIfPresent([String].self, forKey: .imeis) ?? []
+        )
+    }
+}
+
+public struct POSUnit: Decodable, Sendable {
+    public let imei: String
+    public let productId: String
+    public let status: String
+    public let sku: String
+    public let product: String
+    public let price: Int
+}
+
+public struct POSReceipt: Decodable, Sendable {
+    public let markup: String
+    public let svg: String
+    public let escposBase64: String
+}
+
+public struct POSPayment: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderId: String?
+    public let amount: Int
+    public let method: String
+    public let status: String
+}
+
+public struct POSReturn: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderId: String
+    public let reason: String
+    public let status: String
+    public let createdAt: Date
+}
+
+public struct POSReturnTransitionRequest: Encodable, Sendable {
+    public let status: String
+    public init(status: String) { self.status = status }
+}
+
+public struct POSRefundRequest: Encodable, Sendable {
+    public let amount: Int
+    public let reason: String
+
+    public init(amount: Int, reason: String) {
+        self.amount = amount
+        self.reason = reason
+    }
+}
+
+public struct POSRefundApproval: Decodable, Sendable {
+    public let approvalId: String
+}
+
+public struct POSExchangeRequest: Encodable, Sendable {
+    public let originalOrderId: String
+    public let oldImei: String
+    public let newProductId: String
+    public let method: String
+
+    public init(originalOrderId: String, oldImei: String, newProductId: String, method: String) {
+        self.originalOrderId = originalOrderId
+        self.oldImei = oldImei
+        self.newProductId = newProductId
+        self.method = method
+    }
+}
+
+public struct POSExchangeResult: Decodable, Sendable {
+    public let exchangeOrderId: String
+    public let returnId: String
+    public let surcharge: Int
+    public let oldImei: String
+    public let newImei: String
+}
