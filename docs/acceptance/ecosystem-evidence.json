@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "designRetirements": [],
+  "gates": {
+    "visual": {
+      "status": "partial",
+      "packageScript": null,
+      "command": null,
+      "artifacts": []
+    },
+    "ios-app-ui": {
+      "status": "partial",
+      "packageScript": "ios:ui",
+      "command": null,
+      "artifacts": []
+    },
+    "android-app-ui": {
+      "status": "partial",
+      "packageScript": "android:ui",
+      "command": "npm run android:ui",
+      "artifacts": []
+    },
+    "reconciled-e2e": {
+      "status": "partial",
+      "packageScript": "ecosystem:e2e",
+      "command": null,
+      "artifacts": []
+    }
+  }
+}

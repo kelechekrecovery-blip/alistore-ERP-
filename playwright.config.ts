@@ -6,9 +6,12 @@ const databaseUrl =
   process.env.E2E_DATABASE_URL ??
   process.env.DATABASE_URL ??
   'postgresql://alistore@localhost:5432/alistore_test?schema=public';
+const mediaLocalDir = `/tmp/alistore-e2e-media-${apiPort}`;
 
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -30,9 +33,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `DATABASE_URL="${databaseUrl}" AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
+      command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
       url: `http://127.0.0.1:${apiPort}/api/health/live`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {

@@ -33,7 +33,7 @@ credentials, legal approval or physical hardware.
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
 | Client App 2.0 | Partial | SwiftUI/Compose shells and major customer API flows | screen-by-screen pixel matrix, XCUITest, app-level Compose E2E, biometric login, physical push/device gate |
 | Client services | Partial | support, returns, warranty, protection, trade-in APIs/web/native portions | unified native service journey, repair/loaner status, visual and offline acceptance |
-| Logistics management | MVP implemented | ERP zones/slots/capacity, row-locked checkout reservation, cancellation release, dispatch board, courier assignment, route states, Evidence and COD handover | route optimization, exception rescheduling and live tracking |
+| Logistics management | Partial | ERP zones/slots/capacity, row-locked checkout reservation, cancellation release, dispatch board, courier assignment, route states, Evidence and COD handover | authoritative store/pickup-point model, point-local reservation and genuine guest address; then route optimization, rescheduling and live tracking |
 | Marketing CMS | Partial | campaigns, consent and channel transports | banner/collection/navigation draft-review-schedule-publish workflow and storefront consequence E2E |
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
@@ -49,7 +49,7 @@ credentials, legal approval or physical hardware.
 
 | Role | Required black-box journey | Current status |
 |---|---|---|
-| Anonymous customer | browse/search/product/cart/demo checkout without foreign data access | Web covered; native not applicable |
+| Anonymous customer | browse/search/product/cart/demo checkout without foreign data access | Web substantial; guest courier address and pickup-point authority remain open |
 | Authenticated customer | OTP, checkout/payment return, order tracking, return, warranty, support and logout | API/web substantial; native app-level E2E missing |
 | Seller/cashier | login, shift, scan, split sale, approval, receipt, refund/exchange, offline restart | software vertical exists; native E2E and hardware external |
 | Warehouse | PO receive, serialized/quantity stock, consignment, count, transfer, picking, discrepancy | quantity receive/transfer/adjust-to-sale, serialized/quantity consignment receive-to-payout and refund-bound restock/owner-compensation browser/API flows covered; full role E2E remains |
@@ -72,6 +72,13 @@ credentials, legal approval or physical hardware.
    remain outside local software certification.
 8. The 23 tracked handoffs link to 74 design files, but 64 linked `.dc.html` files are
    absent. See `ECOSYSTEM-TRACEABILITY-MATRIX.md`; absent references cannot be accepted visually.
+
+These gaps are now machine-reported by `npm run ecosystem:audit`. The strict form is a
+completion gate, not a routine component gate. It derives the design corpus from Git and
+validates `docs/acceptance/ecosystem-evidence.json`; an accepted gate needs a real command
+plus committed artifacts whose SHA-256 values match the command and tested source-tree
+hash recorded by a successful result. It currently fails on the missing
+design corpus, visual goldens, iOS XCUITest, packaged Android UI and reconciled ecosystem E2E.
 
 ## Ordered remaining work
 

@@ -12,6 +12,8 @@ describe('Customer 360 (integration)', () => {
   let prisma: PrismaService;
   let customers: CustomersService;
   let seq = 0;
+  const ownedCustomerIds = new Set<string>();
+  const phoneSeed = Math.floor(Math.random() * 10_000).toString().padStart(4, '0');
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -20,29 +22,31 @@ describe('Customer 360 (integration)', () => {
   });
 
   afterAll(async () => {
+    const customerIds = [...ownedCustomerIds];
+    if (customerIds.length > 0) {
+      const orderIds = (
+        await prisma.order.findMany({
+          where: { customerId: { in: customerIds } },
+          select: { id: true },
+        })
+      ).map((order) => order.id);
+      await prisma.supportTicket.deleteMany({ where: { customerId: { in: customerIds } } });
+      await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+      await prisma.debtPlan.deleteMany({ where: { customerId: { in: customerIds } } });
+      await prisma.warrantyCase.deleteMany({ where: { customerId: { in: customerIds } } });
+      await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+      await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+      await prisma.customer.deleteMany({ where: { id: { in: customerIds } } });
+    }
     await prisma.$disconnect();
-  });
-
-  beforeEach(async () => {
-    await prisma.auditEvent.deleteMany();
-    await prisma.supportTicket.deleteMany();
-    await prisma.warrantyCase.deleteMany();
-    await prisma.debtPlan.deleteMany();
-    await prisma.payment.deleteMany();
-    await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
-    await prisma.tradeInDevice.deleteMany();
-    await prisma.inventoryMovement.deleteMany();
-    await prisma.deviceUnit.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.customer.deleteMany();
   });
 
   it('aggregates orders, spend, debts, warranties and tickets', async () => {
     seq += 1;
     const customer = await prisma.customer.create({
-      data: { phone: `+9967007${seq.toString().padStart(4, '0')}`, name: 'C360', consent: true },
+      data: { phone: `+99671${phoneSeed}${seq.toString().padStart(2, '0')}`, name: 'C360', consent: true },
     });
+    ownedCustomerIds.add(customer.id);
     const o1 = await prisma.order.create({ data: { customerId: customer.id, channel: 'pos', total: 40000, status: 'completed' } });
     const o2 = await prisma.order.create({ data: { customerId: customer.id, channel: 'web', total: 15000, status: 'paid' } });
     await prisma.payment.createMany({
@@ -74,7 +78,8 @@ describe('Customer 360 (integration)', () => {
 
   it('returns empty aggregates for a customer with no activity', async () => {
     seq += 1;
-    const customer = await prisma.customer.create({ data: { phone: `+9967008${seq.toString().padStart(4, '0')}`, name: 'Empty' } });
+    const customer = await prisma.customer.create({ data: { phone: `+99672${phoneSeed}${seq.toString().padStart(2, '0')}`, name: 'Empty' } });
+    ownedCustomerIds.add(customer.id);
     const ov = await customers.overview(customer.id);
     expect(ov.orders).toMatchObject({ total: 0, spent: 0 });
     expect(ov.debts.openBalance).toBe(0);

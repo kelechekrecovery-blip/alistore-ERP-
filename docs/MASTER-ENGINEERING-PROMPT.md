@@ -1,5 +1,8 @@
 # AliStore master engineering prompt
 
+> Canonical executable contract: [`../CODEX_PROMPT.md`](../CODEX_PROMPT.md).
+> This document remains as a concise companion; update the root contract first.
+
 Use this prompt for every autonomous engineering session in this repository.
 
 ## Mission

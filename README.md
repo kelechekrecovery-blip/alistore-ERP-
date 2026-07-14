@@ -10,7 +10,9 @@
 ## Стек
 - **Backend** (`apps/api`): NestJS + Prisma + PostgreSQL, REST.
 - **Frontend** (`apps/web`): Next.js 16 (App Router) + React + TS + Tailwind.
-- **Native Mobile** (`apps/mobile`): Expo React Native for iOS/Android, no PWA/WebView.
+- **Native iOS** (`apps/ios`): four final SwiftUI targets with shared `AliStoreCore`.
+- **Native Android** (`apps/android`): four final Kotlin Compose application modules.
+- **Behavioral reference** (`apps/mobile`): legacy Expo workspace; not a release target.
 - **Тесты**: Jest + Playwright E2E; QA-сценарии из handoff = приёмочные тесты.
 
 ## Что уже реализовано (MVP)
@@ -24,8 +26,8 @@
   Postgres fallback; reindex endpoint закрыт maintenance-token по умолчанию.
 - **Customer app / Site 2.0**: каталог, поиск, карточка товара, корзина, checkout,
   избранное, сравнение, аккаунт, бонусы, адреса, уведомления, support, returns, trade-in.
-- **Native iOS/Android app**: отдельный Expo React Native workspace с клиентским каталогом,
-  избранным, корзиной, checkout/payment intent и staff POS поверх текущего API.
+- **Native iOS/Android apps**: SwiftUI и Kotlin Compose клиенты для Client, Staff,
+  Courier и POS поверх единого API. Expo сохранён только как behavioral reference.
 - **Staff ecosystem**: POS, warehouse, approvals, refund/dispute center, exchange, warranty,
   ERP reports, AI tools, admin product management, campaign/notification delivery.
 - **Telegram Mini App shell** и provider-ready Apple/Telegram social login.
@@ -52,7 +54,7 @@ npm run db:seed
 # API (http://localhost:4000/api)
 npm run api
 
-# Native iOS/Android app via Expo Go (не PWA)
+# Legacy Expo behavioral reference (не release-приложение)
 EXPO_PUBLIC_API_BASE=http://127.0.0.1:4000/api npm run mobile
 
 # API contract
@@ -73,13 +75,15 @@ is not configured, catalog search uses Postgres as the source of truth.
 DATABASE_URL="postgresql://alistore@localhost:5432/alistore_test?schema=public" \
   npm exec -w @alistore/api -- prisma db push --skip-generate
 
-npm run api:test
+npm run api:test                # serial integration gate against the shared test DB
 npm run mvp:verify              # полный release gate: schema, builds, Jest, E2E, readiness
 npm run mvp:verify -- --skip-e2e # быстрый gate без Playwright
 npm run launch:preflight        # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness        # отчёт по apps/api/.env.production
 npm run launch:check            # strict preflight + strict external readiness
 npm run launch:readiness:strict # strict gate для внешних production-блокеров
+npm run ecosystem:audit        # readable ecosystem/design acceptance report
+npm run ecosystem:audit:json   # writes machine contract to .artifacts/ecosystem-audit.json
 ```
 
 `npm run mvp:verify` не падает из-за отсутствующих production-ключей/железа: внешний статус
@@ -100,14 +104,18 @@ apps/
       prisma/  common/
     test/              unit/e2e acceptance tests
   web/                 Next.js customer app, POS, ERP, staff/admin screens
-  mobile/              Expo React Native native app: client checkout + staff POS
+  mobile/              Expo behavioral reference only
+  ios/                 four final SwiftUI application targets
+  android/             four final Kotlin Compose application modules
 design_handoff_alistore/   источник правды: спека, прототипы, reference
 ```
 
 ## Дальше по Roadmap
-Софт-MVP закрыт текущим gate. Production-launch дальше упирается в внешние доступы и
-физическую сертификацию: POS printer/terminal/scanner QA, Telegram/WhatsApp/Novu credentials,
-Apple/Telegram social-login callbacks, S3 media storage и observability.
+Текущий component gate зелёный, но полный софт-MVP ещё не принят: остаются единая
+финансовая сверка, reconciled all-role E2E, app-level XCUITest/Android packaged journeys и
+дизайн-доказательства. Production-launch дополнительно требует внешние доступы и физическую
+сертификацию: POS printer/terminal/scanner QA, provider/channel credentials, storage и
+observability.
 См. [`BACKLOG.md`](BACKLOG.md) и [`docs/READINESS.md`](docs/READINESS.md).
 
 Open-source candidates and integration order: [`docs/open-source-integrations.md`](docs/open-source-integrations.md).

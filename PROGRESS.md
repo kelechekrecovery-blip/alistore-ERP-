@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-14 — GOV-001
+
+- Iteration ID: `GOV-001`.
+- Backlog / journey IDs: ecosystem governance; unblocks evidence for `ECO-001` and `ECO-002`.
+- Branch / base commit: `codex/open-source-integrations` / `0cdd7e4`.
+- Changed files: root `CODEX_PROMPT.md`; Git-backed ecosystem audit, acceptance manifest and npm commands; archived handoff warning; master prompt pointer; README/backlog/readiness/completion/traceability documentation; suite-owned Customer 360 cleanup; temporary Playwright media lifecycle.
+- Exact checks: `node --check scripts/ecosystem-contract-audit.mjs` (exit 0); JSON assertions for 23 tracked / 74 linked / 64 missing (exit 0); `npm run ecosystem:audit` (exit 0); pre-commit `npm run ecosystem:audit:strict` (expected exit 1: missing corpus plus four acceptance-evidence gaps and dirty manifest/source); targeted Service Center + loaner + Customer 360 regression 3/3 suites and 11/11 tests; isolated Customer 360 3/3; Service Center Playwright 3/3 with temporary media cleanup; final `npm run ecosystem:verify` (exit 0: 120/120 API suites, 478/478 tests, 35/35 Playwright, four iOS targets, 31/31 XCTest, four Android APKs, JVM tests and Lint); `git diff --check` (exit 0).
+- Durable evidence: `CODEX_PROMPT.md`, `scripts/ecosystem-contract-audit.mjs`, `docs/acceptance/ecosystem-evidence.json`, `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` and machine output reproducible at `.artifacts/ecosystem-audit.json` with `npm run ecosystem:audit:json`.
+- Defects found and disposition: canonical root prompt was absent; archived prompt referenced stale Next/Core Data/Kubernetes choices and wrong root paths; README overstated software-MVP completion; exact visual acceptance lacked durable evidence requirements; native and reconciled E2E prose exceeded executable gates; pickup/store identity is client text, guest checkout can submit a synthetic address and stock can be reserved outside the promised point; `PaymentStatus.reconciled`/`payment.reconciled` exist without an authoritative Finance settlement workflow. The full gate also exposed unsafe global Customer 360 test cleanup and repository-local E2E uploads; cleanup is now suite-owned and uploads use a removed temporary directory. Root precedence and fail-closed checks were added, readiness claims were corrected and `FUL-001`/`FIN-001` were recorded; four software acceptance-evidence gaps and 64 absent handoffs remain explicitly open.
+- Acceptance: `accepted` for the governance/audit vertical after its GOV-001 commit; full ecosystem remains `partial`.
+- Commit association: the commit subject/body contains `GOV-001`.
+- Remaining gaps: `ECO-001`, `ECO-002`, `FUL-001`, `FIN-001`, owner-controlled production/device/provider certification.
+- Next backlog ID: `FUL-001` is the highest-impact software-owned first-store integration vertical; `FIN-001` follows, while `ECO-001` source handoffs can be recovered in parallel.
+
 ## 2026-07-13
 
 - Task: complete Android Courier Evidence and push/deep-link routing against the shared API/ERP contracts.

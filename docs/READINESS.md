@@ -19,7 +19,7 @@
 |---|---|---|
 | **0** Ядро данных | Event Ledger (append-only), order state-machine, IMEI-инвариант, миграции | ✅ |
 | **1** Деньги | Payment поддерживает retail-order и paid ServiceWorkOrder, CashShift, Courier COD и provider-neutral intents; live provider/fiscal reconciliation ещё внешние | 🟡 |
-| **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы | ✅ |
+| **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; checkout ещё требует ERP-owned pickup point и явный гостевой адрес | 🟡 |
 | **3** Аккаунт+Auth | OTP-вход, Apple/Telegram social-auth backend, «Мои заказы», адреса, настройки, уведомления+consent, бонусы | ✅ |
 | **4** POS 2.0 | Тёмный терминал, продажа, service estimate payment, split tender, approval, offline replay, catalog delta-sync и print abstraction; packaged-app E2E и железо не сертифицированы | 🟡 |
 | **5** Склад | Fulfillment, серийный и количественный учёт, атомарный резерв/продажа/POS, движение статусов, **Evidence Vault (фото)** | ✅ |
@@ -30,13 +30,13 @@
 | **10** Уведомления+CRM | Support Inbox, Customer 360, consent, CRM/outbox adapters готовы; live channel delivery требует credentials/certification | 🟡 |
 | **10A** Сервис-центр | Warranty и внешний платный intake, диагностика/смета, клиентское подтверждение, POS split payment/open-shift reconciliation, запчасти, lifecycle, 30-дневная гарантия ремонта и DeviceUnit-backed подменный фонд с Evidence/overdue готовы; exact detail handoff и физический UAT остаются | 🟡 |
 | **11** AI-слой | **AI-ассистент владельца** (`/ai/insights`) + **оценка Б/У** (`/ai/assess`, `/assess`) — бесключевые правила за портом | 🟡 |
-| **12** Каналы и рост | Подарочные карты, Telegram shell, click&collect, B2B/опт и защита устройств — готовы; франшиза/реклама — каркас | 🟡 |
+| **12** Каналы и рост | Подарочные карты, Telegram shell, B2B/опт и защита устройств работают; click&collect требует authoritative point/location, франшиза/реклама — каркас | 🟡 |
 | **13** Инфраструктура | Docker/Render blueprint, health, backup tooling, Sentry ports, realtime и offline software готовы; staging/restore/rollback/soak ещё не сертифицированы | 🟡 |
 
 ## Работает вживую сейчас (прод-режим)
 `/` витрина · `/erp` кокпит (+ AI-ассистент, Маржа/KPI, Command Center, Готовность запуска) · `/pos` касса
 (+ offline) · `/assess` оценка Б/У · `/warehouse` · `/warranty` · `/exchange` · `/staff` ·
-`/support` · `/trade-in` · `/b2b` · `/account/protection` · click&collect checkout с pickup-кодом · API: `/pos/sale` … Owner API `/reports/*` и `/ai/*` работают
+`/support` · `/trade-in` · `/b2b` · `/account/protection` · checkout с текущим строковым pickup-кодом (не принят до `FUL-001`) · API: `/pos/sale` … Owner API `/reports/*` и `/ai/*` работают
 под staff-session token (admin/owner).
 
 ## До запуска первого магазина — внешние доступы ⛔

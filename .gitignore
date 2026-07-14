@@ -32,6 +32,8 @@ apps/api/prisma/*.db
 coverage/
 playwright-report/
 test-results/
+.artifacts/
+apps/api/uploads/
 # editor
 .idea/
 .vscode/

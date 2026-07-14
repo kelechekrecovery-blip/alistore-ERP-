@@ -1,0 +1,310 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const screensDir = path.join(root, 'design_handoff_alistore', 'screens');
+const args = new Set(process.argv.slice(2));
+const strict = args.has('--strict');
+const json = args.has('--json');
+const outputIndex = process.argv.indexOf('--output');
+const outputPath = outputIndex >= 0 ? process.argv[outputIndex + 1] : null;
+
+const normalize = (value) => value.normalize('NFC');
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+const sourceFiles = execFileSync(
+  'git',
+  [
+    'ls-files',
+    '-z',
+    '--',
+    'apps',
+    'e2e',
+    'scripts',
+    'design_handoff_alistore/screens',
+    'package.json',
+    'package-lock.json',
+    'playwright.config.ts',
+  ],
+  { cwd: root, encoding: 'utf8' },
+)
+  .split('\0')
+  .filter(Boolean)
+  .sort();
+const sourceTreeHash = crypto.createHash('sha256');
+for (const file of sourceFiles) {
+  sourceTreeHash.update(file).update('\0').update(fs.readFileSync(path.join(root, file))).update('\0');
+}
+const sourceTreeSha256 = sourceTreeHash.digest('hex');
+const dirtySourceTree = execFileSync(
+  'git',
+  [
+    'status',
+    '--porcelain',
+    '--untracked-files=all',
+    '--',
+    'apps',
+    'e2e',
+    'scripts',
+    'design_handoff_alistore/screens',
+    'package.json',
+    'package-lock.json',
+    'playwright.config.ts',
+  ],
+  { cwd: root, encoding: 'utf8' },
+).trim();
+
+const trackedFiles = execFileSync(
+  'git',
+  ['ls-files', '-z', '--', 'design_handoff_alistore/screens/*.dc.html'],
+  { cwd: root, encoding: 'utf8' },
+)
+  .split('\0')
+  .filter(Boolean)
+  .map((name) => path.basename(name))
+  .map(normalize)
+  .sort((a, b) => a.localeCompare(b, 'ru'));
+const tracked = new Set(trackedFiles);
+const linked = new Set();
+let rawLinkOccurrences = 0;
+let presentLinkOccurrences = 0;
+
+for (const file of trackedFiles) {
+  const source = fs.readFileSync(path.join(screensDir, file), 'utf8');
+  for (const match of source.matchAll(/href=["']([^"']+\.dc\.html)["']/giu)) {
+    const target = normalize(decodeURIComponent(match[1]).replace(/^\.\//, ''));
+    rawLinkOccurrences += 1;
+    linked.add(target);
+    if (tracked.has(target)) presentLinkOccurrences += 1;
+  }
+}
+
+const linkedFiles = [...linked].sort((a, b) => a.localeCompare(b, 'ru'));
+const missingLinkedFiles = linkedFiles.filter((name) => !tracked.has(name));
+const packageJson = JSON.parse(read('package.json'));
+const scripts = packageJson.scripts ?? {};
+const ecosystemVerify = read('scripts/ecosystem-verify.mjs');
+const evidencePath = 'docs/acceptance/ecosystem-evidence.json';
+const evidence = JSON.parse(read(evidencePath));
+const dirtyEvidence = execFileSync(
+  'git',
+  ['status', '--porcelain', '--', 'design_handoff_alistore/screens', evidencePath],
+  { cwd: root, encoding: 'utf8' },
+).trim();
+const masterPrompt = fs.existsSync(path.join(root, 'CODEX_PROMPT.md'))
+  ? read('CODEX_PROMPT.md')
+  : '';
+
+const isNoop = (command = '') => /^(?:true|:|echo(?:\s+.+)?|printf(?:\s+.+)?)$/u.test(command.trim());
+const acceptedGate = (id, commandPattern) => {
+  const gate = evidence.gates?.[id];
+  const packageCommand = scripts[gate?.packageScript] ?? '';
+  const declaredCommand = gate?.packageScript ? `npm run ${gate.packageScript}` : '';
+  if (
+    !gate ||
+    gate.status !== 'accepted' ||
+    gate.command !== declaredCommand ||
+    isNoop(packageCommand) ||
+    !commandPattern.test(packageCommand)
+  ) return false;
+  if (!Array.isArray(gate.artifacts) || gate.artifacts.length === 0) return false;
+  let resultEvidenceFound = false;
+  const artifactsValid = gate.artifacts.every((artifact) => {
+    if (!artifact?.path || !/^[a-f0-9]{64}$/u.test(artifact.sha256 ?? '')) return false;
+    const normalizedPath = path.normalize(artifact.path);
+    if (
+      path.isAbsolute(normalizedPath) ||
+      normalizedPath.startsWith('..') ||
+      !normalizedPath.startsWith(`docs${path.sep}acceptance${path.sep}artifacts${path.sep}`)
+    ) return false;
+    const absolute = path.join(root, normalizedPath);
+    if (!fs.existsSync(absolute)) return false;
+    const artifactStat = fs.lstatSync(absolute);
+    if (artifactStat.isSymbolicLink() || !artifactStat.isFile()) return false;
+    const artifactRoot = fs.realpathSync(path.join(root, 'docs', 'acceptance', 'artifacts'));
+    const artifactRealPath = fs.realpathSync(absolute);
+    if (!artifactRealPath.startsWith(`${artifactRoot}${path.sep}`)) return false;
+    try {
+      execFileSync('git', ['ls-files', '--error-unmatch', '--', normalizedPath], {
+        cwd: root,
+        stdio: 'ignore',
+      });
+    } catch {
+      return false;
+    }
+    const artifactDirty = execFileSync('git', ['status', '--porcelain', '--', normalizedPath], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim();
+    if (artifactDirty) return false;
+    const digest = sha256(fs.readFileSync(absolute));
+    if (digest !== artifact.sha256) return false;
+    if (artifact.kind === 'result') {
+      try {
+        const result = JSON.parse(fs.readFileSync(absolute, 'utf8'));
+        const completedAt = Date.parse(result.completedAt ?? '');
+        resultEvidenceFound =
+          result.command === declaredCommand &&
+          result.exitCode === 0 &&
+          result.packageCommandSha256 === sha256(packageCommand) &&
+          result.sourceTreeSha256 === sourceTreeSha256 &&
+          Number.isFinite(completedAt) &&
+          new Date(completedAt).toISOString() === result.completedAt &&
+          completedAt <= Date.now() + 60_000;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  });
+  return artifactsValid && resultEvidenceFound;
+};
+
+const retirements = evidence.designRetirements ?? [];
+const validRetirements = retirements.every(
+  (item) =>
+    typeof item?.file === 'string' &&
+    typeof item?.ownerApprovalRef === 'string' &&
+    item.ownerApprovalRef.length > 0 &&
+    /^\d{4}-\d{2}-\d{2}T/u.test(item?.approvedAt ?? ''),
+);
+const retired = new Set(retirements.map((item) => normalize(item.file)));
+const unresolvedMissingFiles = missingLinkedFiles.filter((name) => !retired.has(name));
+const androidUi = scripts['android:ui'] ?? '';
+
+const checks = [
+  {
+    id: 'canonical-master-prompt',
+    pass: masterPrompt.length > 0,
+    detail: 'Root CODEX_PROMPT.md exists.',
+  },
+  {
+    id: 'master-prompt-honest-readiness',
+    pass:
+      masterPrompt.includes('Do not claim') &&
+      masterPrompt.includes('XCUITest') &&
+      masterPrompt.includes('reconciled ecosystem E2E'),
+    detail: 'Prompt forbids readiness claims without native and reconciled E2E evidence.',
+  },
+  {
+    id: 'durable-visual-acceptance-contract',
+    pass: acceptedGate('visual', /(?:playwright|screenshot|visual)/u),
+    detail: 'Accepted visual command has committed, hash-verified baseline artifacts.',
+  },
+  {
+    id: 'clean-design-evidence',
+    pass: dirtyEvidence.length === 0,
+    detail: 'Tracked handoffs and the acceptance manifest have no working-tree changes.',
+  },
+  {
+    id: 'clean-source-tree',
+    pass: dirtySourceTree.length === 0,
+    detail: 'Tested source, dependency lockfile and handoffs have no tracked or untracked changes.',
+  },
+  {
+    id: 'approved-design-retirements',
+    pass: validRetirements,
+    detail: 'Every retired handoff records an owner approval reference and timestamp.',
+  },
+  {
+    id: 'web-api-gate',
+    pass: Boolean(scripts['mvp:verify']),
+    detail: 'Web/API MVP verification command exists.',
+  },
+  {
+    id: 'native-build-gates',
+    pass: Boolean(scripts['ios:build'] && scripts['android:build']),
+    detail: 'iOS all-target and Android four-APK build commands exist.',
+  },
+  {
+    id: 'ios-app-ui-gate',
+    pass:
+      /xcodebuild\s+test/u.test(scripts['ios:ui'] ?? '') &&
+      /UITests/u.test(scripts['ios:ui'] ?? '') &&
+      acceptedGate('ios-app-ui', /xcodebuild\s+test/u),
+    detail: 'App-specific XCUITest command and hash-verified result evidence are accepted.',
+  },
+  {
+    id: 'android-app-ui-gate',
+    pass:
+      ['app', 'staff', 'courier', 'pos'].every((module) =>
+        androidUi.includes(`:${module}:connectedDebugAndroidTest`),
+      ) && acceptedGate('android-app-ui', /connectedDebugAndroidTest/u),
+    detail: 'All four packaged Android modules have connected-test evidence.',
+  },
+  {
+    id: 'reconciled-ecosystem-e2e',
+    pass:
+      /(?:playwright|jest|node\s+scripts\/)/u.test(scripts['ecosystem:e2e'] ?? '') &&
+      !isNoop(scripts['ecosystem:e2e']) &&
+      acceptedGate('reconciled-e2e', /(?:playwright|jest|node\s+scripts\/)/u),
+    detail: 'Cross-role reconciliation has an executable command and hash-verified result evidence.',
+  },
+  {
+    id: 'ecosystem-gate-discloses-native-limit',
+    pass: ecosystemVerify.includes('XCUITest') && ecosystemVerify.includes('physical'),
+    detail: 'Composite gate states what remains outside local software verification.',
+  },
+];
+
+const report = {
+  generatedAt: new Date().toISOString(),
+  designCorpus: {
+    tracked: trackedFiles.length,
+    linked: linkedFiles.length,
+    presentLinked: linkedFiles.length - missingLinkedFiles.length,
+    missing: unresolvedMissingFiles.length,
+    rawLinkOccurrences,
+    presentLinkOccurrences,
+    missingLinkOccurrences: rawLinkOccurrences - presentLinkOccurrences,
+    impliedNamespace: new Set([...trackedFiles, ...linkedFiles]).size,
+    missingFiles: unresolvedMissingFiles,
+    retiredFiles: [...retired].sort((a, b) => a.localeCompare(b, 'ru')),
+  },
+  checks,
+  blocking: [
+    ...(unresolvedMissingFiles.length > 0
+      ? [`${unresolvedMissingFiles.length} linked design handoffs are absent or not explicitly retired.`]
+      : []),
+    ...checks.filter((check) => !check.pass).map((check) => `${check.id}: ${check.detail}`),
+  ],
+};
+
+if (json) {
+  const serialized = `${JSON.stringify(report, null, 2)}\n`;
+  if (outputPath) {
+    const absoluteOutput = path.resolve(root, outputPath);
+    fs.mkdirSync(path.dirname(absoluteOutput), { recursive: true });
+    fs.writeFileSync(absoluteOutput, serialized);
+  } else {
+    process.stdout.write(serialized);
+  }
+} else {
+  console.log('AliStore ecosystem contract audit');
+  console.log(
+    `Design corpus: ${report.designCorpus.tracked} tracked, ${report.designCorpus.linked} linked, ` +
+      `${report.designCorpus.presentLinked} present, ${report.designCorpus.missing} missing.`,
+  );
+  console.log(
+    `Link graph: ${report.designCorpus.rawLinkOccurrences} occurrences, ` +
+      `${report.designCorpus.missingLinkOccurrences} broken, ${report.designCorpus.impliedNamespace} implied designs.`,
+  );
+  for (const check of checks) {
+    console.log(`${check.pass ? 'PASS' : 'GAP '} ${check.id} - ${check.detail}`);
+  }
+  if (unresolvedMissingFiles.length > 0) {
+    console.log('\nMissing linked handoffs:');
+    for (const file of unresolvedMissingFiles) console.log(`- ${file}`);
+  }
+}
+
+if (strict && report.blocking.length > 0) {
+  console.error(`\nStrict ecosystem contract failed with ${report.blocking.length} blocker(s).`);
+  process.exit(1);
+}

@@ -7,6 +7,12 @@ RBAC/ownership, Event Ledger, role E2E and approved visual evidence are all pres
 The committed design corpus is incomplete: the 23 tracked handoffs link to 74 distinct
 `.dc.html` files, but 64 linked files are absent from `design_handoff_alistore/screens`.
 Missing design files are missing acceptance evidence, even when related software exists.
+The graph contains 104 link occurrences, 70 of them broken, and implies 87 distinct designs
+when committed handoffs and referenced targets are combined. No missing original was found
+elsewhere on this machine or in Git history during the independent audit.
+Run `npm run ecosystem:audit` to recalculate these facts from the committed corpus and
+`npm run ecosystem:audit:strict` as the fail-closed completion gate. The strict gate is
+expected to remain red until missing handoffs and packaged native/ecosystem E2E commands exist.
 
 | Handoff | Routes / apps | API, model and control evidence | Automated evidence | Status and remaining acceptance |
 |---|---|---|---|---|
@@ -22,7 +28,7 @@ Missing design files are missing acceptance evidence, even when related software
 | Procurement | `/erp` | PO lifecycle, partial serialized receive, concurrency and Ledger | API + browser | MVP accepted; missort/completeness, supplier calendar, quantity receive remain |
 | Client App 2.0 | Client iOS/Android | customer auth/catalog/cart/checkout/account service contracts | XCTest/Compose contracts | Partial: app-level XCUITest/Compose journeys, pixel matrix and physical push |
 | Client services | account/support/trade-in/warranty, native clients | owner-scoped support, returns, warranty, devices, protection, trade-in | API/browser/native subsets | Partial: unified native journey, loaner/repair completion and visual/offline proof |
-| Logistics management | `/erp`, checkout, Courier apps | zones, slots, capacity, dispatch, assignment, Evidence and COD | API/browser/native contracts | MVP accepted; optimization, reschedule and live tracking remain |
+| Logistics management | `/erp`, checkout, Courier apps | zones, slots, capacity, dispatch, assignment, Evidence and COD | API/browser/native contracts | Partial: pickup/store point is still client text, guest address defaults are synthetic and reservation is not strictly point-local; optimization/reschedule/live tracking follow |
 | Marketing CMS | `/erp`, storefront | campaign, consent and channel transport primitives | API subsets | Partial: banner/collection/navigation draft-review-schedule-publish consequence |
 | Project overview | documentation | audit, backlog, progress and this matrix | fact checks in release loop | Reference: 64 linked design files must be restored or explicitly retired |
 | Store operations | `/erp` primitives | cash shift and Evidence only | component suites | Missing: opening/closing checklists, incidents, safety and escalation |
@@ -40,4 +46,6 @@ The release suite must cover anonymous customer, authenticated customer, seller/
 warehouse, courier, support/service, manager/owner and security auditor as distinct
 black-box identities. Shared-core tests do not count as packaged-app acceptance. iOS
 requires application XCUITest targets; Android requires connected tests in each app
-module. Visual acceptance requires committed desktop/mobile/native golden artifacts.
+module. Visual acceptance requires committed, SHA-256-verified desktop/mobile/native
+golden artifacts recorded in `docs/acceptance/ecosystem-evidence.json`. Linked handoffs
+may be retired only with an owner approval reference and timestamp in that manifest.
