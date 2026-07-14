@@ -92,3 +92,45 @@ test('owner reconciles and transfers an open cash shift to another active employ
   expect(await prisma.cashShiftHandover.count({ where: { fromShiftId: source.id, toShiftId: target.id } })).toBe(1);
   expect(await prisma.auditEvent.count({ where: { type: 'cash.handover', refs: { has: source.id } } })).toBe(1);
 });
+
+test('owner previews, posts and pays a period payroll from attendance and sales', async ({ page }) => {
+  await resetDb();
+  const owner = await seedStaffCredentials('owner', 'e2e-payroll-owner');
+  const seller = await seedStaffCredentials('seller', 'e2e-payroll-seller');
+  const now = new Date();
+  const period = now.toISOString().slice(0, 7);
+  const shiftDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));
+  const startsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15, 3));
+  const endsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15, 15));
+  const schedule = await prisma.hrSchedule.create({ data: {
+    staffId: seller.staffId, point: 'BISHKEK-1', shiftDate, startsAt, endsAt,
+    createdBy: owner.staffId, idempotencyKey: `e2e-payroll-plan-${Date.now()}`,
+  } });
+  await prisma.hrAttendance.create({ data: {
+    scheduleId: schedule.id, staffId: seller.staffId, point: 'BISHKEK-1',
+    checkedInAt: new Date(startsAt.getTime() + 12 * 60_000), checkedOutAt: new Date(endsAt.getTime() + 25 * 60_000),
+    checkInKey: `e2e-payroll-in-${Date.now()}`, checkOutKey: `e2e-payroll-out-${Date.now()}`,
+  } });
+  const shift = await prisma.cashShift.create({ data: { staffId: seller.staffId, point: 'BISHKEK-1', openCash: 0, openedAt: startsAt } });
+  await prisma.payment.create({ data: { shiftId: shift.id, amount: 100_000, method: 'cash', status: 'received', createdAt: new Date(startsAt.getTime() + 60_000) } });
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(owner.username);
+  await page.getByPlaceholder('password').fill(owner.password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /HR · Смены/ }).click();
+  await page.getByRole('tab', { name: 'Начисления' }).click();
+  await page.getByLabel('Период начисления').fill(period);
+  await expect(page.getByTestId(`payroll-${seller.staffId}`)).toContainText('100 000 с');
+  await expect(page.getByTestId(`payroll-${seller.staffId}`)).toContainText('16 551 с');
+  await page.getByRole('button', { name: 'Провести начисление' }).click();
+  await expect(page.locator('section').filter({ hasText: 'Проведено' })).toContainText('16 551 с');
+  await page.getByLabel('Номер платёжного документа').fill('BANK-E2E-001');
+  await page.getByRole('button', { name: 'Отметить выплату' }).click();
+  await expect(page.locator('section').filter({ hasText: 'Выплачено' })).toContainText('16 551 с');
+
+  const run = await prisma.hrPayrollRun.findUniqueOrThrow({ where: { period_point: { period, point: 'BISHKEK-1' } }, include: { lines: true } });
+  expect(run).toMatchObject({ status: 'paid', totalPayout: 16_551, externalRef: 'BANK-E2E-001' });
+  expect(run.lines[0]).toMatchObject({ staffId: seller.staffId, lateMinutes: 12, overtimeMinutes: 25, revenue: 100_000 });
+  expect(await prisma.auditEvent.count({ where: { type: { in: ['hr.payroll_posted', 'hr.payroll_paid'] }, refs: { has: run.id } } })).toBe(2);
+});

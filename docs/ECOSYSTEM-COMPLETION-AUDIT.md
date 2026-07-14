@@ -1,16 +1,16 @@
 # AliStore ecosystem completion audit
 
-Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, baseline
-`ac0805c` plus the logistics capacity/dispatch iteration. This is a completion audit, not a marketing status page. `Implemented`
+Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, including
+the verified HR payroll iteration. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 49 NestJS modules including the application root, 37 generated Next routes and 51 Prisma migrations.
+- 49 NestJS modules including the application root, 37 generated Next routes and 52 Prisma migrations.
 - `mvp:verify`: API/Web production builds, mobile reference typecheck, 118/118 Jest
-  suites with 468/468 tests and 31/31 Playwright flows.
+  suites with 469/469 tests and 32/32 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 29 contracts.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run ecosystem:verify:ui` passed end to end on 2026-07-14, including 24/24
@@ -23,7 +23,7 @@ credentials, legal approval or physical hardware.
 |---|---|---|---|
 | API Data Contracts | Partial | typed Nest DTO/controllers, Swagger, API integration suites | versioned `/v1` contract, generated client compatibility and every handoff endpoint mapped |
 | ERP 2.0 | Partial | `/erp`, reports, risk, finance, approvals, procurement, HR and logistics links | exact acceptance for every ERP tab; CMS, service, legal and operations surfaces |
-| HR | Partial | StaffUser, replay-safe editable/cancellable schedules, staff-owned attendance, absence approval, derived timesheet, atomic cash-shift handover, tasks, KPI/payroll services and dedicated handoff Playwright | attendance-derived payroll posting and native Staff attendance UI |
+| HR | Partial | StaffUser, replay-safe editable/cancellable schedules, staff-owned attendance, absence approval, derived timesheet, atomic cash-shift handover, immutable period payroll posting/payout, tasks and dedicated API/Playwright acceptance | native Staff attendance UI/offline/device acceptance |
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
@@ -73,7 +73,7 @@ credentials, legal approval or physical hardware.
 
 ## Ordered remaining work
 
-1. Complete attendance-derived payroll posting and native Staff attendance, then run first-store logistics/shift UAT; route optimization/live tracking remain later scope.
+1. Complete native Staff attendance and run first-store payroll/logistics/shift UAT; route optimization/live tracking remain later scope.
 2. Add service center, store operations, CMS, analytics and legal Waves B.
 3. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.

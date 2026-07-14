@@ -14,6 +14,9 @@ export const prisma = new PrismaClient({
 export const API_BASE = `http://127.0.0.1:${Number(process.env.E2E_API_PORT ?? 4200)}/api`;
 
 export async function resetDb() {
+  await prisma.hrPayrollCommand.deleteMany();
+  await prisma.hrPayrollLine.deleteMany();
+  await prisma.hrPayrollRun.deleteMany();
   await prisma.hrAttendance.deleteMany();
   await prisma.hrScheduleCommand.deleteMany();
   await prisma.hrSchedule.deleteMany();

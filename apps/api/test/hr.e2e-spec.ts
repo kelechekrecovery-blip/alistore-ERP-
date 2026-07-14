@@ -41,6 +41,11 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.hrPayrollCommand.deleteMany();
+    await prisma.hrPayrollLine.deleteMany();
+    await prisma.hrPayrollRun.deleteMany();
+    await prisma.payment.deleteMany({ where: { shift: { staffId: sellerId } } });
+    await prisma.cashShift.deleteMany({ where: { staffId: sellerId } });
     await prisma.hrAttendance.deleteMany();
     await prisma.hrScheduleCommand.deleteMany();
     await prisma.hrSchedule.deleteMany();
@@ -49,6 +54,11 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
   });
 
   afterAll(async () => {
+    await prisma.hrPayrollCommand.deleteMany();
+    await prisma.hrPayrollLine.deleteMany();
+    await prisma.hrPayrollRun.deleteMany();
+    await prisma.payment.deleteMany({ where: { shift: { staffId: sellerId } } });
+    await prisma.cashShift.deleteMany({ where: { staffId: sellerId } });
     await prisma.hrAttendance.deleteMany();
     await prisma.hrScheduleCommand.deleteMany();
     await prisma.hrSchedule.deleteMany();
@@ -118,5 +128,40 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     expect(await prisma.hrScheduleCommand.count({ where: { scheduleId: created.body.id } })).toBe(2);
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
     expect(events.map((event) => event.type)).toEqual(['hr.schedule_created', 'hr.schedule_updated', 'hr.schedule_cancelled']);
+  });
+
+  it('previews, posts and pays an immutable period payroll with replay protection', async () => {
+    const schedule = await prisma.hrSchedule.create({ data: {
+      staffId: sellerId, point: 'BISHKEK-1', shiftDate: new Date('2026-07-15T00:00:00.000Z'),
+      startsAt: new Date('2026-07-15T03:00:00.000Z'), endsAt: new Date('2026-07-15T15:00:00.000Z'),
+      createdBy: 'test', idempotencyKey: `hr-payroll-plan-${run}`,
+    } });
+    await prisma.hrAttendance.create({ data: {
+      scheduleId: schedule.id, staffId: sellerId, point: 'BISHKEK-1',
+      checkedInAt: new Date('2026-07-15T03:12:00.000Z'), checkedOutAt: new Date('2026-07-15T15:25:00.000Z'),
+      checkInKey: `hr-payroll-in-${run}`, checkOutKey: `hr-payroll-out-${run}`,
+    } });
+    const shift = await prisma.cashShift.create({ data: { staffId: sellerId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date('2026-07-15T03:00:00.000Z') } });
+    await prisma.payment.create({ data: { shiftId: shift.id, amount: 100_000, method: 'cash', status: 'received', createdAt: new Date('2026-07-15T08:00:00.000Z') } });
+
+    await request(app.getHttpServer()).get('/hr/payroll/preview?period=2026-07&point=BISHKEK-1').set('Authorization', `Bearer ${sellerToken}`).expect(403);
+    const preview = await request(app.getHttpServer()).get('/hr/payroll/preview?period=2026-07&point=BISHKEK-1').set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(preview.body.lines).toEqual([expect.objectContaining({ staffId: sellerId, plannedShifts: 1, completedShifts: 1, workedMinutes: 733, lateMinutes: 12, overtimeMinutes: 25, revenue: 100_000, baseEarned: 15_000, commission: 1_500, lateDeduction: 24, overtimePay: 75, total: 16_551 })]);
+
+    const payload = { period: '2026-07', point: 'BISHKEK-1' };
+    const posted = await request(app.getHttpServer()).post('/hr/payroll/runs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-post-${run}`).send(payload).expect(201);
+    const replay = await request(app.getHttpServer()).post('/hr/payroll/runs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-post-${run}`).send(payload).expect(201);
+    expect(replay.body.id).toBe(posted.body.id);
+    await request(app.getHttpServer()).post('/hr/payroll/runs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-post-duplicate-${run}`).send(payload).expect(409);
+
+    await prisma.hrAttendance.update({ where: { scheduleId: schedule.id }, data: { checkedOutAt: new Date('2026-07-15T16:00:00.000Z') } });
+    const runs = await request(app.getHttpServer()).get('/hr/payroll/runs?period=2026-07&point=BISHKEK-1').set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(runs.body[0].lines[0]).toMatchObject({ overtimeMinutes: 25, total: 16_551 });
+
+    const paid = await request(app.getHttpServer()).post(`/hr/payroll/runs/${posted.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-pay-${run}`).send({ externalRef: 'BANK-2026-07-001' }).expect(201);
+    await request(app.getHttpServer()).post(`/hr/payroll/runs/${posted.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-pay-${run}`).send({ externalRef: 'BANK-2026-07-001' }).expect(201);
+    expect(paid.body).toMatchObject({ status: 'paid', externalRef: 'BANK-2026-07-001', totalPayout: 16_551 });
+    const events = await prisma.auditEvent.findMany({ where: { refs: { has: posted.body.id } }, orderBy: { ts: 'asc' } });
+    expect(events.map((event) => event.type)).toEqual(['hr.payroll_posted', 'hr.payroll_paid']);
   });
 });

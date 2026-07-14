@@ -214,6 +214,11 @@ enum HrAbsenceStatus {
   cancelled
 }
 
+enum HrPayrollStatus {
+  posted
+  paid
+}
+
 // ---------- CORE ----------
 model Customer {
   id             String               @id @default(cuid())
@@ -1273,22 +1278,23 @@ model OutboxMessage {
 // Staff login carries a role in the JWT so dangerous actions are authorized on
 // the server (Role Permission Matrix), not trusted from the request body.
 model StaffUser {
-  id            String         @id @default(cuid())
-  username      String         @unique
-  passwordHash  String
-  role          Role
-  active        Boolean        @default(true)
-  totpSecret    String?
-  totpEnabled   Boolean        @default(false)
-  totpLastToken String? // last used TOTP code — single-use guard (anti-replay)
-  pushTokens    PushToken[]
-  assignedTasks StaffTask[]    @relation("StaffTaskAssignee")
-  createdTasks  StaffTask[]    @relation("StaffTaskCreator")
-  courierOrders Order[]        @relation("OrderCourier")
-  hrSchedules   HrSchedule[]
-  hrAttendances HrAttendance[]
-  hrAbsences    HrAbsence[]
-  createdAt     DateTime       @default(now())
+  id             String          @id @default(cuid())
+  username       String          @unique
+  passwordHash   String
+  role           Role
+  active         Boolean         @default(true)
+  totpSecret     String?
+  totpEnabled    Boolean         @default(false)
+  totpLastToken  String? // last used TOTP code — single-use guard (anti-replay)
+  pushTokens     PushToken[]
+  assignedTasks  StaffTask[]     @relation("StaffTaskAssignee")
+  createdTasks   StaffTask[]     @relation("StaffTaskCreator")
+  courierOrders  Order[]         @relation("OrderCourier")
+  hrSchedules    HrSchedule[]
+  hrAttendances  HrAttendance[]
+  hrAbsences     HrAbsence[]
+  hrPayrollLines HrPayrollLine[]
+  createdAt      DateTime        @default(now())
 
   @@index([role])
 }
@@ -1363,6 +1369,69 @@ model HrAbsence {
 
   @@index([staffId, startsOn, endsOn])
   @@index([status, startsOn])
+}
+
+model HrPayrollRun {
+  id                   String          @id @default(cuid())
+  period               String
+  point                String
+  status               HrPayrollStatus @default(posted)
+  baseAmount           Int
+  commissionBps        Int
+  latePenaltyPerMinute Int
+  overtimePayPerMinute Int
+  totalBase            Int
+  totalCommission      Int
+  totalAdjustments     Int
+  totalPayout          Int
+  createdBy            String
+  paidBy               String?
+  paidAt               DateTime?
+  externalRef          String?
+  lines                HrPayrollLine[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@unique([period, point])
+  @@index([status, createdAt])
+}
+
+model HrPayrollLine {
+  id                String       @id @default(cuid())
+  run               HrPayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId             String
+  staff             StaffUser    @relation(fields: [staffId], references: [id])
+  staffId           String
+  username          String
+  plannedShifts     Int
+  completedShifts   Int
+  paidAbsenceShifts Int
+  workedMinutes     Int
+  lateMinutes       Int
+  overtimeMinutes   Int
+  revenue           Int
+  sales             Int
+  baseEarned        Int
+  commission        Int
+  lateDeduction     Int
+  overtimePay       Int
+  total             Int
+  createdAt         DateTime     @default(now())
+
+  @@unique([runId, staffId])
+  @@index([staffId, createdAt])
+}
+
+model HrPayrollCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  action         String
+  runId          String?
+  request        Json
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([runId, createdAt])
 }
 
 enum StaffTaskStatus {

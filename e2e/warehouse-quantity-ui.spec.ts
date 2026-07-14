@@ -7,7 +7,7 @@ test.afterEach(async () => {
 
 test('warehouse receives quantity stock and the ERP shows the authoritative balance', async ({ page }) => {
   await resetDb();
-  const { username, password } = await seedStaffCredentials('warehouse', 'e2e-quantity');
+  const session = await seedStaffCredentials('warehouse', 'e2e-quantity');
   const product = await prisma.product.create({
     data: {
       sku: `E2E-QTY-${Date.now().toString(36)}`.toUpperCase(),
@@ -20,10 +20,10 @@ test('warehouse receives quantity stock and the ERP shows the authoritative bala
     },
   });
 
+  await page.addInitScript((auth) => {
+    localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(auth));
+  }, { accessToken: session.accessToken, staffId: session.staffId, username: session.username, role: 'warehouse', totpEnabled: false });
   await page.goto('/warehouse');
-  await page.getByPlaceholder('username').fill(username);
-  await page.getByPlaceholder('password').fill(password);
-  await page.getByRole('button', { name: 'Войти' }).click();
 
   await expect(page.getByText('Склад · Сборка заказов')).toBeVisible();
   await page.locator('select').first().selectOption(product.id);

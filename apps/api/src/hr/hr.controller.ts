@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CancelHrScheduleDto, CreateHrScheduleDto, DecideHrAbsenceDto, HrWeekQueryDto, OpenHrAttendanceDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
+import { CancelHrScheduleDto, CreateHrScheduleDto, DecideHrAbsenceDto, HrPayrollQueryDto, HrWeekQueryDto, OpenHrAttendanceDto, PayHrPayrollDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 import { HrService } from './hr.service';
 
 @ApiTags('hr')
@@ -65,5 +65,28 @@ export class HrController {
   @RequirePermission('hr', 'manage')
   decideAbsence(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DecideHrAbsenceDto) {
     return this.hr.decideAbsence(id, dto.status, dto.note, user.customerId);
+  }
+  @Get('payroll/preview')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr', 'read')
+  payrollPreview(@Query() query: HrPayrollQueryDto) { return this.hr.payrollPreview(query.period, query.point); }
+
+  @Get('payroll/runs')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr', 'read')
+  payrollRuns(@Query() query: HrPayrollQueryDto) { return this.hr.payrollRuns(query.period, query.point); }
+
+  @Post('payroll/runs')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr', 'manage')
+  postPayroll(@CurrentUser() user: AuthPrincipal, @Headers('idempotency-key') key: string | undefined, @Body() dto: HrPayrollQueryDto) {
+    return this.hr.postPayroll(dto.period, dto.point, user.customerId, key);
+  }
+
+  @Post('payroll/runs/:id/pay')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('hr', 'manage')
+  payPayroll(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: PayHrPayrollDto) {
+    return this.hr.payPayroll(id, dto.externalRef, user.customerId, key);
   }
 }

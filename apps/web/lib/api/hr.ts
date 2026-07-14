@@ -18,6 +18,19 @@ export type HrWeek = {
 };
 export type HrCashShift = { id: string; staffId: string; point: string; openCash: number; openedAt: string; expectedCash: number; staff: HrStaff | null };
 export type HrHandoverOverview = { shifts: HrCashShift[]; staff: HrStaff[] };
+export type HrPayrollLine = {
+  id?: string; staffId: string; username: string; plannedShifts: number; completedShifts: number; paidAbsenceShifts: number;
+  workedMinutes: number; lateMinutes: number; overtimeMinutes: number; revenue: number; sales: number; baseEarned: number;
+  commission: number; lateDeduction: number; overtimePay: number; total: number;
+};
+export type HrPayrollPreview = {
+  period: string; point: string; config: { baseAmount: number; commissionBps: number; latePenaltyPerMinute: number; overtimePayPerMinute: number };
+  lines: HrPayrollLine[]; totals: { base: number; commission: number; adjustments: number; payout: number };
+};
+export type HrPayrollRun = {
+  id: string; period: string; point: string; status: 'posted' | 'paid'; totalBase: number; totalCommission: number;
+  totalAdjustments: number; totalPayout: number; externalRef: string | null; paidAt: string | null; lines: HrPayrollLine[];
+};
 
 export function fetchHrWeek(weekStart: string, point: string, token: string) {
   const query = new URLSearchParams({ weekStart });
@@ -48,4 +61,22 @@ export function fetchHrHandovers(point: string, token: string) {
 
 export function handoverHrShift(id: string, input: { toStaffId: string; countedCash: number; reason?: string }, token: string) {
   return postAuthJson<{ handover: { id: string; diff: number }; targetShift: HrCashShift }>(`/shifts/${encodeURIComponent(id)}/handover`, input, token, { 'idempotency-key': crypto.randomUUID() });
+}
+
+export function fetchHrPayrollPreview(period: string, point: string, token: string) {
+  const query = new URLSearchParams({ period, point: point.trim() });
+  return getJson<HrPayrollPreview>(`/hr/payroll/preview?${query}`, token);
+}
+
+export function fetchHrPayrollRuns(period: string, point: string, token: string) {
+  const query = new URLSearchParams({ period, point: point.trim() });
+  return getJson<HrPayrollRun[]>(`/hr/payroll/runs?${query}`, token);
+}
+
+export function postHrPayroll(period: string, point: string, token: string) {
+  return postAuthJson<HrPayrollRun>('/hr/payroll/runs', { period, point: point.trim() }, token, { 'idempotency-key': crypto.randomUUID() });
+}
+
+export function payHrPayroll(id: string, externalRef: string, token: string) {
+  return postAuthJson<HrPayrollRun>(`/hr/payroll/runs/${encodeURIComponent(id)}/pay`, { externalRef }, token, { 'idempotency-key': crypto.randomUUID() });
 }

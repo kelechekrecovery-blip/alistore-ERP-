@@ -22,6 +22,10 @@ POST  /webhooks/payment               dedup by txnId
 # Смены
 POST  /shifts/open                    { staffId, point, openCash }
 POST  /shifts/:id/close               { closeCash, evidence }  diff≠0 → approval+Risk
+# HR / payroll
+GET   /hr/payroll/preview             period+point; расчёт из schedule/attendance/payment
+POST  /hr/payroll/runs                Idempotency-Key; неизменяемый снимок периода
+POST  /hr/payroll/runs/:id/pay        Idempotency-Key; { externalRef }
 # Склад / IMEI
 GET   /units/:imei
 POST  /units                          приёмка (partию)
@@ -57,6 +61,7 @@ stock.received / stock.reserved / stock.moved / stock.adjusted / stock.written_o
 inventory.counted
 unit.received / unit.sold / unit.returned / unit.written_off
 shift.opened / shift.closed / cash.handover / cash.shortage
+hr.payroll_posted / hr.payroll_paid
 delivery.assigned / delivery.out / delivery.delivered / delivery.failed
 return.requested / return.completed / refund.requested
 warranty.created / warranty.closed

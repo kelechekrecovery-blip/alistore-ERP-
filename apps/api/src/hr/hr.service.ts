@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateHrScheduleDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 
 const DAY_MS = 86_400_000;
+const PAYROLL_CONFIG = { baseAmount: 15_000, commissionBps: 150, latePenaltyPerMinute: 2, overtimePayPerMinute: 3 } as const;
 
 function dateOnly(value: string, field: string) {
   const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
@@ -17,6 +18,18 @@ function dateOnly(value: string, field: string) {
 function weekBounds(weekStart: string) {
   const start = dateOnly(weekStart, 'weekStart');
   return { start, end: new Date(start.getTime() + 7 * DAY_MS) };
+}
+
+function payrollBounds(period: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new ValidationError('hr_invalid_payroll_period', 'Период должен быть в формате YYYY-MM');
+  const [year, month] = period.split('-').map(Number);
+  return { start: new Date(Date.UTC(year, month - 1, 1)), end: new Date(Date.UTC(year, month, 1)) };
+}
+
+function payrollPoint(point: string) {
+  const value = point.trim();
+  if (!value) throw new ValidationError('hr_payroll_point_required', 'Укажите точку начисления');
+  return value;
 }
 
 function requireKey(key?: string) {
@@ -50,6 +63,118 @@ export class HrService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  private async calculatePayroll(tx: Prisma.TransactionClient, period: string, rawPoint: string) {
+    const point = payrollPoint(rawPoint);
+    const { start, end } = payrollBounds(period);
+    const [schedules, absences, payments] = await Promise.all([
+      tx.hrSchedule.findMany({
+        where: { point, shiftDate: { gte: start, lt: end }, cancelledAt: null },
+        include: { attendance: true, staff: { select: { id: true, username: true } } },
+        orderBy: [{ shiftDate: 'asc' }, { startsAt: 'asc' }],
+      }),
+      tx.hrAbsence.findMany({
+        where: { status: 'approved', type: { in: ['annual_leave', 'sick_leave'] }, startsOn: { lt: end }, endsOn: { gte: start } },
+      }),
+      tx.payment.findMany({
+        where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, createdAt: { gte: start, lt: end }, shift: { point } },
+        select: { amount: true, shift: { select: { staffId: true } } },
+      }),
+    ]);
+    const staffIds = new Set<string>(schedules.map((row) => row.staffId));
+    payments.forEach((payment) => { if (payment.shift?.staffId) staffIds.add(payment.shift.staffId); });
+    const staff = await tx.staffUser.findMany({ where: { id: { in: [...staffIds] } }, select: { id: true, username: true } });
+    const names = new Map(staff.map((person) => [person.id, person.username]));
+    const lines = [...staffIds].map((staffId) => {
+      const plans = schedules.filter((row) => row.staffId === staffId);
+      const approved = absences.filter((absence) => absence.staffId === staffId);
+      const completed = plans.filter((row) => row.attendance?.checkedOutAt);
+      const paidAbsenceShifts = plans.filter((row) => approved.some((absence) => absence.startsOn <= row.shiftDate && absence.endsOn >= row.shiftDate)).length;
+      const workedMinutes = completed.reduce((sum, row) => sum + Math.max(0, Math.round((row.attendance!.checkedOutAt!.getTime() - row.attendance!.checkedInAt.getTime()) / 60_000)), 0);
+      const lateMinutes = completed.reduce((sum, row) => sum + Math.max(0, Math.round((row.attendance!.checkedInAt.getTime() - row.startsAt.getTime()) / 60_000)), 0);
+      const overtimeMinutes = completed.reduce((sum, row) => sum + Math.max(0, Math.round((row.attendance!.checkedOutAt!.getTime() - row.endsAt.getTime()) / 60_000)), 0);
+      const staffPayments = payments.filter((payment) => payment.shift?.staffId === staffId);
+      const revenue = staffPayments.reduce((sum, payment) => sum + payment.amount, 0);
+      const coveredShifts = Math.min(plans.length, completed.length + paidAbsenceShifts);
+      const baseEarned = plans.length ? Math.round(PAYROLL_CONFIG.baseAmount * coveredShifts / plans.length) : 0;
+      const commission = Math.round(revenue * PAYROLL_CONFIG.commissionBps / 10_000);
+      const lateDeduction = lateMinutes * PAYROLL_CONFIG.latePenaltyPerMinute;
+      const overtimePay = overtimeMinutes * PAYROLL_CONFIG.overtimePayPerMinute;
+      return {
+        staffId, username: names.get(staffId) ?? staffId, plannedShifts: plans.length, completedShifts: completed.length, paidAbsenceShifts,
+        workedMinutes, lateMinutes, overtimeMinutes, revenue, sales: staffPayments.length, baseEarned, commission, lateDeduction, overtimePay,
+        total: Math.max(0, baseEarned + commission + overtimePay - lateDeduction),
+      };
+    }).sort((a, b) => a.username.localeCompare(b.username));
+    const totals = lines.reduce((sum, line) => ({
+      base: sum.base + line.baseEarned,
+      commission: sum.commission + line.commission,
+      adjustments: sum.adjustments + line.overtimePay - line.lateDeduction,
+      payout: sum.payout + line.total,
+    }), { base: 0, commission: 0, adjustments: 0, payout: 0 });
+    return { period, point, config: PAYROLL_CONFIG, lines, totals };
+  }
+
+  payrollPreview(period: string, point: string) {
+    return this.prisma.$transaction((tx) => this.calculatePayroll(tx, period, point));
+  }
+
+  payrollRuns(period: string, rawPoint: string) {
+    const point = payrollPoint(rawPoint);
+    payrollBounds(period);
+    return this.prisma.hrPayrollRun.findMany({ where: { period, point }, include: { lines: { orderBy: { username: 'asc' } } }, orderBy: { createdAt: 'desc' } });
+  }
+
+  async postPayroll(period: string, rawPoint: string, actor: string, rawKey?: string) {
+    const key = requireKey(rawKey);
+    const point = payrollPoint(rawPoint);
+    payrollBounds(period);
+    const request = { period, point };
+    return this.audit.transaction(async (tx) => {
+      const replay = await tx.hrPayrollCommand.findUnique({ where: { idempotencyKey: key } });
+      if (replay) {
+        if (replay.action !== 'post' || stableJson(replay.request) !== stableJson(request)) throw new ConflictError('hr_idempotency_mismatch', 'Ключ уже использован для другой операции начисления');
+        return { result: replay.response, events: [] };
+      }
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'hr-payroll:' + period + ':' + point}))::text AS locked`;
+      if (await tx.hrPayrollRun.findUnique({ where: { period_point: { period, point } } })) throw new ConflictError('hr_payroll_already_posted', 'Начисление за этот период уже проведено');
+      const preview = await this.calculatePayroll(tx, period, point);
+      if (!preview.lines.length) throw new ValidationError('hr_payroll_empty', 'Нет смен или продаж для начисления');
+      const run = await tx.hrPayrollRun.create({
+        data: {
+          period, point, ...PAYROLL_CONFIG, totalBase: preview.totals.base, totalCommission: preview.totals.commission,
+          totalAdjustments: preview.totals.adjustments, totalPayout: preview.totals.payout, createdBy: actor,
+          lines: { create: preview.lines },
+        },
+        include: { lines: { orderBy: { username: 'asc' } } },
+      });
+      const response = jsonValue(run);
+      await tx.hrPayrollCommand.create({ data: { idempotencyKey: key, action: 'post', runId: run.id, request, response } });
+      return { result: response, events: [{ type: EventType.HrPayrollPosted, actor, payload: { runId: run.id, period, point, totalPayout: run.totalPayout, lineCount: run.lines.length }, refs: [run.id, ...run.lines.map((line) => line.staffId)] }] };
+    });
+  }
+
+  async payPayroll(runId: string, rawExternalRef: string, actor: string, rawKey?: string) {
+    const key = requireKey(rawKey);
+    const externalRef = rawExternalRef.trim();
+    if (!externalRef) throw new ValidationError('hr_payroll_external_ref_required', 'Укажите номер платёжного документа');
+    const request = { runId, externalRef };
+    return this.audit.transaction(async (tx) => {
+      const replay = await tx.hrPayrollCommand.findUnique({ where: { idempotencyKey: key } });
+      if (replay) {
+        if (replay.action !== 'pay' || stableJson(replay.request) !== stableJson(request)) throw new ConflictError('hr_idempotency_mismatch', 'Ключ уже использован для другой операции начисления');
+        return { result: replay.response, events: [] };
+      }
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'hr-payroll-run:' + runId}))::text AS locked`;
+      const current = await tx.hrPayrollRun.findUnique({ where: { id: runId } });
+      if (!current) throw new ValidationError('hr_payroll_not_found', 'Начисление не найдено');
+      if (current.status === 'paid') throw new ConflictError('hr_payroll_already_paid', 'Начисление уже выплачено');
+      const paid = await tx.hrPayrollRun.update({ where: { id: runId }, data: { status: 'paid', paidBy: actor, paidAt: new Date(), externalRef }, include: { lines: { orderBy: { username: 'asc' } } } });
+      const response = jsonValue(paid);
+      await tx.hrPayrollCommand.create({ data: { idempotencyKey: key, action: 'pay', runId, request, response } });
+      return { result: response, events: [{ type: EventType.HrPayrollPaid, actor, payload: { runId, period: paid.period, point: paid.point, totalPayout: paid.totalPayout, externalRef }, refs: [runId, ...paid.lines.map((line) => line.staffId)] }] };
+    });
+  }
 
   async week(weekStart: string, point?: string, staffId?: string) {
     const { start, end } = weekBounds(weekStart);

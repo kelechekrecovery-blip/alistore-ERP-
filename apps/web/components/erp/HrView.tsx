@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrHandovers, fetchHrWeek, handoverHrShift, updateHrSchedule, type HrHandoverOverview, type HrSchedule, type HrWeek } from '@/lib/api';
+import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrHandovers, fetchHrPayrollPreview, fetchHrPayrollRuns, fetchHrWeek, handoverHrShift, payHrPayroll, postHrPayroll, updateHrSchedule, type HrHandoverOverview, type HrPayrollPreview, type HrPayrollRun, type HrSchedule, type HrWeek } from '@/lib/api';
 import { som } from '@/lib/format';
 
-type Tab = 'schedule' | 'timesheet' | 'profile' | 'handover';
+type Tab = 'schedule' | 'timesheet' | 'payroll' | 'profile' | 'handover';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'schedule', label: 'График смен' }, { id: 'timesheet', label: 'Табель' },
-  { id: 'profile', label: 'Профиль' }, { id: 'handover', label: 'Передача смены' },
+  { id: 'payroll', label: 'Начисления' }, { id: 'profile', label: 'Профиль' }, { id: 'handover', label: 'Передача смены' },
 ];
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const ABSENCE_LABEL: Record<string, string> = { annual_leave: 'Отпуск', sick_leave: 'Больничный', unpaid_leave: 'Без оплаты', other: 'Другое' };
@@ -18,6 +18,8 @@ function mondayIso() {
   now.setDate(now.getDate() - day + 1);
   return now.toISOString().slice(0, 10);
 }
+
+function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
 function dayIso(start: string, offset: number) {
   const date = new Date(`${start}T00:00:00.000Z`);
@@ -46,6 +48,10 @@ export function HrView({ accessToken }: { accessToken: string }) {
   const [targetStaffId, setTargetStaffId] = useState('');
   const [countedCash, setCountedCash] = useState('0');
   const [handoverReason, setHandoverReason] = useState('');
+  const [payrollPeriod, setPayrollPeriod] = useState(currentPeriod);
+  const [payroll, setPayroll] = useState<HrPayrollPreview | null>(null);
+  const [payrollRuns, setPayrollRuns] = useState<HrPayrollRun[]>([]);
+  const [payrollRef, setPayrollRef] = useState('');
 
   const reload = useCallback(() => {
     setMessage('');
@@ -66,6 +72,13 @@ export function HrView({ accessToken }: { accessToken: string }) {
     }).catch(() => setHandovers(null));
   }, [accessToken, point, sourceShiftId]);
   useEffect(() => { if (tab === 'handover') reloadHandovers(); }, [reloadHandovers, tab]);
+  const reloadPayroll = useCallback(() => {
+    if (!point.trim()) return;
+    Promise.all([fetchHrPayrollPreview(payrollPeriod, point, accessToken), fetchHrPayrollRuns(payrollPeriod, point, accessToken)])
+      .then(([preview, runs]) => { setPayroll(preview); setPayrollRuns(runs); })
+      .catch((error) => { setPayroll(null); setPayrollRuns([]); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить начисления'); });
+  }, [accessToken, payrollPeriod, point]);
+  useEffect(() => { if (tab === 'payroll') reloadPayroll(); }, [reloadPayroll, tab]);
   useEffect(() => setShiftDate(weekStart), [weekStart]);
 
   const chosen = data?.staff.find((person) => person.id === selectedStaff);
@@ -116,6 +129,21 @@ export function HrView({ accessToken }: { accessToken: string }) {
     finally { setBusy(''); }
   }
 
+  async function submitPayroll() {
+    setBusy('payroll-post'); setMessage('');
+    try { await postHrPayroll(payrollPeriod, point, accessToken); reloadPayroll(); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Не удалось провести начисление'); }
+    finally { setBusy(''); }
+  }
+
+  async function submitPayrollPayment(id: string) {
+    if (!payrollRef.trim()) return;
+    setBusy(`payroll-pay-${id}`); setMessage('');
+    try { await payHrPayroll(id, payrollRef.trim(), accessToken); setPayrollRef(''); reloadPayroll(); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Не удалось отметить выплату'); }
+    finally { setBusy(''); }
+  }
+
   return (
     <div data-testid="hr-view" className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#2E2822] pb-4">
@@ -150,6 +178,23 @@ export function HrView({ accessToken }: { accessToken: string }) {
       {tab === 'timesheet' && <div className="overflow-hidden rounded-[7px] border border-[#2E2822]">
         <div className="grid grid-cols-[minmax(130px,1fr)_70px_90px_90px_100px] bg-[#1A1611] px-4 py-3 text-[10px] uppercase text-[#8A7F76]"><span>Сотрудник</span><span>Смены</span><span>Часы</span><span>Опоздание</span><span>Переработка</span></div>
         {data?.timesheet.map((row) => <div key={row.staffId} data-testid={`timesheet-${row.staffId}`} className="grid grid-cols-[minmax(130px,1fr)_70px_90px_90px_100px] border-t border-[#2E2822] px-4 py-3 text-xs"><strong className="truncate">{row.username}</strong><span>{row.shifts}</span><span className="font-mono">{hours(row.minutes)}</span><span className={row.lateMinutes ? 'text-[#FF8A7A]' : 'text-[#7FD3A0]'}>{row.lateMinutes}м</span><span className="text-[#C6FF3D]">+{row.overtimeMinutes}м</span></div>)}
+      </div>}
+
+      {tab === 'payroll' && <div className="space-y-4" data-testid="hr-payroll">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#2E2822] pb-4">
+          <label className="text-[10px] text-[#8A7F76]">Период<input aria-label="Период начисления" type="month" value={payrollPeriod} onChange={(event) => setPayrollPeriod(event.target.value)} className="mt-1 block h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs text-white" /></label>
+          <div className="text-right"><div className="text-[10px] uppercase text-[#8A7F76]">К выплате</div><strong className="font-mono text-xl text-[#C6FF3D]">{som(payroll?.totals.payout ?? 0)}</strong></div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-4">
+          {[['Оклад', payroll?.totals.base ?? 0], ['Комиссия', payroll?.totals.commission ?? 0], ['Корректировки', payroll?.totals.adjustments ?? 0], ['Итого', payroll?.totals.payout ?? 0]].map(([label, value]) => <div key={String(label)} className="border-b border-[#2E2822] bg-[#1A1611] px-4 py-3"><span className="text-[10px] uppercase text-[#8A7F76]">{label}</span><strong className="mt-1 block font-mono text-sm">{som(Number(value))}</strong></div>)}
+        </div>
+        <div className="overflow-x-auto rounded-[7px] border border-[#2E2822]">
+          <div className="grid min-w-[920px] grid-cols-[minmax(150px,1.4fr)_80px_90px_100px_110px_100px_110px_110px] bg-[#1A1611] px-4 py-3 text-[10px] uppercase text-[#8A7F76]"><span>Сотрудник</span><span>Смены</span><span>Часы</span><span>Продажи</span><span>Оборот</span><span>Оклад</span><span>Корректировки</span><span>Итого</span></div>
+          {payroll?.lines.map((line) => <div key={line.staffId} data-testid={`payroll-${line.staffId}`} className="grid min-w-[920px] grid-cols-[minmax(150px,1.4fr)_80px_90px_100px_110px_100px_110px_110px] border-t border-[#2E2822] px-4 py-3 text-xs"><strong className="truncate">{line.username}</strong><span>{line.completedShifts}/{line.plannedShifts}</span><span>{hours(line.workedMinutes)}</span><span>{line.sales}</span><span className="font-mono">{som(line.revenue)}</span><span className="font-mono">{som(line.baseEarned)}</span><span className={line.overtimePay - line.lateDeduction >= 0 ? 'text-[#7FD3A0]' : 'text-[#FF8A7A]'}>{som(line.overtimePay - line.lateDeduction)}</span><strong className="font-mono text-[#C6FF3D]">{som(line.total)}</strong></div>)}
+          {!payroll?.lines.length && <div className="p-10 text-center text-sm text-[#8A7F76]">За период нет смен или продаж</div>}
+        </div>
+        {!payrollRuns.length && <button type="button" onClick={submitPayroll} disabled={busy === 'payroll-post' || !payroll?.lines.length} className="h-10 rounded-[6px] bg-[#FF6B55] px-5 text-sm font-bold text-white disabled:opacity-50">{busy === 'payroll-post' ? 'Проводим…' : 'Провести начисление'}</button>}
+        {payrollRuns.map((run) => <section key={run.id} className="flex flex-wrap items-end gap-3 border-t border-[#2E2822] pt-4 text-xs"><div className="min-w-0 flex-1"><strong>{run.status === 'paid' ? 'Выплачено' : 'Проведено'} · {som(run.totalPayout)}</strong><p className="mt-1 text-[#8A7F76]">Снимок периода неизменяем · {run.externalRef ?? 'платёжный документ не указан'}</p></div>{run.status === 'posted' && <><input aria-label="Номер платёжного документа" value={payrollRef} onChange={(event) => setPayrollRef(event.target.value)} placeholder="BANK-2026-07-001" className="h-10 w-52 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" /><button type="button" onClick={() => submitPayrollPayment(run.id)} disabled={!payrollRef.trim() || busy === `payroll-pay-${run.id}`} className="h-10 rounded-[6px] bg-[#26351B] px-4 font-semibold text-[#C6FF3D] disabled:opacity-50">Отметить выплату</button></>}</section>)}
       </div>}
 
       {tab === 'profile' && <div className="grid gap-4 lg:grid-cols-[280px_1fr]">

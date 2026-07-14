@@ -277,9 +277,11 @@ badge на дашборде. HTTP+БД сверка.
   POST /debts, POST /debts/:id/payments, GET /debts. Staff RBAC: seller/cashier/senior/
   franchise/admin/owner создают/читают, cashier/senior/admin/owner принимают платежи;
   actor/requester из staff JWT.
-- ✅ **Зарплаты продавцов** (`reports/payroll.ts`, `GET /reports/payroll`): база +
-  комиссия с оборота по продавцу (из received-платежей через shift.staffId) + фонд ЗП;
-  карточка «Зарплаты продавцов» в ERP-вкладке «Маржа·KPI». 6 тестов. Расчётный (не платит).
+- ✅ **Зарплаты продавцов:** `GET /reports/payroll` сохранён как advisory KPI, а канонический
+  HR-контур использует периодный `GET /hr/payroll/preview`, replay-safe
+  `POST /hr/payroll/runs` и `POST /hr/payroll/runs/:id/pay`. Начисление выводится из
+  графика, attendance, оплачиваемых отсутствий, опозданий, переработок и received/reconciled
+  продаж кассовой смены; проведение создаёт неизменяемые строки и Ledger-события.
 - ✅ **Смены с фотоотчётом** (`/staff` + Evidence Vault): фото открытия/закрытия
   прикрепляются к `entityType=shift`, ledger labels `shift_open_photo`/`shift_close_photo`.
 - ✅ **Импорт данных из Excel/тетради** (`import/`): product workbook маппит колонки по

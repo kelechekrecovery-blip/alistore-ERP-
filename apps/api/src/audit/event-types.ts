@@ -121,6 +121,8 @@ export const EventType = {
   HrAbsenceRequested: 'hr.absence_requested',
   HrAbsenceApproved: 'hr.absence_approved',
   HrAbsenceRejected: 'hr.absence_rejected',
+  HrPayrollPosted: 'hr.payroll_posted',
+  HrPayrollPaid: 'hr.payroll_paid',
   DeliveryZoneCreated: 'logistics.zone_created',
   DeliverySlotCreated: 'logistics.slot_created',
 } as const;

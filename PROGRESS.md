@@ -1363,3 +1363,12 @@
 - Checks run: Prisma format/validation/generation and 51 migrations applied; targeted shift integration 8/8 including concurrent replay and historical payment attribution; API and Next production builds; ERP owner handover browser E2E; complete `npm run mvp:verify`; `git diff --check`.
 - Outcome: full web/API gate is green with 118/118 API suites and 468/468 tests plus 31/31 Playwright flows. The ERP HR handover screen is now functional rather than a placeholder. Production readiness remains blocked by the same 12 external credential/manual groups.
 - Next step: implement attendance-derived payroll adjustments and immutable payroll posting, then expose attendance controls in native Staff apps.
+
+## 2026-07-14
+
+- Task: replace the advisory all-history payroll report with authoritative period payroll inside ERP HR.
+- Files changed: payroll Prisma schema/migration and immutable command journal; HR DTO/controller/service and Ledger events; typed web client and ERP payroll workspace; API/browser regressions, deterministic staff-session E2E setup, shared cleanup, backlog/readiness/completion audit and master plan.
+- Result: owner/admin can preview one point/month from planned shifts, completed attendance, approved paid absence, lateness, overtime and received/reconciled shift sales. Posting snapshots formula inputs and per-staff lines immutably; payout requires an external document. Advisory locks, unique period/point and stable idempotency keys prevent duplicate posting/payment, while `hr.payroll_posted` and `hr.payroll_paid` preserve the accounting trail. Later attendance edits change a new preview but never rewrite a posted run.
+- Checks run: Prisma format/validation/generation and test schema sync; targeted HR API 4/4; API and Next production builds; targeted ERP HR Playwright 3/3; repeated complete `npm run mvp:verify`; `git diff --check`.
+- Outcome: full web/API gate is green with 118/118 API suites and 469/469 tests plus 32/32 Playwright flows. The first full run correctly exposed shared staff-login throttling in two late UI tests; they now use signed seeded sessions and the complete gate was rerun successfully. Production readiness remains blocked by the same 12 external credential/manual groups.
+- Next step: expose the verified schedule/attendance contract in native SwiftUI and Compose Staff apps with durable offline replay, then continue ERP Wave B service-center work.

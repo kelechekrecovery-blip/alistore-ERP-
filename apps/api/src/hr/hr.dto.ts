@@ -1,6 +1,19 @@
 import { HrAbsenceStatus, HrAbsenceType } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsISO8601, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+
+export class HrPayrollQueryDto {
+  @ApiProperty({ example: '2026-07' })
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @MaxLength(120) point!: string;
+}
+
+export class PayHrPayrollDto {
+  @ApiProperty({ example: 'BANK-2026-07-001' })
+  @IsString() @MaxLength(160) externalRef!: string;
+}
 
 export class HrWeekQueryDto {
   @ApiProperty({ example: '2026-07-13' })

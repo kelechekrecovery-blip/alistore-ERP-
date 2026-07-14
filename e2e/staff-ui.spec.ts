@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { prisma, resetDb, seedStaffCredentials } from './helpers';
 
-test('Staff app follows the canonical four-section mobile shell', async ({ page, request }) => {
+test('Staff app follows the canonical four-section mobile shell', async ({ page }) => {
   await resetDb();
-  const { staffId, username, password } = await seedStaffCredentials('owner', 'e2e-staff-ui');
+  const session = await seedStaffCredentials('owner', 'e2e-staff-ui');
+  const { staffId } = session;
   const task = await prisma.staffTask.create({
     data: {
       title: 'Подготовить витрину к открытию',
@@ -15,10 +16,10 @@ test('Staff app follows the canonical four-section mobile shell', async ({ page,
   });
 
   await page.setViewportSize({ width: 1280, height: 900 });
+  await page.addInitScript((auth) => {
+    localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(auth));
+  }, { accessToken: session.accessToken, staffId: session.staffId, username: session.username, role: 'owner', totpEnabled: false });
   await page.goto('/staff');
-  await page.getByPlaceholder('username').fill(username);
-  await page.getByPlaceholder('password').fill(password);
-  await page.getByRole('button', { name: 'Войти' }).click();
 
   const app = page.getByTestId('staff-app');
   await expect(app).toBeVisible();
