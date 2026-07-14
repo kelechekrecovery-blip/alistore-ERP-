@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ValidationError } from '../common/errors';
+import { ConflictError, ValidationError } from '../common/errors';
 import { canTransition } from '../orders/order-state-machine';
 import { insertDebt } from '../debts/debt-insert';
 import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
@@ -102,14 +102,21 @@ const price: ActionExecutor = async (tx, payload, approver, approvalId, events) 
 const write_off: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const productId = String(payload['productId']);
   const qty = Number(payload['qty']);
+  const location = String(payload['location'] ?? '').trim();
   const reason = payload['reason'] ? String(payload['reason']) : null;
+  if (!location) throw new ValidationError('location_required', 'Укажите склад списания');
+  const balance = await lockQuantityBalance(tx, productId, location);
+  if (balance.onHand - balance.reserved < qty) {
+    throw new ConflictError('insufficient_available_stock', 'Списание превышает свободный остаток');
+  }
+  await tx.inventoryBalance.update({ where: { id: balance.id }, data: { onHand: { decrement: qty } } });
   const movement = await tx.inventoryMovement.create({
-    data: { productId, qty: -Math.abs(qty), type: 'write_off', reason },
+    data: { productId, qty: -Math.abs(qty), type: 'write_off', from: location, reason },
   });
   events.push({
     type: EventType.StockWrittenOff,
     actor: approver,
-    payload: { approvalId, productId, qty, movementId: movement.id, reason },
+    payload: { approvalId, productId, location, qty, movementId: movement.id, reason },
     refs: [productId, movement.id],
   });
 };
@@ -118,17 +125,44 @@ const write_off: ActionExecutor = async (tx, payload, approver, approvalId, even
 const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const productId = String(payload['productId']);
   const qty = Number(payload['qty']);
+  const location = String(payload['location'] ?? '').trim();
+  const direction = String(payload['direction'] ?? 'increase');
   const reason = payload['reason'] ? String(payload['reason']) : null;
+  if (!location) throw new ValidationError('location_required', 'Укажите склад корректировки');
+  if (direction !== 'increase' && direction !== 'decrease') {
+    throw new ValidationError('invalid_adjustment_direction', 'Неизвестное направление корректировки');
+  }
+  const delta = direction === 'decrease' ? -Math.abs(qty) : Math.abs(qty);
+  if (delta < 0) {
+    const balance = await lockQuantityBalance(tx, productId, location);
+    if (balance.onHand - balance.reserved < Math.abs(delta)) {
+      throw new ConflictError('insufficient_available_stock', 'Корректировка превышает свободный остаток');
+    }
+    await tx.inventoryBalance.update({ where: { id: balance.id }, data: { onHand: { decrement: Math.abs(delta) } } });
+  } else {
+    await tx.inventoryBalance.upsert({
+      where: { productId_location: { productId, location } },
+      create: { productId, location, onHand: delta },
+      update: { onHand: { increment: delta } },
+    });
+  }
   const movement = await tx.inventoryMovement.create({
-    data: { productId, qty, type: 'adjust', reason },
+    data: { productId, qty: delta, type: 'adjust', from: location, reason },
   });
   events.push({
     type: EventType.StockAdjusted,
     actor: approver,
-    payload: { approvalId, productId, qty, movementId: movement.id, reason },
+    payload: { approvalId, productId, location, qty: delta, direction, movementId: movement.id, reason },
     refs: [productId, movement.id],
   });
 };
+
+async function lockQuantityBalance(tx: Prisma.TransactionClient, productId: string, location: string) {
+  await tx.$queryRaw`SELECT id FROM "InventoryBalance" WHERE "productId" = ${productId} AND location = ${location} FOR UPDATE`;
+  const balance = await tx.inventoryBalance.findUnique({ where: { productId_location: { productId, location } } });
+  if (!balance) throw new ConflictError('inventory_balance_not_found', `На складе ${location} нет остатка товара`);
+  return balance;
+}
 
 /** delete — soft-delete a product (archived = true). */
 const del: ActionExecutor = async (tx, payload, approver, approvalId, events) => {

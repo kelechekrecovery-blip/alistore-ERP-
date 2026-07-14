@@ -146,7 +146,7 @@ export default function WarehousePage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-7xl">
           <WarehouseOps accessToken={session.accessToken} actor={session.staffId} />
           <ConsignmentOps accessToken={session.accessToken} role={session.role} />
           {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}

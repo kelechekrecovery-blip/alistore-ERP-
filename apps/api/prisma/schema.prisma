@@ -612,15 +612,16 @@ model CashShift {
 }
 
 model InventoryMovement {
-  id        String   @id @default(cuid())
-  product   Product  @relation(fields: [productId], references: [id])
-  productId String
-  qty       Int
-  type      String // received | moved | write_off | adjust | count
-  from      String?
-  to        String?
-  reason    String?
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  idempotencyKey String?  @unique
+  product        Product  @relation(fields: [productId], references: [id])
+  productId      String
+  qty            Int
+  type           String // received | moved | write_off | adjust | count
+  from           String?
+  to             String?
+  reason         String?
+  createdAt      DateTime @default(now())
   // write_off / adjust → owner approval + evidence
 
   @@index([productId])

@@ -29,6 +29,26 @@ export class TransferDto {
   @IsOptional() @IsString() requester?: string;
 }
 
+export class TransferQuantityDto {
+  @ApiProperty({ example: 'quantity-transfer-01' })
+  @IsString() @MaxLength(128) idempotencyKey!: string;
+
+  @ApiProperty({ example: 'clx_product_accessory' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @MaxLength(64) from!: string;
+
+  @ApiProperty({ example: 'BISHKEK-2' })
+  @IsString() @MaxLength(64) to!: string;
+
+  @ApiProperty({ minimum: 1, example: 5 })
+  @IsInt() @Min(1) qty!: number;
+
+  @ApiPropertyOptional({ example: 'пополнение точки' })
+  @IsOptional() @IsString() @MaxLength(240) reason?: string;
+}
+
 export class ReceiveDto {
   @ApiProperty({ example: 'clx_product_001' })
   @IsString() productId!: string;
@@ -114,6 +134,12 @@ export class MovementDto {
 
   @ApiProperty({ enum: ['write_off', 'adjust'], example: 'write_off' })
   @IsIn(['write_off', 'adjust']) type!: 'write_off' | 'adjust';
+
+  @ApiPropertyOptional({ example: 'BISHKEK-1', description: 'Required for quantity-tracked stock' })
+  @IsOptional() @IsString() @MaxLength(64) location?: string;
+
+  @ApiPropertyOptional({ enum: ['increase', 'decrease'], example: 'decrease' })
+  @IsOptional() @IsIn(['increase', 'decrease']) direction?: 'increase' | 'decrease';
 
   @ApiProperty({ example: 'бой при транспортировке' })
   @IsString() reason!: string;

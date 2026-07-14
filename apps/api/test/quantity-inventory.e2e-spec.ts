@@ -65,6 +65,7 @@ describe('Quantity inventory (integration)', () => {
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.approval.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   }
 
@@ -137,6 +138,39 @@ describe('Quantity inventory (integration)', () => {
       location: 'BISHKEK-1',
       quantity: 1,
     }, 'warehouse-quantity-test')).rejects.toMatchObject({ code: 'quantity_product_required' });
+  });
+
+  it('moves only available quantity stock once and rejects key reuse', async () => {
+    const product = await quantityProduct();
+    await inventory.receiveQuantity({ productId: product.id, location: 'BISHKEK-1', quantity: 8 }, 'warehouse');
+    await prisma.inventoryBalance.update({
+      where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
+      data: { reserved: 3 },
+    });
+    const command = {
+      idempotencyKey: `quantity-transfer-${seq}`,
+      productId: product.id,
+      from: 'BISHKEK-1',
+      to: 'BISHKEK-2',
+      qty: 5,
+    };
+
+    const first = await inventory.transferQuantity(command, 'warehouse');
+    const replay = await inventory.transferQuantity(command, 'warehouse');
+    expect(first).toMatchObject({ qty: 5, idempotent: false });
+    expect(replay).toMatchObject({ movementId: first.movementId, idempotent: true });
+    expect(await prisma.inventoryBalance.findUnique({
+      where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
+    })).toMatchObject({ onHand: 3, reserved: 3 });
+    expect(await prisma.inventoryBalance.findUnique({
+      where: { productId_location: { productId: product.id, location: 'BISHKEK-2' } },
+    })).toMatchObject({ onHand: 5, reserved: 0 });
+    expect(await prisma.inventoryMovement.count({ where: { idempotencyKey: command.idempotencyKey } })).toBe(1);
+
+    await expect(inventory.transferQuantity({ ...command, qty: 4 }, 'warehouse'))
+      .rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(inventory.transferQuantity({ ...command, idempotencyKey: `${command.idempotencyKey}-new`, qty: 1 }, 'warehouse'))
+      .rejects.toMatchObject({ code: 'insufficient_available_stock' });
   });
 
   it('prevents tracking-mode changes once stock exists', async () => {

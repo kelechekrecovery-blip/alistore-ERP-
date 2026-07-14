@@ -13,6 +13,7 @@ import {
   ReceiveDto,
   ReceiveQuantityDto,
   TransferDto,
+  TransferQuantityDto,
 } from './inventory.dto';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
@@ -40,11 +41,17 @@ export class InventoryService {
     if (!product) {
       throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
     }
+    if (product.trackingMode !== 'quantity') {
+      throw new ValidationError('serialized_movement_requires_unit', 'Для серийного товара укажите конкретный IMEI');
+    }
+    const location = dto.location?.trim();
+    if (!location) throw new ValidationError('location_required', 'Укажите склад корректировки');
+    const direction = dto.type === 'write_off' ? 'decrease' : (dto.direction ?? 'increase');
     return this.approvals.request({
       action: ACTION_BY_TYPE[dto.type],
       requester,
       reason: dto.reason,
-      payload: { productId: dto.productId, qty: dto.qty, reason: dto.reason },
+      payload: { productId: dto.productId, qty: dto.qty, location, direction, reason: dto.reason },
     });
   }
 
@@ -449,4 +456,86 @@ export class InventoryService {
       };
     });
   }
+
+
+  /** Move available quantity stock between two authoritative location balances exactly once. */
+  async transferQuantity(dto: TransferQuantityDto, actor: string) {
+    const existing = await this.prisma.inventoryMovement.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+    if (existing) return replayQuantityTransfer(existing, dto);
+    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+    if (!product) throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+    if (product.trackingMode !== 'quantity') {
+      throw new ValidationError('quantity_product_required', 'Для серийного товара используйте перемещение по IMEI');
+    }
+    const from = dto.from.trim();
+    const to = dto.to.trim();
+    if (!from || !to) throw new ValidationError('location_required', 'Укажите склады отправления и назначения');
+    if (from === to) throw new ValidationError('same_location', 'Склады отправления и назначения совпадают');
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'quantity-transfer:' + dto.idempotencyKey}))::text AS locked`;
+      const replay = await tx.inventoryMovement.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+      if (replay) return { result: replayQuantityTransfer(replay, dto), events: [] };
+      const source = await tx.inventoryBalance.findUnique({
+        where: { productId_location: { productId: dto.productId, location: from } },
+      });
+      if (!source || source.onHand - source.reserved < dto.qty) {
+        throw new ConflictError('insufficient_available_stock', `На складе ${from} недостаточно свободного остатка`);
+      }
+      await tx.inventoryBalance.update({
+        where: { id: source.id },
+        data: { onHand: { decrement: dto.qty } },
+      });
+      await tx.inventoryBalance.upsert({
+        where: { productId_location: { productId: dto.productId, location: to } },
+        create: { productId: dto.productId, location: to, onHand: dto.qty },
+        update: { onHand: { increment: dto.qty } },
+      });
+      const movement = await tx.inventoryMovement.create({
+        data: {
+          idempotencyKey: dto.idempotencyKey,
+          productId: dto.productId,
+          qty: dto.qty,
+          type: 'moved',
+          from,
+          to,
+          reason: dto.reason?.trim() || null,
+        },
+      });
+      return {
+        result: {
+          movementId: movement.id,
+          productId: dto.productId,
+          from,
+          to,
+          qty: dto.qty,
+          idempotent: false,
+        },
+        events: [{
+          type: EventType.StockMoved,
+          actor,
+          payload: { movementId: movement.id, productId: dto.productId, trackingMode: 'quantity', from, to, qty: dto.qty },
+          refs: [movement.id, dto.productId],
+        }],
+      };
+    });
+  }
+}
+
+function replayQuantityTransfer(movement: { id: string; productId: string; qty: number; type: string; from: string | null; to: string | null }, dto: TransferQuantityDto) {
+  if (movement.type !== 'moved'
+    || movement.productId !== dto.productId
+    || movement.qty !== dto.qty
+    || movement.from !== dto.from.trim()
+    || movement.to !== dto.to.trim()) {
+    throw new ConflictError('idempotency_key_reused', 'Ключ перемещения уже использован с другими данными');
+  }
+  return {
+    movementId: movement.id,
+    productId: movement.productId,
+    from: movement.from,
+    to: movement.to,
+    qty: movement.qty,
+    idempotent: true,
+  };
 }

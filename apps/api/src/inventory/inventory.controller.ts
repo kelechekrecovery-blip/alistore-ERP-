@@ -18,6 +18,7 @@ import {
   ReceiveDto,
   ReceiveQuantityDto,
   TransferDto,
+  TransferQuantityDto,
 } from './inventory.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -117,6 +118,13 @@ export class InventoryController {
   @RequirePermission('inventory', 'transfer')
   async transfer(@CurrentUser() user: AuthPrincipal, @Body() dto: TransferDto) {
     return this.inventory.transfer(dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'Transfer quantity-tracked stock between locations exactly once' })
+  @Post('transfer-quantity')
+  @RequirePermission('inventory', 'transfer')
+  async transferQuantity(@CurrentUser() user: AuthPrincipal, @Body() dto: TransferQuantityDto) {
+    return this.inventory.transferQuantity(dto, await requireActiveStaff(user, this.staffAuth));
   }
 
   @ApiOperation({ summary: 'Take inventory for a product at a location (inventory.counted)' })

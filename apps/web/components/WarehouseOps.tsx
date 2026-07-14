@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchCatalog, inventoryCount, receiveInventoryBatch, receiveQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, inventoryCount, receiveInventoryBatch, receiveQuantityInventory, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
 
 /** Transfer + inventory-count operations for the warehouse console. */
 export function WarehouseOps({ accessToken, actor }: { accessToken: string; actor: string }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [imei, setImei] = useState('');
+  const [transferProductId, setTransferProductId] = useState('');
+  const [transferFrom, setTransferFrom] = useState('BISHKEK-1');
+  const [transferQty, setTransferQty] = useState('');
   const [dest, setDest] = useState('BISHKEK-2');
   const [productId, setProductId] = useState('');
   const [location, setLocation] = useState('BISHKEK-1');
@@ -18,6 +21,12 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [receiveGrade, setReceiveGrade] = useState('A');
   const [receiveImeis, setReceiveImeis] = useState('');
   const [receiveQuantity, setReceiveQuantity] = useState('');
+  const [adjustProductId, setAdjustProductId] = useState('');
+  const [adjustLocation, setAdjustLocation] = useState('BISHKEK-1');
+  const [adjustQty, setAdjustQty] = useState('');
+  const [adjustType, setAdjustType] = useState<'write_off' | 'adjust'>('write_off');
+  const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('decrease');
+  const [adjustReason, setAdjustReason] = useState('');
   const [transferFiles, setTransferFiles] = useState<File[]>([]);
   const [countFiles, setCountFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -29,6 +38,8 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
       if (c.items[0]) {
         setProductId(c.items[0].id);
         setReceiveProductId(c.items[0].id);
+        setTransferProductId(c.items[0].id);
+        setAdjustProductId(c.items.find((product) => product.trackingMode === 'quantity')?.id ?? c.items[0].id);
       }
     });
   }, []);
@@ -39,22 +50,44 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   }
 
   async function doTransfer() {
-    if (!imei.trim() || !dest.trim()) return;
+    const selected = products.find((product) => product.id === transferProductId);
+    const quantity = Number(transferQty);
+    if (!selected || !dest.trim()) return;
+    if (selected.trackingMode === 'quantity'
+      ? !transferFrom.trim() || !Number.isInteger(quantity) || quantity < 1
+      : !imei.trim()) return;
     setBusy('transfer');
     try {
-      const r = await transferUnit(imei.trim(), dest.trim(), accessToken);
+      let movementId: string;
+      let success: string;
+      if (selected.trackingMode === 'quantity') {
+        const result = await transferQuantityInventory({
+            idempotencyKey: crypto.randomUUID(),
+            productId: selected.id,
+            from: transferFrom.trim(),
+            to: dest.trim(),
+            qty: quantity,
+          }, accessToken);
+        movementId = result.movementId;
+        success = `✓ ${result.qty} шт: ${result.from} → ${result.to}`;
+      } else {
+        const result = await transferUnit(imei.trim(), dest.trim(), accessToken);
+        movementId = result.movementId;
+        success = `✓ ${result.imei}: ${result.from} → ${result.to}`;
+      }
       const evidence = transferFiles.length
         ? await uploadEvidenceImages({
             files: transferFiles,
             entityType: 'inventory',
-            entityId: r.movementId,
+            entityId: movementId,
             label: 'transfer_photo',
             actor,
             accessToken,
           })
         : [];
-      flash(`✓ ${r.imei}: ${r.from} → ${r.to} · фото ${evidence.length}`);
+      flash(`${success} · фото ${evidence.length}`);
       setImei('');
+      setTransferQty('');
       setTransferFiles([]);
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка перемещения');
@@ -114,10 +147,33 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
     }
   }
 
+  async function requestAdjustment() {
+    const quantity = Number(adjustQty);
+    if (!adjustProductId || !adjustLocation.trim() || !adjustReason.trim() || !Number.isInteger(quantity) || quantity < 1) return;
+    setBusy('adjust');
+    try {
+      const result = await requestInventoryMovement({
+        productId: adjustProductId,
+        location: adjustLocation.trim(),
+        qty: quantity,
+        type: adjustType,
+        direction: adjustType === 'adjust' ? adjustDirection : undefined,
+        reason: adjustReason.trim(),
+      }, accessToken);
+      flash(`✓ Заявка ${result.approvalId.slice(-8)} отправлена владельцу`);
+      setAdjustQty('');
+      setAdjustReason('');
+    } catch (e) {
+      flash(e instanceof Error ? errMsg(e) : 'Ошибка заявки');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="mb-4 rounded-card border border-[#2E2822] bg-[#1A1611] p-4 ">
       <div className="mb-3 font-display text-sm font-bold text-white">Операции склада</div>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {/* receive */}
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Приёмка партии</p>
@@ -148,14 +204,49 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
         </div>
         {/* transfer */}
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Перемещение по IMEI</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Перемещение</p>
           <div className="flex flex-col gap-2">
-            <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="IMEI единицы" className="rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+            <select aria-label="Товар для перемещения" value={transferProductId} onChange={(e) => setTransferProductId(e.target.value)} className="rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-2 text-sm outline-none focus:border-coral">
+              {products.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.trackingMode === 'quantity' ? 'количество' : 'IMEI'}</option>)}
+            </select>
+            {products.find((product) => product.id === transferProductId)?.trackingMode === 'quantity' ? (
+              <div className="grid grid-cols-2 gap-2">
+                <input aria-label="Склад отправления" value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} placeholder="откуда" className="min-w-0 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+                <input aria-label="Количество для перемещения" value={transferQty} onChange={(e) => setTransferQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="количество" className="min-w-0 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+              </div>
+            ) : (
+              <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="IMEI единицы" className="rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+            )}
             <div className="flex gap-2">
-              <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="куда (склад)" className="flex-1 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+              <input aria-label="Склад назначения" value={dest} onChange={(e) => setDest(e.target.value)} placeholder="куда (склад)" className="flex-1 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
               <button type="button" disabled={busy === 'transfer'} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-[#2E2822]">Переместить</button>
             </div>
             <EvidencePicker files={transferFiles} onChange={setTransferFiles} label="Фото перемещения" hint="Коробка, IMEI или полка" max={3} />
+          </div>
+        </div>
+        {/* adjustment */}
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">Списание и корректировка</p>
+          <div className="flex flex-col gap-2">
+            <select aria-label="Товар для корректировки" value={adjustProductId} onChange={(e) => setAdjustProductId(e.target.value)} className="rounded-btn border border-[#2E2822] bg-[#1A1611] px-3 py-2 text-sm outline-none focus:border-coral">
+              {products.filter((product) => product.trackingMode === 'quantity').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <select aria-label="Тип корректировки" value={adjustType} onChange={(e) => setAdjustType(e.target.value as 'write_off' | 'adjust')} className="min-w-0 rounded-btn border border-[#2E2822] bg-[#1A1611] px-2 py-2 text-sm outline-none focus:border-coral">
+                <option value="write_off">Списание</option>
+                <option value="adjust">Корректировка</option>
+              </select>
+              <select aria-label="Направление корректировки" disabled={adjustType === 'write_off'} value={adjustDirection} onChange={(e) => setAdjustDirection(e.target.value as 'increase' | 'decrease')} className="min-w-0 rounded-btn border border-[#2E2822] bg-[#1A1611] px-2 py-2 text-sm outline-none focus:border-coral disabled:text-[#6E645C]">
+                <option value="decrease">Уменьшить</option>
+                <option value="increase">Увеличить</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input aria-label="Склад корректировки" value={adjustLocation} onChange={(e) => setAdjustLocation(e.target.value)} placeholder="склад" className="min-w-0 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+              <input aria-label="Количество корректировки" value={adjustQty} onChange={(e) => setAdjustQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="количество" className="min-w-0 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+            </div>
+            <input aria-label="Причина корректировки" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} placeholder="причина и основание" className="rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral" />
+            <button type="button" disabled={busy === 'adjust'} onClick={requestAdjustment} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-[#2E2822]">На согласование</button>
           </div>
         </div>
         {/* count */}

@@ -16,6 +16,22 @@ export function transferUnit(
   return postAuthJson('/inventory/transfer', { imei, to, reason }, accessToken);
 }
 
+export interface TransferQuantityResult {
+  movementId: string;
+  productId: string;
+  from: string;
+  to: string;
+  qty: number;
+  idempotent: boolean;
+}
+
+export function transferQuantityInventory(
+  input: { idempotencyKey: string; productId: string; from: string; to: string; qty: number; reason?: string },
+  accessToken: string,
+): Promise<TransferQuantityResult> {
+  return postAuthJson('/inventory/transfer-quantity', input, accessToken);
+}
+
 export interface CountResult {
   productId: string;
   location: string;
@@ -60,6 +76,20 @@ export function receiveQuantityInventory(
   accessToken: string,
 ): Promise<ReceiveQuantityResult> {
   return postAuthJson('/inventory/receive-quantity', { productId, location, quantity }, accessToken);
+}
+
+export function requestInventoryMovement(
+  input: {
+    productId: string;
+    location: string;
+    qty: number;
+    type: 'write_off' | 'adjust';
+    direction?: 'increase' | 'decrease';
+    reason: string;
+  },
+  accessToken: string,
+): Promise<{ approvalId: string }> {
+  return postAuthJson('/inventory/movements', input, accessToken);
 }
 
 export function inventoryCount(
