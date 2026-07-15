@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsISO8601, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class StorefrontBenefitDto {
@@ -24,4 +24,13 @@ export class CreateStorefrontContentDto {
   @ApiProperty({ type: () => [StorefrontBenefitDto] })
   @IsArray() @ArrayMaxSize(4) @ValidateNested({ each: true }) @Type(() => StorefrontBenefitDto)
   benefits!: StorefrontBenefitDto[];
+  @ApiProperty() @IsString() @MaxLength(100) featuredTitle!: string;
+  @ApiProperty({ type: [String], maxItems: 12 })
+  @IsArray() @ArrayMaxSize(12) @ArrayUnique() @IsString({ each: true })
+  featuredProductIds!: string[];
+}
+
+export class ScheduleStorefrontContentDto {
+  @ApiProperty() @IsISO8601() startsAt!: string;
+  @ApiPropertyOptional() @IsOptional() @IsISO8601() endsAt?: string;
 }

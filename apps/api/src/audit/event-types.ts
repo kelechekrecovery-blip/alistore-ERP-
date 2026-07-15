@@ -133,6 +133,8 @@ export const EventType = {
   CampaignConverted: 'campaign.converted',
   StorefrontContentDrafted: 'storefront.content_drafted',
   StorefrontContentPublished: 'storefront.content_published',
+  StorefrontContentScheduled: 'storefront.content_scheduled',
+  StorefrontContentScheduleCancelled: 'storefront.content_schedule_cancelled',
   TicketCreated: 'ticket.created',
   TicketEscalated: 'ticket.escalated',
   B2BQuoteRequested: 'b2b.quote_requested',

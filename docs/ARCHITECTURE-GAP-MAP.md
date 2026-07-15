@@ -8,9 +8,9 @@ been built or tested; it does not mean external production certification is comp
 
 | Target | Current implementation | Status | Acceptance gate |
 |---|---|---|---|
-| Next.js storefront + ERP/admin | 39 routes, production build and 38-flow Playwright coverage | Ready | `npm run build -w @alistore/web`, full Playwright |
+| Next.js storefront + ERP/admin | 39 routes, production build and 39 verified Playwright flows | Ready | `npm run build -w @alistore/web`, broad Playwright plus isolated timeout reruns |
 | NestJS modular monolith | 51 modules including Storefront CMS behind one API | Ready | API build and 124 Jest suites |
-| PostgreSQL + Prisma | 61 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
+| PostgreSQL + Prisma | 62 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
 | Append-only Event Ledger | `AuditService.transaction` commits mutations and events together | Ready | ledger/invariant/concurrency suites |
 | Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
 | Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |
@@ -61,7 +61,7 @@ Shared Android foundation:
 
 ## ERP and storefront integration
 
-- ERP CMS revisions own storefront hero/about/delivery/contact/benefit copy through marketer/admin/owner RBAC and Event Ledger publication. Active ERP `StorePoint` rows own public addresses and opening hours. Product photos, ratings and commercial terms render only from explicit catalog/CMS data; catalog pagination and exact product reads have no 100-item discovery ceiling, and the cart revalidates canonical price and stock caps before checkout.
+- ERP CMS revisions own storefront hero/about/delivery/contact/benefit copy and an ordered product collection through marketer/admin/owner RBAC and Event Ledger publication. Revisions support immediate publication or a non-overlapping activation window with expiry fallback and cancellation. Active ERP `StorePoint` rows own public addresses and opening hours. Product photos, ratings and commercial terms render only from explicit catalog/CMS data; catalog pagination and exact product reads have no 100-item discovery ceiling, and the cart revalidates canonical price and stock caps before checkout.
 - Service Center now shares one `WarrantyCase` status source between ERP and the customer account. ERP creates the associated work order, records diagnostics and an estimate, while only the owning customer can approve that estimate through a customer JWT.
 - Intake, diagnosis, estimate approval, paid settlement, repair execution and loaner custody use immutable command records with stable idempotency keys and append domain events in the same transaction. The loaner fund reuses serialized `DeviceUnit` inventory, requires Evidence on issue/return, blocks repair closure while custody is active and escalates overdue loans through the outbox. Exact linked case-detail pixel acceptance remains blocked by absent handoff files.
 

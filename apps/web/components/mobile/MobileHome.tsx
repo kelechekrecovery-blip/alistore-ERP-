@@ -21,10 +21,14 @@ export default function MobileHome() {
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
 
   useEffect(() => {
-    fetchCatalog({ limit: 20 })
-      .then((response) => setProducts(response.items))
-      .catch(() => setProducts([]));
-    fetchStorefrontContent().then(setStorefront);
+    fetchStorefrontContent().then(async (payload) => {
+      setStorefront(payload);
+      if (payload?.featuredProducts.length) {
+        setProducts(payload.featuredProducts);
+        return;
+      }
+      setProducts((await fetchCatalog({ limit: 20, sort: 'stock_desc' })).items);
+    }).catch(() => setProducts([]));
   }, []);
 
   const hits = (products ?? []).slice(0, 6);
@@ -92,7 +96,7 @@ export default function MobileHome() {
 
         {/* hits */}
         <StaggerItem className="mb-3 flex items-center">
-          <span className="font-display text-[18px] font-bold text-white">Товары в каталоге</span>
+          <span className="font-display text-[18px] font-bold text-white">{storefront?.content.featuredTitle ?? 'Товары в каталоге'}</span>
           <Link href="/catalog" className="ml-auto text-[13px] text-lime">
             Все →
           </Link>

@@ -26,8 +26,14 @@ export default function HomePage() {
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
 
   useEffect(() => {
-    fetchCatalog({ limit: 12 }).then((response) => setProducts(response.items)).catch(() => setProducts([]));
-    fetchStorefrontContent().then(setStorefront);
+    fetchStorefrontContent().then(async (payload) => {
+      setStorefront(payload);
+      if (payload?.featuredProducts.length) {
+        setProducts(payload.featuredProducts);
+        return;
+      }
+      setProducts((await fetchCatalog({ limit: 12, sort: 'stock_desc' })).items);
+    }).catch(() => setProducts([]));
   }, []);
 
   return (
@@ -76,7 +82,7 @@ export default function HomePage() {
 
           <section className="pb-10 pt-12">
             <div className="mb-6 flex items-end justify-between">
-              <div><p className="text-xs font-bold uppercase text-[#ff4d2e]">Актуальные данные</p><h2 className="mt-1 text-[28px] font-extrabold">Товары в каталоге</h2></div>
+              <div><p className="text-xs font-bold uppercase text-[#ff4d2e]">Подборка магазина</p><h2 className="mt-1 text-[28px] font-extrabold">{storefront?.content.featuredTitle ?? 'Товары в каталоге'}</h2></div>
               <Link href="/catalog" className="flex items-center gap-2 text-sm font-bold hover:text-[#ff4d2e]">Смотреть все <ArrowRight size={17} /></Link>
             </div>
             {products === null ? <CatalogSkeleton /> : products.length > 0 ? <div className="grid grid-cols-4 gap-4">{products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="rounded-[12px] border border-[#e5e5e7] bg-white px-6 py-12 text-center text-[#4a4a4a]">Каталог обновляется. <Link href="/catalog" className="font-bold text-[#ff4d2e]">Открыть каталог</Link></div>}

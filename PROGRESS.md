@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-001
+
+- Iteration ID: `MKT-001`.
+- Task: turn the first Marketing CMS slice into an authoritative ERP-to-storefront workflow.
+- Files changed: Storefront revision schema/migration, scheduling API/RBAC/Ledger events, ordered catalog projection, ERP CMS product selector and scheduling controls, desktop/mobile storefront consumption, API and Playwright regression coverage.
+- Result: marketer/admin/owner can select and order up to 12 active products, publish immediately or schedule a bounded campaign, cancel it and automatically fall back to the baseline publication after expiry. Missing/archived products and overlapping campaign windows fail closed. The customer home reads the exact server-owned title and product order; the browser test proves the ERP consequence end to end.
+- Checks run: clean PostgreSQL migration deploy (62/62); targeted Storefront API 5/5; full API 124/124 suites and 493/493 tests; API and Next production builds; targeted ERP-to-storefront Playwright 1/1; broad Playwright 36 passed with three unrelated Next dev navigation timeouts, followed by isolated 3/3 green reruns; `git diff --check` passed.
+- Acceptance: `accepted` for scheduled product collections. Banner/block ordering, review approval and promo/review moderation remain partial and are not claimed complete.
+- Next backlog ID: complete the remaining Marketing CMS handoff without changing the MKT-001 publication contract.
+
 ## 2026-07-15 — MER-001
 
 - Iteration ID: `MER-001`.

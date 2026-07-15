@@ -180,6 +180,19 @@ export class CatalogService {
     return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
   }
 
+  async curated(ids: string[]): Promise<CatalogProductDto[]> {
+    if (ids.length === 0) return [];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: ids }, archived: false },
+      include: this.stockCountInclude(),
+    });
+    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
+    const ordered = ids
+      .map((id) => byId.get(id))
+      .filter((product): product is CatalogProductDto => Boolean(product));
+    return this.enrichReviews(ordered);
+  }
+
   async reindex(maintenanceToken?: string): Promise<CatalogReindexResponseDto> {
     this.assertMaintenanceToken(maintenanceToken);
     const indexName = this.indexName();

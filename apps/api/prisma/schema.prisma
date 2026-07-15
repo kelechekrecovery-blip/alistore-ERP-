@@ -1421,12 +1421,18 @@ model StorefrontContentRevision {
   contactPhone   String?
   supportHours   String?
   benefits       Json
+  featuredTitle  String   @default("Подборка AliStore")
+  featuredProductIds String[] @default([])
   createdBy      String
   publishedBy    String?
+  scheduledBy    String?
   createdAt      DateTime @default(now())
   publishedAt    DateTime?
+  startsAt       DateTime?
+  endsAt         DateTime?
 
   @@index([status, publishedAt])
+  @@index([status, startsAt, endsAt])
 }
 
 model SupportTicket {
