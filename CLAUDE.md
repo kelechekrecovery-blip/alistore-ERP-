@@ -16,6 +16,17 @@ iOS/Android. Монорепо на npm workspaces.
 - **systematic-debugging** — 4 фазы root-cause: воспроизвести → изолировать → причина → фикс+verify.
 - **verification-before-completion** — реальные гейты перед «готово».
 
+## Проектные сабагенты (`.claude/agents/`)
+
+Узкие специалисты под этот стек (авто-подбор по контексту или явным упоминанием):
+
+- **nestjs-ledger-engineer** — бэкенд-фичи apps/api: Event Ledger, `audit.transaction`, advisory-lock, RBAC, idempotency, TDD.
+- **storefront-web-developer** — apps/web (Next.js витрина/ERP): server-authoritative данные, desktop/mobile-зеркала, токены.
+- **ai-layer-engineer** — apps/api/src/ai: нейтральный LlmClient-порт, structured output, keyless-fallback, ai:eval.
+- **ledger-security-reviewer** — read-only ревью: RBAC/IDOR, атомарность леджера, idempotency, утечки ключей.
+- **prisma-migration-reviewer** — read-only ревью схемы/миграций: инварианты-первыми, индексы, uniques, дрейф истории.
+- **e2e-acceptance-engineer** — jest-интеграция + Playwright по ролям (хелперы `e2e/helpers.ts`, Postgres-предусловие).
+
 ## Команды (это правда — сверено)
 
 | Задача | Команда |

@@ -17,9 +17,10 @@ current model IDs and SDK usage — do not guess.
   `supportsTools`/`supportsStructuredOutput`). Resolve the provider via `resolveLlmClient()`
   (`llm/llm.factory.ts`) — never re-implement the `AI_PROVIDER_KEY ?? OPENROUTER_API_KEY` check.
   Implementations: `AnthropicLlmClient` (vision, structured output via `output_config.format`, tool
-  loop, prompt caching), `OpenRouterLlmClient` (text-only fallback). Model default `claude-opus-4-8`;
-  `AI_FAST_MODEL` (Haiku) for high-volume paths — apply it only on the Anthropic client
-  (`client.supportsStructuredOutput`).
+  loop, prompt caching) and `OpenRouterLlmClient` (OpenAI-compatible: vision via `image_url`
+  data-URLs + structured output via `response_format: json_schema`; no tool loop). Model default
+  `claude-opus-4-8`; `AI_FAST_MODEL` (Haiku) for high-volume paths — apply it only on the Anthropic
+  client (gate with `isAnthropic(client)` from `llm/llm-client.ts`).
 - **Structured output** for machine-readable results: define a JSON schema (`*_SCHEMA`), pass
   `jsonSchema`, and keep the tolerant text parser as a safety net (see `moderation.ts`,
   `categorize.ts`, `grading.ts`, `price-scout.ts`). Cache stable system prefixes (`cacheSystem: true`).

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationError } from '../common/errors';
 import { buildDescription, buildDescriptionMessages, DescribeInput, ProductDescription } from './describe';
+import { isAnthropic } from './llm/llm-client';
 import { fastModel, resolveLlmClient } from './llm/llm.factory';
 
 /**
@@ -30,7 +31,7 @@ export class DescribeService {
         cacheSystem: true,
         // AI_FAST_MODEL names a Claude model — only apply it to the Anthropic client, never
         // to OpenRouter (whose model comes from AI_MODEL and uses a different id namespace).
-        model: client.supportsStructuredOutput ? fastModel() : undefined,
+        model: isAnthropic(client) ? fastModel() : undefined,
         maxTokens: 400,
       });
       const description = res.text.trim();

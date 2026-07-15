@@ -5,8 +5,8 @@
  * callers. Keys live server-side only and never reach the client.
  *
  * Three capabilities are modelled explicitly (vision, tools, structured output) because
- * they differ by provider: the OpenRouter transport is text-only, while the Anthropic
- * client supports image content blocks, an agentic tool loop, and schema-validated JSON.
+ * they differ by provider and model: OpenRouter capabilities are model-aware, while the
+ * Anthropic client supports image content blocks, an agentic tool loop, and structured JSON.
  * Callers check the capability flags and degrade (or fall back to rules) when unsupported.
  */
 
@@ -76,4 +76,13 @@ export interface LlmClient {
   readonly supportsStructuredOutput: boolean;
   /** Run one turn (or a full tool loop when `opts.tools` is set). Throws on transport error. */
   chat(messages: LlmMessage[], opts?: LlmChatOptions): Promise<LlmChatResult>;
+}
+
+/**
+ * Whether the client is the Anthropic implementation. Used to gate model-name overrides
+ * that live in the Anthropic id namespace (e.g. `AI_FAST_MODEL=claude-haiku-4-5`) so a
+ * Claude model id is never sent to another provider.
+ */
+export function isAnthropic(client: Pick<LlmClient, 'source'>): boolean {
+  return client.source.startsWith('anthropic:');
 }

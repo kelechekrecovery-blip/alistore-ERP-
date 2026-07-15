@@ -1,4 +1,4 @@
-import { ChatMessage, openRouterChat, OpenRouterOptions } from './openrouter-provider';
+import { ChatMessage } from './openrouter-provider';
 import type { LlmMessage } from './llm/llm-client';
 import type { ResolvedPhoto } from './llm/image-resolver';
 import { DeviceGrade } from './valuation';
@@ -9,7 +9,6 @@ export interface PhotoEvidence {
   label?: string;
   mimeType?: string;
 }
-
 export interface PhotoGradingInput {
   photos: PhotoEvidence[];
   model?: string;
@@ -100,14 +99,18 @@ export function gradePhotosByRules(input: PhotoGradingInput): PhotoGradingResult
   return { source: 'rules', grade, confidence, defects, notes, recommendedChecks };
 }
 
-/** Shared grading persona — used by both the text (OpenRouter) and vision (Claude) paths. */
+/** Shared grading persona + the AliStore intake rubric — used by both vision and text paths. */
 const GRADING_SYSTEM = [
   'Ты — эксперт приёмки Б/У электроники AliStore.',
   'Оцени реальное состояние устройства и верни строгий результат.',
-  'grade: A (как новый), B (следы использования), C (существенный износ/риск ремонта или блокировки).',
+  'Рубрика AliStore (следуй ей строго):',
+  'A — полный набор ракурсов (3+ фото/меток) и НИ ОДНОГО дефекта на фото или в анкете.',
+  'B — один тяжёлый дефект (экран/аккумулятор/камера), износ корпуса, ИЛИ неполный набор (<3 ракурсов).',
+  'C — влага/окисление, блокировка (iCloud/не включается), IMEI-mismatch, или 2+ тяжёлых дефектов.',
+  'Если claimedGrade заявлен НИЖЕ рассчитанного — используй claimedGrade.',
   'Смотри на дефекты: трещины и сколы экрана/корпуса, царапины, вздутие/деформация (возможный аккумулятор),',
   'следы влаги/окисления, отсутствие/повреждение камеры, признаки вскрытия. Не выдумывай факты:',
-  'если на фото не видно дефекта — не заявляй его; если фото недоступны или неинформативны — снижай confidence.',
+  'если дефекта нет на фото и в анкете — не заявляй его; если фото недоступны — грейди по анкете/меткам по рубрике и снижай confidence.',
   'confidence 0..1. defects — короткие машинные метки, notes и recommendedChecks — на русском.',
 ].join(' ');
 
@@ -201,17 +204,4 @@ export function parsePhotoGradingResponse(content: string): Omit<PhotoGradingRes
     notes: notes.slice(0, 6),
     recommendedChecks: recommendedChecks.slice(0, 8),
   };
-}
-
-export class OpenRouterPhotoGradingProvider {
-  readonly source: string;
-
-  constructor(private readonly opts: OpenRouterOptions) {
-    this.source = `openrouter:${opts.model ?? 'openai/gpt-4o-mini'}`;
-  }
-
-  async grade(input: PhotoGradingInput): Promise<PhotoGradingResult> {
-    const content = await openRouterChat(buildPhotoGradingMessages(input), this.opts);
-    return { source: this.source, ...parsePhotoGradingResponse(content) };
-  }
 }

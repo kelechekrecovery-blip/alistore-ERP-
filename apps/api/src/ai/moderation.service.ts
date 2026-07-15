@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { isAnthropic } from './llm/llm-client';
 import { fastModel, resolveLlmClient } from './llm/llm.factory';
 import {
   buildModerationMessages,
@@ -32,7 +33,8 @@ export class ModerationService {
         system: MODERATION_SYSTEM,
         cacheSystem: true,
         jsonSchema: MODERATION_SCHEMA,
-        model: fastModel(),
+        // AI_FAST_MODEL names a Claude model — never send it to a non-Anthropic provider.
+        model: isAnthropic(client) ? fastModel() : undefined,
         maxTokens: 300,
       });
       return coerceModeration(res.parsed, res.source) ?? fallback;

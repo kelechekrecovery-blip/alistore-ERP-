@@ -7,6 +7,7 @@ import {
   coerceCategorySuggestion,
   suggestCategory,
 } from './categorize';
+import { isAnthropic } from './llm/llm-client';
 import { fastModel, resolveLlmClient } from './llm/llm.factory';
 
 /**
@@ -29,7 +30,8 @@ export class CategorizeService {
         system: CATEGORIZE_SYSTEM,
         cacheSystem: true,
         jsonSchema: CATEGORIZE_SCHEMA,
-        model: fastModel(),
+        // AI_FAST_MODEL names a Claude model — never send it to a non-Anthropic provider.
+        model: isAnthropic(client) ? fastModel() : undefined,
         maxTokens: 400,
       });
       return coerceCategorySuggestion(res.parsed) ?? fallback;

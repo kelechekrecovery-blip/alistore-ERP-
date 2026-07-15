@@ -27,8 +27,10 @@ describe('resolveLlmClient', () => {
   it('falls back to OpenRouter in auto mode when only its key is present', () => {
     const client = resolveLlmClient(envOf({ AI_PROVIDER_KEY: 'or-key', AI_MODEL: 'x/y' }));
     expect(client?.source).toBe('openrouter:x/y');
+    // Unknown OpenRouter models are fail-closed; known multimodal models advertise more.
     expect(client?.supportsVision).toBe(false);
     expect(client?.supportsStructuredOutput).toBe(false);
+    expect(client?.supportsTools).toBe(false);
   });
 
   it('honours an explicit ANTHROPIC_MODEL override', () => {
