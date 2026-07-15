@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — AP-001A
+
+- Iteration ID: `AP-001A`.
+- Task: make purchase receiving create authoritative supplier payable accounting instead of only stock movements.
+- Files changed: `PurchaseReceipt` journal relation/migration, procurement receiving service, procurement regression assertions.
+- Result: every non-zero partial or full PO receipt posts `1200` inventory debit / `2000` supplier liability credit, links the receipt to its journal entry and emits `AccountingEntryPosted`. The receipt id is the source/idempotency boundary, so replay cannot duplicate either stock or AP.
+- Checks run: Prisma schema generation, API build, reset test database, procurement API/RBAC suite 5/5 tests.
+- Acceptance: `accepted` for receipt-to-AP posting. Supplier invoice matching, supplier payment, credit notes, landed cost and AP aging remain open.
+- Next step: add a supplier invoice document with three-way PO/receipt matching and an idempotent AP payment path.
+
 ## 2026-07-15 — FIN-003C
 
 - Iteration ID: `FIN-003C`.

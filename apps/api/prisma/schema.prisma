@@ -1376,6 +1376,7 @@ model AccountingJournalEntry {
   createdBy      String
   lines          AccountingJournalLine[]
   payment        Payment?
+  purchaseReceipt PurchaseReceipt?
 
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])
@@ -1527,6 +1528,8 @@ model PurchaseReceipt {
   idempotencyKey  String
   actor           String
   payload         Json
+  accountingEntryId String?                 @unique
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   createdAt       DateTime      @default(now())
 
   @@unique([purchaseOrderId, idempotencyKey])

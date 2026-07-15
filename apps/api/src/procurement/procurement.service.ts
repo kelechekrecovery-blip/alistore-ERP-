@@ -7,6 +7,7 @@ import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseOrderDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
 const DETAIL_INCLUDE = {
   supplier: { select: { id: true, name: true, contact: true } },
@@ -14,7 +15,7 @@ const DETAIL_INCLUDE = {
     include: { product: { select: { id: true, sku: true, name: true } } },
     orderBy: { id: 'asc' as const },
   },
-  receipts: { select: { id: true, idempotencyKey: true, actor: true, createdAt: true }, orderBy: { createdAt: 'desc' as const } },
+  receipts: { select: { id: true, idempotencyKey: true, actor: true, accountingEntryId: true, createdAt: true }, orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.PurchaseOrderInclude;
 
 @Injectable()
@@ -190,9 +191,11 @@ export class ProcurementService {
           data: { purchaseOrderId: id, idempotencyKey: dto.idempotencyKey, actor, payload: normalizedLines },
         });
         const events: AuditInput[] = [];
+        let receiptValue = 0;
         const nextReceived = new Map(order.items.map((item) => [item.id, item.receivedQty]));
         for (const line of normalizedLines) {
           const item = byId.get(line.itemId)!;
+          receiptValue += line.imeis.length * item.unitCost;
           await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQty: { increment: line.imeis.length } } });
           const movement = await tx.inventoryMovement.create({
             data: { productId: item.productId, qty: line.imeis.length, type: 'received', to: order.location, reason: order.number, unitCost: item.unitCost, totalValue: line.imeis.length * item.unitCost },
@@ -213,6 +216,30 @@ export class ProcurementService {
             payload: { purchaseOrderId: id, receiptId: receipt.id, productId: item.productId, imei, location: order.location, grade: line.grade ?? null },
             refs: [id, receipt.id, item.productId, imei],
           })));
+        }
+        const accountingEntry = receiptValue > 0
+          ? await postAccountingEntryOnTx(tx, {
+            idempotencyKey: `accounting:procurement.receipt:${receipt.id}`,
+            sourceType: 'procurement.receipt',
+            sourceRef: receipt.id,
+            description: `Оприходование закупки ${order.number}`,
+            point: order.location,
+            occurredAt: receipt.createdAt,
+            createdBy: actor,
+            lines: [
+              { accountCode: '1200', debit: receiptValue, memo: 'Поступление товарного запаса по PO' },
+              { accountCode: '2000', credit: receiptValue, memo: 'Обязательство перед поставщиком по PO' },
+            ],
+          })
+          : null;
+        if (accountingEntry) {
+          await tx.purchaseReceipt.update({ where: { id: receipt.id }, data: { accountingEntryId: accountingEntry.id } });
+          events.push({
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: { accountingEntryId: accountingEntry.id, sourceType: 'procurement.receipt', sourceRef: receipt.id, amount: receiptValue, supplierId: order.supplierId },
+            refs: [accountingEntry.id, receipt.id, id, order.supplierId],
+          });
         }
         const complete = order.items.every((item) => nextReceived.get(item.id) === item.orderedQty);
         const status: PurchaseOrderStatus = complete ? 'received' : 'receiving';

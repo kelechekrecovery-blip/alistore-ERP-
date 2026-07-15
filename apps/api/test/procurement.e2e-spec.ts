@@ -133,6 +133,14 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .expect(201);
     expect(partial.body).toMatchObject({ status: 'receiving', idempotent: false });
     expect(partial.body.items[0].receivedQty).toBe(1);
+    const partialReceipt = await prisma.purchaseReceipt.findUnique({ where: { id: partial.body.receiptId } });
+    expect(partialReceipt?.accountingEntryId).toBeTruthy();
+    const partialEntry = await prisma.accountingJournalEntry.findUnique({ where: { id: partialReceipt?.accountingEntryId ?? '' }, include: { lines: true } });
+    expect(partialEntry?.sourceType).toBe('procurement.receipt');
+    expect(partialEntry?.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1200', debit: 70000 }),
+      expect.objectContaining({ accountCode: '2000', credit: 70000 }),
+    ]));
 
     const replay = await request(app.getHttpServer())
       .post(`/procurement/purchase-orders/${created.body.id}/receive`)
@@ -162,6 +170,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     expect(completed.body.items[0].receivedQty).toBe(2);
     expect(await prisma.deviceUnit.count({ where: { productId: product.id, status: 'in_stock' } })).toBe(2);
     expect(await prisma.inventoryMovement.count({ where: { productId: product.id, type: 'received' } })).toBe(2);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'procurement.receipt' } })).toBe(2);
 
     const eventTypes = (await prisma.auditEvent.findMany({ orderBy: { ts: 'asc' } })).map((event) => event.type);
     expect(eventTypes).toEqual(expect.arrayContaining([
