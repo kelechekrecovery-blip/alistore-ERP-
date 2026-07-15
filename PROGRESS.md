@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — FIN-003C
+
+- Iteration ID: `FIN-003C`.
+- Task: close the accounting gap for consignment returns before and after owner payout.
+- Files changed: consignment return journal helper, serialized/quantity return reconciliation, and regression assertions.
+- Result: an unpaid consignment return reverses the owner payable reclassification (`2000` debit / `4000` credit); a return after payout creates an owner receivable (`1100` debit / `4000` credit) alongside the existing compensation obligation. Both paths are scoped by return and line and emit `AccountingEntryPosted` Ledger evidence, so reconciliation cannot silently change business tables without a journal consequence.
+- Checks run: Prisma reset/schema push; API build; serialized, quantity-consignment and return-reconciliation suites passed, 12/12 tests; `git diff --check` for the iteration files.
+- Acceptance: `accepted` for the consignment-return accounting contour. Settlement of owner receivables and payroll/AP/period controls remain open.
+- Next step: implement authoritative supplier AP documents and three-way matching, then expose journal balances in ERP reports.
+
 ## 2026-07-15 — FIN-003B
 
 - Iteration ID: `FIN-003B`.

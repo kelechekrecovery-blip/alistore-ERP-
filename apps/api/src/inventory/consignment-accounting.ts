@@ -4,6 +4,44 @@ import { EventType } from '../audit/event-types';
 import { ConflictError } from '../common/errors';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
+/**
+ * Keep the owner share truthful when a sold consignment line is returned.
+ * Before payout, reverse the payable reclassification; after payout, record
+ * the amount recoverable from the owner instead of resurrecting a payable.
+ */
+export async function postConsignmentReturnAccountingOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    returnId: string;
+    sourceRef: string;
+    ownerAmount: number;
+    payoutPaid: boolean;
+    actor: string;
+  },
+) {
+  if (input.ownerAmount <= 0) return null;
+  const mode = input.payoutPaid ? 'owner-receivable' : 'unpaid-reversal';
+  return postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:owner-return:${mode}:${input.returnId}:${input.sourceRef}`,
+    sourceType: input.payoutPaid ? 'consignment.return.owner_receivable' : 'consignment.return.unpaid_reversal',
+    sourceRef: `${input.returnId}:${input.sourceRef}`,
+    description: input.payoutPaid
+      ? `Дебиторка владельца по возврату ${input.returnId}`
+      : `Сторно обязательства владельцу по возврату ${input.returnId}`,
+    occurredAt: new Date(),
+    createdBy: input.actor,
+    lines: input.payoutPaid
+      ? [
+        { accountCode: '1100', debit: input.ownerAmount, memo: 'Сумма к возврату владельцем после выплаты' },
+        { accountCode: '4000', credit: input.ownerAmount, memo: 'Сторно доли владельца в выручке' },
+      ]
+      : [
+        { accountCode: '2000', debit: input.ownerAmount, memo: 'Уменьшение обязательства перед владельцем' },
+        { accountCode: '4000', credit: input.ownerAmount, memo: 'Сторно доли владельца в выручке' },
+      ],
+  });
+}
+
 /** Accrue the immutable owner liability when a serialized consignment unit is sold. */
 export async function accrueConsignmentSalesOnTx(
   tx: Prisma.TransactionClient,

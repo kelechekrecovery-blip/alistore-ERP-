@@ -149,6 +149,15 @@ describe('Quantity consignment inventory (integration)', () => {
     expect(await prisma.inventoryBalance.findFirst({ where: { productId: product.id } })).toMatchObject({ onHand: 5, reserved: 0 });
     expect(await prisma.quantityConsignmentAllocation.findUnique({ where: { id: allocation.id } })).toMatchObject({ status: 'withdrawn', payoutId: payout.id });
     expect(await prisma.quantityConsignmentAdjustment.findUnique({ where: { returnId_allocationId: { returnId: ret.id, allocationId: allocation.id } } })).toMatchObject({ amount: 1_800, status: 'open' });
+    const ownerReceivable = await prisma.accountingJournalEntry.findUnique({
+      where: { idempotencyKey: `accounting:owner-return:owner-receivable:${ret.id}:quantity:${allocation.id}` },
+      include: { lines: true },
+    });
+    expect(ownerReceivable?.sourceType).toBe('consignment.return.owner_receivable');
+    expect(ownerReceivable?.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 1800 }),
+      expect.objectContaining({ accountCode: '4000', credit: 1800 }),
+    ]));
     expect(await prisma.quantityConsignmentLot.count({ where: { productId: product.id } })).toBe(2);
     expect(await prisma.auditEvent.count({ where: { type: 'consignment.returned', refs: { has: allocation.id } } })).toBe(1);
   });

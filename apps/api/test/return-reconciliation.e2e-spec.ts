@@ -341,6 +341,15 @@ describe('Refund-bound return reconciliation (integration)', () => {
     expect(await prisma.consignmentAdjustment.findUnique({
       where: { returnId_itemId: { returnId: ret.id, itemId: item.id } },
     })).toMatchObject({ payoutId: payout.id, amount: 45000, status: 'open' });
+    const ownerReceivable = await prisma.accountingJournalEntry.findUnique({
+      where: { idempotencyKey: `accounting:owner-return:owner-receivable:${ret.id}:serialized:${item.id}` },
+      include: { lines: true },
+    });
+    expect(ownerReceivable?.sourceType).toBe('consignment.return.owner_receivable');
+    expect(ownerReceivable?.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 45000 }),
+      expect.objectContaining({ accountCode: '4000', credit: 45000 }),
+    ]));
     expect(await prisma.consignmentAdjustment.count()).toBe(1);
   });
 
@@ -407,6 +416,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
     const returnedItems = await prisma.consignmentItem.findMany({ where: { saleOrderId: null } });
     expect(returnedItems).toHaveLength(2);
     expect(returnedItems.every((item) => item.status === 'active' && item.payoutId === null)).toBe(true);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'consignment.return.unpaid_reversal', sourceRef: { startsWith: `${ret.id}:` } } })).toBe(2);
     expect(await prisma.consignmentAdjustment.count()).toBe(0);
   });
 });

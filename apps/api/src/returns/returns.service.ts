@@ -5,6 +5,8 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import type { ReturnSelectionDto } from './returns.dto';
+import { reverseInventoryCostOnTx, reverseQuantityCostOnTx } from '../inventory/inventory-valuation';
+import { postConsignmentReturnAccountingOnTx } from '../inventory/consignment-accounting';
 
 type ReturnWithItems = Prisma.ReturnGetPayload<{ include: { items: true } }>;
 
@@ -240,6 +242,27 @@ export class ReturnsService {
     }
 
     for (const returned of returnedQuantityAllocations) {
+      const balance = await tx.inventoryBalance.findUniqueOrThrow({
+        where: { productId_location: { productId: returned.productId, location } },
+      });
+      const valuation = await reverseQuantityCostOnTx(tx, {
+        orderId: order.id,
+        allocationId: returned.id,
+        productId: returned.productId,
+        balanceId: balance.id,
+        quantity: returned.qty,
+        returnId: ret.id,
+        actor,
+      });
+      if (valuation.totalCost > 0) {
+        await tx.inventoryBalance.update({
+          where: { id: balance.id },
+          data: { inventoryValue: { increment: valuation.totalCost } },
+        });
+      }
+    }
+
+    for (const returned of returnedQuantityAllocations) {
       let remaining = returned.qty;
       const quantityConsignments = await tx.quantityConsignmentAllocation.findMany({
         where: {
@@ -303,6 +326,19 @@ export class ReturnsService {
               createdBy: actor,
             },
           });
+          const accountingEntry = await postConsignmentReturnAccountingOnTx(tx, {
+            returnId: ret.id,
+            sourceRef: `quantity:${allocation.id}`,
+            ownerAmount,
+            payoutPaid: true,
+            actor,
+          });
+          if (accountingEntry) events.push({
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: { accountingEntryId: accountingEntry.id, sourceType: 'consignment.return.owner_receivable', sourceRef: `${ret.id}:quantity:${allocation.id}`, amount: ownerAmount },
+            refs: [accountingEntry.id, ret.id, allocation.id],
+          });
           events.push({
             type: EventType.ConsignmentAdjustmentCreated,
             actor,
@@ -327,6 +363,21 @@ export class ReturnsService {
               ownerAmount: nextOwnerAmount,
               status: nextOwnerAmount === 0 ? 'cancelled' : 'created',
             },
+          });
+        }
+        if (allocation.payout?.status !== 'paid') {
+          const accountingEntry = await postConsignmentReturnAccountingOnTx(tx, {
+            returnId: ret.id,
+            sourceRef: `quantity:${allocation.id}`,
+            ownerAmount,
+            payoutPaid: false,
+            actor,
+          });
+          if (accountingEntry) events.push({
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: { accountingEntryId: accountingEntry.id, sourceType: 'consignment.return.unpaid_reversal', sourceRef: `${ret.id}:quantity:${allocation.id}`, amount: ownerAmount },
+            refs: [accountingEntry.id, ret.id, allocation.id],
           });
         }
         await tx.quantityConsignmentAllocation.update({
@@ -403,6 +454,11 @@ export class ReturnsService {
         );
       }
       for (const imei of regularImeis) {
+        const issue = await tx.inventoryValuationIssue.findFirst({
+          where: { imei, sourceType: 'sale', orderId: order.id, reversedQty: 0 },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (issue) await reverseInventoryCostOnTx(tx, { issueId: issue.id, quantity: 1, returnId: ret.id, actor });
         events.push({
           type: EventType.UnitReturned,
           actor,
@@ -433,6 +489,19 @@ export class ReturnsService {
             createdBy: actor,
           },
           update: {},
+        });
+        const accountingEntry = await postConsignmentReturnAccountingOnTx(tx, {
+          returnId: ret.id,
+          sourceRef: `serialized:${item.id}`,
+          ownerAmount: item.ownerAmount ?? 0,
+          payoutPaid: true,
+          actor,
+        });
+        if (accountingEntry) events.push({
+          type: EventType.AccountingEntryPosted,
+          actor,
+          payload: { accountingEntryId: accountingEntry.id, sourceType: 'consignment.return.owner_receivable', sourceRef: `${ret.id}:serialized:${item.id}`, amount: item.ownerAmount ?? 0 },
+          refs: [accountingEntry.id, ret.id, item.id],
         });
         await tx.consignmentItem.update({
           where: { id: item.id },
@@ -469,6 +538,19 @@ export class ReturnsService {
             },
           });
         }
+        const accountingEntry = await postConsignmentReturnAccountingOnTx(tx, {
+          returnId: ret.id,
+          sourceRef: `serialized:${item.id}`,
+          ownerAmount: item.ownerAmount ?? 0,
+          payoutPaid: false,
+          actor,
+        });
+        if (accountingEntry) events.push({
+          type: EventType.AccountingEntryPosted,
+          actor,
+          payload: { accountingEntryId: accountingEntry.id, sourceType: 'consignment.return.unpaid_reversal', sourceRef: `${ret.id}:serialized:${item.id}`, amount: item.ownerAmount ?? 0 },
+          refs: [accountingEntry.id, ret.id, item.id],
+        });
         await tx.consignmentItem.update({
           where: { id: item.id },
           data: {
