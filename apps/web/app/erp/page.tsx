@@ -267,7 +267,7 @@ export default function ErpPage() {
           {route === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
-          {route === 'admin' && <AdminView role={session.role} username={session.username} />}
+          {route === 'admin' && <AdminView role={session.role} username={session.username} onNavigate={setRoute} />}
           {route === 'ai' && <AiView insights={insights} />}
           {route === 'pricing' && <PricingView accessToken={session.accessToken} />}
           {route === 'reorder' && <ReorderView accessToken={session.accessToken} />}

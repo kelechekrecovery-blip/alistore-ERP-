@@ -6,6 +6,7 @@ import { Card } from './Card';
 type AdminViewProps = {
   role: string;
   username: string;
+  onNavigate: (route: 'campaigns' | 'storefront') => void;
 };
 
 const MODULES = [
@@ -17,8 +18,14 @@ const MODULES = [
   { href: '/', icon: '↗', title: 'Клиентская витрина', description: 'Открыть сайт и проверить опубликованный каталог', roles: ['admin', 'owner', 'marketer'] },
 ] as const;
 
-export function AdminView({ role, username }: AdminViewProps) {
+const INTERNAL_MODULES = [
+  { route: 'storefront' as const, icon: '▤', title: 'CMS витрины', description: 'Баннеры, подборки, публикация и ревизии контента', roles: ['admin', 'owner', 'marketer'] },
+  { route: 'campaigns' as const, icon: '◌', title: 'Кампании и промо', description: 'Сегменты, промокоды, согласования и ROI', roles: ['admin', 'owner', 'marketer'] },
+];
+
+export function AdminView({ role, username, onNavigate }: AdminViewProps) {
   const visible = MODULES.filter((module) => (module.roles as readonly string[]).includes(role));
+  const internal = INTERNAL_MODULES.filter((module) => module.roles.includes(role));
   return (
     <div className="max-w-6xl space-y-5">
       <section className="flex flex-wrap items-end justify-between gap-4 border-b border-[#2E2822] pb-5">
@@ -46,6 +53,23 @@ export function AdminView({ role, username }: AdminViewProps) {
               <span className="ml-auto text-[#8A7F76]">→</span>
             </div>
           </Link>
+        ))}
+        {internal.map((module) => (
+          <button
+            key={module.route}
+            type="button"
+            onClick={() => onNavigate(module.route)}
+            className="group rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4 text-left transition hover:border-[#C6FF3D]/60 hover:bg-[#221E19]"
+          >
+            <span className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-[#C6FF3D]">{module.icon}</span>
+              <span className="min-w-0">
+                <strong className="block text-sm text-white group-hover:text-[#C6FF3D]">{module.title}</strong>
+                <span className="mt-1 block text-xs leading-5 text-[#8A7F76]">{module.description}</span>
+              </span>
+              <span className="ml-auto text-[#8A7F76]">→</span>
+            </span>
+          </button>
         ))}
       </div>
 
