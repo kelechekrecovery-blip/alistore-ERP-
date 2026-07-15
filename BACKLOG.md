@@ -1,6 +1,8 @@
 # BACKLOG
 
 ## Next
+- `AUT-001` Reconcile the autonomous lane commits into a clean ownership baseline, split or document the pre-staged campaign files included in `45f8383`, and rerun full Playwright plus native connected UI gates.
+- `AUT-002` Provide an Android emulator/device and run connected Compose tests for Client catalog filters; then add app-level Staff/Courier/POS connected acceptance.
 - `MKT-008` Connect certified advertising and messaging providers to the accepted campaign lifecycle: signed callbacks or scheduled imports, account/currency reconciliation, delivery receipts, retry/DLQ and explicit certification flags. Keep manual owner spend reconciliation as the audited fallback; no live-provider readiness claim before credentials and sandbox/live evidence.
 - `ECO-001` Restore or explicitly retire the 64 missing `.dc.html` files linked by the 23 committed handoffs; maintain `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` until every row has route/app, API/model, RBAC, Ledger, role E2E and visual evidence. Gate: `npm run ecosystem:audit:strict` no longer reports missing design evidence.
 - `ECO-002` Add one reconciled all-role ecosystem E2E and packaged-app acceptance: customer-to-payment-to-stock-to-pickup/courier/POS/refund, all staff roles, iOS XCUITest targets, connected tests in each Android app module and committed visual goldens. Gate: `ios:ui`, packaged-module `android:ui` and `ecosystem:e2e` commands exist and pass, then `npm run ecosystem:audit:strict` accepts their contract evidence.
@@ -23,6 +25,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- `AUT-001` Run five autonomous lanes with bounded ownership: desktop compare count and regression, iOS Client support inbox, Android Client catalog filters, campaign creative moderation, and ERP logistics availability E2E. Shared API/Web/native gates pass where runnable; external credentials, Android connected device coverage and physical hardware remain open.
 - `MKT-007` Make the advertiser cabinet operational: draft/review/approved/active/paused/completed lifecycle, four-eye budget approval, creative metadata and internal destinations, consent recheck at activation, campaign-linked cancellable Outbox delivery, owner-only idempotent actual-spend reconciliation, budget-exhaustion auto-pause, Event Ledger and ERP status/budget/spend/delivery controls.
 - `MKT-006` Make campaign economics net and funnel-aware: approved refunds now create immutable replay-safe compensation rows, attributed revenue and cost are reduced without rewriting paid history, privacy-safe click/visit/checkout/conversion facts store only a hash of the browser journey, and ERP exposes funnel conversion, paid versus net economics, net ROAS and contribution ROI with API and campaign-to-storefront-to-refund browser evidence.
 - `MKT-005` Make campaign ROI operational: persist consent-safe first/last UTM attribution from storefront through checkout, bind promotion fallback and campaign conversion exactly once on fully received payment, snapshot server product cost, expose marketer spend/revenue/gross profit/ROAS and prove campaign → storefront → payment → ERP consequence E2E.
