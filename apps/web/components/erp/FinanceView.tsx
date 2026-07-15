@@ -20,6 +20,7 @@ import { som } from '@/lib/format';
 import type { Dashboard } from '@/lib/reports';
 import { Card } from './Card';
 import { FinanceSettlementWorkspace } from './FinanceSettlementWorkspace';
+import { FinanceControlsPanel } from './FinanceControlsPanel';
 
 const CATEGORIES: Record<string, string> = {
   rent: 'Аренда', payroll: 'Зарплата', logistics: 'Логистика', marketing: 'Маркетинг',
@@ -157,6 +158,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   return (
     <div className="space-y-5">
       <FinanceSettlementWorkspace accessToken={accessToken} />
+      <FinanceControlsPanel accessToken={accessToken} />
       <section aria-labelledby="trial-balance-title" className="border-b border-[#2E2822] pb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div><h2 id="trial-balance-title" className="font-display text-[15px] font-bold">Оборотно-сальдовая ведомость</h2><p className="mt-1 text-xs text-[#8A7F76]">{trialBalance?.coverage.note ?? 'Загружаем проводки операционных расходов'}</p></div>

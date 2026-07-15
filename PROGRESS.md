@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ERP-FIN-001
+
+- Iteration ID: `ERP-FIN-001`.
+- Task: expose the accounting control plane inside ERP Finance.
+- Files changed: typed finance web API clients, `FinanceControlsPanel`, and the Finance workspace integration.
+- Result: Finance now shows journal-backed P&L, cash movement, AP outstanding, incassation totals, journal count/balance, accounting-period statuses, bank statement statuses and recent deposits. Period and point filters are sent to the API; the UI preserves server-authoritative values and surfaces unavailable/empty states.
+- Checks run: production Next.js build passed with 39 routes; `git diff --check`. Browser visual smoke remains unverified because Playwright Chromium is not installed locally.
+- Acceptance: `accepted` for Finance control-plane integration. Mutation controls for period close, bank import/reconciliation and deposit creation still need dedicated ERP forms and role-specific browser coverage.
+- Next step: add tax/currency snapshots and opening-balance controls, then complete Finance mutation forms and export/drilldown.
+
 ## 2026-07-15 — ERP-ADMIN-001
 
 - Iteration ID: `ERP-ADMIN-001`.

@@ -49,6 +49,55 @@ export interface TrialBalance {
   rows: TrialBalanceRow[];
 }
 
+export interface AccountingPeriod {
+  id: string;
+  period: string;
+  status: 'open' | 'soft_closed' | 'hard_closed';
+  closedAt: string | null;
+}
+
+export interface SupplierAgingReport {
+  asOf: string;
+  totalOutstanding: number;
+  totalCreditReceivable: number;
+  totalCreditApplied: number;
+  supplierCount: number;
+  totals: Record<string, number>;
+  rows: Array<{ id: string; invoiceNumber: string; amount: number; outstanding: number; supplier: { id: string; name: string }; status: string; dueDate: string }>;
+}
+
+export interface FinancialStatements {
+  from: string;
+  to: string;
+  source: string;
+  entries: number;
+  balanced: boolean;
+  journal: { debit: number; credit: number };
+  profitAndLoss: { revenue: number; expenses: number; netProfit: number };
+  balanceSheet: { assets: number; liabilities: number; equity: number; currentPeriodProfit: number; liabilitiesAndEquity: number; balanced: boolean };
+  cashFlow: { cashMovement: number };
+}
+
+export interface BankStatementSummary {
+  id: string;
+  statementNumber: string;
+  accountCode: string;
+  status: 'imported' | 'reconciled' | 'disputed';
+  openingBalance: number;
+  closingBalance: number;
+  lines: Array<{ id: string; status: string; amount: number; externalId: string }>;
+}
+
+export interface CashIncassation {
+  id: string;
+  shiftId: string;
+  point: string;
+  amount: number;
+  status: 'deposited' | 'reconciled' | 'disputed';
+  depositedAt: string;
+  accountingEntryId: string | null;
+}
+
 export interface FinancePlanFactRow {
   category: string;
   plan: number;
@@ -142,6 +191,31 @@ export const payExpense = (id: string, fundingAccountCode: string, paymentRefere
 
 export const fetchAccountingAccounts = (accessToken: string) =>
   getJson<AccountingAccount[]>('/finance/accounts', accessToken);
+
+export const fetchAccountingPeriods = (accessToken: string) =>
+  getJson<AccountingPeriod[]>('/finance/periods', accessToken);
+
+function accountingRange(period: string, point: string) {
+  const [year, month] = period.split('-').map(Number);
+  const query = new URLSearchParams({
+    from: new Date(Date.UTC(year, month - 1, 1)).toISOString(),
+    to: new Date(Date.UTC(year, month, 1)).toISOString(),
+  });
+  if (point.trim()) query.set('point', point.trim());
+  return query.toString();
+}
+
+export const fetchFinancialStatements = (period: string, point: string, accessToken: string) =>
+  getJson<FinancialStatements>(`/finance/statements?${accountingRange(period, point)}`, accessToken);
+
+export const fetchSupplierAging = (accessToken: string) =>
+  getJson<SupplierAgingReport>('/finance/ap-aging', accessToken);
+
+export const fetchBankStatements = (accessToken: string) =>
+  getJson<BankStatementSummary[]>('/finance/bank-statements', accessToken);
+
+export const fetchCashIncassations = (accessToken: string) =>
+  getJson<CashIncassation[]>('/finance/cash-incassations', accessToken);
 
 export const fetchTrialBalance = (period: string, point: string, accessToken: string) => {
   const [year, month] = period.split('-').map(Number);
