@@ -7,6 +7,7 @@
 - Shared gate after conflict repair: API/Web builds pass; API Jest `133/133 suites`, `528/528 tests`; targeted logistics E2E passed three repeats; iOS XCTest `33/33` and all iOS targets passed; Android unit/compile/lint/app build passed.
 - One Android connected Compose gate remains unexecuted because no emulator/device was available.
 - External readiness remains blocked by provider/storage/monitoring credentials and manual POS hardware certification. No production readiness or store-release claim is made.
+- OpenRouter was configured locally through the ignored `apps/api/.env` (`AI_PROVIDER=openrouter`); readiness reports the AI provider configured, provider tests pass, and the key is intentionally absent from Git and client bundles.
 - Coordination note: the initial Web commit also contained pre-staged parallel campaign files already in the index; subsequent lane commits used explicit file ownership and `git diff --cached` control.
 
 ## 2026-07-15 — MKT-007
