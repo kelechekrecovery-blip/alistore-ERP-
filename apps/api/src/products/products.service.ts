@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditService } from '../audit/audit.service';
+import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { ModerationService } from '../ai/moderation.service';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import {
   CreateProductDto,
@@ -60,6 +61,7 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly approvals: ApprovalsService,
+    @Optional() private readonly moderation?: ModerationService,
   ) {}
 
   get(id: string) {
@@ -333,6 +335,15 @@ export class ProductsService {
 
     const text = dto.text?.trim() || null;
     const customerName = order.customer.name.trim() || this.maskPhone(order.customer.phone);
+
+    // AI moderation runs BEFORE the transaction (an LLM call must not hold a DB tx open).
+    // It never throws — falls back to keyless rules / no-op without a provider key. When it
+    // blocks, the review is created already rejected; clean text stays 'pending' for the
+    // existing human moderation queue.
+    const verdict = text && this.moderation ? await this.moderation.moderate(text) : null;
+    const rejected = verdict ? !verdict.allowed : false;
+    const moderationReason = rejected ? verdict!.reason || verdict!.categories.join(', ') : null;
+
     return this.audit.transaction(async (tx) => {
       const review = await tx.productReview.create({
         data: {
@@ -343,18 +354,27 @@ export class ProductsService {
           orderId: order.id,
           rating: dto.rating,
           text,
-          status: 'pending',
+          status: rejected ? 'rejected' : 'pending',
+          ...(rejected ? { moderatedBy: 'ai', moderatedAt: new Date(), moderationReason } : {}),
         },
       });
-      return {
-        result: review,
-        events: [{
+      const events: AuditInput[] = [
+        {
           type: EventType.ProductReviewSubmitted,
           actor: user.customerId,
           payload: { reviewId: review.id, productId, orderId: order.id, rating: dto.rating },
           refs: [review.id, productId, order.id, user.customerId],
-        }],
-      };
+        },
+      ];
+      if (rejected) {
+        events.push({
+          type: EventType.ProductReviewRejected,
+          actor: 'ai',
+          payload: { reviewId: review.id, productId, status: 'rejected', reason: moderationReason },
+          refs: [review.id, productId, order.id, user.customerId],
+        });
+      }
+      return { result: review, events };
     });
   }
 
