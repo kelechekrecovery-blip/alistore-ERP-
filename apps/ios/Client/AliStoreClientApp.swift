@@ -470,6 +470,9 @@ private struct AccountView: View {
                         NavigationLink("Мои устройства и гарантия") {
                             DevicesView(environment: environment, auth: auth)
                         }
+                        NavigationLink("Поддержка") {
+                            CustomerSupportView(environment: environment, auth: auth)
+                        }
                     }
                     Section("Уведомления") {
                         LabeledContent("Статус", value: pushStatus)
@@ -520,6 +523,182 @@ private struct AccountView: View {
     private var normalizedPhone: String {
         let digits = phone.filter(\.isNumber)
         return "+\(digits)"
+    }
+}
+
+private struct CustomerSupportView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var tickets: [CustomerSupportTicket] = []
+    @State private var isLoading = true
+    @State private var loadError: String?
+    @State private var subject = ""
+    @State private var details = ""
+    @State private var priority = "normal"
+    @State private var submissionKey = UUID().uuidString
+    @State private var isSubmitting = false
+    @State private var submissionError: String?
+
+    private var normalizedSubject: String {
+        subject.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedDetails: String? {
+        let value = details.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    var body: some View {
+        List {
+            Section("Связаться с нами") {
+                Label("Ответим в приложении", systemImage: "message.fill")
+                Text("Опишите вопрос — обращение получит SLA и появится в очереди поддержки.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Новое обращение") {
+                TextField("Тема", text: $subject)
+                    .accessibilityIdentifier("support-subject")
+                TextField("Подробности", text: $details, axis: .vertical)
+                    .lineLimit(3...7)
+                    .accessibilityIdentifier("support-details")
+                Picker("Срочность", selection: $priority) {
+                    Text("Обычная").tag("normal")
+                    Text("Высокая").tag("high")
+                    Text("Срочная").tag("urgent")
+                }
+                if let submissionError {
+                    Text(submissionError).font(.caption).foregroundStyle(.red)
+                }
+                Button {
+                    Task { await submit() }
+                } label: {
+                    if isSubmitting {
+                        ProgressView()
+                    } else {
+                        Label("Создать обращение", systemImage: "paperplane.fill")
+                    }
+                }
+                .disabled(isSubmitting || normalizedSubject.isEmpty)
+                .accessibilityIdentifier("support-submit")
+            }
+
+            Section("Мои обращения") {
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView("Загружаем")
+                        Spacer()
+                    }
+                } else if let loadError {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(loadError).font(.caption).foregroundStyle(.red)
+                        Button("Повторить", systemImage: "arrow.clockwise") {
+                            Task { await load() }
+                        }
+                    }
+                } else if tickets.isEmpty {
+                    ContentUnavailableView("Обращений пока нет", systemImage: "bubble.left.and.bubble.right")
+                } else {
+                    ForEach(tickets) { ticket in
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(ticket.subject).font(.headline)
+                                Spacer()
+                                Text(statusLabel(ticket.status))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ticket.status == "resolved" || ticket.status == "closed" ? .secondary : ClientTheme.lime)
+                            }
+                            if let body = ticket.body, !body.isEmpty {
+                                Text(body).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                            HStack {
+                                Text(priorityLabel(ticket.priority))
+                                Spacer()
+                                Text(ticket.createdAt, format: .dateTime.day().month().year())
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                        .accessibilityIdentifier("support-ticket-\(ticket.id)")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Поддержка")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load() }
+        .onChange(of: subject) { _, _ in renewSubmissionKey() }
+        .onChange(of: details) { _, _ in renewSubmissionKey() }
+        .onChange(of: priority) { _, _ in renewSubmissionKey() }
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let loaded: [CustomerSupportTicket] = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "support/tickets/mine",
+                token: token
+            )
+            guard !Task.isCancelled else { return }
+            tickets = loaded
+            loadError = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func submit() async {
+        guard let token = auth.session?.accessToken, !normalizedSubject.isEmpty else { return }
+        let request = OpenCustomerSupportTicketRequest(
+            subject: normalizedSubject,
+            body: normalizedDetails,
+            priority: priority
+        )
+        let key = submissionKey
+        isSubmitting = true
+        submissionError = nil
+        defer { isSubmitting = false }
+        do {
+            let ticket: CustomerSupportTicket = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "support/tickets/mine",
+                body: request,
+                token: token,
+                idempotencyKey: key
+            )
+            tickets.removeAll { $0.id == ticket.id }
+            tickets.insert(ticket, at: 0)
+            subject = ""
+            details = ""
+            priority = "normal"
+            submissionKey = UUID().uuidString
+        } catch is CancellationError {
+            return
+        } catch {
+            submissionError = error.localizedDescription
+        }
+    }
+
+    private func renewSubmissionKey() {
+        guard !isSubmitting else { return }
+        submissionKey = UUID().uuidString
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        ["new": "Новое", "in_progress": "В работе", "waiting": "Ожидает", "resolved": "Решено", "closed": "Закрыто"][status] ?? status
+    }
+
+    private func priorityLabel(_ priority: String) -> String {
+        ["normal": "Обычная", "high": "Высокая", "urgent": "Срочная"][priority] ?? priority
     }
 }
 

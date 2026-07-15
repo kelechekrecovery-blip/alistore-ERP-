@@ -345,6 +345,49 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "warranty-1")
     }
 
+    func testLoadsCustomerSupportTickets() async throws {
+        let session = makeSession(status: 200, body: """
+        [{"id":"ticket-1","customerId":"customer-1","channel":"app","subject":"Не пришёл чек","body":"После оплаты","priority":"high","sla":"2026-07-15T12:00:00Z","status":"new","assignee":null,"createdAt":"2026-07-14T08:00:00Z"}]
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let tickets: [CustomerSupportTicket] = try await client.get("support/tickets/mine", token: "access-1")
+
+        XCTAssertEqual(tickets.first?.subject, "Не пришёл чек")
+        XCTAssertEqual(tickets.first?.priority, "high")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "GET")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/support/tickets/mine")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
+    }
+
+    func testOpensIdempotentCustomerSupportTicket() async throws {
+        let session = makeSession(status: 201, body: """
+        {"id":"ticket-2","customerId":"customer-1","channel":"app","subject":"Вопрос по доставке","body":"Когда приедет курьер?","priority":"normal","sla":"2026-07-16T12:00:00Z","status":"new","assignee":null,"createdAt":"2026-07-15T08:00:00Z"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let request = OpenCustomerSupportTicketRequest(
+            subject: "Вопрос по доставке",
+            body: "Когда приедет курьер?"
+        )
+
+        let ticket: CustomerSupportTicket = try await client.post(
+            "support/tickets/mine",
+            body: request,
+            token: "access-1",
+            idempotencyKey: "ios-support-ticket-1"
+        )
+
+        XCTAssertEqual(ticket.status, "new")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "ios-support-ticket-1")
+        let body = try JSONEncoder().encode(request)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["channel"] as? String, "app")
+        XCTAssertEqual(payload["subject"] as? String, "Вопрос по доставке")
+        XCTAssertEqual(payload["body"] as? String, "Когда приедет курьер?")
+        XCTAssertEqual(payload["priority"] as? String, "normal")
+        XCTAssertNil(payload["customerId"])
+    }
+
     func testRegistersNativeAPNsTokenForCustomer() async throws {
         let token = String(repeating: "ab", count: 32)
         let session = makeSession(status: 201, body: """

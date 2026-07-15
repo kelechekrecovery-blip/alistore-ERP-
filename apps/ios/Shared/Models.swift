@@ -419,6 +419,31 @@ public struct WarrantyCase: Decodable, Identifiable, Sendable {
     public let sla: Date
 }
 
+public struct OpenCustomerSupportTicketRequest: Encodable, Sendable {
+    public let channel: String
+    public let subject: String
+    public let body: String?
+    public let priority: String
+
+    public init(subject: String, body: String?, priority: String = "normal") {
+        self.channel = "app"
+        self.subject = subject
+        self.body = body
+        self.priority = priority
+    }
+}
+
+public struct CustomerSupportTicket: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let channel: String
+    public let subject: String
+    public let body: String?
+    public let priority: String
+    public let sla: Date
+    public let status: String
+    public let createdAt: Date
+}
+
 public struct RegisterPushTokenRequest: Encodable, Sendable {
     public let token: String
     public let platform: String
