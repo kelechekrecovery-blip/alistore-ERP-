@@ -21,6 +21,16 @@ function read(env: EnvReader, name: string): string | undefined {
  * server-side only.
  */
 export function resolveLlmClient(env: EnvReader = defaultEnv): LlmClient | null {
+  // Tests must remain deterministic and must never spend a real provider key from a
+  // developer's .env. An explicit opt-in is available for provider contract tests.
+  if (
+    read(env, 'NODE_ENV') === 'test' &&
+    read(env, 'AI_TEST_ALLOW_EXTERNAL') !== 'true' &&
+    !read(env, 'AI_PROVIDER_KEY')
+  ) {
+    return null;
+  }
+
   const provider = (read(env, 'AI_PROVIDER') ?? 'auto').toLowerCase();
   const anthropicKey = read(env, 'ANTHROPIC_API_KEY');
   const openRouterKey = read(env, 'AI_PROVIDER_KEY') ?? read(env, 'OPENROUTER_API_KEY');

@@ -33,7 +33,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" E2E_TEST=true AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
+      command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" E2E_TEST=true NODE_ENV=test AI_PROVIDER=rules AI_PROVIDER_KEY= OPENROUTER_API_KEY= ANTHROPIC_API_KEY= AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
       url: `http://127.0.0.1:${apiPort}/api/health/live`,
       reuseExistingServer: false,
       timeout: 120_000,

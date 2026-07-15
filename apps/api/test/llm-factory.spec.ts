@@ -7,6 +7,12 @@ const envOf =
     map[name];
 
 describe('resolveLlmClient', () => {
+  it('disables external providers in test mode by default', () => {
+    expect(
+      resolveLlmClient(envOf({ NODE_ENV: 'test', AI_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'or' })),
+    ).toBeNull();
+  });
+
   it('returns null when no provider key is configured (keyless rule engines run)', () => {
     expect(resolveLlmClient(envOf({}))).toBeNull();
   });
