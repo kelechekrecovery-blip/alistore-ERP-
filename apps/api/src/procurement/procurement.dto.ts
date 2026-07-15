@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsDateString,
   IsIn,
   IsInt,
   IsOptional,
@@ -40,4 +41,19 @@ export class ReceivePurchaseOrderDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => ReceivePurchaseOrderLineDto)
   lines!: ReceivePurchaseOrderLineDto[];
+}
+
+export class CreateSupplierInvoiceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(128) invoiceNumber!: string;
+  @IsString() @MaxLength(64) supplierId!: string;
+  @IsString() @MaxLength(64) purchaseOrderId!: string;
+  @IsInt() @Min(1) amount!: number;
+  @IsOptional() @IsDateString() dueDate?: string;
+}
+
+export class PaySupplierInvoiceDto {
+  @IsString() @MinLength(3) @MaxLength(128) paymentKey!: string;
+  @IsIn(['1000', '1010', '1020']) paymentAccountCode!: '1000' | '1010' | '1020';
+  @IsString() @MinLength(1) @MaxLength(128) paymentReference!: string;
 }

@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { Grade, Prisma, PurchaseOrderStatus } from '@prisma/client';
+import { Grade, Prisma, PurchaseOrderStatus, SupplierInvoiceStatus } from '@prisma/client';
 import { AuditService, AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePurchaseOrderDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { CreatePurchaseOrderDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
@@ -263,6 +263,126 @@ export class ProcurementService {
       throw error;
     }
   }
+
+  listInvoices(status?: string) {
+    const allowed: SupplierInvoiceStatus[] = ['draft', 'approved', 'paid', 'cancelled'];
+    if (status && !allowed.includes(status as SupplierInvoiceStatus)) {
+      throw new ValidationError('invalid_supplier_invoice_status', `Неизвестный статус счета поставщика: ${status}`);
+    }
+    return this.prisma.supplierInvoice.findMany({
+      where: status ? { status: status as SupplierInvoiceStatus } : undefined,
+      include: { supplier: true, purchaseOrder: { select: { id: true, number: true, status: true } }, accountingEntry: { include: { lines: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  async createSupplierInvoice(dto: CreateSupplierInvoiceDto, actor: string) {
+    const existing = await this.prisma.supplierInvoice.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+    if (existing) return replaySupplierInvoice(existing, dto);
+    return this.audit.transaction(async (tx) => {
+      const [supplier, order] = await Promise.all([
+        tx.supplier.findUnique({ where: { id: dto.supplierId } }),
+        tx.purchaseOrder.findUnique({ where: { id: dto.purchaseOrderId }, include: { items: true } }),
+      ]);
+      if (!supplier) throw new ValidationError('supplier_not_found', `Поставщик ${dto.supplierId} не найден`);
+      if (!order) throw new ValidationError('purchase_order_not_found', `PO ${dto.purchaseOrderId} не найден`);
+      if (order.supplierId !== supplier.id) throw new ConflictError('supplier_invoice_supplier_mismatch', 'Счёт не соответствует поставщику PO');
+      const match = receiptMatch(order.items);
+      if (match.receivedQty === 0) throw new ConflictError('supplier_invoice_no_receipt', 'Нельзя сопоставить счёт без принятого товара');
+      if (dto.amount !== match.value) throw new ConflictError('supplier_invoice_three_way_mismatch', `Счёт ${dto.amount} не совпадает с принятой стоимостью ${match.value}`);
+      const invoice = await tx.supplierInvoice.create({
+        data: {
+          supplierId: supplier.id,
+          purchaseOrderId: order.id,
+          invoiceNumber: dto.invoiceNumber.trim(),
+          idempotencyKey: dto.idempotencyKey,
+          amount: dto.amount,
+          matchedReceiptValue: match.value,
+          dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+          createdBy: actor,
+        },
+        include: { supplier: true, purchaseOrder: { select: { id: true, number: true, status: true } } },
+      });
+      return {
+        result: invoice,
+        events: [{
+          type: 'supplier.invoice.created',
+          actor,
+          payload: { invoiceId: invoice.id, supplierId: supplier.id, purchaseOrderId: order.id, amount: invoice.amount, matchedReceiptValue: match.value },
+          refs: [invoice.id, supplier.id, order.id],
+        }],
+      };
+    });
+  }
+
+  async approveSupplierInvoice(id: string, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "SupplierInvoice" WHERE id = ${id} FOR UPDATE`;
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id }, include: { purchaseOrder: { include: { items: true } } } });
+      if (!invoice) throw new ValidationError('supplier_invoice_not_found', `Счёт ${id} не найден`);
+      if (invoice.status === 'approved' || invoice.status === 'paid') return { result: invoice, events: [] };
+      if (invoice.status !== 'draft') throw new ConflictError('supplier_invoice_state', 'Счёт нельзя утвердить в текущем статусе');
+      const match = receiptMatch(invoice.purchaseOrder.items);
+      if (match.value !== invoice.amount) throw new ConflictError('supplier_invoice_three_way_mismatch', 'После приёмки сумма счёта больше не совпадает');
+      const approved = await tx.supplierInvoice.update({ where: { id }, data: { status: 'approved', approvedBy: actor, approvedAt: new Date() } });
+      return { result: approved, events: [{ type: 'supplier.invoice.approved', actor, payload: { invoiceId: id, amount: approved.amount }, refs: [id, invoice.supplierId, invoice.purchaseOrderId] }] };
+    });
+  }
+
+  async paySupplierInvoice(id: string, dto: PaySupplierInvoiceDto, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "SupplierInvoice" WHERE id = ${id} FOR UPDATE`;
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
+      if (!invoice) throw new ValidationError('supplier_invoice_not_found', `Счёт ${id} не найден`);
+      if (invoice.status === 'paid') {
+        if (invoice.paymentKey !== dto.paymentKey || invoice.paymentAccountCode !== dto.paymentAccountCode || invoice.paymentReference !== dto.paymentReference) {
+          throw new ConflictError('supplier_invoice_payment_replay_conflict', 'Ключ оплаты уже использован с другими реквизитами');
+        }
+        return { result: invoice, events: [] };
+      }
+      if (invoice.status !== 'approved') throw new ConflictError('supplier_invoice_not_approved', 'Оплатить можно только утверждённый счёт');
+      const duplicate = await tx.supplierInvoice.findUnique({ where: { paymentKey: dto.paymentKey } });
+      if (duplicate) throw new ConflictError('supplier_invoice_payment_key_reused', 'Ключ оплаты уже использован');
+      const accountingEntry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:supplier-invoice.payment:${id}:${dto.paymentKey}`,
+        sourceType: 'supplier.invoice.payment',
+        sourceRef: `${id}:${dto.paymentKey}`,
+        description: `Оплата счёта поставщика ${id}`,
+        occurredAt: new Date(),
+        createdBy: actor,
+        lines: [
+          { accountCode: '2000', debit: invoice.amount, memo: 'Погашение обязательства перед поставщиком' },
+          { accountCode: dto.paymentAccountCode, credit: invoice.amount, memo: `Оплата поставщику: ${dto.paymentReference}` },
+        ],
+      });
+      const paid = await tx.supplierInvoice.update({
+        where: { id },
+        data: { status: 'paid', paymentKey: dto.paymentKey, paymentAccountCode: dto.paymentAccountCode, paymentReference: dto.paymentReference, paidBy: actor, paidAt: new Date(), accountingEntryId: accountingEntry.id },
+      });
+      return {
+        result: paid,
+        events: [
+          { type: 'supplier.invoice.paid', actor, payload: { invoiceId: id, amount: invoice.amount, paymentKey: dto.paymentKey, accountingEntryId: accountingEntry.id }, refs: [id, invoice.supplierId, invoice.purchaseOrderId] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'supplier.invoice.payment', sourceRef: `${id}:${dto.paymentKey}`, amount: invoice.amount }, refs: [accountingEntry.id, id] },
+        ],
+      };
+    });
+  }
+}
+
+function receiptMatch(items: Array<{ orderedQty: number; receivedQty: number; unitCost: number }>) {
+  return {
+    receivedQty: items.reduce((sum, item) => sum + item.receivedQty, 0),
+    value: items.reduce((sum, item) => sum + item.receivedQty * item.unitCost, 0),
+  };
+}
+
+function replaySupplierInvoice(invoice: Prisma.SupplierInvoiceGetPayload<{}>, dto: CreateSupplierInvoiceDto) {
+  if (invoice.supplierId !== dto.supplierId || invoice.purchaseOrderId !== dto.purchaseOrderId || invoice.invoiceNumber !== dto.invoiceNumber.trim() || invoice.amount !== dto.amount) {
+    throw new ConflictError('supplier_invoice_idempotency_mismatch', 'Ключ счёта уже использован с другими данными');
+  }
+  return { ...invoice, idempotent: true };
 }
 
 function purchaseOrderNumber(): string {

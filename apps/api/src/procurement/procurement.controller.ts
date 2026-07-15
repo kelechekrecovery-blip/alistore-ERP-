@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreatePurchaseOrderDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { CreatePurchaseOrderDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { ProcurementService } from './procurement.service';
 
 @ApiTags('procurement')
@@ -50,5 +50,37 @@ export class ProcurementController {
   @RequirePermission('procurement', 'receive')
   receive(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReceivePurchaseOrderDto) {
     return this.procurement.receive(id, dto, user.customerId);
+  }
+}
+
+@ApiTags('procurement')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@Controller('procurement/supplier-invoices')
+export class SupplierInvoiceController {
+  constructor(private readonly procurement: ProcurementService) {}
+
+  @Get()
+  @RequirePermission('procurement', 'read')
+  list(@Query('status') status?: string) {
+    return this.procurement.listInvoices(status);
+  }
+
+  @Post()
+  @RequirePermission('procurement', 'create')
+  create(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateSupplierInvoiceDto) {
+    return this.procurement.createSupplierInvoice(dto, user.customerId);
+  }
+
+  @Post(':id/approve')
+  @RequirePermission('procurement', 'send')
+  approve(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.procurement.approveSupplierInvoice(id, user.customerId);
+  }
+
+  @Post(':id/pay')
+  @RequirePermission('procurement', 'receive')
+  pay(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: PaySupplierInvoiceDto) {
+    return this.procurement.paySupplierInvoice(id, dto, user.customerId);
   }
 }

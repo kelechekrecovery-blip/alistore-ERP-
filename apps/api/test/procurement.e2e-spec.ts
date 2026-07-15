@@ -50,6 +50,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   async function cleanFixtures() {
     await prisma.auditEvent.deleteMany();
+    await prisma.supplierInvoice.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.supplierRma.deleteMany();
     await prisma.supplier.deleteMany();
@@ -170,7 +171,8 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     expect(completed.body.items[0].receivedQty).toBe(2);
     expect(await prisma.deviceUnit.count({ where: { productId: product.id, status: 'in_stock' } })).toBe(2);
     expect(await prisma.inventoryMovement.count({ where: { productId: product.id, type: 'received' } })).toBe(2);
-    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'procurement.receipt' } })).toBe(2);
+    const receiptIds = (await prisma.purchaseReceipt.findMany({ where: { purchaseOrderId: created.body.id }, select: { id: true } })).map((receipt) => receipt.id);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'procurement.receipt', sourceRef: { in: receiptIds } } })).toBe(2);
 
     const eventTypes = (await prisma.auditEvent.findMany({ orderBy: { ts: 'asc' } })).map((event) => event.type);
     expect(eventTypes).toEqual(expect.arrayContaining([
@@ -203,6 +205,56 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     await request(app.getHttpServer())
       .post(`/procurement/purchase-orders/${created.body.id}/send`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .expect(409);
+  });
+
+  it('matches a supplier invoice to received PO value and clears AP only once', async () => {
+    const { supplier, product } = await fixture();
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `create-${RUN}-invoice`, supplierId: supplier.id, location: 'BISHKEK-1', items: [{ productId: product.id, qty: 1, unitCost: 70000 }] })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/send`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ idempotencyKey: `receipt-${RUN}-invoice`, lines: [{ itemId: created.body.items[0].id, imeis: [`PO-INVOICE-${RUN}`] }] })
+      .expect(201);
+
+    const invoicePayload = { idempotencyKey: `invoice-${RUN}`, invoiceNumber: `INV-${RUN}`, supplierId: supplier.id, purchaseOrderId: created.body.id, amount: 70000 };
+    const invoice = await request(app.getHttpServer())
+      .post('/procurement/supplier-invoices')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(invoicePayload)
+      .expect(201);
+    expect(invoice.body.status).toBe('draft');
+    expect((await request(app.getHttpServer()).post('/procurement/supplier-invoices').set('Authorization', `Bearer ${adminToken}`).send(invoicePayload)).body.idempotent).toBe(true);
+    await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201)
+      .expect(({ body }) => expect(body.status).toBe('approved'));
+    const paid = await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/pay`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ paymentKey: `supplier-bank-${RUN}`, paymentAccountCode: '1010', paymentReference: 'BANK-STATEMENT-1' })
+      .expect(201);
+    expect(paid.body.status).toBe('paid');
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'supplier.invoice.payment', sourceRef: `${invoice.body.id}:supplier-bank-${RUN}` } })).toBe(1);
+    const replay = await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/pay`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ paymentKey: `supplier-bank-${RUN}`, paymentAccountCode: '1010', paymentReference: 'BANK-STATEMENT-1' })
+      .expect(201);
+    expect(replay.body.id).toBe(invoice.body.id);
+    await request(app.getHttpServer())
+      .post('/procurement/supplier-invoices')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...invoicePayload, idempotencyKey: `invoice-${RUN}-mismatch`, invoiceNumber: `INV-${RUN}-MISMATCH`, amount: 70001 })
       .expect(409);
   });
 

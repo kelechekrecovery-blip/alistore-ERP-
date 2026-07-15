@@ -237,6 +237,13 @@ enum PurchaseOrderStatus {
   cancelled
 }
 
+enum SupplierInvoiceStatus {
+  draft
+  approved
+  paid
+  cancelled
+}
+
 enum ExpenseStatus {
   submitted
   approved
@@ -1314,6 +1321,7 @@ model Supplier {
   contact        String?
   rmas           SupplierRma[]
   purchaseOrders PurchaseOrder[]
+  invoices       SupplierInvoice[]
   expenses       Expense[]
   createdAt      DateTime        @default(now())
 }
@@ -1377,6 +1385,7 @@ model AccountingJournalEntry {
   lines          AccountingJournalLine[]
   payment        Payment?
   purchaseReceipt PurchaseReceipt?
+  supplierInvoice SupplierInvoice?
 
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])
@@ -1502,6 +1511,7 @@ model PurchaseOrder {
   updatedAt      DateTime            @updatedAt
   items          PurchaseOrderItem[]
   receipts       PurchaseReceipt[]
+  invoices       SupplierInvoice[]
 
   @@index([supplierId, createdAt])
   @@index([status, createdAt])
@@ -1534,6 +1544,37 @@ model PurchaseReceipt {
 
   @@unique([purchaseOrderId, idempotencyKey])
   @@index([purchaseOrderId, createdAt])
+}
+
+model SupplierInvoice {
+  id                String                 @id @default(cuid())
+  supplier          Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId        String
+  purchaseOrder     PurchaseOrder          @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrderId   String
+  invoiceNumber     String
+  idempotencyKey    String                 @unique
+  amount            Int
+  matchedReceiptValue Int
+  dueDate           DateTime?
+  status            SupplierInvoiceStatus  @default(draft)
+  approvedBy        String?
+  approvedAt        DateTime?
+  paymentKey        String?                @unique
+  paymentAccountCode String?
+  paymentReference  String?
+  paidBy            String?
+  paidAt            DateTime?
+  accountingEntryId String?                @unique
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  createdBy         String
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@unique([supplierId, invoiceNumber])
+  @@index([status, dueDate])
+  @@index([supplierId, createdAt])
+  @@index([purchaseOrderId])
 }
 
 // Возврат брака поставщику (RMA). Машина статусов + SLA; просрочка → Risk Center.
