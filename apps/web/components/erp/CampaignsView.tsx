@@ -262,12 +262,20 @@ function CampaignList({ campaigns }: {
             <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] bg-[#1A1611] px-3 py-2 font-mono text-[11px] text-[#A79C92]" data-testid={`campaign-link-${item.campaign.id}`}>
               /?utm_source={item.campaign.source}&amp;utm_medium={item.campaign.medium}&amp;utm_campaign={item.campaign.trackingCode}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
-              <Metric label="orders" value={item.orders} />
-              <Metric label="revenue" value={som(item.revenue)} />
-              <Metric label="gross" value={som(item.grossProfit)} />
-              <Metric label="ROAS" value={item.roas === null ? '—' : `${item.roas}×`} />
-              <Metric label="ROI" value={item.roiPct === null ? '∞' : `${item.roiPct}%`} />
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5" data-testid={`campaign-funnel-${item.campaign.id}`}>
+              <Metric label="clicks" value={item.funnel.clicks} />
+              <Metric label="visits" value={item.funnel.visits} />
+              <Metric label="checkout" value={item.funnel.checkouts} />
+              <Metric label="paid" value={item.funnel.conversions} />
+              <Metric label="CVR" value={item.funnel.conversionRate === null ? '—' : `${item.funnel.conversionRate}%`} />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 xl:grid-cols-6" data-testid={`campaign-net-${item.campaign.id}`}>
+              <Metric label="paid revenue" value={som(item.revenue)} />
+              <Metric label="refunds" value={som(item.refundRevenue)} />
+              <Metric label="net revenue" value={som(item.netRevenue)} />
+              <Metric label="net gross" value={som(item.netGrossProfit)} />
+              <Metric label="net ROAS" value={item.roas === null ? '—' : `${item.roas}×`} />
+              <Metric label="net ROI" value={item.roiPct === null ? '∞' : `${item.roiPct}%`} />
             </div>
           </li>
         ))}

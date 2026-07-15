@@ -1,3 +1,5 @@
+import { postJson } from './api/http';
+
 export interface AttributionTouch {
   source: string;
   medium?: string;
@@ -8,6 +10,7 @@ export interface AttributionTouch {
 }
 
 export interface StoredAttribution {
+  journeyId: string;
   first: AttributionTouch;
   last: AttributionTouch;
   firstCapturedAt: string;
@@ -34,6 +37,7 @@ export function captureAttribution(location: Pick<Location, 'search' | 'pathname
   const now = new Date().toISOString();
   const existing = loadAttribution();
   const stored: StoredAttribution = {
+    journeyId: existing?.journeyId ?? crypto.randomUUID(),
     first: existing?.first ?? touch,
     last: touch,
     firstCapturedAt: existing?.firstCapturedAt ?? now,
@@ -52,11 +56,27 @@ export function loadAttribution(): StoredAttribution | null {
       window.localStorage.removeItem(STORAGE_KEY);
       return null;
     }
+    if (!parsed.journeyId) {
+      parsed.journeyId = crypto.randomUUID();
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
     return parsed;
   } catch {
     window.localStorage.removeItem(STORAGE_KEY);
     return null;
   }
+}
+
+export function recordCampaignFunnel(
+  trackingCode: string,
+  journeyId: string,
+  stage: 'click' | 'visit',
+) {
+  return postJson<{ accepted: boolean; recorded: boolean }>('/campaigns/funnel', {
+    trackingCode,
+    journeyId,
+    stage,
+  });
 }
 
 function clean(value: string | null, max: number): string | undefined {

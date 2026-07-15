@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- `MKT-006` Make campaign economics net and funnel-aware: compensate attributed revenue/gross profit after approved refunds, add immutable visit/click/checkout funnel facts without storing raw PII, expose conversion rate and net ROAS by source/medium/campaign, and prove payment → partial/full refund reconciliation without double adjustment.
+- `MKT-007` Make the advertiser cabinet operational: add draft/review/approved/active/paused/completed lifecycle, budget requests, creative metadata/assets, approval and RBAC, channel publication linkage, spend controls and net performance visibility without allowing marketing clients to mutate money, stock or order status.
 - `ECO-001` Restore or explicitly retire the 64 missing `.dc.html` files linked by the 23 committed handoffs; maintain `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` until every row has route/app, API/model, RBAC, Ledger, role E2E and visual evidence. Gate: `npm run ecosystem:audit:strict` no longer reports missing design evidence.
 - `ECO-002` Add one reconciled all-role ecosystem E2E and packaged-app acceptance: customer-to-payment-to-stock-to-pickup/courier/POS/refund, all staff roles, iOS XCUITest targets, connected tests in each Android app module and committed visual goldens. Gate: `ios:ui`, packaged-module `android:ui` and `ecosystem:e2e` commands exist and pass, then `npm run ecosystem:audit:strict` accepts their contract evidence.
 - Run first-store HR acceptance with real schedules, payroll, cash handover and physical Staff devices; certify APNs/FCM delivery plus scanner/camera behavior without changing the now-verified native attendance contracts.
@@ -15,7 +15,6 @@
 - Add Kubernetes deployment manifests for API, web and workers with migration jobs, secrets, probes, autoscaling and rollback gates.
 - Add franchise partner point audit scaffold with branch scorecards and ledger-backed findings.
 - Add WhatsApp storefront session/webhook shell that creates orders through the shared checkout backend when provider credentials arrive.
-- Add advertiser cabinet lifecycle on top of Campaigns: budget request, creative metadata, approval/status visibility, and ROI.
 - Add a defensive P2002 existing-payment fallback as optional belt-and-suspenders idempotency beyond the proven webhook row lock.
 - Activate production AI vision/market scout after provider key and reference datasets are available: configure `AI_PROVIDER_KEY`/`OPENROUTER_API_KEY`, validate real photo/listing outputs, and add offline eval thresholds.
 - Certify physical POS hardware after devices/provider accounts are available: silent ESC/POS/QZ printing, bank terminal SDKs, and real scanner QA.
@@ -24,6 +23,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- `MKT-006` Make campaign economics net and funnel-aware: approved refunds now create immutable replay-safe compensation rows, attributed revenue and cost are reduced without rewriting paid history, privacy-safe click/visit/checkout/conversion facts store only a hash of the browser journey, and ERP exposes funnel conversion, paid versus net economics, net ROAS and contribution ROI with API and campaign-to-storefront-to-refund browser evidence.
 - `MKT-005` Make campaign ROI operational: persist consent-safe first/last UTM attribution from storefront through checkout, bind promotion fallback and campaign conversion exactly once on fully received payment, snapshot server product cost, expose marketer spend/revenue/gross profit/ROAS and prove campaign → storefront → payment → ERP consequence E2E.
 - `MKT-004` Replace fixed storefront composition with owner/marketer-managed hero, promo, info and collection blocks: explicit order and desktop/mobile targeting, draft/scheduled/published/archived lifecycle, HTTPS/link/product validation, non-overlapping hero schedules, RBAC, Ledger and exact ERP-to-desktop/mobile visual consequence E2E.
 - `MKT-003` Replace hard-coded checkout discounts with owner/marketer-managed promotion codes: draft/active/paused plus derived scheduled/expired states, date window, total/per-customer limits, product/category/minimum-subtotal rules, canonical server quote and atomic application, replay-safe redemption, RBAC, Ledger, ERP Marketing CMS and checkout consequence E2E.

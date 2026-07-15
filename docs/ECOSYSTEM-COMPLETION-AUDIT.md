@@ -1,14 +1,14 @@
 # AliStore ecosystem completion audit
 
 Evidence snapshot: 2026-07-15, branch `codex/open-source-integrations`, including
-the verified first-store fulfillment, Finance settlement and paid campaign-attribution iterations. This is a completion audit, not a marketing status page. `Implemented`
+the verified first-store fulfillment, Finance settlement and net campaign-attribution iterations. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 53 NestJS modules including the application root, 39 generated Next routes and 66 Prisma migrations.
+- 54 NestJS modules including the application root, 39 generated Next routes and 67 Prisma migrations.
 - API/Web production builds, 127/127 Jest suites with 499/499 tests and 43/43 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
@@ -26,14 +26,14 @@ credentials, legal approval or physical hardware.
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
-| QA Test Scenarios | Partial | 499 API tests, 43 Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
+| QA Test Scenarios | Partial | 499 committed API tests, 43 committed Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
 | Analytics | Partial | reports, margin/KPI, revenue and AI insights | cohorts, retention, funnels, stock aging, delivery/supplier dashboards and exports |
 | Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
 | Client App 2.0 | Partial | SwiftUI/Compose shells and major customer API flows | screen-by-screen pixel matrix, XCUITest, app-level Compose E2E, biometric login, physical push/device gate |
 | Client services | Partial | support, returns, warranty, protection, trade-in APIs/web/native portions | unified native service journey, repair/loaner status, visual and offline acceptance |
 | Logistics management | Partial | authoritative store/pickup points, point-local inventory reservation, exact guest address, ERP zones/slots/capacity, row-locked checkout reservation, cancellation release, dispatch board, courier assignment, route states, Evidence and COD handover | route optimization, rescheduling and live tracking |
-| Marketing CMS | Implemented | revisioned copy plus ordered storefront blocks, targeting/scheduling, approved review moderation, managed promotions, consent-filtered recipients, server tracking codes, first/last UTM and payment-bound paid revenue/gross/ROAS with RBAC/Ledger and ERP/site E2E | production media, live channel certification, refund-adjusted net ROAS and privacy-safe visit/click funnel metrics |
+| Marketing CMS | Implemented | revisioned copy plus ordered storefront blocks, targeting/scheduling, approved review moderation, managed promotions, consent-filtered recipients, server tracking codes, first/last UTM, hashed click/visit/checkout/conversion funnel and payment/refund-bound paid/net revenue, gross profit and ROAS with RBAC/Ledger and ERP/site E2E | production media, live channel certification, advertiser lifecycle and provider spend import |
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
 | Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
 | Service center | Partial | warranty/paid intake, dedicated service/technician roles, diagnostics/customer approval, point-scoped POS settlement, store-owned parts, assigned repair lifecycle, automatic SLA breach Ledger, closure, 30-day repair warranty and DeviceUnit-backed loaner issue/return/Evidence/overdue custody | exact detail pixel acceptance remains blocked by absent linked handoffs; physical first-store service UAT remains |

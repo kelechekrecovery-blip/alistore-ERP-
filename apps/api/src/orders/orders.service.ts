@@ -323,6 +323,14 @@ export class OrdersService {
           },
           include: { items: true },
         });
+        if (preparedAttribution?.campaignId) {
+          await this.campaignAttribution?.recordCheckoutOnTx(
+            tx,
+            preparedAttribution.campaignId,
+            preparedAttribution.data.journeyHash,
+            initialOrder.id,
+          );
+        }
         if (appliedPromotion && !isDemo) {
           await this.requirePromotions().registerRedemptionOnTx(
             tx,

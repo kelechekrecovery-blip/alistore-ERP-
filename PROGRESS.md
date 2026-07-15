@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-006
+
+- Iteration ID: `MKT-006`.
+- Task: connect privacy-safe acquisition funnel facts and approved refund compensation to net campaign economics in ERP.
+- Files changed: campaign funnel/refund Prisma schema and migration, public hashed journey tracking, checkout/payment/refund domain integration, Ledger catalogue, typed storefront attribution, ERP Campaigns net/funnel presentation and API/browser acceptance.
+- Result: the storefront creates one opaque journey UUID and records replay-safe click and visit facts through a rate-limited public endpoint; the API stores only its SHA-256 hash. Order creation records checkout and the first fully received payment records conversion. Approved refunds append one adjustment per refund payment, restore exact return-item cost when available or bounded proportional cost otherwise, and never rewrite historical paid revenue/gross profit. ERP now separates paid revenue from refunds and shows net revenue, net gross profit, paid/net ROAS, contribution ROI and click-to-paid conversion. Unknown tracking codes fail closed without exposing campaign existence.
+- Checks run: Prisma generation; clean isolated PostgreSQL migration deploy 67/67; targeted campaign attribution/campaign/refund/return API 4 suites and 12 tests; API and Next production builds; targeted campaign → storefront → checkout → payment → refund → ERP browser acceptance 1/1; full current Playwright 44/44; detached committed API regression on a fresh 67-migration database passed 127/127 suites and 499/499 tests. The broad current worktree additionally passed all 502 runnable tests, with four unrelated suites compile-blocked only by parallel unstaged AI moderation work.
+- Acceptance: `accepted` for software-side funnel and net campaign economics. Raw journey identifiers and customer PII are absent from funnel rows; payment, refund and campaign conversion remain server-authoritative and replay-safe. Production ad-channel spend import, creative publication and provider credentials remain separate work.
+- Next backlog ID: `MKT-007` advertiser cabinet lifecycle and channel-controlled activation.
+
 ## 2026-07-15 — MKT-005
 
 - Iteration ID: `MKT-005`.

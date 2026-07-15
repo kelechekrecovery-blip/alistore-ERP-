@@ -6,11 +6,15 @@ import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { CampaignAttributionService } from '../src/campaigns/campaign-attribution.service';
 import { PromotionsService } from '../src/promotions/promotions.service';
+import { CampaignsService } from '../src/campaigns/campaigns.service';
 
 describe('Campaign attribution → paid conversion (integration)', () => {
   let prisma: PrismaService;
   let orders: OrdersService;
   let payments: PaymentsService;
+  let approvals: ApprovalsService;
+  let attribution: CampaignAttributionService;
+  let campaignMetrics: CampaignsService;
   const run = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
   beforeAll(async () => {
@@ -18,7 +22,8 @@ describe('Campaign attribution → paid conversion (integration)', () => {
     await prisma.$connect();
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
-    const attribution = new CampaignAttributionService();
+    attribution = new CampaignAttributionService(prisma);
+    approvals = new ApprovalsService(prisma, audit);
     orders = new OrdersService(
       prisma, audit, units, undefined, undefined, undefined,
       new PromotionsService(prisma, audit), attribution,
@@ -27,11 +32,12 @@ describe('Campaign attribution → paid conversion (integration)', () => {
       prisma,
       audit,
       units,
-      new ApprovalsService(prisma, audit),
+      approvals,
       undefined,
       undefined,
       attribution,
     );
+    campaignMetrics = new CampaignsService(prisma, audit, undefined as never, attribution);
   });
 
   afterAll(async () => {
@@ -87,6 +93,13 @@ describe('Campaign attribution → paid conversion (integration)', () => {
         eligibleProductIds: [], eligibleCategories: [], createdBy: 'mkt005-test', updatedBy: 'mkt005-test',
       },
     });
+    const journeyId = '9a89ddf4-a2a7-4735-a544-8a58d732ad47';
+    expect(await attribution.trackPublic({ trackingCode: campaign.trackingCode, journeyId, stage: 'click' }))
+      .toEqual({ accepted: true, recorded: true });
+    expect(await attribution.trackPublic({ trackingCode: campaign.trackingCode, journeyId, stage: 'click' }))
+      .toEqual({ accepted: true, recorded: false });
+    expect(await attribution.trackPublic({ trackingCode: campaign.trackingCode, journeyId, stage: 'visit' }))
+      .toEqual({ accepted: true, recorded: true });
 
     const order = await orders.createFromCatalog({
       customerId: customer.id,
@@ -96,6 +109,7 @@ describe('Campaign attribution → paid conversion (integration)', () => {
       total: 1,
       promoCode: campaign.promotionCode!,
       attribution: {
+        journeyId,
         first: { source: 'google', medium: 'organic', landing: '/catalog' },
         last: {
           source: 'spoofed-client-source', medium: 'spoofed-client-medium',
@@ -123,7 +137,7 @@ describe('Campaign attribution → paid conversion (integration)', () => {
     await orders.fulfill(order.id, 'warehouse-mkt005');
 
     expect(order).toMatchObject({ promoCode: campaign.promotionCode, promoDiscount: 1000, total: 9000 });
-    await payments.pay({ orderId: order.id, amount: 4500, method: 'card', txnId: `mkt005-${run}-pay-1` }, 'cashier-mkt005');
+    const firstPayment = await payments.pay({ orderId: order.id, amount: 4500, method: 'card', txnId: `mkt005-${run}-pay-1` }, 'cashier-mkt005');
     expect(await prisma.campaign.findUniqueOrThrow({ where: { id: campaign.id } })).toMatchObject({ orders: 0, revenue: 0, grossProfit: 0 });
 
     const completed = await payments.pay({ orderId: order.id, amount: 4500, method: 'card', txnId: `mkt005-${run}-pay-2` }, 'cashier-mkt005');
@@ -141,5 +155,69 @@ describe('Campaign attribution → paid conversion (integration)', () => {
     });
     expect(await prisma.auditEvent.count({ where: { type: 'campaign.attributed', refs: { has: order.id } } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'campaign.converted', refs: { has: order.id } } })).toBe(1);
+    expect(await prisma.campaignFunnelEvent.groupBy({
+      by: ['stage'], where: { campaignId: campaign.id }, _count: { _all: true },
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: 'click', _count: { _all: 1 } }),
+      expect.objectContaining({ stage: 'visit', _count: { _all: 1 } }),
+      expect.objectContaining({ stage: 'checkout', _count: { _all: 1 } }),
+      expect.objectContaining({ stage: 'conversion', _count: { _all: 1 } }),
+    ]));
+    const storedFunnel = await prisma.campaignFunnelEvent.findMany({ where: { campaignId: campaign.id } });
+    expect(storedFunnel.every((event) => event.sessionHash.length === 64)).toBe(true);
+    expect(JSON.stringify(storedFunnel)).not.toContain(journeyId);
+
+    const partialRefund = await payments.refund(
+      firstPayment.payment.id,
+      4500,
+      'partial campaign return',
+      'support-mkt006',
+    );
+    await approvals.decide(partialRefund.approvalId, {
+      status: 'approved', approver: 'admin-mkt006', approverRole: 'admin',
+    });
+    expect(await prisma.orderAttribution.findUniqueOrThrow({ where: { orderId: order.id } })).toMatchObject({
+      refundedRevenue: 4500,
+      refundedCost: 2000,
+    });
+    expect(await prisma.campaignRefundAdjustment.count({ where: { campaignId: campaign.id } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'campaign.refund_adjusted', refs: { has: order.id } } })).toBe(1);
+    expect(await campaignMetrics.roiFor(campaign.id)).toMatchObject({
+      revenue: 9000,
+      refundRevenue: 4500,
+      netRevenue: 4500,
+      grossProfit: 5000,
+      netGrossProfit: 2500,
+      paidRoas: 4.5,
+      roas: 2.25,
+      funnel: { clicks: 1, visits: 1, checkouts: 1, conversions: 1, conversionRate: 100 },
+    });
+
+    await expect(approvals.decide(partialRefund.approvalId, {
+      status: 'approved', approver: 'admin-mkt006', approverRole: 'admin',
+    })).rejects.toMatchObject({ code: 'approval_already_decided' });
+    expect(await prisma.campaignRefundAdjustment.count({ where: { campaignId: campaign.id } })).toBe(1);
+
+    const finalRefund = await payments.refund(
+      completed.payment.id,
+      4500,
+      'final campaign return',
+      'support-mkt006',
+    );
+    await approvals.decide(finalRefund.approvalId, {
+      status: 'approved', approver: 'admin-mkt006', approverRole: 'admin',
+    });
+    expect(await prisma.orderAttribution.findUniqueOrThrow({ where: { orderId: order.id } })).toMatchObject({
+      refundedRevenue: 9000,
+      refundedCost: 4000,
+    });
+    expect(await prisma.campaignRefundAdjustment.count({ where: { campaignId: campaign.id } })).toBe(2);
+    expect(await prisma.auditEvent.count({ where: { type: 'campaign.refund_adjusted', refs: { has: order.id } } })).toBe(2);
+    expect(await campaignMetrics.roiFor(campaign.id)).toMatchObject({
+      refundRevenue: 9000,
+      netRevenue: 0,
+      netGrossProfit: 0,
+      roas: 0,
+    });
   });
 });

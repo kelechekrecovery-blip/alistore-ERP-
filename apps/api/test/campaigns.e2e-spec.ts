@@ -141,6 +141,28 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
     expect(created.body).toMatchObject({ queued: 1, excludedNoConsent: 1 });
     expect(created.body.campaign).toMatchObject({ source: 'alistore_crm', medium: 'whatsapp' });
 
+    const journeyId = '8b0a8fdc-5ce8-449e-8686-5d5c684ff131';
+    await request(app.getHttpServer())
+      .post('/campaigns/funnel')
+      .send({ trackingCode: created.body.campaign.trackingCode, journeyId, stage: 'click' })
+      .expect(202, { accepted: true, recorded: true });
+    await request(app.getHttpServer())
+      .post('/campaigns/funnel')
+      .send({ trackingCode: created.body.campaign.trackingCode, journeyId, stage: 'click' })
+      .expect(202, { accepted: true, recorded: false });
+    await request(app.getHttpServer())
+      .post('/campaigns/funnel')
+      .send({ trackingCode: created.body.campaign.trackingCode, journeyId, stage: 'visit' })
+      .expect(202, { accepted: true, recorded: true });
+    await request(app.getHttpServer())
+      .post('/campaigns/funnel')
+      .send({ trackingCode: created.body.campaign.trackingCode, journeyId: 'not-a-uuid', stage: 'visit' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/campaigns/funnel')
+      .send({ trackingCode: 'cmp_unknown', journeyId, stage: 'visit' })
+      .expect(202, { accepted: true, recorded: false });
+
     const outbox = await prisma.outboxMessage.findMany({ orderBy: { createdAt: 'asc' } });
     expect(outbox).toHaveLength(1);
     expect(outbox[0]).toMatchObject({
@@ -181,8 +203,12 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
       budget: 10000,
       profit: 70000,
       grossProfit: 80000,
+      netRevenue: 80000,
+      netGrossProfit: 80000,
+      paidRoas: 8,
       roas: 8,
       roiPct: 700,
+      funnel: { clicks: 1, visits: 1, checkouts: 0, conversions: 0, conversionRate: 0 },
     });
 
     const conversions = await prisma.auditEvent.findMany({ where: { type: 'campaign.converted' } });

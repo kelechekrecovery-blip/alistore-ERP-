@@ -1,16 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
-import { OrderAttributionDto, AttributionTouchDto } from './attribution.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { CampaignFunnelDto, OrderAttributionDto, AttributionTouchDto } from './attribution.dto';
 
 type Tx = Prisma.TransactionClient;
+type PrismaLike = PrismaService | Tx;
 
 @Injectable()
 export class CampaignAttributionService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async trackPublic(input: CampaignFunnelDto) {
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { trackingCode: input.trackingCode },
+      select: { id: true },
+    });
+    if (!campaign) return { accepted: true, recorded: false };
+    const recorded = await this.recordStageOnTx(
+      this.prisma,
+      campaign.id,
+      this.hashJourney(input.journeyId),
+      input.stage,
+    );
+    return { accepted: true, recorded };
+  }
+
   async prepareForOrder(
-    tx: Tx,
+    tx: PrismaLike,
     customerId: string,
     input?: OrderAttributionDto,
     promotionCode?: string | null,
@@ -33,6 +53,7 @@ export class CampaignAttributionService {
       campaignId: campaign?.id ?? null,
       data: {
         campaignId: campaign?.id ?? null,
+        journeyHash: input?.journeyId ? this.hashJourney(input.journeyId) : null,
         firstSource: first.source,
         firstMedium: first.medium,
         firstCampaign: first.campaign,
@@ -113,6 +134,9 @@ export class CampaignAttributionService {
         grossProfit: { increment: grossProfit },
       },
     });
+    if (attribution.journeyHash) {
+      await this.recordStageOnTx(tx, campaign.id, attribution.journeyHash, 'conversion', orderId);
+    }
     events.push({
       type: EventType.CampaignConverted,
       actor,
@@ -120,6 +144,29 @@ export class CampaignAttributionService {
       refs: [campaign.id, orderId, attribution.id],
     });
     return { campaign, revenue, grossProfit };
+  }
+
+  async recordCheckoutOnTx(tx: Tx, campaignId: string, journeyHash: string | null, orderId: string) {
+    if (!journeyHash) return false;
+    return this.recordStageOnTx(tx, campaignId, journeyHash, 'checkout', orderId);
+  }
+
+  private async recordStageOnTx(
+    tx: PrismaLike,
+    campaignId: string,
+    sessionHash: string,
+    stage: 'click' | 'visit' | 'checkout' | 'conversion',
+    orderId?: string,
+  ) {
+    const created = await tx.campaignFunnelEvent.createMany({
+      data: [{ campaignId, sessionHash, stage, orderId: orderId ?? null }],
+      skipDuplicates: true,
+    });
+    return created.count === 1;
+  }
+
+  private hashJourney(journeyId: string) {
+    return createHash('sha256').update(journeyId).digest('hex');
   }
 
   private touch(input: AttributionTouchDto | undefined, fallbackSource: string, fallbackMedium?: string) {

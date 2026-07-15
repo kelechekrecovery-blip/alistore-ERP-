@@ -48,6 +48,7 @@ test('campaign UTM survives navigation, converts on payment once, and appears as
     grossProfit: 20_000,
   });
   expect(await prisma.auditEvent.count({ where: { type: 'campaign.converted', refs: { has: order.id } } })).toBe(1);
+  await expect.poll(() => prisma.campaignFunnelEvent.count({ where: { campaignId: campaign.id } })).toBe(4);
 
   await page.goto('/erp');
   await page.getByPlaceholder('username').fill(username);
@@ -56,6 +57,7 @@ test('campaign UTM survives navigation, converts on payment once, and appears as
   await page.getByRole('button', { name: /Кампании/ }).click();
   await expect(page.getByText('Instagram · живой checkout')).toBeVisible();
   await expect(page.getByTestId(`campaign-link-${campaign.id}`)).toContainText(trackingCode);
+  await expect(page.getByTestId(`campaign-funnel-${campaign.id}`)).toContainText('100%');
   await expect(page.getByText('20×')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => document.documentElement.clientWidth),

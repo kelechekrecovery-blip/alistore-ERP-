@@ -30,9 +30,21 @@ export interface CampaignRoi {
   budget: number;
   profit: number;
   grossProfit: number;
+  refundRevenue: number;
+  restoredCost: number;
+  netRevenue: number;
+  netGrossProfit: number;
   contribution: number;
+  paidRoas: number | null;
   roas: number | null;
   roiPct: number | null;
+  funnel: {
+    clicks: number;
+    visits: number;
+    checkouts: number;
+    conversions: number;
+    conversionRate: number | null;
+  };
 }
 
 @Injectable()
@@ -134,25 +146,47 @@ export class CampaignsService {
   }
 
   async recordConversion(id: string, orderId: string, actor: string) {
-    return this.audit.transaction(async (tx) => {
+    await this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       await this.attribution.attachForBackfill(tx, id, orderId);
       const events: Parameters<CampaignAttributionService['convertPaidOrderOnTx']>[3] = [];
       await this.attribution.convertPaidOrderOnTx(tx, orderId, actor, events);
-      const updated = await tx.campaign.findUniqueOrThrow({ where: { id } });
       return {
-        result: this.roiView(updated),
+        result: null,
         events,
       };
     });
+    return this.roiFor(id);
   }
 
   async roiFor(id: string): Promise<CampaignRoi> {
-    const campaign = await this.prisma.campaign.findUnique({ where: { id } });
+    const [campaign, refunds, funnelRows] = await Promise.all([
+      this.prisma.campaign.findUnique({ where: { id } }),
+      this.prisma.campaignRefundAdjustment.aggregate({
+        where: { campaignId: id },
+        _sum: { revenue: true, restoredCost: true },
+      }),
+      this.prisma.campaignFunnelEvent.groupBy({
+        by: ['stage'],
+        where: { campaignId: id },
+        _count: { _all: true },
+      }),
+    ]);
     if (!campaign) {
       throw new ValidationError('campaign_not_found', `Кампания ${id} не найдена`);
     }
-    return this.roiView(campaign);
+    const counts = new Map(funnelRows.map((row) => [row.stage, row._count._all]));
+    return this.roiView(
+      campaign,
+      refunds._sum.revenue ?? 0,
+      refunds._sum.restoredCost ?? 0,
+      {
+        clicks: counts.get('click') ?? 0,
+        visits: counts.get('visit') ?? 0,
+        checkouts: counts.get('checkout') ?? 0,
+        conversions: counts.get('conversion') ?? 0,
+      },
+    );
   }
 
   private async loadCustomersWithSpend(client: PrismaLike): Promise<AudienceCustomer[]> {
@@ -185,8 +219,18 @@ export class CampaignsService {
     }));
   }
 
-  private roiView(campaign: Campaign): CampaignRoi {
-    const contribution = campaign.grossProfit - campaign.budget;
+  private roiView(
+    campaign: Campaign,
+    refundRevenue = 0,
+    restoredCost = 0,
+    funnel = { clicks: 0, visits: 0, checkouts: 0, conversions: 0 },
+  ): CampaignRoi {
+    const netRevenue = campaign.revenue - refundRevenue;
+    const netGrossProfit = campaign.grossProfit - (refundRevenue - restoredCost);
+    const contribution = netGrossProfit - campaign.budget;
+    const conversionRate = funnel.visits > 0
+      ? Math.round((funnel.conversions / funnel.visits) * 10_000) / 100
+      : null;
     const rules = parseSegmentLabel(campaign.segment);
     return {
       campaign,
@@ -197,9 +241,15 @@ export class CampaignsService {
       budget: campaign.budget,
       profit: contribution,
       grossProfit: campaign.grossProfit,
+      refundRevenue,
+      restoredCost,
+      netRevenue,
+      netGrossProfit,
       contribution,
-      roas: campaign.budget > 0 ? Math.round((campaign.revenue / campaign.budget) * 100) / 100 : null,
+      paidRoas: campaign.budget > 0 ? Math.round((campaign.revenue / campaign.budget) * 100) / 100 : null,
+      roas: campaign.budget > 0 ? Math.round((netRevenue / campaign.budget) * 100) / 100 : null,
       roiPct: campaign.budget > 0 ? Math.round((contribution / campaign.budget) * 1000) / 10 : null,
+      funnel: { ...funnel, conversionRate },
     };
   }
 

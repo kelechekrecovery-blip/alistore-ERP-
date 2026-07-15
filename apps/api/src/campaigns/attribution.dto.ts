@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AttributionTouchDto {
@@ -23,9 +23,23 @@ export class AttributionTouchDto {
 }
 
 export class OrderAttributionDto {
+  @ApiPropertyOptional({ example: '9a89ddf4-a2a7-4735-a544-8a58d732ad47' })
+  @IsOptional() @IsUUID() journeyId?: string;
+
   @ApiProperty({ type: AttributionTouchDto })
   @ValidateNested() @Type(() => AttributionTouchDto) first!: AttributionTouchDto;
 
   @ApiProperty({ type: AttributionTouchDto })
   @ValidateNested() @Type(() => AttributionTouchDto) last!: AttributionTouchDto;
+}
+
+export class CampaignFunnelDto {
+  @ApiProperty({ example: 'cmp_7P4M2K9Q' })
+  @IsString() @MaxLength(120) trackingCode!: string;
+
+  @ApiProperty({ example: '9a89ddf4-a2a7-4735-a544-8a58d732ad47' })
+  @IsUUID() journeyId!: string;
+
+  @ApiProperty({ enum: ['click', 'visit'], example: 'visit' })
+  @IsIn(['click', 'visit']) stage!: 'click' | 'visit';
 }

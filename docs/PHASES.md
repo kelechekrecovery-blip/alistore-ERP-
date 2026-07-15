@@ -325,14 +325,17 @@ unchanged 1, Product count stays 1.
   тикетов с фильтрами по статусу + переходы + эскалация) и Customer 360 карточка (потрачено/
   заказы/долг/гарантии/обращения + consent-переключатель). Вкладка использует общий staff
   session; API-клиенты в `lib/crm.ts`.
-- ✅ Segment Builder + paid Campaign ROI: `/campaigns/preview` строит аудиторию по level/city/
+- ✅ Segment Builder + net Campaign ROI: `/campaigns/preview` строит аудиторию по level/city/
   tags/spend/ltv и всегда фильтрует `Customer.consent`; `POST /campaigns` создаёт серверный
   tracking code, фиксирует consenting recipients и ставит outbox только для них. Витрина
   сохраняет ограниченные first/last UTM, заказ принимает их как недоверенный input, а API
   канонизирует campaign/source/medium. Полностью полученная оплата один раз пишет
-  `campaign.converted` и обновляет paid revenue, server-cost gross profit и ROAS. ERP даёт
-  preview, запуск, tracking URL и экономику; ручная привязка убрана из UI и оставлена только
-  как permissioned locked backfill.
+  `campaign.converted` и обновляет paid revenue и server-cost gross profit. Публичный
+  rate-limited funnel сохраняет только SHA-256 journey hash и идемпотентные click/visit/
+  checkout/conversion. Approved refund пишет отдельную immutable adjustment, компенсирует
+  revenue/cost ровно один раз и не переписывает paid history. ERP даёт preview, запуск,
+  tracking URL, conversion rate, paid/net revenue, net gross, paid/net ROAS и contribution ROI;
+  ручная привязка убрана из UI и оставлена только как permissioned locked backfill.
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;
 SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/list-by-customer,
@@ -340,10 +343,11 @@ SLA-breach ловится в Risk Center). ✅ Support/CRM RBAC: public open/lis
 ✅ Customer 360: 3 теста + HTTP-смоук (реальный клиент: 3 заказа, spent 109900,
 1 гарантия; неизвестный → 422). ✅ Campaigns: targeted e2e на RBAC, consent-filter,
 first/last attribution, partial/full payment и replay-safe conversion; browser QA проходит
-campaign → storefront UTM → checkout → sandbox payment → ERP Campaigns (tracking URL, paid
-revenue, gross profit and ROAS, no overflow) с БД-сверкой attribution/Ledger. Outbox recipients
+campaign → storefront UTM → checkout → sandbox payment → partial/full refund → ERP Campaigns
+(tracking URL, funnel, paid/net revenue, net gross and ROAS, no overflow) с БД-сверкой
+attribution/adjustment/Ledger. Outbox recipients
 include consenting customer and exclude opted-out customer. Refund-adjusted net ROAS и
-visit/click funnel вынесены в MKT-006. ✅ Transactional
+visit/click funnel закрыты в MKT-006. ✅ Transactional
 notifications: targeted e2e verifies order/warranty templates, consent filtering, debt opt-out
 reminders, and reservation expiry without an opted-out notice.
 

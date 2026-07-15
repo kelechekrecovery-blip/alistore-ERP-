@@ -5,6 +5,7 @@ import { ConflictError, ValidationError } from '../common/errors';
 import { canTransition } from '../orders/order-state-machine';
 import { insertDebt } from '../debts/debt-insert';
 import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
+import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
 
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
@@ -108,6 +109,13 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
     refs: [original.orderId, original.serviceWorkOrderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
   });
   if (original.orderId) {
+    await applyCampaignRefundOnTx(tx, {
+      orderId: original.orderId,
+      refundPaymentId: compensating.id,
+      returnId,
+      amount,
+      actor: approver,
+    }, events);
     const order = await tx.order.findUnique({ where: { id: original.orderId } });
     if (order) {
       await reconcileRefundLoyaltyOnTx(tx, {

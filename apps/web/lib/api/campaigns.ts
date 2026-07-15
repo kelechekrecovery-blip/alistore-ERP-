@@ -48,9 +48,21 @@ export interface CampaignRoi {
   budget: number;
   profit: number;
   grossProfit: number;
+  refundRevenue: number;
+  restoredCost: number;
+  netRevenue: number;
+  netGrossProfit: number;
   contribution: number;
+  paidRoas: number | null;
   roas: number | null;
   roiPct: number | null;
+  funnel: {
+    clicks: number;
+    visits: number;
+    checkouts: number;
+    conversions: number;
+    conversionRate: number | null;
+  };
 }
 
 export interface CreateCampaignInput extends SegmentRules {
