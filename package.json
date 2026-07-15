@@ -34,6 +34,8 @@
     "ecosystem:verify": "node scripts/ecosystem-verify.mjs",
     "ecosystem:verify:ui": "node scripts/ecosystem-verify.mjs --native-ui",
     "web": "npm run dev -w @alistore/web",
+    "local:up": "bash scripts/local-up.sh",
+    "local:down": "bash scripts/local-down.sh",
     "db:migrate": "npm run db:migrate -w @alistore/api",
     "db:seed": "npm run db:seed -w @alistore/api",
     "db:studio": "npm run db:studio -w @alistore/api",
