@@ -58,6 +58,13 @@ public enum OfflineOrderQueue {
         try? context.save()
         do {
             let request = try JSONDecoder().decode(CreateOrderRequest.self, from: mutation.body)
+            if request.fulfillmentType == "pickup" && request.storePointId == nil {
+                mutation.state = "conflict"
+                mutation.lastError = "Выберите актуальную точку самовывоза и создайте заказ повторно"
+                mutation.updatedAt = Date()
+                try? context.save()
+                return
+            }
             let _: CustomerOrder = try await api.post(
                 mutation.endpoint,
                 body: request,

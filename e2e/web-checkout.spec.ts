@@ -37,7 +37,10 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   expect(order).toMatchObject({
     status: 'paid',
     fulfillmentType: 'pickup',
-    pickupPoint: 'alistore-center',
+    storePointId: 'alistore-bishkek-1',
+    pickupPoint: 'AliStore Центр',
+    pickupAddress: 'Бишкек, ул. Киевская 95',
+    fulfillmentLocation: 'BISHKEK-1',
   });
   expect(order?.pickupCode).toMatch(/^PU-/);
   expect(await prisma.payment.count({ where: { orderId: order?.id, method: 'card' } })).toBe(1);
@@ -79,6 +82,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   await page.getByRole('button', { name: /Курьер/ }).click();
   await expect(page.getByLabel('Зона доставки')).toHaveValue(zone.id);
   await expect(page.getByRole('button', { name: /осталось 1/ })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Точный адрес доставки' }).fill('Бишкек, ул. Токтогула 125/1, кв. 42');
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900351');
   await page.getByPlaceholder('Имя').fill('Delivery Buyer');
@@ -95,6 +99,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
     deliverySlotId: zone.slots[0].id,
     deliveryFee: 350,
     total: product.price + 350,
+    deliveryAddress: 'Бишкек, ул. Токтогула 125/1, кв. 42',
   });
   const availability = await page.request.get(`http://127.0.0.1:4200/api/logistics/availability?date=${startsAt.toISOString().slice(0, 10)}`);
   expect(availability.ok()).toBeTruthy();

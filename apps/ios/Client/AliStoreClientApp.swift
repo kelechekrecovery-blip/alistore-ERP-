@@ -190,6 +190,9 @@ private struct CartView: View {
     @State private var fulfillment = "pickup"
     @State private var paymentMethod = "cash"
     @State private var address = ""
+    @State private var pickupPoints: [StorePoint] = []
+    @State private var selectedStorePointId = ""
+    @State private var pointError: String?
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var completedOrder: CustomerOrder?
@@ -256,7 +259,15 @@ private struct CartView: View {
                             if fulfillment == "courier" {
                                 TextField("Адрес доставки", text: $address)
                             } else {
-                                LabeledContent("Точка", value: "AliStore Центр")
+                                if pickupPoints.isEmpty {
+                                    Text(pointError ?? "Загружаем точки…").foregroundStyle(.secondary)
+                                } else {
+                                    Picker("Точка", selection: $selectedStorePointId) {
+                                        ForEach(pickupPoints) { point in
+                                            Text("\(point.name) · \(point.address)").tag(point.id)
+                                        }
+                                    }
+                                }
                             }
                         }
                         Section("Оплата") {
@@ -283,12 +294,13 @@ private struct CartView: View {
                                     Spacer()
                                 }
                             }
-                            .disabled(isSubmitting || auth.session == nil || (fulfillment == "courier" && address.trimmingCharacters(in: .whitespaces).isEmpty))
+                            .disabled(isSubmitting || auth.session == nil || (fulfillment == "pickup" && selectedStorePointId.isEmpty) || (fulfillment == "courier" && address.trimmingCharacters(in: .whitespaces).isEmpty))
                         }
                     }
                 }
             }
             .navigationTitle("Корзина")
+            .task { await loadStorePoints() }
         }
     }
 
@@ -309,7 +321,7 @@ private struct CartView: View {
         let request = CreateOrderRequest(
             customerId: session.customerId,
             fulfillmentType: fulfillment,
-            pickupPoint: fulfillment == "pickup" ? "BISHKEK-1" : nil,
+            storePointId: fulfillment == "pickup" ? selectedStorePointId : nil,
             deliveryAddress: fulfillment == "courier" ? address.trimmingCharacters(in: .whitespaces) : nil,
             total: total,
             items: lines.map { CreateOrderItem(sku: $0.0.sku, qty: $0.1, price: $0.0.price) }
@@ -349,6 +361,22 @@ private struct CartView: View {
             } else {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    @MainActor
+    private func loadStorePoints() async {
+        do {
+            let options: CheckoutOptions = try await APIClient(baseURL: environment.apiBaseURL).get("logistics/checkout-options")
+            pickupPoints = options.pickupPoints
+            if !pickupPoints.contains(where: { $0.id == selectedStorePointId }) {
+                selectedStorePointId = pickupPoints.first?.id ?? ""
+            }
+            pointError = pickupPoints.isEmpty ? "Самовывоз временно недоступен" : nil
+        } catch {
+            pickupPoints = []
+            selectedStorePointId = ""
+            pointError = error.localizedDescription
         }
     }
 

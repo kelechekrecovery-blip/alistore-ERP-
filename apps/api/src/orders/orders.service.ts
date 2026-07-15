@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, Prisma, StorePoint } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
@@ -18,6 +18,7 @@ import {
   releaseQuantityConsignmentOnTx,
   reserveQuantityConsignmentOnTx,
 } from '../inventory/consignment-accounting';
+import { LogisticsService } from '../logistics/logistics.service';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -31,7 +32,7 @@ interface CanonicalPricing {
   loyaltyPoints: number;
 }
 
-function defaultFulfillment(channel: string): string {
+function defaultFulfillment(channel: string): NonNullable<CreateOrderDto['fulfillmentType']> {
   if (channel === 'pos' || channel === 'staff_mobile') return 'store';
   return 'pickup';
 }
@@ -48,6 +49,7 @@ export class OrdersService {
     private readonly units: UnitsService,
     @Optional() private readonly outbox?: OutboxService,
     @Optional() private readonly config?: ConfigService,
+    @Optional() private readonly logistics?: LogisticsService,
   ) {}
 
   get(id: string) {
@@ -90,7 +92,7 @@ export class OrdersService {
       }
     }
 
-    if (dto.fulfillmentType === 'courier' && !dto.deliveryAddress?.trim()) {
+    if (['courier', 'express'].includes(dto.fulfillmentType ?? '') && !dto.deliveryAddress?.trim()) {
       throw new ValidationError('delivery_address_required', 'Укажите адрес доставки');
     }
     if ((dto.deliveryZoneId && !dto.deliverySlotId) || (!dto.deliveryZoneId && dto.deliverySlotId)) {
@@ -99,20 +101,36 @@ export class OrdersService {
     if (dto.deliveryZoneId && dto.fulfillmentType !== 'courier') {
       throw new ValidationError('delivery_selection_forbidden', 'Зона и слот доступны только для курьерской доставки');
     }
+    const fulfillmentType: NonNullable<CreateOrderDto['fulfillmentType']> = dto.fulfillmentType ?? defaultFulfillment(dto.channel);
+    const requiresPointSelection = fulfillmentType === 'pickup';
+    const storePoint = this.logistics
+      ? await this.logistics.resolveStorePoint(
+          dto.storePointId,
+          fulfillmentType === 'store' ? dto.pickupPoint : undefined,
+          requiresPointSelection,
+        )
+      : await this.resolveStorePointFromDatabase(
+          dto.storePointId,
+          fulfillmentType === 'store' ? dto.pickupPoint : undefined,
+          false,
+        );
+    const deliveryAddress = fulfillmentType === 'pickup' || fulfillmentType === 'store'
+      ? undefined
+      : dto.deliveryAddress?.trim();
     const quantities = new Map<string, number>();
     for (const item of dto.items) quantities.set(item.sku, (quantities.get(item.sku) ?? 0) + item.qty);
     const skus = [...quantities.keys()];
     const products = await this.prisma.product.findMany({
       where: { sku: { in: skus }, archived: false },
       include: {
-        units: { where: { status: 'in_stock' }, select: { id: true } },
-        balances: { select: { onHand: true, reserved: true } },
+        units: { where: { status: 'in_stock', location: storePoint.inventoryLocation }, select: { id: true } },
+        balances: { where: { location: storePoint.inventoryLocation }, select: { onHand: true, reserved: true } },
         bundleComponents: {
           include: {
             componentProduct: {
               include: {
-                units: { where: { status: 'in_stock' }, select: { id: true } },
-                balances: { select: { onHand: true, reserved: true } },
+                units: { where: { status: 'in_stock', location: storePoint.inventoryLocation }, select: { id: true } },
+                balances: { where: { location: storePoint.inventoryLocation }, select: { onHand: true, reserved: true } },
               },
             },
           },
@@ -147,15 +165,34 @@ export class OrdersService {
     }
     const pricing: CanonicalPricing = { subtotal, deliveryFee, promoCode, promoDiscount, loyaltyPoints };
     return this.create(
-      { ...dto, total: subtotal + deliveryFee - promoDiscount, items },
+      {
+        ...dto,
+        fulfillmentType,
+        storePointId: storePoint.id,
+        pickupPoint: undefined,
+        deliveryAddress,
+        total: subtotal + deliveryFee - promoDiscount,
+        items,
+      },
       actor,
       idempotencyKey,
       pricing,
+      storePoint,
     );
   }
 
-  async create(dto: CreateOrderDto, actor: string, idempotencyKey?: string, pricing?: CanonicalPricing) {
+  async create(
+    dto: CreateOrderDto,
+    actor: string,
+    idempotencyKey?: string,
+    pricing?: CanonicalPricing,
+    storePoint?: StorePoint,
+  ) {
     const isDemo = this.config?.get<string>('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
+    const fulfillmentType = dto.fulfillmentType ?? defaultFulfillment(dto.channel);
+    const canonicalStorePoint = storePoint ?? (this.logistics
+      ? await this.logistics.resolveStorePoint(dto.storePointId, dto.pickupPoint, fulfillmentType === 'pickup')
+      : await this.resolveStorePointFromDatabase(dto.storePointId, dto.pickupPoint, false));
     try {
       return await this.audit.transaction(async (tx) => {
         if (idempotencyKey) {
@@ -198,8 +235,14 @@ export class OrdersService {
             isDemo,
             customerId: dto.customerId,
             channel: dto.channel,
-            fulfillmentType: dto.fulfillmentType ?? defaultFulfillment(dto.channel),
-            pickupPoint: dto.pickupPoint,
+            fulfillmentType,
+            storePointId: canonicalStorePoint.id,
+            storePointCode: canonicalStorePoint.code,
+            storePointName: canonicalStorePoint.name,
+            storePointAddress: canonicalStorePoint.address,
+            pickupPoint: ['pickup', 'store'].includes(fulfillmentType) ? canonicalStorePoint.name : null,
+            pickupAddress: ['pickup', 'store'].includes(fulfillmentType) ? canonicalStorePoint.address : null,
+            fulfillmentLocation: canonicalStorePoint.inventoryLocation,
             deliveryAddress: dto.deliveryAddress,
             deliverySlot: dto.deliverySlot,
             deliveryZoneId: isDemo ? null : dto.deliveryZoneId,
@@ -252,7 +295,10 @@ export class OrdersService {
               orderId: order.id,
               channel: order.channel,
               fulfillmentType: order.fulfillmentType,
+              storePointId: order.storePointId,
               pickupPoint: order.pickupPoint,
+              pickupAddress: order.pickupAddress,
+              fulfillmentLocation: order.fulfillmentLocation,
               deliveryAddress: order.deliveryAddress,
               deliverySlot: order.deliverySlot,
               pickupCode: order.pickupCode,
@@ -319,6 +365,10 @@ export class OrdersService {
       const events: AuditInput[] = [];
       for (const item of order.items) {
         if (item.imei) {
+          const unit = await tx.deviceUnit.findUnique({ where: { imei: item.imei } });
+          if (!unit || (order.fulfillmentLocation && unit.location !== order.fulfillmentLocation)) {
+            throw new ConflictError('unit_wrong_store_point', `Единица ${item.imei} недоступна в выбранной точке`);
+          }
           await this.units.reserveOnTx(tx, item.imei, orderId);
           await tx.reservation.create({
             data: { orderId, imei: item.imei, expiresAt, active: true },
@@ -335,7 +385,7 @@ export class OrdersService {
         if (product?.trackingMode === 'quantity') {
           await this.reserveQuantityOnTx(
             tx, orderId, item.id, product.id, product.sku, item.qty,
-            order.pickupPoint, expiresAt, actor, events,
+            order.fulfillmentLocation, expiresAt, actor, events,
           );
         }
       }
@@ -509,6 +559,9 @@ export class OrdersService {
         if (item.imei) {
           // already serialized (e.g. POS) — reserve if still in stock
           const unit = await tx.deviceUnit.findUnique({ where: { imei: item.imei } });
+          if (unit && order.fulfillmentLocation && unit.location !== order.fulfillmentLocation) {
+            throw new ConflictError('unit_wrong_store_point', `Единица ${item.imei} недоступна в выбранной точке`);
+          }
           if (unit?.status === 'in_stock') await reserveUnit(item.imei, item.sku);
           continue;
         }
@@ -524,13 +577,17 @@ export class OrdersService {
             if (component.componentProduct.trackingMode === 'quantity') {
               await this.reserveQuantityOnTx(
                 tx, orderId, item.id, component.componentProductId,
-                component.componentProduct.sku, required, order.pickupPoint,
+                component.componentProduct.sku, required, order.fulfillmentLocation,
                 expiresAt, actor, events,
               );
               continue;
             }
             const units = await tx.deviceUnit.findMany({
-              where: { productId: component.componentProductId, status: 'in_stock' },
+              where: {
+                productId: component.componentProductId,
+                status: 'in_stock',
+                ...(order.fulfillmentLocation ? { location: order.fulfillmentLocation } : {}),
+              },
               take: required,
               orderBy: { id: 'asc' },
             });
@@ -549,6 +606,7 @@ export class OrdersService {
                   bundleSku: item.sku,
                   componentProductId: component.componentProductId,
                   componentSku: component.componentProduct.sku,
+                  location: unit.location,
                   imei: unit.imei,
                 },
               });
@@ -560,13 +618,17 @@ export class OrdersService {
         if (product.trackingMode === 'quantity') {
           await this.reserveQuantityOnTx(
             tx, orderId, item.id, product.id, product.sku, item.qty,
-            order.pickupPoint, expiresAt, actor, events,
+            order.fulfillmentLocation, expiresAt, actor, events,
           );
           continue;
         }
 
         const units = await tx.deviceUnit.findMany({
-          where: { productId: product.id, status: 'in_stock' },
+          where: {
+            productId: product.id,
+            status: 'in_stock',
+            ...(order.fulfillmentLocation ? { location: order.fulfillmentLocation } : {}),
+          },
           take: item.qty,
           orderBy: { id: 'asc' },
         });
@@ -657,10 +719,9 @@ export class OrdersService {
     events: AuditInput[],
   ): Promise<void> {
     const balances = await tx.inventoryBalance.findMany({
-      where: { productId },
+      where: { productId, ...(preferredLocation ? { location: preferredLocation } : {}) },
       orderBy: { location: 'asc' },
     });
-    balances.sort((a, b) => Number(b.location === preferredLocation) - Number(a.location === preferredLocation));
     let remaining = quantity;
     for (const balance of balances) {
       if (remaining === 0) break;
@@ -673,7 +734,7 @@ export class OrdersService {
       `;
       if (claimed === 0) continue;
       const allocation = await tx.orderQuantityAllocation.create({
-        data: { orderId, orderItemId, productId, balanceId: balance.id, sku, qty: desired },
+        data: { orderId, orderItemId, productId, balanceId: balance.id, sku, location: balance.location, qty: desired },
       });
       await reserveQuantityConsignmentOnTx(tx, {
         orderQuantityAllocationId: allocation.id,
@@ -694,6 +755,27 @@ export class OrdersService {
     if (remaining > 0) {
       throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: не хватает ${remaining}`);
     }
+  }
+
+  private async resolveStorePointFromDatabase(storePointId?: string, legacyAlias?: string, requireSelection = false) {
+    const alias = legacyAlias?.trim();
+    const knownCode = alias === 'alistore-center' || alias === 'AliStore Центр' ? 'center' : alias;
+    const point = storePointId
+      ? await this.prisma.storePoint.findFirst({ where: { id: storePointId, active: true } })
+      : alias
+        ? await this.prisma.storePoint.findFirst({
+            where: { active: true, OR: [{ code: knownCode }, { inventoryLocation: alias }] },
+          })
+        : requireSelection
+          ? null
+          : await this.prisma.storePoint.findFirst({ where: { active: true }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] });
+    if (!point) {
+      throw new ValidationError(
+        storePointId ? 'store_point_unavailable' : 'store_point_required',
+        storePointId ? 'Точка недоступна или отключена' : 'Нет доступной точки выполнения заказа',
+      );
+    }
+    return point;
   }
 
   private async consumeQuantityOnTx(

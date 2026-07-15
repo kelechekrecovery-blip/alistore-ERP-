@@ -54,8 +54,6 @@ test('warehouse role can open procurement and receive a sent PO', async ({ page,
   await resetDb();
   const owner = await seedStaffCredentials('owner', 'e2e-owner');
   const warehouse = await seedStaffCredentials('warehouse', 'e2e-warehouse');
-  const warehouseUsername = warehouse.username;
-  const password = warehouse.password;
 
   const supplier = await prisma.supplier.create({ data: { name: `Warehouse Supplier ${Date.now().toString(36)}` } });
   const product = await prisma.product.create({
@@ -69,10 +67,16 @@ test('warehouse role can open procurement and receive a sent PO', async ({ page,
   }, owner.accessToken);
   await postJson(request, `/procurement/purchase-orders/${order.id}/send`, {}, owner.accessToken);
 
+  await page.addInitScript((session) => {
+    localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(session));
+  }, {
+    accessToken: warehouse.accessToken,
+    staffId: warehouse.staffId,
+    username: warehouse.username,
+    role: 'warehouse',
+    totpEnabled: false,
+  });
   await page.goto('/erp');
-  await page.getByPlaceholder('username').fill(warehouseUsername);
-  await page.getByPlaceholder('password').fill(password);
-  await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /Закупки/ }).click();
 
   await expect(page.getByText('Рекомендации недоступны для этой роли.')).toBeVisible();

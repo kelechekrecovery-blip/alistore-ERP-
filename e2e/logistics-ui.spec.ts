@@ -1,7 +1,36 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedStaffCredentials } from './helpers';
+import { API_BASE, prisma, resetDb, seedStaffCredentials } from './helpers';
 
 test.afterEach(async () => resetDb());
+
+test('ERP point availability immediately controls public checkout options', async ({ page, request }) => {
+  await resetDb();
+  const owner = await seedStaffCredentials('owner', 'e2e-store-point-owner');
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(owner.username);
+  await page.getByPlaceholder('password').fill(owner.password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /Логистика/ }).click();
+  await page.getByRole('tab', { name: 'Точки выдачи' }).click();
+
+  const point = page.getByTestId('store-point-alistore-bishkek-1');
+  await expect(point).toBeVisible();
+  await point.getByRole('button', { name: 'Активна' }).click();
+  await expect(point.getByRole('button', { name: 'Отключена' })).toBeVisible();
+
+  let response = await request.get(`${API_BASE}/logistics/checkout-options`);
+  expect(response.ok()).toBeTruthy();
+  expect((await response.json()).pickupPoints).toEqual([]);
+
+  await point.getByRole('button', { name: 'Отключена' }).click();
+  await expect(point.getByRole('button', { name: 'Активна' })).toBeVisible();
+  response = await request.get(`${API_BASE}/logistics/checkout-options`);
+  expect(response.ok()).toBeTruthy();
+  expect((await response.json()).pickupPoints).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: 'alistore-bishkek-1', inventoryLocation: 'BISHKEK-1' })]),
+  );
+});
 
 test('owner creates delivery capacity and dispatches a packed order', async ({ page }) => {
   await resetDb();

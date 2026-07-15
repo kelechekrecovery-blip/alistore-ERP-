@@ -51,7 +51,7 @@ describe('Order fulfillment metadata', () => {
     expect(order).toMatchObject({
       channel: 'web',
       fulfillmentType: 'pickup',
-      pickupPoint: 'alistore-center',
+      pickupPoint: 'AliStore Центр',
       deliverySlot: 'today 16:00-18:00',
       deliveryAddress: null,
     });
@@ -62,7 +62,7 @@ describe('Order fulfillment metadata', () => {
       orderId: order.id,
       channel: 'web',
       fulfillmentType: 'pickup',
-      pickupPoint: 'alistore-center',
+      pickupPoint: 'AliStore Центр',
       deliverySlot: 'today 16:00-18:00',
       pickupCode: order.pickupCode,
     });

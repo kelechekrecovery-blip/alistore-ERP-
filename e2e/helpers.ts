@@ -60,6 +60,8 @@ export async function resetDb() {
   await prisma.return.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.storePointCommand.deleteMany();
+  await prisma.storePoint.deleteMany({ where: { id: { not: 'alistore-bishkek-1' } } });
   await prisma.deliverySlot.deleteMany();
   await prisma.deliveryZone.deleteMany();
   await prisma.inventoryMovement.deleteMany();
@@ -75,6 +77,30 @@ export async function resetDb() {
   await prisma.courierRun.deleteMany();
   await prisma.approval.deleteMany();
   await prisma.staffUser.deleteMany();
+  await prisma.storePoint.upsert({
+    where: { id: 'alistore-bishkek-1' },
+    update: {
+      code: 'center',
+      name: 'AliStore Центр',
+      address: 'Бишкек, ул. Киевская 95',
+      inventoryLocation: 'BISHKEK-1',
+      hours: 'Ежедневно 10:00–21:00',
+      active: true,
+      sortOrder: 0,
+    },
+    create: {
+      id: 'alistore-bishkek-1',
+      code: 'center',
+      name: 'AliStore Центр',
+      address: 'Бишкек, ул. Киевская 95',
+      inventoryLocation: 'BISHKEK-1',
+      hours: 'Ежедневно 10:00–21:00',
+      active: true,
+      sortOrder: 0,
+      createdBy: 'e2e-reset',
+      idempotencyKey: 'e2e:store-point:bishkek-1',
+    },
+  });
 }
 
 export async function seedProduct(prefix: string, price = 100000, cost = 80000) {

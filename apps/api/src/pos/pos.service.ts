@@ -58,6 +58,46 @@ export class PosService {
 
   async sale(dto: PosSaleDto) {
     const actor = dto.staffId;
+    const requestedPoint = dto.point.trim();
+    const knownCode = requestedPoint === 'alistore-center' || requestedPoint === 'AliStore Центр' ? 'center' : requestedPoint.toLowerCase();
+    const storePoint = await this.prisma.storePoint.findFirst({
+      where: {
+        active: true,
+        OR: [
+          { id: requestedPoint },
+          { code: knownCode },
+          { inventoryLocation: requestedPoint.toUpperCase() },
+        ],
+      },
+    });
+    if (!storePoint) {
+      throw new ValidationError('store_point_unavailable', 'Точка кассы недоступна или отключена');
+    }
+    const staff = await this.prisma.staffUser.findUnique({
+      where: { id: actor },
+      select: { active: true, point: true },
+    });
+    if (staff) {
+      if (!staff.active) throw new ForbiddenError('staff_inactive', 'Учётная запись сотрудника отключена');
+      const staffPointAlias = staff.point.trim();
+      const staffPointCode = staffPointAlias === 'alistore-center' || staffPointAlias === 'AliStore Центр'
+        ? 'center'
+        : staffPointAlias.toLowerCase();
+      const staffPoint = await this.prisma.storePoint.findFirst({
+        where: {
+          active: true,
+          OR: [
+            { id: staffPointAlias },
+            { code: staffPointCode },
+            { inventoryLocation: staffPointAlias.toUpperCase() },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!staffPoint || staffPoint.id !== storePoint.id) {
+        throw new ForbiddenError('staff_point_mismatch', 'Кассир не назначен на выбранную точку');
+      }
+    }
     const pct = dto.discountPct ?? 0;
     const txnId = this.deriveTxnId(dto);
 
@@ -87,7 +127,7 @@ export class PosService {
           reason: dto.reason ?? this.defaultApprovalMessage(approvalReason, pct, margin),
           payload: {
             staffId: dto.staffId,
-            point: dto.point,
+            point: storePoint.inventoryLocation,
             discountPct: pct,
             gross: margin.gross,
             total: margin.total,
@@ -122,7 +162,7 @@ export class PosService {
     let shift = await this.shifts.currentOpen(dto.staffId);
     if (!shift) {
       shift = await this.shifts.open(
-        { staffId: dto.staffId, point: dto.point, openCash: 0 },
+        { staffId: dto.staffId, point: storePoint.inventoryLocation, openCash: 0 },
         actor,
       );
     }
@@ -141,6 +181,9 @@ export class PosService {
         if (selected.status !== 'in_stock') {
           throw new ConflictError('unit_not_available', `IMEI ${line.imei} недоступен (статус: ${selected.status})`);
         }
+        if (selected.location !== storePoint.inventoryLocation) {
+          throw new ConflictError('unit_wrong_location', `IMEI ${line.imei} находится в другой точке`);
+        }
         items.push({ sku: line.sku, qty: 1, price: line.price, imei: line.imei });
         continue;
       }
@@ -155,7 +198,11 @@ export class PosService {
         items.push({ sku: line.sku, qty: line.qty, price: line.price });
         continue;
       }
-      const available = await this.units.listAvailable(line.productId, line.qty);
+      const available = await this.prisma.deviceUnit.findMany({
+        where: { productId: line.productId, status: 'in_stock', location: storePoint.inventoryLocation },
+        take: line.qty,
+        orderBy: { id: 'asc' },
+      });
       if (available.length >= line.qty) {
         for (const unit of available.slice(0, line.qty)) {
           items.push({ sku: line.sku, qty: 1, price: line.price, imei: unit.imei });
@@ -169,8 +216,11 @@ export class PosService {
     }
 
     const order = await this.orders.create(
-      { customerId: customer.id, channel: 'pos', fulfillmentType: 'store', pickupPoint: dto.point, total, items },
+      { customerId: customer.id, channel: 'pos', fulfillmentType: 'store', storePointId: storePoint.id, total, items },
       actor,
+      undefined,
+      undefined,
+      storePoint,
     );
     const containsBundle = await this.prisma.product.count({
       where: { sku: { in: items.map((item) => item.sku) }, bundleComponents: { some: {} } },

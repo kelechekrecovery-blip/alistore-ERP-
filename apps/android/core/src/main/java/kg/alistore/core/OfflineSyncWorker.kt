@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class OfflineSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -17,6 +18,13 @@ class OfflineSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
     for (mutation in queue.pending()) {
       try {
         queue.markState(mutation.id, "syncing", incrementAttempt = true)
+        if (mutation.endpoint == "orders/mine") {
+          val body = JSONObject(mutation.body)
+          if (body.optString("fulfillmentType") == "pickup" && body.optString("storePointId").isBlank()) {
+            queue.markState(mutation.id, "conflict", "Выберите актуальную точку самовывоза и создайте заказ повторно")
+            continue
+          }
+        }
         var status = client.send(mutation, session?.accessToken)
         if (status == 401 && session != null) {
           session = client.refresh(session.refreshToken).also(tokenStore::saveSession)

@@ -11,6 +11,15 @@ data class Product(
   val availableUnits: Int,
 )
 
+data class StorePoint(
+  val id: String,
+  val code: String,
+  val name: String,
+  val address: String,
+  val inventoryLocation: String,
+  val hours: String,
+)
+
 data class PendingMutation(
   val id: String,
   val endpoint: String,
@@ -35,7 +44,7 @@ data class CreateOrderItem(val sku: String, val qty: Int, val price: Int)
 data class CreateOrderRequest(
   val customerId: String,
   val fulfillmentType: String,
-  val pickupPoint: String?,
+  val storePointId: String?,
   val deliveryAddress: String?,
   val total: Int,
   val items: List<CreateOrderItem>,

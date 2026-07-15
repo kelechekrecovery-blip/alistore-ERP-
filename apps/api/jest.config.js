@@ -8,6 +8,7 @@ module.exports = {
   },
   testEnvironment: 'node',
   setupFiles: ['<rootDir>/test/setup-env.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/setup-db.ts'],
   testTimeout: 30000,
   maxWorkers: 1,
 };

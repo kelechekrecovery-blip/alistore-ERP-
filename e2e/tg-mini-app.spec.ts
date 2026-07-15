@@ -13,7 +13,7 @@ test('Telegram Mini App shell creates an order with channel telegram', async ({ 
   await page.getByRole('button', { name: /Оформить · 1 шт/ }).click();
   await page.getByPlaceholder('+996700900007').fill('+996700900007');
   await page.getByPlaceholder('Имя в Telegram').fill('Telegram Buyer');
-  await page.getByRole('button', { name: 'Подтвердить в Mini App' }).click();
+  await page.getByRole('button', { name: /Подтвердить · AliStore Центр/ }).click();
   await expect(page.getByText('Заказ в Telegram оформлен')).toBeVisible();
   await expect(page.getByText('channel=telegram')).toBeVisible();
 
@@ -26,6 +26,8 @@ test('Telegram Mini App shell creates an order with channel telegram', async ({ 
     channel: 'telegram',
     status: 'created',
     total: product.price,
+    storePointId: 'alistore-bishkek-1',
+    fulfillmentLocation: 'BISHKEK-1',
   });
   expect(order?.customer.phone).toBe('+996700900007');
   expect(order?.items).toHaveLength(1);

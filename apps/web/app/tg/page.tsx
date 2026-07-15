@@ -9,8 +9,10 @@ import {
   type CatalogProduct,
   type CreatedOrder,
   fetchCatalog,
+  fetchCheckoutOptions,
   type OnlinePaymentMethod,
   type PaymentIntent,
+  type StorePoint,
 } from '@/lib/api';
 import { som, conditionLabel } from '@/lib/format';
 
@@ -61,6 +63,7 @@ export default function TelegramMiniAppPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<DoneState | null>(null);
+  const [storePoint, setStorePoint] = useState<StorePoint | null>(null);
 
   useEffect(() => {
     const tg = telegramApp();
@@ -78,6 +81,12 @@ export default function TelegramMiniAppPage() {
       .then((catalog) => setProducts(catalog.items))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchCheckoutOptions(new Date().toISOString().slice(0, 10))
+      .then((options) => setStorePoint(options.pickupPoints[0] ?? null))
+      .catch(() => setStorePoint(null));
   }, []);
 
   const categories = useMemo(
@@ -132,7 +141,7 @@ export default function TelegramMiniAppPage() {
   }
 
   async function placeOrder() {
-    if (cart.length === 0 || !phoneValid) return;
+    if (cart.length === 0 || !phoneValid || !storePoint) return;
     setBusy(true);
     setError('');
     try {
@@ -144,8 +153,8 @@ export default function TelegramMiniAppPage() {
         customerId: customer.id,
         channel: 'telegram',
         fulfillmentType: 'pickup',
-        pickupPoint: 'alistore-center',
-        deliverySlot: 'AliStore Центр · сегодня',
+        storePointId: storePoint.id,
+        deliverySlot: storePoint.hours,
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
       }, customer.guestCapability, crypto.randomUUID());
@@ -314,6 +323,7 @@ export default function TelegramMiniAppPage() {
           busy={busy}
           error={error}
           phoneValid={phoneValid}
+          storePoint={storePoint}
           onBack={() => setMode('catalog')}
           onPhone={setPhone}
           onName={setName}
@@ -345,6 +355,7 @@ function Checkout({
   busy,
   error,
   phoneValid,
+  storePoint,
   onBack,
   onPhone,
   onName,
@@ -360,6 +371,7 @@ function Checkout({
   busy: boolean;
   error: string;
   phoneValid: boolean;
+  storePoint: StorePoint | null;
   onBack: () => void;
   onPhone: (value: string) => void;
   onName: (value: string) => void;
@@ -433,11 +445,11 @@ function Checkout({
       {error && <p className="mt-3 text-sm text-[#FF8A7A]">{error}</p>}
       <button
         type="button"
-        disabled={busy || !phoneValid || cart.length === 0}
+        disabled={busy || !phoneValid || cart.length === 0 || !storePoint}
         onClick={onPlace}
         className="mt-4 w-full rounded-[14px] bg-lime py-3.5 text-sm font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
       >
-        {busy ? 'Оформляем…' : 'Подтвердить в Mini App'}
+        {busy ? 'Оформляем…' : storePoint ? `Подтвердить · ${storePoint.name}` : 'Самовывоз временно недоступен'}
       </button>
     </section>
   );

@@ -147,6 +147,8 @@ export const EventType = {
   HrPayrollPaid: 'hr.payroll_paid',
   DeliveryZoneCreated: 'logistics.zone_created',
   DeliverySlotCreated: 'logistics.slot_created',
+  StorePointCreated: 'logistics.store_point_created',
+  StorePointUpdated: 'logistics.store_point_updated',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

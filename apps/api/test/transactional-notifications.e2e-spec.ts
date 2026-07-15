@@ -34,10 +34,14 @@ describe('Transactional customer notifications (integration)', () => {
     await prisma.outboxMessage.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.warrantyOpenCommand.deleteMany();
-    await prisma.warrantyCase.deleteMany();
     await prisma.debtPlan.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.servicePart.deleteMany();
+    await prisma.loanerLoan.deleteMany();
+    await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.serviceWorkOrder.deleteMany();
+    await prisma.warrantyCase.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.inventoryMovement.deleteMany();

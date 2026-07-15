@@ -35,6 +35,25 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     }
   }
 
+  suspend fun checkoutStorePoints(): List<StorePoint> = withContext(Dispatchers.IO) {
+    val connection = open("logistics/checkout-options", "GET")
+    try {
+      val status = connection.responseCode
+      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+      val payload = stream.bufferedReader().use { it.readText() }
+      if (status !in 200..299) throw ApiException(status, "Не удалось загрузить точки самовывоза")
+      val points = JSONObject(payload).getJSONArray("pickupPoints")
+      buildList {
+        for (index in 0 until points.length()) {
+          val point = points.getJSONObject(index)
+          add(StorePoint(point.getString("id"), point.getString("code"), point.getString("name"), point.getString("address"), point.getString("inventoryLocation"), point.getString("hours")))
+        }
+      }
+    } finally {
+      connection.disconnect()
+    }
+  }
+
   override suspend fun requestOtp(phone: String): OtpChallenge = request("auth/otp/request", "POST", JSONObject().put("phone", phone)).let {
     OtpChallenge(it.optString("devCode").takeIf(String::isNotBlank))
   }

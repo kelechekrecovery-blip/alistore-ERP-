@@ -11,7 +11,7 @@ class CheckoutManagerTest {
   private val request = CreateOrderRequest(
     customerId = "customer-1",
     fulfillmentType = "courier",
-    pickupPoint = null,
+    storePointId = "alistore-bishkek-1",
     deliveryAddress = "Бишкек, Киевская 95",
     total = 250000,
     items = listOf(CreateOrderItem("PHONE-1", 2, 125000)),

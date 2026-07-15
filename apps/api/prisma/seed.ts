@@ -13,6 +13,30 @@ const CATALOGUE = [
 ];
 
 async function main(): Promise<void> {
+  await prisma.storePoint.upsert({
+    where: { code: 'center' },
+    update: {
+      name: 'AliStore Центр',
+      address: 'Бишкек, ул. Киевская 95',
+      inventoryLocation: 'BISHKEK-1',
+      hours: 'Ежедневно 10:00–21:00',
+      active: true,
+      sortOrder: 10,
+    },
+    create: {
+      code: 'center',
+      name: 'AliStore Центр',
+      address: 'Бишкек, ул. Киевская 95',
+      inventoryLocation: 'BISHKEK-1',
+      hours: 'Ежедневно 10:00–21:00',
+      pickupInstructions: 'Назовите код выдачи сотруднику',
+      active: true,
+      sortOrder: 10,
+      createdBy: 'seed',
+      idempotencyKey: 'seed:store-point:bishkek-1',
+    },
+  });
+
   const customer = await prisma.customer.upsert({
     where: { phone: '+996700123456' },
     update: {},

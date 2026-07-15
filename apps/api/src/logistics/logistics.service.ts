@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateDeliverySlotDto, CreateDeliveryZoneDto } from './logistics.dto';
+import { CreateDeliverySlotDto, CreateDeliveryZoneDto, CreateStorePointDto, UpdateStorePointDto } from './logistics.dto';
 
 const ACTIVE_SLOT_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'courier_assigned', 'out_for_delivery'] as const;
 
@@ -41,8 +42,56 @@ export class LogisticsService {
     }) }));
   }
 
+  async checkoutOptions(date?: string) {
+    const [pickupPoints, deliveryZones] = await Promise.all([
+      this.prisma.storePoint.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          address: true,
+          inventoryLocation: true,
+          hours: true,
+          pickupInstructions: true,
+          sortOrder: true,
+        },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.availability(date),
+    ]);
+    return { pickupPoints, deliveryZones };
+  }
+
+  async resolveStorePoint(storePointId?: string, legacyAlias?: string, requireSelection = false) {
+    const alias = legacyAlias?.trim();
+    const knownCode = alias === 'alistore-center' || alias === 'AliStore Центр' ? 'center' : alias?.toLowerCase();
+    const point = storePointId
+      ? await this.prisma.storePoint.findFirst({ where: { id: storePointId, active: true } })
+      : alias
+        ? await this.prisma.storePoint.findFirst({
+            where: {
+              active: true,
+              OR: [{ code: knownCode }, { inventoryLocation: alias.toUpperCase() }],
+            },
+          })
+        : requireSelection
+          ? null
+          : await this.prisma.storePoint.findFirst({
+              where: { active: true },
+              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            });
+    if (!point) {
+      throw new ValidationError(
+        storePointId ? 'store_point_unavailable' : 'store_point_required',
+        storePointId ? 'Точка недоступна или отключена' : 'Нет доступной точки выполнения заказа',
+      );
+    }
+    return point;
+  }
+
   async overview(date?: string) {
-    const [zones, couriers, pendingOrders, runs, pickupOrders] = await Promise.all([
+    const [zones, couriers, pendingOrders, runs, storePoints, pickupOrders] = await Promise.all([
       this.availability(date),
       this.prisma.staffUser.findMany({ where: { active: true, role: 'courier' }, select: { id: true, username: true, role: true }, orderBy: { username: 'asc' } }),
       this.prisma.order.findMany({
@@ -51,12 +100,104 @@ export class LogisticsService {
         orderBy: [{ deliverySlot: 'asc' }, { createdAt: 'asc' }],
       }),
       this.prisma.courierRun.findMany({ include: { orders: { include: { customer: { select: { name: true, phone: true } }, logisticsSlot: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
-      this.prisma.order.findMany({ where: { pickupPoint: { not: null }, status: { in: ['paid', 'picking', 'packed', 'ready_for_pickup'] } }, select: { pickupPoint: true, status: true } }),
+      this.prisma.storePoint.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] }),
+      this.prisma.order.findMany({
+        where: { storePointId: { not: null }, status: { in: ['paid', 'picking', 'packed', 'ready_for_pickup'] } },
+        select: { storePointId: true, status: true },
+      }),
     ]);
-    const pickupPoints = [...new Set(pickupOrders.map((order) => order.pickupPoint).filter((value): value is string => Boolean(value)))].map((name) => ({
-      name, type: 'магазин', waiting: pickupOrders.filter((order) => order.pickupPoint === name && order.status === 'ready_for_pickup').length, status: 'работает',
+    const pickupPoints = storePoints.map((point) => ({
+      ...point,
+      type: 'магазин',
+      waiting: pickupOrders.filter((order) => order.storePointId === point.id && order.status === 'ready_for_pickup').length,
+      status: point.active ? 'работает' : 'отключена',
     }));
     return { zones, couriers, pendingOrders, runs, pickupPoints };
+  }
+
+  createStorePoint(dto: CreateStorePointDto, actor: string, rawKey?: string) {
+    const idempotencyKey = key(rawKey);
+    const code = dto.code.trim().toLowerCase();
+    const inventoryLocation = dto.inventoryLocation.trim().toUpperCase();
+    return this.audit.transaction(async (tx) => {
+      const replay = await tx.storePoint.findUnique({ where: { idempotencyKey } });
+      if (replay) {
+        if (replay.code !== code || replay.inventoryLocation !== inventoryLocation) {
+          throw new ConflictError('store_point_idempotency_mismatch', 'Ключ уже использован для другой точки');
+        }
+        return { result: replay, events: [] };
+      }
+      const point = await tx.storePoint.create({
+        data: {
+          code,
+          name: dto.name.trim(),
+          address: dto.address.trim(),
+          inventoryLocation,
+          hours: dto.hours.trim(),
+          pickupInstructions: dto.pickupInstructions?.trim() || null,
+          active: dto.active ?? true,
+          sortOrder: dto.sortOrder ?? 100,
+          createdBy: actor,
+          idempotencyKey,
+        },
+      });
+      return {
+        result: point,
+        events: [{
+          type: EventType.StorePointCreated,
+          actor,
+          payload: { storePointId: point.id, code, inventoryLocation, active: point.active },
+          refs: [point.id, inventoryLocation],
+        }],
+      };
+    });
+  }
+
+  updateStorePoint(id: string, dto: UpdateStorePointDto, actor: string, rawKey?: string) {
+    const idempotencyKey = key(rawKey);
+    const normalized = {
+      name: dto.name?.trim(),
+      address: dto.address?.trim(),
+      hours: dto.hours?.trim(),
+      pickupInstructions: dto.pickupInstructions?.trim(),
+      active: dto.active,
+      sortOrder: dto.sortOrder,
+    };
+    const fingerprint = JSON.stringify(normalized);
+    return this.audit.transaction(async (tx) => {
+      const replay = await tx.storePointCommand.findUnique({ where: { idempotencyKey } });
+      if (replay) {
+        if (replay.storePointId !== id || replay.fingerprint !== fingerprint) {
+          throw new ConflictError('store_point_idempotency_mismatch', 'Ключ уже использован для другого изменения');
+        }
+        return { result: replay.response, events: [] };
+      }
+      await tx.$queryRaw`SELECT id FROM "StorePoint" WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.storePoint.findUnique({ where: { id } });
+      if (!current) throw new ValidationError('store_point_not_found', 'Точка не найдена');
+      const point = await tx.storePoint.update({
+        where: { id },
+        data: {
+          ...(normalized.name !== undefined ? { name: normalized.name } : {}),
+          ...(normalized.address !== undefined ? { address: normalized.address } : {}),
+          ...(normalized.hours !== undefined ? { hours: normalized.hours } : {}),
+          ...(normalized.pickupInstructions !== undefined ? { pickupInstructions: normalized.pickupInstructions || null } : {}),
+          ...(normalized.active !== undefined ? { active: normalized.active } : {}),
+          ...(normalized.sortOrder !== undefined ? { sortOrder: normalized.sortOrder } : {}),
+        },
+      });
+      const response = JSON.parse(JSON.stringify(point)) as Prisma.InputJsonValue;
+      await tx.storePointCommand.create({ data: { idempotencyKey, storePointId: id, fingerprint, response } });
+      return {
+        result: response,
+        events: [{
+          type: EventType.StorePointUpdated,
+          actor,
+          payload: { storePointId: id, before: current, after: point },
+          refs: [id, point.inventoryLocation],
+        }],
+      };
+    });
   }
 
   createZone(dto: CreateDeliveryZoneDto, actor: string, rawKey?: string) {

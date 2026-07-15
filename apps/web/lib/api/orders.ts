@@ -18,7 +18,13 @@ export interface CreatedOrder {
   loyaltyRedeemed?: number;
   loyaltyEarned?: number;
   fulfillmentType?: string;
+  storePointId?: string | null;
+  storePointCode?: string | null;
+  storePointName?: string | null;
+  storePointAddress?: string | null;
   pickupPoint?: string | null;
+  pickupAddress?: string | null;
+  fulfillmentLocation?: string | null;
   deliveryAddress?: string | null;
   deliverySlot?: string | null;
   deliveryZoneId?: string | null;
@@ -42,7 +48,7 @@ export async function createOrder(input: {
   customerId: string;
   channel: string;
   fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
-  pickupPoint?: string;
+  storePointId?: string;
   deliveryAddress?: string;
   deliverySlot?: string;
   deliveryZoneId?: string;
@@ -68,7 +74,7 @@ export async function createOrder(input: {
 export async function createMyOrder(input: {
   channel: 'web' | 'mobile';
   fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
-  pickupPoint?: string;
+  storePointId?: string;
   deliveryAddress?: string;
   deliverySlot?: string;
   deliveryZoneId?: string;

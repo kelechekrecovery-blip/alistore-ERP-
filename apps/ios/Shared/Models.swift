@@ -14,6 +14,21 @@ public struct Product: Decodable, Identifiable, Sendable {
     public let availableUnits: Int
 }
 
+public struct StorePoint: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let code: String
+    public let name: String
+    public let address: String
+    public let inventoryLocation: String
+    public let hours: String
+    public let pickupInstructions: String?
+    public let sortOrder: Int
+}
+
+public struct CheckoutOptions: Decodable, Sendable {
+    public let pickupPoints: [StorePoint]
+}
+
 public struct StaffSession: Codable, Sendable {
     public let accessToken: String
     public let staffId: String
@@ -307,7 +322,7 @@ public struct CreateOrderRequest: Codable, Sendable {
     public let customerId: String
     public let channel: String
     public let fulfillmentType: String
-    public let pickupPoint: String?
+    public let storePointId: String?
     public let deliveryAddress: String?
     public let total: Int
     public let items: [CreateOrderItem]
@@ -315,7 +330,7 @@ public struct CreateOrderRequest: Codable, Sendable {
     public init(
         customerId: String,
         fulfillmentType: String,
-        pickupPoint: String?,
+        storePointId: String?,
         deliveryAddress: String?,
         total: Int,
         items: [CreateOrderItem]
@@ -323,7 +338,7 @@ public struct CreateOrderRequest: Codable, Sendable {
         self.customerId = customerId
         self.channel = "mobile"
         self.fulfillmentType = fulfillmentType
-        self.pickupPoint = pickupPoint
+        self.storePointId = storePointId
         self.deliveryAddress = deliveryAddress
         self.total = total
         self.items = items

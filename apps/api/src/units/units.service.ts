@@ -37,6 +37,7 @@ export class UnitsService {
       imei: unit.imei,
       productId: unit.productId,
       status: unit.status,
+      location: unit.location,
       orderId: unit.orderId,
       product: unit.product.name,
       sku: unit.product.sku,

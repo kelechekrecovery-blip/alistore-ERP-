@@ -7,7 +7,7 @@ import { ShiftsService } from '../src/shifts/shifts.service';
 import { CustomersService } from '../src/customers/customers.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
-import { ConflictError, ValidationError } from '../src/common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../src/common/errors';
 
 /**
  * POS counter sale: one call opens a shift, assigns IMEI units, and drives the
@@ -178,6 +178,38 @@ describe('POS sale (integration)', () => {
     expect(err.code).toBe('product_price_mismatch');
     expect(await prisma.order.count()).toBe(0);
     expect(await prisma.payment.count()).toBe(0);
+  });
+
+  it('rejects an authenticated cashier attempting to sell from another active point', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const staff = await prisma.staffUser.create({
+      data: { username: `pos-point-${suffix}`, passwordHash: 'test', role: 'cashier', point: 'BISHKEK-1' },
+    });
+    const otherPoint = await prisma.storePoint.create({
+      data: {
+        code: `pos-other-${suffix}`,
+        name: 'Other POS point',
+        address: 'Бишкек, другая точка',
+        inventoryLocation: `POS-OTHER-${suffix}`.toUpperCase(),
+        hours: '10:00–20:00',
+        createdBy: 'pos-test',
+        idempotencyKey: `pos-test:${suffix}`,
+      },
+    });
+    const product = await seedProduct(1);
+
+    const err = await pos.sale({
+      staffId: staff.id,
+      point: otherPoint.id,
+      method: 'cash',
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    }).catch((error) => error);
+
+    expect(err).toBeInstanceOf(ForbiddenError);
+    expect(err.code).toBe('staff_point_mismatch');
+    expect(await prisma.order.count()).toBe(0);
+    await prisma.storePoint.delete({ where: { id: otherPoint.id } });
+    await prisma.staffUser.delete({ where: { id: staff.id } });
   });
 
   it('sells the exact in-stock IMEI selected by the POS scanner', async () => {

@@ -15,16 +15,15 @@ import {
   createPaymentIntent,
   fetchMyAddresses,
   fetchGiftCard,
-  fetchDeliveryAvailability,
+  fetchCheckoutOptions,
   payOrder,
   type CreatedOrder,
-  type CustomerAddress,
   type GiftCardView,
   type PaymentIntent,
   type DeliverySlot,
   type DeliveryZone,
+  type StorePoint,
 } from '@/lib/api';
-import { loadAddresses, mainAddress, type SavedAddress } from '@/lib/account-local';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 
@@ -32,10 +31,6 @@ const DELIVERY = [
   { id: 'pickup', icon: '🏬', name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
   { id: 'courier', icon: '🚚', name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с', fee: 200 },
   { id: 'express', icon: '⚡', name: 'Экспресс', meta: 'в течение часа', price: '400 с', fee: 400 },
-];
-const PICKUP_POINTS = [
-  { id: 'alistore-center', name: 'AliStore Центр', meta: 'Киевская 95 · сегодня до 21:00' },
-  { id: 'alistore-asia-mall', name: 'AliStore Asia Mall', meta: 'просп. Чынгыза Айтматова · завтра с 11:00' },
 ];
 const PAYMENT = [
   { id: 'cash', icon: '💵', name: 'Наличными при получении' },
@@ -64,11 +59,12 @@ export default function CheckoutPage() {
   const { user, hydrated: authHydrated, authed } = useAuth();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState('pickup');
-  const [pickupPoint, setPickupPoint] = useState(PICKUP_POINTS[0].id);
+  const [pickupPoints, setPickupPoints] = useState<StorePoint[]>([]);
+  const [pickupPoint, setPickupPoint] = useState('');
   const [payment, setPayment] = useState<PaymentChoice>('cash');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
-  const [address, setAddress] = useState<SavedAddress | CustomerAddress | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [deliveryZoneId, setDeliveryZoneId] = useState('');
   const [deliverySlotId, setDeliverySlotId] = useState('');
@@ -86,18 +82,21 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!authHydrated) return;
     if (!user) {
-      setAddress(mainAddress(loadAddresses()));
+      setDeliveryAddress('');
       return;
     }
     authed(fetchMyAddresses)
-      .then((addresses) => setAddress(addresses.find((item) => item.isPrimary) ?? addresses[0] ?? null))
-      .catch(() => setAddress(null));
+      .then((addresses) => setDeliveryAddress((current) => current || addresses.find((item) => item.isPrimary)?.text || addresses[0]?.text || ''))
+      .catch(() => setDeliveryAddress(''));
   }, [authHydrated, user, authed]);
   useEffect(() => {
     let active = true;
-    fetchDeliveryAvailability(logisticsDate())
-      .then((zones) => {
+    fetchCheckoutOptions(logisticsDate())
+      .then((options) => {
         if (!active) return;
+        const zones = options.deliveryZones;
+        setPickupPoints(options.pickupPoints);
+        setPickupPoint((current) => options.pickupPoints.some((point) => point.id === current) ? current : options.pickupPoints[0]?.id ?? '');
         setDeliveryZones(zones);
         const zone = zones.find((item) => item.slots.some((slot) => slot.available));
         const slot = zone?.slots.find((item) => item.available);
@@ -120,7 +119,7 @@ export default function CheckoutPage() {
   const deliveryFee = delivery === 'courier' && selectedDeliveryZone
     ? selectedDeliveryZone.fee
     : DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
-  const selectedPickupPoint = PICKUP_POINTS.find((p) => p.id === pickupPoint) ?? PICKUP_POINTS[0];
+  const selectedPickupPoint = pickupPoints.find((point) => point.id === pickupPoint);
   const payable = total + deliveryFee;
   const giftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, payable) : 0;
   const dueAfterGift = Math.max(payable - giftAmount, 0);
@@ -152,10 +151,10 @@ export default function CheckoutPage() {
       const orderInput = {
         channel: 'web',
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
-        pickupPoint: delivery === 'pickup' ? pickupPoint : undefined,
-        deliveryAddress: delivery !== 'pickup' ? address?.text : undefined,
+        storePointId: delivery === 'pickup' ? pickupPoint : undefined,
+        deliveryAddress: delivery !== 'pickup' ? deliveryAddress.trim() : undefined,
         deliverySlot: delivery === 'pickup'
-          ? selectedPickupPoint.meta
+          ? selectedPickupPoint?.hours
           : selectedDeliverySlot ? slotLabel(selectedDeliverySlot) : DELIVERY.find((d) => d.id === delivery)?.meta,
         deliveryZoneId: delivery === 'courier' ? selectedDeliveryZone?.id : undefined,
         deliverySlotId: delivery === 'courier' ? selectedDeliverySlot?.id : undefined,
@@ -302,7 +301,7 @@ export default function CheckoutPage() {
             {delivery === 'pickup' && (
               <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
                 <div className="mb-2 text-[13px] font-semibold">Точка самовывоза</div>
-                {PICKUP_POINTS.map((point) => (
+                {pickupPoints.map((point) => (
                   <button
                     key={point.id}
                     type="button"
@@ -312,26 +311,33 @@ export default function CheckoutPage() {
                     <span className={`mt-0.5 h-4 w-4 rounded-full border-2 ${pickupPoint === point.id ? 'border-lime bg-lime' : 'border-[#3A342E]'}`} />
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold text-white">{point.name}</span>
-                      <span className="mt-0.5 block text-xs text-[#A79C92]">{point.meta}</span>
+                      <span className="mt-0.5 block text-xs text-[#A79C92]">{point.address} · {point.hours}</span>
                     </span>
                   </button>
                 ))}
+                {!deliveryCapacityLoading && pickupPoints.length === 0 && (
+                  <p className="rounded-[10px] border border-[#6B3B32] bg-[#2A1818] p-3 text-sm text-[#FFAA9D]">Сейчас нет доступных точек самовывоза.</p>
+                )}
               </div>
             )}
             {delivery !== 'pickup' && (
               <>
-                <Link href="/account/addresses" className="checkout-surface mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
-                  <div className="flex items-center justify-between text-[13px] font-semibold">
-                    <span>Адрес доставки</span>
-                    <span className="text-lime">изменить</span>
-                  </div>
-                  <div className="mt-1.5 text-[12px] leading-relaxed text-[#A79C92]">{address ? `${address.title}: ${address.text}` : 'Добавьте адрес доставки'}</div>
-                </Link>
+                <label className="checkout-surface mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                  <span className="text-[13px] font-semibold">Точный адрес доставки</span>
+                  <textarea
+                    aria-label="Точный адрес доставки"
+                    value={deliveryAddress}
+                    onChange={(event) => setDeliveryAddress(event.target.value)}
+                    placeholder="Город, улица, дом, квартира и ориентир"
+                    rows={3}
+                    className="checkout-field mt-2 w-full resize-none rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
+                  />
+                </label>
                 {delivery === 'courier' && deliveryCapacityLoading && (
                   <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5 text-sm text-[#A79C92]">Проверяем доступное время…</div>
                 )}
                 {delivery === 'courier' && deliveryCapacityError && (
-                  <div className="mb-2.5 rounded-[13px] border border-[#6B3B32] bg-[#2A1818] p-3.5 text-sm text-[#FFAA9D]">Не удалось обновить интервалы. Можно продолжить по стандартному тарифу.</div>
+                  <div className="mb-2.5 rounded-[13px] border border-[#6B3B32] bg-[#2A1818] p-3.5 text-sm text-[#FFAA9D]">Не удалось загрузить доступные точки и интервалы. Обновите страницу.</div>
                 )}
                 {delivery === 'courier' && deliveryZones.length > 0 && (
                   <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
@@ -369,7 +375,7 @@ export default function CheckoutPage() {
                 )}
               </>
             )}
-            <button type="button" disabled={deliveryCapacityLoading || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
+            <button type="button" disabled={deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
           </>
         )}
         {step === 1 && (
@@ -408,8 +414,8 @@ export default function CheckoutPage() {
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
             <div className="checkout-surface rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
-              {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint.name} />}
-              {delivery !== 'pickup' && <Row k="Адрес" v={address?.text ?? 'не указан'} />}
+              {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint?.name ?? 'не выбрана'} />}
+              {delivery !== 'pickup' && <Row k="Адрес" v={deliveryAddress || 'не указан'} />}
               {delivery === 'courier' && selectedDeliveryZone && <Row k="Зона" v={selectedDeliveryZone.name} />}
               {delivery === 'courier' && selectedDeliverySlot && <Row k="Интервал" v={slotLabel(selectedDeliverySlot)} />}
               <Row k="Оплата" v={PAYMENT.find((p) => p.id === payment)?.name ?? ''} />

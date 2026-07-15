@@ -91,6 +91,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
         productId: product.id,
         balanceId: balance.id,
         sku: product.sku,
+        location: 'SALE',
         qty: 3,
         active: false,
         consumedAt: new Date(),
@@ -164,6 +165,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
         bundleSku: order.items[0].sku,
         componentProductId: component.id,
         componentSku: component.sku,
+        location: 'SALE',
         imei,
       })),
     });
@@ -226,6 +228,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
         productId: quantity.id,
         balanceId: balance.id,
         sku: quantity.sku,
+        location: 'SALE-FLOOR',
         qty: 3,
         active: false,
         consumedAt: new Date(),
@@ -246,6 +249,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
         bundleSku: bundle.sku,
         componentProductId: component.id,
         componentSku: component.sku,
+        location: 'SALE-FLOOR',
         imei: bundleImei,
       },
     });

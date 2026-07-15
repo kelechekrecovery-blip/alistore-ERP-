@@ -4,9 +4,9 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **50 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **58 миграций**
-- **120 API test suites / 478 тестов — зелёные** (`jest`)
-- **35/35 Playwright flow — зелёные**, включая Service Center intake/diagnostics/approval/POS settlement/parts/repair/closure и loaner issue/customer visibility/return
+- **50 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **59 миграций**
+- **121 API test suites / 480 тестов — зелёные** (`jest`)
+- **36/36 Playwright flow — зелёные**, включая ERP-controlled checkout points, Service Center intake/diagnostics/approval/POS settlement/parts/repair/closure и loaner issue/customer visibility/return
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **31/31** on iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **25/25** connected Compose tests pass on API 36, including Staff attendance with SQLite/WorkManager replay. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -19,7 +19,7 @@
 |---|---|---|
 | **0** Ядро данных | Event Ledger (append-only), order state-machine, IMEI-инвариант, миграции | ✅ |
 | **1** Деньги | Payment поддерживает retail-order и paid ServiceWorkOrder, CashShift, Courier COD и provider-neutral intents; live provider/fiscal reconciliation ещё внешние | 🟡 |
-| **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; checkout ещё требует ERP-owned pickup point и явный гостевой адрес | 🟡 |
+| **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; ERP-owned точки и точный адрес доставки подключены, коммерческий контент/guest status recovery ещё требуют завершения | 🟡 |
 | **3** Аккаунт+Auth | OTP-вход, Apple/Telegram social-auth backend, «Мои заказы», адреса, настройки, уведомления+consent, бонусы | ✅ |
 | **4** POS 2.0 | Тёмный терминал, продажа, service estimate payment, split tender, approval, offline replay, catalog delta-sync и print abstraction; packaged-app E2E и железо не сертифицированы | 🟡 |
 | **5** Склад | Fulfillment, серийный и количественный учёт, атомарный резерв/продажа/POS, движение статусов, **Evidence Vault (фото)** | ✅ |
@@ -36,7 +36,7 @@
 ## Работает вживую сейчас (прод-режим)
 `/` витрина · `/erp` кокпит (+ AI-ассистент, Маржа/KPI, Command Center, Готовность запуска) · `/pos` касса
 (+ offline) · `/assess` оценка Б/У · `/warehouse` · `/warranty` · `/exchange` · `/staff` ·
-`/support` · `/trade-in` · `/b2b` · `/account/protection` · checkout с текущим строковым pickup-кодом (не принят до `FUL-001`) · API: `/pos/sale` … Owner API `/reports/*` и `/ai/*` работают
+`/support` · `/trade-in` · `/b2b` · `/account/protection` · checkout с ERP-owned active StorePoint, точным адресом доставки и point-local резервом · API: `/pos/sale` … Owner API `/reports/*` и `/ai/*` работают
 под staff-session token (admin/owner).
 
 ## До запуска первого магазина — внешние доступы ⛔
@@ -71,11 +71,11 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest                 # 119 suites / 477 тестов ✓
+cd apps/api && npx jest                 # 121 suites / 480 тестов ✓
 npm run migration:test:service-payment # legacy refund/point migration regression ✓
 npm run api:build                     # ✓
 cd apps/web && npx next build         # ✓ (37 роутов)
-npm run e2e                           # 35/35 ✓
+npm run e2e                           # 36/36 ✓
 npm run ecosystem:verify              # web/API + all iOS targets/XCTest + four Android APKs/JVM/Lint
 npm run mobile:store-preflight        # 0 failures; production env warnings only
 cd apps/mobile && npx expo-doctor     # 20/20 ✓

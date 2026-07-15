@@ -46,6 +46,11 @@ export class CreateOrderDto {
   @IsIn(FULFILLMENT_TYPES)
   fulfillmentType?: (typeof FULFILLMENT_TYPES)[number];
 
+  @ApiPropertyOptional({ description: 'Server-managed active store/pickup point id.' })
+  @IsOptional()
+  @IsString()
+  storePointId?: string;
+
   @ApiPropertyOptional({ example: 'alistore-center' })
   @IsOptional()
   @IsString()

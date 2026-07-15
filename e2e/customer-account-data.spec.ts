@@ -48,7 +48,7 @@ test('customer account data is shared by API, web cabinet and checkout', async (
   await page.goto('/checkout', { waitUntil: 'domcontentloaded' });
   await addressesLoaded;
   await page.getByRole('button', { name: /Курьер/ }).click();
-  await expect(page.getByText('E2E дом: Бишкек, улица Синхронизации 7', { exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Точный адрес доставки' })).toHaveValue('Бишкек, улица Синхронизации 7');
 
   const storedAddress = await prisma.customerAddress.findFirstOrThrow({ where: { customerId: customer.id } });
   expect(storedAddress).toMatchObject({ text: 'Бишкек, улица Синхронизации 7', isPrimary: true });

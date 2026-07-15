@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-15 — FUL-001
+
+- Iteration ID: `FUL-001`.
+- Backlog / journey IDs: first-store ERP → storefront/Telegram/POS/native checkout → point-local stock allocation.
+- Branch / base commit: `codex/open-source-integrations` / `9cb6528`.
+- Changed files: StorePoint/command/order snapshot Prisma schema and migration; Logistics, Orders, POS and Units services/DTOs/controllers; checkout, Telegram and ERP Logistics web surfaces; SwiftUI and Compose checkout/offline contracts; deterministic Jest/Playwright fixtures and cross-surface tests; backlog/readiness/traceability documentation.
+- Exact checks: Prisma schema validation, fresh-database deploy/status for all 59 migrations and `git diff --check`; targeted store-point/POS/quantity/fulfillment Jest 4/4 suites and 25/25 tests plus final POS/store-point regression 16/16; full API 121/121 suites and 480/480 tests; API and Next production builds; targeted Logistics Playwright 2/2, procurement 2/2 and customer/Telegram/checkout Playwright 8/8; full Playwright 36/36; four iOS target build and 31/31 XCTest; Android all-module JVM tests and Lint.
+- Durable evidence: `store-points-fulfillment.e2e-spec.ts` proves unknown/disabled point rejection, immutable snapshots, exact address and no cross-location serialized reservation; `logistics-ui.spec.ts` proves an ERP active toggle immediately changes public checkout options; checkout/Telegram browser tests prove canonical point snapshots and exact delivery address.
+- Defects found and disposition: client-owned pickup strings, synthetic guest delivery fallback and cross-location allocation were replaced by server-owned StorePoint identity and inventory location. POS now rejects an authenticated cashier attempting to sell from another active point. Legacy queued pickup mutations without a point are marked conflict for explicit reselection. Full-suite validation exposed and fixed an unrelated Service Center payment cleanup ordering defect, auth-throttle-dependent procurement setup and stale browser expectations.
+- Acceptance: `accepted` for first-store fulfillment software integration. Route optimization/live tracking, guest receipt recovery (`FUL-002`), Finance settlement (`FIN-001`), physical devices/providers and full ecosystem visual acceptance remain outside this gate.
+- Commit association: commit subject/body contains `FUL-001`.
+- Remaining gaps: `FIN-001`, `FUL-002`, `MER-001`, `ECO-001`, `ECO-002`, owner-controlled production/device/provider certification.
+- Next backlog ID: `FIN-001` is the next highest-impact ERP/site integration vertical; `FUL-002` then closes guest post-checkout recovery.
+
 ## 2026-07-14 — GOV-001
 
 - Iteration ID: `GOV-001`.

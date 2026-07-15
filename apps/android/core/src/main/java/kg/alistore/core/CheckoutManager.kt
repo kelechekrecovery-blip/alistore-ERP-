@@ -58,7 +58,7 @@ fun CreateOrderRequest.toJson(): JSONObject = JSONObject()
   .put("customerId", customerId)
   .put("channel", "mobile")
   .put("fulfillmentType", fulfillmentType)
-  .put("pickupPoint", pickupPoint ?: JSONObject.NULL)
+  .put("storePointId", storePointId ?: JSONObject.NULL)
   .put("deliveryAddress", deliveryAddress ?: JSONObject.NULL)
   .put("total", total)
   .put("items", JSONArray().apply {

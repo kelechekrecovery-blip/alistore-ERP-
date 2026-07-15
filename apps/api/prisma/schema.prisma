@@ -457,6 +457,37 @@ model DeviceUnit {
   @@index([updatedAt])
 }
 
+model StorePoint {
+  id                String              @id @default(cuid())
+  code              String              @unique
+  name              String
+  address           String
+  inventoryLocation String              @unique
+  hours             String
+  pickupInstructions String?
+  active            Boolean             @default(true)
+  sortOrder         Int                 @default(100)
+  createdBy         String
+  idempotencyKey    String              @unique
+  orders            Order[]
+  commands          StorePointCommand[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+model StorePointCommand {
+  idempotencyKey String     @id
+  storePoint     StorePoint @relation(fields: [storePointId], references: [id], onDelete: Cascade)
+  storePointId   String
+  fingerprint    String
+  response       Json
+  createdAt      DateTime   @default(now())
+
+  @@index([storePointId, createdAt])
+}
+
 model Order {
   id                       String                          @id @default(cuid())
   idempotencyKey           String?                         @unique
@@ -466,7 +497,14 @@ model Order {
   status                   OrderStatus                     @default(draft)
   channel                  String // web | app | mobile | pos | telegram
   fulfillmentType          String                          @default("pickup") // pickup | courier | express | store
+  storePointId             String?
+  storePoint               StorePoint?                     @relation(fields: [storePointId], references: [id], onDelete: Restrict)
+  storePointCode           String?
+  storePointName           String?
+  storePointAddress        String?
   pickupPoint              String?
+  pickupAddress            String?
+  fulfillmentLocation      String?
   deliveryAddress          String?
   deliverySlot             String?
   deliveryZoneId           String?
@@ -499,6 +537,7 @@ model Order {
   @@index([isDemo, createdAt])
   @@index([status])
   @@index([fulfillmentType, status])
+  @@index([storePointId, status])
   @@index([pickupPoint, status])
   @@index([courierId, status])
   @@index([courierRunId])
@@ -697,6 +736,7 @@ model OrderQuantityAllocation {
   balance                InventoryBalance                @relation(fields: [balanceId], references: [id])
   balanceId              String
   sku                    String
+  location               String
   qty                    Int
   active                 Boolean                         @default(true)
   consumedAt             DateTime?
@@ -719,6 +759,7 @@ model OrderBundleAllocation {
   componentProduct   Product  @relation(fields: [componentProductId], references: [id])
   componentProductId String
   componentSku       String
+  location           String
   imei               String   @unique
   createdAt          DateTime @default(now())
 

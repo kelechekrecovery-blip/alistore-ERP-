@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,9 +65,13 @@ internal fun ClientCheckout(
   val context = LocalContext.current.applicationContext
   val scope = rememberCoroutineScope()
   val checkout = remember(apiBaseUrl) { CheckoutManager(ApiClient(apiBaseUrl), OfflineQueueDb(context)) }
+  val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   var fulfillment by rememberSaveable { mutableStateOf("pickup") }
   var paymentMethod by rememberSaveable { mutableStateOf("cash") }
   var address by rememberSaveable { mutableStateOf("") }
+  var pickupPoints by remember { mutableStateOf<List<StorePoint>>(emptyList()) }
+  var selectedStorePointId by rememberSaveable { mutableStateOf("") }
+  var pointError by remember { mutableStateOf<String?>(null) }
   var idempotencyKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var paymentIdempotencyKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var busy by remember { mutableStateOf(false) }
@@ -74,6 +79,16 @@ internal fun ClientCheckout(
   var result by remember { mutableStateOf<CheckoutResult?>(null) }
   val lines = cart.mapNotNull { (id, quantity) -> products.firstOrNull { it.id == id }?.let { it to quantity.coerceAtMost(it.availableUnits) } }
   val total = lines.sumOf { (product, quantity) -> product.price * quantity }
+
+  LaunchedEffect(apiBaseUrl) {
+    runCatching { api.checkoutStorePoints() }
+      .onSuccess { points ->
+        pickupPoints = points
+        if (points.none { it.id == selectedStorePointId }) selectedStorePointId = points.firstOrNull()?.id.orEmpty()
+        pointError = if (points.isEmpty()) "Самовывоз временно недоступен" else null
+      }
+      .onFailure { failure -> pointError = failure.message; pickupPoints = emptyList(); selectedStorePointId = "" }
+  }
 
   if (result != null) {
     CheckoutResultScreen(result!!, apiBaseUrl, modifier) {
@@ -128,7 +143,17 @@ internal fun ClientCheckout(
             ),
           )
         } else {
-          Text("AliStore Центр · BISHKEK-1", color = CheckoutMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+          if (pickupPoints.isEmpty()) {
+            Text(pointError ?: "Загружаем точки…", color = CheckoutMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+          } else {
+            pickupPoints.forEach { point ->
+              FulfillmentButton(
+                "${point.name} · ${point.address}",
+                selectedStorePointId == point.id,
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+              ) { selectedStorePointId = point.id; error = null }
+            }
+          }
         }
       }
     }
@@ -170,7 +195,7 @@ internal fun ClientCheckout(
                 val request = CreateOrderRequest(
                   customerId = authState.user.customerId,
                   fulfillmentType = fulfillment,
-                  pickupPoint = if (fulfillment == "pickup") "BISHKEK-1" else null,
+                  storePointId = if (fulfillment == "pickup") selectedStorePointId else null,
                   deliveryAddress = if (fulfillment == "courier") address.trim() else null,
                   total = total,
                   items = lines.map { (product, quantity) -> CreateOrderItem(product.sku, quantity, product.price) },
@@ -202,7 +227,7 @@ internal fun ClientCheckout(
                 busy = false
               }
             },
-            enabled = !busy && (fulfillment != "courier" || address.isNotBlank()),
+            enabled = !busy && (fulfillment != "pickup" || selectedStorePointId.isNotBlank()) && (fulfillment != "courier" || address.isNotBlank()),
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("checkout-submit"),
             colors = ButtonDefaults.buttonColors(containerColor = CheckoutLime, contentColor = CheckoutInk),
             shape = RoundedCornerShape(8.dp),

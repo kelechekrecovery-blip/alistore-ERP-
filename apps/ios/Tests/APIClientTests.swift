@@ -187,7 +187,7 @@ final class APIClientTests: XCTestCase {
         let request = CreateOrderRequest(
             customerId: "customer-1",
             fulfillmentType: "pickup",
-            pickupPoint: "BISHKEK-1",
+            storePointId: "alistore-bishkek-1",
             deliveryAddress: nil,
             total: 100,
             items: [CreateOrderItem(sku: "OFFLINE-1", qty: 1, price: 100)]
@@ -268,7 +268,7 @@ final class APIClientTests: XCTestCase {
         let input = CreateOrderRequest(
             customerId: "customer-1",
             fulfillmentType: "pickup",
-            pickupPoint: "BISHKEK-1",
+            storePointId: "alistore-bishkek-1",
             deliveryAddress: nil,
             total: 109900,
             items: [CreateOrderItem(sku: "IP-1", qty: 1, price: 109900)]
