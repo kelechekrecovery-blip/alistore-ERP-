@@ -1,0 +1,62 @@
+'use client';
+
+import Link from 'next/link';
+import { Card } from './Card';
+
+type AdminViewProps = {
+  role: string;
+  username: string;
+};
+
+const MODULES = [
+  { href: '/admin/products', icon: '▤', title: 'Каталог и товары', description: 'Товары, цены, варианты, AI-обогащение и архивирование', roles: ['admin', 'owner'] },
+  { href: '/approvals', icon: '✓', title: 'Согласования и 2FA', description: 'Скидки, возвраты, списания и опасные действия', roles: ['admin', 'owner', 'senior_seller'] },
+  { href: '/warehouse', icon: '□', title: 'Склад и IMEI', description: 'Приемка, остатки, движения, назначения и документы', roles: ['admin', 'owner', 'warehouse'] },
+  { href: '/pos', icon: '▣', title: 'POS и касса', description: 'Продажи, смены, возвраты, печать и сверка', roles: ['admin', 'owner', 'cashier', 'seller', 'senior_seller'] },
+  { href: '/staff', icon: '♙', title: 'Staff и операции', description: 'Задачи, заказы, Customer 360, поддержка и гарантия', roles: ['admin', 'owner', 'seller', 'warehouse', 'service', 'technician'] },
+  { href: '/', icon: '↗', title: 'Клиентская витрина', description: 'Открыть сайт и проверить опубликованный каталог', roles: ['admin', 'owner', 'marketer'] },
+] as const;
+
+export function AdminView({ role, username }: AdminViewProps) {
+  const visible = MODULES.filter((module) => (module.roles as readonly string[]).includes(role));
+  return (
+    <div className="max-w-6xl space-y-5">
+      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-[#2E2822] pb-5">
+        <div>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8A7F76]">Центр управления</div>
+          <h2 className="font-display text-2xl font-bold">Администрирование AliStore</h2>
+          <p className="mt-2 max-w-2xl text-sm text-[#A79C92]">Все служебные разделы сайта, кассы и склада доступны из единого ERP-контекста.</p>
+        </div>
+        <div className="rounded-[8px] border border-[#2E2822] bg-[#1A1611] px-4 py-3 text-right text-xs">
+          <div className="text-[#8A7F76]">Текущая сессия</div>
+          <strong className="mt-1 block text-[#C6FF3D]">{username}</strong>
+          <span className="text-[#A79C92]">{role}</span>
+        </div>
+      </section>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {visible.map((module) => (
+          <Link key={module.href} href={module.href} className="group rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4 transition hover:border-[#C6FF3D]/60 hover:bg-[#221E19]">
+            <div className="flex items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-[#C6FF3D]">{module.icon}</span>
+              <span className="min-w-0">
+                <strong className="block text-sm text-white group-hover:text-[#C6FF3D]">{module.title}</strong>
+                <span className="mt-1 block text-xs leading-5 text-[#8A7F76]">{module.description}</span>
+              </span>
+              <span className="ml-auto text-[#8A7F76]">→</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {!visible.length && <Card><p className="text-sm text-[#FFB5AA]">Для роли {role} нет административных разделов.</p></Card>}
+
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-display text-[15px] font-bold">Контур доступа</h3><p className="mt-1 text-xs text-[#8A7F76]">Доступ ограничен staff JWT и серверным RBAC. Ссылки не расширяют права пользователя.</p></div>
+          <Link href="/" className="rounded-[6px] border border-[#3A332C] px-3 py-2 text-xs text-[#D8CFC6] hover:border-[#C6FF3D] hover:text-[#C6FF3D]">Открыть витрину</Link>
+        </div>
+      </Card>
+    </div>
+  );
+}

@@ -40,12 +40,14 @@ import { HrView } from '@/components/erp/HrView';
 import { LogisticsView } from '@/components/erp/LogisticsView';
 import { ServiceCenterView } from '@/components/erp/ServiceCenterView';
 import { StorefrontView } from '@/components/erp/StorefrontView';
+import { AdminView } from '@/components/erp/AdminView';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
-type Route = 'dash' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'service' | 'kpi' | 'crm' | 'campaigns' | 'storefront' | 'risks' | 'readiness' | 'ledger';
+type Route = 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'service' | 'kpi' | 'crm' | 'campaigns' | 'storefront' | 'risks' | 'readiness' | 'ledger';
 
 const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
+  { id: 'admin', icon: '⚙', label: 'Администрирование' },
   { id: 'stock', icon: '📦', label: 'Склад' },
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'hr', icon: '◫', label: 'HR · Смены' },
@@ -66,6 +68,7 @@ const EXTENDED_NAV: { id: Route; icon: string; label: string }[] = [
 ];
 const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор сети · сегодня'],
+  admin: ['Администрирование', 'Сайт · операции · доступы'],
   ai: ['AI-ассистент', 'Инсайты владельца из Event Ledger'],
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
   reorder: ['Закупки', 'Что дозаказать по спросу/остатку'],
@@ -264,6 +267,7 @@ export default function ErpPage() {
           {route === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
+          {route === 'admin' && <AdminView role={session.role} username={session.username} />}
           {route === 'ai' && <AiView insights={insights} />}
           {route === 'pricing' && <PricingView accessToken={session.accessToken} />}
           {route === 'reorder' && <ReorderView accessToken={session.accessToken} />}

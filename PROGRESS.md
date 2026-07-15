@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ERP-ADMIN-001
+
+- Iteration ID: `ERP-ADMIN-001`.
+- Task: bring the website administration entry points into the ERP shell.
+- Files changed: `apps/web/app/erp/page.tsx` and `apps/web/components/erp/AdminView.tsx`.
+- Result: `/erp` now has an Administration section. The current staff role sees only permitted links to products/catalog, approvals and 2FA, warehouse/IMEI, POS, Staff operations and the public storefront; links reuse the existing server-authenticated routes and do not grant permissions client-side.
+- Checks run: production Next.js build passed with 39 routes; `git diff --check`; HTTP smoke `GET /erp` returned 200. Playwright screenshot smoke was not run because the local Chromium executable is not installed.
+- Acceptance: `accepted` for the ERP navigation/admin hub. The underlying modules still require their own functional, RBAC and visual acceptance gates.
+- Next step: wire Finance controls (journal, AP aging, bank statements and cash incassations) into the ERP Finance workspace instead of leaving them API-only.
+
 ## 2026-07-15 — ACC-002F
 
 - Iteration ID: `ACC-002F`.

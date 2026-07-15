@@ -30,6 +30,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- `ERP-ADMIN-001` Собрать административный центр внутри `/erp`: роль-зависимые входы в каталог, согласования/2FA, склад/IMEI, POS, Staff и клиентскую витрину с единым серверным staff JWT/RBAC-контуром. Production web build проходит; визуальный Playwright smoke требует установленного Chromium.
 - `AP-001B` Add supplier invoice documents with exact PO/receipt three-way matching, approval, idempotent payment and `2000` liability clearance to the selected funding account. Remaining `AP-001` scope is credit notes, advances/partial payments, landed cost and statement reconciliation.
 - `AP-001C` Add Finance AP aging read model: as-of date, supplier filter, current/1-30/31-60/61-90/90+ buckets, paid/outstanding totals and drill-down to supplier, PO and journal. Draft/cancelled invoices are excluded and paid invoices do not remain outstanding.
 - `ACC-002B` Add immutable journal reversal documents: permissioned, idempotent opposite entries linked to the original, with no mutation of posted lines and no reversal-of-reversal. Remaining `ACC-002` scope is taxes, currencies/rates, bank reconciliation, statements and exports.
