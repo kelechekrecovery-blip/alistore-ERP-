@@ -61,7 +61,7 @@ const EXTENDED_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'pricing', icon: '🏷️', label: 'Цены' },
   { id: 'reorder', icon: '🛒', label: 'Закупки' },
   { id: 'campaigns', icon: '◌', label: 'Кампании' },
-  { id: 'storefront', icon: '▤', label: 'CMS витрины' },
+  { id: 'storefront', icon: '▤', label: 'Сайт · CMS витрины' },
   { id: 'risks', icon: '⚠', label: 'Риски' },
   { id: 'readiness', icon: '✓', label: 'Готовность' },
   { id: 'ledger', icon: '📜', label: 'Event Ledger' },
@@ -80,7 +80,7 @@ const TITLES: Record<Route, [string, string]> = {
   stock: ['Склад', 'Остатки по статусам'],
   crm: ['CRM · Поддержка', 'Инбокс обращений + Customer 360'],
   campaigns: ['Кампании', 'Сегменты, consent-фильтр и ROI'],
-  storefront: ['CMS витрины', 'Контент сайта · ревизии · публикация'],
+  storefront: ['Управление сайтом', 'Товары · контент · промо · отзывы · публикации'],
   risks: ['Риски', 'Центр тревог'],
   readiness: ['Готовность запуска', 'Внешние провайдеры · железо · production gate'],
   ledger: ['Event Ledger', 'Единая книга событий'],
@@ -279,7 +279,7 @@ export default function ErpPage() {
           {route === 'stock' && <StockView d={d} />}
           {route === 'crm' && <CrmView />}
           {route === 'campaigns' && <CampaignsView />}
-          {route === 'storefront' && <StorefrontView accessToken={session.accessToken} />}
+          {route === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}
           {route === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
           {route === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}
           {route === 'ledger' && <LedgerView ledger={ledger} />}

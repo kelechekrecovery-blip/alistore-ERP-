@@ -10,7 +10,6 @@ type AdminViewProps = {
 };
 
 const MODULES = [
-  { href: '/admin/products', icon: '▤', title: 'Каталог и товары', description: 'Товары, цены, варианты, AI-обогащение и архивирование', roles: ['admin', 'owner'] },
   { href: '/approvals', icon: '✓', title: 'Согласования и 2FA', description: 'Скидки, возвраты, списания и опасные действия', roles: ['admin', 'owner', 'senior_seller'] },
   { href: '/warehouse', icon: '□', title: 'Склад и IMEI', description: 'Приемка, остатки, движения, назначения и документы', roles: ['admin', 'owner', 'warehouse'] },
   { href: '/pos', icon: '▣', title: 'POS и касса', description: 'Продажи, смены, возвраты, печать и сверка', roles: ['admin', 'owner', 'cashier', 'seller', 'senior_seller'] },
@@ -19,7 +18,7 @@ const MODULES = [
 ] as const;
 
 const INTERNAL_MODULES = [
-  { route: 'storefront' as const, icon: '▤', title: 'CMS витрины', description: 'Баннеры, подборки, публикация и ревизии контента', roles: ['admin', 'owner', 'marketer'] },
+  { route: 'storefront' as const, icon: '▤', title: 'Админка сайта', description: 'Товары, баннеры, контент, промокоды, отзывы и публикации', roles: ['admin', 'owner', 'marketer'] },
   { route: 'campaigns' as const, icon: '◌', title: 'Кампании и промо', description: 'Сегменты, промокоды, согласования и ROI', roles: ['admin', 'owner', 'marketer'] },
 ];
 

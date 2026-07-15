@@ -1,5 +1,31 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedStaffCredentials } from './helpers';
+import { prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+
+test('ERP embeds website catalog administration and publishes product changes to the storefront', async ({ page }) => {
+  await resetDb();
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-erp-site-admin');
+  const { product } = await seedProduct('ERP Site Product', 84_000, 65_000);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /Сайт · CMS витрины/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Администрирование интернет-магазина' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Товары' }).click();
+  await expect(page.getByTestId('erp-product-management')).toBeVisible();
+  const productRow = page.getByRole('button', { name: new RegExp(product.name) });
+  await expect(productRow).toBeVisible();
+  await productRow.click();
+  await page.getByPlaceholder('iPhone 15 128GB Black').fill('ERP Published Product');
+  await page.getByRole('button', { name: 'Сохранить изменения' }).click();
+  await expect(page.getByText(`Сохранено: ${product.sku}`)).toBeVisible();
+
+  await page.goto(`/product/${product.id}`);
+  await expect(page.getByRole('heading', { name: 'ERP Published Product' })).toBeVisible();
+});
 
 test('admin manages products with AI enrichment and approval-gated danger actions', async ({ page }) => {
   await resetDb();

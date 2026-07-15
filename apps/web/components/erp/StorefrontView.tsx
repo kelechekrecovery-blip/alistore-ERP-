@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowDown, ArrowUp, CalendarClock, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarClock, ExternalLink, LayoutDashboard, Package, Plus, Search, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   cancelStorefrontSchedule,
@@ -16,11 +17,12 @@ import {
 import { ReviewModerationView } from './ReviewModerationView';
 import { PromotionsView } from './PromotionsView';
 import { StorefrontBlocksView } from './StorefrontBlocksView';
+import { ProductManagementView } from '@/components/admin/ProductManagementView';
 
 const FIELD = 'w-full rounded-[8px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none focus:border-coral';
 
-export function StorefrontView({ accessToken }: { accessToken: string }) {
-  const [mode, setMode] = useState<'blocks' | 'content' | 'promotions' | 'reviews'>('blocks');
+export function StorefrontView({ accessToken, role }: { accessToken: string; role: string }) {
+  const [mode, setMode] = useState<'overview' | 'catalog' | 'blocks' | 'content' | 'promotions' | 'reviews'>('overview');
   const [form, setForm] = useState<StorefrontContent | null>(null);
   const [revisions, setRevisions] = useState<StorefrontContent[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -61,8 +63,21 @@ export function StorefrontView({ accessToken }: { accessToken: string }) {
 
   const byId = useMemo(() => new Map(knownProducts.map((product) => [product.id, product])), [knownProducts]);
 
-  const tabs = <div className="mb-4 flex flex-wrap gap-2"><button type="button" onClick={() => setMode('blocks')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'blocks' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Витрина (баннеры)</button><button type="button" onClick={() => setMode('content')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'content' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Тексты и подборка</button><button type="button" onClick={() => setMode('promotions')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'promotions' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Промокоды</button><button type="button" onClick={() => setMode('reviews')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'reviews' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Модерация отзывов</button></div>;
+  const canManageProducts = role === 'owner' || role === 'admin';
+  const tabClass = (tab: typeof mode) => `rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === tab ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92] hover:border-[#4A4139] hover:text-white'}`;
+  const tabs = (
+    <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Администрирование сайта">
+      <button type="button" role="tab" aria-selected={mode === 'overview'} onClick={() => setMode('overview')} className={tabClass('overview')}>Обзор</button>
+      {canManageProducts && <button type="button" role="tab" aria-selected={mode === 'catalog'} onClick={() => setMode('catalog')} className={tabClass('catalog')}>Товары</button>}
+      <button type="button" role="tab" aria-selected={mode === 'blocks'} onClick={() => setMode('blocks')} className={tabClass('blocks')}>Витрина (баннеры)</button>
+      <button type="button" role="tab" aria-selected={mode === 'content'} onClick={() => setMode('content')} className={tabClass('content')}>Тексты и подборка</button>
+      <button type="button" role="tab" aria-selected={mode === 'promotions'} onClick={() => setMode('promotions')} className={tabClass('promotions')}>Промокоды</button>
+      <button type="button" role="tab" aria-selected={mode === 'reviews'} onClick={() => setMode('reviews')} className={tabClass('reviews')}>Модерация отзывов</button>
+    </div>
+  );
 
+  if (mode === 'overview') return <>{tabs}<SiteAdministrationOverview canManageProducts={canManageProducts} onOpen={setMode} /></>;
+  if (mode === 'catalog' && canManageProducts) return <>{tabs}<ProductManagementView accessToken={accessToken} /></>;
   if (mode === 'reviews') return <>{tabs}<ReviewModerationView accessToken={accessToken} /></>;
   if (mode === 'promotions') return <>{tabs}<PromotionsView accessToken={accessToken} /></>;
   if (mode === 'blocks') return <>{tabs}<StorefrontBlocksView accessToken={accessToken} /></>;
@@ -209,6 +224,61 @@ export function StorefrontView({ accessToken }: { accessToken: string }) {
         </div>
       </aside>
     </div></>
+  );
+}
+
+function SiteAdministrationOverview({
+  canManageProducts,
+  onOpen,
+}: {
+  canManageProducts: boolean;
+  onOpen: (mode: 'overview' | 'catalog' | 'blocks' | 'content' | 'promotions' | 'reviews') => void;
+}) {
+  const modules = [
+    ...(canManageProducts ? [{ id: 'catalog' as const, icon: Package, title: 'Каталог товаров', body: 'Карточки, варианты, наборы, цены, себестоимость и публикация.' }] : []),
+    { id: 'blocks' as const, icon: LayoutDashboard, title: 'Главная и баннеры', body: 'Порядок блоков, desktop/mobile таргетинг и расписание публикаций.' },
+    { id: 'content' as const, icon: LayoutDashboard, title: 'Контент и подборки', body: 'Тексты сайта, контакты, преимущества и товары на главной.' },
+    { id: 'promotions' as const, icon: LayoutDashboard, title: 'Промокоды', body: 'Условия скидок, лимиты, сроки и активация в checkout.' },
+    { id: 'reviews' as const, icon: LayoutDashboard, title: 'Отзывы', body: 'Модерация клиентских отзывов до публикации на карточке товара.' },
+  ];
+
+  return (
+    <section data-testid="erp-site-administration" className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#2E2822] pb-5">
+        <div>
+          <div className="mb-2 text-[10px] font-semibold uppercase text-[#8A7F76]">Сайт · единый контур</div>
+          <h2 className="font-display text-2xl font-bold">Администрирование интернет-магазина</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#A79C92]">Изменения выполняются через staff JWT и серверные права. На клиентский сайт попадает только опубликованный контент.</p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/" target="_blank" className="inline-flex items-center gap-2 rounded-[7px] border border-[#3A332C] px-3 py-2 text-xs font-bold text-[#D8CFC6] hover:border-lime hover:text-lime">
+            Открыть сайт <ExternalLink size={14} />
+          </Link>
+          <Link href="/catalog" target="_blank" className="inline-flex items-center gap-2 rounded-[7px] bg-lime px-3 py-2 text-xs font-bold text-lime-ink">
+            Проверить каталог <ExternalLink size={14} />
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {modules.map((module) => {
+          const Icon = module.icon;
+          return (
+            <button key={module.id} type="button" onClick={() => onOpen(module.id)} className="group min-h-32 rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4 text-left transition hover:border-lime/60 hover:bg-[#221E19]">
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-[#29231E] text-lime"><Icon size={18} /></span>
+              <strong className="mt-4 block text-sm text-white group-hover:text-lime">{module.title}</strong>
+              <span className="mt-1 block text-xs leading-5 text-[#8A7F76]">{module.body}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {!canManageProducts && (
+        <div className="rounded-[8px] border border-[#3A332C] bg-[#1A1611] px-4 py-3 text-xs text-[#A79C92]">
+          Роль маркетолога управляет публикациями, промокодами и отзывами. Изменение товара доступно только owner/admin.
+        </div>
+      )}
+    </section>
   );
 }
 

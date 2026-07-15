@@ -13,7 +13,8 @@ test('ERP publishes an ordered product collection to the desktop storefront', as
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /CMS витрины/ }).click();
-  await page.getByRole('button', { name: 'Тексты и подборка' }).click();
+  await expect(page.getByRole('tab', { name: 'Товары' })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Тексты и подборка' }).click();
 
   await expect(page.getByRole('heading', { name: 'Контент клиентского сайта' })).toBeVisible();
   await page.getByLabel('Заголовок подборки').fill('Выбор команды AliStore');
@@ -49,6 +50,7 @@ test('marketer composes and reorders published storefront blocks without a code 
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /CMS витрины/ }).click();
+  await page.getByRole('tab', { name: 'Витрина (баннеры)' }).click();
   await expect(page.getByRole('heading', { name: 'Баннеры, подборки и порядок' })).toBeVisible();
 
   await page.getByLabel('Устройства').selectOption('desktop');
@@ -106,6 +108,7 @@ test('marketer edits an existing draft storefront block', async ({ page }) => {
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /CMS витрины/ }).click();
+  await page.getByRole('tab', { name: 'Витрина (баннеры)' }).click();
   await expect(page.getByRole('heading', { name: 'Баннеры, подборки и порядок' })).toBeVisible();
 
   await page.getByLabel('Заголовок').fill('Черновик до правки');
@@ -146,7 +149,7 @@ test('customer review stays private until a marketer approves it in ERP', async 
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /CMS витрины/ }).click();
-  await page.getByRole('button', { name: 'Модерация отзывов' }).click();
+  await page.getByRole('tab', { name: 'Модерация отзывов' }).click();
   await expect(page.getByText('Проверенный отзыв из браузерного сценария')).toBeVisible();
   await page.getByRole('button', { name: 'Одобрить' }).click();
   await expect(page.getByText('Отзыв опубликован на карточке товара')).toBeVisible();
@@ -171,7 +174,7 @@ test('marketer launches a promotion in ERP and checkout redeems the same server 
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /CMS витрины/ }).click();
-  await page.getByRole('button', { name: 'Промокоды' }).click();
+  await page.getByRole('tab', { name: 'Промокоды' }).click();
   await page.getByLabel('Код').fill(code);
   await page.getByLabel('Название').fill('Живая акция AliStore');
   await page.getByLabel('Скидка, сом').fill('3000');
