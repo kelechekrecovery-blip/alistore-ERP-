@@ -1392,6 +1392,9 @@ model AccountingJournalEntry {
   payment        Payment?
   purchaseReceipt PurchaseReceipt?
   supplierInvoice SupplierInvoice?
+  reversalOfId    String?                 @unique
+  reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal        AccountingJournalEntry? @relation("AccountingReversal")
 
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])

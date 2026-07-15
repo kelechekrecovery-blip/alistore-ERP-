@@ -39,6 +39,12 @@ export class FinanceAccountingQueryDto {
   @IsOptional() @IsString() @MaxLength(64) sourceType?: string;
 }
 
+export class ReverseAccountingEntryDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(3) @MaxLength(500) reason!: string;
+  @IsOptional() @IsISO8601({ strict: true }) occurredAt?: string;
+}
+
 export class FinancePeriodQueryDto {
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
   @IsOptional() @IsString() @MaxLength(100) point?: string;

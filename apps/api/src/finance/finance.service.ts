@@ -14,6 +14,7 @@ import {
   ResolveFinanceSettlementDto,
   CloseAccountingPeriodDto,
   SupplierAgingQueryDto,
+  ReverseAccountingEntryDto,
   SetFinanceBudgetDto,
   SETTLEMENT_SOURCE_TYPES,
 } from './finance.dto';
@@ -116,6 +117,29 @@ export class FinanceService {
     const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
     const totals = Object.fromEntries(buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0)]));
     return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size };
+  }
+
+  async reverseAccountingEntry(id: string, dto: ReverseAccountingEntryDto, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "AccountingJournalEntry" WHERE id = ${id} FOR UPDATE`;
+      const original = await tx.accountingJournalEntry.findUnique({ where: { id }, include: { lines: true } });
+      if (!original) throw new ValidationError('accounting_entry_not_found', `Проводка ${id} не найдена`);
+      if (original.reversalOfId) throw new ConflictError('accounting_reversal_of_reversal', 'Нельзя сторнировать уже обратную проводку');
+      const existingReversal = await tx.accountingJournalEntry.findUnique({ where: { reversalOfId: id }, include: { lines: true } });
+      if (existingReversal) return { result: { ...existingReversal, idempotent: true }, events: [] };
+      const reversal = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:reversal:${id}:${dto.idempotencyKey}`,
+        sourceType: 'accounting.reversal',
+        sourceRef: `${id}:${dto.idempotencyKey}`,
+        description: `Сторно проводки ${id}: ${dto.reason.trim()}`,
+        point: original.point,
+        occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
+        createdBy: actor,
+        lines: original.lines.map((line) => ({ accountCode: line.accountCode, debit: line.credit, credit: line.debit, memo: `Сторно: ${line.memo ?? original.description}` })),
+      });
+      const linked = await tx.accountingJournalEntry.update({ where: { id: reversal.id }, data: { reversalOfId: id }, include: { lines: true } });
+      return { result: { ...linked, idempotent: false }, events: [{ type: 'finance.accounting_entry_reversed', actor, payload: { originalEntryId: id, reversalEntryId: linked.id, reason: dto.reason.trim() }, refs: [id, linked.id] }] };
+    });
   }
 
   async trialBalance(query: FinanceAccountingQueryDto) {

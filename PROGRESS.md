@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ACC-002B
+
+- Iteration ID: `ACC-002B`.
+- Task: add immutable accounting reversal documents.
+- Files changed: journal self-reversal relation/migration, permissioned reversal API and Finance regression.
+- Result: a posted journal entry can be corrected only through a balanced opposite entry; the original remains unchanged, one reversal is allowed, reversal-of-reversal is rejected, and repeated requests return the same linked entry.
+- Checks run: Prisma format/generate/validate, API build, reset Finance integration suite 8/8.
+- Acceptance: `accepted` for journal reversal software contour. Tax, currency, bank reconciliation and full financial statements remain open.
+- Next step: add credit notes and tax-aware supplier adjustments, then expose statement slices in ERP.
+
 ## 2026-07-15 — AP-001C
 
 - Iteration ID: `AP-001C`.

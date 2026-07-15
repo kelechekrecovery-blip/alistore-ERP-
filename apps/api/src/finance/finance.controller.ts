@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -82,6 +82,12 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   journal(@Query() query: FinanceAccountingQueryDto) {
     return this.finance.accountingJournal(query);
+  }
+
+  @Post('journal/:id/reverse')
+  @RequirePermission('finance', 'approve')
+  reverseJournal(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReverseAccountingEntryDto) {
+    return this.finance.reverseAccountingEntry(id, dto, user.customerId);
   }
 
   @Get('trial-balance')

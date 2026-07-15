@@ -220,6 +220,29 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(report.body.totals).toMatchObject({ current: 0, '1_30': 0, '90_plus': 0, paid: 0 });
   });
 
+  it('reverses a posted journal entry without mutating the original', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `reverse-expense-${run}`, category: 'rent', description: 'Расход для сторно', amount: 2_000 })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/finance/expenses/${created.body.id}/approve`).set('Authorization', `Bearer ${ownerToken}`).expect(201);
+    await request(app.getHttpServer()).post(`/finance/expenses/${created.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).send({ idempotencyKey: `reverse-pay-${run}`, fundingAccountCode: '1000' }).expect(201);
+    const original = await prisma.accountingJournalEntry.findFirstOrThrow({ where: { sourceType: 'expense.payment' }, include: { lines: true } });
+
+    const reversal = await request(app.getHttpServer())
+      .post(`/finance/journal/${original.id}/reverse`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `reverse-${run}`, reason: 'Исправление ошибочного расхода' })
+      .expect(201);
+    expect(reversal.body.reversalOfId).toBe(original.id);
+    expect(reversal.body.lines.map((line: { debit: number; credit: number }) => [line.debit, line.credit])).toEqual(original.lines.map((line) => [line.credit, line.debit]));
+
+    const replay = await request(app.getHttpServer()).post(`/finance/journal/${original.id}/reverse`).set('Authorization', `Bearer ${ownerToken}`).send({ idempotencyKey: `reverse-${run}`, reason: 'Исправление ошибочного расхода' }).expect(201);
+    expect(replay.body.id).toBe(reversal.body.id);
+    expect(await prisma.accountingJournalEntry.count({ where: { reversalOfId: original.id } })).toBe(1);
+  });
+
   it('returns a deterministic conflict when two expenses reuse one payment key', async () => {
     const createApproved = async (suffix: string) => {
       const created = await request(app.getHttpServer())
