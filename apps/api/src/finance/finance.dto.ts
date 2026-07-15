@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 export const EXPENSE_CATEGORIES = [
   'rent',
@@ -15,10 +15,27 @@ export class CreateExpenseDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsIn(EXPENSE_CATEGORIES) category!: (typeof EXPENSE_CATEGORIES)[number];
   @IsString() @MinLength(2) @MaxLength(500) @Matches(/\S/) description!: string;
-  @IsInt() @Min(1) amount!: number;
+  @IsInt() @Min(1) @Max(2147483647) amount!: number;
+  @IsOptional() @IsString() @Matches(/^[A-Z]{3}$/) currency?: string;
+  @IsOptional() @IsString() @MaxLength(64) exchangeRateId?: string;
+  @IsOptional() @IsIn(['none', 'included', 'excluded']) taxMode?: 'none' | 'included' | 'excluded';
+  @IsOptional() @IsInt() @Min(0) @Max(10000) taxRateBps?: number;
   @IsOptional() @IsString() @MaxLength(100) point?: string;
   @IsOptional() @IsString() @MaxLength(64) supplierId?: string;
   @IsOptional() @IsISO8601({ strict: true }) incurredAt?: string;
+}
+
+export class CurrencyRateQueryDto {
+  @IsOptional() @IsString() @Matches(/^[A-Z]{3}$/) currency?: string;
+  @IsOptional() @IsISO8601({ strict: true }) asOf?: string;
+}
+
+export class CreateCurrencyRateDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @Matches(/^[A-Z]{3}$/) currency!: string;
+  @IsInt() @Min(1) @Max(2147483647) rateMicros!: number;
+  @IsISO8601({ strict: true }) effectiveAt!: string;
+  @IsString() @MinLength(2) @MaxLength(128) @Matches(/\S/) source!: string;
 }
 
 export class RejectExpenseDto {

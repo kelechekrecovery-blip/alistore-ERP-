@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ACC-002G
+
+- Iteration ID: `ACC-002G`.
+- Task: make foreign-currency expenses and recoverable input tax reproducible in the KGS accounting journal.
+- Files changed: expense/currency Prisma schema and migration, deterministic accounting helper, Finance DTO/controller/service, journal snapshot metadata, Ledger event type, typed web client, ERP Finance controls and integration regression.
+- Result: owner/admin can register an immutable dated currency rate; an expense stores source amount/currency/rate and included/excluded tax snapshots while its authoritative payable amount remains KGS. Payment posts the tax base to the expense account, recoverable input tax to `1210` and the gross amount to the funding account in one balanced entry.
+- Checks run: clean test-DB migration reset through `20260716080000`; physical schema assertion; Finance integration suite 12/12 (one transient `ECONNRESET` run, immediate clean rerun passed); API production build; Next production build with 39 routes; browser flow registered USD 87.5, created a 1,000 USD expense with 12% included tax, and verified the server snapshot `87,500 / 78,125 / 9,375 KGS`; desktop horizontal-overflow check passed.
+- Acceptance: `accepted` for expense FX/input-tax accounting. Mobile ERP visual acceptance is not claimed: the existing fixed desktop shell clips at 390px, recorded as `ERP-RESP-001`. Output tax/settlement, supplier/payment currency, FX revaluation/gains, opening balances, AR aging and exports remain open.
+- Next step: implement sales/refund output-tax liability and period tax settlement, then fix the narrow-screen ERP shell.
+
 ## 2026-07-15 — ERP-ADMIN-002
 
 - Iteration ID: `ERP-ADMIN-002`.

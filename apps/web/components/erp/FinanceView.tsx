@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   approveExpense,
+  createAccountingCurrencyRate,
   createExpense,
   fetchAccountingAccounts,
+  fetchAccountingCurrencyRates,
   fetchExpenses,
   fetchFinancePlanFact,
   fetchTrialBalance,
@@ -13,6 +15,7 @@ import {
   setFinanceBudget,
   type Expense,
   type AccountingAccount,
+  type AccountingCurrencyRate,
   type FinancePlanFact,
   type TrialBalance,
 } from '@/lib/api';
@@ -37,6 +40,10 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const [category, setCategory] = useState('other');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState('KGS');
+  const [exchangeRateId, setExchangeRateId] = useState('');
+  const [taxMode, setTaxMode] = useState<'none' | 'included' | 'excluded'>('none');
+  const [taxRatePercent, setTaxRatePercent] = useState('0');
   const [point, setPoint] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -48,6 +55,11 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const [planningBusy, setPlanningBusy] = useState(false);
   const [planningMessage, setPlanningMessage] = useState('');
   const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
+  const [currencyRates, setCurrencyRates] = useState<AccountingCurrencyRate[]>([]);
+  const [rateCurrency, setRateCurrency] = useState('USD');
+  const [rateValue, setRateValue] = useState('');
+  const [rateDate, setRateDate] = useState(new Date().toISOString().slice(0, 10));
+  const [rateSource, setRateSource] = useState('НБКР');
   const [trialBalance, setTrialBalance] = useState<TrialBalance | null>(null);
   const [accountingState, setAccountingState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [fundingByExpense, setFundingByExpense] = useState<Record<string, string>>({});
@@ -72,6 +84,25 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   useEffect(() => {
     fetchAccountingAccounts(accessToken).then(setAccounts).catch(() => setMessage('Не удалось загрузить план счетов'));
   }, [accessToken]);
+
+  const reloadCurrencyRates = useCallback(() => {
+    fetchAccountingCurrencyRates(accessToken).then(setCurrencyRates).catch(() => setMessage('Не удалось загрузить курсы валют'));
+  }, [accessToken]);
+
+  useEffect(() => reloadCurrencyRates(), [reloadCurrencyRates]);
+
+  useEffect(() => {
+    if (currency === 'KGS') {
+      setExchangeRateId('');
+      return;
+    }
+    const matching = currencyRates.filter((rate) => rate.currency === currency);
+    if (!matching.some((rate) => rate.id === exchangeRateId)) setExchangeRateId(matching[0]?.id ?? '');
+  }, [currency, currencyRates, exchangeRateId]);
+
+  useEffect(() => {
+    if (taxMode === 'none') setTaxRatePercent('0');
+  }, [taxMode]);
 
   const reloadPlanning = useCallback(() => {
     setPlanningMessage('');
@@ -108,12 +139,17 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   async function submit(event: FormEvent) {
     event.preventDefault();
     const numericAmount = Math.round(Number(amount));
-    if (!description.trim() || !Number.isFinite(numericAmount) || numericAmount < 1) return;
+    const numericTaxRateBps = Math.round(Number(taxRatePercent) * 100);
+    if (!description.trim() || !Number.isFinite(numericAmount) || numericAmount < 1 || (currency !== 'KGS' && !exchangeRateId) || !Number.isInteger(numericTaxRateBps) || numericTaxRateBps < 0 || numericTaxRateBps > 10_000 || (taxMode === 'none' ? numericTaxRateBps !== 0 : numericTaxRateBps === 0)) return;
     setBusy('create');
     setMessage('');
     try {
       await createExpense({
         idempotencyKey: crypto.randomUUID(), category, description: description.trim(), amount: numericAmount,
+        currency,
+        ...(currency !== 'KGS' && exchangeRateId ? { exchangeRateId } : {}),
+        taxMode,
+        taxRateBps: numericTaxRateBps,
         ...(point.trim() ? { point: point.trim() } : {}),
       }, accessToken);
       setDescription('');
@@ -121,6 +157,30 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
       reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось создать расход');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function submitCurrencyRate(event: FormEvent) {
+    event.preventDefault();
+    const rateMicros = Math.round(Number(rateValue) * 1_000_000);
+    if (!/^[A-Z]{3}$/.test(rateCurrency) || rateCurrency === 'KGS' || !Number.isSafeInteger(rateMicros) || rateMicros < 1 || !rateSource.trim()) return;
+    setBusy('currency-rate');
+    setMessage('');
+    try {
+      const created = await createAccountingCurrencyRate({
+        currency: rateCurrency,
+        rateMicros,
+        effectiveAt: new Date(`${rateDate}T00:00:00.000Z`).toISOString(),
+        source: rateSource.trim(),
+      }, accessToken);
+      setCurrency(created.currency);
+      setExchangeRateId(created.id);
+      setRateValue('');
+      reloadCurrencyRates();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось зарегистрировать курс');
     } finally {
       setBusy('');
     }
@@ -154,6 +214,8 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
     { label: 'Оплаченные расходы', value: `-${som(d.money.expenses)}`, color: '#FFB86B' },
     { label: 'Операционная прибыль', value: som(d.money.operatingProfit), color: '#C6FF3D' },
   ] : [];
+  const currencies = ['KGS', ...new Set(currencyRates.map((rate) => rate.currency))];
+  const matchingRates = currencyRates.filter((rate) => rate.currency === currency);
 
   return (
     <div className="space-y-5">
@@ -232,6 +294,21 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             </div>
           ))}
         </Card>
+        <form onSubmit={submitCurrencyRate} className="border-t border-[#2E2822] pt-5">
+          <div className="mb-1 font-display text-sm font-bold">Курсы валют</div>
+          <p className="mb-3 text-xs leading-5 text-[#8A7F76]">Фиксируется курс к KGS на дату первичного документа.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input aria-label="Валюта курса" value={rateCurrency} onChange={(event) => setRateCurrency(event.target.value.toUpperCase())} maxLength={3} placeholder="USD" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm uppercase" />
+            <input aria-label="Курс к KGS" value={rateValue} onChange={(event) => setRateValue(event.target.value)} inputMode="decimal" placeholder="87.50 KGS" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+            <input aria-label="Дата курса" type="date" value={rateDate} onChange={(event) => setRateDate(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+            <input aria-label="Источник курса" value={rateSource} onChange={(event) => setRateSource(event.target.value)} maxLength={128} placeholder="НБКР" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+          </div>
+          <button disabled={busy === 'currency-rate'} className="mt-2 h-10 w-full rounded-[6px] border border-[#3A332C] bg-[#221E19] px-4 text-sm font-semibold text-[#C6FF3D] disabled:opacity-50">{busy === 'currency-rate' ? 'Фиксируем...' : 'Зарегистрировать курс'}</button>
+          <div className="mt-3 grid gap-1">
+            {currencyRates.slice(0, 4).map((rate) => <div key={rate.id} className="flex justify-between text-[11px] text-[#8A7F76]"><span>{rate.currency} · {new Date(rate.effectiveAt).toLocaleDateString('ru-RU')}</span><span className="font-mono text-[#D8CFC6]">{(rate.rateMicros / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 6 })} KGS</span></div>)}
+            {!currencyRates.length && <span className="text-[11px] text-[#6E645C]">Иностранные курсы ещё не зарегистрированы</span>}
+          </div>
+        </form>
         <form onSubmit={submit} className="border-t border-[#2E2822] pt-5">
           <div className="mb-3 font-display text-sm font-bold">Новый расход</div>
           <div className="grid gap-2">
@@ -240,8 +317,26 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             </select>
             <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} placeholder="Назначение" className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
             <div className="grid grid-cols-2 gap-2">
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder="Сумма, сом" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder={`Сумма, ${currency}`} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+              <select aria-label="Валюта расхода" value={currency} onChange={(event) => setCurrency(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
+                {currencies.map((code) => <option key={code} value={code}>{code}</option>)}
+              </select>
+            </div>
+            {currency !== 'KGS' && <select aria-label="Курс расхода" required value={exchangeRateId} onChange={(event) => setExchangeRateId(event.target.value)} className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
+              <option value="">Выберите зафиксированный курс</option>
+              {matchingRates.map((rate) => <option key={rate.id} value={rate.id}>{new Date(rate.effectiveAt).toLocaleDateString('ru-RU')} · {(rate.rateMicros / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 6 })} KGS · {rate.source}</option>)}
+            </select>}
+            <div className="grid grid-cols-2 gap-2">
+              <select aria-label="Налоговый режим" value={taxMode} onChange={(event) => setTaxMode(event.target.value as 'none' | 'included' | 'excluded')} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
+                <option value="none">Без налога</option>
+                <option value="included">Налог включён</option>
+                <option value="excluded">Налог сверху</option>
+              </select>
+              <input aria-label="Ставка налога" disabled={taxMode === 'none'} value={taxRatePercent} onChange={(event) => setTaxRatePercent(event.target.value)} inputMode="decimal" placeholder="Ставка, %" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm disabled:opacity-50" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               <input value={point} onChange={(e) => setPoint(e.target.value)} maxLength={100} placeholder="Точка" className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+              <div className="flex h-10 items-center rounded-[6px] border border-[#2E2822] bg-[#16130F] px-3 text-xs text-[#8A7F76]">Проводка в KGS</div>
             </div>
             <button disabled={busy === 'create'} className="h-10 rounded-[6px] bg-[#C6FF3D] px-4 text-sm font-bold text-[#111] disabled:opacity-50">
               {busy === 'create' ? 'Создаём...' : 'Отправить на согласование'}
@@ -260,6 +355,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{expense.description}</strong><span className="rounded bg-[#29231E] px-2 py-0.5 text-[10px] text-[#B9ADA2]">{CATEGORIES[expense.category] ?? expense.category}</span></div>
                 <div className="mt-2 text-xs text-[#8A7F76]">{STATUS[expense.status]}{expense.point ? ` · ${expense.point}` : ''}{expense.supplier ? ` · ${expense.supplier.name}` : ''}</div>
+                <div className="mt-1 text-[11px] text-[#6E645C]">Документ: {expense.documentAmount.toLocaleString('ru-RU')} {expense.currency}{expense.currency !== 'KGS' ? ` · курс ${(expense.exchangeRateMicros / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 6 })}` : ''}{expense.taxAmount > 0 ? ` · налог ${som(expense.taxAmount)} (${expense.taxRateBps / 100}%)` : ' · без налога'}</div>
                 {expense.rejectionNote && <div className="mt-2 text-xs text-[#FF8A7A]">{expense.rejectionNote}</div>}
               </div>
               <div className="flex min-w-32 flex-col items-end justify-between gap-3">

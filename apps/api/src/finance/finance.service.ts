@@ -5,6 +5,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  CreateCurrencyRateDto,
   CreateExpenseDto,
   CreateFinanceSettlementDto,
   EXPENSE_CATEGORIES,
@@ -19,12 +20,15 @@ import {
   ReconcileBankStatementLineDto,
   SetFinanceBudgetDto,
   CreateCashIncassationDto,
+  CurrencyRateQueryDto,
   SETTLEMENT_SOURCE_TYPES,
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
+import { expenseAccountingSnapshot } from './expense-accounting';
 
 const EXPENSE_INCLUDE = {
   supplier: { select: { id: true, name: true } },
+  exchangeRate: { select: { id: true, currency: true, baseCurrency: true, rateMicros: true, effectiveAt: true, source: true } },
 } satisfies Prisma.ExpenseInclude;
 
 @Injectable()
@@ -53,6 +57,56 @@ export class FinanceService {
 
   listAccountingPeriods() {
     return this.prisma.accountingPeriod.findMany({ orderBy: { period: 'desc' }, take: 120 });
+  }
+
+  listCurrencyRates(query: CurrencyRateQueryDto) {
+    const asOf = query.asOf ? new Date(query.asOf) : undefined;
+    return this.prisma.accountingCurrencyRate.findMany({
+      where: {
+        ...(query.currency ? { currency: query.currency } : {}),
+        ...(asOf ? { effectiveAt: { lte: asOf } } : {}),
+      },
+      orderBy: [{ effectiveAt: 'desc' }, { createdAt: 'desc' }],
+      take: 365,
+    });
+  }
+
+  async createCurrencyRate(dto: CreateCurrencyRateDto, actor: string) {
+    const input = {
+      currency: dto.currency.trim().toUpperCase(),
+      baseCurrency: 'KGS',
+      rateMicros: dto.rateMicros,
+      effectiveAt: new Date(dto.effectiveAt),
+      source: dto.source.trim(),
+    };
+    if (input.currency === input.baseCurrency) {
+      throw new ValidationError('currency_rate_base_pair_invalid', 'Для KGS используется фиксированный курс 1.0 без отдельной записи');
+    }
+    const existing = await this.prisma.accountingCurrencyRate.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+    if (existing) return replayCurrencyRate(existing, input);
+    try {
+      return await this.audit.transaction(async (tx) => {
+        const rate = await tx.accountingCurrencyRate.create({
+          data: { ...input, idempotencyKey: dto.idempotencyKey, createdBy: actor },
+        });
+        return {
+          result: { ...rate, idempotent: false },
+          events: [{
+            type: EventType.FinanceCurrencyRateRecorded,
+            actor,
+            payload: { currencyRateId: rate.id, currency: rate.currency, baseCurrency: rate.baseCurrency, rateMicros: rate.rateMicros, effectiveAt: rate.effectiveAt, source: rate.source },
+            refs: [rate.id],
+          }],
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replay = await this.prisma.accountingCurrencyRate.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+        if (replay) return replayCurrencyRate(replay, input);
+        throw new ConflictError('currency_rate_effective_at_conflict', 'Курс этой валюты на указанную дату уже зарегистрирован');
+      }
+      throw error;
+    }
   }
 
   listBankStatements(accountCode?: string) {
@@ -672,7 +726,7 @@ export class FinanceService {
   }
 
   async create(dto: CreateExpenseDto, actor: string) {
-    const input = normalizedExpense(dto);
+    const input = await normalizedExpense(this.prisma, dto);
     const existing = await this.prisma.expense.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
       include: EXPENSE_INCLUDE,
@@ -744,10 +798,18 @@ export class FinanceService {
         sourceRef: expense.id,
         description: expense.description,
         point: expense.point,
+        currency: expense.currency,
+        documentAmount: expense.documentAmount,
+        exchangeRateMicros: expense.exchangeRateMicros,
+        baseAmount: expense.amount,
+        taxCode: expense.taxCode,
+        taxRateBps: expense.taxRateBps,
+        taxAmount: expense.taxAmount,
         occurredAt: paidAt,
         createdBy: actor,
         lines: [
-          { accountCode: expenseAccountCode(expense.category), debit: expense.amount, memo: expense.description },
+          { accountCode: expenseAccountCode(expense.category), debit: expense.taxBaseAmount, memo: expense.description },
+          ...(expense.taxAmount > 0 ? [{ accountCode: '1210', debit: expense.taxAmount, memo: `${expense.taxCode} ${expense.taxRateBps} bps` }] : []),
           { accountCode: dto.fundingAccountCode, credit: expense.amount, memo: dto.paymentReference },
         ],
       });
@@ -765,7 +827,7 @@ export class FinanceService {
           {
             type: EventType.ExpensePaid,
             actor,
-            payload: { expenseId: id, amount: paid.amount, category: paid.category, fundingAccountCode: dto.fundingAccountCode, paymentReference: paid.paymentReference, accountingEntryId: entry.id },
+            payload: { expenseId: id, amount: paid.amount, documentAmount: paid.documentAmount, currency: paid.currency, exchangeRateMicros: paid.exchangeRateMicros, taxBaseAmount: paid.taxBaseAmount, taxAmount: paid.taxAmount, taxRateBps: paid.taxRateBps, category: paid.category, fundingAccountCode: dto.fundingAccountCode, paymentReference: paid.paymentReference, accountingEntryId: entry.id },
             refs: [id, entry.id, ...(paid.supplierId ? [paid.supplierId] : [])],
           },
           {
@@ -894,29 +956,87 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function normalizedExpense(dto: CreateExpenseDto) {
+async function normalizedExpense(prisma: PrismaService, dto: CreateExpenseDto) {
+  const currency = (dto.currency ?? 'KGS').trim().toUpperCase();
+  const incurredAt = dto.incurredAt ? new Date(dto.incurredAt) : undefined;
+  const rateDate = incurredAt ?? new Date();
+  let exchangeRateId: string | null = null;
+  let exchangeRateMicros = 1_000_000;
+  if (currency === 'KGS') {
+    if (dto.exchangeRateId) throw new ValidationError('expense_exchange_rate_not_allowed', 'Для расхода в KGS отдельный курс не требуется');
+  } else {
+    if (!dto.exchangeRateId) throw new ValidationError('expense_exchange_rate_required', `Для валюты ${currency} требуется зарегистрированный курс`);
+    const rate = await prisma.accountingCurrencyRate.findUnique({ where: { id: dto.exchangeRateId } });
+    if (!rate || rate.currency !== currency || rate.baseCurrency !== 'KGS') {
+      throw new ValidationError('expense_exchange_rate_mismatch', 'Курс не соответствует валюте документа и базовой валюте KGS');
+    }
+    if (rate.effectiveAt.getTime() > rateDate.getTime()) {
+      throw new ValidationError('expense_exchange_rate_future', 'Нельзя использовать курс, который вступает в силу после даты расхода');
+    }
+    exchangeRateId = rate.id;
+    exchangeRateMicros = rate.rateMicros;
+  }
+  const taxMode = dto.taxMode ?? 'none';
+  const taxRateBps = dto.taxRateBps ?? 0;
+  const snapshot = expenseAccountingSnapshot({
+    documentAmount: dto.amount,
+    exchangeRateMicros,
+    taxMode,
+    taxRateBps,
+  });
   return {
     category: dto.category,
     description: dto.description.trim(),
-    amount: dto.amount,
+    amount: snapshot.amount,
+    documentAmount: dto.amount,
+    currency,
+    exchangeRateMicros,
+    exchangeRateId,
+    taxMode,
+    taxCode: taxMode === 'none' ? 'none' : 'vat_input',
+    taxRateBps,
+    taxBaseAmount: snapshot.taxBaseAmount,
+    taxAmount: snapshot.taxAmount,
     point: dto.point?.trim() || null,
     supplierId: dto.supplierId || null,
-    incurredAt: dto.incurredAt ? new Date(dto.incurredAt) : undefined,
+    incurredAt,
   };
 }
 
 function replayExpense(
   expense: Prisma.ExpenseGetPayload<{ include: typeof EXPENSE_INCLUDE }>,
-  input: ReturnType<typeof normalizedExpense>,
+  input: Awaited<ReturnType<typeof normalizedExpense>>,
 ) {
   const same = expense.category === input.category
     && expense.description === input.description
     && expense.amount === input.amount
+    && expense.documentAmount === input.documentAmount
+    && expense.currency === input.currency
+    && expense.exchangeRateMicros === input.exchangeRateMicros
+    && expense.exchangeRateId === input.exchangeRateId
+    && expense.taxMode === input.taxMode
+    && expense.taxCode === input.taxCode
+    && expense.taxRateBps === input.taxRateBps
+    && expense.taxBaseAmount === input.taxBaseAmount
+    && expense.taxAmount === input.taxAmount
     && expense.point === input.point
     && expense.supplierId === input.supplierId
     && (!input.incurredAt || expense.incurredAt.toISOString() === input.incurredAt.toISOString());
   if (!same) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим расходом');
   return { ...expense, idempotent: true };
+}
+
+function replayCurrencyRate(
+  rate: { id: string; currency: string; baseCurrency: string; rateMicros: number; effectiveAt: Date; source: string },
+  input: { currency: string; baseCurrency: string; rateMicros: number; effectiveAt: Date; source: string },
+) {
+  const same = rate.currency === input.currency
+    && rate.baseCurrency === input.baseCurrency
+    && rate.rateMicros === input.rateMicros
+    && rate.effectiveAt.toISOString() === input.effectiveAt.toISOString()
+    && rate.source === input.source;
+  if (!same) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим курсом');
+  return { ...rate, idempotent: true };
 }
 
 function normalizePoint(point?: string) {

@@ -26,6 +26,13 @@ export type AccountingJournalEntryInput = {
   sourceRef: string;
   description: string;
   point?: string | null;
+  currency?: string;
+  documentAmount?: number | null;
+  exchangeRateMicros?: number;
+  baseAmount?: number | null;
+  taxCode?: string;
+  taxRateBps?: number;
+  taxAmount?: number;
   occurredAt: Date;
   createdBy: string;
   lines: AccountingJournalLineInput[];
@@ -140,6 +147,13 @@ export async function postAccountingEntryOnTx(tx: Prisma.TransactionClient, inpu
       sourceRef: normalized.sourceRef,
       description: normalized.description,
       point: normalized.point,
+      currency: normalized.currency,
+      documentAmount: normalized.documentAmount,
+      exchangeRateMicros: normalized.exchangeRateMicros,
+      baseAmount: normalized.baseAmount,
+      taxCode: normalized.taxCode,
+      taxRateBps: normalized.taxRateBps,
+      taxAmount: normalized.taxAmount,
       occurredAt: normalized.occurredAt,
       createdBy: normalized.createdBy,
       lines: { create: normalized.lines },
@@ -175,12 +189,34 @@ function normalizeEntry(input: AccountingJournalEntryInput) {
   const debit = lines.reduce((sum, line) => sum + line.debit, 0);
   const credit = lines.reduce((sum, line) => sum + line.credit, 0);
   if (debit <= 0 || debit !== credit) throw new ValidationError('accounting_entry_unbalanced', 'Дебет и кредит проводки должны совпадать');
+  const currency = (input.currency ?? 'KGS').trim().toUpperCase();
+  const exchangeRateMicros = input.exchangeRateMicros ?? 1_000_000;
+  const documentAmount = input.documentAmount ?? null;
+  const baseAmount = input.baseAmount ?? null;
+  const taxCode = input.taxCode?.trim() || 'none';
+  const taxRateBps = input.taxRateBps ?? 0;
+  const taxAmount = input.taxAmount ?? 0;
+  if (!/^[A-Z]{3}$/.test(currency)) throw new ValidationError('accounting_currency_invalid', 'Код валюты должен состоять из трёх заглавных букв');
+  if (!Number.isSafeInteger(exchangeRateMicros) || exchangeRateMicros <= 0) throw new ValidationError('accounting_exchange_rate_invalid', 'Курс проводки должен быть положительным целым числом');
+  if ((documentAmount !== null && (!Number.isSafeInteger(documentAmount) || documentAmount <= 0)) || (baseAmount !== null && (!Number.isSafeInteger(baseAmount) || baseAmount <= 0))) {
+    throw new ValidationError('accounting_amount_snapshot_invalid', 'Снимок суммы проводки должен быть положительным целым числом');
+  }
+  if (!Number.isSafeInteger(taxRateBps) || taxRateBps < 0 || taxRateBps > 10_000 || !Number.isSafeInteger(taxAmount) || taxAmount < 0) {
+    throw new ValidationError('accounting_tax_snapshot_invalid', 'Налоговый снимок проводки некорректен');
+  }
   return {
     ...input,
     sourceType: input.sourceType.trim(),
     sourceRef: input.sourceRef.trim(),
     description: input.description.trim(),
     point: input.point?.trim() || null,
+    currency,
+    documentAmount,
+    exchangeRateMicros,
+    baseAmount,
+    taxCode,
+    taxRateBps,
+    taxAmount,
     lines: lines.sort((left, right) => left.accountCode.localeCompare(right.accountCode)),
   };
 }
@@ -194,6 +230,13 @@ function replayEntry(
     && existing.sourceRef === input.sourceRef
     && existing.description === input.description
     && existing.point === input.point
+    && existing.currency === input.currency
+    && existing.documentAmount === input.documentAmount
+    && existing.exchangeRateMicros === input.exchangeRateMicros
+    && existing.baseAmount === input.baseAmount
+    && existing.taxCode === input.taxCode
+    && existing.taxRateBps === input.taxRateBps
+    && existing.taxAmount === input.taxAmount
     && existing.occurredAt.getTime() === input.occurredAt.getTime()
     && JSON.stringify(existingLines) === JSON.stringify(input.lines);
   if (!same) throw new ConflictError('accounting_idempotency_conflict', 'Idempotency key уже использован для другой проводки');

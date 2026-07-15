@@ -52,6 +52,7 @@ export const EventType = {
   ExpenseRejected: 'expense.rejected',
   ExpensePaid: 'expense.paid',
   AccountingEntryPosted: 'accounting.entry_posted',
+  FinanceCurrencyRateRecorded: 'finance.currency_rate_recorded',
   FinanceBudgetSet: 'finance.budget_set',
   FinanceSettlementCreated: 'finance.settlement_created',
   FinanceSettlementDisputeResolved: 'finance.settlement_dispute_resolved',

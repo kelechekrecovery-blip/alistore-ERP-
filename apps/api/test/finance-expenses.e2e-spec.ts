@@ -58,6 +58,7 @@ describe('Finance expenses (integration + RBAC)', () => {
       prisma.accountingJournalEntry.deleteMany(),
     ]);
     await prisma.expense.deleteMany();
+    await prisma.accountingCurrencyRate.deleteMany();
     await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'expense.' } }, { type: { startsWith: 'accounting.' } }, { type: { startsWith: 'finance.' } }, { type: 'finance.budget_set' }] } });
   }
 
@@ -169,6 +170,93 @@ describe('Finance expenses (integration + RBAC)', () => {
 
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
     expect(events.map((event) => event.type)).toEqual(['expense.submitted', 'expense.approved', 'expense.paid', 'accounting.entry_posted']);
+  });
+
+  it('freezes foreign-currency and input-tax snapshots into the expense journal', async () => {
+    const effectiveAt = new Date(Date.now() - 60_000).toISOString();
+    const ratePayload = {
+      idempotencyKey: `fx-rate-${run}`,
+      currency: 'USD',
+      rateMicros: 87_500_000,
+      effectiveAt,
+      source: 'NBKR daily rate',
+    };
+    await request(app.getHttpServer()).post('/finance/currency-rates').send(ratePayload).expect(401);
+    await request(app.getHttpServer()).post('/finance/currency-rates').set('Authorization', `Bearer ${sellerToken}`).send(ratePayload).expect(403);
+    const rate = await request(app.getHttpServer())
+      .post('/finance/currency-rates')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(ratePayload)
+      .expect(201);
+    expect(rate.body).toMatchObject({ currency: 'USD', baseCurrency: 'KGS', rateMicros: 87_500_000, source: 'NBKR daily rate', idempotent: false });
+    const rateReplay = await request(app.getHttpServer()).post('/finance/currency-rates').set('Authorization', `Bearer ${ownerToken}`).send(ratePayload).expect(201);
+    expect(rateReplay.body).toMatchObject({ id: rate.body.id, idempotent: true });
+
+    const rates = await request(app.getHttpServer())
+      .get(`/finance/currency-rates?currency=USD&asOf=${encodeURIComponent(new Date().toISOString())}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(rates.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: rate.body.id })]));
+
+    await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `fx-expense-missing-rate-${run}`, category: 'rent', description: 'USD без курса', amount: 1000, currency: 'USD' })
+      .expect(422);
+
+    const expense = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        idempotencyKey: `fx-expense-${run}`,
+        category: 'rent',
+        description: 'Аренда в USD с входным НДС',
+        amount: 1000,
+        currency: 'USD',
+        exchangeRateId: rate.body.id,
+        taxMode: 'included',
+        taxRateBps: 1200,
+        incurredAt: new Date().toISOString(),
+      })
+      .expect(201);
+    expect(expense.body).toMatchObject({
+      documentAmount: 1000,
+      currency: 'USD',
+      exchangeRateMicros: 87_500_000,
+      exchangeRateId: rate.body.id,
+      amount: 87_500,
+      taxMode: 'included',
+      taxCode: 'vat_input',
+      taxRateBps: 1200,
+      taxBaseAmount: 78_125,
+      taxAmount: 9_375,
+    });
+    await request(app.getHttpServer()).post(`/finance/expenses/${expense.body.id}/approve`).set('Authorization', `Bearer ${ownerToken}`).expect(201);
+    const paid = await request(app.getHttpServer())
+      .post(`/finance/expenses/${expense.body.id}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `fx-expense-pay-${run}`, fundingAccountCode: '1010', paymentReference: 'USD-INVOICE-1' })
+      .expect(201);
+
+    const entry = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { id: paid.body.accountingEntryId },
+      include: { lines: { orderBy: { accountCode: 'asc' } } },
+    });
+    expect(entry).toMatchObject({
+      currency: 'USD',
+      documentAmount: 1000,
+      exchangeRateMicros: 87_500_000,
+      baseAmount: 87_500,
+      taxCode: 'vat_input',
+      taxRateBps: 1200,
+      taxAmount: 9_375,
+    });
+    expect(entry.lines).toMatchObject([
+      { accountCode: '1010', debit: 0, credit: 87_500 },
+      { accountCode: '1210', debit: 9_375, credit: 0 },
+      { accountCode: '6200', debit: 78_125, credit: 0 },
+    ]);
+    expect(await prisma.auditEvent.count({ where: { type: 'finance.currency_rate_recorded', refs: { has: rate.body.id } } })).toBe(1);
   });
 
   it('closes an accounting period and blocks new postings', async () => {

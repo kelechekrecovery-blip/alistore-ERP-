@@ -7,6 +7,16 @@ export interface Expense {
   category: string;
   description: string;
   amount: number;
+  documentAmount: number;
+  currency: string;
+  exchangeRateMicros: number;
+  exchangeRateId: string | null;
+  exchangeRate: AccountingCurrencyRate | null;
+  taxMode: 'none' | 'included' | 'excluded';
+  taxCode: string;
+  taxRateBps: number;
+  taxBaseAmount: number;
+  taxAmount: number;
   point: string | null;
   supplierId: string | null;
   supplier: { id: string; name: string } | null;
@@ -20,6 +30,18 @@ export interface Expense {
   paymentReference: string | null;
   accountingEntryId?: string | null;
   createdAt: string;
+}
+
+export interface AccountingCurrencyRate {
+  id: string;
+  currency: string;
+  baseCurrency: string;
+  rateMicros: number;
+  effectiveAt: string;
+  source: string;
+  createdBy: string;
+  createdAt: string;
+  idempotent?: boolean;
 }
 
 export interface AccountingAccount {
@@ -173,7 +195,7 @@ export interface FinanceSettlementRun {
 export const fetchExpenses = (accessToken: string) => getJson<Expense[]>('/finance/expenses', accessToken);
 
 export const createExpense = (
-  input: { idempotencyKey: string; category: string; description: string; amount: number; point?: string },
+  input: { idempotencyKey: string; category: string; description: string; amount: number; point?: string; currency?: string; exchangeRateId?: string; taxMode?: 'none' | 'included' | 'excluded'; taxRateBps?: number },
   accessToken: string,
 ) => postAuthJson<Expense>('/finance/expenses', input, accessToken);
 
@@ -191,6 +213,14 @@ export const payExpense = (id: string, fundingAccountCode: string, paymentRefere
 
 export const fetchAccountingAccounts = (accessToken: string) =>
   getJson<AccountingAccount[]>('/finance/accounts', accessToken);
+
+export const fetchAccountingCurrencyRates = (accessToken: string) =>
+  getJson<AccountingCurrencyRate[]>('/finance/currency-rates', accessToken);
+
+export const createAccountingCurrencyRate = (
+  input: { currency: string; rateMicros: number; effectiveAt: string; source: string },
+  accessToken: string,
+) => postAuthJson<AccountingCurrencyRate>('/finance/currency-rates', { ...input, idempotencyKey: crypto.randomUUID() }, accessToken);
 
 export const fetchAccountingPeriods = (accessToken: string) =>
   getJson<AccountingPeriod[]>('/finance/periods', accessToken);

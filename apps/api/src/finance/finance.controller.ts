@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CurrencyRateQueryDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -58,6 +58,18 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   accounts() {
     return this.finance.listAccountingAccounts();
+  }
+
+  @Get('currency-rates')
+  @RequirePermission('finance', 'read')
+  currencyRates(@Query() query: CurrencyRateQueryDto) {
+    return this.finance.listCurrencyRates(query);
+  }
+
+  @Post('currency-rates')
+  @RequirePermission('finance', 'approve')
+  createCurrencyRate(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateCurrencyRateDto) {
+    return this.finance.createCurrencyRate(dto, user.customerId);
   }
 
   @Get('cash-incassations')

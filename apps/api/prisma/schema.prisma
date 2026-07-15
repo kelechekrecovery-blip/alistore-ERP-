@@ -276,6 +276,12 @@ enum ExpenseStatus {
   paid
 }
 
+enum ExpenseTaxMode {
+  none
+  included
+  excluded
+}
+
 enum AccountingPeriodStatus {
   open
   soft_closed
@@ -1386,6 +1392,16 @@ model Expense {
   category           String
   description        String
   amount             Int
+  documentAmount     Int
+  currency           String        @default("KGS")
+  exchangeRateMicros Int           @default(1000000)
+  exchangeRate       AccountingCurrencyRate? @relation(fields: [exchangeRateId], references: [id], onDelete: Restrict)
+  exchangeRateId     String?
+  taxMode            ExpenseTaxMode @default(none)
+  taxCode            String        @default("none")
+  taxRateBps         Int           @default(0)
+  taxBaseAmount      Int
+  taxAmount          Int           @default(0)
   point              String?
   supplier           Supplier?     @relation(fields: [supplierId], references: [id])
   supplierId         String?
@@ -1408,6 +1424,24 @@ model Expense {
   @@index([status, createdAt])
   @@index([category, incurredAt])
   @@index([supplierId])
+  @@index([currency, incurredAt])
+  @@index([exchangeRateId])
+}
+
+model AccountingCurrencyRate {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  currency       String
+  baseCurrency   String    @default("KGS")
+  rateMicros     Int
+  effectiveAt    DateTime
+  source         String
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  expenses       Expense[]
+
+  @@unique([currency, baseCurrency, effectiveAt])
+  @@index([currency, baseCurrency, effectiveAt])
 }
 
 // Balanced accounting ledger. AuditEvent explains what happened; these rows
@@ -1427,18 +1461,24 @@ model AccountingAccount {
 }
 
 model AccountingJournalEntry {
-  id             String                  @id @default(cuid())
-  idempotencyKey String                  @unique
-  sourceType     String
-  sourceRef      String
-  description    String
-  point          String?
-  currency       String                  @default("KGS")
-  occurredAt     DateTime
-  postedAt       DateTime                @default(now())
-  createdBy      String
-  lines          AccountingJournalLine[]
-  payment        Payment?
+  id              String                  @id @default(cuid())
+  idempotencyKey  String                  @unique
+  sourceType      String
+  sourceRef       String
+  description     String
+  point           String?
+  currency        String                  @default("KGS")
+  documentAmount  Int?
+  exchangeRateMicros Int                  @default(1000000)
+  baseAmount      Int?
+  taxCode         String                  @default("none")
+  taxRateBps      Int                     @default(0)
+  taxAmount       Int                     @default(0)
+  occurredAt      DateTime
+  postedAt        DateTime                @default(now())
+  createdBy       String
+  lines           AccountingJournalLine[]
+  payment         Payment?
   purchaseReceipt PurchaseReceipt?
   supplierInvoice SupplierInvoice?
   supplierCreditNote SupplierCreditNote?
