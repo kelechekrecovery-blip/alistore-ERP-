@@ -180,6 +180,47 @@ export class FinanceService {
     };
   }
 
+  async financialStatements(query: FinanceAccountingQueryDto) {
+    const period = accountingPeriod(query);
+    const point = normalizePoint(query.point);
+    const where = {
+      occurredAt: { gte: period.from, lt: period.to },
+      ...(point ? { point } : {}),
+    } satisfies Prisma.AccountingJournalEntryWhereInput;
+    const [accounts, entries] = await Promise.all([
+      this.prisma.accountingAccount.findMany({ where: { active: true }, orderBy: { code: 'asc' } }),
+      this.prisma.accountingJournalEntry.findMany({ where, include: { lines: true }, orderBy: { occurredAt: 'asc' } }),
+    ]);
+    const totals = new Map(accounts.map((account) => [account.code, { debit: 0, credit: 0, name: account.name, type: account.type }]));
+    for (const entry of entries) for (const line of entry.lines) {
+      const total = totals.get(line.accountCode);
+      if (total) { total.debit += line.debit; total.credit += line.credit; }
+    }
+    const rows = [...totals.entries()].map(([code, value]) => ({ code, ...value, balance: normalBalance(value.type, value.debit, value.credit) }));
+    const revenue = rows.filter((row) => row.type === 'revenue').reduce((sum, row) => sum + row.balance, 0);
+    const expenses = rows.filter((row) => row.type === 'expense').reduce((sum, row) => sum + row.balance, 0);
+    const netProfit = revenue - expenses;
+    const assets = rows.filter((row) => row.type === 'asset').reduce((sum, row) => sum + row.balance, 0);
+    const liabilities = rows.filter((row) => row.type === 'liability').reduce((sum, row) => sum + row.balance, 0);
+    const equity = rows.filter((row) => row.type === 'equity').reduce((sum, row) => sum + row.balance, 0);
+    const cashCodes = new Set(['1000', '1010', '1020']);
+    const cash = rows.filter((row) => cashCodes.has(row.code)).reduce((sum, row) => sum + row.balance, 0);
+    const journalDebit = entries.reduce((sum, entry) => sum + entry.lines.reduce((total, line) => total + line.debit, 0), 0);
+    const journalCredit = entries.reduce((sum, entry) => sum + entry.lines.reduce((total, line) => total + line.credit, 0), 0);
+    return {
+      from: period.from,
+      to: period.to,
+      point: point || null,
+      source: 'accounting_journal',
+      entries: entries.length,
+      balanced: journalDebit === journalCredit,
+      journal: { debit: journalDebit, credit: journalCredit },
+      profitAndLoss: { revenue, expenses, netProfit, rows: rows.filter((row) => row.type === 'revenue' || row.type === 'expense') },
+      balanceSheet: { assets, liabilities, equity, currentPeriodProfit: netProfit, liabilitiesAndEquity: liabilities + equity + netProfit, balanced: assets === liabilities + equity + netProfit, rows: rows.filter((row) => row.type === 'asset' || row.type === 'liability' || row.type === 'equity') },
+      cashFlow: { cashMovement: cash, rows: rows.filter((row) => cashCodes.has(row.code)) },
+    };
+  }
+
   listBudgets(period: string, point?: string) {
     return this.prisma.financeBudget.findMany({
       where: { period, point: normalizePoint(point) },

@@ -220,6 +220,20 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(report.body.totals).toMatchObject({ current: 0, '1_30': 0, '90_plus': 0, paid: 0 });
   });
 
+  it('builds financial statements from the journal with reconciliation flags', async () => {
+    const from = new Date(Date.now() - 86_400_000).toISOString();
+    const to = new Date(Date.now() + 86_400_000).toISOString();
+    const response = await request(app.getHttpServer())
+      .get(`/finance/statements?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(response.body.source).toBe('accounting_journal');
+    expect(response.body.balanced).toBe(true);
+    expect(response.body.journal.debit).toBe(response.body.journal.credit);
+    expect(response.body.balanceSheet.balanced).toBe(true);
+    expect(response.body.profitAndLoss.netProfit).toBe(0);
+  });
+
   it('reverses a posted journal entry without mutating the original', async () => {
     const created = await request(app.getHttpServer())
       .post('/finance/expenses')

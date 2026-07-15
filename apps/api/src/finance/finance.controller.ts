@@ -96,6 +96,12 @@ export class FinancePlanningController {
     return this.finance.trialBalance(query);
   }
 
+  @Get('statements')
+  @RequirePermission('finance', 'read')
+  statements(@Query() query: FinanceAccountingQueryDto) {
+    return this.finance.financialStatements(query);
+  }
+
   @Get('budgets')
   @RequirePermission('finance', 'read')
   budgets(@Query() query: FinancePeriodQueryDto) {

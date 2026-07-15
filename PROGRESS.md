@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ACC-002C
+
+- Iteration ID: `ACC-002C`.
+- Task: add journal-backed financial statements.
+- Files changed: Finance statements endpoint and reconciliation regression.
+- Result: `/finance/statements` returns P&L, balance sheet, cash account movement, journal debit/credit totals, period/point scope and explicit balance flags. No operational table is used as a second accounting truth.
+- Checks run: Prisma generation, API build, reset Finance integration suite 9/9.
+- Acceptance: `accepted` for software statements slice. Opening balances, bank import/reconciliation, tax, currency and export formats remain open.
+- Next step: add currency/tax snapshots and bank/cash reconciliation workflows.
+
 ## 2026-07-15 — ACC-002B
 
 - Iteration ID: `ACC-002B`.
