@@ -263,6 +263,17 @@ enum HrPayrollStatus {
   paid
 }
 
+enum PromotionStatus {
+  draft
+  active
+  paused
+}
+
+enum PromotionDiscountType {
+  fixed
+  percent
+}
+
 // ---------- CORE ----------
 model Customer {
   id             String               @id @default(cuid())
@@ -277,6 +288,7 @@ model Customer {
   preferences    CustomerPreferences?
   loyaltyEntries LoyaltyEntry[]
   coupons        CustomerCoupon[]
+  promotionRedemptions PromotionRedemption[]
   orders         Order[]
   tradeIns       TradeInDevice[]
   createdAt      DateTime             @default(now())
@@ -512,6 +524,47 @@ model StorePointCommand {
   @@index([storePointId, createdAt])
 }
 
+model PromotionCode {
+  id                 String                @id @default(cuid())
+  code               String                @unique
+  name               String
+  description        String?
+  status             PromotionStatus       @default(draft)
+  discountType       PromotionDiscountType
+  discountValue      Int
+  maxDiscount        Int?
+  minimumSubtotal    Int                   @default(0)
+  eligibleProductIds String[]
+  eligibleCategories String[]
+  startsAt           DateTime?
+  endsAt             DateTime?
+  totalLimit         Int?
+  perCustomerLimit   Int?
+  createdBy          String
+  updatedBy          String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  redemptions        PromotionRedemption[]
+
+  @@index([status, startsAt, endsAt])
+  @@index([createdAt])
+}
+
+model PromotionRedemption {
+  id             String        @id @default(cuid())
+  promotion      PromotionCode @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  promotionId    String
+  customer       Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerId     String
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId        String        @unique
+  discountAmount Int
+  createdAt      DateTime      @default(now())
+
+  @@index([promotionId, createdAt])
+  @@index([promotionId, customerId, createdAt])
+}
+
 model Order {
   id                       String                          @id @default(cuid())
   idempotencyKey           String?                         @unique
@@ -544,6 +597,7 @@ model Order {
   deliveryFee              Int                             @default(0)
   promoCode                String?
   promoDiscount            Int                             @default(0)
+  promotionRedemption      PromotionRedemption?
   loyaltyRedeemed          Int                             @default(0)
   loyaltyEarned            Int                             @default(0)
   total                    Int

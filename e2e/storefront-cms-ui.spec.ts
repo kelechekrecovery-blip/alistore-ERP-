@@ -69,3 +69,50 @@ test('customer review stays private until a marketer approves it in ERP', async 
   await page.goto(`/product/${product.id}`);
   await expect(page.getByRole('article').filter({ hasText: 'Проверенный отзыв из браузерного сценария' })).toBeVisible();
 });
+
+test('marketer launches a promotion in ERP and checkout redeems the same server quote', async ({ page }) => {
+  await resetDb();
+  const { username, password } = await seedStaffCredentials('marketer', 'e2e-promo');
+  const { product } = await seedProduct('Managed Promo', 100_000, 80_000);
+  const code = `LIVE${Date.now().toString().slice(-6)}`;
+  await page.addInitScript((item) => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1, stockLimit: 1 }]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  }, { id: product.id, sku: product.sku, name: product.name, price: product.price });
+
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /CMS витрины/ }).click();
+  await page.getByRole('button', { name: 'Промокоды' }).click();
+  await page.getByLabel('Код').fill(code);
+  await page.getByLabel('Название').fill('Живая акция AliStore');
+  await page.getByLabel('Скидка, сом').fill('3000');
+  await page.getByLabel('Общий лимит').fill('5');
+  await page.getByLabel('На одного клиента').fill('1');
+  await page.getByRole('button', { name: 'Создать черновик' }).click();
+  await expect(page.getByText('Черновик промокода создан. Активируйте его после проверки условий.')).toBeVisible();
+  await page.getByRole('button', { name: 'Активировать' }).first().click();
+  await expect(page.getByText(`${code} доступен в корзине`)).toBeVisible();
+
+  await page.goto('/cart');
+  await page.getByPlaceholder('Введите промокод').fill(code);
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect(page.getByText(new RegExp(`${code} применён`))).toBeVisible();
+  await expect(page.getByText(/скидка 3\s?000 с/)).toBeVisible();
+  await page.getByRole('link', { name: 'Перейти к оформлению' }).click();
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByPlaceholder('+996 700 12 34 56').fill(`+996700${Date.now().toString().slice(-6)}`);
+  await page.getByPlaceholder('Имя').fill('Promo Buyer');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
+  await expect(page.getByText('Заказ оформлен!')).toBeVisible();
+
+  const order = await prisma.order.findFirstOrThrow({ where: { promoCode: code }, orderBy: { createdAt: 'desc' } });
+  expect(order).toMatchObject({ subtotal: 100_000, promoDiscount: 3000, total: 97_000 });
+  expect(await prisma.promotionRedemption.count({ where: { orderId: order.id } })).toBe(1);
+  expect(await prisma.auditEvent.count({ where: { type: 'promotion.redeemed', refs: { has: order.id } } })).toBe(1);
+});

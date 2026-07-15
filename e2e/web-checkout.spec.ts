@@ -196,6 +196,12 @@ test('authenticated checkout redeems server loyalty and canonical promo exactly 
   await prisma.loyaltyEntry.create({
     data: { customerId: customer.id, label: 'E2E balance', amount: 725, sourceRef: 'loyalty-e2e-seed' },
   });
+  await prisma.promotionCode.create({
+    data: {
+      code: 'ALI10', name: 'E2E managed promo', status: 'active', discountType: 'fixed', discountValue: 3000,
+      eligibleProductIds: [], eligibleCategories: [], createdBy: 'e2e', updatedBy: 'e2e',
+    },
+  });
   const tokens = {
     accessToken: sign(
       { sub: customer.id, phone: customer.phone, typ: 'customer' },

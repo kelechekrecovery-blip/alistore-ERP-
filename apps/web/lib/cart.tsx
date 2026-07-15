@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useAuth } from './auth';
 import { fetchMyLoyalty } from './api';
+import { quotePromotion } from './api/promotions';
 
 export interface CartItem {
   id: string;
@@ -28,6 +29,8 @@ interface CartContextValue {
   total: number;
   promoCode: string | null;
   promoDiscount: number;
+  promoLoading: boolean;
+  promoError: string | null;
   bonusApplied: boolean;
   bonusBalance: number;
   bonusLoading: boolean;
@@ -38,7 +41,7 @@ interface CartContextValue {
   add: (item: Omit<CartItem, 'qty'>, qty?: number) => void;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
-  applyPromo: (code: string) => boolean;
+  applyPromo: (code: string) => Promise<boolean>;
   clearPromo: () => void;
   toggleBonus: () => void;
   clear: () => void;
@@ -48,15 +51,13 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = 'alistore.cart.v1';
 const PRICING_KEY = 'alistore.cart.pricing.v1';
-const PROMOS: Record<string, number> = {
-  SALE5000: 5000,
-  ALI10: 3000,
-};
-
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, hydrated: authHydrated, authed } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
   const [bonusApplied, setBonusApplied] = useState(false);
   const [bonusBalance, setBonusBalance] = useState(0);
   const [bonusLoading, setBonusLoading] = useState(false);
@@ -156,14 +157,59 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
-  const applyPromo = useCallback((code: string) => {
+  const requestPromoQuote = useCallback(async (code: string) => {
+    const input = items.map((item) => ({ sku: item.sku, qty: item.qty }));
+    if (input.length === 0) throw new Error('Добавьте товар перед применением промокода');
+    return user
+      ? authed((token) => quotePromotion(code, input, token))
+      : quotePromotion(code, input);
+  }, [items, user, authed]);
+
+  const applyPromo = useCallback(async (code: string) => {
     const normalized = code.trim().toUpperCase();
-    if (!PROMOS[normalized]) return false;
-    setPromoCode(normalized);
-    return true;
+    if (!normalized) return false;
+    setPromoLoading(true);
+    setPromoError(null);
+    try {
+      const quote = await requestPromoQuote(normalized);
+      setPromoCode(quote.code);
+      setPromoDiscount(quote.discount);
+      return true;
+    } catch (error) {
+      setPromoCode(null);
+      setPromoDiscount(0);
+      setPromoError(error instanceof Error ? error.message : 'Промокод недоступен');
+      return false;
+    } finally {
+      setPromoLoading(false);
+    }
+  }, [requestPromoQuote]);
+
+  const clearPromo = useCallback(() => {
+    setPromoCode(null);
+    setPromoDiscount(0);
+    setPromoError(null);
   }, []);
 
-  const clearPromo = useCallback(() => setPromoCode(null), []);
+  useEffect(() => {
+    if (!hydrated || !promoCode) return;
+    let active = true;
+    setPromoLoading(true);
+    requestPromoQuote(promoCode)
+      .then((quote) => {
+        if (!active) return;
+        setPromoDiscount(quote.discount);
+        setPromoError(null);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setPromoCode(null);
+        setPromoDiscount(0);
+        setPromoError(error instanceof Error ? error.message : 'Промокод больше не действует');
+      })
+      .finally(() => { if (active) setPromoLoading(false); });
+    return () => { active = false; };
+  }, [hydrated, promoCode, requestPromoQuote]);
   const toggleBonus = useCallback(() => {
     if (bonusBalance > 0) setBonusApplied((value) => !value);
   }, [bonusBalance]);
@@ -171,6 +217,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => {
     setItems([]);
     setPromoCode(null);
+    setPromoDiscount(0);
+    setPromoError(null);
     setBonusApplied(false);
   }, []);
 
@@ -188,7 +236,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     () => items.reduce((s, x) => s + x.price * x.qty, 0),
     [items],
   );
-  const promoDiscount = promoCode ? Math.min(subtotal, PROMOS[promoCode] ?? 0) : 0;
   const bonusDiscount = bonusApplied ? Math.min(Math.max(subtotal - promoDiscount, 0), bonusBalance) : 0;
   const discount = promoDiscount + bonusDiscount;
   const total = Math.max(subtotal - discount, 0);
@@ -201,6 +248,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       total,
       promoCode,
       promoDiscount,
+      promoLoading,
+      promoError,
       bonusApplied,
       bonusBalance,
       bonusLoading,
@@ -224,6 +273,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       total,
       promoCode,
       promoDiscount,
+      promoLoading,
+      promoError,
       bonusApplied,
       bonusBalance,
       bonusLoading,

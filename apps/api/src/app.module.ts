@@ -49,6 +49,7 @@ import { HrModule } from './hr/hr.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { ServiceCenterModule } from './service-center/service-center.module';
 import { StorefrontModule } from './storefront/storefront.module';
+import { PromotionsModule } from './promotions/promotions.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     LogisticsModule,
     ServiceCenterModule,
     StorefrontModule,
+    PromotionsModule,
   ],
 })
 export class AppModule {}

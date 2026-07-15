@@ -5,7 +5,7 @@
 и не должны смешиваться с готовностью первого магазина к запуску.
 
 - **51 backend-модуль** (NestJS) · **39 веб-роутов** (Next.js) · **63 миграции**
-- **124 committed API test suites / 494 теста** для текущего продуктового baseline; широкий worktree с параллельным AI-контуром также прошёл **127/127 и 513/513**.
+- **125 committed API test suites / 496 тестов** для текущего продуктового baseline; detached regression на зафиксированном commit прошёл полностью.
 - **40 Playwright flow подтверждены**, включая ERP-controlled storefront collection, review moderation, checkout points, owner Finance settlement и Service Center.
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **31/31** on iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **25/25** connected Compose tests pass on API 36, including Staff attendance with SQLite/WorkManager replay. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
@@ -19,7 +19,7 @@
 |---|---|---|
 | **0** Ядро данных | Event Ledger (append-only), order state-machine, IMEI-инвариант, миграции | ✅ |
 | **1** Деньги | Payment поддерживает retail-order и paid ServiceWorkOrder, CashShift, Courier COD, provider-neutral intents и owner Finance settlement provider/POS/COD/refund с dispute/atomic Ledger close; live provider/fiscal statement certification ещё внешняя | 🟡 |
-| **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; ERP-owned точки, scoped guest recovery, CMS-подборки и approved-only review moderation подключены; управляемые промокоды и banner/block CMS ещё требуют завершения | 🟡 |
+| **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; ERP-owned точки, scoped guest recovery, CMS-подборки, approved-only review moderation и управляемые сервером промокоды подключены; banner/block CMS ещё требует завершения | 🟡 |
 | **3** Аккаунт+Auth | OTP-вход, Apple/Telegram social-auth backend, «Мои заказы», адреса, настройки, уведомления+consent, бонусы | ✅ |
 | **4** POS 2.0 | Тёмный терминал, продажа, service estimate payment, split tender, approval, offline replay, catalog delta-sync и print abstraction; packaged-app E2E и железо не сертифицированы | 🟡 |
 | **5** Склад | Fulfillment, серийный и количественный учёт, атомарный резерв/продажа/POS, движение статусов, **Evidence Vault (фото)** | ✅ |

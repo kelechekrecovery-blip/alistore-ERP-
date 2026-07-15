@@ -64,6 +64,8 @@ export async function resetDb() {
   await prisma.return.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.promotionRedemption.deleteMany();
+  await prisma.promotionCode.deleteMany();
   await prisma.storePointCommand.deleteMany();
   await prisma.storePoint.deleteMany({ where: { id: { not: 'alistore-bishkek-1' } } });
   await prisma.deliverySlot.deleteMany();

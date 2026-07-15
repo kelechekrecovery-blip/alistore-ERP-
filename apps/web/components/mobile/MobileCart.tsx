@@ -13,6 +13,8 @@ export default function MobileCart() {
     total,
     promoCode,
     promoDiscount,
+    promoLoading,
+    promoError,
     bonusApplied,
     bonusBalance,
     bonusLoading,
@@ -26,20 +28,18 @@ export default function MobileCart() {
     toggleBonus,
   } = useCart();
   const [promoInput, setPromoInput] = useState("");
-  const [promoErr, setPromoErr] = useState("");
 
   const count = items.reduce((s, i) => s + i.qty, 0);
   const discount = promoDiscount + bonusDiscount;
   const empty = hydrated && items.length === 0;
 
-  function submitPromo() {
+  async function submitPromo() {
     if (promoCode) {
       clearPromo();
       setPromoInput("");
-      setPromoErr("");
       return;
     }
-    setPromoErr(applyPromo(promoInput) ? "" : "Промокод не найден");
+    await applyPromo(promoInput);
   }
 
   return (
@@ -136,14 +136,15 @@ export default function MobileCart() {
                   <button
                     type="button"
                     onClick={submitPromo}
+                    disabled={promoLoading}
                     className="rounded-[11px] bg-[#2E2822] px-[18px] text-[13px] font-semibold text-lime"
                   >
-                    {promoCode ? "Убрать" : "Применить"}
+                    {promoCode ? "Убрать" : promoLoading ? "Проверяем…" : "Применить"}
                   </button>
                 </div>
-                {promoErr && (
+                {promoError && (
                   <div className="mt-1.5 text-[11px] text-coral">
-                    {promoErr}
+                    {promoError}
                   </div>
                 )}
                 {promoCode && (

@@ -19,17 +19,17 @@ import {
   reserveQuantityConsignmentOnTx,
 } from '../inventory/consignment-accounting';
 import { LogisticsService } from '../logistics/logistics.service';
+import { PromotionLine, PromotionsService } from '../promotions/promotions.service';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
-const PROMO_DISCOUNTS: Record<string, number> = { SALE5000: 5000, ALI10: 3000 };
-
 interface CanonicalPricing {
   subtotal: number;
   deliveryFee: number;
   promoCode: string | null;
   promoDiscount: number;
   loyaltyPoints: number;
+  promotionLines?: PromotionLine[];
 }
 
 function defaultFulfillment(channel: string): NonNullable<CreateOrderDto['fulfillmentType']> {
@@ -50,6 +50,7 @@ export class OrdersService {
     @Optional() private readonly outbox?: OutboxService,
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly logistics?: LogisticsService,
+    @Optional() private readonly promotions?: PromotionsService,
   ) {}
 
   get(id: string) {
@@ -171,7 +172,7 @@ export class OrdersService {
       if (available < qty) {
         throw new ConflictError('insufficient_stock', `Недостаточно товара ${sku}: доступно ${available}`);
       }
-      return { sku, qty, price: product.price };
+      return { sku, qty, price: product.price, productId: product.id, category: product.category.trim().toLowerCase() };
     });
     const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
     const deliverySelection = dto.deliveryZoneId && dto.deliverySlotId
@@ -179,12 +180,25 @@ export class OrdersService {
       : null;
     const deliveryFee = deliverySelection?.zone.fee ?? fulfillmentFee(dto.fulfillmentType);
     const promoCode = normalizePromo(dto.promoCode);
-    const promoDiscount = promoCode ? Math.min(subtotal, PROMO_DISCOUNTS[promoCode]) : 0;
+    const promoDiscount = 0;
     const loyaltyPoints = dto.loyaltyPoints ?? 0;
     if (loyaltyPoints > 0 && !allowLoyalty) {
       throw new ConflictError('loyalty_auth_required', 'Списание бонусов доступно только после входа в аккаунт');
     }
-    const pricing: CanonicalPricing = { subtotal, deliveryFee, promoCode, promoDiscount, loyaltyPoints };
+    const pricing: CanonicalPricing = {
+      subtotal,
+      deliveryFee,
+      promoCode,
+      promoDiscount,
+      loyaltyPoints,
+      promotionLines: items.map((item) => ({
+        productId: item.productId,
+        sku: item.sku,
+        category: item.category,
+        price: item.price,
+        qty: item.qty,
+      })),
+    };
     return this.create(
       {
         ...dto,
@@ -238,6 +252,15 @@ export class OrdersService {
         if (isDemo && canonical.loyaltyPoints > 0) {
           throw new ConflictError('demo_loyalty_forbidden', 'Демо-заказ не списывает бонусы');
         }
+        const events: AuditInput[] = [];
+        const appliedPromotion = canonical.promoCode
+          ? await this.requirePromotions().evaluateForOrderOnTx(tx, {
+              code: canonical.promoCode,
+              customerId: dto.customerId,
+              lines: canonical.promotionLines ?? [],
+            })
+          : null;
+        const promoDiscount = appliedPromotion?.discount ?? canonical.promoDiscount;
         if (!isDemo && dto.deliverySlotId && dto.deliveryZoneId) {
           await tx.$queryRaw`SELECT id FROM "DeliverySlot" WHERE id = ${dto.deliverySlotId} FOR UPDATE`;
           const slot = await tx.deliverySlot.findUnique({ where: { id: dto.deliverySlotId } });
@@ -249,7 +272,7 @@ export class OrdersService {
           });
           if (booked >= slot.capacity) throw new ConflictError('delivery_slot_full', 'Слот доставки уже занят');
         }
-        const baseTotal = canonical.subtotal + canonical.deliveryFee - canonical.promoDiscount;
+        const baseTotal = canonical.subtotal + canonical.deliveryFee - promoDiscount;
         const initialOrder = await tx.order.create({
           data: {
             idempotencyKey,
@@ -271,8 +294,8 @@ export class OrdersService {
             pickupCode: pickupCode(),
             subtotal: canonical.subtotal,
             deliveryFee: canonical.deliveryFee,
-            promoCode: canonical.promoCode,
-            promoDiscount: canonical.promoDiscount,
+            promoCode: appliedPromotion?.code ?? canonical.promoCode,
+            promoDiscount,
             total: baseTotal,
             status: 'created',
             items: {
@@ -286,12 +309,21 @@ export class OrdersService {
           },
           include: { items: true },
         });
-        const events: AuditInput[] = [];
+        if (appliedPromotion && !isDemo) {
+          await this.requirePromotions().registerRedemptionOnTx(
+            tx,
+            appliedPromotion,
+            dto.customerId,
+            initialOrder.id,
+            actor,
+            events,
+          );
+        }
         const loyaltyRedeemed = await redeemLoyaltyOnTx(tx, {
           customerId: dto.customerId,
           orderId: initialOrder.id,
           requested: canonical.loyaltyPoints,
-          maximum: Math.max(0, canonical.subtotal - canonical.promoDiscount),
+          maximum: Math.max(0, canonical.subtotal - promoDiscount),
           actor,
         }, events);
         const order = loyaltyRedeemed > 0
@@ -362,6 +394,11 @@ export class OrdersService {
       throw new ValidationError('delivery_slot_unavailable', 'Зона или слот доставки недоступны');
     }
     return slot;
+  }
+
+  private requirePromotions(): PromotionsService {
+    if (!this.promotions) throw new ValidationError('promotions_unavailable', 'Сервис промокодов недоступен');
+    return this.promotions;
   }
 
   /**
@@ -845,11 +882,7 @@ function directAvailability(product: {
 
 function normalizePromo(value?: string): string | null {
   if (!value?.trim()) return null;
-  const normalized = value.trim().toUpperCase();
-  if (!(normalized in PROMO_DISCOUNTS)) {
-    throw new ValidationError('promo_not_found', 'Промокод не найден или больше не действует');
-  }
-  return normalized;
+  return value.trim().toUpperCase();
 }
 
 function fulfillmentFee(type?: string): number {

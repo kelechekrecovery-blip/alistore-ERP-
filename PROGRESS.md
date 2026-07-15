@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-003
+
+- Iteration ID: `MKT-003`.
+- Task: remove hard-coded checkout promo behavior and make discounts an authoritative Marketing CMS workflow.
+- Files changed: promotion/redemption schema and migration, typed DTO/service/controller/module, RBAC and Ledger events, atomic order redemption, typed web client, server-quoted cart behavior, ERP promotion workspace and API/browser acceptance.
+- Result: marketer/admin/owner can create, activate and pause fixed or percentage codes with schedules, product/category eligibility, minimum subtotal, maximum discount and total/per-customer limits. Public cart quotes canonical server prices; order creation row-locks the promotion, rechecks limits and records order, redemption and Ledger atomically. Replays and demo orders do not consume a second redemption; seller management is denied.
+- Checks run: Prisma generation; clean isolated PostgreSQL migration deploy (64/64); targeted promotions/orders API 2 suites and 12 tests; API and Next production builds; targeted ERP promo → cart → guest checkout browser acceptance plus checkout regression 9/9; full Playwright 41/41; detached committed baseline API 125/125 suites and 496/496 tests. The broader current worktree executed 129 suites: 125 suites and all 498 runnable tests passed, while four suites were compile-blocked only by a parallel unstaged `ProductsService` moderation constructor change.
+- Acceptance: `accepted` for managed promotion codes. Banner/content-block entities remain open, so Marketing CMS is still partial.
+- Next backlog ID: `MKT-004` implements authoritative banner and content-block composition.
+
 ## 2026-07-15 — MKT-002
 
 - Iteration ID: `MKT-002`.

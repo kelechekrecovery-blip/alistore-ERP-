@@ -5,6 +5,7 @@ import { OrdersService } from '../src/orders/orders.service';
 import { ConfigService } from '@nestjs/config';
 import { ConflictError } from '../src/common/errors';
 import { reconcileRefundLoyaltyOnTx } from '../src/customers/loyalty-ledger';
+import { PromotionsService } from '../src/promotions/promotions.service';
 
 /**
  * Personal account: listByCustomer returns only the caller's orders, newest first.
@@ -20,7 +21,15 @@ describe('Orders by customer (account)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     const audit = new AuditService(prisma);
-    orders = new OrdersService(prisma, audit, new UnitsService(prisma));
+    orders = new OrdersService(
+      prisma,
+      audit,
+      new UnitsService(prisma),
+      undefined,
+      undefined,
+      undefined,
+      new PromotionsService(prisma, audit),
+    );
   });
 
   afterAll(async () => {
@@ -34,6 +43,8 @@ describe('Orders by customer (account)', () => {
     await prisma.reservation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.promotionRedemption.deleteMany();
+    await prisma.promotionCode.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.inventoryMovement.deleteMany();
     await prisma.product.deleteMany();
@@ -132,6 +143,19 @@ describe('Orders by customer (account)', () => {
     });
     await prisma.deviceUnit.create({
       data: { imei: 'LOYALTY-PRICE-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+    });
+    await prisma.promotionCode.create({
+      data: {
+        code: 'ALI10',
+        name: 'Managed test offer',
+        status: 'active',
+        discountType: 'fixed',
+        discountValue: 3000,
+        eligibleProductIds: [],
+        eligibleCategories: [],
+        createdBy: 'test',
+        updatedBy: 'test',
+      },
     });
     const input = {
       customerId: owner.id,

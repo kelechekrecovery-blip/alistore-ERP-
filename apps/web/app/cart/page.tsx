@@ -17,6 +17,8 @@ export default function CartPage() {
     total,
     promoCode,
     promoDiscount,
+    promoLoading,
+    promoError,
     bonusApplied,
     bonusBalance,
     bonusLoading,
@@ -31,7 +33,6 @@ export default function CartPage() {
     reconcileAvailability,
   } = useCart();
   const [promoInput, setPromoInput] = useState(promoCode ?? "");
-  const [promoError, setPromoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hydrated || items.length === 0) return;
@@ -44,18 +45,13 @@ export default function CartPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, reconcileAvailability]);
 
-  function submitPromo() {
+  async function submitPromo() {
     if (promoCode) {
       clearPromo();
       setPromoInput("");
-      setPromoError(null);
       return;
     }
-    setPromoError(
-      applyPromo(promoInput)
-        ? null
-        : "Промокод не найден",
-    );
+    await applyPromo(promoInput);
   }
 
   return (
@@ -174,7 +170,7 @@ export default function CartPage() {
                         onClick={submitPromo}
                         className="rounded-[9px] border border-[#d2d2d7] bg-[#f5f5f7] px-5 py-3 text-sm font-semibold hover:border-[#ff4d2e]"
                       >
-                        {promoCode ? "Убрать" : "Применить"}
+                        {promoCode ? "Убрать" : promoLoading ? "Проверяем…" : "Применить"}
                       </button>
                     </div>
                     {promoError && (
