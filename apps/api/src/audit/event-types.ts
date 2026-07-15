@@ -51,6 +51,10 @@ export const EventType = {
   ExpenseRejected: 'expense.rejected',
   ExpensePaid: 'expense.paid',
   FinanceBudgetSet: 'finance.budget_set',
+  FinanceSettlementCreated: 'finance.settlement_created',
+  FinanceSettlementDisputeResolved: 'finance.settlement_dispute_resolved',
+  FinanceSettlementAdjustmentCreated: 'finance.settlement_adjustment_created',
+  FinanceSettlementClosed: 'finance.settlement_closed',
   // delivery
   DeliveryAssigned: 'delivery.assigned',
   DeliveryOut: 'delivery.out',

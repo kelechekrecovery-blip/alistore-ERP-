@@ -36,7 +36,7 @@ expected to remain red until missing handoffs and packaged native/ecosystem E2E 
 | Warehouse accounting | `/warehouse`, `/erp` | serialized/quantity stock, counts, transfers, adjustments, consignment and return reconciliation | API/browser suites | Partial: completeness, missort and markdown workflows |
 | Staff App 2.0 | `/staff`, Staff iOS/Android | orders, tasks, customer, support/warranty, scanner/Evidence and attendance | browser/native contracts | Partial: visual acceptance, iOS XCUITest and physical push/scanner/camera |
 | Product management | `/admin/products`, `/erp`, storefront | CRUD, variants, bundles, stock modes, catalog/search | API/browser suites | Partial: preorder, publishing, pricing history and completeness policy |
-| Finance 2.0 | `/erp` | expenses, approvals/payment, budgets and plan/fact | API/browser suites | Partial: provider/POS/COD reconciliation, cashflow, settlement/currency/export |
+| Finance 2.0 | `/erp` | expenses, approvals/payment, budgets/plan-fact and durable provider/POS/COD/refund settlement with disputed-variance resolution and Ledger close | exact/negative/disputed/replay/rollback API plus owner browser close | First-store software settlement accepted; live statement import/provider certification, cashflow, currency and export remain |
 | Ecosystem | all surfaces | common Nest/Postgres/Event Ledger | `ecosystem:verify` component gate | Partial: no reconciled all-role E2E, production or store certification |
 | Legal | account/ERP document primitives | documents, consent timestamps and data controls | API subsets | Partial: immutable policy versions, retention jobs, contracts and KG legal approval |
 

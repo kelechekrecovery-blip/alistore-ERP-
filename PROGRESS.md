@@ -1,5 +1,20 @@
 # PROGRESS
 
+## 2026-07-15 — FIN-001
+
+- Iteration ID: `FIN-001`.
+- Backlog / journey IDs: website/provider payment + POS cash shift + Courier COD + refund → owner Finance settlement → Event Ledger.
+- Branch / base commit: `codex/open-source-integrations` / `c20aeb7`.
+- Changed files: Finance settlement Prisma enums/models/command journal and migration; Finance DTO/controller/service and Ledger events; typed web client and ERP reconciliation workspace; API/browser acceptance and shared E2E reset/config; consign­ment-return invariant repair; backlog/readiness/completion/traceability documentation.
+- Exact checks: Prisma generate; clean-database deploy of all 60 migrations; targeted Finance API 5/5 and browser 2/2; isolated return reconciliation 5/5; full API 122/122 suites and 485/485 tests; API and Next production builds; full Playwright 37/37; `git diff --check`.
+- Independent review fixes: observed POS/COD/provider amounts remain immutable; discrepancies close only through explicit compensating entries recorded in Event Ledger; COD uses `handedOverAt`; UI retries retain the same command key; cross-run idempotency races return deterministic conflict instead of 500.
+- Durable evidence: `finance-settlements.e2e-spec.ts` proves exact provider/POS/COD/refund settlement, negative refund amounts, disputed close rejection, reasoned resolution, command replay and atomic rollback. `finance-ui.spec.ts` proves an owner discovers a website payment, creates and closes the settlement, changes the payment to `reconciled` and records Ledger evidence through ERP.
+- Defects found and disposition: Finance previously showed channel totals without a durable proof that a source was reconciled. Settlement runs/lines now bind each source once and close only at zero unexplained variance. The full gate exposed a paid consign­ment return that violated its existing DB check by retaining `saleOrderId`; the same transaction now detaches the withdrawn item while preserving payout adjustment and Ledger history. Playwright login throttling is disabled only under explicit `E2E_TEST=true`, and a checkout test now follows the configured API port; production rate-limit tests remain active.
+- Acceptance: `accepted` for first-store Finance software reconciliation. Live merchant statement import/certification, provider callbacks, fiscal reconciliation, currency/cashflow/export and first-store accounting UAT remain external/later scope.
+- Commit association: commit subject/body contains `FIN-001`.
+- Remaining gaps: `FUL-002`, `MER-001`, `ECO-001`, `ECO-002`, owner-controlled production/device/provider certification.
+- Next backlog ID: `FUL-002` closes guest post-checkout recovery before the commercial-truth `MER-001` storefront pass.
+
 ## 2026-07-15 — FUL-001
 
 - Iteration ID: `FUL-001`.

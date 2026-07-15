@@ -434,7 +434,10 @@ export class ReturnsService {
           },
           update: {},
         });
-        await tx.consignmentItem.update({ where: { id: item.id }, data: { status: 'withdrawn' } });
+        await tx.consignmentItem.update({
+          where: { id: item.id },
+          data: { status: 'withdrawn', saleOrderId: null },
+        });
         await tx.deviceUnit.update({
           where: { id: item.unitId },
           data: { status: 'returned', location, orderId: null },

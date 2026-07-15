@@ -1,16 +1,15 @@
 # AliStore ecosystem completion audit
 
-Evidence snapshot: 2026-07-14, branch `codex/open-source-integrations`, including
-the verified Service Center diagnostics iteration. This is a completion audit, not a marketing status page. `Implemented`
+Evidence snapshot: 2026-07-15, branch `codex/open-source-integrations`, including
+the verified first-store fulfillment and Finance settlement iterations. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 50 NestJS modules including the application root, 37 generated Next routes and 56 Prisma migrations.
-- `mvp:verify`: API/Web production builds, mobile reference typecheck, 120/120 Jest
-  suites with 478/478 tests and 35/35 Playwright flows.
+- 50 NestJS modules including the application root, 37 generated Next routes and 60 Prisma migrations.
+- API/Web production builds, 122/122 Jest suites with 485/485 tests and 37/37 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run android:ui` passed on 2026-07-14 with 25/25 connected Compose tests,
@@ -41,7 +40,7 @@ credentials, legal approval or physical hardware.
 | Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, line-level refund-bound quantity/direct/bundle IMEI restock, serialized and quantity consignment ownership/accrual/payout/partial-return compensation, procurement and bundles | completeness, missort and markdown workflows |
 | Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence plus owned schedule/attendance/offline replay on both platforms | complete visual acceptance, iOS app-level XCUITest and physical push/scanner/camera gate |
 | Product management | Partial | product CRUD, variants, virtual bundles, explicit serialized/quantity tracking, catalog/search | preorders, channel publishing, pricing history and completeness policy |
-| Finance 2.0 | Partial | expenses, approval/payment, budgets and plan/fact | provider/POS/COD reconciliation, cashflow, collection, settlements, currency and exports |
+| Finance 2.0 | Partial | expenses, approval/payment, budgets/plan-fact and durable one-source provider/POS/COD/refund settlement with dispute resolution, replay, atomic close and Ledger | live statement import/provider certification, cashflow, collection, currency and exports |
 | Ecosystem | Partial | common Nest API/Postgres/Ledger and several cross-surface flows | all rows in this matrix accepted together; production/stores not certified |
 | Legal | Partial | documents, consent timestamps and customer data controls | immutable policy/template versions, retention jobs, contracts and Kyrgyz legal approval |
 

@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreateExpenseDto, FinancePeriodQueryDto, PayExpenseDto, RejectExpenseDto, SetFinanceBudgetDto } from './finance.dto';
+import { CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -70,5 +70,35 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   planFact(@Query() query: FinancePeriodQueryDto) {
     return this.finance.planFact(query.period, query.point);
+  }
+
+  @Get('settlement-sources')
+  @RequirePermission('finance', 'read')
+  settlementSources(@Query() query: FinanceSettlementQueryDto) {
+    return this.finance.settlementSources(query);
+  }
+
+  @Get('settlements')
+  @RequirePermission('finance', 'read')
+  settlements() {
+    return this.finance.listSettlements();
+  }
+
+  @Post('settlements')
+  @RequirePermission('finance', 'approve')
+  createSettlement(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateFinanceSettlementDto) {
+    return this.finance.createSettlement(dto, user.customerId);
+  }
+
+  @Post('settlements/:id/resolve')
+  @RequirePermission('finance', 'approve')
+  resolveSettlement(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ResolveFinanceSettlementDto) {
+    return this.finance.resolveSettlement(id, dto, user.customerId);
+  }
+
+  @Post('settlements/:id/close')
+  @RequirePermission('finance', 'pay')
+  closeSettlement(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CloseFinanceSettlementDto) {
+    return this.finance.closeSettlement(id, dto.idempotencyKey, user.customerId);
   }
 }

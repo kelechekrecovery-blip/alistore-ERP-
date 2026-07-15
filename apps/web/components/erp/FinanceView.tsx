@@ -15,6 +15,7 @@ import {
 import { som } from '@/lib/format';
 import type { Dashboard } from '@/lib/reports';
 import { Card } from './Card';
+import { FinanceSettlementWorkspace } from './FinanceSettlementWorkspace';
 
 const CATEGORIES: Record<string, string> = {
   rent: 'Аренда', payroll: 'Зарплата', logistics: 'Логистика', marketing: 'Маркетинг',
@@ -124,6 +125,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
 
   return (
     <div className="space-y-5">
+      <FinanceSettlementWorkspace accessToken={accessToken} />
       <section aria-labelledby="finance-plan-title" className="border-b border-[#2E2822] pb-5">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>

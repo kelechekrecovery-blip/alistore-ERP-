@@ -72,6 +72,25 @@ enum PaymentStatus {
   refunded
 }
 
+enum FinanceSettlementStatus {
+  balanced
+  disputed
+  closed
+}
+
+enum FinanceSettlementLineStatus {
+  matched
+  disputed
+  reconciled
+}
+
+enum FinanceSettlementSourceType {
+  provider_payment
+  pos_shift
+  courier_cod
+  refund
+}
+
 enum UnitStatus {
   in_stock
   reserved
@@ -458,21 +477,21 @@ model DeviceUnit {
 }
 
 model StorePoint {
-  id                String              @id @default(cuid())
-  code              String              @unique
-  name              String
-  address           String
-  inventoryLocation String              @unique
-  hours             String
+  id                 String              @id @default(cuid())
+  code               String              @unique
+  name               String
+  address            String
+  inventoryLocation  String              @unique
+  hours              String
   pickupInstructions String?
-  active            Boolean             @default(true)
-  sortOrder         Int                 @default(100)
-  createdBy         String
-  idempotencyKey    String              @unique
-  orders            Order[]
-  commands          StorePointCommand[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  active             Boolean             @default(true)
+  sortOrder          Int                 @default(100)
+  createdBy          String
+  idempotencyKey     String              @unique
+  orders             Order[]
+  commands           StorePointCommand[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@index([active, sortOrder])
 }
@@ -1159,6 +1178,64 @@ model FinanceBudgetCommand {
   @@index([budgetId])
 }
 
+model FinanceSettlementRun {
+  id              String                  @id @default(cuid())
+  periodStart     DateTime
+  periodEnd       DateTime
+  point           String                  @default("")
+  status          FinanceSettlementStatus @default(balanced)
+  expectedTotal   Int
+  actualTotal     Int
+  adjustmentTotal Int                     @default(0)
+  variance        Int
+  note            String?
+  createdBy       String
+  closedBy        String?
+  closedAt        DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  lines           FinanceSettlementLine[]
+
+  @@index([status, createdAt])
+  @@index([periodStart, periodEnd, point])
+}
+
+model FinanceSettlementLine {
+  id               String                      @id @default(cuid())
+  run              FinanceSettlementRun        @relation(fields: [runId], references: [id], onDelete: Restrict)
+  runId            String
+  sourceType       FinanceSettlementSourceType
+  sourceRef        String
+  label            String
+  expectedAmount   Int
+  actualAmount     Int
+  adjustmentAmount Int                         @default(0)
+  variance         Int
+  status           FinanceSettlementLineStatus @default(matched)
+  reason           String?
+  resolutionReason String?
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  reconciledAt     DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@unique([sourceType, sourceRef])
+  @@index([runId, status])
+}
+
+model FinanceSettlementCommand {
+  idempotencyKey String   @id
+  action         String
+  runId          String?
+  input          Json
+  response       Json
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@index([runId, createdAt])
+}
+
 model PurchaseOrder {
   id             String              @id @default(cuid())
   number         String              @unique
@@ -1258,16 +1335,17 @@ model TradeInDevice {
 }
 
 model CourierRun {
-  id                     String   @id @default(cuid())
+  id                     String    @id @default(cuid())
   courierId              String
   codTotal               Int // COD не сдан >24ч → Risk
-  handedOver             Boolean  @default(false)
-  collectedTotal         Int      @default(0)
-  handoverIdempotencyKey String?  @unique
+  handedOver             Boolean   @default(false)
+  collectedTotal         Int       @default(0)
+  handoverIdempotencyKey String?   @unique
   handoverAmount         Int?
   handoverReason         String?
+  handedOverAt           DateTime?
   orders                 Order[]
-  createdAt              DateTime @default(now())
+  createdAt              DateTime  @default(now())
 
   @@index([courierId])
   @@index([handedOver])

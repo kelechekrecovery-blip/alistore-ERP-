@@ -49,3 +49,45 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
   await expect.poll(() => prisma.auditEvent.count({ where: { refs: { has: expense.id } } })).toBe(3);
   await expect.poll(() => prisma.auditEvent.count({ where: { refs: { has: budget.id } } })).toBe(1);
 });
+
+test('owner creates and closes an authoritative provider settlement in ERP', async ({ page }) => {
+  await resetDb();
+  const username = `e2e-settlement-${Date.now().toString(36)}`;
+  const password = 'pass-e2e';
+  await prisma.staffUser.create({ data: { username, passwordHash: await argon2.hash(password), role: 'owner' } });
+  const customer = await prisma.customer.create({ data: { phone: `+996700${Date.now().toString().slice(-6)}`, name: 'Finance UI' } });
+  const order = await prisma.order.create({ data: { customerId: customer.id, status: 'paid', channel: 'web', total: 12_500, storePointCode: 'center', storePointName: 'AliStore Центр' } });
+  const payment = await prisma.payment.create({ data: { orderId: order.id, amount: 12_500, method: 'qr_mbank', status: 'received', txnId: `e2e-settlement-${Date.now()}` } });
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /Финансы/ }).click();
+
+  const workspace = page.locator('section[aria-labelledby="settlements-title"]');
+  await workspace.getByRole('button', { name: 'Найти источники' }).click();
+  await expect(workspace.getByText(/Платёж qr_mbank/)).toBeVisible();
+  await expect(workspace.getByText(/12.500/).first()).toBeVisible();
+  let droppedCreateResponse = false;
+  await page.route('**/api/finance/settlements', async (route) => {
+    if (route.request().method() === 'POST' && !droppedCreateResponse) {
+      droppedCreateResponse = true;
+      await route.fetch();
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  });
+  await workspace.getByRole('button', { name: 'Создать сверку' }).click();
+  await expect(workspace.getByRole('status')).toBeVisible();
+  await workspace.getByRole('button', { name: 'Создать сверку' }).click();
+  const run = workspace.getByTestId('finance-settlement-run').first();
+  await expect(run).toContainText('Сходится');
+  expect(await prisma.financeSettlementRun.count()).toBe(1);
+  await run.getByRole('button', { name: 'Провести и закрыть' }).click();
+  await expect(run).toContainText('Закрыта');
+
+  expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe('reconciled');
+  expect(await prisma.auditEvent.count({ where: { type: 'payment.reconciled', refs: { has: payment.id } } })).toBe(1);
+});

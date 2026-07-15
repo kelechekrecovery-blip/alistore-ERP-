@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { sign } from 'jsonwebtoken';
-import { prisma, resetDb, seedProduct } from './helpers';
+import { API_BASE, prisma, resetDb, seedProduct } from './helpers';
 
 test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await resetDb();
@@ -101,7 +101,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
     total: product.price + 350,
     deliveryAddress: 'Бишкек, ул. Токтогула 125/1, кв. 42',
   });
-  const availability = await page.request.get(`http://127.0.0.1:4200/api/logistics/availability?date=${startsAt.toISOString().slice(0, 10)}`);
+  const availability = await page.request.get(`${API_BASE}/logistics/availability?date=${startsAt.toISOString().slice(0, 10)}`);
   expect(availability.ok()).toBeTruthy();
   const zones = await availability.json() as Array<{ slots: Array<{ id: string; remaining: number; available: boolean }> }>;
   expect(zones.flatMap((item) => item.slots).find((slot) => slot.id === zone.slots[0].id)).toMatchObject({ remaining: 0, available: false });

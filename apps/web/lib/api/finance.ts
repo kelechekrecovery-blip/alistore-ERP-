@@ -47,6 +47,50 @@ export interface FinanceBudget {
   idempotent: boolean;
 }
 
+export type FinanceSettlementSourceType = 'provider_payment' | 'pos_shift' | 'courier_cod' | 'refund';
+export type FinanceSettlementStatus = 'balanced' | 'disputed' | 'closed';
+
+export interface FinanceSettlementSource {
+  sourceType: FinanceSettlementSourceType;
+  sourceRef: string;
+  label: string;
+  expectedAmount: number;
+  suggestedActualAmount: number;
+  point: string | null;
+  occurredAt: string;
+}
+
+export interface FinanceSettlementLine {
+  id: string;
+  sourceType: FinanceSettlementSourceType;
+  sourceRef: string;
+  label: string;
+  expectedAmount: number;
+  actualAmount: number;
+  adjustmentAmount: number;
+  variance: number;
+  status: 'matched' | 'disputed' | 'reconciled';
+  reason: string | null;
+  resolutionReason: string | null;
+}
+
+export interface FinanceSettlementRun {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  point: string;
+  status: FinanceSettlementStatus;
+  expectedTotal: number;
+  actualTotal: number;
+  adjustmentTotal: number;
+  variance: number;
+  note: string | null;
+  lines: FinanceSettlementLine[];
+  createdAt: string;
+  closedAt: string | null;
+  idempotent?: boolean;
+}
+
 export const fetchExpenses = (accessToken: string) => getJson<Expense[]>('/finance/expenses', accessToken);
 
 export const createExpense = (
@@ -73,3 +117,32 @@ export const setFinanceBudget = (
   input: { period: string; category: string; amount: number; point?: string },
   accessToken: string,
 ) => postAuthJson<FinanceBudget>('/finance/budgets', { ...input, idempotencyKey: crypto.randomUUID() }, accessToken);
+
+function settlementQuery(from: string, to: string, point: string) {
+  const query = new URLSearchParams({ from: new Date(`${from}T00:00:00.000Z`).toISOString(), to: new Date(`${to}T00:00:00.000Z`).toISOString() });
+  if (point.trim()) query.set('point', point.trim());
+  return query.toString();
+}
+
+export const fetchFinanceSettlementSources = (from: string, to: string, point: string, accessToken: string) =>
+  getJson<FinanceSettlementSource[]>(`/finance/settlement-sources?${settlementQuery(from, to, point)}`, accessToken);
+
+export const fetchFinanceSettlements = (accessToken: string) =>
+  getJson<FinanceSettlementRun[]>('/finance/settlements', accessToken);
+
+export const createFinanceSettlement = (
+  input: { from: string; to: string; point?: string; note?: string; entries: Array<{ sourceType: FinanceSettlementSourceType; sourceRef: string; actualAmount: number; reason?: string }> },
+  accessToken: string,
+  idempotencyKey: string,
+) => postAuthJson<FinanceSettlementRun>('/finance/settlements', {
+  ...input,
+  from: new Date(`${input.from}T00:00:00.000Z`).toISOString(),
+  to: new Date(`${input.to}T00:00:00.000Z`).toISOString(),
+  idempotencyKey,
+}, accessToken);
+
+export const resolveFinanceSettlement = (runId: string, lineId: string, adjustmentAmount: number, reason: string, accessToken: string, idempotencyKey: string) =>
+  postAuthJson<FinanceSettlementRun>(`/finance/settlements/${encodeURIComponent(runId)}/resolve`, { idempotencyKey, lineId, adjustmentAmount, reason }, accessToken);
+
+export const closeFinanceSettlement = (runId: string, accessToken: string, idempotencyKey: string) =>
+  postAuthJson<FinanceSettlementRun>(`/finance/settlements/${encodeURIComponent(runId)}/close`, { idempotencyKey }, accessToken);

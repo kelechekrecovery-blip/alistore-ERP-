@@ -4,9 +4,9 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **50 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **59 миграций**
-- **121 API test suites / 480 тестов — зелёные** (`jest`)
-- **36/36 Playwright flow — зелёные**, включая ERP-controlled checkout points, Service Center intake/diagnostics/approval/POS settlement/parts/repair/closure и loaner issue/customer visibility/return
+- **50 backend-модулей** (NestJS) · **37 веб-роутов** (Next.js) · **60 миграций**
+- **122 API test suites / 485 тестов — зелёные** (`jest`)
+- **37/37 Playwright flow — зелёные**, включая ERP-controlled checkout points, owner Finance settlement, Service Center intake/diagnostics/approval/POS settlement/parts/repair/closure и loaner issue/customer visibility/return
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **31/31** on iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **25/25** connected Compose tests pass on API 36, including Staff attendance with SQLite/WorkManager replay. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
@@ -18,7 +18,7 @@
 | Фаза | Что | Статус |
 |---|---|---|
 | **0** Ядро данных | Event Ledger (append-only), order state-machine, IMEI-инвариант, миграции | ✅ |
-| **1** Деньги | Payment поддерживает retail-order и paid ServiceWorkOrder, CashShift, Courier COD и provider-neutral intents; live provider/fiscal reconciliation ещё внешние | 🟡 |
+| **1** Деньги | Payment поддерживает retail-order и paid ServiceWorkOrder, CashShift, Courier COD, provider-neutral intents и owner Finance settlement provider/POS/COD/refund с dispute/atomic Ledger close; live provider/fiscal statement certification ещё внешняя | 🟡 |
 | **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; ERP-owned точки и точный адрес доставки подключены, коммерческий контент/guest status recovery ещё требуют завершения | 🟡 |
 | **3** Аккаунт+Auth | OTP-вход, Apple/Telegram social-auth backend, «Мои заказы», адреса, настройки, уведомления+consent, бонусы | ✅ |
 | **4** POS 2.0 | Тёмный терминал, продажа, service estimate payment, split tender, approval, offline replay, catalog delta-sync и print abstraction; packaged-app E2E и железо не сертифицированы | 🟡 |

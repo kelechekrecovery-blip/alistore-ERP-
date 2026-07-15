@@ -206,6 +206,7 @@ export class CourierService {
             handoverIdempotencyKey: key,
             handoverAmount: dto.amount,
             handoverReason: normalized.reason,
+            handedOverAt: new Date(),
           },
         });
         const events: AuditInput[] = [{
