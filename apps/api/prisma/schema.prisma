@@ -1179,6 +1179,7 @@ model InventoryValuationIssue {
   sourceType  String
   sourceRef   String
   quantity    Int
+  reversedQty Int @default(0)
   unitCost    Int
   totalCost   Int
   createdAt   DateTime @default(now())

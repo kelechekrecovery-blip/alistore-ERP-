@@ -87,3 +87,108 @@ export async function consumeQuantityValuationOnTx(
   if (remaining > 0) throw new ConflictError('inventory_valuation_missing', `Для резерва ${input.allocationId} не найдено достаточно слоёв себестоимости`);
   return totalCost;
 }
+
+export async function reverseInventoryCostOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    issueId: string;
+    quantity: number;
+    returnId: string;
+    actor: string;
+    occurredAt?: Date;
+  },
+) {
+  const issue = await tx.inventoryValuationIssue.findUniqueOrThrow({ where: { id: input.issueId } });
+  const available = issue.quantity - issue.reversedQty;
+  if (input.quantity <= 0 || input.quantity > available) {
+    throw new ConflictError('valuation_return_exceeded', `Возврат превышает неразвёрнутую себестоимость ${issue.id}`);
+  }
+  const sourceRef = `${input.returnId}:${issue.id}:${issue.reversedQty + input.quantity}`;
+  const updated = await tx.inventoryValuationIssue.updateMany({
+    where: { id: issue.id, reversedQty: issue.reversedQty },
+    data: { reversedQty: { increment: input.quantity } },
+  });
+  if (updated.count !== 1) throw new ConflictError('valuation_return_race', `Себестоимость ${issue.id} изменена параллельно`);
+  const total = input.quantity * issue.unitCost;
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:inventory.return:${sourceRef}`,
+    sourceType: 'inventory.return',
+    sourceRef,
+    description: `Восстановление себестоимости возврата ${input.returnId}`,
+    occurredAt: input.occurredAt ?? new Date(),
+    createdBy: input.actor,
+    lines: [
+      { accountCode: INVENTORY_ASSET_ACCOUNT, debit: total, memo: 'Возврат товара на склад' },
+      { accountCode: COGS_ACCOUNT, credit: total, memo: 'Сторно себестоимости продаж' },
+    ],
+  });
+  return { issue, quantity: input.quantity, unitCost: issue.unitCost, totalCost: total, entry };
+}
+
+export async function reverseQuantityCostOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    orderId: string;
+    allocationId: string;
+    productId: string;
+    balanceId: string;
+    quantity: number;
+    returnId: string;
+    actor: string;
+  },
+) {
+  const issues = await tx.inventoryValuationIssue.findMany({
+    where: {
+      orderId: input.orderId,
+      productId: input.productId,
+      sourceType: 'sale',
+      sourceRef: { startsWith: `${input.orderId}:${input.allocationId}:` },
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  let remaining = input.quantity;
+  let totalCost = 0;
+  const entries: Array<{ id: string; issueId: string; quantity: number; totalCost: number }> = [];
+  const location = (await tx.inventoryBalance.findUniqueOrThrow({
+    where: { id: input.balanceId },
+    select: { location: true },
+  })).location;
+  for (const issue of issues) {
+    if (remaining === 0) break;
+    const quantity = Math.min(remaining, issue.quantity - issue.reversedQty);
+    if (quantity <= 0) continue;
+    const reversed = await reverseInventoryCostOnTx(tx, {
+      issueId: issue.id,
+      quantity,
+      returnId: input.returnId,
+      actor: input.actor,
+    });
+    await tx.inventoryValuationLayer.create({
+      data: {
+        productId: input.productId,
+        balanceId: input.balanceId,
+        location,
+        sourceType: 'inventory.return',
+        sourceRef: `${input.returnId}:${issue.id}:${quantity}`,
+        unitCost: reversed.unitCost,
+        quantityReceived: quantity,
+        quantityRemaining: quantity,
+      },
+    });
+    remaining -= quantity;
+    totalCost += reversed.totalCost;
+    entries.push({
+      id: reversed.entry.id,
+      issueId: issue.id,
+      quantity,
+      totalCost: reversed.totalCost,
+    });
+  }
+  // Orders created before immutable valuation was introduced have no issues.
+  // Once an order has valuation provenance, an incomplete reversal is a hard
+  // conflict: silently accepting it would overstate COGS and understate stock.
+  if (remaining > 0 && issues.length > 0) {
+    throw new ConflictError('valuation_return_missing', `Для возврата ${input.returnId} не найдена полная себестоимость`);
+  }
+  return { quantity: input.quantity - remaining, totalCost, entries };
+}

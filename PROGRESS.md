@@ -1821,3 +1821,12 @@
 - Outcome: `FIN-003D2` is accepted at local software level for both serialized and quantity stock. `FIN-003D` remains open only for exchange return/replacement revenue, tax and COGS accounting; live COD and accountant UAT remain external gates.
 - Commit: `02b65f3` (`feat(finance): finalize COD inventory and COGS`).
 - Next step: implement exchange reversal of the returned sale/tax/COGS and authoritative posting of the replacement without duplicate revenue.
+
+## 2026-07-15
+
+- Task: restore the missing committed baseline for return valuation and make owned-stock returns accounting-complete.
+- Files changed: `InventoryValuationIssue.reversedQty` schema/migration; serialized and quantity cost-reversal helpers; return reconciliation value/Ledger integration; serialized and FIFO quantity regressions; backlog/progress.
+- Result: a return reverses only unreversed immutable sale issues, debits inventory `1200`, credits COGS `5000`, restores quantity value through a new return FIFO layer, records exact movement value and emits atomic AccountingEntryPosted evidence. Repeated reconciliation creates no second stock/value/journal effect, and legacy orders with no valuation issues remain zero-value compatible rather than borrowing cost from unrelated return stock.
+- Checks run: Prisma validate/generate; targeted return reconciliation 7/7; API production build; first full API 134/135 suites and 550/551 tests with one unrelated transient CMS HTTP parse error; isolated CMS rerun 5/5; final full API 135/135 suites and 551/551 tests; targeted `git diff --check`.
+- Outcome: `INV-VAL-001B` is accepted at local software level and the branch no longer relies on uncommitted return-valuation functions. Quarantine disposition, valuation-aware adjustments/transfers and inventory-to-GL reconciliation remain open. Local dev migration history also has pre-existing drift and must be normalized before staging.
+- Next step: complete exchange accounting on this now self-contained return valuation boundary, then add the inventory valuation subledger reconciliation report.

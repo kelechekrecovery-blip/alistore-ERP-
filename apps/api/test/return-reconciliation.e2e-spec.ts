@@ -4,6 +4,8 @@ import { UnitsService } from '../src/units/units.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { ReturnsService } from '../src/returns/returns.service';
+import { postCogsOnTx } from '../src/inventory/inventory-valuation';
+import { EventType } from '../src/audit/event-types';
 
 describe('Refund-bound return reconciliation (integration)', () => {
   let prisma: PrismaService;
@@ -37,6 +39,16 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.$transaction([
+      prisma.accountingJournalLine.deleteMany({
+        where: { entry: { sourceType: { in: ['inventory.cogs', 'inventory.return'] } } },
+      }),
+      prisma.accountingJournalEntry.deleteMany({
+        where: { sourceType: { in: ['inventory.cogs', 'inventory.return'] } },
+      }),
+    ]);
+    await prisma.inventoryValuationIssue.deleteMany();
+    await prisma.inventoryValuationLayer.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany();
     await prisma.orderBundleAllocation.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -49,6 +61,149 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   }
+
+  it('reverses serialized COGS exactly once and records accounting evidence', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const customer = await prisma.customer.create({
+      data: { phone: `+996705${suffix.slice(-6)}`, name: 'Serialized valuation return' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: `RET-SER-${suffix}`, name: 'Serialized return', price: 1200, cost: 800, category: 'devices', attrs: {} },
+    });
+    const imei = `RET-SER-${suffix}-IMEI`;
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'pos',
+        status: 'paid',
+        total: 1200,
+        items: { create: { sku: product.sku, qty: 1, price: 1200, imei } },
+      },
+      include: { items: true },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei, productId: product.id, status: 'sold', location: 'SALE', orderId: order.id, acquisitionCost: 800 },
+    });
+    const sold = await prisma.$transaction((tx) => postCogsOnTx(tx, {
+      productId: product.id,
+      orderId: order.id,
+      sourceRef: `${order.id}:${imei}`,
+      imei,
+      quantity: 1,
+      unitCost: 800,
+      actor: 'cashier',
+    }));
+    const ret = await prisma.return.create({
+      data: {
+        orderId: order.id,
+        reason: 'serialized valuation return',
+        status: 'paid',
+        refundAmount: 1200,
+        isFullOrder: true,
+        items: { create: { orderItemId: order.items[0].id, qty: 1, refundAmount: 1200 } },
+      },
+    });
+
+    await returns.transition(ret.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+    await returns.transition(ret.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+
+    expect(await prisma.inventoryValuationIssue.findUniqueOrThrow({ where: { id: sold.issue.id } })).toMatchObject({ reversedQty: 1 });
+    const reversal = await prisma.accountingJournalEntry.findFirstOrThrow({
+      where: { sourceType: 'inventory.return', sourceRef: { startsWith: `${ret.id}:` } },
+      include: { lines: true },
+    });
+    expect(reversal.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1200', debit: 800 }),
+      expect.objectContaining({ accountCode: '5000', credit: 800 }),
+    ]));
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'inventory.return', sourceRef: { startsWith: `${ret.id}:` } } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: EventType.AccountingEntryPosted, refs: { has: reversal.id } } })).toBe(1);
+  });
+
+  it('restores quantity FIFO value, movement value and COGS exactly once', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const customer = await prisma.customer.create({
+      data: { phone: `+996706${suffix.slice(-6)}`, name: 'Quantity valuation return' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: `RET-Q-${suffix}`, name: 'Quantity return', price: 1000, cost: 600, category: 'accessories', trackingMode: 'quantity', attrs: {} },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        status: 'paid',
+        total: 2000,
+        items: { create: { sku: product.sku, qty: 2, price: 1000 } },
+      },
+      include: { items: true },
+    });
+    const saleBalance = await prisma.inventoryBalance.create({
+      data: { productId: product.id, location: 'SALE', onHand: 0, inventoryValue: 0 },
+    });
+    const allocation = await prisma.orderQuantityAllocation.create({
+      data: {
+        orderId: order.id,
+        orderItemId: order.items[0].id,
+        productId: product.id,
+        balanceId: saleBalance.id,
+        sku: product.sku,
+        location: saleBalance.location,
+        qty: 2,
+        active: false,
+        consumedAt: new Date(),
+      },
+    });
+    const layer = await prisma.inventoryValuationLayer.create({
+      data: {
+        productId: product.id,
+        balanceId: saleBalance.id,
+        location: saleBalance.location,
+        sourceType: 'test.receive',
+        sourceRef: `return-valuation-${suffix}`,
+        unitCost: 600,
+        quantityReceived: 2,
+        quantityRemaining: 0,
+      },
+    });
+    const sold = await prisma.$transaction((tx) => postCogsOnTx(tx, {
+      productId: product.id,
+      orderId: order.id,
+      sourceRef: `${order.id}:${allocation.id}:${layer.id}`,
+      layerId: layer.id,
+      quantity: 2,
+      unitCost: 600,
+      actor: 'cashier',
+    }));
+    const ret = await prisma.return.create({
+      data: {
+        orderId: order.id,
+        reason: 'quantity valuation return',
+        status: 'paid',
+        refundAmount: 2000,
+        isFullOrder: true,
+        items: { create: { orderItemId: order.items[0].id, qty: 2, refundAmount: 2000 } },
+      },
+    });
+
+    await returns.transition(ret.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+    await returns.transition(ret.id, 'reconciled', 'staff:warehouse', 'RETURNS');
+
+    expect(await prisma.inventoryValuationIssue.findUniqueOrThrow({ where: { id: sold.issue.id } })).toMatchObject({ reversedQty: 2 });
+    expect(await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId_location: { productId: product.id, location: 'RETURNS' } },
+    })).toMatchObject({ onHand: 2, inventoryValue: 1200 });
+    expect(await prisma.inventoryMovement.findFirstOrThrow({ where: { idempotencyKey: `return:${ret.id}:quantity:${product.id}:RETURNS` } })).toMatchObject({
+      qty: 2,
+      unitCost: 600,
+      totalValue: 1200,
+    });
+    expect(await prisma.inventoryValuationLayer.findFirstOrThrow({
+      where: { sourceType: 'inventory.return', sourceRef: { startsWith: `${ret.id}:` } },
+    })).toMatchObject({ quantityReceived: 2, quantityRemaining: 2, unitCost: 600 });
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'inventory.return', sourceRef: { startsWith: `${ret.id}:` } } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: EventType.AccountingEntryPosted, refs: { has: ret.id } } })).toBe(1);
+  });
 
   async function moveToProcessing(returnId: string) {
     await returns.transition(returnId, 'under_review', 'staff:returns');

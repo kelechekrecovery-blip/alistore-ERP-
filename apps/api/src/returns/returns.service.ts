@@ -192,6 +192,7 @@ export class ReturnsService {
 
     const events: Array<{ type: string; actor: string; payload: Record<string, unknown>; refs: string[] }> = [];
     const quantityByProduct = new Map<string, number>();
+    const quantityMovementByProduct = new Map<string, string>();
     const returnedQuantityAllocations: Array<{ id: string; productId: string; qty: number }> = [];
     for (const item of order.items) {
       let remaining = selectedQty.get(item.id) ?? 0;
@@ -233,6 +234,7 @@ export class ReturnsService {
           reason: ret.reason,
         },
       });
+      quantityMovementByProduct.set(productId, movement.id);
       events.push({
         type: EventType.StockReceived,
         actor,
@@ -259,6 +261,35 @@ export class ReturnsService {
           where: { id: balance.id },
           data: { inventoryValue: { increment: valuation.totalCost } },
         });
+        const movementId = quantityMovementByProduct.get(returned.productId);
+        if (movementId) {
+          const movement = await tx.inventoryMovement.findUniqueOrThrow({ where: { id: movementId } });
+          const totalValue = (movement.totalValue ?? 0) + valuation.totalCost;
+          await tx.inventoryMovement.update({
+            where: { id: movementId },
+            data: {
+              totalValue,
+              unitCost: totalValue % movement.qty === 0 ? totalValue / movement.qty : null,
+            },
+          });
+        }
+        for (const entry of valuation.entries) {
+          events.push({
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: {
+              accountingEntryId: entry.id,
+              sourceType: 'inventory.return',
+              returnId: ret.id,
+              orderId: order.id,
+              productId: returned.productId,
+              valuationIssueId: entry.issueId,
+              quantity: entry.quantity,
+              totalCost: entry.totalCost,
+            },
+            refs: [entry.id, entry.issueId, ret.id, order.id, returned.productId],
+          });
+        }
       }
     }
 
@@ -458,7 +489,23 @@ export class ReturnsService {
           where: { imei, sourceType: 'sale', orderId: order.id, reversedQty: 0 },
           orderBy: { createdAt: 'desc' },
         });
-        if (issue) await reverseInventoryCostOnTx(tx, { issueId: issue.id, quantity: 1, returnId: ret.id, actor });
+        if (issue) {
+          const reversed = await reverseInventoryCostOnTx(tx, { issueId: issue.id, quantity: 1, returnId: ret.id, actor });
+          events.push({
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: {
+              accountingEntryId: reversed.entry.id,
+              sourceType: 'inventory.return',
+              returnId: ret.id,
+              orderId: order.id,
+              imei,
+              quantity: 1,
+              totalCost: reversed.totalCost,
+            },
+            refs: [reversed.entry.id, ret.id, order.id, imei],
+          });
+        }
         events.push({
           type: EventType.UnitReturned,
           actor,
