@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { assertTaxClassification } from '../finance/sales-tax';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { ModerationService } from '../ai/moderation.service';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -115,6 +116,9 @@ export class ProductsService {
     const category = dto.category.trim();
     const barcode = this.optionalValue(dto.barcode);
     const variantGroup = this.optionalValue(dto.variantGroup);
+    const taxCode = dto.taxCode?.trim() || 'vat_standard';
+    const taxRateBps = dto.taxRateBps ?? 1200;
+    assertTaxClassification({ taxCode, taxRateBps });
     if (!sku || !name || !category) {
       throw new ValidationError('product_fields_required', 'SKU, название и категория обязательны');
     }
@@ -138,6 +142,8 @@ export class ProductsService {
           price: dto.price,
           cost: dto.cost,
           category,
+          taxCode,
+          taxRateBps,
           trackingMode: dto.trackingMode ?? 'serialized',
           attrs: (dto.attrs ?? {}) as Prisma.InputJsonValue,
           ...(bundleComponents.length > 0
@@ -161,6 +167,8 @@ export class ProductsService {
               price: dto.price,
               cost: dto.cost,
               category,
+              taxCode,
+              taxRateBps,
               trackingMode: product.trackingMode,
             },
             refs: [product.id, sku],
@@ -198,6 +206,13 @@ export class ProductsService {
       const category = dto.category.trim();
       if (!category) throw new ValidationError('product_category_required', 'Категория обязательна');
       data.category = category;
+    }
+    if (dto.taxCode !== undefined || dto.taxRateBps !== undefined) {
+      const taxCode = dto.taxCode?.trim() || product.taxCode;
+      const taxRateBps = dto.taxRateBps ?? product.taxRateBps;
+      assertTaxClassification({ taxCode, taxRateBps });
+      data.taxCode = taxCode;
+      data.taxRateBps = taxRateBps;
     }
     if (dto.trackingMode !== undefined && dto.trackingMode !== product.trackingMode) {
       const [unitCount, balanceCount, bundleUse] = await Promise.all([
@@ -498,6 +513,8 @@ export class ProductsService {
       price: product.price,
       cost: product.cost,
       category: product.category,
+      taxCode: product.taxCode,
+      taxRateBps: product.taxRateBps,
       trackingMode: product.trackingMode,
       attrs: product.attrs,
       bundleComponents: product.bundleComponents.map((component) => ({

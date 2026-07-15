@@ -7,6 +7,7 @@ import { insertDebt } from '../debts/debt-insert';
 import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
 import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
+import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
@@ -101,6 +102,7 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   const shiftId = payload['shiftId'] ? String(payload['shiftId']) : null;
   const externalReference = payload['externalReference'] ? String(payload['externalReference']).trim() : null;
   const cashierStaffId = payload['cashierStaffId'] ? String(payload['cashierStaffId']) : null;
+  let refundTax = { taxCode: 'none', taxRateBps: 0, taxAmount: 0 };
   const original = await tx.payment.findUnique({ where: { id: paymentId } });
   if (!original) {
     throw new ValidationError('payment_not_found', 'Платёж для возврата не найден');
@@ -159,11 +161,34 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
         'Сумма возвратов превышает оплаченную по заказу',
       );
     }
+    const [taxDocument, priorRefunds] = await Promise.all([
+      tx.order.findUnique({ where: { id: original.orderId }, include: { items: true } }),
+      tx.payment.aggregate({
+        where: { orderId: original.orderId, amount: { lt: 0 } },
+        _sum: { amount: true },
+      }),
+    ]);
+    if (!taxDocument) throw new ValidationError('order_not_found', 'Заказ возврата не найден');
+    refundTax = {
+      ...outputTaxMetadata(taxDocument.items),
+      taxAmount: cumulativeTaxDelta(
+        taxDocument.taxAmount,
+        taxDocument.total,
+        Math.abs(priorRefunds._sum.amount ?? 0),
+        amount,
+      ),
+    };
   } else if (original.serviceWorkOrderId) {
     await tx.$queryRaw`SELECT id FROM "ServiceWorkOrder" WHERE id = ${original.serviceWorkOrderId} FOR UPDATE`;
     const workOrder = await tx.serviceWorkOrder.findUnique({
       where: { id: original.serviceWorkOrderId },
-      select: { repairStartedAt: true },
+      select: {
+        repairStartedAt: true,
+        estimateAmount: true,
+        taxCode: true,
+        taxRateBps: true,
+        taxAmount: true,
+      },
     });
     if (workOrder?.repairStartedAt) {
       throw new ConflictError(
@@ -178,6 +203,22 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
     if (amount > (agg._sum.amount ?? 0)) {
       throw new ValidationError('refund_exceeds_paid', 'Сумма возвратов превышает оплату ремонта');
     }
+    if (!workOrder?.estimateAmount) {
+      throw new ConflictError('service_estimate_missing', 'У ремонта отсутствует налоговый первичный документ');
+    }
+    const priorRefunds = await tx.payment.aggregate({
+      where: { serviceWorkOrderId: original.serviceWorkOrderId, amount: { lt: 0 } },
+      _sum: { amount: true },
+    });
+    refundTax = {
+      ...outputTaxMetadata([workOrder]),
+      taxAmount: cumulativeTaxDelta(
+        workOrder.taxAmount,
+        workOrder.estimateAmount,
+        Math.abs(priorRefunds._sum.amount ?? 0),
+        amount,
+      ),
+    };
   }
   const compensating = await tx.payment.create({
     data: {
@@ -201,11 +242,12 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
     point: original.point,
     actor: approver,
     receivedBy: cashierStaffId,
+    tax: refundTax,
   });
   events.push({
     type: EventType.PaymentRefunded,
     actor: approver,
-    payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, returnId, amount },
+    payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, returnId, amount, taxAmount: accountingEntry.taxAmount },
     refs: [original.orderId, original.serviceWorkOrderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
   });
   events.push({

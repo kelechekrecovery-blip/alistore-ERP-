@@ -63,6 +63,11 @@ export async function postPaymentEntryOnTx(
     point?: string | null;
     actor: string;
     receivedBy?: string | null;
+    tax?: {
+      taxCode: string;
+      taxRateBps: number;
+      taxAmount: number;
+    };
   },
 ) {
   if (input.payment.amount === 0) {
@@ -72,23 +77,36 @@ export async function postPaymentEntryOnTx(
   const accountCode = paymentAccountCode(input.payment.method);
   const revenueCode = input.payment.serviceWorkOrderId ? '4100' : '4000';
   const isRefund = input.payment.amount < 0;
+  const taxAmount = input.tax?.taxAmount ?? 0;
+  if (!Number.isSafeInteger(taxAmount) || taxAmount < 0 || taxAmount > amount) {
+    throw new ValidationError('accounting_payment_tax_invalid', 'Налог платежа превышает сумму движения');
+  }
+  const revenueAmount = amount - taxAmount;
+  const lines: AccountingJournalLineInput[] = isRefund
+    ? [
+      ...(revenueAmount > 0 ? [{ accountCode: revenueCode, debit: revenueAmount, memo: 'Уменьшение выручки без налога' }] : []),
+      ...(taxAmount > 0 ? [{ accountCode: '2200', debit: taxAmount, memo: 'Уменьшение исходящего НДС' }] : []),
+      { accountCode, credit: amount, memo: 'Выбытие денежных средств' },
+    ]
+    : [
+      { accountCode, debit: amount, memo: 'Поступление денежных средств' },
+      ...(revenueAmount > 0 ? [{ accountCode: revenueCode, credit: revenueAmount, memo: 'Признание выручки без налога' }] : []),
+      ...(taxAmount > 0 ? [{ accountCode: '2200', credit: taxAmount, memo: 'Начисление исходящего НДС' }] : []),
+    ];
   const entry = await postAccountingEntryOnTx(tx, {
     idempotencyKey: `accounting:${input.idempotencyKey}`,
     sourceType: isRefund ? 'payment.refund' : 'payment.receipt',
     sourceRef: input.payment.id,
     description: `${isRefund ? 'Возврат' : 'Получение'} платежа ${input.payment.id}`,
     point: input.point,
+    documentAmount: amount,
+    baseAmount: amount,
+    taxCode: input.tax?.taxCode ?? 'none',
+    taxRateBps: input.tax?.taxRateBps ?? 0,
+    taxAmount,
     occurredAt: input.payment.createdAt,
     createdBy: input.actor,
-    lines: isRefund
-      ? [
-        { accountCode: revenueCode, debit: amount, memo: 'Уменьшение выручки' },
-        { accountCode, credit: amount, memo: 'Выбытие денежных средств' },
-      ]
-      : [
-        { accountCode, debit: amount, memo: 'Поступление денежных средств' },
-        { accountCode: revenueCode, credit: amount, memo: 'Признание выручки' },
-      ],
+    lines,
   });
   await tx.payment.update({
     where: { id: input.payment.id },
@@ -128,6 +146,18 @@ export async function postAccountingEntryOnTx(tx: Prisma.TransactionClient, inpu
   });
   if (accountingPeriod.status === 'hard_closed') {
     throw new ConflictError('accounting_period_hard_closed', `Бухгалтерский период ${period} закрыт для новых проводок`);
+  }
+  if (accountingPeriod.status === 'soft_closed' && !['tax.settlement', 'accounting.reversal'].includes(normalized.sourceType)) {
+    throw new ConflictError('accounting_period_soft_closed', `Бухгалтерский период ${period} закрыт для обычных проводок`);
+  }
+  if (accountingPeriod.status === 'soft_closed' && normalized.sourceType === 'accounting.reversal') {
+    const taxSettlement = await tx.accountingTaxSettlement.findUnique({
+      where: { period_point: { period, point: '' } },
+      select: { id: true },
+    });
+    if (taxSettlement) {
+      throw new ConflictError('accounting_period_tax_settled', `Период ${period} уже имеет налоговую сверку; сторно требует отдельной корректировки периода`);
+    }
   }
 
   const accountCodes = [...new Set(normalized.lines.map((line) => line.accountCode))];

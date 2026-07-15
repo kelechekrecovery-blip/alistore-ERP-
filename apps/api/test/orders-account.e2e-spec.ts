@@ -220,7 +220,7 @@ describe('Orders by customer (account)', () => {
       data: { customerId: owner.id, label: 'Баланс', amount: 1000, sourceRef: 'loyalty-refund-seed' },
     });
     const order = await orders.create(
-      { customerId: owner.id, channel: 'web', total: 9000, items: [{ sku: 'LOYALTY-REFUND', qty: 1, price: 9000 }] },
+      { customerId: owner.id, channel: 'web', total: 9000, items: [{ sku: 'LOYALTY-REFUND', qty: 1, price: 10000 }] },
       owner.id,
       undefined,
       { subtotal: 10000, deliveryFee: 0, promoCode: null, promoDiscount: 0, loyaltyPoints: 1000 },

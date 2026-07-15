@@ -22,6 +22,7 @@ import { LogisticsService } from '../logistics/logistics.service';
 import { PromotionLine, PromotionsService } from '../promotions/promotions.service';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { consumeQuantityValuationOnTx } from '../inventory/inventory-valuation';
+import { salesTaxSnapshot } from '../finance/sales-tax';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -266,6 +267,18 @@ export class OrdersService {
             })
           : null;
         const promoDiscount = appliedPromotion?.discount ?? canonical.promoDiscount;
+        const productTaxes = await tx.product.findMany({
+          where: { sku: { in: [...new Set(dto.items.map((item) => item.sku))] } },
+          select: { sku: true, taxCode: true, taxRateBps: true },
+        });
+        const taxBySku = new Map(productTaxes.map((product) => [product.sku, product]));
+        for (const item of dto.items) {
+          if (!taxBySku.has(item.sku)) {
+            // Internal/direct order creation is retained for migration fixtures and
+            // non-catalogue lines. The classification still comes from server policy.
+            taxBySku.set(item.sku, { sku: item.sku, taxCode: 'vat_standard', taxRateBps: 1200 });
+          }
+        }
         const preparedAttribution = this.campaignAttribution
           ? await this.campaignAttribution.prepareForOrder(
               tx,
@@ -286,6 +299,7 @@ export class OrdersService {
           if (booked >= slot.capacity) throw new ConflictError('delivery_slot_full', 'Слот доставки уже занят');
         }
         const baseTotal = canonical.subtotal + canonical.deliveryFee - promoDiscount;
+        const initialTax = orderTaxSnapshot(dto.items, taxBySku, baseTotal, canonical.deliveryFee);
         const initialOrder = await tx.order.create({
           data: {
             idempotencyKey,
@@ -309,14 +323,22 @@ export class OrdersService {
             deliveryFee: canonical.deliveryFee,
             promoCode: appliedPromotion?.code ?? canonical.promoCode,
             promoDiscount,
+            taxBaseAmount: initialTax.taxBaseAmount,
+            taxAmount: initialTax.taxAmount,
             total: baseTotal,
             status: 'created',
             items: {
-              create: dto.items.map((i) => ({
+              create: dto.items.map((i, index) => ({
+                lineNumber: index + 1,
                 sku: i.sku,
                 qty: i.qty,
                 price: i.price,
                 unitCost: canonical.unitCosts?.[i.sku] ?? 0,
+                discountAmount: initialTax.lines[index].discountAmount,
+                taxCode: initialTax.lines[index].taxCode,
+                taxRateBps: initialTax.lines[index].taxRateBps,
+                taxBaseAmount: initialTax.lines[index].taxBaseAmount,
+                taxAmount: initialTax.lines[index].taxAmount,
                 imei: i.imei,
               })),
             },
@@ -349,13 +371,31 @@ export class OrdersService {
           maximum: Math.max(0, canonical.subtotal - promoDiscount),
           actor,
         }, events);
-        const order = loyaltyRedeemed > 0
-          ? await tx.order.update({
-              where: { id: initialOrder.id },
-              data: { loyaltyRedeemed, total: baseTotal - loyaltyRedeemed },
-              include: { items: true },
-            })
-          : initialOrder;
+        let order = initialOrder;
+        if (loyaltyRedeemed > 0) {
+          const finalTotal = baseTotal - loyaltyRedeemed;
+          const finalTax = orderTaxSnapshot(dto.items, taxBySku, finalTotal, canonical.deliveryFee);
+          for (const [index, line] of finalTax.lines.entries()) {
+            await tx.orderItem.updateMany({
+              where: { orderId: initialOrder.id, lineNumber: index + 1 },
+              data: {
+                discountAmount: line.discountAmount,
+                taxBaseAmount: line.taxBaseAmount,
+                taxAmount: line.taxAmount,
+              },
+            });
+          }
+          order = await tx.order.update({
+            where: { id: initialOrder.id },
+            data: {
+              loyaltyRedeemed,
+              total: finalTotal,
+              taxBaseAmount: finalTax.taxBaseAmount,
+              taxAmount: finalTax.taxAmount,
+            },
+            include: { items: true },
+          });
+        }
         if (this.outbox && !order.isDemo) {
           await enqueueConsentedCustomerNotice(tx, this.outbox, {
             customerId: order.customerId,
@@ -383,6 +423,8 @@ export class OrdersService {
               promoCode: order.promoCode,
               promoDiscount: order.promoDiscount,
               loyaltyRedeemed: order.loyaltyRedeemed,
+              taxBaseAmount: order.taxBaseAmount,
+              taxAmount: order.taxAmount,
               total: order.total,
               isDemo: order.isDemo,
             },
@@ -626,6 +668,7 @@ export class OrdersService {
       const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
       const events: AuditInput[] = [];
       const assigned: string[] = [];
+      let nextLineNumber = Math.max(0, ...order.items.map((item) => item.lineNumber)) + 1;
 
       const reserveUnit = async (imei: string, sku: string) => {
         // Conditional claim — a findUnique→update would let two concurrent fulfills both
@@ -732,15 +775,37 @@ export class OrdersService {
           );
         }
 
-        // first unit stays on this line (qty→1); extra units become their own lines
+        // Preserve the legal line totals while normalizing one serialized unit per row.
+        // Cumulative integer splitting makes all generated rows add back to the source row.
+        const originalQty = item.qty;
+        const splitSnapshot = (index: number) => {
+          const discountAmount = splitInteger(item.discountAmount, index, originalQty);
+          const taxAmount = splitInteger(item.taxAmount, index, originalQty);
+          return {
+            discountAmount,
+            taxBaseAmount: item.price - discountAmount - taxAmount,
+            taxAmount,
+          };
+        };
         await tx.orderItem.update({
           where: { id: item.id },
-          data: { qty: 1, imei: units[0].imei },
+          data: { qty: 1, imei: units[0].imei, ...splitSnapshot(0) },
         });
         await reserveUnit(units[0].imei, item.sku);
-        for (const unit of units.slice(1)) {
+        for (const [offset, unit] of units.slice(1).entries()) {
           await tx.orderItem.create({
-            data: { orderId, sku: item.sku, qty: 1, price: item.price, imei: unit.imei },
+            data: {
+              orderId,
+              lineNumber: nextLineNumber++,
+              sku: item.sku,
+              qty: 1,
+              price: item.price,
+              unitCost: item.unitCost,
+              taxCode: item.taxCode,
+              taxRateBps: item.taxRateBps,
+              ...splitSnapshot(offset + 1),
+              imei: unit.imei,
+            },
           });
           await reserveUnit(unit.imei, item.sku);
         }
@@ -921,6 +986,33 @@ function directAvailability(product: {
 }): number {
   if (product.trackingMode === 'serialized') return product.units.length;
   return product.balances.reduce((sum, balance) => sum + balance.onHand - balance.reserved, 0);
+}
+
+function orderTaxSnapshot(
+  items: Array<{ sku: string; qty: number; price: number }>,
+  taxBySku: Map<string, { taxCode: string; taxRateBps: number }>,
+  orderTotal: number,
+  deliveryFee: number,
+) {
+  if (!Number.isSafeInteger(orderTotal) || !Number.isSafeInteger(deliveryFee) || orderTotal < deliveryFee) {
+    throw new ValidationError('order_tax_total_invalid', 'Итог заказа меньше стоимости доставки');
+  }
+  return salesTaxSnapshot(items.map((item, index) => {
+    const classification = taxBySku.get(item.sku);
+    if (!classification) throw new ValidationError('product_not_found', `Товар ${item.sku} не найден`);
+    return {
+      lineNumber: index + 1,
+      grossAmount: item.price * item.qty,
+      taxCode: classification.taxCode,
+      taxRateBps: classification.taxRateBps,
+    };
+  }), orderTotal - deliveryFee);
+}
+
+function splitInteger(total: number, index: number, parts: number) {
+  const before = Number(BigInt(total) * BigInt(index) / BigInt(parts));
+  const after = Number(BigInt(total) * BigInt(index + 1) / BigInt(parts));
+  return after - before;
 }
 
 function normalizePromo(value?: string): string | null {

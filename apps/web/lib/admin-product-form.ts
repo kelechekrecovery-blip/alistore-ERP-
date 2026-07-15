@@ -10,6 +10,8 @@ export interface ProductForm {
   price: string;
   cost: string;
   category: string;
+  taxCode: string;
+  taxRateBps: string;
   trackingMode: 'serialized' | 'quantity';
   attrsText: string;
 }
@@ -23,6 +25,8 @@ export const emptyForm: ProductForm = {
   price: '',
   cost: '',
   category: '',
+  taxCode: 'vat_standard',
+  taxRateBps: '1200',
   trackingMode: 'serialized',
   attrsText: '{\n  "description": ""\n}',
 };
@@ -47,6 +51,8 @@ export function formFromProduct(product: AdminProduct): ProductForm {
     price: String(product.price),
     cost: String(product.cost),
     category: product.category,
+    taxCode: product.taxCode,
+    taxRateBps: String(product.taxRateBps),
     trackingMode: product.trackingMode,
     attrsText: attrsToText(product.attrs),
   };
@@ -66,6 +72,14 @@ export function parseSom(value: string, label: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(`${label}: укажите целое число >= 0`);
+  }
+  return parsed;
+}
+
+export function parseBasisPoints(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10_000) {
+    throw new Error('Ставка налога: укажите целое число от 0 до 10000 bps');
   }
   return parsed;
 }

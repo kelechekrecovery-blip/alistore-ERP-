@@ -494,6 +494,8 @@ model Product {
   price                   Int
   cost                    Int
   category                String
+  taxCode                 String                    @default("vat_standard")
+  taxRateBps              Int                       @default(1200)
   trackingMode            StockTrackingMode         @default(serialized)
   attrs                   Json
   archived                Boolean                   @default(false) // soft-delete: НЕ удалять физически
@@ -727,6 +729,8 @@ model Order {
   promotionRedemption      PromotionRedemption?
   loyaltyRedeemed          Int                             @default(0)
   loyaltyEarned            Int                             @default(0)
+  taxBaseAmount            Int                             @default(0)
+  taxAmount                Int                             @default(0)
   total                    Int
   items                    OrderItem[]
   bundleAllocations        OrderBundleAllocation[]
@@ -975,17 +979,24 @@ model OrderBundleAllocation {
 }
 
 model OrderItem {
-  id          String       @id @default(cuid())
-  order       Order        @relation(fields: [orderId], references: [id])
-  orderId     String
-  sku         String
-  qty         Int
-  price       Int
-  unitCost    Int          @default(0)
-  imei        String?
-  returnItems ReturnItem[]
+  id             String       @id @default(cuid())
+  order          Order        @relation(fields: [orderId], references: [id])
+  orderId        String
+  lineNumber     Int          @default(0)
+  sku            String
+  qty            Int
+  price          Int
+  unitCost       Int          @default(0)
+  discountAmount Int          @default(0)
+  taxCode        String       @default("vat_standard")
+  taxRateBps     Int          @default(1200)
+  taxBaseAmount  Int          @default(0)
+  taxAmount      Int          @default(0)
+  imei           String?
+  returnItems    ReturnItem[]
 
   @@index([orderId])
+  @@index([orderId, lineNumber])
 }
 
 model Payment {
@@ -1264,6 +1275,10 @@ model ServiceWorkOrder {
   replacementImei     String?                   @unique
   createdBy           String
   point               String
+  taxCode             String                    @default("vat_standard")
+  taxRateBps          Int                       @default(1200)
+  taxBaseAmount       Int                       @default(0)
+  taxAmount           Int                       @default(0)
   payments            Payment[]
   parts               ServicePart[]
   commands            ServiceWorkOrderCommand[]
@@ -1484,6 +1499,7 @@ model AccountingJournalEntry {
   supplierCreditNote SupplierCreditNote?
   bankStatementLine BankStatementLine?
   cashIncassation CashIncassation?
+  taxSettlement   AccountingTaxSettlement?
   reversalOfId    String?                 @unique
   reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversal        AccountingJournalEntry? @relation("AccountingReversal")
@@ -1504,6 +1520,25 @@ model AccountingPeriod {
   updatedAt               DateTime               @updatedAt
 
   @@index([status, period])
+}
+
+model AccountingTaxSettlement {
+  id                String                  @id @default(cuid())
+  period            String
+  point             String                  @default("")
+  idempotencyKey    String                  @unique
+  outputTax         Int
+  inputTax          Int
+  offsetAmount      Int
+  payableAmount     Int
+  recoverableAmount Int
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                 @unique
+  createdBy         String
+  createdAt         DateTime                @default(now())
+
+  @@unique([period, point])
+  @@index([period, createdAt])
 }
 
 model AccountingJournalLine {

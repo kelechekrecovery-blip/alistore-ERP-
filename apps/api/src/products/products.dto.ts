@@ -101,6 +101,14 @@ export class CreateProductDto {
   @MaxLength(80)
   category!: string;
 
+  @ApiPropertyOptional({ example: 'vat_standard', default: 'vat_standard' })
+  @IsOptional() @IsString() @MaxLength(64)
+  taxCode?: string;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 10000, example: 1200, default: 1200 })
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  taxRateBps?: number;
+
   @ApiPropertyOptional({ enum: ['serialized', 'quantity'], default: 'serialized' })
   @IsOptional()
   @IsIn(['serialized', 'quantity'])
@@ -155,6 +163,14 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(80)
   category?: string;
+
+  @ApiPropertyOptional({ example: 'vat_standard' })
+  @IsOptional() @IsString() @MaxLength(64)
+  taxCode?: string;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 10000, example: 1200 })
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  taxRateBps?: number;
 
   @ApiPropertyOptional({ enum: ['serialized', 'quantity'] })
   @IsOptional()

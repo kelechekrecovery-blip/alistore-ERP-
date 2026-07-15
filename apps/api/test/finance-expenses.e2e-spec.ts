@@ -48,6 +48,7 @@ describe('Finance expenses (integration + RBAC)', () => {
   async function clean() {
     await prisma.financeBudgetCommand.deleteMany();
     await prisma.financeBudget.deleteMany();
+    await prisma.accountingTaxSettlement.deleteMany();
     await prisma.$transaction([
       prisma.cashIncassation.deleteMany(),
       prisma.cashShift.deleteMany(),
@@ -259,20 +260,115 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(await prisma.auditEvent.count({ where: { type: 'finance.currency_rate_recorded', refs: { has: rate.body.id } } })).toBe(1);
   });
 
-  it('closes an accounting period and blocks new postings', async () => {
+  it('soft-closes, settles output/input VAT, then hard-closes the period', async () => {
     const now = new Date();
     const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const expense = await request(app.getHttpServer())
+    const pendingExpense = await request(app.getHttpServer())
       .post('/finance/expenses')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ idempotencyKey: `period-expense-${run}`, category: 'rent', description: 'Проверка закрытия периода', amount: 1_000, incurredAt: now.toISOString() })
       .expect(201);
+
+    const inputTaxExpense = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-tax-expense-${run}`, category: 'rent', description: 'Входящий НДС периода', amount: 56_000, taxMode: 'included', taxRateBps: 1200, incurredAt: now.toISOString() })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/finance/expenses/${inputTaxExpense.body.id}/approve`).set('Authorization', `Bearer ${ownerToken}`).expect(201);
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${inputTaxExpense.body.id}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-tax-expense-pay-${run}`, fundingAccountCode: '1010' })
+      .expect(201);
+
+    const outputEntry = await prisma.accountingJournalEntry.create({
+      data: {
+        idempotencyKey: `period-output-tax-${run}`,
+        sourceType: 'payment.receipt',
+        sourceRef: `period-sale-${run}`,
+        description: 'Продажа с исходящим НДС',
+        documentAmount: 112_000,
+        baseAmount: 112_000,
+        taxCode: 'vat_output:vat_standard',
+        taxRateBps: 1200,
+        taxAmount: 12_000,
+        occurredAt: now,
+        createdBy: ownerId,
+        lines: { create: [
+          { accountCode: '1020', debit: 112_000 },
+          { accountCode: '4000', credit: 100_000 },
+          { accountCode: '2200', credit: 12_000 },
+        ] },
+      },
+    });
 
     await request(app.getHttpServer())
       .post(`/finance/periods/${period}/close`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .send({ idempotencyKey: `period-close-forbidden-${run}`, status: 'hard_closed' })
       .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/finance/periods/${period}/close`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-close-too-early-${run}`, status: 'hard_closed' })
+      .expect(409);
+
+    const softClosed = await request(app.getHttpServer())
+      .post(`/finance/periods/${period}/close`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-soft-close-${run}`, status: 'soft_closed' })
+      .expect(201);
+    expect(softClosed.body.status).toBe('soft_closed');
+
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${pendingExpense.body.id}/approve`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${pendingExpense.body.id}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-pay-${run}`, fundingAccountCode: '1000' })
+      .expect(409);
+
+    const report = await request(app.getHttpServer())
+      .get(`/finance/tax-periods/${period}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(report.body).toMatchObject({ status: 'soft_closed', outputTax: 12_000, inputTax: 6_000, offsetAmount: 6_000, payableAmount: 6_000, recoverableAmount: 0, settlement: null });
+
+    await request(app.getHttpServer())
+      .post(`/finance/tax-periods/${period}/settle`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-tax-point-${run}`, point: 'BISHKEK-1' })
+      .expect(422);
+
+    const settled = await request(app.getHttpServer())
+      .post(`/finance/tax-periods/${period}/settle`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-tax-settlement-${run}` })
+      .expect(201);
+    expect(settled.body).toMatchObject({ outputTax: 12_000, inputTax: 6_000, offsetAmount: 6_000, payableAmount: 6_000, idempotent: false });
+    expect(settled.body.settlement.accountingEntryId).toEqual(expect.any(String));
+    const settlementReplay = await request(app.getHttpServer())
+      .post(`/finance/tax-periods/${period}/settle`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-tax-settlement-${run}` })
+      .expect(201);
+    expect(settlementReplay.body).toMatchObject({ idempotent: true, settlement: { id: settled.body.settlement.id } });
+    await request(app.getHttpServer())
+      .post(`/finance/journal/${outputEntry.id}/reverse`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-late-reversal-${run}`, reason: 'Позднее сторно после налоговой сверки', occurredAt: now.toISOString() })
+      .expect(409);
+    const settlementEntry = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { id: settled.body.settlement.accountingEntryId },
+      include: { lines: { orderBy: { accountCode: 'asc' } } },
+    });
+    expect(settlementEntry.lines).toMatchObject([
+      { accountCode: '1210', debit: 0, credit: 6_000 },
+      { accountCode: '2200', debit: 6_000, credit: 0 },
+    ]);
 
     const closed = await request(app.getHttpServer())
       .post(`/finance/periods/${period}/close`)
@@ -288,15 +384,6 @@ describe('Finance expenses (integration + RBAC)', () => {
       .expect(201);
     expect(replay.body.idempotent).toBe(true);
 
-    await request(app.getHttpServer())
-      .post(`/finance/expenses/${expense.body.id}/approve`)
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .expect(201);
-    await request(app.getHttpServer())
-      .post(`/finance/expenses/${expense.body.id}/pay`)
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ idempotencyKey: `period-pay-${run}`, fundingAccountCode: '1000' })
-      .expect(409);
   });
 
   it('records cash incassation as an idempotent 1010/1000 journal movement', async () => {

@@ -78,6 +78,28 @@ export interface AccountingPeriod {
   closedAt: string | null;
 }
 
+export interface TaxPeriodReport {
+  period: string;
+  point: string | null;
+  from: string;
+  to: string;
+  status: AccountingPeriod['status'];
+  outputTax: number;
+  inputTax: number;
+  outputNet: number;
+  inputNet: number;
+  offsetAmount: number;
+  payableAmount: number;
+  recoverableAmount: number;
+  settlement: null | {
+    id: string;
+    accountingEntryId: string | null;
+    createdAt: string;
+    createdBy: string;
+  };
+  idempotent?: boolean;
+}
+
 export interface SupplierAgingReport {
   asOf: string;
   totalOutstanding: number;
@@ -224,6 +246,27 @@ export const createAccountingCurrencyRate = (
 
 export const fetchAccountingPeriods = (accessToken: string) =>
   getJson<AccountingPeriod[]>('/finance/periods', accessToken);
+
+export const closeAccountingPeriod = (
+  period: string,
+  status: 'soft_closed' | 'hard_closed',
+  accessToken: string,
+) => postAuthJson<AccountingPeriod>(`/finance/periods/${encodeURIComponent(period)}/close`, {
+  status,
+  idempotencyKey: crypto.randomUUID(),
+}, accessToken);
+
+export const fetchTaxPeriod = (period: string, point: string, accessToken: string) => {
+  const query = new URLSearchParams();
+  if (point.trim()) query.set('point', point.trim());
+  return getJson<TaxPeriodReport>(`/finance/tax-periods/${encodeURIComponent(period)}${query.size ? `?${query.toString()}` : ''}`, accessToken);
+};
+
+export const settleTaxPeriod = (period: string, point: string, accessToken: string) =>
+  postAuthJson<TaxPeriodReport>(`/finance/tax-periods/${encodeURIComponent(period)}/settle`, {
+    idempotencyKey: crypto.randomUUID(),
+    ...(point.trim() ? { point: point.trim() } : {}),
+  }, accessToken);
 
 function accountingRange(period: string, point: string) {
   const [year, month] = period.split('-').map(Number);

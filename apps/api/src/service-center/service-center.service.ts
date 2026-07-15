@@ -13,6 +13,8 @@ import {
   serviceJson,
   ServiceCommandInput,
 } from './service-command';
+import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
+import { cumulativeTaxDelta, includedTax, outputTaxMetadata } from '../finance/sales-tax';
 
 const ACTIVE_SERVICE_STATUSES: WarrantyStatus[] = ['created', 'received', 'diagnostics', 'waiting_supplier', 'approved', 'repairing', 'repaired', 'replaced'];
 const PAID_REPAIR_SLA_MS = 3 * 24 * 60 * 60 * 1000;
@@ -186,17 +188,42 @@ export class ServiceCenterService {
         if (activeShift.point !== workOrder.point) throw new ConflictError('service_payment_wrong_point', 'Ремонт относится к другой точке');
 
         const createdPayments = [];
+        const accountingEntries = [];
+        const taxMetadata = outputTaxMetadata([workOrder]);
+        let processedAmount = 0;
         for (const [index, payment] of payments.entries()) {
-          createdPayments.push(await tx.payment.create({
+          const createdPayment = await tx.payment.create({
             data: {
-            serviceWorkOrderId: id,
-            amount: payment.amount,
-            method: payment.method,
-            status: 'received',
-            shiftId: shift.id,
-            txnId: `service:${key}:${index}`,
+              serviceWorkOrderId: id,
+              amount: payment.amount,
+              method: payment.method,
+              status: 'received',
+              shiftId: shift.id,
+              txnId: `service:${key}:${index}`,
+              accountCode: paymentAccountCode(payment.method),
+              idempotencyKey: `service:${key}:${index}`,
+              receivedBy: actor,
+              point: workOrder.point,
             },
-          }));
+          });
+          const accountingEntry = await postPaymentEntryOnTx(tx, {
+            payment: createdPayment,
+            idempotencyKey: `service:${key}:${index}`,
+            point: workOrder.point,
+            actor,
+            tax: {
+              ...taxMetadata,
+              taxAmount: cumulativeTaxDelta(
+                workOrder.taxAmount,
+                workOrder.estimateAmount,
+                processedAmount,
+                payment.amount,
+              ),
+            },
+          });
+          processedAmount += payment.amount;
+          createdPayments.push(await tx.payment.findUniqueOrThrow({ where: { id: createdPayment.id } }));
+          accountingEntries.push(accountingEntry);
         }
         const updated = await tx.serviceWorkOrder.findUniqueOrThrow({
           where: { id },
@@ -214,6 +241,12 @@ export class ServiceCenterService {
               actor,
               payload: { paymentId: payment.id, serviceWorkOrderId: id, shiftId: shift.id, amount: payment.amount, method: payment.method },
               refs: [payment.id, id, workOrder.warrantyCaseId, shift.id, workOrder.warrantyCase.customerId],
+            })),
+            ...accountingEntries.map((entry) => ({
+              type: EventType.AccountingEntryPosted,
+              actor,
+              payload: { accountingEntryId: entry.id, sourceType: 'payment.receipt', sourceRef: entry.sourceRef },
+              refs: [entry.id, entry.sourceRef, id, workOrder.warrantyCaseId],
             })),
             {
               type: EventType.ServicePaymentCompleted,
@@ -420,6 +453,7 @@ export class ServiceCenterService {
           throw new ConflictError('service_diagnostics_closed', 'Диагностика недоступна в текущем статусе');
         }
         const moved = workOrder.warrantyCase.status === 'received';
+        const taxAmount = includedTax(dto.estimateAmount, workOrder.taxRateBps);
         if (moved) {
           assertWarrantyTransition(workOrder.warrantyCase.status, 'diagnostics');
           await tx.warrantyCase.update({ where: { id: workOrder.warrantyCaseId }, data: { status: 'diagnostics' } });
@@ -430,6 +464,8 @@ export class ServiceCenterService {
             diagnosticSummary: dto.summary.trim(),
             diagnosticFee: dto.diagnosticFee ?? 0,
             estimateAmount: dto.estimateAmount,
+            taxBaseAmount: dto.estimateAmount - taxAmount,
+            taxAmount,
             estimatePreparedAt: new Date(),
             estimateApprovedAt: null,
             estimateApprovedBy: null,

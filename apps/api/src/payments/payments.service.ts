@@ -14,6 +14,7 @@ import { accrueConsignmentSalesOnTx, accrueQuantityConsignmentSalesOnTx } from '
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { consumeQuantityValuationOnTx } from '../inventory/inventory-valuation';
+import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -267,11 +268,16 @@ export class PaymentsService {
       });
       const alreadyReceived = received._sum.amount ?? 0;
       const batchTotal = tenders.reduce((sum, payment) => sum + payment.amount, 0);
+      if (alreadyReceived + batchTotal > order.total) {
+        throw new ValidationError('payment_exceeds_order_total', 'Сумма платежей превышает итог заказа');
+      }
       const cashShift = tenders.some((payment) => payment.method === 'cash')
         ? await this.resolveCashShiftOnTx(tx, dto.shiftId, context.staffId, point)
         : null;
       const events: AuditInput[] = [];
       const payments: Payment[] = [];
+      const taxMetadata = outputTaxMetadata(order.items);
+      let processedAmount = alreadyReceived;
       for (const tender of tenders) {
         if (tender.method === 'gift_card') {
           if (!this.giftcards || !tender.giftCardCode) {
@@ -305,7 +311,12 @@ export class PaymentsService {
           idempotencyKey: tender.idempotencyKey as string,
           point,
           actor,
+          tax: {
+            ...taxMetadata,
+            taxAmount: cumulativeTaxDelta(order.taxAmount, order.total, processedAmount, tender.amount),
+          },
         });
+        processedAmount += tender.amount;
         const postedPayment = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
         payments.push(postedPayment);
         events.push({
@@ -319,6 +330,7 @@ export class PaymentsService {
             accountCode: postedPayment.accountCode,
             shiftId: postedPayment.shiftId,
             accountingEntryId: accountingEntry.id,
+            taxAmount: accountingEntry.taxAmount,
           },
           refs: [order.id, payment.id],
         });

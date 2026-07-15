@@ -83,6 +83,9 @@ describe('Warehouse fulfillment (integration)', () => {
     const items = await prisma.orderItem.findMany({ where: { orderId: order.id } });
     expect(items).toHaveLength(2);
     expect(items.every((i) => i.imei && i.qty === 1)).toBe(true);
+    expect(items.every((item) => item.taxBaseAmount + item.taxAmount + item.discountAmount === item.price)).toBe(true);
+    expect(items.reduce((sum, item) => sum + item.taxAmount, 0)).toBe(order.taxAmount);
+    expect(items.reduce((sum, item) => sum + item.taxBaseAmount, 0)).toBe(order.taxBaseAmount);
     const reserved = await prisma.deviceUnit.count({ where: { status: 'reserved' } });
     expect(reserved).toBe(2);
   });

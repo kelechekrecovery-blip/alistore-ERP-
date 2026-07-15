@@ -415,6 +415,7 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
 
     const diagnosed = await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/diagnose`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `paid-diagnose-${run}`).send({ summary: 'Нужна замена дисплея', estimateAmount: 6500, diagnosticFee: 500 }).expect(201);
     expect(diagnosed.body.warrantyCase.status).toBe('diagnostics');
+    expect(diagnosed.body).toMatchObject({ taxCode: 'vat_standard', taxRateBps: 1200, taxBaseAmount: 5804, taxAmount: 696 });
     const mine = await request(app.getHttpServer()).get('/service-center/me/work-orders').set('Authorization', `Bearer ${customerToken(customer)}`).expect(200);
     expect(mine.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id })]));
     const approved = await request(app.getHttpServer()).post(`/service-center/me/work-orders/${created.body.id}/approve-estimate`).set('Authorization', `Bearer ${customerToken(customer)}`).set('Idempotency-Key', `paid-approve-${run}`).expect(201);
@@ -453,9 +454,16 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     const cash = await prisma.payment.aggregate({ where: { shiftId: shift.id, method: 'cash' }, _sum: { amount: true } });
     expect(shift.openCash + (cash._sum.amount ?? 0)).toBe(3500);
     expect(await prisma.deviceUnit.count({ where: { imei: `PAID-${run}-SERIAL` } })).toBe(0);
+    const serviceEntries = await prisma.accountingJournalEntry.findMany({
+      where: { sourceType: 'payment.receipt', sourceRef: { in: recordedPayments.map((payment) => payment.id) } },
+      include: { lines: true },
+    });
+    expect(serviceEntries).toHaveLength(2);
+    expect(serviceEntries.reduce((sum, entry) => sum + entry.taxAmount, 0)).toBe(696);
+    expect(serviceEntries.flatMap((entry) => entry.lines).filter((line) => line.accountCode === '2200').reduce((sum, line) => sum + line.credit, 0)).toBe(696);
 
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
-    expect(events).toHaveLength(7);
+    expect(events).toHaveLength(9);
     expect(events.map((event) => event.type)).toEqual(expect.arrayContaining([
       'service.paid_repair_received',
       'service.work_order_created',
@@ -463,9 +471,12 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
       'service.estimate_approved',
       'payment.received',
       'payment.received',
+      'accounting.entry_posted',
+      'accounting.entry_posted',
       'service.payment_completed',
     ]));
     expect(events.filter((event) => event.type === 'payment.received')).toHaveLength(2);
+    expect(events.filter((event) => event.type === 'accounting.entry_posted')).toHaveLength(2);
     expect(events.some((event) => event.type.startsWith('warranty.'))).toBe(false);
     expect(await prisma.serviceWorkOrderCommand.count({ where: { workOrderId: created.body.id } })).toBe(4);
 

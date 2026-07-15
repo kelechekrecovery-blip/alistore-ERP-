@@ -157,6 +157,28 @@ export function ProductEditor({
                 className={inputCls}
               />
             </div>
+            <div>
+              <label htmlFor="product-tax-code" className={labelCls}>Налоговая категория</label>
+              <input
+                id="product-tax-code"
+                value={form.taxCode}
+                onChange={(event) => onUpdateForm({ taxCode: event.target.value })}
+                placeholder="vat_standard"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label htmlFor="product-tax-rate" className={labelCls}>Ставка, bps</label>
+              <input
+                id="product-tax-rate"
+                value={form.taxRateBps}
+                onChange={(event) => onUpdateForm({ taxRateBps: event.target.value })}
+                placeholder="1200"
+                inputMode="numeric"
+                className={inputCls}
+              />
+              <p className="mt-1.5 text-xs text-[#6E645C]">1200 bps = 12%. Ставку подтверждает бухгалтер; заказ сохраняет неизменяемый снимок.</p>
+            </div>
             <div className="md:col-span-2">
               <label className={labelCls}>Тип складского учёта</label>
               <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-[#2E2822] bg-[#16130F] p-1">

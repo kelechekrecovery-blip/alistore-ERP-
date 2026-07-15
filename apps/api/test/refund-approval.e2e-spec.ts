@@ -20,6 +20,7 @@ describe('Refund approval cycle (integration)', () => {
   let approvals: ApprovalsService;
   let units: UnitsService;
   let seq = 0;
+  const run = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -63,7 +64,7 @@ describe('Refund approval cycle (integration)', () => {
       'seller',
     );
     await orders.reserve(order.id, 'seller');
-    const paid = await payments.pay({ orderId: order.id, method: 'card', amount: 100000, txnId: `refund-payment-${seq}` }, 'cashier');
+    const paid = await payments.pay({ orderId: order.id, method: 'card', amount: 100000, txnId: `refund-payment-${run}-${seq}` }, 'cashier');
     return { orderId: order.id, paymentId: paid.payment.id };
   }
 
@@ -86,6 +87,18 @@ describe('Refund approval cycle (integration)', () => {
     expect(refunds[0].amount).toBe(-100000);
     expect(refunds[0].status).toBe('refunded');
     expect((await prisma.order.findUnique({ where: { id: orderId } }))?.status).toBe('refunded');
+    const taxEntries = await prisma.accountingJournalEntry.findMany({
+      where: { sourceRef: { in: [paymentId, refunds[0].id] } },
+      include: { lines: true },
+      orderBy: { sourceType: 'asc' },
+    });
+    expect(taxEntries).toHaveLength(2);
+    expect(taxEntries.map((entry) => entry.taxAmount)).toEqual([10_714, 10_714]);
+    const outputTaxLines = taxEntries.flatMap((entry) => entry.lines).filter((line) => line.accountCode === '2200');
+    expect(outputTaxLines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ debit: 10_714, credit: 0 }),
+      expect.objectContaining({ debit: 0, credit: 10_714 }),
+    ]));
 
     const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
     expect(types).toEqual(

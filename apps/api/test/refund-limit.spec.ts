@@ -35,9 +35,9 @@ describe('Refund cumulative limit (invariant #1)', () => {
       prisma.$transaction((tx) =>
         ACTION_EXECUTORS.refund(
           tx,
-          { paymentId: payment.id, amount, externalReference: `refund-limit-${amount}` },
+          { paymentId: payment.id, amount, externalReference: `refund-limit-${RUN}-${amount}` },
           'admin-1',
-          `appr-${amount}`,
+          `appr-${RUN}-${amount}`,
           [],
         ),
       );
@@ -71,9 +71,9 @@ describe('Refund cumulative limit (invariant #1)', () => {
       prisma.$transaction((tx) =>
         ACTION_EXECUTORS.refund(
           tx,
-          { paymentId: payment.id, amount: 100000, externalReference: 'refund-race-provider' },
+          { paymentId: payment.id, amount: 100000, externalReference: `refund-race-provider-${RUN}` },
           'admin-1',
-          'appr-race',
+          `appr-race-${RUN}`,
           [],
         ),
       );
@@ -123,7 +123,7 @@ describe('Refund cumulative limit (invariant #1)', () => {
     });
     const events: Parameters<typeof ACTION_EXECUTORS.refund>[4] = [];
     const refundCash = (amount: number) => prisma.$transaction((tx) =>
-      ACTION_EXECUTORS.refund(tx, { paymentId: cash.id, amount, externalReference: `service-refund-provider-${amount}` }, 'owner-1', `service-refund-${amount}`, events),
+      ACTION_EXECUTORS.refund(tx, { paymentId: cash.id, amount, externalReference: `service-refund-provider-${RUN}-${amount}` }, 'owner-1', `service-refund-${RUN}-${amount}`, events),
     );
 
     await refundCash(2000);

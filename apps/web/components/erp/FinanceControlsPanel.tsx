@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { fetchAccountingPeriods, fetchBankStatements, fetchCashIncassations, fetchFinancialStatements, fetchSupplierAging, type AccountingPeriod, type BankStatementSummary, type CashIncassation, type FinancialStatements, type SupplierAgingReport } from '@/lib/api';
+import { closeAccountingPeriod, fetchAccountingPeriods, fetchBankStatements, fetchCashIncassations, fetchFinancialStatements, fetchSupplierAging, fetchTaxPeriod, settleTaxPeriod, type AccountingPeriod, type BankStatementSummary, type CashIncassation, type FinancialStatements, type SupplierAgingReport, type TaxPeriodReport } from '@/lib/api';
 import { som } from '@/lib/format';
 
 export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
@@ -13,7 +13,10 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
   const [periods, setPeriods] = useState<AccountingPeriod[]>([]);
   const [banks, setBanks] = useState<BankStatementSummary[]>([]);
   const [incassations, setIncassations] = useState<CashIncassation[]>([]);
+  const [tax, setTax] = useState<TaxPeriodReport | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [action, setAction] = useState<'idle' | 'soft' | 'tax' | 'hard'>('idle');
+  const [notice, setNotice] = useState('');
 
   const reload = useCallback(() => {
     setState('loading');
@@ -23,12 +26,27 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
       fetchAccountingPeriods(accessToken),
       fetchBankStatements(accessToken),
       fetchCashIncassations(accessToken),
-    ]).then(([nextStatements, nextAging, nextPeriods, nextBanks, nextIncassations]) => {
-      setStatements(nextStatements); setAging(nextAging); setPeriods(nextPeriods); setBanks(nextBanks); setIncassations(nextIncassations); setState('ready');
+      fetchTaxPeriod(period, point, accessToken),
+    ]).then(([nextStatements, nextAging, nextPeriods, nextBanks, nextIncassations, nextTax]) => {
+      setStatements(nextStatements); setAging(nextAging); setPeriods(nextPeriods); setBanks(nextBanks); setIncassations(nextIncassations); setTax(nextTax); setState('ready');
     }).catch(() => setState('error'));
   }, [accessToken, period, point]);
 
   useEffect(() => reload(), [reload]);
+
+  const runAction = async (next: 'soft' | 'tax' | 'hard') => {
+    setAction(next); setNotice('');
+    try {
+      if (next === 'tax') await settleTaxPeriod(period, point, accessToken);
+      else await closeAccountingPeriod(period, next === 'soft' ? 'soft_closed' : 'hard_closed', accessToken);
+      setNotice(next === 'soft' ? 'Период мягко закрыт.' : next === 'tax' ? 'Налоговая сверка зафиксирована.' : 'Период окончательно закрыт.');
+      reload();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Операция учёта не выполнена');
+    } finally {
+      setAction('idle');
+    }
+  };
 
   return (
     <section aria-labelledby="finance-controls-title" className="border-b border-[#2E2822] pb-5">
@@ -41,17 +59,34 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
         </div>
       </div>
       {state === 'error' && <div className="mb-3 rounded-[6px] border border-[#6B3B32] bg-[#321F1A] px-3 py-2 text-xs text-[#FFB5AA]">Часть учетных данных недоступна для этой роли или сервиса.</div>}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <Metric label="Прибыль периода" value={som(statements?.profitAndLoss.netProfit ?? 0)} tone="text-[#C6FF3D]" />
         <Metric label="Движение денег" value={som(statements?.cashFlow.cashMovement ?? 0)} />
         <Metric label="AP к оплате" value={som(aging?.totalOutstanding ?? 0)} tone="text-[#FFB86B]" />
         <Metric label="Инкассация" value={som(incassations.reduce((sum, row) => sum + row.amount, 0))} />
         <Metric label="Проводки" value={String(statements?.entries ?? 0)} tone={statements?.balanced ? 'text-[#C6FF3D]' : 'text-[#FF8A7A]'} />
+        <Metric label="Исходящий НДС" value={som(tax?.outputTax ?? 0)} tone="text-[#FFB86B]" />
+        <Metric label="НДС к уплате" value={som(tax?.payableAmount ?? 0)} tone={(tax?.payableAmount ?? 0) > 0 ? 'text-[#FF8A7A]' : 'text-[#C6FF3D]'} />
       </div>
-      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid gap-3 lg:grid-cols-4">
         <ControlList title="Периоды" empty="Периоды еще не открывались">{periods.slice(0, 4).map((row) => <Row key={row.id} label={row.period} value={row.status === 'hard_closed' ? 'закрыт' : row.status === 'soft_closed' ? 'мягко закрыт' : 'открыт'} tone={row.status === 'hard_closed' ? 'text-[#FFB5AA]' : 'text-[#C6FF3D]'} />)}</ControlList>
         <ControlList title="Банковские выписки" empty="Выписок еще нет">{banks.slice(0, 4).map((row) => <Row key={row.id} label={row.statementNumber} value={`${row.status} · ${som(row.closingBalance)}`} tone={row.status === 'reconciled' ? 'text-[#C6FF3D]' : 'text-[#FFB86B]'} />)}</ControlList>
         <ControlList title="Инкассация" empty="Инкассаций еще нет">{incassations.slice(0, 4).map((row) => <Row key={row.id} label={row.point} value={`${row.status} · ${som(row.amount)}`} tone={row.status === 'reconciled' ? 'text-[#C6FF3D]' : 'text-[#FFB86B]'} />)}</ControlList>
+        <ControlList title={`Налоговый период${point.trim() ? ` · ${point.trim()}` : ''}`} empty="Налоговых движений нет">
+          {tax && <>
+            <Row label="Исходящий НДС" value={som(tax.outputTax)} tone="text-[#FFB86B]" />
+            <Row label="Входящий НДС" value={som(tax.inputTax)} tone="text-[#8FD3FF]" />
+            <Row label="Взаимозачёт" value={som(tax.offsetAmount)} tone="text-[#D8CFC6]" />
+            <Row label={tax.payableAmount > 0 ? 'К уплате' : 'К возмещению'} value={som(tax.payableAmount || tax.recoverableAmount)} tone={tax.payableAmount > 0 ? 'text-[#FF8A7A]' : 'text-[#C6FF3D]'} />
+          </>}
+        </ControlList>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#2E2822] pt-3">
+        {(tax?.status ?? 'open') === 'open' && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('soft')} className="h-9 rounded-[6px] border border-[#5B5148] px-3 text-xs text-[#D8CFC6] disabled:opacity-40">Мягко закрыть период</button>}
+        {tax?.status === 'soft_closed' && !tax.settlement && !point.trim() && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('tax')} className="h-9 rounded-[6px] bg-[#C6FF3D] px-3 text-xs font-bold text-[#111] disabled:opacity-40">Зафиксировать НДС</button>}
+        {tax?.status === 'soft_closed' && tax.settlement && !point.trim() && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('hard')} className="h-9 rounded-[6px] border border-[#FF8A7A] px-3 text-xs text-[#FFB5AA] disabled:opacity-40">Закрыть период окончательно</button>}
+        {point.trim() && <span className="text-[11px] text-[#8A7F76]">Окончательное закрытие доступно в отчёте «Все точки».</span>}
+        {notice && <span role="status" className="text-xs text-[#D8CFC6]">{notice}</span>}
       </div>
     </section>
   );

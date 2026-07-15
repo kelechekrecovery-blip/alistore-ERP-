@@ -317,7 +317,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             </select>
             <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} placeholder="Назначение" className="h-10 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
             <div className="grid grid-cols-2 gap-2">
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder={`Сумма, ${currency}`} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
+              <input aria-label="Сумма расхода" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder={`Сумма, ${currency}`} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm" />
               <select aria-label="Валюта расхода" value={currency} onChange={(event) => setCurrency(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-sm">
                 {currencies.map((code) => <option key={code} value={code}>{code}</option>)}
               </select>

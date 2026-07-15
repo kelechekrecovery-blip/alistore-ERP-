@@ -17,6 +17,10 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /Финансы/ }).click();
+  const controls = page.locator('section[aria-labelledby="finance-controls-title"]');
+  await expect(controls.getByRole('heading', { name: 'Учетный контроль' })).toBeVisible();
+  await expect(controls.getByText('Исходящий НДС').first()).toBeVisible();
+  await expect(controls.getByRole('heading', { name: 'Налоговый период' })).toBeVisible();
 
   const period = new Date().toISOString().slice(0, 7);
   const planning = page.locator('section[aria-labelledby="finance-plan-title"]');
@@ -29,7 +33,7 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
 
   await page.getByLabel('Категория расхода').selectOption('rent');
   await page.getByPlaceholder('Назначение').fill('Аренда склада за июль');
-  await page.getByPlaceholder('Сумма, сом').fill('85000');
+  await page.getByLabel('Сумма расхода').fill('85000');
   await page.getByPlaceholder('Точка').fill('BISHKEK-1');
   await page.getByRole('button', { name: 'Отправить на согласование' }).click();
   await expect(page.getByText('Аренда склада за июль')).toBeVisible();

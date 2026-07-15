@@ -22,6 +22,7 @@ import {
   CreateCashIncassationDto,
   CurrencyRateQueryDto,
   SETTLEMENT_SOURCE_TYPES,
+  SettleTaxPeriodDto,
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
 import { expenseAccountingSnapshot } from './expense-accounting';
@@ -235,16 +236,35 @@ export class FinanceService {
   }
 
   async closeAccountingPeriod(rawPeriod: string, dto: CloseAccountingPeriodDto, actor: string) {
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(rawPeriod)) {
-      throw new ValidationError('invalid_accounting_period', 'Период должен быть в формате YYYY-MM');
-    }
-    const period = rawPeriod;
+    const period = validateMonth(rawPeriod);
     return this.audit.transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accounting-period:${period}`}))`;
       const commandKey = `accounting-period:${period}:${dto.idempotencyKey}`;
       const existing = await tx.accountingPeriod.findUnique({ where: { period } });
       if (existing?.lastCloseIdempotencyKey === commandKey || existing?.status === 'hard_closed') {
         return { result: { ...existing, idempotent: true }, events: [] };
+      }
+      if ((!existing || existing.status === 'open') && dto.status !== 'soft_closed') {
+        throw new ConflictError('accounting_period_soft_close_required', 'Сначала выполните мягкое закрытие периода');
+      }
+      if (existing?.status === 'soft_closed' && dto.status === 'soft_closed') {
+        return { result: { ...existing, idempotent: true }, events: [] };
+      }
+      if (dto.status === 'hard_closed') {
+        const taxSettlement = await tx.accountingTaxSettlement.findUnique({
+          where: { period_point: { period, point: '' } },
+        });
+        if (!taxSettlement) {
+          throw new ConflictError('tax_period_settlement_required', 'Перед закрытием периода зафиксируйте итоговую налоговую сверку по всем точкам');
+        }
+        const currentTax = await taxPeriodOnTx(tx, period, '');
+        if (taxSettlement.outputTax !== currentTax.outputTax
+          || taxSettlement.inputTax !== currentTax.inputTax
+          || taxSettlement.offsetAmount !== currentTax.offsetAmount
+          || taxSettlement.payableAmount !== currentTax.payableAmount
+          || taxSettlement.recoverableAmount !== currentTax.recoverableAmount) {
+          throw new ConflictError('tax_period_settlement_stale', 'Налоговые движения изменились после сверки; период нельзя закрыть');
+        }
       }
       const closed = await tx.accountingPeriod.upsert({
         where: { period },
@@ -254,6 +274,105 @@ export class FinanceService {
       return {
         result: { ...closed, idempotent: false },
         events: [{ type: 'finance.accounting_period_closed', actor, payload: { period, status: dto.status }, refs: [closed.id] }],
+      };
+    });
+  }
+
+  async taxPeriod(rawPeriod: string, rawPoint?: string) {
+    const period = validateMonth(rawPeriod);
+    const point = normalizePoint(rawPoint);
+    return this.prisma.$transaction((tx) => taxPeriodOnTx(tx, period, point));
+  }
+
+  async settleTaxPeriod(rawPeriod: string, dto: SettleTaxPeriodDto, actor: string) {
+    const period = validateMonth(rawPeriod);
+    if (normalizePoint(dto.point)) {
+      throw new ValidationError('tax_settlement_global_only', 'Фиксация НДС выполняется по всем точкам; точка доступна только как аналитический фильтр');
+    }
+    const point = '';
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`tax-period:${period}:${point}`}))::text AS locked`;
+      const replay = await tx.accountingTaxSettlement.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { accountingEntry: true },
+      });
+      if (replay) {
+        if (replay.period !== period || replay.point !== point) {
+          throw new ConflictError('idempotency_key_reused', 'Ключ налоговой сверки уже использован для другого периода или точки');
+        }
+        const report = await taxPeriodOnTx(tx, period, point);
+        return { result: { ...report, settlement: replay, idempotent: true }, events: [] };
+      }
+      const duplicate = await tx.accountingTaxSettlement.findUnique({
+        where: { period_point: { period, point } },
+        include: { accountingEntry: true },
+      });
+      if (duplicate) {
+        throw new ConflictError('tax_period_already_settled', 'Налоговая сверка этого периода и точки уже зафиксирована');
+      }
+      const accountingPeriod = await tx.accountingPeriod.findUnique({ where: { period } });
+      if (accountingPeriod?.status !== 'soft_closed') {
+        throw new ConflictError('tax_period_soft_close_required', 'Налоговая сверка доступна только после мягкого закрытия периода');
+      }
+      const report = await taxPeriodOnTx(tx, period, point);
+      const settlement = await tx.accountingTaxSettlement.create({
+        data: {
+          period,
+          point,
+          idempotencyKey: dto.idempotencyKey,
+          outputTax: report.outputTax,
+          inputTax: report.inputTax,
+          offsetAmount: report.offsetAmount,
+          payableAmount: report.payableAmount,
+          recoverableAmount: report.recoverableAmount,
+          createdBy: actor,
+        },
+      });
+      let accountingEntry = null;
+      if (report.offsetAmount > 0) {
+        const [, to] = periodBounds(period);
+        accountingEntry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:tax-settlement:${dto.idempotencyKey}`,
+          sourceType: 'tax.settlement',
+          sourceRef: settlement.id,
+          description: `Взаимозачёт входящего и исходящего НДС за ${period}${point ? ` · ${point}` : ''}`,
+          point: point || null,
+          documentAmount: report.offsetAmount,
+          baseAmount: report.offsetAmount,
+          taxCode: 'vat_offset',
+          taxAmount: report.offsetAmount,
+          occurredAt: new Date(to.getTime() - 1),
+          createdBy: actor,
+          lines: [
+            { accountCode: '2200', debit: report.offsetAmount, memo: 'Погашение исходящего НДС' },
+            { accountCode: '1210', credit: report.offsetAmount, memo: 'Зачёт входящего НДС' },
+          ],
+        });
+        await tx.accountingTaxSettlement.update({
+          where: { id: settlement.id },
+          data: { accountingEntryId: accountingEntry.id },
+        });
+      }
+      const persisted = await tx.accountingTaxSettlement.findUniqueOrThrow({
+        where: { id: settlement.id },
+        include: { accountingEntry: true },
+      });
+      return {
+        result: { ...report, settlement: persisted, idempotent: false },
+        events: [
+          {
+            type: 'finance.tax_period_settled',
+            actor,
+            payload: { period, point: point || null, outputTax: report.outputTax, inputTax: report.inputTax, offsetAmount: report.offsetAmount, payableAmount: report.payableAmount, recoverableAmount: report.recoverableAmount, accountingEntryId: accountingEntry?.id ?? null },
+            refs: [persisted.id, ...(accountingEntry ? [accountingEntry.id] : [])],
+          },
+          ...(accountingEntry ? [{
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: { accountingEntryId: accountingEntry.id, sourceType: 'tax.settlement', sourceRef: settlement.id },
+            refs: [accountingEntry.id, settlement.id],
+          }] : []),
+        ],
       };
     });
   }
@@ -887,6 +1006,50 @@ type SettlementSource = {
   occurredAt: Date;
 };
 
+async function taxPeriodOnTx(tx: Prisma.TransactionClient, period: string, point: string) {
+  const [from, to] = periodBounds(period);
+  const entryFilter: Prisma.AccountingJournalEntryWhereInput = {
+    occurredAt: { gte: from, lt: to },
+    sourceType: { not: 'tax.settlement' },
+    ...(point ? { point } : {}),
+  };
+  const [output, input, accountingPeriod, settlement] = await Promise.all([
+    tx.accountingJournalLine.aggregate({
+      where: { accountCode: '2200', entry: entryFilter },
+      _sum: { debit: true, credit: true },
+    }),
+    tx.accountingJournalLine.aggregate({
+      where: { accountCode: '1210', entry: entryFilter },
+      _sum: { debit: true, credit: true },
+    }),
+    tx.accountingPeriod.findUnique({ where: { period } }),
+    tx.accountingTaxSettlement.findUnique({
+      where: { period_point: { period, point } },
+      include: { accountingEntry: true },
+    }),
+  ]);
+  const outputNet = (output._sum.credit ?? 0) - (output._sum.debit ?? 0);
+  const inputNet = (input._sum.debit ?? 0) - (input._sum.credit ?? 0);
+  const outputTax = Math.max(0, outputNet) + Math.max(0, -inputNet);
+  const inputTax = Math.max(0, inputNet) + Math.max(0, -outputNet);
+  const offsetAmount = Math.min(outputTax, inputTax);
+  return {
+    period,
+    point: point || null,
+    from,
+    to,
+    status: accountingPeriod?.status ?? 'open',
+    outputTax,
+    inputTax,
+    outputNet,
+    inputNet,
+    offsetAmount,
+    payableAmount: Math.max(0, outputTax - inputTax),
+    recoverableAmount: Math.max(0, inputTax - outputTax),
+    settlement,
+  };
+}
+
 function settlementPeriod(query: FinanceSettlementQueryDto) {
   const from = new Date(query.from);
   const to = new Date(query.to);
@@ -1078,4 +1241,11 @@ function replayBudgetCommand(
 function periodBounds(period: string): [Date, Date] {
   const [year, month] = period.split('-').map(Number);
   return [new Date(Date.UTC(year, month - 1, 1)), new Date(Date.UTC(year, month, 1))];
+}
+
+function validateMonth(period: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+    throw new ValidationError('invalid_accounting_period', 'Период должен быть в формате YYYY-MM');
+  }
+  return period;
 }

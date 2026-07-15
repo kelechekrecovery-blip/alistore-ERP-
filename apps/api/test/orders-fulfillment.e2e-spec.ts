@@ -54,7 +54,10 @@ describe('Order fulfillment metadata', () => {
       pickupPoint: 'AliStore Центр',
       deliverySlot: 'today 16:00-18:00',
       deliveryAddress: null,
+      taxBaseAmount: 89_286,
+      taxAmount: 10_714,
     });
+    expect(order.items).toMatchObject([{ lineNumber: 1, discountAmount: 0, taxCode: 'vat_standard', taxRateBps: 1200, taxBaseAmount: 89_286, taxAmount: 10_714 }]);
     expect(order.pickupCode).toMatch(/^PU-[0-9A-F]{6}$/);
 
     const event = await prisma.auditEvent.findFirstOrThrow({ where: { type: 'order.created' } });
@@ -65,6 +68,8 @@ describe('Order fulfillment metadata', () => {
       pickupPoint: 'AliStore Центр',
       deliverySlot: 'today 16:00-18:00',
       pickupCode: order.pickupCode,
+      taxBaseAmount: 89_286,
+      taxAmount: 10_714,
     });
   });
 
