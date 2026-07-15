@@ -63,6 +63,9 @@ export class ReceiveDto {
   @IsString({ each: true })
   imeis!: string[];
 
+  @ApiPropertyOptional({ minimum: 0, example: 80000, description: 'Immutable acquisition cost per unit' })
+  @IsOptional() @IsInt() @Min(0) unitCost?: number;
+
   @ApiPropertyOptional({ enum: ['A', 'B', 'C'], example: 'A' })
   @IsOptional()
   @IsIn(['A', 'B', 'C'])
@@ -81,6 +84,9 @@ export class ReceiveQuantityDto {
 
   @ApiProperty({ minimum: 1, example: 25 })
   @IsInt() @Min(1) quantity!: number;
+
+  @ApiPropertyOptional({ minimum: 0, example: 1200, description: 'Immutable acquisition cost per unit' })
+  @IsOptional() @IsInt() @Min(0) unitCost?: number;
 
   @ApiPropertyOptional({ example: 'поставка #INV-001' })
   @IsOptional() @IsString() reason?: string;

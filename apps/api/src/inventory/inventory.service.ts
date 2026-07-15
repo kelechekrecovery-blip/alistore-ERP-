@@ -86,6 +86,7 @@ export class InventoryService {
       );
     }
 
+    const unitCost = dto.unitCost ?? product.cost;
     return this.audit.transaction(async (tx) => {
       const movement = await tx.inventoryMovement.create({
         data: {
@@ -94,6 +95,8 @@ export class InventoryService {
           type: 'received',
           to: dto.location,
           reason: dto.reason ?? null,
+          unitCost,
+          totalValue: imeis.length * unitCost,
         },
       });
       for (const imei of imeis) {
@@ -104,6 +107,7 @@ export class InventoryService {
             status: 'in_stock',
             location: dto.location,
             grade: dto.grade,
+            acquisitionCost: unitCost,
           },
         });
       }
@@ -152,10 +156,11 @@ export class InventoryService {
     if (!location) throw new ValidationError('location_required', 'Укажите склад приёмки');
 
     return this.audit.transaction(async (tx) => {
+      const unitCost = dto.unitCost ?? product.cost;
       const balance = await tx.inventoryBalance.upsert({
         where: { productId_location: { productId: dto.productId, location } },
-        create: { productId: dto.productId, location, onHand: dto.quantity },
-        update: { onHand: { increment: dto.quantity } },
+        create: { productId: dto.productId, location, onHand: dto.quantity, inventoryValue: dto.quantity * unitCost },
+        update: { onHand: { increment: dto.quantity }, inventoryValue: { increment: dto.quantity * unitCost } },
       });
       const movement = await tx.inventoryMovement.create({
         data: {
@@ -164,6 +169,20 @@ export class InventoryService {
           type: 'received',
           to: location,
           reason: dto.reason?.trim() || null,
+          unitCost,
+          totalValue: dto.quantity * unitCost,
+        },
+      });
+      await tx.inventoryValuationLayer.create({
+        data: {
+          productId: dto.productId,
+          balanceId: balance.id,
+          location,
+          sourceType: 'inventory.receive',
+          sourceRef: movement.id,
+          unitCost,
+          quantityReceived: dto.quantity,
+          quantityRemaining: dto.quantity,
         },
       });
       return {

@@ -195,10 +195,10 @@ export class ProcurementService {
           const item = byId.get(line.itemId)!;
           await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQty: { increment: line.imeis.length } } });
           const movement = await tx.inventoryMovement.create({
-            data: { productId: item.productId, qty: line.imeis.length, type: 'received', to: order.location, reason: order.number },
+            data: { productId: item.productId, qty: line.imeis.length, type: 'received', to: order.location, reason: order.number, unitCost: item.unitCost, totalValue: line.imeis.length * item.unitCost },
           });
           await tx.deviceUnit.createMany({
-            data: line.imeis.map((imei) => ({ imei, productId: item.productId, status: 'in_stock', location: order.location, grade: (line.grade ?? null) as Grade | null })),
+            data: line.imeis.map((imei) => ({ imei, productId: item.productId, status: 'in_stock', location: order.location, grade: (line.grade ?? null) as Grade | null, acquisitionCost: item.unitCost })),
           });
           nextReceived.set(item.id, item.receivedQty + line.imeis.length);
           events.push({

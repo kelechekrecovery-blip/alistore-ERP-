@@ -465,6 +465,8 @@ model Product {
   consignmentItems        ConsignmentItem[]
   quantityConsignmentLots QuantityConsignmentLot[]
   serviceParts            ServicePart[]
+  valuationLayers         InventoryValuationLayer[]
+  valuationIssues         InventoryValuationIssue[]
 
   @@index([category])
   @@index([variantGroup])
@@ -479,10 +481,12 @@ model InventoryBalance {
   location                String
   onHand                  Int                       @default(0)
   reserved                Int                       @default(0)
+  inventoryValue          Int                       @default(0) // value of on-hand stock at receipt cost
   updatedAt               DateTime                  @default(now()) @updatedAt
   allocations             OrderQuantityAllocation[]
   quantityConsignmentLots QuantityConsignmentLot[]
   serviceParts            ServicePart[]
+  valuationLayers         InventoryValuationLayer[]
 
   @@unique([productId, location])
   @@index([location])
@@ -531,11 +535,13 @@ model DeviceUnit {
   status             UnitStatus        @default(in_stock)
   grade              Grade?
   location           String
+  acquisitionCost    Int?
   orderId            String?
   updatedAt          DateTime          @default(now()) @updatedAt
   consignmentItem    ConsignmentItem?
   serviceReplacement ServiceWorkOrder? @relation("ServiceReplacementUnit")
   loanerProfile      LoanerDevice?
+  valuationIssues    InventoryValuationIssue[]
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -1052,12 +1058,58 @@ model InventoryMovement {
   from           String?
   to             String?
   reason         String?
+  unitCost       Int?
+  totalValue     Int?
   createdAt      DateTime     @default(now())
   servicePart    ServicePart?
   // write_off / adjust → owner approval + evidence
 
   @@index([productId])
   @@index([type])
+}
+
+// Immutable cost provenance. Product.cost is only the current catalog default;
+// these rows are the accounting source for stock value and COGS.
+model InventoryValuationLayer {
+  id               String   @id @default(cuid())
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId        String
+  balance          InventoryBalance @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+  balanceId        String
+  location         String
+  sourceType       String
+  sourceRef        String
+  unitCost         Int
+  quantityReceived Int
+  quantityRemaining Int
+  createdAt        DateTime @default(now())
+  issues           InventoryValuationIssue[]
+
+  @@unique([sourceType, sourceRef])
+  @@index([productId, location, createdAt])
+  @@index([balanceId, quantityRemaining, createdAt])
+}
+
+model InventoryValuationIssue {
+  id          String   @id @default(cuid())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+  layer       InventoryValuationLayer? @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  layerId     String?
+  unit        DeviceUnit? @relation(fields: [imei], references: [imei], onDelete: Cascade)
+  imei        String?
+  orderId     String?
+  sourceType  String
+  sourceRef   String
+  quantity    Int
+  unitCost    Int
+  totalCost   Int
+  createdAt   DateTime @default(now())
+
+  @@unique([sourceType, sourceRef])
+  @@index([productId, createdAt])
+  @@index([orderId])
+  @@index([imei])
 }
 
 model Reservation {

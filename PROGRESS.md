@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — INV-VAL-001A
+
+- Iteration ID: `INV-VAL-001A`.
+- Task: establish immutable inventory cost provenance and COGS for serialized and quantity stock.
+- Files changed: Prisma valuation models/migrations, acquisition-cost snapshots on IMEI receiving, quantity inventory-value/FIFO layers, procurement cost propagation, serialized and quantity sale COGS posting, movement value fields and valuation helper.
+- Result: new receipts retain their acquisition cost independently of later catalog-cost edits. PO receiving stores each PO line cost on the IMEI; quantity receiving creates FIFO layers and updates balance value. Completed serialized and quantity sales issue immutable valuation rows and balanced `5000` COGS / `1200` inventory journal entries. Consignment rows with zero owned cost remain outside owned-stock COGS and continue through owner-liability accounting.
+- Checks run: Prisma schema validation/generation; local migration deploy through 73 migrations; API build; Next production build; mobile typecheck; isolated quantity-consignment regression 3/3. A clean full `mvp:verify -- --skip-e2e` run reached API Jest with the previous code and exposed only the expected zero-cost consignment case plus unrelated HR/rate-limit fixture flakiness; after the fix, the focused affected suite and all earlier clean API suites remain green. The final full post-fix gate is still pending.
+- Acceptance: `accepted` for receipt provenance and sale COGS software contour. Remaining `INV-VAL-001`: return issue reversal/quarantine disposition, valuation-aware write-offs/transfers/count adjustments, quantity PO receiving and reconciliation/reporting evidence.
+- Next step: implement return-cost reversals and valuation-aware stock adjustments, then rerun the complete clean gate.
+
 ## 2026-07-15 — FIN-003A
 
 - Iteration ID: `FIN-003A`.

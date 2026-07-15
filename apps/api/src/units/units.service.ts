@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ValidationError } from '../common/errors';
+import { postCogsOnTx } from '../inventory/inventory-valuation';
 
 /**
  * DeviceUnit (IMEI/SN) lifecycle. Enforces the hard invariant:
@@ -101,6 +102,7 @@ export class UnitsService {
     tx: Prisma.TransactionClient,
     imei: string,
     orderId: string,
+    actor = 'system',
   ): Promise<void> {
     const { count } = await tx.deviceUnit.updateMany({
       where: { imei, status: 'reserved', orderId },
@@ -118,6 +120,25 @@ export class UnitsService {
         'unit_not_reserved_for_order',
         `IMEI ${imei} не зарезервирован под заказ ${orderId}`,
       );
+    }
+    const sold = await tx.deviceUnit.findUniqueOrThrow({
+      where: { imei },
+      include: { product: { select: { cost: true } } },
+    });
+    const unitCost = sold.acquisitionCost ?? sold.product.cost;
+    // Consignment/trade-in units can have no owned acquisition cost. They create
+    // owner liability through consignment accounting, but must not create a
+    // zero-value journal entry (the ledger rejects zero debit/credit lines).
+    if (unitCost > 0) {
+      await postCogsOnTx(tx, {
+        productId: sold.productId,
+        orderId,
+        sourceRef: `${orderId}:${imei}`,
+        imei,
+        quantity: 1,
+        unitCost,
+        actor,
+      });
     }
   }
 

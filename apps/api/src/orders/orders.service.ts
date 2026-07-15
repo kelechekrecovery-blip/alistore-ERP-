@@ -21,6 +21,7 @@ import {
 import { LogisticsService } from '../logistics/logistics.service';
 import { PromotionLine, PromotionsService } from '../promotions/promotions.service';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
+import { consumeQuantityValuationOnTx } from '../inventory/inventory-valuation';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -758,7 +759,7 @@ export class OrdersService {
       // sold and the order becomes paid. No synthetic Payment row is created.
       if (order.total === 0) {
         for (const imei of assigned) {
-          await this.units.sellOnTx(tx, imei, order.id);
+          await this.units.sellOnTx(tx, imei, order.id, actor);
           events.push({
             type: EventType.UnitSold,
             actor,
@@ -878,9 +879,17 @@ export class OrdersService {
   ): Promise<void> {
     const allocations = await tx.orderQuantityAllocation.findMany({ where: { orderId, active: true } });
     for (const allocation of allocations) {
+      const totalCost = await consumeQuantityValuationOnTx(tx, {
+        orderId,
+        allocationId: allocation.id,
+        productId: allocation.productId,
+        balanceId: allocation.balanceId,
+        quantity: allocation.qty,
+        actor,
+      });
       const consumed = await tx.inventoryBalance.updateMany({
-        where: { id: allocation.balanceId, onHand: { gte: allocation.qty }, reserved: { gte: allocation.qty } },
-        data: { onHand: { decrement: allocation.qty }, reserved: { decrement: allocation.qty } },
+        where: { id: allocation.balanceId, onHand: { gte: allocation.qty }, reserved: { gte: allocation.qty }, inventoryValue: { gte: totalCost } },
+        data: { onHand: { decrement: allocation.qty }, reserved: { decrement: allocation.qty }, inventoryValue: { decrement: totalCost } },
       });
       if (consumed.count !== 1) {
         throw new ConflictError('quantity_allocation_invalid', `Резерв ${allocation.id} больше недоступен`);

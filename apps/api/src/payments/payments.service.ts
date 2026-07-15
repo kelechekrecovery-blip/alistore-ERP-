@@ -13,6 +13,7 @@ import { PayDto } from './payments.dto';
 import { accrueConsignmentSalesOnTx, accrueQuantityConsignmentSalesOnTx } from '../inventory/consignment-accounting';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
+import { consumeQuantityValuationOnTx } from '../inventory/inventory-valuation';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -341,7 +342,7 @@ export class PaymentsService {
       });
       for (const reservation of reservedUnits) {
         if (!reservation.imei) continue;
-        await this.units.sellOnTx(tx, reservation.imei, order.id);
+        await this.units.sellOnTx(tx, reservation.imei, order.id, actor);
         events.push({
           type: EventType.UnitSold,
           actor,
@@ -360,15 +361,25 @@ export class PaymentsService {
         where: { orderId: order.id, active: true },
       });
       for (const allocation of quantityAllocations) {
+        const totalCost = await consumeQuantityValuationOnTx(tx, {
+          orderId: order.id,
+          allocationId: allocation.id,
+          productId: allocation.productId,
+          balanceId: allocation.balanceId,
+          quantity: allocation.qty,
+          actor,
+        });
         const consumed = await tx.inventoryBalance.updateMany({
           where: {
             id: allocation.balanceId,
             onHand: { gte: allocation.qty },
             reserved: { gte: allocation.qty },
+            inventoryValue: { gte: totalCost },
           },
           data: {
             onHand: { decrement: allocation.qty },
             reserved: { decrement: allocation.qty },
+            inventoryValue: { decrement: totalCost },
           },
         });
         if (consumed.count !== 1) {
