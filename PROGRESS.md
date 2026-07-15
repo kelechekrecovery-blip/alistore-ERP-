@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ERP-ADMIN-002
+
+- Iteration ID: `ERP-ADMIN-002`.
+- Task: connect storefront administration modules to the ERP shell.
+- Files changed: `apps/web/app/erp/page.tsx` and `apps/web/components/erp/AdminView.tsx`.
+- Result: role-authorized users can open CMS storefront and campaigns directly from the ERP Administration hub; the internal navigation preserves the current staff session and does not bypass server RBAC.
+- Checks run: production Next.js build completed; targeted `git diff --check` passed for changed files. Full diff check remains blocked by an unrelated pre-existing trailing blank line in `apps/api/src/ai/grading.ts`.
+- Acceptance: `accepted` for ERP administration navigation integration. CMS and campaign business capabilities retain their own functional/API acceptance gates.
+- Commit: `b3ff416`.
+
 ## 2026-07-15 — ERP-FIN-001
 
 - Iteration ID: `ERP-FIN-001`.

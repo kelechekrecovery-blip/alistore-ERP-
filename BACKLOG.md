@@ -30,6 +30,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- `ERP-ADMIN-002` Connect CMS storefront and campaigns to the ERP Administration hub so authorized staff can open them inside the ERP shell while preserving staff JWT/RBAC. Production web build and targeted diff check pass; full visual browser smoke still requires local Chromium.
 - `ERP-ADMIN-001` Собрать административный центр внутри `/erp`: роль-зависимые входы в каталог, согласования/2FA, склад/IMEI, POS, Staff и клиентскую витрину с единым серверным staff JWT/RBAC-контуром. Production web build проходит; визуальный Playwright smoke требует установленного Chromium.
 - `ERP-FIN-001` Подключить к Finance workspace серверные AP aging, финансовые statements, accounting periods, банковские выписки и cash incassations с фильтром периода/точки и состояниями loading/error/empty.
 - `AP-001B` Add supplier invoice documents with exact PO/receipt three-way matching, approval, idempotent payment and `2000` liability clearance to the selected funding account. Remaining `AP-001` scope is credit notes, advances/partial payments, landed cost and statement reconciliation.
