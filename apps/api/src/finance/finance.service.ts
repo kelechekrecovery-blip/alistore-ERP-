@@ -12,6 +12,7 @@ import {
   FinanceSettlementQueryDto,
   PayExpenseDto,
   ResolveFinanceSettlementDto,
+  CloseAccountingPeriodDto,
   SetFinanceBudgetDto,
   SETTLEMENT_SOURCE_TYPES,
 } from './finance.dto';
@@ -43,6 +44,34 @@ export class FinanceService {
 
   listAccountingAccounts() {
     return this.prisma.accountingAccount.findMany({ orderBy: { code: 'asc' } });
+  }
+
+  listAccountingPeriods() {
+    return this.prisma.accountingPeriod.findMany({ orderBy: { period: 'desc' }, take: 120 });
+  }
+
+  async closeAccountingPeriod(rawPeriod: string, dto: CloseAccountingPeriodDto, actor: string) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(rawPeriod)) {
+      throw new ValidationError('invalid_accounting_period', 'Период должен быть в формате YYYY-MM');
+    }
+    const period = rawPeriod;
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accounting-period:${period}`}))`;
+      const commandKey = `accounting-period:${period}:${dto.idempotencyKey}`;
+      const existing = await tx.accountingPeriod.findUnique({ where: { period } });
+      if (existing?.lastCloseIdempotencyKey === commandKey || existing?.status === 'hard_closed') {
+        return { result: { ...existing, idempotent: true }, events: [] };
+      }
+      const closed = await tx.accountingPeriod.upsert({
+        where: { period },
+        create: { period, status: dto.status, lastCloseIdempotencyKey: commandKey, closedBy: actor, closedAt: new Date() },
+        update: { status: dto.status, lastCloseIdempotencyKey: commandKey, closedBy: actor, closedAt: new Date() },
+      });
+      return {
+        result: { ...closed, idempotent: false },
+        events: [{ type: 'finance.accounting_period_closed', actor, payload: { period, status: dto.status }, refs: [closed.id] }],
+      };
+    });
   }
 
   async accountingJournal(query: FinanceAccountingQueryDto) {

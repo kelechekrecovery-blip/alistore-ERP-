@@ -1,5 +1,25 @@
 # PROGRESS
 
+## 2026-07-15 — AP-001B
+
+- Iteration ID: `AP-001B`.
+- Task: add supplier invoice approval, exact three-way matching and idempotent payment.
+- Files changed: `SupplierInvoice` Prisma model/migration, procurement DTO/controller/service and procurement regression assertions.
+- Result: invoices cannot be created before receipt, invoice amount must equal received PO value, approval rechecks the match, and payment clears supplier liability `2000` into the selected funding account with stable replay protection and journal/Ledger links.
+- Checks run: Prisma generate/validate, API build, reset procurement suite 6/6, clean migration deploy through 77 migrations.
+- Acceptance: `accepted` for receipt/invoice/AP payment contour. Credit notes, advances/partial payments, landed cost, supplier statement and AP aging remain open.
+- Next step: add supplier statement/AP aging and credit-note controls.
+
+## 2026-07-15 — ACC-002A
+
+- Iteration ID: `ACC-002A`.
+- Task: introduce server-enforced accounting period controls.
+- Files changed: `AccountingPeriod` Prisma model/migration, journal posting guard, finance period list/close API, DTO and finance integration regression.
+- Result: periods are created lazily as open, owners/admins can soft-close or hard-close a `YYYY-MM` period, repeated close requests are idempotent, and new journal entries dated in a hard-closed period fail with a conflict. Existing idempotent replays remain readable and do not create a second entry.
+- Checks run: Prisma generate/validate, API production build, reset Finance integration suite 6/6, clean migration deploy through 77 migrations.
+- Acceptance: `accepted` for hard-close posting protection. Reversal entries, taxes, currencies, bank reconciliation, statements and AP/AR aging remain open.
+- Next step: add reversal/adjustment documents and AP aging/statement drill-down without mutating posted journal rows.
+
 ## 2026-07-15 — AP-001A
 
 - Iteration ID: `AP-001A`.
@@ -7,8 +27,8 @@
 - Files changed: `PurchaseReceipt` journal relation/migration, procurement receiving service, procurement regression assertions.
 - Result: every non-zero partial or full PO receipt posts `1200` inventory debit / `2000` supplier liability credit, links the receipt to its journal entry and emits `AccountingEntryPosted`. The receipt id is the source/idempotency boundary, so replay cannot duplicate either stock or AP.
 - Checks run: Prisma schema generation, API build, reset test database, procurement API/RBAC suite 5/5 tests.
-- Acceptance: `accepted` for receipt-to-AP posting. Supplier invoice matching, supplier payment, credit notes, landed cost and AP aging remain open.
-- Next step: add a supplier invoice document with three-way PO/receipt matching and an idempotent AP payment path.
+- Acceptance: `accepted` for receipt-to-AP posting. Supplier invoice matching/payment is now covered by `AP-001B`; credit notes, landed cost and AP aging remain open.
+- Next step: add supplier statement/AP aging and credit-note controls.
 
 ## 2026-07-15 — FIN-003C
 

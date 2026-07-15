@@ -44,6 +44,11 @@ export class FinancePeriodQueryDto {
   @IsOptional() @IsString() @MaxLength(100) point?: string;
 }
 
+export class CloseAccountingPeriodDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsIn(['soft_closed', 'hard_closed']) status!: 'soft_closed' | 'hard_closed';
+}
+
 export class SetFinanceBudgetDto extends FinancePeriodQueryDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsIn(EXPENSE_CATEGORIES) category!: (typeof EXPENSE_CATEGORIES)[number];

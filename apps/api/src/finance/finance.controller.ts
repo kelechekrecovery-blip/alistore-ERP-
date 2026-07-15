@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -58,6 +58,18 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   accounts() {
     return this.finance.listAccountingAccounts();
+  }
+
+  @Get('periods')
+  @RequirePermission('finance', 'read')
+  periods() {
+    return this.finance.listAccountingPeriods();
+  }
+
+  @Post('periods/:period/close')
+  @RequirePermission('finance', 'approve')
+  closePeriod(@CurrentUser() user: AuthPrincipal, @Param('period') period: string, @Body() dto: CloseAccountingPeriodDto) {
+    return this.finance.closeAccountingPeriod(period, dto, user.customerId);
   }
 
   @Get('journal')

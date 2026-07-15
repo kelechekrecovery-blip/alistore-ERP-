@@ -112,6 +112,17 @@ export async function postAccountingEntryOnTx(tx: Prisma.TransactionClient, inpu
     throw new ConflictError('accounting_source_already_posted', 'Для этого первичного документа проводка уже создана');
   }
 
+  const period = accountingPeriodKey(normalized.occurredAt);
+  const accountingPeriod = await tx.accountingPeriod.upsert({
+    where: { period },
+    create: { period },
+    update: {},
+    select: { status: true },
+  });
+  if (accountingPeriod.status === 'hard_closed') {
+    throw new ConflictError('accounting_period_hard_closed', `Бухгалтерский период ${period} закрыт для новых проводок`);
+  }
+
   const accountCodes = [...new Set(normalized.lines.map((line) => line.accountCode))];
   const accounts = await tx.accountingAccount.findMany({
     where: { code: { in: accountCodes }, active: true },
@@ -136,6 +147,12 @@ export async function postAccountingEntryOnTx(tx: Prisma.TransactionClient, inpu
     include: { lines: { orderBy: { accountCode: 'asc' } } },
   });
   return { ...entry, idempotent: false };
+}
+
+export function accountingPeriodKey(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
 }
 
 export function normalBalance(type: AccountingAccountType, debit: number, credit: number) {

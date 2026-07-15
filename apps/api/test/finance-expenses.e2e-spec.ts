@@ -49,6 +49,7 @@ describe('Finance expenses (integration + RBAC)', () => {
     await prisma.financeBudgetCommand.deleteMany();
     await prisma.financeBudget.deleteMany();
     await prisma.$transaction([
+      prisma.accountingPeriod.deleteMany(),
       prisma.payment.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
       prisma.accountingJournalLine.deleteMany(),
       prisma.accountingJournalEntry.deleteMany(),
@@ -165,6 +166,46 @@ describe('Finance expenses (integration + RBAC)', () => {
 
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
     expect(events.map((event) => event.type)).toEqual(['expense.submitted', 'expense.approved', 'expense.paid', 'accounting.entry_posted']);
+  });
+
+  it('closes an accounting period and blocks new postings', async () => {
+    const now = new Date();
+    const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const expense = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-expense-${run}`, category: 'rent', description: 'Проверка закрытия периода', amount: 1_000, incurredAt: now.toISOString() })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/finance/periods/${period}/close`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ idempotencyKey: `period-close-forbidden-${run}`, status: 'hard_closed' })
+      .expect(403);
+
+    const closed = await request(app.getHttpServer())
+      .post(`/finance/periods/${period}/close`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-close-${run}`, status: 'hard_closed' })
+      .expect(201);
+    expect(closed.body.status).toBe('hard_closed');
+
+    const replay = await request(app.getHttpServer())
+      .post(`/finance/periods/${period}/close`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-close-${run}`, status: 'hard_closed' })
+      .expect(201);
+    expect(replay.body.idempotent).toBe(true);
+
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${expense.body.id}/approve`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${expense.body.id}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `period-pay-${run}`, fundingAccountCode: '1000' })
+      .expect(409);
   });
 
   it('returns a deterministic conflict when two expenses reuse one payment key', async () => {
