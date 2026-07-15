@@ -104,6 +104,7 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
   val authManager = remember(apiBaseUrl) {
     AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"))
   }
+  val quickUnlock = remember { QuickUnlockStore(context, "client") }
   val addToCart: (String) -> Unit = { id ->
     products.firstOrNull { it.id == id }?.let { product ->
       val current = cart[id] ?: 0
@@ -134,6 +135,7 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
   }
 
   MaterialTheme {
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
       containerColor = Ink,
       bottomBar = {
@@ -180,6 +182,10 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
           orderRefreshRevision = orderRefreshRevision,
         )
       }
+    }
+    if (authManager.requiresQuickUnlock && authState is AuthState.SignedIn) {
+      QuickUnlockGate("AliStore", (authState as AuthState.SignedIn).user.phone ?: "Клиент", quickUnlock, authManager::unlock, { authState = authManager.forceLogout() }) {}
+    }
     }
   }
 }

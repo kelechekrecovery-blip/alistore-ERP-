@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `NATIVE-QUICK-UNLOCK` Run Android compilation/Lint/Compose gates after JDK setup, then validate Face ID/Touch ID and PIN quick unlock on physical devices for Client, Staff, Courier and POS. Keep server session validation and no-password-storage invariant.
 - `AUT-001` Reconcile the autonomous lane commits into a clean ownership baseline, split or document the pre-staged campaign files included in `45f8383`, and rerun full Playwright plus native connected UI gates.
 - `AUT-002` Provide an Android emulator/device and run connected Compose tests for Client catalog filters; then add app-level Staff/Courier/POS connected acceptance.
 - `MKT-008` Connect certified advertising and messaging providers to the accepted campaign lifecycle: signed callbacks or scheduled imports, account/currency reconciliation, delivery receipts, retry/DLQ and explicit certification flags. Keep manual owner spend reconciliation as the audited fallback; no live-provider readiness claim before credentials and sandbox/live evidence.

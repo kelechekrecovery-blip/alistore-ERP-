@@ -33,6 +33,7 @@
 		E3B3670272FF6B5A0E381FFE /* CourierOperationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */; };
 		E4AFBA9E7AA4F56F3FB28A7E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A617D85C85DD435B687E350 /* StaffLoginView.swift */; };
+		EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1835E8741DBB19503E6334A1 /* QuickUnlock.swift */; };
 		F5420D98BEB7F7E63A8AFCAE /* AliStoreCourierApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */; };
 		FA0AB9B3D7316B9DA3538939 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42436819B18857A22AC06504 /* APIClientTests.swift */; };
@@ -138,6 +139,7 @@
 		04AAB6220384C05861A21153 /* NativeShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeShell.swift; sourceTree = "<group>"; };
 		11F23ACBE05CF3A0E1499E0B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		13A9A1766E34065A9DE2EE32 /* Courier.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Courier.entitlements; sourceTree = "<group>"; };
+		1835E8741DBB19503E6334A1 /* QuickUnlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlock.swift; sourceTree = "<group>"; };
 		1897622CBA172469A7099983 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2A617D85C85DD435B687E350 /* StaffLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffLoginView.swift; sourceTree = "<group>"; };
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -222,6 +224,7 @@
 				A9EBC4D5C06A5630E3B7D69D /* Models.swift */,
 				04AAB6220384C05861A21153 /* NativeShell.swift */,
 				8A5A549F226050ACB113FF4E /* OfflineQueue.swift */,
+				1835E8741DBB19503E6334A1 /* QuickUnlock.swift */,
 				3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */,
 				915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */,
 				2A617D85C85DD435B687E350 /* StaffLoginView.swift */,
@@ -542,6 +545,7 @@
 				8C5A4F7C9419670E633A9668 /* Models.swift in Sources */,
 				95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */,
 				03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */,
+				EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */,
 				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,
 				77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */,
 				E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */,

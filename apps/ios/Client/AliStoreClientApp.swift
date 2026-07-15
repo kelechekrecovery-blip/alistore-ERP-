@@ -84,6 +84,11 @@ private struct ClientRootView: View {
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
+        .overlay {
+            if auth.requiresQuickUnlock, let session = auth.session {
+                QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout() } })
+            }
+        }
         .task {
             async let restore: Void = auth.restore()
             async let catalog: Void = loadCatalog()

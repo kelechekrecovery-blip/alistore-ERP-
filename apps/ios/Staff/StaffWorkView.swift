@@ -16,6 +16,17 @@ struct StaffWorkView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Рабочий день").font(.title2.weight(.black))
+                    Text(session.username).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(session.role.uppercased()).font(.caption.weight(.bold)).foregroundStyle(.black)
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(Color(red: 0.776, green: 1, blue: 0.239), in: RoundedRectangle(cornerRadius: 7))
+            }
+            .padding(.horizontal, 18).padding(.top, 14).padding(.bottom, 12)
             Picker("Работа", selection: $mode) {
                 ForEach(StaffWorkMode.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -32,7 +43,10 @@ struct StaffWorkView: View {
                 StaffSupportView(session: session)
             }
         }
+        .preferredColorScheme(.dark)
+        .background(Color(red: 0.055, green: 0.047, blue: 0.039))
         .navigationTitle("Работа")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

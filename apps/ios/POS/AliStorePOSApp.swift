@@ -8,8 +8,12 @@ struct AliStorePOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let session = auth.session {
-                if ["cashier", "admin", "owner"].contains(session.role) {
+            if auth.isRestoring {
+                ProgressView("Восстанавливаем кассу…")
+            } else if let session = auth.session {
+                if auth.requiresQuickUnlock {
+                    QuickUnlockView(title: "AliStore POS", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+                } else if ["cashier", "admin", "owner"].contains(session.role) {
                     POSRootView(session: session, logout: auth.logout)
                         .preferredColorScheme(.dark)
                 } else {

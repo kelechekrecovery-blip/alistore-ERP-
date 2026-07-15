@@ -94,6 +94,7 @@ fun StaffApp(
   val manager = remember(apiBaseUrl) {
     StaffSessionManager(api, SecureTokenStore(context, "alistore-staff-session"))
   }
+  val quickUnlock = remember { QuickUnlockStore(context, "staff") }
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(manager) { state = manager.restore() }
 
@@ -102,18 +103,11 @@ fun StaffApp(
       StaffAuthState.Restoring -> StaffLoading()
       StaffAuthState.SignedOut -> StaffLoginScreen(manager) { state = it }
       is StaffAuthState.Failed -> StaffLoginScreen(manager, current.message) { state = it }
-      is StaffAuthState.SignedIn -> StaffSignedInScreen(
-        current.session,
-        api,
-        api,
-        api,
-        api,
-        deepLinkUrl = deepLinkUrl,
-        deepLinkRevision = deepLinkRevision,
-        pushRegistrar = pushRegistrar,
-        onLogout = { state = manager.logout() },
-        apiBaseUrl = apiBaseUrl,
-      )
+      is StaffAuthState.SignedIn -> if (manager.requiresQuickUnlock) {
+        QuickUnlockGate("AliStore Staff", current.session.username, quickUnlock, manager::unlock, { state = manager.logout() }) {
+          StaffSignedInScreen(current.session, api, api, api, api, deepLinkUrl, deepLinkRevision, pushRegistrar, { state = manager.logout() }, apiBaseUrl)
+        }
+      } else StaffSignedInScreen(current.session, api, api, api, api, deepLinkUrl, deepLinkRevision, pushRegistrar, { state = manager.logout() }, apiBaseUrl)
     }
   }
 }
@@ -233,12 +227,19 @@ private fun StaffHome(session: StaffSession, modifier: Modifier, onTab: (Int) ->
     item {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-          Text("Рабочий день", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("staff-home-title"))
-          Text(session.username, color = StaffMuted)
+          Text("Рабочий день", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("staff-home-title"))
+          Text("Добро пожаловать, ${session.username}", color = StaffMuted, fontSize = 13.sp)
         }
         Text(session.role.uppercase(), color = StaffInk, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(StaffLime, RoundedCornerShape(6.dp)).padding(9.dp, 6.dp))
       }
       Spacer(Modifier.height(22.dp))
+    }
+    item {
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        StaffMetric("Заказы", "Сегодня", StaffCoral, Modifier.weight(1f))
+        StaffMetric("Смена", if (session.totpEnabled) "2FA OK" else "Проверьте 2FA", StaffLime, Modifier.weight(1f), StaffInk)
+      }
+      Spacer(Modifier.height(16.dp))
     }
     item { StaffShortcut("Очередь заказов", "Комплектация и выдача", StaffCoral) { onTab(1) } }
     item { StaffShortcut("Задачи и KPI", "Назначения на сегодня", StaffLime, StaffInk) { onTab(2) } }
@@ -252,6 +253,16 @@ private fun StaffHome(session: StaffSession, modifier: Modifier, onTab: (Int) ->
         fontSize = 12.sp,
         modifier = Modifier.padding(top = 18.dp),
       )
+    }
+  }
+}
+
+@Composable
+private fun StaffMetric(title: String, value: String, color: Color, modifier: Modifier, content: Color = Color.White) {
+  Card(colors = CardDefaults.cardColors(containerColor = color), shape = RoundedCornerShape(8.dp), modifier = modifier) {
+    Column(Modifier.padding(14.dp)) {
+      Text(title, color = content.copy(alpha = .7f), fontSize = 11.sp)
+      Text(value, color = content, fontSize = 15.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 6.dp))
     }
   }
 }

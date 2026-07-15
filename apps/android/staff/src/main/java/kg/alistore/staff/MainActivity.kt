@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
@@ -17,7 +17,7 @@ import androidx.core.content.ContextCompat
 import kg.alistore.core.AliStoreApp
 import kg.alistore.core.AppRole
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
   private var deepLinkUrl by mutableStateOf<String?>(null)
   private var deepLinkRevision by mutableLongStateOf(0)
 

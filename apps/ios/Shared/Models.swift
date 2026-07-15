@@ -36,6 +36,15 @@ public struct StaffSession: Codable, Sendable {
     public let role: String
 }
 
+public struct StaffPrincipal: Decodable, Sendable {
+    public let id: String
+    public let username: String
+    public let role: String
+    public let active: Bool
+    public let totpEnabled: Bool
+    public let typ: String
+}
+
 public struct StaffLogin: Encodable, Sendable {
     public let username: String
     public let password: String

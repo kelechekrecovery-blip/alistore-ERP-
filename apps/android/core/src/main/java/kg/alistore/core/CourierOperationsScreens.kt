@@ -134,6 +134,7 @@ fun CourierApp(
   val context = LocalContext.current.applicationContext
   val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   val manager = remember(apiBaseUrl) { StaffSessionManager(api, SecureTokenStore(context, "alistore-courier-session")) }
+  val quickUnlock = remember { QuickUnlockStore(context, "courier") }
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(manager) { state = manager.restore() }
   MaterialTheme {
@@ -142,7 +143,8 @@ fun CourierApp(
       StaffAuthState.SignedOut -> CourierLogin(manager) { state = it }
       is StaffAuthState.Failed -> CourierLogin(manager, current.message) { state = it }
       is StaffAuthState.SignedIn -> if (current.session.role == "courier") {
-        CourierWorkspace(current.session, api, apiBaseUrl, deepLinkUrl, deepLinkRevision, pushRegistrar) { state = manager.logout() }
+        val workspace: @Composable () -> Unit = { CourierWorkspace(current.session, api, apiBaseUrl, deepLinkUrl, deepLinkRevision, pushRegistrar) { state = manager.logout() } }
+        if (manager.requiresQuickUnlock) QuickUnlockGate("AliStore Courier", current.session.username, quickUnlock, manager::unlock, { state = manager.logout() }, workspace) else workspace()
       } else {
         CourierLogin(manager, "Эта учётная запись не является курьером") { state = manager.logout() }
       }

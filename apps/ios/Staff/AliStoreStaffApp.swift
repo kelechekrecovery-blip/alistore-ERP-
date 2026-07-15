@@ -39,8 +39,14 @@ struct AliStoreStaffApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let session = auth.session {
-                StaffRootView(session: session, logout: auth.logout)
+            if auth.isRestoring {
+                ProgressView("Восстанавливаем рабочее место…")
+            } else if let session = auth.session {
+                if auth.requiresQuickUnlock {
+                    QuickUnlockView(title: "AliStore Staff", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+                } else {
+                    StaffRootView(session: session, logout: auth.logout)
+                }
             } else {
                 StaffLoginView(auth: auth, title: "AliStore Staff")
             }

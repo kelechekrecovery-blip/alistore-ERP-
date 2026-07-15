@@ -25,15 +25,18 @@ class AuthSessionManager(
   private val api: AuthGateway,
   private val store: SessionStore,
 ) {
+  var requiresQuickUnlock: Boolean = false
+    private set
   suspend fun restore(): AuthState {
     val stored = store.readSession() ?: return AuthState.Guest
-    return runCatching { signedIn(stored) }.getOrElse { initialError ->
+    return runCatching { requiresQuickUnlock = true; signedIn(stored) }.getOrElse { initialError ->
       if (initialError !is ApiException || initialError.status != 401) {
         return@getOrElse failAndClear(initialError)
       }
       runCatching {
         val refreshed = api.refresh(stored.refreshToken)
         store.saveSession(refreshed)
+        requiresQuickUnlock = true
         signedIn(refreshed)
       }.getOrElse(::failAndClear)
     }
@@ -44,12 +47,22 @@ class AuthSessionManager(
   suspend fun verify(phone: String, code: String): AuthState = runCatching {
     val tokens = api.verifyOtp(phone.normalizedPhone(), code.trim())
     store.saveSession(tokens)
+    requiresQuickUnlock = false
     signedIn(tokens)
   }.getOrElse { AuthState.Failed(it.userMessage()) }
 
   suspend fun logout(state: AuthState.SignedIn): AuthState {
     runCatching { api.logout(state.tokens.refreshToken) }
     store.clear()
+    requiresQuickUnlock = false
+    return AuthState.Guest
+  }
+
+  fun unlock() { requiresQuickUnlock = false }
+
+  fun forceLogout(): AuthState {
+    store.clear()
+    requiresQuickUnlock = false
     return AuthState.Guest
   }
 

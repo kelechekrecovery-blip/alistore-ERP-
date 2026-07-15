@@ -39,8 +39,12 @@ struct AliStoreCourierApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let session = auth.session {
-                if session.role == "courier" {
+            if auth.isRestoring {
+                ProgressView("Восстанавливаем рабочее место…")
+            } else if let session = auth.session {
+                if auth.requiresQuickUnlock {
+                    QuickUnlockView(title: "AliStore Courier", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+                } else if session.role == "courier" {
                     CourierRootView(session: session, logout: auth.logout)
                 } else {
                     ContentUnavailableView(

@@ -97,6 +97,7 @@ fun PosApp(apiBaseUrl: String) {
   val context = LocalContext.current.applicationContext
   val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   val auth = remember(apiBaseUrl) { StaffSessionManager(api, SecureTokenStore(context, "alistore-pos-session")) }
+  val quickUnlock = remember { QuickUnlockStore(context, "pos") }
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(auth) { state = auth.restore() }
   MaterialTheme {
@@ -105,7 +106,8 @@ fun PosApp(apiBaseUrl: String) {
       StaffAuthState.SignedOut -> PosLogin(auth) { state = it }
       is StaffAuthState.Failed -> PosLogin(auth, current.message) { state = it }
       is StaffAuthState.SignedIn -> if (current.session.role in setOf("cashier", "admin", "owner")) {
-        PosWorkspace(current.session, api, apiBaseUrl) { state = auth.logout() }
+        val workspace: @Composable () -> Unit = { PosWorkspace(current.session, api, apiBaseUrl) { state = auth.logout() } }
+        if (auth.requiresQuickUnlock) QuickUnlockGate("AliStore POS", current.session.username, quickUnlock, auth::unlock, { state = auth.logout() }, workspace) else workspace()
       } else PosLogin(auth, "У роли ${current.session.role} нет доступа к кассе") { state = auth.logout() }
     }
   }

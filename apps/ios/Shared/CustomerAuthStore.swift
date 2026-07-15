@@ -9,6 +9,8 @@ public final class CustomerAuthStore {
     public private(set) var isLoading = false
     public private(set) var errorMessage: String?
     public private(set) var devCode: String?
+    public private(set) var requiresQuickUnlock = false
+    public let quickUnlockService: String
 
     private let api: APIClient
     private let tokens: SecureTokenStore
@@ -16,6 +18,7 @@ public final class CustomerAuthStore {
     public init(environment: AppEnvironment, keychainService: String = "kg.alistore.client.auth") {
         self.api = APIClient(baseURL: environment.apiBaseURL)
         self.tokens = SecureTokenStore(service: keychainService)
+        self.quickUnlockService = keychainService
     }
 
     public func restore() async {
@@ -29,6 +32,7 @@ public final class CustomerAuthStore {
                 customerId: principal.customerId,
                 phone: principal.phone ?? stored.phone
             )
+            requiresQuickUnlock = true
         } catch {
             await refresh(stored)
         }
@@ -66,6 +70,7 @@ public final class CustomerAuthStore {
             )
             try save(next)
             session = next
+            requiresQuickUnlock = false
             devCode = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -78,6 +83,7 @@ public final class CustomerAuthStore {
         }
         try? tokens.clear(account: "customer-session")
         session = nil
+        requiresQuickUnlock = false
         errorMessage = nil
         devCode = nil
     }
@@ -97,11 +103,14 @@ public final class CustomerAuthStore {
             )
             try save(next)
             session = next
+            requiresQuickUnlock = true
         } catch {
             try? tokens.clear(account: "customer-session")
             session = nil
         }
     }
+
+    public func unlock() { requiresQuickUnlock = false }
 
     private func save(_ session: CustomerSession) throws {
         let data = try JSONEncoder().encode(session)

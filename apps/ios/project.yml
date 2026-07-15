@@ -37,6 +37,7 @@ targets:
             CFBundleURLSchemes: [alistore]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в AliStore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.client
@@ -61,6 +62,7 @@ targets:
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование IMEI и фото для подтверждения операций
         NSPhotoLibraryUsageDescription: Выбор фото для Evidence Vault
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в рабочее приложение
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.staff
             CFBundleURLSchemes: [alistore-staff]
@@ -90,6 +92,7 @@ targets:
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Фото подтверждения доставки для Evidence Vault
         NSPhotoLibraryUsageDescription: Выбор фото подтверждения доставки
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в приложение курьера
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.courier
             CFBundleURLSchemes: [alistore-courier]
@@ -118,6 +121,7 @@ targets:
         UILaunchScreen: {}
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование штрихкодов и IMEI на кассе
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в кассу
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.pos
             CFBundleURLSchemes: [alistore-pos]
