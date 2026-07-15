@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -152,7 +153,7 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
         loading -> Loading(Modifier.padding(padding))
         error != null -> ClientMessage("Каталог недоступен", error, Modifier.padding(padding))
         selected == 0 -> ClientHome(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
-        selected == 1 -> ProductGrid("Каталог", products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
+        selected == 1 -> ClientCatalogScreen(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
         selected == 2 -> ProductGrid("Избранное", products.filter { it.id in favorites }, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, Modifier.padding(padding))
         selected == 3 -> ClientCheckout(
           apiBaseUrl = apiBaseUrl,
@@ -267,7 +268,7 @@ private fun ProductGrid(
 }
 
 @Composable
-private fun ProductCard(
+internal fun ProductCard(
   product: Product,
   favorite: Boolean,
   inCart: Boolean,
@@ -275,7 +276,7 @@ private fun ProductCard(
   onCart: (String) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Column(modifier.background(Surface, RoundedCornerShape(8.dp)).padding(10.dp)) {
+  Column(modifier.testTag("product-${product.id}").background(Surface, RoundedCornerShape(8.dp)).padding(10.dp)) {
     Box(Modifier.fillMaxWidth().aspectRatio(1.15f).background(Color(0xFFF2EFEB), RoundedCornerShape(6.dp))) {
       Box(Modifier.size(46.dp, 82.dp).align(Alignment.Center).background(Coral, RoundedCornerShape(13.dp)))
       IconButton(onClick = { onFavorite(product.id) }, modifier = Modifier.align(Alignment.TopEnd).size(34.dp)) {
