@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsIn,
   Max,
   Min,
 } from 'class-validator';
@@ -39,6 +40,11 @@ export class CatalogSearchQueryDto {
   @Transform(({ value }) => parseBoolean(value))
   stockOnly?: boolean;
 
+  @ApiPropertyOptional({ enum: ['name', 'price_asc', 'price_desc', 'stock_desc'], default: 'name' })
+  @IsOptional()
+  @IsIn(['name', 'price_asc', 'price_desc', 'stock_desc'])
+  sort?: 'name' | 'price_asc' | 'price_desc' | 'stock_desc';
+
   @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 24 })
   @IsOptional()
   @IsInt()
@@ -68,7 +74,15 @@ export class CatalogProductDto {
   @ApiProperty({ type: 'array', items: { type: 'object' } })
   bundleComponents!: Array<{ productId: string; sku: string; name: string; qty: number }>;
   @ApiProperty({ example: 3 }) availableUnits!: number;
+  @ApiProperty({ example: 8 }) reviewCount!: number;
+  @ApiPropertyOptional({ nullable: true, example: 4.8 }) avgRating!: number | null;
   @ApiProperty({ example: '2026-07-08T09:30:00.000Z' }) updatedAt!: string;
+}
+
+export class CatalogProductDetailDto {
+  @ApiProperty({ type: () => CatalogProductDto }) product!: CatalogProductDto;
+  @ApiProperty({ type: () => [CatalogProductDto] }) variants!: CatalogProductDto[];
+  @ApiProperty({ type: () => [CatalogProductDto] }) related!: CatalogProductDto[];
 }
 
 export class CatalogSearchResponseDto {

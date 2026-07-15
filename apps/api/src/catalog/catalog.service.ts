@@ -13,6 +13,8 @@ import {
 } from './catalog.dto';
 
 type SearchSource = CatalogSearchResponseDto['source'];
+type NormalizedQuery = Required<Pick<CatalogSearchQueryDto, 'limit' | 'offset' | 'sort'>> &
+  Pick<CatalogSearchQueryDto, 'q' | 'category' | 'stockOnly'>;
 
 type ProductWithStockCount = Prisma.ProductGetPayload<{
   include: {
@@ -151,6 +153,33 @@ export class CatalogService {
     };
   }
 
+  async categories(): Promise<Array<{ category: string; count: number }>> {
+    const rows = await this.prisma.product.groupBy({
+      by: ['category'], where: { archived: false }, orderBy: { category: 'asc' }, _count: { _all: true },
+    });
+    return rows.map((row) => ({ category: row.category, count: row._count._all }));
+  }
+
+  async product(id: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, archived: false }, include: this.stockCountInclude(),
+    });
+    if (!product) throw new ValidationError('catalog_product_not_found', `Товар ${id} не найден`);
+    const [variants, related] = await Promise.all([
+      product.variantGroup ? this.prisma.product.findMany({
+        where: { archived: false, variantGroup: product.variantGroup, id: { not: id } },
+        orderBy: [{ price: 'asc' }, { name: 'asc' }], include: this.stockCountInclude(),
+      }) : [],
+      this.prisma.product.findMany({
+        where: { archived: false, category: product.category, id: { not: id } },
+        orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
+      }),
+    ]);
+    const enriched = await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item)));
+    const [main, ...rest] = enriched;
+    return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
+  }
+
   async reindex(maintenanceToken?: string): Promise<CatalogReindexResponseDto> {
     this.assertMaintenanceToken(maintenanceToken);
     const indexName = this.indexName();
@@ -184,8 +213,7 @@ export class CatalogService {
   }
 
   private async searchMeili(
-    query: Required<Pick<CatalogSearchQueryDto, 'limit' | 'offset'>> &
-      Pick<CatalogSearchQueryDto, 'q' | 'category' | 'stockOnly'>,
+    query: NormalizedQuery,
   ): Promise<CatalogSearchResponseDto> {
     const client = await this.requireMeiliClient();
     const filters = ['archived = false'];
@@ -200,6 +228,9 @@ export class CatalogService {
       limit: query.limit,
       offset: query.offset,
       filter: filters.join(' AND '),
+      ...(query.sort === 'price_asc' ? { sort: ['price:asc'] }
+        : query.sort === 'price_desc' ? { sort: ['price:desc'] }
+          : query.sort === 'stock_desc' ? { sort: ['availableUnits:desc'] } : {}),
     });
     const ids = (response.hits ?? [])
       .map((hit) => (hit.id === undefined ? undefined : String(hit.id)))
@@ -232,33 +263,33 @@ export class CatalogService {
       total: response.estimatedTotalHits ?? response.totalHits ?? ordered.length,
       limit: query.limit,
       offset: query.offset,
-      items: ordered,
+      items: await this.enrichReviews(ordered),
     };
   }
 
   private async searchPostgres(
-    query: Required<Pick<CatalogSearchQueryDto, 'limit' | 'offset'>> &
-      Pick<CatalogSearchQueryDto, 'q' | 'category' | 'stockOnly'>,
+    query: NormalizedQuery,
     source: SearchSource,
     warning?: string,
   ): Promise<CatalogSearchResponseDto> {
     const where = this.sourceOfTruthWhere(query);
-    if (query.stockOnly) {
+    if (query.stockOnly || query.sort === 'stock_desc') {
       const candidates = await this.prisma.product.findMany({
         where,
-        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        orderBy: this.orderBy(query.sort),
         include: this.stockCountInclude(),
       });
-      const available = candidates
+      const sorted = candidates
         .map((product) => this.toCatalogProduct(product))
-        .filter((product) => product.availableUnits > 0);
+        .filter((product) => !query.stockOnly || product.availableUnits > 0)
+        .sort((a, b) => this.compareProducts(a, b, query.sort));
       return {
         source,
         warning,
-        total: available.length,
+        total: sorted.length,
         limit: query.limit,
         offset: query.offset,
-        items: available.slice(query.offset, query.offset + query.limit),
+        items: await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit)),
       };
     }
     const [total, products] = await this.prisma.$transaction([
@@ -267,7 +298,7 @@ export class CatalogService {
         where,
         skip: query.offset,
         take: query.limit,
-        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        orderBy: this.orderBy(query.sort),
         include: this.stockCountInclude(),
       }),
     ]);
@@ -278,7 +309,7 @@ export class CatalogService {
       total,
       limit: query.limit,
       offset: query.offset,
-      items: products.map((product) => this.toCatalogProduct(product)),
+      items: await this.enrichReviews(products.map((product) => this.toCatalogProduct(product))),
     };
   }
 
@@ -305,12 +336,12 @@ export class CatalogService {
 
   private normalizeQuery(
     query: CatalogSearchQueryDto,
-  ): Required<Pick<CatalogSearchQueryDto, 'limit' | 'offset'>> &
-    Pick<CatalogSearchQueryDto, 'q' | 'category' | 'stockOnly'> {
+  ): NormalizedQuery {
     return {
       q: query.q?.trim() || undefined,
       category: query.category?.trim() || undefined,
       stockOnly: query.stockOnly ?? false,
+      sort: query.sort ?? 'name',
       limit: query.limit ?? 24,
       offset: query.offset ?? 0,
     };
@@ -338,8 +369,33 @@ export class CatalogService {
             Math.floor(this.directAvailability(component.componentProduct) / component.qty),
           ))
         : this.directAvailability(product),
+      reviewCount: 0,
+      avgRating: null,
       updatedAt: product.updatedAt.toISOString(),
     };
+  }
+
+  private async enrichReviews(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
+    if (items.length === 0) return items;
+    const rows = await this.prisma.productReview.groupBy({
+      by: ['productId'], where: { productId: { in: items.map((item) => item.id) } },
+      _count: { _all: true }, _avg: { rating: true },
+    });
+    const summaries = new Map(rows.map((row) => [row.productId, { reviewCount: row._count._all, avgRating: row._avg.rating === null ? null : Math.round(row._avg.rating * 10) / 10 }]));
+    return items.map((item) => ({ ...item, ...(summaries.get(item.id) ?? { reviewCount: 0, avgRating: null }) }));
+  }
+
+  private orderBy(sort: NormalizedQuery['sort']): Prisma.ProductOrderByWithRelationInput[] {
+    if (sort === 'price_asc') return [{ price: 'asc' }, { name: 'asc' }];
+    if (sort === 'price_desc') return [{ price: 'desc' }, { name: 'asc' }];
+    return [{ category: 'asc' }, { name: 'asc' }];
+  }
+
+  private compareProducts(a: CatalogProductDto, b: CatalogProductDto, sort: NormalizedQuery['sort']) {
+    if (sort === 'price_asc') return a.price - b.price || a.name.localeCompare(b.name, 'ru');
+    if (sort === 'price_desc') return b.price - a.price || a.name.localeCompare(b.name, 'ru');
+    if (sort === 'stock_desc') return b.availableUnits - a.availableUnits || a.name.localeCompare(b.name, 'ru');
+    return a.name.localeCompare(b.name, 'ru');
   }
 
   private stockCountInclude() {

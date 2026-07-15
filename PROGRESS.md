@@ -1,5 +1,18 @@
 # PROGRESS
 
+## 2026-07-15 — MER-001
+
+- Iteration ID: `MER-001`.
+- Task: make the customer storefront commercially truthful and complete while connecting owner-managed merchandising to ERP.
+- Files changed: versioned Storefront CMS Prisma model/migration, API/RBAC/Ledger module, catalog categories/exact detail/reviews/sort contracts, typed web clients, ERP CMS editor, desktop/mobile storefront/product/catalog/cart/info surfaces and API/browser regressions.
+- Result: marketer/admin/owner can draft and publish one canonical storefront revision; the public site reads its hero, about, delivery, contacts and benefits alongside active ERP store points. Guessed product photos, synthetic ratings/review counts and hard-coded financing/warranty/delivery/return claims were removed. Product media and commercial terms render only from explicit product/CMS data. `/about` and `/delivery` are real routes, desktop/mobile catalog pagination reaches products beyond the former 100-item ceiling, exact product reads no longer scan a page, and cart quantity/price are refreshed and clamped to server availability.
+- Checks run: Prisma generation; clean isolated PostgreSQL with all 61 migrations; targeted CMS/catalog API 7/7; API and Next production builds; full API regression 124/124 suites and 490/490 tests; full Playwright 38/38 plus repeated storefront/CMS acceptance 6/6 including 1440/863/402 px, information links, 105-product pagination, no fabricated claims, server stock cap and stock-first sorting; `git diff --check`.
+- Defects found and disposition: `stock_desc` previously accepted the UI request but used category/name order unless `stockOnly` was also set; Postgres now computes availability before sorting and an integration test fixes the contract. Internal media/commercial attributes are excluded from visible product specifications. The first full regression command was overridden by Jest's configured stale `TEST_DATABASE_URL`; the migrated isolated URL was then supplied explicitly through both environment variables and the complete suite passed.
+- Acceptance: `accepted` for commercial-truth software integration. Real product photography/content population, live provider terms and legal approval remain owner-controlled production data/certification, not code readiness.
+- Commit association: commit subject/body contains `MER-001`.
+- Remaining gaps: `ECO-001`, `ECO-002`, production accounts/providers, physical-device/hardware and legal certification.
+- Next backlog ID: `ECO-001` restores or explicitly retires missing design evidence before broad 95-screen visual acceptance.
+
 ## 2026-07-15 — FUL-002
 
 - Iteration ID: `FUL-002`.

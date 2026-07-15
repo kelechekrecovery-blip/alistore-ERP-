@@ -7,16 +7,18 @@ test('desktop storefront matches the AliStore shop prototype', async ({ page }) 
   await seedProduct('MOTION-E2E');
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'iPhone 15 Pro Max' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Техника из актуального каталога' })).toBeVisible();
   await expect(page.getByRole('banner').getByRole('link', { name: 'Каталог', exact: true })).toBeVisible();
   await expect(page.getByPlaceholder('Поиск по товарам')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Обменяйте старый смартфон' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Хиты продаж' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Товары в каталоге' })).toBeVisible();
+  await expect(page.getByText('4.9', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('0 · 0 · 12', { exact: true })).toHaveCount(0);
   await expect(page.locator('article')).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 
   await page.goto('/app');
-  await expect(page.getByText('iPhone 17 Pro Max')).toBeVisible();
+  await expect(page.getByText('Техника из актуального каталога', { exact: true }).first()).toBeVisible();
 });
 
 test('desktop storefront remains active in a narrow desktop browser window', async ({ page }) => {
@@ -25,9 +27,9 @@ test('desktop storefront remains active in a narrow desktop browser window', asy
   await page.setViewportSize({ width: 863, height: 954 });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'iPhone 15 Pro Max' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Техника из актуального каталога' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Категории товаров' })).toBeVisible();
-  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toBeHidden();
+  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toHaveCount(0);
   const desktopTheme = await page.evaluate(() => {
     const desktop = document.querySelector('.md\\:block');
     const heading = document.querySelector('h1');
@@ -48,10 +50,33 @@ test('native-style Client App keeps the dark handoff theme on phone viewports', 
   await page.setViewportSize({ width: 402, height: 858 });
   await page.goto('/');
 
-  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'iPhone 15 Pro Max' })).toBeHidden();
-  await expect(page.getByText('iPhone 17 Pro Max', { exact: true })).toBeVisible();
+  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.md\\:hidden').getByText('Техника из актуального каталога', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
+});
+
+test('storefront information links, catalog pagination and stock caps use server truth', async ({ page }) => {
+  await resetDb();
+  await prisma.product.createMany({ data: Array.from({ length: 105 }, (_, index) => ({ sku: `MER-${index.toString().padStart(3, '0')}`, name: `MER product ${index.toString().padStart(3, '0')}`, price: 1000 + index, cost: 500, category: 'paging', attrs: {} })) });
+  const stocked = await seedProduct('STOCK-CAP', 25900);
+
+  for (const route of ['/about', '/delivery']) {
+    await page.goto(route);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AliStore Центр' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+  }
+
+  await page.goto('/catalog?category=paging');
+  await expect(page.getByText('105 товаров')).toBeVisible();
+  await page.getByRole('button', { name: 'Дальше' }).click();
+  await expect(page.getByText('MER product 024', { exact: true })).toBeVisible();
+
+  await page.goto(`/product/${stocked.product.id}`);
+  await page.getByRole('button', { name: 'В корзину' }).click();
+  await page.goto('/cart');
+  const desktopCart = page.locator('.md\\:block');
+  await expect(desktopCart.getByRole('button', { name: 'Увеличить' })).toBeDisabled();
 });
 
 test('desktop catalog, product and cart keep the exact shop visual system', async ({ page }) => {

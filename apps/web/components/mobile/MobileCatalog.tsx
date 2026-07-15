@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
-import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, fetchCatalogCategories, type CatalogProduct, type CatalogQuery } from '@/lib/api';
 
 const SORTS = [
-  { id: 'popular', label: 'Популярные' },
-  { id: 'price-asc', label: 'Дешевле' },
-  { id: 'price-desc', label: 'Дороже' },
+  { id: 'stock_desc', label: 'В наличии' },
+  { id: 'price_asc', label: 'Дешевле' },
+  { id: 'price_desc', label: 'Дороже' },
 ] as const;
 
 export default function MobileCatalog() {
@@ -16,37 +16,23 @@ export default function MobileCatalog() {
   const [category, setCategory] = useState('Все');
   const [stockOnly, setStockOnly] = useState(false);
   const [sortIdx, setSortIdx] = useState(0);
+  const [categories, setCategories] = useState(['Все']);
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setCategory(params.get('category') ?? 'Все');
-    fetchCatalog({ limit: 100 })
-      .then((response) => setProducts(response.items))
-      .catch(() => setProducts([]));
+    fetchCatalogCategories().then((items) => setCategories(['Все', ...items.map((item) => item.category)]));
   }, []);
-
-  const categories = useMemo(
-    () => ['Все', ...Array.from(new Set((products ?? []).map((p) => p.category))).sort()],
-    [products],
-  );
   const sort = SORTS[sortIdx];
-  const visible = useMemo(() => {
-    const items = (products ?? []).filter(
-      (p) => (category === 'Все' || p.category === category) && (!stockOnly || p.availableUnits > 0),
-    );
-    return [...items].sort((a, b) =>
-      sort.id === 'price-asc'
-        ? a.price - b.price
-        : sort.id === 'price-desc'
-          ? b.price - a.price
-          : b.availableUnits - a.availableUnits,
-    );
-  }, [products, category, stockOnly, sort]);
+  useEffect(() => { setProducts(null); fetchCatalog({ category: category === 'Все' ? undefined : category, stockOnly, sort: sort.id as CatalogQuery['sort'], limit: 20, offset }).then((response) => { setProducts(response.items); setTotal(response.total); }).catch(() => { setProducts([]); setTotal(0); }); }, [category, stockOnly, sort, offset]);
 
   const reset = () => {
     setCategory('Все');
     setStockOnly(false);
     setSortIdx(0);
+    setOffset(0);
   };
 
   return (
@@ -54,7 +40,7 @@ export default function MobileCatalog() {
       <div className="px-4 pb-6 pt-1">
         <div className="mb-3 flex items-center gap-2">
           <span className="font-display text-[20px] font-bold text-white">Каталог</span>
-          <span className="text-[13px] text-[#8A7F76]">{products === null ? '…' : visible.length}</span>
+          <span className="text-[13px] text-[#8A7F76]">{products === null ? '…' : total}</span>
         </div>
 
         {/* filter chips */}
@@ -63,7 +49,7 @@ export default function MobileCatalog() {
             <button
               key={c}
               type="button"
-              onClick={() => setCategory(c)}
+              onClick={() => { setCategory(c); setOffset(0); }}
               className={`flex-shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
                 category === c
                   ? 'border-lime bg-lime text-lime-ink'
@@ -79,14 +65,14 @@ export default function MobileCatalog() {
         <div className="mb-4 flex gap-2">
           <button
             type="button"
-            onClick={() => setSortIdx((i) => (i + 1) % SORTS.length)}
+            onClick={() => { setSortIdx((i) => (i + 1) % SORTS.length); setOffset(0); }}
             className="flex-1 rounded-[10px] border border-[#2E2822] bg-[#221E19] py-2.5 text-center text-xs text-[#D8CFC6]"
           >
             ↕ {sort.label}
           </button>
           <button
             type="button"
-            onClick={() => setStockOnly((v) => !v)}
+            onClick={() => { setStockOnly((v) => !v); setOffset(0); }}
             className={`flex-1 rounded-[10px] border border-[#2E2822] py-2.5 text-center text-xs transition ${
               stockOnly ? 'bg-lime/10 text-lime' : 'bg-[#221E19] text-[#D8CFC6]'
             }`}
@@ -101,12 +87,12 @@ export default function MobileCatalog() {
               <div key={i} className="h-[248px] animate-pulse rounded-[16px] border border-[#2E2822] bg-[#221E19]" />
             ))}
           </div>
-        ) : visible.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
-            {visible.map((product, i) => (
+        ) : products.length > 0 ? (
+          <><div className="grid grid-cols-2 gap-3">
+            {products.map((product, i) => (
               <MobileProductCard key={product.id} product={product} showCompare priority={i === 0} />
             ))}
-          </div>
+          </div><div className="mt-5 flex justify-center gap-2"><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))} className="rounded-[10px] border border-[#2E2822] px-4 py-2 text-xs text-white disabled:opacity-30">Назад</button><button disabled={offset + 20 >= total} onClick={() => setOffset(offset + 20)} className="rounded-[10px] border border-[#2E2822] px-4 py-2 text-xs text-white disabled:opacity-30">Дальше</button></div></>
         ) : (
           <div className="py-14 text-center">
             <div className="text-5xl">🔍</div>

@@ -12,6 +12,8 @@ export interface CatalogProduct {
   attrs: Record<string, unknown> | null;
   bundleComponents?: Array<{ productId: string; sku: string; name: string; qty: number }>;
   availableUnits: number;
+  reviewCount: number;
+  avgRating: number | null;
   updatedAt?: string;
 }
 
@@ -40,6 +42,7 @@ export interface CatalogQuery {
   stockOnly?: boolean;
   limit?: number;
   offset?: number;
+  sort?: 'name' | 'price_asc' | 'price_desc' | 'stock_desc';
 }
 
 /**
@@ -51,6 +54,7 @@ export async function fetchCatalog(query: CatalogQuery = {}): Promise<CatalogRes
   if (query.q) params.set('q', query.q);
   if (query.category) params.set('category', query.category);
   if (query.stockOnly) params.set('stockOnly', 'true');
+  if (query.sort) params.set('sort', query.sort);
   params.set('limit', String(query.limit ?? 24));
   params.set('offset', String(query.offset ?? 0));
 
@@ -191,8 +195,15 @@ function mergeCatalogDelta(
  * endpoint when the catalog grows.
  */
 export async function fetchProduct(id: string): Promise<CatalogProduct | null> {
-  const catalog = await fetchCatalog({ limit: 100 });
-  return catalog.items.find((p) => p.id === id) ?? null;
+  try {
+    const res = await fetch(`${API_BASE}/catalog/products/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`product responded ${res.status}`);
+    const result = (await res.json()) as ProductWithRelated;
+    return result.product;
+  } catch {
+    return null;
+  }
 }
 
 export interface ProductWithRelated {
@@ -237,28 +248,23 @@ export async function fetchProductWithRelated(id: string, relatedLimit = 6): Pro
 }
 
 async function fetchProductWithRelatedUncached(id: string, relatedLimit: number): Promise<ProductWithRelated> {
-  const catalog = await fetchCatalog({ limit: 100 });
-  const product = catalog.items.find((p) => p.id === id) ?? null;
-  if (!product) return { product: null, variants: [], related: [] };
+  try {
+    const res = await fetch(`${API_BASE}/catalog/products/${encodeURIComponent(id)}?relatedLimit=${relatedLimit}`, { cache: 'no-store' });
+    if (!res.ok) return { product: null, variants: [], related: [] };
+    return (await res.json()) as ProductWithRelated;
+  } catch {
+    return { product: null, variants: [], related: [] };
+  }
+}
 
-  const variants = product.variantGroup
-    ? catalog.items
-        .filter((item) => item.id !== product.id && item.variantGroup === product.variantGroup)
-        .sort((a, b) => a.price - b.price || a.name.localeCompare(b.name, 'ru'))
-    : [];
-
-  const related = catalog.items
-    .filter((p) => p.id !== product.id && p.category === product.category)
-    .sort((a, b) => {
-      const stockRank = Number(b.availableUnits > 0) - Number(a.availableUnits > 0);
-      if (stockRank !== 0) return stockRank;
-      const priceDistance = Math.abs(a.price - product.price) - Math.abs(b.price - product.price);
-      if (priceDistance !== 0) return priceDistance;
-      return a.name.localeCompare(b.name, 'ru');
-    })
-    .slice(0, relatedLimit);
-
-  return { product, variants, related };
+export async function fetchCatalogCategories(): Promise<Array<{ category: string; count: number }>> {
+  try {
+    const res = await fetch(`${API_BASE}/catalog/categories`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`categories responded ${res.status}`);
+    return (await res.json()) as Array<{ category: string; count: number }>;
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchProductReviews(id: string): Promise<ProductReviews> {

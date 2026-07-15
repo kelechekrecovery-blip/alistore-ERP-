@@ -38,7 +38,7 @@ const PAYMENT = [
   { id: 'card', icon: '💳', name: 'Картой' },
   { id: 'qr_mbank', icon: '📱', name: 'QR · MBank' },
   { id: 'qr_odengi', icon: '📲', name: 'QR · O!Деньги' },
-  { id: 'installment', icon: '📅', name: 'Рассрочка 0-0-12' },
+  { id: 'installment', icon: '📅', name: 'Рассрочка (условия провайдера)' },
 ] as const;
 type PaymentChoice = (typeof PAYMENT)[number]['id'];
 const STEPS = ['Получение', 'Контакты', 'Оплата', 'Подтверждение'];

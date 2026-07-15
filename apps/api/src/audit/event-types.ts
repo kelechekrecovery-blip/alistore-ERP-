@@ -131,6 +131,8 @@ export const EventType = {
   CustomerAddressDeleted: 'customer.address_deleted',
   CampaignSent: 'campaign.sent',
   CampaignConverted: 'campaign.converted',
+  StorefrontContentDrafted: 'storefront.content_drafted',
+  StorefrontContentPublished: 'storefront.content_published',
   TicketCreated: 'ticket.created',
   TicketEscalated: 'ticket.escalated',
   B2BQuoteRequested: 'b2b.quote_requested',

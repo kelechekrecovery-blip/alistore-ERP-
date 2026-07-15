@@ -50,7 +50,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   function reorder() {
     if (order === null || order === 'missing') return;
     let any = false;
-    for (const i of order.items) { const p = bySku.get(i.sku); if (p) { add({ id: p.id, sku: p.sku, name: p.name, price: i.price }, i.qty); any = true; } }
+    for (const i of order.items) { const p = bySku.get(i.sku); if (p) { add({ id: p.id, sku: p.sku, name: p.name, price: i.price, stockLimit: p.availableUnits }, i.qty); any = true; } }
     if (any) router.push('/cart');
   }
 

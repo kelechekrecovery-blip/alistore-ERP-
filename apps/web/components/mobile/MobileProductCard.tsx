@@ -10,6 +10,7 @@ import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { productImage } from '@/components/ProductCard';
+import { ImageOff } from 'lucide-react';
 
 interface MobileProductCardProps {
   product: CatalogProduct;
@@ -34,7 +35,7 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
 
   function addToCart() {
     if (!inStock) return;
-    add({ id: product.id, sku: product.sku, name: product.name, price: product.price });
+    add({ id: product.id, sku: product.sku, name: product.name, price: product.price, stockLimit: product.availableUnits });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
   }
@@ -47,7 +48,7 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
     >
       <Link href={href} className="relative block h-[120px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-        <Image src={productImage(product)} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" />
+        {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" /> : <span className="flex h-full flex-col items-center justify-center gap-1 text-[10px] text-[#8A7F76]"><ImageOff size={24} /><span>Фото готовится</span></span>}
         {badge && (
           <span className="absolute left-2 top-2 rounded-[6px] bg-coral px-1.5 py-[3px] text-[10px] font-bold text-white">
             {badge}

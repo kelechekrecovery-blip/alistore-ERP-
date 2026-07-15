@@ -289,6 +289,15 @@ p, admin, campaigns, convert
 p, owner, campaigns, read
 p, owner, campaigns, create
 p, owner, campaigns, convert
+p, marketer, storefront, read
+p, marketer, storefront, update
+p, marketer, storefront, publish
+p, admin, storefront, read
+p, admin, storefront, update
+p, admin, storefront, publish
+p, owner, storefront, read
+p, owner, storefront, update
+p, owner, storefront, publish
 p, seller, b2b, read
 p, senior_seller, b2b, read
 p, admin, b2b, read

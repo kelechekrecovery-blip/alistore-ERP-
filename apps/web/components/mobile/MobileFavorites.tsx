@@ -46,7 +46,7 @@ export default function MobileFavorites() {
                   href={`/product/${p.id}`}
                   className="relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]"
                 >
-                  <Image src={productImage(p)} alt={p.name} fill sizes="74px" className="object-contain p-1.5" />
+                  {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="74px" className="object-contain p-1.5" /> : <span className="grid h-full place-items-center text-lg font-bold text-[#8A7F76]">{p.name.slice(0,1)}</span>}
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link href={`/product/${p.id}`} className="block text-[13px] font-semibold text-white">
@@ -60,7 +60,7 @@ export default function MobileFavorites() {
                     <button
                       type="button"
                       disabled={!inStock}
-                      onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price })}
+                      onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price, stockLimit: p.availableUnits })}
                       className={`rounded-[8px] px-3 py-1.5 text-[12px] font-bold ${
                         inStock ? 'bg-lime text-lime-ink' : 'bg-[#2E2822] text-[#6E645C]'
                       }`}

@@ -180,7 +180,7 @@ export function PosCatalog({
               className="min-w-0 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3 text-left transition hover:border-lime/40 focus-visible:border-lime focus-visible:outline-none"
             >
               <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-                <Image src={productImage(p)} alt={p.name} fill sizes="120px" className="object-contain p-2" />
+                {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-xl font-bold text-[#8a8a8a]">{p.name.slice(0,1)}</span>}
                 {p.availableUnits < 5 && (
                   <span className="absolute right-1.5 top-1.5 rounded bg-warn px-1.5 py-0.5 text-[9px] font-bold text-lime-ink">
                     {p.availableUnits} шт

@@ -18,6 +18,7 @@ export interface CartItem {
   name: string;
   price: number;
   qty: number;
+  stockLimit: number;
 }
 
 interface CartContextValue {
@@ -41,6 +42,7 @@ interface CartContextValue {
   clearPromo: () => void;
   toggleBonus: () => void;
   clear: () => void;
+  reconcileAvailability: (products: Array<{ id: string; price: number; availableUnits: number }>) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -65,7 +67,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw) as CartItem[]);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<Partial<CartItem>>;
+        setItems(parsed.filter((item) => item.id && item.sku && item.name && Number.isFinite(item.price) && Number.isFinite(item.qty)).map((item) => ({
+          id: item.id!, sku: item.sku!, name: item.name!, price: item.price!,
+          stockLimit: Math.max(0, Number.isFinite(item.stockLimit) ? item.stockLimit! : item.qty!),
+          qty: Math.max(1, Math.min(item.qty!, Number.isFinite(item.stockLimit) ? item.stockLimit! : item.qty!)),
+        })));
+      }
     } catch {
       /* ignore corrupt storage */
     }
@@ -129,9 +138,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => {
       const existing = prev.find((x) => x.id === item.id);
       if (existing) {
-        return prev.map((x) => (x.id === item.id ? { ...x, qty: x.qty + qty } : x));
+        return prev.map((x) => (x.id === item.id ? { ...x, ...item, qty: Math.min(x.qty + qty, item.stockLimit) } : x));
       }
-      return [...prev, { ...item, qty }];
+      return item.stockLimit > 0 ? [...prev, { ...item, qty: Math.min(qty, item.stockLimit) }] : prev;
     });
   }, []);
 
@@ -139,7 +148,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) =>
       qty <= 0
         ? prev.filter((x) => x.id !== id)
-        : prev.map((x) => (x.id === id ? { ...x, qty } : x)),
+        : prev.map((x) => (x.id === id ? { ...x, qty: Math.min(qty, x.stockLimit) } : x)),
     );
   }, []);
 
@@ -163,6 +172,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems([]);
     setPromoCode(null);
     setBonusApplied(false);
+  }, []);
+
+  const reconcileAvailability = useCallback((products: Array<{ id: string; price: number; availableUnits: number }>) => {
+    const byId = new Map(products.map((product) => [product.id, product]));
+    setItems((current) => current.flatMap((item) => {
+      const product = byId.get(item.id);
+      if (!product || product.availableUnits <= 0) return [];
+      return [{ ...item, price: product.price, stockLimit: product.availableUnits, qty: Math.min(item.qty, product.availableUnits) }];
+    }));
   }, []);
 
   const count = useMemo(() => items.reduce((s, x) => s + x.qty, 0), [items]);
@@ -197,6 +215,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       clearPromo,
       toggleBonus,
       clear,
+      reconcileAvailability,
     }),
     [
       items,
@@ -219,6 +238,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       clearPromo,
       toggleBonus,
       clear,
+      reconcileAvailability,
     ],
   );
 

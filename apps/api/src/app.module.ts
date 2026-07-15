@@ -48,6 +48,7 @@ import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
 import { HrModule } from './hr/hr.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { ServiceCenterModule } from './service-center/service-center.module';
+import { StorefrontModule } from './storefront/storefront.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { ServiceCenterModule } from './service-center/service-center.module';
     HrModule,
     LogisticsModule,
     ServiceCenterModule,
+    StorefrontModule,
   ],
 })
 export class AppModule {}

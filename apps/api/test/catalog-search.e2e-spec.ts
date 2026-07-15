@@ -97,7 +97,7 @@ describe('Catalog search integration', () => {
   });
 
   it('supports category filters and excludes out-of-stock products when requested', async () => {
-    await seedCatalog();
+    const { phone, watch } = await seedCatalog();
 
     const inStockOnly = await catalog.search({
       category: 'wearables',
@@ -114,6 +114,13 @@ describe('Catalog search integration', () => {
     expect(inStockOnly.total).toBe(0);
     expect(allWearables.total).toBe(1);
     expect(allWearables.items[0].availableUnits).toBe(0);
+
+    const stockFirst = await catalog.search({
+      sort: 'stock_desc',
+      limit: 10,
+      offset: 0,
+    });
+    expect(stockFirst.items.map((product) => product.id)).toEqual([phone.id, watch.id]);
   });
 
   it('returns delta changes for product updates, stock updates, and archived removals', async () => {
@@ -151,5 +158,18 @@ describe('Catalog search integration', () => {
     expect(err).toBeInstanceOf(ForbiddenError);
     expect(err.getStatus()).toBe(403);
     expect(err.code).toBe('maintenance_token_not_configured');
+  });
+
+  it('paginates beyond one hundred products and resolves exact product details', async () => {
+    seq += 1;
+    const suffix = seq.toString().padStart(3, '0');
+    await prisma.product.createMany({ data: Array.from({ length: 105 }, (_, index) => ({ sku: `PAGE-${suffix}-${index.toString().padStart(3, '0')}`, name: `Paged product ${index.toString().padStart(3, '0')}`, price: 1000 + index, cost: 500, category: 'paging', attrs: {} })) });
+    const secondPage = await catalog.search({ category: 'paging', limit: 10, offset: 100, sort: 'name' });
+    expect(secondPage.total).toBe(105);
+    expect(secondPage.items).toHaveLength(5);
+    const detail = await catalog.product(secondPage.items[4].id);
+    expect(detail.product.sku).toBe(secondPage.items[4].sku);
+    const categories = await catalog.categories();
+    expect(categories).toContainEqual({ category: 'paging', count: 105 });
   });
 });

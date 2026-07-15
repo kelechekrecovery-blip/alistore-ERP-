@@ -1403,6 +1403,32 @@ model Campaign {
   // аудитория фильтруется по Customer.consent
 }
 
+model StorefrontContentRevision {
+  id             String   @id @default(cuid())
+  version        Int      @unique
+  status         String   @default("draft")
+  heroEyebrow    String
+  heroTitle      String
+  heroBody       String
+  heroCtaLabel   String
+  heroCtaHref    String
+  heroImageUrl   String?
+  financingText String?
+  aboutTitle     String
+  aboutBody      String
+  deliveryTitle  String
+  deliveryBody   String
+  contactPhone   String?
+  supportHours   String?
+  benefits       Json
+  createdBy      String
+  publishedBy    String?
+  createdAt      DateTime @default(now())
+  publishedAt    DateTime?
+
+  @@index([status, publishedAt])
+}
+
 model SupportTicket {
   id             String       @id @default(cuid())
   customerId     String // ссылка строкой, без @relation (см. Customer)

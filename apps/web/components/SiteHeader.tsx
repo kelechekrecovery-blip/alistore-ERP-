@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Heart, MapPin, Menu, Phone, Scale, Search, ShoppingBag, User, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { ScrollProgress } from './storefront/Motion';
+import { fetchStorefrontContent, type StorefrontPayload } from '@/lib/api';
 
 const MOBILE_NAV = [
   { href: '/', label: 'Магазин' },
@@ -34,6 +35,9 @@ export function SiteHeader() {
   const { count: favoritesCount } = useFavorites();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
+  useEffect(() => { fetchStorefrontContent().then(setStorefront); }, []);
+  const point = storefront?.stores[0];
 
   return (
     <header className="sticky top-0 z-50 bg-white text-[#0f0f0f] shadow-[0_1px_0_#e5e5e7]">
@@ -46,9 +50,9 @@ export function SiteHeader() {
             <Link href="/b2b" className="hover:text-white">Для бизнеса</Link>
           </div>
           <div className="ml-auto flex items-center gap-5 text-white/80">
-            <span className="hidden items-center gap-1.5 sm:flex"><MapPin size={13} /> Манас</span>
-            <a href="tel:+996555123456" className="flex items-center gap-1.5 hover:text-white"><Phone size={13} /> +996 555 123 456</a>
-            <span className="hidden lg:inline">Ежедневно 09:00–21:00</span>
+            {point && <span className="hidden items-center gap-1.5 sm:flex"><MapPin size={13} /> {point.name}</span>}
+            {storefront?.content.contactPhone && <a href={`tel:${storefront.content.contactPhone.replace(/\s/g, '')}`} className="flex items-center gap-1.5 hover:text-white"><Phone size={13} /> {storefront.content.contactPhone}</a>}
+            {storefront?.content.supportHours && <span className="hidden lg:inline">{storefront.content.supportHours}</span>}
           </div>
         </div>
       </div>

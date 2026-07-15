@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Post, Query } from '@nestjs/common';
+import { Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiOkResponse,
@@ -8,6 +8,7 @@ import {
 } from '@nestjs/swagger';
 import {
   CatalogDeltaQueryDto,
+  CatalogProductDetailDto,
   CatalogDeltaResponseDto,
   CatalogReindexResponseDto,
   CatalogSearchQueryDto,
@@ -41,6 +42,15 @@ export class CatalogController {
   delta(@Query() query: CatalogDeltaQueryDto) {
     return this.catalog.delta(query);
   }
+
+  @ApiOperation({ summary: 'List active storefront categories without a page-size ceiling' })
+  @Get('categories')
+  categories() { return this.catalog.categories(); }
+
+  @ApiOperation({ summary: 'Read one product with variants and related products' })
+  @ApiOkResponse({ type: CatalogProductDetailDto })
+  @Get('products/:id')
+  product(@Param('id') id: string) { return this.catalog.product(id); }
 
   @ApiOperation({
     summary: 'Rebuild the Meilisearch products index',

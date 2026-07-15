@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useCart } from '@/lib/cart';
 
 interface AddToCartButtonProps {
-  product: { id: string; sku: string; name: string; price: number };
+  product: { id: string; sku: string; name: string; price: number; stockLimit: number };
   disabled?: boolean;
   full?: boolean;
 }
