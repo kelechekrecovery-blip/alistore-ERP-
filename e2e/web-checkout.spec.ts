@@ -33,6 +33,19 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
   await expect(page.getByText('Заказ оформлен!')).toBeVisible();
 
+  await page.getByRole('link', { name: 'Статус и чек' }).click();
+  await expect(page).toHaveURL(/\/order\//);
+  await expect.poll(() => new URL(page.url()).hash).toBe('');
+  await expect(page.getByText('Защищённый гостевой доступ')).toBeVisible();
+  await expect(page.getByText(product.sku)).toBeVisible();
+  await page.getByRole('button', { name: 'Показать чек' }).click();
+  await expect(page.getByTestId('guest-receipt')).toContainText(product.name);
+  const cleanGuestUrl = page.url();
+  await page.reload();
+  await expect(page.getByText('Защищённый гостевой доступ')).toBeVisible();
+  await page.goto(cleanGuestUrl);
+  await expect(page.getByText('Защищённый гостевой доступ')).toBeVisible();
+
   const order = await prisma.order.findFirst({ orderBy: { createdAt: 'desc' } });
   expect(order).toMatchObject({
     status: 'paid',

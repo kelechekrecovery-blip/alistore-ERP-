@@ -16,6 +16,13 @@ test('Telegram Mini App shell creates an order with channel telegram', async ({ 
   await page.getByRole('button', { name: /Подтвердить · AliStore Центр/ }).click();
   await expect(page.getByText('Заказ в Telegram оформлен')).toBeVisible();
   await expect(page.getByText('channel=telegram')).toBeVisible();
+  await page.getByRole('link', { name: 'Статус и чек' }).click();
+  await expect(page).toHaveURL(/\/order\//);
+  await expect.poll(() => new URL(page.url()).hash).toBe('');
+  await expect(page.getByText('Защищённый гостевой доступ')).toBeVisible();
+  await expect(page.getByText(product.sku)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Защищённый гостевой доступ')).toBeVisible();
 
   const order = await prisma.order.findFirst({
     where: { channel: 'telegram' },

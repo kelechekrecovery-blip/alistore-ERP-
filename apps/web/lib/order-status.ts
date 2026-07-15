@@ -31,7 +31,7 @@ export const TERMINAL_BAD: Record<string, string> = {
  * `current`; the rest are `future`. Fully-completed orders have every step done.
  * Pure — all events are supplied by the caller.
  */
-export function buildOrderTimeline(ledger: LedgerEvent[]): TimelineStep[] {
+export function buildOrderTimeline(ledger: Array<Pick<LedgerEvent, 'type' | 'ts'>>): TimelineStep[] {
   const firstTs = (types: string[]): string | null => {
     const hits = ledger
       .filter((e) => types.includes(e.type))

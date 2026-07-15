@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ConflictException,
   ForbiddenException,
   Get,
   Headers,
@@ -33,7 +34,8 @@ import { requireActiveStaff } from '../auth/staff-principal';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
-import { requireGuestCapability } from '../auth/guest-capability';
+import { guestOrderCapabilityTtlSeconds, issueGuestOrderCapability, requireGuestCapability } from '../auth/guest-capability';
+import { ReceiptsService } from '../receipts/receipts.service';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -42,6 +44,7 @@ export class OrdersController {
     private readonly orders: OrdersService,
     private readonly staffAuth: StaffAuthService,
     private readonly authz: AuthzService,
+    private readonly receipts: ReceiptsService,
   ) {}
 
   @ApiOperation({ summary: 'Orders of the authenticated customer (personal account)' })
@@ -127,6 +130,38 @@ export class OrdersController {
     return order;
   }
 
+  @ApiOperation({ summary: 'Read one guest order through an order-scoped capability' })
+  @ApiParam({ name: 'id', description: 'Order id bound into the capability' })
+  @Get(':id/guest')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async guestOrder(@Headers('x-guest-capability') capability: string | undefined, @Param('id') id: string) {
+    const claims = requireGuestCapability(capability, 'orders:read', undefined, { type: 'order', id });
+    const order = await this.orders.getGuest(id);
+    if (!order || order.customerId !== claims.sub) throw new NotFoundException(`Заказ ${id} не найден`);
+    const ledger = await this.orders.ledger(id);
+    const { customerId: _, ...safeOrder } = order;
+    return {
+      order: safeOrder,
+      timeline: ledger.map((event) => ({ type: event.type, ts: event.ts })),
+    };
+  }
+
+  @ApiOperation({ summary: 'Read a guest receipt through an order-scoped capability' })
+  @ApiParam({ name: 'id', description: 'Order id bound into the capability' })
+  @Get(':id/guest-receipt')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async guestReceipt(@Headers('x-guest-capability') capability: string | undefined, @Param('id') id: string) {
+    const claims = requireGuestCapability(capability, 'receipts:read', undefined, { type: 'order', id });
+    const order = await this.orders.get(id);
+    if (!order || order.customerId !== claims.sub) throw new NotFoundException(`Заказ ${id} не найден`);
+    const paid = order.payments.some((payment) => payment.amount > 0 && ['received', 'reconciled'].includes(payment.status));
+    if (!paid) throw new ConflictException('receipt_not_available');
+    const receipt = await this.receipts.renderOrder(id);
+    return { markup: receipt.markup };
+  }
+
   @ApiOperation({
     summary: 'Create an order and append order.created to the Event Ledger',
   })
@@ -135,13 +170,21 @@ export class OrdersController {
   @Post()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  create(
+  async create(
     @Headers('x-guest-capability') capability: string | undefined,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateOrderDto,
   ) {
     const guest = requireGuestCapability(capability, 'orders:create', dto.customerId);
-    return this.orders.createFromCatalog(dto, `guest:${guest.sub}`, idempotencyKey, false);
+    const order = await this.orders.createFromCatalog(dto, `guest:${guest.sub}`, idempotencyKey, false);
+    const expiresIn = guestOrderCapabilityTtlSeconds();
+    return {
+      ...order,
+      guestAccess: {
+        capability: issueGuestOrderCapability(order.customerId, order.id, expiresIn),
+        expiresIn,
+      },
+    };
   }
 
   @ApiOperation({

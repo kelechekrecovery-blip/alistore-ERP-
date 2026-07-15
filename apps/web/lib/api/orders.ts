@@ -30,6 +30,7 @@ export interface CreatedOrder {
   deliveryZoneId?: string | null;
   deliverySlotId?: string | null;
   pickupCode?: string | null;
+  guestAccess?: { capability: string; expiresIn: number };
 }
 
 /** Find-or-create a customer by phone (guest checkout). Throws on API error. */
@@ -153,6 +154,32 @@ export interface OrderDetail {
   createdAt: string;
   items: { sku: string; qty: number; price: number; imei?: string | null }[];
   payments: { amount: number; method: string; status: string }[];
+}
+
+export interface GuestOrderView {
+  order: OrderDetail;
+  timeline: Array<{ type: string; ts: string }>;
+}
+
+export async function fetchGuestOrder(id: string, capability: string): Promise<GuestOrderView> {
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(id)}/guest`, {
+    cache: 'no-store',
+    headers: { 'x-guest-capability': capability },
+  });
+  if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? 'guest_access_invalid' : `guest order ${res.status}`);
+  return (await res.json()) as GuestOrderView;
+}
+
+export async function fetchGuestReceipt(id: string, capability: string): Promise<{ markup: string }> {
+  const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(id)}/guest-receipt`, {
+    cache: 'no-store',
+    headers: { 'x-guest-capability': capability },
+  });
+  if (!res.ok) {
+    if (res.status === 409) throw new Error('receipt_not_available');
+    throw new Error(res.status === 401 || res.status === 403 ? 'guest_access_invalid' : `guest receipt ${res.status}`);
+  }
+  return (await res.json()) as { markup: string };
 }
 
 export async function fetchOrder(id: string, accessToken: string): Promise<OrderDetail | null> {

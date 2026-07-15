@@ -7,9 +7,10 @@ import { AuthzModule } from '../authz/authz.module';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { OutboxModule } from '../outbox/outbox.module';
 import { LogisticsModule } from '../logistics/logistics.module';
+import { ReceiptsModule } from '../receipts/receipts.module';
 
 @Module({
-  imports: [UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule],
+  imports: [UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule],
   providers: [OrdersService],
   controllers: [OrdersController],
   exports: [OrdersService],

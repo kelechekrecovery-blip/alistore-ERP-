@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-15 — FUL-002
+
+- Iteration ID: `FUL-002`.
+- Backlog / journey IDs: guest web/Telegram checkout → private order status → paid receipt → refresh/restart recovery.
+- Branch / base commit: `codex/open-source-integrations` / `5d08ae2`.
+- Changed files: order-scoped guest capability claims/TTL, safe guest order and receipt endpoints, storefront access persistence and `/order/[id]` status surface, checkout/Telegram handoff, security/rate-limit/API/browser tests, backlog/readiness/completion evidence.
+- Exact checks: targeted guest capability/order API 2/2 suites and 4/4 tests; API and Next production builds; targeted checkout/Telegram Playwright 7/7; full API 123/123 suites and 487/487 tests on a fresh 60-migration database; full Playwright 37/37; `git diff --check`.
+- Durable evidence: `guest-order-access.e2e-spec.ts` proves narrow scope, customer/order ownership, expiry, tamper and cross-order rejection, paid-only safe receipt output and no capability in Ledger. Checkout and Telegram Playwright prove fragment stripping, private status/receipt access and clean-URL reload recovery.
+- Defects found and disposition: guests previously lost the only safe post-checkout route and could not reopen an order without OTP. Access is now shareable only through a short-lived scoped fragment, persisted per order and never accepted from a broad checkout capability. Full validation also exposed a missing `ReceiptsService` mock in the isolated public rate-limit harness; production behavior was unchanged and the harness now compiles.
+- Acceptance: `accepted` for guest post-checkout software recovery. Device loss/cleared browser storage requires OTP account recovery; live provider receipt/fiscal certification remains external.
+- Commit association: commit subject/body contains `FUL-002`.
+- Remaining gaps: `MER-001`, `ECO-001`, `ECO-002`, owner-controlled production/device/provider certification.
+- Next backlog ID: `MER-001` removes fabricated merchandising claims and closes catalog/storefront commercial truth.
+
 ## 2026-07-15 — FIN-001
 
 - Iteration ID: `FIN-001`.

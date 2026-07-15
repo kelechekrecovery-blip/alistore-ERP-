@@ -59,6 +59,27 @@ export class OrdersService {
     });
   }
 
+  getGuest(id: string) {
+    return this.prisma.order.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        customerId: true,
+        channel: true,
+        fulfillmentType: true,
+        pickupPoint: true,
+        deliveryAddress: true,
+        deliverySlot: true,
+        pickupCode: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        items: { select: { sku: true, qty: true, price: true, imei: true } },
+        payments: { select: { amount: true, method: true, status: true } },
+      },
+    });
+  }
+
   /** Orders belonging to one customer, newest first (personal account). */
   listByCustomer(customerId: string) {
     return this.prisma.order.findMany({

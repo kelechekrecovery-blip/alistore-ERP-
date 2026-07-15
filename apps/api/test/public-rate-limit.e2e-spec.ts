@@ -9,6 +9,7 @@ import { PaymentsController } from '../src/payments/payments.controller';
 import { PaymentIntentsService } from '../src/payments/payment-intents.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { RateLimitModule } from '../src/rate-limit/rate-limit.module';
+import { ReceiptsService } from '../src/receipts/receipts.service';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { SupportController } from '../src/support/support.controller';
 import { SupportService } from '../src/support/support.service';
@@ -34,6 +35,7 @@ describe('public endpoint rate limits', () => {
         { provide: SupportService, useValue: { open: async () => ({ id: 'ticket-1' }), list: async () => [] } },
         { provide: StaffAuthService, useValue: { me: async () => ({ id: 'staff-1' }) } },
         { provide: AuthzService, useValue: { can: async () => true } },
+        { provide: ReceiptsService, useValue: { build: async () => ({ markup: '' }) } },
       ],
     }).compile();
 

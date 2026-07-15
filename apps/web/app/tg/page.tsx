@@ -15,6 +15,7 @@ import {
   type StorePoint,
 } from '@/lib/api';
 import { som, conditionLabel } from '@/lib/format';
+import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
 
 type TgUser = {
   first_name?: string;
@@ -158,6 +159,7 @@ export default function TelegramMiniAppPage() {
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
       }, customer.guestCapability, crypto.randomUUID());
+      if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
       if (payment === 'cash') {
         setDone({ order });
         setCart([]);
@@ -196,6 +198,11 @@ export default function TelegramMiniAppPage() {
                 {done.intent.qrPayload ?? done.intent.paymentUrl}
               </div>
             </div>
+          )}
+          {done.order.guestAccess && (
+            <Link href={guestOrderLink(done.order.id, done.order.guestAccess.capability)} className="mt-5 w-full rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">
+              Статус и чек
+            </Link>
           )}
           <button
             type="button"

@@ -26,6 +26,7 @@ import {
 } from '@/lib/api';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
+import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
 
 const DELIVERY = [
   { id: 'pickup', icon: '🏬', name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
@@ -172,6 +173,7 @@ export default function CheckoutPage() {
         const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
         guestCapability = customer.guestCapability;
         order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
+        if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
       }
       const serverTotal = order.total;
       const serverGiftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, serverTotal) : 0;
@@ -268,7 +270,7 @@ export default function CheckoutPage() {
             {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
           </div>
         )}
-        <Link href={`/account/orders/${done.order.id}`} className="checkout-primary mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Отследить заказ</Link>
+        <Link href={done.order.guestAccess ? guestOrderLink(done.order.id, done.order.guestAccess.capability) : `/account/orders/${done.order.id}`} className="checkout-primary mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Статус и чек</Link>
         <Link href="/" className="mt-4 text-sm text-[#A79C92]">На главную</Link>
       </div>,
     );

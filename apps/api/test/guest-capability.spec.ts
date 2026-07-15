@@ -1,5 +1,6 @@
 import {
   issueGuestCheckoutCapability,
+  issueGuestOrderCapability,
   requireGuestCapability,
 } from '../src/auth/guest-capability';
 
@@ -11,6 +12,15 @@ describe('guest checkout capability', () => {
     expect(requireGuestCapability(token, 'evidence:write').scopes).toContain('support:create');
     expect(() => requireGuestCapability(token, 'orders:create', 'customer-2'))
       .toThrow('guest_capability_owner_mismatch');
+  });
+
+  it('binds read scopes to one order and rejects expired access', () => {
+    const token = issueGuestOrderCapability('customer-1', 'order-1');
+    expect(requireGuestCapability(token, 'orders:read', undefined, { type: 'order', id: 'order-1' }).sub).toBe('customer-1');
+    expect(() => requireGuestCapability(token, 'orders:read', undefined, { type: 'order', id: 'order-2' }))
+      .toThrow('guest_capability_entity_mismatch');
+    expect(() => requireGuestCapability(issueGuestOrderCapability('customer-1', 'order-1', -1), 'orders:read'))
+      .toThrow('guest_capability_invalid');
   });
 
   it('rejects missing and tampered capabilities', () => {
