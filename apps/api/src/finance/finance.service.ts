@@ -171,6 +171,9 @@ export class FinanceService {
       const duplicate = await tx.bankStatementLine.findUnique({ where: { matchedEntryId: entry.id }, select: { id: true } });
       if (duplicate && duplicate.id !== id) throw new ConflictError('accounting_entry_already_reconciled', 'Проводка уже связана с другой строкой выписки');
       const matched = await tx.bankStatementLine.update({ where: { id }, data: { status: 'matched', reconciliationKey: dto.idempotencyKey, matchedEntryId: entry.id, matchedBy: actor, matchedAt: new Date() } });
+      if (entry.sourceType === 'cash.incassation') {
+        await tx.cashIncassation.updateMany({ where: { accountingEntryId: entry.id, status: 'deposited' }, data: { status: 'reconciled', reconciledAt: new Date() } });
+      }
       const remaining = await tx.bankStatementLine.count({ where: { statementId: line.statementId, status: { not: 'matched' } } });
       const statement = await tx.bankStatement.update({ where: { id: line.statementId }, data: { status: remaining === 0 ? 'reconciled' : 'imported' } });
       return { result: { ...matched, statement, statementStatus: statement.status, idempotent: false }, events: [{ type: 'finance.bank_statement_line_reconciled', actor, payload: { lineId: id, statementId: line.statementId, journalEntryId: entry.id, amount: line.amount }, refs: [id, line.statementId, entry.id] }] };

@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ACC-002F
+
+- Iteration ID: `ACC-002F`.
+- Task: close the cash-to-bank reconciliation loop.
+- Files changed: Finance reconciliation service and cash-incassation integration regression.
+- Result: matching a bank statement line to a `cash.incassation` journal now marks the originating deposit `reconciled` with a timestamp; journal, source document and bank-line links remain immutable and replay-safe.
+- Checks run: clean test DB push and Finance integration suite 11/11.
+- Acceptance: `accepted` for cash deposit reconciliation. Tax/currency snapshots, opening balances and export formats remain open.
+- Next step: add tax/currency snapshots to primary documents and journal lines.
+
 ## 2026-07-15 — ACC-002E
 
 - Iteration ID: `ACC-002E`.

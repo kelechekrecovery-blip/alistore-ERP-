@@ -249,6 +249,28 @@ describe('Finance expenses (integration + RBAC)', () => {
     ]);
     const rows = await request(app.getHttpServer()).get('/finance/cash-incassations?point=BISHKEK-1').set('Authorization', `Bearer ${ownerToken}`).expect(200);
     expect(rows.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, accountingEntryId: entry.id })]));
+
+    const statement = await request(app.getHttpServer())
+      .post('/finance/bank-statements')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        idempotencyKey: `incassation-statement-${run}`,
+        statementNumber: `INCASSATION-${run}`,
+        accountCode: '1010',
+        periodStart: new Date(now.getTime() - 86_400_000).toISOString(),
+        periodEnd: new Date(now.getTime() + 86_400_000).toISOString(),
+        openingBalance: 0,
+        closingBalance: 30_000,
+        lines: [{ externalId: `incassation-bank-line-${run}`, occurredAt: now.toISOString(), amount: 30_000 }],
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/finance/bank-statements/lines/${statement.body.lines[0].id}/reconcile`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `incassation-reconcile-${run}`, journalEntryId: entry.id })
+      .expect(201);
+    const reconciled = await prisma.cashIncassation.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(reconciled.status).toBe('reconciled');
   });
 
   it('exposes supplier AP aging with permission and a stable empty report', async () => {
