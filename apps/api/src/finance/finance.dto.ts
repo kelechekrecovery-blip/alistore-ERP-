@@ -79,6 +79,16 @@ export class ReconcileBankStatementLineDto {
   @IsString() @MinLength(1) @MaxLength(64) journalEntryId!: string;
 }
 
+export class CreateCashIncassationDto {
+  @IsInt()
+  @Min(1)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
+}
+
 export class CloseAccountingPeriodDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsIn(['soft_closed', 'hard_closed']) status!: 'soft_closed' | 'hard_closed';

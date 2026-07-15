@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -58,6 +58,19 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   accounts() {
     return this.finance.listAccountingAccounts();
+  }
+
+  @Get('cash-incassations')
+  @RequirePermission('finance', 'read')
+  cashIncassations(@Query('point') point?: string) {
+    return this.finance.listCashIncassations(point);
+  }
+
+  @Post('cash-incassations/:shiftId')
+  @RequirePermission('finance', 'create')
+  cashIncassation(@CurrentUser() user: AuthPrincipal, @Param('shiftId') shiftId: string, @Headers('idempotency-key') idempotencyKey: string | undefined, @Body() dto: CreateCashIncassationDto) {
+    if (!idempotencyKey?.trim()) throw new BadRequestException('Требуется Idempotency-Key');
+    return this.finance.createCashIncassation(shiftId, dto, user.customerId, idempotencyKey.trim());
   }
 
   @Get('periods')

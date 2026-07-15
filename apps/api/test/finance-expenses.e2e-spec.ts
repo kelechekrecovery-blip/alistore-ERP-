@@ -49,6 +49,8 @@ describe('Finance expenses (integration + RBAC)', () => {
     await prisma.financeBudgetCommand.deleteMany();
     await prisma.financeBudget.deleteMany();
     await prisma.$transaction([
+      prisma.cashIncassation.deleteMany(),
+      prisma.cashShift.deleteMany(),
       prisma.accountingPeriod.deleteMany(),
       prisma.bankStatement.deleteMany(),
       prisma.payment.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
@@ -56,7 +58,7 @@ describe('Finance expenses (integration + RBAC)', () => {
       prisma.accountingJournalEntry.deleteMany(),
     ]);
     await prisma.expense.deleteMany();
-    await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'expense.' } }, { type: { startsWith: 'accounting.' } }, { type: 'finance.budget_set' }] } });
+    await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'expense.' } }, { type: { startsWith: 'accounting.' } }, { type: { startsWith: 'finance.' } }, { type: 'finance.budget_set' }] } });
   }
 
   beforeEach(clean);
@@ -207,6 +209,46 @@ describe('Finance expenses (integration + RBAC)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ idempotencyKey: `period-pay-${run}`, fundingAccountCode: '1000' })
       .expect(409);
+  });
+
+  it('records cash incassation as an idempotent 1010/1000 journal movement', async () => {
+    const now = new Date();
+    const shift = await prisma.cashShift.create({
+      data: { staffId: ownerId, point: 'BISHKEK-1', openCash: 5_000, closeCash: 45_000, closedAt: now },
+    });
+    const payload = { amount: 30_000, reference: 'BANK-BAG-001' };
+    const created = await request(app.getHttpServer())
+      .post(`/finance/cash-incassations/${shift.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `incassation-${run}-1`)
+      .send(payload)
+      .expect(201);
+    expect(created.body).toMatchObject({ shiftId: shift.id, amount: 30_000, point: 'BISHKEK-1', status: 'deposited', idempotent: false });
+    expect(created.body.accountingEntryId).toEqual(expect.any(String));
+
+    const replay = await request(app.getHttpServer())
+      .post(`/finance/cash-incassations/${shift.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `incassation-${run}-1`)
+      .send(payload)
+      .expect(201);
+    expect(replay.body).toMatchObject({ id: created.body.id, idempotent: true });
+
+    await request(app.getHttpServer())
+      .post(`/finance/cash-incassations/${shift.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `incassation-${run}-2`)
+      .send({ amount: 20_000 })
+      .expect(409);
+
+    const entry = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: created.body.accountingEntryId }, include: { lines: { orderBy: { accountCode: 'asc' } } } });
+    expect(entry).toMatchObject({ sourceType: 'cash.incassation', sourceRef: created.body.id, point: 'BISHKEK-1' });
+    expect(entry.lines).toMatchObject([
+      { accountCode: '1000', debit: 0, credit: 30_000 },
+      { accountCode: '1010', debit: 30_000, credit: 0 },
+    ]);
+    const rows = await request(app.getHttpServer()).get('/finance/cash-incassations?point=BISHKEK-1').set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(rows.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, accountingEntryId: entry.id })]));
   });
 
   it('exposes supplier AP aging with permission and a stable empty report', async () => {

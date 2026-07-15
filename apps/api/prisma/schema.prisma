@@ -91,6 +91,12 @@ enum FinanceSettlementSourceType {
   refund
 }
 
+enum CashIncassationStatus {
+  deposited
+  reconciled
+  disputed
+}
+
 enum UnitStatus {
   in_stock
   reserved
@@ -1056,9 +1062,31 @@ model CashShift {
   openedAt            DateTime  @default(now())
   closedAt            DateTime?
   payments            Payment[]
+  incassations        CashIncassation[]
 
   @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
   @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy
+}
+
+model CashIncassation {
+  id              String                   @id @default(cuid())
+  idempotencyKey  String                   @unique
+  shift           CashShift                @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId         String
+  point           String
+  amount          Int
+  destinationCode String                   @default("1010")
+  reference       String?
+  status          CashIncassationStatus    @default(deposited)
+  depositedBy     String
+  depositedAt     DateTime                 @default(now())
+  reconciledAt    DateTime?
+  accountingEntry AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                @unique
+
+  @@index([shiftId, depositedAt])
+  @@index([point, depositedAt])
+  @@index([status, depositedAt])
 }
 
 model CashShiftHandover {
@@ -1415,6 +1443,7 @@ model AccountingJournalEntry {
   supplierInvoice SupplierInvoice?
   supplierCreditNote SupplierCreditNote?
   bankStatementLine BankStatementLine?
+  cashIncassation CashIncassation?
   reversalOfId    String?                 @unique
   reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversal        AccountingJournalEntry? @relation("AccountingReversal")

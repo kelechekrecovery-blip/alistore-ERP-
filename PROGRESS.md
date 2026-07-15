@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ACC-002E
+
+- Iteration ID: `ACC-002E`.
+- Task: add closed-shift cash incassation with accounting and Ledger provenance.
+- Files changed: CashIncassation Prisma model/migration, Finance DTO/controller/service and Finance integration regression.
+- Result: only a closed and counted shift can be deposited; total deposits cannot exceed the counted drawer cash. Each deposit moves `1000` cash to `1010` bank in one immutable balanced journal entry, is protected by a stable `Idempotency-Key`, and is queryable with its source shift and journal link.
+- Checks run: Prisma validate/generate, API build, clean reset plus full migration deploy through `20260716079000_cash_incassations`, Finance integration suite 11/11.
+- Acceptance: `accepted` for cash incassation software contour. Bank-format adapters, reconciliation status for deposits, tax/currency snapshots, opening balances and export formats remain open.
+- Next step: add tax/currency snapshots to primary documents and journal lines, then expose finance controls in the ERP workspace.
+
 ## 2026-07-15 — ACC-002D
 
 - Iteration ID: `ACC-002D`.
