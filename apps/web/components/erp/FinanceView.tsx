@@ -4,13 +4,17 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   approveExpense,
   createExpense,
+  fetchAccountingAccounts,
   fetchExpenses,
   fetchFinancePlanFact,
+  fetchTrialBalance,
   payExpense,
   rejectExpense,
   setFinanceBudget,
   type Expense,
+  type AccountingAccount,
   type FinancePlanFact,
+  type TrialBalance,
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import type { Dashboard } from '@/lib/reports';
@@ -25,6 +29,7 @@ const STATUS: Record<string, string> = {
   submitted: 'На согласовании', approved: 'Согласовано', rejected: 'Отклонено', paid: 'Выплачено',
 };
 const CURRENT_PERIOD = new Date().toISOString().slice(0, 7);
+const paymentStorageKey = (expenseId: string) => `alistore:finance:expense-payment:${expenseId}`;
 
 export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessToken: string }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -41,18 +46,44 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const [budgetAmount, setBudgetAmount] = useState('');
   const [planningBusy, setPlanningBusy] = useState(false);
   const [planningMessage, setPlanningMessage] = useState('');
+  const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
+  const [trialBalance, setTrialBalance] = useState<TrialBalance | null>(null);
+  const [accountingState, setAccountingState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [fundingByExpense, setFundingByExpense] = useState<Record<string, string>>({});
+  const [referenceByExpense, setReferenceByExpense] = useState<Record<string, string>>({});
+  const [paymentKeyByExpense, setPaymentKeyByExpense] = useState<Record<string, string>>({});
   const reload = useCallback(() => {
     fetchExpenses(accessToken).then(setExpenses).catch(() => setMessage('Не удалось загрузить расходы'));
   }, [accessToken]);
 
   useEffect(() => reload(), [reload]);
 
+  useEffect(() => {
+    const paidIds = new Set(expenses.filter((expense) => expense.status === 'paid').map((expense) => expense.id));
+    if (!paidIds.size) return;
+    paidIds.forEach((id) => localStorage.removeItem(paymentStorageKey(id)));
+    setPaymentKeyByExpense((current) => {
+      if (!Object.keys(current).some((id) => paidIds.has(id))) return current;
+      return Object.fromEntries(Object.entries(current).filter(([id]) => !paidIds.has(id)));
+    });
+  }, [expenses]);
+
+  useEffect(() => {
+    fetchAccountingAccounts(accessToken).then(setAccounts).catch(() => setMessage('Не удалось загрузить план счетов'));
+  }, [accessToken]);
+
   const reloadPlanning = useCallback(() => {
     setPlanningMessage('');
-    fetchFinancePlanFact(period, planPoint, accessToken)
-      .then(setPlanFact)
+    setAccountingState('loading');
+    Promise.all([
+      fetchFinancePlanFact(period, planPoint, accessToken),
+      fetchTrialBalance(period, planPoint, accessToken),
+    ])
+      .then(([planning, balance]) => { setPlanFact(planning); setTrialBalance(balance); setAccountingState('ready'); })
       .catch(() => {
         setPlanFact(null);
+        setTrialBalance(null);
+        setAccountingState('error');
         setPlanningMessage('Не удалось загрузить план-факт');
       });
   }, [accessToken, period, planPoint]);
@@ -126,6 +157,20 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   return (
     <div className="space-y-5">
       <FinanceSettlementWorkspace accessToken={accessToken} />
+      <section aria-labelledby="trial-balance-title" className="border-b border-[#2E2822] pb-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div><h2 id="trial-balance-title" className="font-display text-[15px] font-bold">Оборотно-сальдовая ведомость</h2><p className="mt-1 text-xs text-[#8A7F76]">{trialBalance?.coverage.note ?? 'Загружаем проводки операционных расходов'}</p></div>
+          <span data-testid="trial-balance-status" className={`rounded-[5px] px-2.5 py-1 text-xs font-semibold ${accountingState === 'ready' && trialBalance?.balanced ? 'bg-[#26351B] text-[#C6FF3D]' : accountingState === 'error' || accountingState === 'ready' ? 'bg-[#593127] text-[#FFB5AA]' : 'bg-[#29231E] text-[#B9ADA2]'}`}>{accountingState === 'loading' ? 'Загрузка' : accountingState === 'error' ? 'Данные недоступны' : trialBalance?.balanced ? 'Дебет = кредит' : 'Баланс не сошёлся'}</span>
+        </div>
+        <div className="overflow-x-auto rounded-[7px] border border-[#2E2822] bg-[#16130F]">
+          <table className="w-full min-w-[620px] text-left text-xs">
+            <thead className="bg-[#1D1915] text-[#8A7F76]"><tr><th className="px-4 py-2.5">Счёт</th><th className="px-4 py-2.5">Наименование</th><th className="px-4 py-2.5 text-right">Дебет</th><th className="px-4 py-2.5 text-right">Кредит</th><th className="px-4 py-2.5 text-right">Сальдо</th></tr></thead>
+            <tbody>{(trialBalance?.rows ?? []).filter((row) => row.debit || row.credit).map((row) => <tr key={row.code} className="border-t border-[#2E2822]"><td className="px-4 py-2.5 font-mono text-[#C6FF3D]">{row.code}</td><td className="px-4 py-2.5 text-[#D8CFC6]">{row.name}</td><td className="px-4 py-2.5 text-right font-mono">{som(row.debit)}</td><td className="px-4 py-2.5 text-right font-mono">{som(row.credit)}</td><td className="px-4 py-2.5 text-right font-mono">{som(row.balance)}</td></tr>)}</tbody>
+            <tfoot><tr className="border-t border-[#3A332C] font-bold"><td className="px-4 py-3" colSpan={2}>Обороты</td><td className="px-4 py-3 text-right font-mono">{som(trialBalance?.totalDebit ?? 0)}</td><td className="px-4 py-3 text-right font-mono">{som(trialBalance?.totalCredit ?? 0)}</td><td /></tr></tfoot>
+          </table>
+          {!(trialBalance?.rows ?? []).some((row) => row.debit || row.credit) && <div className="border-t border-[#2E2822] px-4 py-8 text-center text-sm text-[#8A7F76]">Проводок за период пока нет</div>}
+        </div>
+      </section>
       <section aria-labelledby="finance-plan-title" className="border-b border-[#2E2822] pb-5">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -221,7 +266,29 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
                   <button disabled={busy === expense.id} onClick={() => run(expense.id, () => rejectExpense(expense.id, 'Отклонено владельцем', accessToken))} className="text-xs text-[#FF8A7A] disabled:opacity-50">Отклонить</button>
                   <button disabled={busy === expense.id} onClick={() => run(expense.id, () => approveExpense(expense.id, accessToken))} className="rounded-[5px] bg-[#29231E] px-3 py-1.5 text-xs font-semibold text-[#C6FF3D] disabled:opacity-50">Согласовать</button>
                 </div>}
-                {expense.status === 'approved' && <button disabled={busy === expense.id} onClick={() => run(expense.id, () => payExpense(expense.id, accessToken))} className="rounded-[5px] bg-[#C6FF3D] px-3 py-1.5 text-xs font-bold text-[#111] disabled:opacity-50">Выплатить</button>}
+                {expense.status === 'approved' && <div className="grid w-52 gap-2">
+                  <select aria-label={`Источник выплаты ${expense.description}`} value={fundingByExpense[expense.id] ?? '1000'} onChange={(event) => setFundingByExpense((current) => ({ ...current, [expense.id]: event.target.value }))} className="h-8 rounded-[5px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs">
+                    {accounts.filter((account) => ['1000', '1010', '1020'].includes(account.code)).map((account) => <option key={account.code} value={account.code}>{account.code} · {account.name}</option>)}
+                  </select>
+                  <input aria-label={`Платёжный референс ${expense.description}`} value={referenceByExpense[expense.id] ?? ''} onChange={(event) => setReferenceByExpense((current) => ({ ...current, [expense.id]: event.target.value }))} maxLength={128} placeholder="Номер документа" className="h-8 rounded-[5px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs" />
+                  <button disabled={busy === expense.id} onClick={() => {
+                    const storageKey = paymentStorageKey(expense.id);
+                    const idempotencyKey = paymentKeyByExpense[expense.id] ?? localStorage.getItem(storageKey) ?? crypto.randomUUID();
+                    localStorage.setItem(storageKey, idempotencyKey);
+                    setPaymentKeyByExpense((current) => ({ ...current, [expense.id]: idempotencyKey }));
+                    void run(expense.id, async () => {
+                      const result = await payExpense(expense.id, fundingByExpense[expense.id] ?? '1000', referenceByExpense[expense.id] ?? '', idempotencyKey, accessToken);
+                      localStorage.removeItem(storageKey);
+                      setPaymentKeyByExpense((current) => {
+                        const next = { ...current };
+                        delete next[expense.id];
+                        return next;
+                      });
+                      return result;
+                    });
+                  }} className="rounded-[5px] bg-[#C6FF3D] px-3 py-1.5 text-xs font-bold text-[#111] disabled:opacity-50">Провести выплату</button>
+                </div>}
+                {expense.status === 'paid' && <div className="text-right text-[11px] text-[#8A7F76]"><span className="font-mono text-[#C6FF3D]">{expense.paymentAccountCode}</span>{expense.paymentReference ? <span className="mt-1 block">{expense.paymentReference}</span> : null}</div>}
               </div>
             </article>
           ))}

@@ -16,7 +16,37 @@ export interface Expense {
   rejectionNote: string | null;
   incurredAt: string;
   paidAt: string | null;
+  paymentAccountCode: string | null;
+  paymentReference: string | null;
+  accountingEntryId?: string | null;
   createdAt: string;
+}
+
+export interface AccountingAccount {
+  code: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  active: boolean;
+}
+
+export interface TrialBalanceRow {
+  code: string;
+  name: string;
+  type: AccountingAccount['type'];
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface TrialBalance {
+  from: string;
+  to: string;
+  point: string | null;
+  totalDebit: number;
+  totalCredit: number;
+  balanced: boolean;
+  coverage: { complete: boolean; sourceTypes: string[]; note: string };
+  rows: TrialBalanceRow[];
 }
 
 export interface FinancePlanFactRow {
@@ -104,8 +134,23 @@ export const approveExpense = (id: string, accessToken: string) =>
 export const rejectExpense = (id: string, note: string, accessToken: string) =>
   postAuthJson<Expense>(`/finance/expenses/${encodeURIComponent(id)}/reject`, { note }, accessToken);
 
-export const payExpense = (id: string, accessToken: string) =>
-  postAuthJson<Expense>(`/finance/expenses/${encodeURIComponent(id)}/pay`, { idempotencyKey: crypto.randomUUID() }, accessToken);
+export const payExpense = (id: string, fundingAccountCode: string, paymentReference: string, idempotencyKey: string, accessToken: string) =>
+  postAuthJson<Expense>(`/finance/expenses/${encodeURIComponent(id)}/pay`, {
+    idempotencyKey, fundingAccountCode,
+    ...(paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
+  }, accessToken);
+
+export const fetchAccountingAccounts = (accessToken: string) =>
+  getJson<AccountingAccount[]>('/finance/accounts', accessToken);
+
+export const fetchTrialBalance = (period: string, point: string, accessToken: string) => {
+  const [year, month] = period.split('-').map(Number);
+  const from = new Date(Date.UTC(year, month - 1, 1)).toISOString();
+  const to = new Date(Date.UTC(year, month, 1)).toISOString();
+  const query = new URLSearchParams({ from, to });
+  if (point.trim()) query.set('point', point.trim());
+  return getJson<TrialBalance>(`/finance/trial-balance?${query.toString()}`, accessToken);
+};
 
 export const fetchFinancePlanFact = (period: string, point: string, accessToken: string) => {
   const query = new URLSearchParams({ period });

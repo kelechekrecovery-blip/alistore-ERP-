@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto } from './finance.dto';
+import { CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -43,7 +43,7 @@ export class FinanceController {
   @Post(':id/pay')
   @RequirePermission('finance', 'pay')
   pay(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: PayExpenseDto) {
-    return this.finance.pay(id, dto.idempotencyKey, user.customerId);
+    return this.finance.pay(id, dto, user.customerId);
   }
 }
 
@@ -53,6 +53,24 @@ export class FinanceController {
 @Controller('finance')
 export class FinancePlanningController {
   constructor(private readonly finance: FinanceService) {}
+
+  @Get('accounts')
+  @RequirePermission('finance', 'read')
+  accounts() {
+    return this.finance.listAccountingAccounts();
+  }
+
+  @Get('journal')
+  @RequirePermission('finance', 'read')
+  journal(@Query() query: FinanceAccountingQueryDto) {
+    return this.finance.accountingJournal(query);
+  }
+
+  @Get('trial-balance')
+  @RequirePermission('finance', 'read')
+  trialBalance(@Query() query: FinanceAccountingQueryDto) {
+    return this.finance.trialBalance(query);
+  }
 
   @Get('budgets')
   @RequirePermission('finance', 'read')

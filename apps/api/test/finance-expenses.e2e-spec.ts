@@ -48,8 +48,12 @@ describe('Finance expenses (integration + RBAC)', () => {
   async function clean() {
     await prisma.financeBudgetCommand.deleteMany();
     await prisma.financeBudget.deleteMany();
+    await prisma.$transaction([
+      prisma.accountingJournalLine.deleteMany(),
+      prisma.accountingJournalEntry.deleteMany(),
+    ]);
     await prisma.expense.deleteMany();
-    await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'expense.' } }, { type: 'finance.budget_set' }] } });
+    await prisma.auditEvent.deleteMany({ where: { OR: [{ type: { startsWith: 'expense.' } }, { type: { startsWith: 'accounting.' } }, { type: 'finance.budget_set' }] } });
   }
 
   beforeEach(clean);
@@ -93,13 +97,14 @@ describe('Finance expenses (integration + RBAC)', () => {
     ]);
     expect(concurrent.map((response) => response.status).sort()).toEqual([201, 409]);
 
-    const paymentPayload = { idempotencyKey: `expense-payment-${run}-1` };
+    const paymentPayload = { idempotencyKey: `expense-payment-${run}-1`, fundingAccountCode: '1010', paymentReference: 'BANK-001' };
     const paid = await request(app.getHttpServer())
       .post(`/finance/expenses/${created.body.id}/pay`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send(paymentPayload)
       .expect(201);
-    expect(paid.body).toMatchObject({ status: 'paid', paidBy: ownerId, idempotent: false });
+    expect(paid.body).toMatchObject({ status: 'paid', paidBy: ownerId, paymentAccountCode: '1010', paymentReference: 'BANK-001', idempotent: false });
+    expect(paid.body.accountingEntryId).toEqual(expect.any(String));
 
     const paymentReplay = await request(app.getHttpServer())
       .post(`/finance/expenses/${created.body.id}/pay`)
@@ -107,6 +112,43 @@ describe('Finance expenses (integration + RBAC)', () => {
       .send(paymentPayload)
       .expect(201);
     expect(paymentReplay.body).toMatchObject({ id: created.body.id, idempotent: true });
+    await request(app.getHttpServer())
+      .post(`/finance/expenses/${created.body.id}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...paymentPayload, fundingAccountCode: '1000' })
+      .expect(409);
+
+    const journalEntry = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { id: paid.body.accountingEntryId },
+      include: { lines: { orderBy: { accountCode: 'asc' } } },
+    });
+    expect(journalEntry).toMatchObject({ sourceType: 'expense.payment', sourceRef: created.body.id, point: 'BISHKEK-1' });
+    expect(journalEntry.lines).toMatchObject([
+      { accountCode: '1010', debit: 0, credit: 120_000 },
+      { accountCode: '6200', debit: 120_000, credit: 0 },
+    ]);
+
+    const now = Date.now();
+    const trialBalance = await request(app.getHttpServer())
+      .get(`/finance/trial-balance?from=${encodeURIComponent(new Date(now - 86_400_000).toISOString())}&to=${encodeURIComponent(new Date(now + 86_400_000).toISOString())}&point=BISHKEK-1`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(trialBalance.body).toMatchObject({ totalDebit: 120_000, totalCredit: 120_000, balanced: true });
+    expect(trialBalance.body.coverage).toMatchObject({ complete: false, sourceTypes: ['expense.payment'] });
+    const journal = await request(app.getHttpServer())
+      .get(`/finance/journal?from=${encodeURIComponent(new Date(now - 86_400_000).toISOString())}&to=${encodeURIComponent(new Date(now + 86_400_000).toISOString())}&accountCode=6200`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(journal.body).toHaveLength(1);
+    expect(journal.body[0]).toMatchObject({ id: paid.body.accountingEntryId, sourceType: 'expense.payment' });
+    await request(app.getHttpServer())
+      .get(`/finance/journal?from=${encodeURIComponent(new Date(now + 86_400_000).toISOString())}&to=${encodeURIComponent(new Date(now - 86_400_000).toISOString())}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(422);
+    await request(app.getHttpServer())
+      .get(`/finance/trial-balance?from=${encodeURIComponent(new Date(now - 86_400_000).toISOString())}&to=${encodeURIComponent(new Date(now + 86_400_000).toISOString())}`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(403);
 
     const dashboard = await request(app.getHttpServer())
       .get('/reports/dashboard')
@@ -118,7 +160,37 @@ describe('Finance expenses (integration + RBAC)', () => {
     );
 
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });
-    expect(events.map((event) => event.type)).toEqual(['expense.submitted', 'expense.approved', 'expense.paid']);
+    expect(events.map((event) => event.type)).toEqual(['expense.submitted', 'expense.approved', 'expense.paid', 'accounting.entry_posted']);
+  });
+
+  it('returns a deterministic conflict when two expenses reuse one payment key', async () => {
+    const createApproved = async (suffix: string) => {
+      const created = await request(app.getHttpServer())
+        .post('/finance/expenses')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ idempotencyKey: `expense-${run}-${suffix}`, category: 'other', description: `Расход ${suffix}`, amount: 1000 })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/finance/expenses/${created.body.id}/approve`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(201);
+      return created.body.id as string;
+    };
+    const [firstId, secondId] = await Promise.all([createApproved('shared-a'), createApproved('shared-b')]);
+    const payload = { idempotencyKey: `expense-payment-${run}-shared`, fundingAccountCode: '1000' };
+    const firstPayment = await request(app.getHttpServer())
+      .post(`/finance/expenses/${firstId}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(payload)
+      .expect(201);
+    expect(firstPayment.body).toMatchObject({ status: 'paid', idempotent: false });
+    const collision = await request(app.getHttpServer())
+      .post(`/finance/expenses/${secondId}/pay`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(payload)
+      .expect(409);
+    expect(collision.body).toMatchObject({ code: 'accounting_idempotency_conflict' });
+    expect(await prisma.accountingJournalEntry.count({ where: { idempotencyKey: payload.idempotencyKey } })).toBe(1);
   });
 
   it('rejects a submitted expense and prevents payment', async () => {
@@ -136,7 +208,7 @@ describe('Finance expenses (integration + RBAC)', () => {
     await request(app.getHttpServer())
       .post(`/finance/expenses/${created.body.id}/pay`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ idempotencyKey: `expense-payment-${run}-reject` })
+      .send({ idempotencyKey: `expense-payment-${run}-reject`, fundingAccountCode: '1000' })
       .expect(409);
   });
 
@@ -200,7 +272,7 @@ describe('Finance expenses (integration + RBAC)', () => {
     await request(app.getHttpServer())
       .post(`/finance/expenses/${expense.body.id}/pay`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ idempotencyKey: `expense-payment-${run}-plan-fact` })
+      .send({ idempotencyKey: `expense-payment-${run}-plan-fact`, fundingAccountCode: '1010' })
       .expect(201);
 
     const report = await request(app.getHttpServer())

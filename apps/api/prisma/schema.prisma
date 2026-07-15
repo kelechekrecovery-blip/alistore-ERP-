@@ -244,6 +244,14 @@ enum ExpenseStatus {
   paid
 }
 
+enum AccountingAccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
 enum HrAbsenceType {
   annual_leave
   sick_leave
@@ -1250,31 +1258,79 @@ model Supplier {
 }
 
 model Expense {
-  id             String        @id @default(cuid())
-  idempotencyKey String        @unique
-  category       String
-  description    String
-  amount         Int
-  point          String?
-  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
-  supplierId     String?
-  status         ExpenseStatus @default(submitted)
-  requestedBy    String
-  approvedBy     String?
-  rejectedBy     String?
-  rejectionNote  String?
-  paidBy         String?
-  paymentKey     String?       @unique
-  incurredAt     DateTime      @default(now())
-  approvedAt     DateTime?
-  rejectedAt     DateTime?
-  paidAt         DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  idempotencyKey     String        @unique
+  category           String
+  description        String
+  amount             Int
+  point              String?
+  supplier           Supplier?     @relation(fields: [supplierId], references: [id])
+  supplierId         String?
+  status             ExpenseStatus @default(submitted)
+  requestedBy        String
+  approvedBy         String?
+  rejectedBy         String?
+  rejectionNote      String?
+  paidBy             String?
+  paymentKey         String?       @unique
+  paymentAccountCode String?
+  paymentReference   String?
+  incurredAt         DateTime      @default(now())
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  paidAt             DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@index([status, createdAt])
   @@index([category, incurredAt])
   @@index([supplierId])
+}
+
+// Balanced accounting ledger. AuditEvent explains what happened; these rows
+// prove where value moved and that every posted entry balances.
+model AccountingAccount {
+  code      String                  @id
+  name      String
+  type      AccountingAccountType
+  system    Boolean                 @default(true)
+  active    Boolean                 @default(true)
+  lines     AccountingJournalLine[]
+  createdAt DateTime                @default(now())
+
+  @@index([type, active])
+}
+
+model AccountingJournalEntry {
+  id             String                  @id @default(cuid())
+  idempotencyKey String                  @unique
+  sourceType     String
+  sourceRef      String
+  description    String
+  point          String?
+  currency       String                  @default("KGS")
+  occurredAt     DateTime
+  postedAt       DateTime                @default(now())
+  createdBy      String
+  lines          AccountingJournalLine[]
+
+  @@unique([sourceType, sourceRef])
+  @@index([occurredAt, point])
+  @@index([sourceType, occurredAt])
+}
+
+model AccountingJournalLine {
+  id          String                 @id @default(cuid())
+  entry       AccountingJournalEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  entryId     String
+  account     AccountingAccount      @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode String
+  debit       Int                    @default(0)
+  credit      Int                    @default(0)
+  memo        String?
+
+  @@index([entryId])
+  @@index([accountCode, entryId])
 }
 
 model FinanceBudget {

@@ -37,16 +37,52 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
 
   await page.getByRole('button', { name: 'Согласовать' }).click();
   await expect(page.getByText(/Согласовано/)).toBeVisible();
-  await page.getByRole('button', { name: 'Выплатить' }).click();
+  const paymentKeys: string[] = [];
+  await page.route('**/api/finance/expenses/*/pay', async (route) => {
+    paymentKeys.push((route.request().postDataJSON() as { idempotencyKey: string }).idempotencyKey);
+    if (paymentKeys.length === 1) {
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByLabel('Источник выплаты Аренда склада за июль').selectOption('1010');
+  await page.getByLabel('Платёжный референс Аренда склада за июль').fill('E2E-BANK-001');
+  await page.getByRole('button', { name: 'Провести выплату' }).click();
+  await expect.poll(() => paymentKeys.length).toBe(1);
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).find((key) => key.startsWith('alistore:finance:expense-payment:')) ?? null)).not.toBeNull();
+
+  await page.reload();
+  await page.getByRole('button', { name: /Финансы/ }).click();
+  await planning.getByLabel('Точка бюджета').fill('BISHKEK-1');
+  await page.getByLabel('Источник выплаты Аренда склада за июль').selectOption('1010');
+  await page.getByLabel('Платёжный референс Аренда склада за июль').fill('E2E-BANK-001');
+  await page.getByRole('button', { name: 'Провести выплату' }).click();
   await expect(page.getByText(/Выплачено/)).toBeVisible();
+  await expect(page.getByText('E2E-BANK-001')).toBeVisible();
+  expect(paymentKeys).toHaveLength(2);
+  expect(paymentKeys[1]).toBe(paymentKeys[0]);
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some((key) => key.startsWith('alistore:finance:expense-payment:')))).toBe(false);
   await expect(planning.getByTestId('finance-actual')).toContainText(/85.000/);
   await expect(planning.getByTestId('finance-row-rent')).toContainText('85%');
 
   const expense = await prisma.expense.findFirstOrThrow();
-  expect(expense).toMatchObject({ status: 'paid', amount: 85000, point: 'BISHKEK-1' });
+  expect(expense).toMatchObject({
+    status: 'paid',
+    amount: 85000,
+    point: 'BISHKEK-1',
+    paymentAccountCode: '1010',
+    paymentReference: 'E2E-BANK-001',
+  });
+  const journalEntry = await prisma.accountingJournalEntry.findFirstOrThrow({
+    where: { sourceType: 'expense.payment', sourceRef: expense.id },
+    include: { lines: true },
+  });
+  expect(journalEntry.lines.reduce((sum, line) => sum + line.debit, 0)).toBe(85000);
+  expect(journalEntry.lines.reduce((sum, line) => sum + line.credit, 0)).toBe(85000);
   const budget = await prisma.financeBudget.findFirstOrThrow();
   expect(budget).toMatchObject({ period, category: 'rent', point: 'BISHKEK-1', amount: 100000, version: 1 });
-  await expect.poll(() => prisma.auditEvent.count({ where: { refs: { has: expense.id } } })).toBe(3);
+  await expect.poll(() => prisma.auditEvent.count({ where: { refs: { has: expense.id } } })).toBe(4);
   await expect.poll(() => prisma.auditEvent.count({ where: { refs: { has: budget.id } } })).toBe(1);
 });
 

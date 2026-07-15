@@ -8,11 +8,14 @@ import {
   CreateExpenseDto,
   CreateFinanceSettlementDto,
   EXPENSE_CATEGORIES,
+  FinanceAccountingQueryDto,
   FinanceSettlementQueryDto,
+  PayExpenseDto,
   ResolveFinanceSettlementDto,
   SetFinanceBudgetDto,
   SETTLEMENT_SOURCE_TYPES,
 } from './finance.dto';
+import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
 
 const EXPENSE_INCLUDE = {
   supplier: { select: { id: true, name: true } },
@@ -36,6 +39,59 @@ export class FinanceService {
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
+  }
+
+  listAccountingAccounts() {
+    return this.prisma.accountingAccount.findMany({ orderBy: { code: 'asc' } });
+  }
+
+  async accountingJournal(query: FinanceAccountingQueryDto) {
+    const period = accountingPeriod(query);
+    return this.prisma.accountingJournalEntry.findMany({
+      where: {
+        occurredAt: { gte: period.from, lt: period.to },
+        ...(normalizePoint(query.point) ? { point: normalizePoint(query.point) } : {}),
+        ...(query.sourceType?.trim() ? { sourceType: query.sourceType.trim() } : {}),
+        ...(query.accountCode?.trim() ? { lines: { some: { accountCode: query.accountCode.trim() } } } : {}),
+      },
+      include: { lines: { include: { account: true }, orderBy: { accountCode: 'asc' } } },
+      orderBy: [{ occurredAt: 'desc' }, { postedAt: 'desc' }],
+      take: 500,
+    });
+  }
+
+  async trialBalance(query: FinanceAccountingQueryDto) {
+    const period = accountingPeriod(query);
+    const point = normalizePoint(query.point);
+    const accounts = await this.prisma.accountingAccount.findMany({
+      where: query.accountCode?.trim() ? { code: query.accountCode.trim() } : undefined,
+      include: {
+        lines: {
+          where: {
+            entry: {
+              occurredAt: { gte: period.from, lt: period.to },
+              ...(point ? { point } : {}),
+              ...(query.sourceType?.trim() ? { sourceType: query.sourceType.trim() } : {}),
+            },
+          },
+          select: { debit: true, credit: true },
+        },
+      },
+      orderBy: { code: 'asc' },
+    });
+    const rows = accounts.map((account) => {
+      const debit = account.lines.reduce((sum, line) => sum + line.debit, 0);
+      const credit = account.lines.reduce((sum, line) => sum + line.credit, 0);
+      return { code: account.code, name: account.name, type: account.type, debit, credit, balance: normalBalance(account.type, debit, credit) };
+    });
+    const totalDebit = rows.reduce((sum, row) => sum + row.debit, 0);
+    const totalCredit = rows.reduce((sum, row) => sum + row.credit, 0);
+    return {
+      from: period.from, to: period.to, point: point || null, totalDebit, totalCredit,
+      balanced: totalDebit === totalCredit,
+      coverage: { complete: false, sourceTypes: ['expense.payment'], note: 'Пока включены только выплаты операционных расходов' },
+      rows,
+    };
   }
 
   listBudgets(period: string, point?: string) {
@@ -403,35 +459,71 @@ export class FinanceService {
     return this.transitionSubmitted(id, actor, 'rejected', note.trim());
   }
 
-  async pay(id: string, paymentKey: string, actor: string) {
-    return this.audit.transaction(async (tx) => {
+  async pay(id: string, dto: PayExpenseDto, actor: string) {
+    try {
+      return await this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Expense" WHERE id = ${id} FOR UPDATE`;
       const expense = await tx.expense.findUnique({ where: { id }, include: EXPENSE_INCLUDE });
       if (!expense) throw new ValidationError('expense_not_found', `Расход ${id} не найден`);
       if (expense.status === 'paid') {
-        if (expense.paymentKey !== paymentKey) {
+        if (expense.paymentKey !== dto.idempotencyKey || expense.paymentAccountCode !== dto.fundingAccountCode || expense.paymentReference !== (dto.paymentReference?.trim() || null)) {
           throw new ConflictError('expense_already_paid', 'Расход уже выплачен с другим idempotency key');
         }
-        return { result: { ...expense, idempotent: true }, events: [] };
+        const entry = await tx.accountingJournalEntry.findUnique({
+          where: { sourceType_sourceRef: { sourceType: 'expense.payment', sourceRef: expense.id } },
+          select: { id: true },
+        });
+        return { result: { ...expense, accountingEntryId: entry?.id ?? null, idempotent: true }, events: [] };
       }
       if (expense.status !== 'approved') {
         throw new ConflictError('expense_not_approved', 'Выплатить можно только согласованный расход');
       }
+      const paidAt = new Date();
+      const entry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: dto.idempotencyKey,
+        sourceType: 'expense.payment',
+        sourceRef: expense.id,
+        description: expense.description,
+        point: expense.point,
+        occurredAt: paidAt,
+        createdBy: actor,
+        lines: [
+          { accountCode: expenseAccountCode(expense.category), debit: expense.amount, memo: expense.description },
+          { accountCode: dto.fundingAccountCode, credit: expense.amount, memo: dto.paymentReference },
+        ],
+      });
       const paid = await tx.expense.update({
         where: { id },
-        data: { status: 'paid', paidBy: actor, paidAt: new Date(), paymentKey },
+        data: {
+          status: 'paid', paidBy: actor, paidAt, paymentKey: dto.idempotencyKey,
+          paymentAccountCode: dto.fundingAccountCode, paymentReference: dto.paymentReference?.trim() || null,
+        },
         include: EXPENSE_INCLUDE,
       });
       return {
-        result: { ...paid, idempotent: false },
-        events: [{
-          type: EventType.ExpensePaid,
-          actor,
-          payload: { expenseId: id, amount: paid.amount, category: paid.category },
-          refs: [id, ...(paid.supplierId ? [paid.supplierId] : [])],
-        }],
+        result: { ...paid, accountingEntryId: entry.id, idempotent: false },
+        events: [
+          {
+            type: EventType.ExpensePaid,
+            actor,
+            payload: { expenseId: id, amount: paid.amount, category: paid.category, fundingAccountCode: dto.fundingAccountCode, paymentReference: paid.paymentReference, accountingEntryId: entry.id },
+            refs: [id, entry.id, ...(paid.supplierId ? [paid.supplierId] : [])],
+          },
+          {
+            type: EventType.AccountingEntryPosted,
+            actor,
+            payload: { accountingEntryId: entry.id, sourceType: entry.sourceType, sourceRef: entry.sourceRef, debit: paid.amount, credit: paid.amount },
+            refs: [entry.id, id],
+          },
+        ],
       };
-    });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('expense_payment_idempotency_conflict', 'Ключ выплаты уже использован для другой операции');
+      }
+      throw error;
+    }
   }
 
   private transitionSubmitted(id: string, actor: string, to: 'approved' | 'rejected', note?: string) {
@@ -479,6 +571,14 @@ function settlementPeriod(query: FinanceSettlementQueryDto) {
   const to = new Date(query.to);
   if (!(from < to)) throw new ValidationError('invalid_settlement_period', 'Конец периода должен быть позже начала');
   if (to.getTime() - from.getTime() > 366 * 24 * 60 * 60 * 1000) throw new ValidationError('settlement_period_too_long', 'Период сверки не может превышать 366 дней');
+  return { from, to };
+}
+
+function accountingPeriod(query: FinanceAccountingQueryDto) {
+  const from = new Date(query.from);
+  const to = new Date(query.to);
+  if (!(from < to)) throw new ValidationError('invalid_accounting_period', 'Конец периода должен быть позже начала');
+  if (to.getTime() - from.getTime() > 366 * 24 * 60 * 60 * 1000) throw new ValidationError('accounting_period_too_long', 'Период отчёта не может превышать 366 дней');
   return { from, to };
 }
 

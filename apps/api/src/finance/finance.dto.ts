@@ -27,6 +27,16 @@ export class RejectExpenseDto {
 
 export class PayExpenseDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsIn(['1000', '1010', '1020']) fundingAccountCode!: '1000' | '1010' | '1020';
+  @IsOptional() @IsString() @MaxLength(128) paymentReference?: string;
+}
+
+export class FinanceAccountingQueryDto {
+  @IsISO8601({ strict: true }) from!: string;
+  @IsISO8601({ strict: true }) to!: string;
+  @IsOptional() @IsString() @MaxLength(100) point?: string;
+  @IsOptional() @IsString() @MaxLength(32) accountCode?: string;
+  @IsOptional() @IsString() @MaxLength(64) sourceType?: string;
 }
 
 export class FinancePeriodQueryDto {
