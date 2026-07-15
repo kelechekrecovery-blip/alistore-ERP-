@@ -1819,4 +1819,5 @@
 - Result: payment and COD delivery now use the same atomic inventory boundary. Active serialized reservations become sold units, quantity allocations consume FIFO valuation and reduce on-hand/reserved/value, consignment accrual remains channel-independent, reservations close, and COGS posts to `5000`/`1200`. Replaying the same courier command returns the recorded result without a second stock issue, valuation change or journal entry.
 - Checks run: focused Courier integration 8/8; final full API 135/135 suites and 549/549 tests; API and Next production builds; ERP website-administration Playwright 2/2.
 - Outcome: `FIN-003D2` is accepted at local software level for both serialized and quantity stock. `FIN-003D` remains open only for exchange return/replacement revenue, tax and COGS accounting; live COD and accountant UAT remain external gates.
+- Commit: `02b65f3` (`feat(finance): finalize COD inventory and COGS`).
 - Next step: implement exchange reversal of the returned sale/tax/COGS and authoritative posting of the replacement without duplicate revenue.
