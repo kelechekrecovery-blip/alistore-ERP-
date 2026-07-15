@@ -10,11 +10,10 @@ import { OrdersService } from '../orders/orders.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
 import { PayDto } from './payments.dto';
-import { accrueConsignmentSalesOnTx, accrueQuantityConsignmentSalesOnTx } from '../inventory/consignment-accounting';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
-import { consumeQuantityValuationOnTx } from '../inventory/inventory-valuation';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
+import { finalizeOrderInventorySaleOnTx } from '../inventory/order-inventory-sale';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -346,83 +345,11 @@ export class PaymentsService {
         return { result: { order, payment: payments[0], payments, idempotent: false }, events };
       }
 
-      // Convert every active reservation to sold. This includes the concrete component
-      // units allocated behind a bundle line while the customer-facing order stays compact.
-      const reservedUnits = await tx.reservation.findMany({
-        where: { orderId: order.id, active: true, imei: { not: null } },
-        select: { imei: true },
-      });
-      for (const reservation of reservedUnits) {
-        if (!reservation.imei) continue;
-        await this.units.sellOnTx(tx, reservation.imei, order.id, actor);
-        events.push({
-          type: EventType.UnitSold,
-          actor,
-          payload: { orderId: order.id, imei: reservation.imei },
-          refs: [order.id, reservation.imei],
-        });
-      }
-      await accrueConsignmentSalesOnTx(tx, {
+      await finalizeOrderInventorySaleOnTx(tx, {
         orderId: order.id,
-        imeis: reservedUnits.flatMap((reservation) => reservation.imei ? [reservation.imei] : []),
         actor,
+        units: this.units,
         events,
-      });
-
-      const quantityAllocations = await tx.orderQuantityAllocation.findMany({
-        where: { orderId: order.id, active: true },
-      });
-      for (const allocation of quantityAllocations) {
-        const totalCost = await consumeQuantityValuationOnTx(tx, {
-          orderId: order.id,
-          allocationId: allocation.id,
-          productId: allocation.productId,
-          balanceId: allocation.balanceId,
-          quantity: allocation.qty,
-          actor,
-        });
-        const consumed = await tx.inventoryBalance.updateMany({
-          where: {
-            id: allocation.balanceId,
-            onHand: { gte: allocation.qty },
-            reserved: { gte: allocation.qty },
-            inventoryValue: { gte: totalCost },
-          },
-          data: {
-            onHand: { decrement: allocation.qty },
-            reserved: { decrement: allocation.qty },
-            inventoryValue: { decrement: totalCost },
-          },
-        });
-        if (consumed.count !== 1) {
-          throw new ConflictError('quantity_allocation_invalid', `Резерв ${allocation.id} больше недоступен`);
-        }
-        await tx.orderQuantityAllocation.update({
-          where: { id: allocation.id },
-          data: { active: false, consumedAt: new Date() },
-        });
-        events.push({
-          type: EventType.StockSold,
-          actor,
-          payload: {
-            orderId: order.id,
-            sku: allocation.sku,
-            qty: allocation.qty,
-            allocationId: allocation.id,
-          },
-          refs: [order.id, allocation.productId, allocation.id],
-        });
-      }
-      await accrueQuantityConsignmentSalesOnTx(tx, {
-        orderId: order.id,
-        orderQuantityAllocationIds: quantityAllocations.map((allocation) => allocation.id),
-        actor,
-        events,
-      });
-
-      await tx.reservation.updateMany({
-        where: { orderId: order.id, active: true },
-        data: { active: false },
       });
 
       assertTransition(order.status, 'paid');

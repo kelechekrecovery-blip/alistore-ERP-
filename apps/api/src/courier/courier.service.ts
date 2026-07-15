@@ -8,6 +8,8 @@ import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto } from 
 import { OutboxService } from '../outbox/outbox.service';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
 import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/accounting-journal';
+import { UnitsService } from '../units/units.service';
+import { finalizeOrderInventorySaleOnTx } from '../inventory/order-inventory-sale';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
@@ -18,6 +20,7 @@ export class CourierService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly units: UnitsService,
   ) {}
 
   listMine(courierId: string) {
@@ -146,6 +149,13 @@ export class CourierService {
         });
       }
       const receivedBefore = settledAmount(order);
+      const inventoryEvents: AuditInput[] = [];
+      await finalizeOrderInventorySaleOnTx(tx, {
+        orderId,
+        actor: courierId,
+        units: this.units,
+        events: inventoryEvents,
+      });
       const receivableEntry = dto.codAmount > 0
         ? await postOrderReceivableOnTx(tx, {
           idempotencyKey: `accounting:cod.receivable:${order.id}`,
@@ -167,6 +177,7 @@ export class CourierService {
           payload: { orderId, from: 'out_for_delivery', to: 'delivered', codAmount: dto.codAmount },
           refs: [orderId, order.courierRunId].filter((value): value is string => Boolean(value)),
         },
+        ...inventoryEvents,
         ...(receivableEntry ? [{
           type: EventType.AccountingEntryPosted,
           actor: courierId,

@@ -1811,3 +1811,12 @@
 - Outcome: `FIN-003D1` is accepted at local software level. Full `FIN-003D` is deliberately still open because COD delivery stock/COGS and exchange reversal/replacement accounting are not yet complete. Live tax/payment/COD policy still requires first-store accountant/provider UAT.
 - Commit: `d157596` (`feat(finance): recognize COD and debt receivables`).
 - Next step: make COD delivery consume reserved stock and post immutable COGS once, then implement exchange reversal/replacement accounting before starting multi-tender refund allocation.
+
+## 2026-07-15
+
+- Task: finalize authoritative stock consumption and COGS when a courier completes a COD delivery.
+- Files changed: shared order-inventory sale transaction helper; prepaid payment and courier delivery integration; courier module dependency; serialized and quantity COD integration regressions; backlog/progress.
+- Result: payment and COD delivery now use the same atomic inventory boundary. Active serialized reservations become sold units, quantity allocations consume FIFO valuation and reduce on-hand/reserved/value, consignment accrual remains channel-independent, reservations close, and COGS posts to `5000`/`1200`. Replaying the same courier command returns the recorded result without a second stock issue, valuation change or journal entry.
+- Checks run: focused Courier integration 8/8; final full API 135/135 suites and 549/549 tests; API and Next production builds; ERP website-administration Playwright 2/2.
+- Outcome: `FIN-003D2` is accepted at local software level for both serialized and quantity stock. `FIN-003D` remains open only for exchange return/replacement revenue, tax and COGS accounting; live COD and accountant UAT remain external gates.
+- Next step: implement exchange reversal of the returned sale/tax/COGS and authoritative posting of the replacement without duplicate revenue.

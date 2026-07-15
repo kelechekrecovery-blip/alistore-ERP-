@@ -3,6 +3,7 @@ import { AuditService } from '../src/audit/audit.service';
 import { CourierService } from '../src/courier/courier.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
 import { OutboxService } from '../src/outbox/outbox.service';
+import { UnitsService } from '../src/units/units.service';
 
 /**
  * Courier COD handover (invariant #4): COD is not money-closed until the courier
@@ -18,29 +19,53 @@ describe('Courier COD handover (integration)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     const outbox = new OutboxService(prisma, { deliver: async () => undefined });
-    courier = new CourierService(prisma, new AuditService(prisma), outbox);
+    courier = new CourierService(prisma, new AuditService(prisma), outbox, new UnitsService(prisma));
   });
 
-  afterAll(async () => {
-    await prisma.$disconnect();
-  });
-
-  beforeEach(async () => {
+  const clean = async () => {
+    const fixtureProducts = await prisma.product.findMany({
+      where: { sku: { startsWith: 'COD-STOCK-' } },
+      select: { id: true },
+    });
+    const productIds = fixtureProducts.map((product) => product.id);
+    const fixtureIssues = await prisma.inventoryValuationIssue.findMany({
+      where: { productId: { in: productIds } },
+      select: { id: true },
+    });
+    const issueIds = fixtureIssues.map((issue) => issue.id);
     await prisma.outboxMessage.deleteMany();
     await prisma.courierCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.reservation.deleteMany();
     await prisma.$transaction([
-      prisma.accountingJournalLine.deleteMany({ where: { entry: { sourceType: { startsWith: 'cod.' } } } }),
-      prisma.accountingJournalEntry.deleteMany({ where: { sourceType: { startsWith: 'cod.' } } }),
+      prisma.accountingJournalLine.deleteMany({
+        where: { entry: { OR: [{ sourceType: { startsWith: 'cod.' } }, { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } }] } },
+      }),
+      prisma.accountingJournalEntry.deleteMany({
+        where: { OR: [{ sourceType: { startsWith: 'cod.' } }, { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } }] },
+      }),
     ]);
+    await prisma.inventoryValuationIssue.deleteMany({ where: { id: { in: issueIds } } });
+    await prisma.inventoryValuationLayer.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.orderQuantityAllocation.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.courierRun.deleteMany();
     await prisma.tradeInDevice.deleteMany();
+    await prisma.deviceUnit.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.inventoryBalance.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.product.deleteMany({ where: { id: { in: productIds } } });
     await prisma.customer.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'courier-integration-' } } });
+  };
+
+  afterAll(async () => {
+    await clean();
+    await prisma.$disconnect();
   });
+
+  beforeEach(clean);
 
   const createCourier = async () => {
     seq += 1;
@@ -131,7 +156,6 @@ describe('Courier COD handover (integration)', () => {
         payments: { create: { amount: 50000, method: 'card', status: 'received' } },
       },
     });
-
     const run = await courier.createRun(
       { courierId: staff.id, codTotal: 104900, orderIds: [order.id] },
       'dispatcher',
@@ -167,6 +191,22 @@ describe('Courier COD handover (integration)', () => {
         status: 'packed',
         items: { create: { lineNumber: 1, sku: `COD-TAX-${seq}`, qty: 1, price: 2500, taxCode: 'vat_standard', taxRateBps: 1200, taxBaseAmount: 2200, taxAmount: 300 } },
       },
+    });
+    const product = await prisma.product.create({
+      data: { sku: `COD-STOCK-${seq}`, name: 'COD stock fixture', price: 2500, cost: 1700, category: 'phones', attrs: {} },
+    });
+    const unit = await prisma.deviceUnit.create({
+      data: {
+        imei: `COD-STOCK-${seq}-IMEI`,
+        productId: product.id,
+        status: 'reserved',
+        location: 'BISHKEK-1',
+        orderId: order.id,
+        acquisitionCost: 1700,
+      },
+    });
+    const reservation = await prisma.reservation.create({
+      data: { orderId: order.id, imei: unit.imei, active: true, expiresAt: new Date(Date.now() + 60_000) },
     });
     const run = await courier.createRun(
       { courierId: staff.id, codTotal: 2500, orderIds: [order.id] },
@@ -210,6 +250,19 @@ describe('Courier COD handover (integration)', () => {
       expect.objectContaining({ accountCode: '4000', credit: 2200 }),
       expect.objectContaining({ accountCode: '2200', credit: 300 }),
     ]));
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { id: unit.id } })).toMatchObject({ status: 'sold', orderId: order.id });
+    expect(await prisma.reservation.findUniqueOrThrow({ where: { id: reservation.id } })).toMatchObject({ active: false });
+    const valuationIssues = await prisma.inventoryValuationIssue.findMany({ where: { orderId: order.id } });
+    expect(valuationIssues).toHaveLength(1);
+    const cogs = await prisma.accountingJournalEntry.findMany({
+      where: { sourceType: 'inventory.cogs', sourceRef: { in: valuationIssues.map((issue) => issue.id) } },
+      include: { lines: true },
+    });
+    expect(cogs).toHaveLength(1);
+    expect(cogs[0].lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '5000', debit: 1700 }),
+      expect.objectContaining({ accountCode: '1200', credit: 1700 }),
+    ]));
 
     const settled = await courier.handover({ runId: run.id, amount: 2500 }, 'cashier', undefined, `handover-delivery-${run.id}`);
     expect(settled).toMatchObject({ handedOver: true, collectedTotal: 2500, diff: 0 });
@@ -246,5 +299,53 @@ describe('Courier COD handover (integration)', () => {
     await courier.failDelivery(order.id, dto, staff.id, 'fail-once');
     await courier.failDelivery(order.id, dto, staff.id, 'fail-once');
     expect(await prisma.auditEvent.count({ where: { type: 'delivery.failed', refs: { has: order.id } } })).toBe(1);
+  });
+
+  it('consumes quantity stock and FIFO value exactly once on COD delivery', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967049${seq.toString().padStart(3, '0')}`, name: 'Quantity COD' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: `COD-STOCK-Q-${seq}`, name: 'Quantity COD fixture', price: 1000, cost: 600, category: 'accessories', trackingMode: 'quantity', attrs: {} },
+    });
+    const balance = await prisma.inventoryBalance.create({
+      data: { productId: product.id, location: 'BISHKEK-1', onHand: 3, reserved: 2, inventoryValue: 1800 },
+    });
+    const layer = await prisma.inventoryValuationLayer.create({
+      data: { productId: product.id, balanceId: balance.id, location: balance.location, sourceType: 'test.receive', sourceRef: `cod-quantity-${seq}`, unitCost: 600, quantityReceived: 3, quantityRemaining: 3 },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'app',
+        fulfillmentType: 'courier',
+        total: 2000,
+        status: 'packed',
+        items: { create: { lineNumber: 1, sku: product.sku, qty: 2, price: 1000, taxCode: 'exempt', taxRateBps: 0, taxBaseAmount: 2000, taxAmount: 0 } },
+      },
+      include: { items: true },
+    });
+    const allocation = await prisma.orderQuantityAllocation.create({
+      data: { orderId: order.id, orderItemId: order.items[0].id, productId: product.id, balanceId: balance.id, sku: product.sku, location: balance.location, qty: 2 },
+    });
+    await prisma.reservation.create({
+      data: { orderId: order.id, quantityAllocationId: allocation.id, active: true, expiresAt: new Date(Date.now() + 60_000) },
+    });
+    const run = await courier.createRun({ courierId: staff.id, codTotal: 2000, orderIds: [order.id] }, 'dispatcher');
+
+    await courier.startDelivery(order.id, staff.id, `quantity-start-${seq}`);
+    await courier.completeDelivery(order.id, { codAmount: 2000 }, staff.id, `quantity-deliver-${seq}`);
+    await courier.completeDelivery(order.id, { codAmount: 2000 }, staff.id, `quantity-deliver-${seq}`);
+
+    expect(await prisma.inventoryBalance.findUniqueOrThrow({ where: { id: balance.id } })).toMatchObject({ onHand: 1, reserved: 0, inventoryValue: 600 });
+    expect(await prisma.inventoryValuationLayer.findUniqueOrThrow({ where: { id: layer.id } })).toMatchObject({ quantityRemaining: 1 });
+    expect(await prisma.orderQuantityAllocation.findUniqueOrThrow({ where: { id: allocation.id } })).toMatchObject({ active: false });
+    const issues = await prisma.inventoryValuationIssue.findMany({ where: { orderId: order.id } });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ quantity: 2, unitCost: 600, totalCost: 1200 });
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'inventory.cogs', sourceRef: issues[0].id } })).toBe(1);
+    expect(await prisma.courierRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ collectedTotal: 2000 });
   });
 });
