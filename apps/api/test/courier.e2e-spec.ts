@@ -30,6 +30,10 @@ describe('Courier COD handover (integration)', () => {
     await prisma.courierCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.$transaction([
+      prisma.accountingJournalLine.deleteMany({ where: { entry: { sourceType: { startsWith: 'cod.' } } } }),
+      prisma.accountingJournalEntry.deleteMany({ where: { sourceType: { startsWith: 'cod.' } } }),
+    ]);
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.courierRun.deleteMany();
@@ -158,13 +162,31 @@ describe('Courier COD handover (integration)', () => {
         channel: 'app',
         fulfillmentType: 'courier',
         total: 2500,
+        taxBaseAmount: 2200,
+        taxAmount: 300,
         status: 'packed',
+        items: { create: { lineNumber: 1, sku: `COD-TAX-${seq}`, qty: 1, price: 2500, taxCode: 'vat_standard', taxRateBps: 1200, taxBaseAmount: 2200, taxAmount: 300 } },
       },
     });
     const run = await courier.createRun(
       { courierId: staff.id, codTotal: 2500, orderIds: [order.id] },
       'dispatcher',
     );
+
+    await expect(courier.handover(
+      { runId: run.id, amount: 2500 },
+      'cashier',
+      undefined,
+      `handover-before-delivery-${run.id}`,
+    )).rejects.toMatchObject({ code: 'run_delivery_incomplete' });
+    await prisma.courierRun.update({ where: { id: run.id }, data: { collectedTotal: 2500 } });
+    await expect(courier.handover(
+      { runId: run.id, amount: 2500 },
+      'cashier',
+      undefined,
+      `handover-without-receivable-${run.id}`,
+    )).rejects.toMatchObject({ code: 'cod_receivable_not_recognized' });
+    await prisma.courierRun.update({ where: { id: run.id }, data: { collectedTotal: 0 } });
 
     await courier.startDelivery(order.id, staff.id, 'start-once');
     await courier.startDelivery(order.id, staff.id, 'start-once');
@@ -178,9 +200,27 @@ describe('Courier COD handover (integration)', () => {
     expect(replay).toMatchObject({ id: order.id, status: 'delivered' });
     expect(await prisma.auditEvent.count({ where: { type: 'delivery.out', refs: { has: order.id } } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'delivery.delivered', refs: { has: order.id } } })).toBe(1);
+    const receivable = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { sourceType_sourceRef: { sourceType: 'cod.receivable', sourceRef: order.id } },
+      include: { lines: true },
+    });
+    expect(receivable).toMatchObject({ documentAmount: 2500, taxAmount: 300, taxCode: 'vat_output:vat_standard' });
+    expect(receivable.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 2500 }),
+      expect.objectContaining({ accountCode: '4000', credit: 2200 }),
+      expect.objectContaining({ accountCode: '2200', credit: 300 }),
+    ]));
 
     const settled = await courier.handover({ runId: run.id, amount: 2500 }, 'cashier', undefined, `handover-delivery-${run.id}`);
     expect(settled).toMatchObject({ handedOver: true, collectedTotal: 2500, diff: 0 });
+    const codEntries = await prisma.accountingJournalEntry.findMany({
+      where: { sourceType: { in: ['cod.receivable', 'cod.handover'] } },
+      include: { lines: true },
+    });
+    const receivableBalance = codEntries.flatMap((entry) => entry.lines)
+      .filter((line) => line.accountCode === '1100')
+      .reduce((sum, line) => sum + line.debit - line.credit, 0);
+    expect(receivableBalance).toBe(0);
   });
 
   it('records one failed attempt and rejects another courier', async () => {

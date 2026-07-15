@@ -17,6 +17,9 @@ export class CreateDebtDto {
   @ApiPropertyOptional({ example: 'постоянный клиент' })
   @IsOptional() @IsString() reason?: string;
 
+  @ApiPropertyOptional({ example: 'debt-order-2026-001' })
+  @IsOptional() @IsString() @MaxLength(128) idempotencyKey?: string;
+
   @ApiPropertyOptional({ example: 'senior_seller' })
   @IsOptional() @IsString() actor?: string;
 }

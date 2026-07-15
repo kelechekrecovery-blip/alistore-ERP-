@@ -1,5 +1,6 @@
 import { AccountingAccountType, PaymentMethod, Prisma } from '@prisma/client';
 import { ConflictError, ValidationError } from '../common/errors';
+import { cumulativeTaxDelta, outputTaxMetadata } from './sales-tax';
 
 export const FUNDING_ACCOUNT_CODES = ['1000', '1010', '1020'] as const;
 
@@ -117,6 +118,59 @@ export async function postPaymentEntryOnTx(
       point: input.point?.trim() || null,
       receivedBy: input.receivedBy ?? input.actor,
     },
+  });
+  return entry;
+}
+
+export async function postOrderReceivableOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    idempotencyKey: string;
+    sourceType: string;
+    sourceRef: string;
+    description: string;
+    order: {
+      id: string;
+      total: number;
+      taxAmount: number;
+      storePointCode?: string | null;
+      items: Array<{ taxCode: string; taxRateBps: number; taxAmount: number }>;
+    };
+    processedBefore: number;
+    amount: number;
+    occurredAt: Date;
+    actor: string;
+  },
+) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
+    throw new ValidationError('accounting_receivable_amount_invalid', 'Сумма дебиторской задолженности должна быть положительной');
+  }
+  const taxAmount = cumulativeTaxDelta(
+    input.order.taxAmount,
+    input.order.total,
+    input.processedBefore,
+    input.amount,
+  );
+  const revenueAmount = input.amount - taxAmount;
+  const taxMetadata = outputTaxMetadata(input.order.items);
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: input.idempotencyKey,
+    sourceType: input.sourceType,
+    sourceRef: input.sourceRef,
+    description: input.description,
+    point: input.order.storePointCode,
+    documentAmount: input.amount,
+    baseAmount: input.amount,
+    taxCode: taxMetadata.taxCode,
+    taxRateBps: taxMetadata.taxRateBps,
+    taxAmount,
+    occurredAt: input.occurredAt,
+    createdBy: input.actor,
+    lines: [
+      { accountCode: '1100', debit: input.amount, memo: 'Возникновение дебиторской задолженности покупателя' },
+      ...(revenueAmount > 0 ? [{ accountCode: '4000', credit: revenueAmount, memo: 'Признание выручки без налога' }] : []),
+      ...(taxAmount > 0 ? [{ accountCode: '2200', credit: taxAmount, memo: 'Начисление исходящего НДС' }] : []),
+    ],
   });
   return entry;
 }

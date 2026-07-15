@@ -55,6 +55,10 @@ describe('Finance expenses (integration + RBAC)', () => {
       prisma.accountingPeriod.deleteMany(),
       prisma.bankStatement.deleteMany(),
       prisma.payment.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
+      prisma.debtPlan.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
+      prisma.purchaseReceipt.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
+      prisma.supplierInvoice.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
+      prisma.supplierCreditNote.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
       prisma.accountingJournalLine.deleteMany(),
       prisma.accountingJournalEntry.deleteMany(),
     ]);

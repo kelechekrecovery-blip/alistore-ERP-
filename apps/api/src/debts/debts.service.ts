@@ -50,7 +50,20 @@ export class DebtsService {
 
   /** Book a debt, or park it for approval when it exceeds the limit. */
   async create(dto: CreateDebtDto, actor: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: dto.orderId } });
+    const idempotencyKey = dto.idempotencyKey?.trim() || null;
+    if (idempotencyKey) {
+      const replay = await this.prisma.debtPlan.findUnique({ where: { idempotencyKey } });
+      if (replay) {
+        if (replay.orderId === dto.orderId
+          && replay.principal === dto.principal
+          && replay.installments === (dto.installments ?? 1)) return replay;
+        throw new ConflictError('debt_idempotency_conflict', 'Ключ создания долга уже использован с другими параметрами');
+      }
+    }
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+      include: { payments: { select: { amount: true, status: true } } },
+    });
     if (!order) {
       throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
     }
@@ -61,7 +74,18 @@ export class DebtsService {
       principal: dto.principal,
       installments: dto.installments ?? 1,
       dueDate,
+      idempotencyKey,
     };
+
+    const received = order.payments
+      .filter((payment) => payment.amount > 0 && ['received', 'reconciled'].includes(payment.status))
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    const outstanding = Math.max(0, order.total - received);
+    if (dto.principal > outstanding) {
+      throw new ValidationError('debt_principal_exceeds_outstanding', `Непокрытый остаток заказа: ${outstanding}`);
+    }
+    const existing = await this.prisma.debtPlan.findUnique({ where: { orderId: dto.orderId } });
+    if (existing) throw new ConflictError('order_debt_exists', 'Для заказа уже оформлен долг или рассрочка');
 
     if (dto.principal > DEBT_LIMIT) {
       return this.approvals.request({

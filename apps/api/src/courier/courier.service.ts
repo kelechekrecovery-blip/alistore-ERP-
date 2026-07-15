@@ -7,7 +7,7 @@ import { ConflictError, ForbiddenError, ValidationError } from '../common/errors
 import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
 import { OutboxService } from '../outbox/outbox.service';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
-import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/accounting-journal';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
@@ -145,13 +145,42 @@ export class CourierService {
           data: { collectedTotal: { increment: dto.codAmount } },
         });
       }
+      const receivedBefore = settledAmount(order);
+      const receivableEntry = dto.codAmount > 0
+        ? await postOrderReceivableOnTx(tx, {
+          idempotencyKey: `accounting:cod.receivable:${order.id}`,
+          sourceType: 'cod.receivable',
+          sourceRef: order.id,
+          description: `COD к получению по заказу ${order.id}`,
+          order,
+          processedBefore: receivedBefore,
+          amount: dto.codAmount,
+          occurredAt: new Date(),
+          actor: courierId,
+        })
+        : null;
       const result = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
-      return { result, events: [{
-        type: EventType.DeliveryDelivered,
-        actor: courierId,
-        payload: { orderId, from: 'out_for_delivery', to: 'delivered', codAmount: dto.codAmount },
-        refs: [orderId, order.courierRunId].filter((value): value is string => Boolean(value)),
-      }] };
+      return { result, events: [
+        {
+          type: EventType.DeliveryDelivered,
+          actor: courierId,
+          payload: { orderId, from: 'out_for_delivery', to: 'delivered', codAmount: dto.codAmount },
+          refs: [orderId, order.courierRunId].filter((value): value is string => Boolean(value)),
+        },
+        ...(receivableEntry ? [{
+          type: EventType.AccountingEntryPosted,
+          actor: courierId,
+          payload: {
+            accountingEntryId: receivableEntry.id,
+            sourceType: 'cod.receivable',
+            sourceRef: order.id,
+            orderId,
+            amount: dto.codAmount,
+            taxAmount: receivableEntry.taxAmount,
+          },
+          refs: [receivableEntry.id, orderId],
+        }] : []),
+      ] };
     });
   }
 
@@ -184,7 +213,10 @@ export class CourierService {
     try {
       return await this.audit.transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${dto.runId}))`;
-        const run = await tx.courierRun.findUnique({ where: { id: dto.runId } });
+        const run = await tx.courierRun.findUnique({
+          where: { id: dto.runId },
+          include: { orders: { select: { id: true } } },
+        });
         if (!run) throw new ValidationError('run_not_found', `Курьерский рейс ${dto.runId} не найден`);
         assertCourierRunOwner(run, expectedCourierId);
         if (run.handedOver) {
@@ -199,6 +231,15 @@ export class CourierService {
         const diff = dto.amount - run.codTotal;
         if (diff !== 0 && !normalized.reason) {
           throw new ValidationError('handover_reason_required', `Расхождение COD ${diff} сом требует причину`);
+        }
+        if (run.orders.length > 0 && run.codTotal > 0) {
+          const recognized = await tx.accountingJournalEntry.aggregate({
+            where: { sourceType: 'cod.receivable', sourceRef: { in: run.orders.map((order) => order.id) } },
+            _sum: { documentAmount: true },
+          });
+          if ((recognized._sum.documentAmount ?? 0) !== run.codTotal) {
+            throw new ConflictError('cod_receivable_not_recognized', 'COD нельзя сдать до признания дебиторской задолженности всех доставок');
+          }
         }
         const settled = await tx.courierRun.update({
           where: { id: dto.runId },
@@ -221,17 +262,17 @@ export class CourierService {
             lines: dto.amount === run.codTotal
               ? [
                 { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
-                { accountCode: '1100', credit: run.codTotal, memo: 'Погашение дебиторской задолженности по COD' },
+                { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: run.codTotal, memo: run.orders.length > 0 ? 'Погашение дебиторской задолженности по COD' : 'Выручка legacy COD без заказа' },
               ]
               : dto.amount < run.codTotal
                 ? [
                   { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
                   { accountCode: '6990', debit: run.codTotal - dto.amount, memo: 'Недостача COD' },
-                  { accountCode: '1100', credit: run.codTotal, memo: 'Погашение COD с расхождением' },
+                  { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: run.codTotal, memo: run.orders.length > 0 ? 'Погашение COD с расхождением' : 'Выручка legacy COD без заказа' },
                 ]
                 : [
                   { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
-                  { accountCode: '1100', credit: run.codTotal, memo: 'Погашение дебиторской задолженности по COD' },
+                  { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: run.codTotal, memo: run.orders.length > 0 ? 'Погашение дебиторской задолженности по COD' : 'Выручка legacy COD без заказа' },
                   { accountCode: '6990', credit: dto.amount - run.codTotal, memo: 'Излишек COD' },
                 ],
           })
@@ -284,7 +325,10 @@ export class CourierService {
         if (existing) return { result: replayCommand<T>(existing, courierId, orderId, action, payload), events: [] };
         const order = await tx.order.findUnique({
           where: { id: orderId },
-          include: { payments: { select: { amount: true, status: true } } },
+          include: {
+            payments: { select: { amount: true, status: true } },
+            items: { select: { taxCode: true, taxRateBps: true, taxAmount: true } },
+          },
         });
         if (!order) throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
         if (order.courierId !== courierId) throw new ForbiddenError('delivery_forbidden', 'Доставка назначена другому курьеру');
@@ -309,14 +353,20 @@ export class CourierService {
 }
 
 type CourierOrder = Prisma.OrderGetPayload<{
-  include: { payments: { select: { amount: true; status: true } } };
+  include: {
+    payments: { select: { amount: true; status: true } };
+    items: { select: { taxCode: true; taxRateBps: true; taxAmount: true } };
+  };
 }>;
 
 function outstandingAmount(order: { total: number; payments: Array<{ amount: number; status: string }> }): number {
-  const paid = order.payments
+  return Math.max(0, order.total - settledAmount(order));
+}
+
+function settledAmount(order: { payments: Array<{ amount: number; status: string }> }): number {
+  return order.payments
     .filter((payment) => payment.amount > 0 && SETTLED_PAYMENT_STATUSES.has(payment.status))
     .reduce((sum, payment) => sum + payment.amount, 0);
-  return Math.max(0, order.total - paid);
 }
 
 function replayCommand<T>(

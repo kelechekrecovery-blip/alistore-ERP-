@@ -52,7 +52,7 @@ describe('Managed promotion codes', () => {
     await prisma.deviceUnit.deleteMany({ where: { imei: { startsWith: `PROMO-${run}` } } });
     await prisma.product.deleteMany({ where: { sku: { startsWith: `PROMO-${run}` } } });
     await prisma.storePoint.deleteMany({ where: { code: { startsWith: `PROMO-${run}` } } });
-    await prisma.customer.deleteMany({ where: { phone: { startsWith: '+996711' } } });
+    await prisma.customer.deleteMany({ where: { name: { startsWith: `Promo Buyer ${run}` } } });
   });
 
   async function fixture() {
@@ -113,8 +113,8 @@ describe('Managed promotion codes', () => {
     const created = await request(app.getHttpServer()).post('/promotions').set('Authorization', `Bearer ${marketerToken}`).send(body(code, product.id)).expect(201);
     await request(app.getHttpServer()).post(`/promotions/${created.body.id}/activate`).set('Authorization', `Bearer ${marketerToken}`).send({}).expect(201);
     const customers = await Promise.all([
-      prisma.customer.create({ data: { phone: `+996711${Date.now().toString().slice(-6)}`, name: 'Buyer A' } }),
-      prisma.customer.create({ data: { phone: `+996711${(Date.now() + 1).toString().slice(-6)}`, name: 'Buyer B' } }),
+      prisma.customer.create({ data: { phone: `+996711${Date.now().toString().slice(-6)}`, name: `Promo Buyer ${run} A` } }),
+      prisma.customer.create({ data: { phone: `+996711${(Date.now() + 1).toString().slice(-6)}`, name: `Promo Buyer ${run} B` } }),
     ]);
     const create = (customerId: string, key: string) => orders.createFromCatalog({
       customerId,

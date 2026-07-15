@@ -39,6 +39,10 @@ describe('Debts (integration)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.debtPlan.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.$transaction([
+      prisma.accountingJournalLine.deleteMany({ where: { entry: { sourceType: { startsWith: 'debt.' } } } }),
+      prisma.accountingJournalEntry.deleteMany({ where: { sourceType: { startsWith: 'debt.' } } }),
+    ]);
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.reservation.deleteMany();
@@ -68,10 +72,71 @@ describe('Debts (integration)', () => {
 
   it('books a debt within the limit and starts balance at principal', async () => {
     const { orderId } = await order();
-    const debt = await debts.create({ orderId, principal: 30000, installments: 3 }, 'seller');
+    const debt = await debts.create({ orderId, principal: 30000, installments: 3 }, 'seller') as DebtPlan;
     expect(debt).toMatchObject({ principal: 30000, balance: 30000, status: 'open', installments: 3 });
+    const entry = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { id: debt.accountingEntryId as string },
+      include: { lines: true },
+    });
+    expect(entry).toMatchObject({ sourceType: 'debt.origination', sourceRef: debt.id, documentAmount: 30000, taxAmount: 0 });
+    expect(entry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 30000, credit: 0 }),
+      expect.objectContaining({ accountCode: '4000', debit: 0, credit: 30000 }),
+    ]));
     const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
-    expect(types).toContain('debt.created');
+    expect(types).toEqual(expect.arrayContaining(['debt.created', 'accounting.entry_posted']));
+  });
+
+  it('recognizes only the unpaid taxable balance after a prepayment', async () => {
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967035${seq.toString().padStart(4, '0')}`, name: 'Tax debt' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'pos',
+        total: 11200,
+        taxBaseAmount: 10000,
+        taxAmount: 1200,
+        status: 'paid',
+        items: { create: { lineNumber: 1, sku: `DEBT-TAX-${seq}`, qty: 1, price: 11200, taxCode: 'vat_standard', taxRateBps: 1200, taxBaseAmount: 10000, taxAmount: 1200 } },
+        payments: { create: { amount: 5600, method: 'card', status: 'received' } },
+      },
+    });
+
+    const debt = await debts.create({ orderId: order.id, principal: 5600, idempotencyKey: `debt-tax-${seq}` }, 'seller') as DebtPlan;
+    const entry = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { id: debt.accountingEntryId as string },
+      include: { lines: true },
+    });
+    expect(entry).toMatchObject({ documentAmount: 5600, taxAmount: 600, taxCode: 'vat_output:vat_standard', taxRateBps: 1200 });
+    expect(entry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 5600 }),
+      expect.objectContaining({ accountCode: '4000', credit: 5000 }),
+      expect.objectContaining({ accountCode: '2200', credit: 600 }),
+    ]));
+  });
+
+  it('rejects a debt above the server-derived unpaid order balance', async () => {
+    const { orderId } = await order();
+    await prisma.payment.create({ data: { orderId, amount: 80000, method: 'card', status: 'received' } });
+    await expect(debts.create({ orderId, principal: 30000 }, 'seller')).rejects.toMatchObject({
+      code: 'debt_principal_exceeds_outstanding',
+    });
+    expect(await prisma.debtPlan.count()).toBe(0);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'debt.origination' } })).toBe(0);
+  });
+
+  it('replays debt creation with the same stable idempotency key', async () => {
+    const { orderId } = await order();
+    const input = { orderId, principal: 12000, installments: 2, idempotencyKey: `debt-replay-${seq}` };
+    const first = await debts.create(input, 'seller') as DebtPlan;
+    const replay = await debts.create(input, 'seller') as DebtPlan;
+
+    expect(replay.id).toBe(first.id);
+    expect(await prisma.debtPlan.count({ where: { orderId } })).toBe(1);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'debt.origination', sourceRef: first.id } })).toBe(1);
   });
 
   it('reduces the balance on payment and settles at zero', async () => {

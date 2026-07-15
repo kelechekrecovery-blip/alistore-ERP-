@@ -39,11 +39,7 @@ describe('Event Ledger coverage — invariant #10 (integration)', () => {
     );
   });
 
-  afterAll(async () => {
-    await prisma.$disconnect();
-  });
-
-  beforeEach(async () => {
+  const clean = async () => {
     await prisma.auditEvent.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
@@ -56,7 +52,14 @@ describe('Event Ledger coverage — invariant #10 (integration)', () => {
     await prisma.approval.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
+  };
+
+  afterAll(async () => {
+    await clean();
+    await prisma.$disconnect();
   });
+
+  beforeEach(clean);
 
   /** Narrow the sale() union to the completed variant, failing if it parked instead. */
   function expectCompleted<T extends { pendingApproval: boolean }>(r: T): Extract<T, { pendingApproval: false }> {

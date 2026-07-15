@@ -418,7 +418,7 @@ const del: ActionExecutor = async (tx, payload, approver, approvalId, events) =>
 };
 
 /** debt — book a sale-on-credit that exceeded the debt limit (owner/senior approved). */
-const debt: ActionExecutor = async (tx, payload, approver, _approvalId, events) => {
+const debt: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   await insertDebt(
     tx,
     {
@@ -427,6 +427,7 @@ const debt: ActionExecutor = async (tx, payload, approver, _approvalId, events) 
       principal: Number(payload['principal']),
       installments: Number(payload['installments'] ?? 1),
       dueDate: new Date(String(payload['dueDate'])),
+      idempotencyKey: `approval:${approvalId}`,
     },
     approver,
     events,

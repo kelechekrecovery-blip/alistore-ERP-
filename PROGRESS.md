@@ -1801,3 +1801,12 @@
 - Outcome: `ACC-002H` is accepted at local software level, but complete store accounting is not claimed. The audit leaves explicit next gates for COD/debt revenue origination, multi-tender return allocation, exchange accounting, payroll accrual, opening balances, fixed assets, AR aging/export and live Kyrgyz accountant validation.
 - Commit: `d8c9cc3` (`feat(finance): add immutable output tax accounting`).
 - Next step: implement `FIN-003D` so COD and instalment sales originate AR, net revenue and output tax before later collections clear receivables; then close split-tender return allocation under `FIN-003E`.
+
+## 2026-07-15
+
+- Task: recognize COD and instalment sales before cash collection and keep the website administration inside ERP verified.
+- Files changed: DebtPlan idempotency/accounting linkage and migration; shared order-receivable journal posting; debt creation/approval validation; courier delivery and handover accounting; Event Ledger payloads; debt/COD integration tests; deterministic accounting, Ledger and promotion test cleanup; backlog/progress.
+- Result: one order can originate one debt only, the API derives the unpaid cap from settled payments, exact retries return the same debt and changed key reuse conflicts. Debt origination and COD delivery post customer receivable `1100`, net revenue `4000` and output tax `2200` from immutable order snapshots; partial prepayment uses cumulative tax allocation. Debt receipts and order-bound COD handover clear `1100`, while handover fails when collection or receivable recognition is incomplete. The existing ERP website-administration flow still publishes catalog changes to the client storefront.
+- Checks run: Prisma validate/generate and migration deploy; related Finance/Debt/Courier suites 49/49; final full API 135/135 suites and 548/548 tests; API and Next production builds; ERP website-administration Playwright 2/2; targeted `git diff --check`.
+- Outcome: `FIN-003D1` is accepted at local software level. Full `FIN-003D` is deliberately still open because COD delivery stock/COGS and exchange reversal/replacement accounting are not yet complete. Live tax/payment/COD policy still requires first-store accountant/provider UAT.
+- Next step: make COD delivery consume reserved stock and post immutable COGS once, then implement exchange reversal/replacement accounting before starting multi-tender refund allocation.

@@ -1500,6 +1500,7 @@ model AccountingJournalEntry {
   bankStatementLine BankStatementLine?
   cashIncassation CashIncassation?
   taxSettlement   AccountingTaxSettlement?
+  debtPlan        DebtPlan?
   reversalOfId    String?                 @unique
   reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversal        AccountingJournalEntry? @relation("AccountingReversal")
@@ -1814,19 +1815,21 @@ model SupplierRma {
 // Продажа в долг / рассрочка. Долг сверх лимита — через approval (action=debt).
 // balance гасится платежами; просрочка (open + dueDate<now) → Risk Center.
 model DebtPlan {
-  id           String     @id @default(cuid())
-  orderId      String
-  customerId   String
-  principal    Int // исходная сумма долга
-  balance      Int // остаток к погашению
-  installments Int        @default(1) // число платежей (рассрочка)
-  dueDate      DateTime
-  status       DebtStatus @default(open)
-  createdAt    DateTime   @default(now())
+  id                String                  @id @default(cuid())
+  orderId           String                  @unique
+  customerId        String
+  principal         Int // исходная сумма долга
+  balance           Int // остаток к погашению
+  installments      Int                     @default(1) // число платежей (рассрочка)
+  dueDate           DateTime
+  status            DebtStatus              @default(open)
+  idempotencyKey    String?                 @unique
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                 @unique
+  createdAt         DateTime                @default(now())
 
   @@index([customerId])
   @@index([status])
-  @@index([orderId])
 }
 
 model TradeInDevice {
