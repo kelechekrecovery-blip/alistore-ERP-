@@ -11,6 +11,7 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
 import { PayDto } from './payments.dto';
 import { accrueConsignmentSalesOnTx, accrueQuantityConsignmentSalesOnTx } from '../inventory/consignment-accounting';
+import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -31,6 +32,7 @@ export class PaymentsService {
     private readonly approvals: ApprovalsService,
     @Optional() private readonly giftcards?: GiftcardsService,
     @Optional() private readonly orders?: OrdersService,
+    @Optional() private readonly campaignAttribution?: CampaignAttributionService,
   ) {}
 
   /**
@@ -331,6 +333,7 @@ export class PaymentsService {
         payload: { orderId: order.id, total: order.total },
         refs: [order.id],
       });
+      await this.campaignAttribution?.convertPaidOrderOnTx(tx, order.id, actor, events);
 
       return { result: { order: paid, payment: payments[0], payments, idempotent: false }, events };
     });

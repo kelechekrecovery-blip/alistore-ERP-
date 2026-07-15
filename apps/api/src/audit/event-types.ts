@@ -138,6 +138,7 @@ export const EventType = {
   CustomerAddressUpdated: 'customer.address_updated',
   CustomerAddressDeleted: 'customer.address_deleted',
   CampaignSent: 'campaign.sent',
+  CampaignAttributed: 'campaign.attributed',
   CampaignConverted: 'campaign.converted',
   StorefrontContentDrafted: 'storefront.content_drafted',
   StorefrontContentPublished: 'storefront.content_published',

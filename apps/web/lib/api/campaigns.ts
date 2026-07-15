@@ -30,24 +30,37 @@ export interface CampaignPreview {
 export interface CampaignRoi {
   campaign: {
     id: string;
+    name: string;
+    trackingCode: string;
+    source: string;
+    medium: string;
+    promotionCode?: string | null;
     segment: string;
     channel: string;
     budget: number;
     orders: number;
     revenue: number;
+    grossProfit: number;
   };
   description: string;
   orders: number;
   revenue: number;
   budget: number;
   profit: number;
+  grossProfit: number;
+  contribution: number;
+  roas: number | null;
   roiPct: number | null;
 }
 
 export interface CreateCampaignInput extends SegmentRules {
+  name: string;
   channel: 'sms' | 'push' | 'telegram' | 'whatsapp';
   budget: number;
   message?: string;
+  source?: string;
+  medium?: string;
+  promotionCode?: string;
 }
 
 export function previewCampaign(rules: SegmentRules, accessToken: string): Promise<CampaignPreview> {

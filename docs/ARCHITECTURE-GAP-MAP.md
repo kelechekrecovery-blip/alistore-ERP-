@@ -8,9 +8,9 @@ been built or tested; it does not mean external production certification is comp
 
 | Target | Current implementation | Status | Acceptance gate |
 |---|---|---|---|
-| Next.js storefront + ERP/admin | 39 routes, production build and 42 verified Playwright flows | Ready | `npm run build -w @alistore/web`, broad Playwright plus targeted Marketing CMS acceptance |
-| NestJS modular monolith | 53 modules including Storefront CMS, Promotions and Storefront Blocks behind one API | Ready | API build and 126 Jest suites |
-| PostgreSQL + Prisma | 65 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
+| Next.js storefront + ERP/admin | 39 routes, production build and 43 verified Playwright flows | Ready | `npm run build -w @alistore/web`, broad Playwright plus targeted campaign/site acceptance |
+| NestJS modular monolith | 53 modules including Storefront CMS, Promotions, Campaign Attribution and Storefront Blocks behind one API | Ready | API build and 127 Jest suites |
+| PostgreSQL + Prisma | 66 migrations, transactional domain services | Ready | isolated test DB reset + migration deploy |
 | Append-only Event Ledger | `AuditService.transaction` commits mutations and events together | Ready | ledger/invariant/concurrency suites |
 | Redis cache | Password-protected persistent Compose service and healthcheck exist; cache adapter is absent | Partial | cache port, fail-open reads, invalidation tests, live compose smoke |
 | Meilisearch | Catalog adapter, Postgres fallback and pinned Compose runtime/healthcheck exist; automatic indexing is absent | Partial | live compose smoke, bootstrap settings, incremental reindex worker, fallback test |

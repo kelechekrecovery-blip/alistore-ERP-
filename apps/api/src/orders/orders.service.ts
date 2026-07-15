@@ -20,6 +20,7 @@ import {
 } from '../inventory/consignment-accounting';
 import { LogisticsService } from '../logistics/logistics.service';
 import { PromotionLine, PromotionsService } from '../promotions/promotions.service';
+import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -30,6 +31,7 @@ interface CanonicalPricing {
   promoDiscount: number;
   loyaltyPoints: number;
   promotionLines?: PromotionLine[];
+  unitCosts?: Record<string, number>;
 }
 
 function defaultFulfillment(channel: string): NonNullable<CreateOrderDto['fulfillmentType']> {
@@ -51,6 +53,7 @@ export class OrdersService {
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly logistics?: LogisticsService,
     @Optional() private readonly promotions?: PromotionsService,
+    @Optional() private readonly campaignAttribution?: CampaignAttributionService,
   ) {}
 
   get(id: string) {
@@ -198,6 +201,7 @@ export class OrdersService {
         price: item.price,
         qty: item.qty,
       })),
+      unitCosts: Object.fromEntries(products.map((product) => [product.sku, product.cost])),
     };
     return this.create(
       {
@@ -261,6 +265,14 @@ export class OrdersService {
             })
           : null;
         const promoDiscount = appliedPromotion?.discount ?? canonical.promoDiscount;
+        const preparedAttribution = this.campaignAttribution
+          ? await this.campaignAttribution.prepareForOrder(
+              tx,
+              dto.customerId,
+              dto.attribution,
+              appliedPromotion?.code ?? canonical.promoCode,
+            )
+          : null;
         if (!isDemo && dto.deliverySlotId && dto.deliveryZoneId) {
           await tx.$queryRaw`SELECT id FROM "DeliverySlot" WHERE id = ${dto.deliverySlotId} FOR UPDATE`;
           const slot = await tx.deliverySlot.findUnique({ where: { id: dto.deliverySlotId } });
@@ -303,9 +315,11 @@ export class OrdersService {
                 sku: i.sku,
                 qty: i.qty,
                 price: i.price,
+                unitCost: canonical.unitCosts?.[i.sku] ?? 0,
                 imei: i.imei,
               })),
             },
+            ...(preparedAttribution ? { attribution: { create: preparedAttribution.data } } : {}),
           },
           include: { items: true },
         });
@@ -366,6 +380,18 @@ export class OrdersService {
             refs: [order.id],
           },
         );
+        if (preparedAttribution?.campaignId) {
+          events.push({
+            type: EventType.CampaignAttributed,
+            actor,
+            payload: {
+              orderId: order.id,
+              campaignId: preparedAttribution.campaignId,
+              trackingCode: preparedAttribution.trackingCode,
+            },
+            refs: [order.id, preparedAttribution.campaignId],
+          });
+        }
         return {
           result: order,
           events,

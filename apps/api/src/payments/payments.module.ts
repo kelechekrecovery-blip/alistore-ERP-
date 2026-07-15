@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from './payment-gateway-provider';
 import { selectPaymentGatewayProvider } from './payment-gateway-selector';
 import { SandboxPaymentsController } from './sandbox-payments.controller';
+import { CampaignsModule } from '../campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SandboxPaymentsController } from './sandbox-payments.controller';
     AuthzModule,
     RateLimitModule,
     GiftcardsModule,
+    CampaignsModule,
   ],
   providers: [
     PaymentsService,

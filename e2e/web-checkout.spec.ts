@@ -1,6 +1,66 @@
 import { expect, test } from '@playwright/test';
 import { sign } from 'jsonwebtoken';
-import { API_BASE, prisma, resetDb, seedProduct } from './helpers';
+import { API_BASE, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+
+test('campaign UTM survives navigation, converts on payment once, and appears as ROAS in ERP', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('ATTRIBUTION-E2E', 100_000, 80_000);
+  const trackingCode = `cmp_e2e_${Date.now().toString(36)}`;
+  const campaign = await prisma.campaign.create({
+    data: {
+      name: 'Instagram · живой checkout', trackingCode, source: 'instagram', medium: 'paid_social',
+      segment: '{}', channel: 'push', budget: 5_000,
+    },
+  });
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-attribution');
+  await page.addInitScript((item) => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  }, { id: product.id, sku: product.sku, name: product.name, price: product.price });
+
+  await page.goto(`/?utm_source=untrusted&utm_medium=other&utm_campaign=${trackingCode}&utm_content=hero-a`);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('alistore.marketing-attribution.v1'))).not.toBeNull();
+  await page.goto('/checkout');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByPlaceholder('+996 700 12 34 56').fill(`+996700${Date.now().toString().slice(-6)}`);
+  await page.getByPlaceholder('Имя').fill('Attributed Buyer');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: /Картой/ }).click();
+  await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
+  await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
+  await expect(page.getByText('Заказ оформлен!')).toBeVisible();
+
+  const order = await prisma.order.findFirstOrThrow({ orderBy: { createdAt: 'desc' } });
+  expect(await prisma.orderAttribution.findUnique({ where: { orderId: order.id } })).toMatchObject({
+    campaignId: campaign.id,
+    firstSource: 'untrusted',
+    lastSource: 'instagram',
+    lastMedium: 'paid_social',
+    lastCampaign: trackingCode,
+    lastContent: 'hero-a',
+    revenue: 100_000,
+    grossProfit: 20_000,
+  });
+  expect(await prisma.campaign.findUnique({ where: { id: campaign.id } })).toMatchObject({
+    orders: 1,
+    revenue: 100_000,
+    grossProfit: 20_000,
+  });
+  expect(await prisma.auditEvent.count({ where: { type: 'campaign.converted', refs: { has: order.id } } })).toBe(1);
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /Кампании/ }).click();
+  await expect(page.getByText('Instagram · живой checkout')).toBeVisible();
+  await expect(page.getByTestId(`campaign-link-${campaign.id}`)).toContainText(trackingCode);
+  await expect(page.getByText('20×')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+});
 
 test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await resetDb();

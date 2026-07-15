@@ -1,5 +1,6 @@
 import { API_BASE, getJson, postAuthJson } from './http';
 import type { LedgerEvent } from '../reports';
+import type { StoredAttribution } from '../attribution';
 
 export interface OrderLine {
   sku: string;
@@ -56,6 +57,7 @@ export async function createOrder(input: {
   deliverySlotId?: string;
   total: number;
   promoCode?: string;
+  attribution?: Pick<StoredAttribution, 'first' | 'last'>;
   loyaltyPoints?: number;
   items: OrderLine[];
 }, guestCapability: string, idempotencyKey: string): Promise<CreatedOrder> {
@@ -82,6 +84,7 @@ export async function createMyOrder(input: {
   deliverySlotId?: string;
   total: number;
   promoCode?: string;
+  attribution?: Pick<StoredAttribution, 'first' | 'last'>;
   loyaltyPoints?: number;
   items: OrderLine[];
 }, accessToken: string, idempotencyKey: string): Promise<CreatedOrder> {

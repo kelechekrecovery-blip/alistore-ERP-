@@ -24,6 +24,7 @@ import {
   type DeliveryZone,
   type StorePoint,
 } from '@/lib/api';
+import { loadAttribution } from '@/lib/attribution';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
@@ -161,6 +162,7 @@ export default function CheckoutPage() {
         deliverySlotId: delivery === 'courier' ? selectedDeliverySlot?.id : undefined,
         total: payable,
         promoCode: promoCode ?? undefined,
+        attribution: loadAttribution() ?? undefined,
         loyaltyPoints: user ? bonusDiscount : undefined,
         items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })),
       } as const;

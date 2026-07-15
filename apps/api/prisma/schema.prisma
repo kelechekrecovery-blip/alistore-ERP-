@@ -309,6 +309,7 @@ model Customer {
   loyaltyEntries LoyaltyEntry[]
   coupons        CustomerCoupon[]
   promotionRedemptions PromotionRedemption[]
+  campaignRecipients CampaignRecipient[]
   orders         Order[]
   tradeIns       TradeInDevice[]
   createdAt      DateTime             @default(now())
@@ -653,6 +654,7 @@ model Order {
   consignmentSales         ConsignmentItem[]               @relation("ConsignmentSaleOrder")
   quantityConsignmentSales QuantityConsignmentAllocation[] @relation("QuantityConsignmentSaleOrder")
   payments                 Payment[]
+  attribution              OrderAttribution?
   returns                  Return[]
   createdAt                DateTime                        @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
@@ -899,6 +901,7 @@ model OrderItem {
   sku         String
   qty         Int
   price       Int
+  unitCost    Int          @default(0)
   imei        String?
   returnItems ReturnItem[]
 
@@ -1499,13 +1502,67 @@ model AuditEvent {
 }
 
 model Campaign {
-  id      String @id @default(cuid())
-  segment String
-  channel String
-  budget  Int
-  orders  Int    @default(0)
-  revenue Int    @default(0)
+  id            String              @id @default(cuid())
+  name          String              @default("Campaign")
+  trackingCode  String              @unique
+  source        String              @default("alistore")
+  medium        String
+  promotionCode String?
+  segment       String
+  channel       String
+  budget        Int
+  orders        Int                 @default(0)
+  revenue       Int                 @default(0)
+  grossProfit   Int                 @default(0)
+  recipients    CampaignRecipient[]
+  attributions  OrderAttribution[]
+  createdAt     DateTime             @default(now())
   // аудитория фильтруется по Customer.consent
+
+  @@index([channel, createdAt])
+  @@index([promotionCode])
+}
+
+model CampaignRecipient {
+  id            String   @id @default(cuid())
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId    String
+  consentAtSend Boolean
+  createdAt     DateTime @default(now())
+
+  @@unique([campaignId, customerId])
+  @@index([customerId, createdAt])
+}
+
+model OrderAttribution {
+  id            String    @id @default(cuid())
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String    @unique
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId    String?
+  firstSource   String
+  firstMedium   String?
+  firstCampaign String?
+  firstContent  String?
+  firstTerm     String?
+  firstLanding  String?
+  lastSource    String
+  lastMedium    String?
+  lastCampaign  String?
+  lastContent   String?
+  lastTerm      String?
+  lastLanding   String?
+  capturedAt    DateTime
+  convertedAt   DateTime?
+  revenue       Int       @default(0)
+  grossProfit   Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([campaignId, convertedAt])
+  @@index([lastSource, lastMedium])
 }
 
 model StorefrontContentRevision {

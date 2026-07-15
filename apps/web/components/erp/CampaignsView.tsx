@@ -7,17 +7,17 @@ import {
   createCampaign,
   fetchCampaigns,
   previewCampaign,
-  recordCampaignConversion,
   type CampaignPreview,
   type CampaignRoi,
   type SegmentRules,
 } from '@/lib/api/campaigns';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
-const CHANNELS = ['sms', 'push', 'telegram'] as const;
+const CHANNELS = ['sms', 'push', 'telegram', 'whatsapp'] as const;
 const FIELD_CLASS = 'w-full rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none transition placeholder:text-[#6E645C] focus:border-coral focus:ring-2 focus:ring-coral/20';
 
 type CampaignForm = {
+  name: string;
   level: string;
   city: string;
   tags: string;
@@ -25,9 +25,12 @@ type CampaignForm = {
   budget: string;
   channel: (typeof CHANNELS)[number];
   message: string;
+  source: string;
+  promotionCode: string;
 };
 
 const INITIAL_FORM: CampaignForm = {
+  name: 'VIP аксессуары · июль',
   level: 'gold',
   city: 'Бишкек',
   tags: '',
@@ -35,6 +38,8 @@ const INITIAL_FORM: CampaignForm = {
   budget: '10000',
   channel: 'sms',
   message: 'VIP-предложение AliStore',
+  source: 'alistore_crm',
+  promotionCode: '',
 };
 
 export function CampaignsView() {
@@ -43,7 +48,6 @@ export function CampaignsView() {
   const [form, setForm] = useState<CampaignForm>(INITIAL_FORM);
   const [preview, setPreview] = useState<CampaignPreview | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRoi[]>([]);
-  const [orderIds, setOrderIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string>('');
 
@@ -81,9 +85,12 @@ export function CampaignsView() {
       const created = await createCampaign(
         {
           ...rulesFromForm(form),
+          name: form.name.trim(),
           channel: form.channel,
           budget: numberOrZero(form.budget),
           message: form.message.trim() || undefined,
+          source: form.source.trim() || undefined,
+          promotionCode: form.promotionCode.trim() || undefined,
         },
         session.accessToken,
       );
@@ -91,23 +98,6 @@ export function CampaignsView() {
       await load();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : 'Кампания не создана');
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function convert(campaignId: string) {
-    if (!session) return;
-    const orderId = orderIds[campaignId]?.trim();
-    if (!orderId) return;
-    setBusy(campaignId);
-    setNotice('');
-    try {
-      await recordCampaignConversion(campaignId, orderId, session.accessToken);
-      setOrderIds((current) => ({ ...current, [campaignId]: '' }));
-      await load();
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Конверсия не записана');
     } finally {
       setBusy(null);
     }
@@ -151,6 +141,9 @@ export function CampaignsView() {
         </div>
         <div className="font-display text-[15px] font-bold">Сегмент</div>
         <div className="mt-4 grid gap-3">
+          <Field label="Название кампании">
+            <input value={form.name} onChange={(e) => setFormValue(setForm, 'name', e.target.value)} className={FIELD_CLASS} />
+          </Field>
           <Field label="Уровень">
             <input value={form.level} onChange={(e) => setFormValue(setForm, 'level', e.target.value)} className={FIELD_CLASS} />
           </Field>
@@ -187,6 +180,14 @@ export function CampaignsView() {
               className={`${FIELD_CLASS} min-h-24 resize-none`}
             />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Источник">
+              <input value={form.source} onChange={(e) => setFormValue(setForm, 'source', e.target.value)} className={FIELD_CLASS} placeholder="alistore_crm" />
+            </Field>
+            <Field label="Промокод">
+              <input value={form.promotionCode} onChange={(e) => setFormValue(setForm, 'promotionCode', e.target.value.toUpperCase())} className={FIELD_CLASS} placeholder="VIP10" />
+            </Field>
+          </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           <button type="button" disabled={busy === 'preview'} onClick={runPreview} className="rounded-btn bg-[#221E19] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
@@ -201,13 +202,7 @@ export function CampaignsView() {
 
       <section className="grid gap-4">
         <PreviewPanel preview={preview} />
-        <CampaignList
-          campaigns={campaigns}
-          busy={busy}
-          orderIds={orderIds}
-          setOrderIds={setOrderIds}
-          onConvert={convert}
-        />
+        <CampaignList campaigns={campaigns} />
       </section>
     </div>
   );
@@ -247,18 +242,8 @@ function PreviewPanel({ preview }: { preview: CampaignPreview | null }) {
   );
 }
 
-function CampaignList({
-  campaigns,
-  busy,
-  orderIds,
-  setOrderIds,
-  onConvert,
-}: {
+function CampaignList({ campaigns }: {
   campaigns: CampaignRoi[];
-  busy: string | null;
-  orderIds: Record<string, string>;
-  setOrderIds: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  onConvert: (campaignId: string) => void;
 }) {
   return (
     <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
@@ -269,32 +254,20 @@ function CampaignList({
           <li key={item.campaign.id} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] p-4">
             <div className="flex flex-wrap items-start gap-3">
               <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{item.description}</div>
-                <div className="mt-1 font-mono text-[11px] text-[#8A7F76]">{item.campaign.id}</div>
+                <div className="truncate font-semibold">{item.campaign.name}</div>
+                <div className="mt-1 text-xs text-[#8A7F76]">{item.description}</div>
               </div>
               <span className="rounded-chip bg-[#1A1611] px-2.5 py-1 text-[11px] font-bold text-[#C6FF3D]">{item.campaign.channel}</span>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] bg-[#1A1611] px-3 py-2 font-mono text-[11px] text-[#A79C92]" data-testid={`campaign-link-${item.campaign.id}`}>
+              /?utm_source={item.campaign.source}&amp;utm_medium={item.campaign.medium}&amp;utm_campaign={item.campaign.trackingCode}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
               <Metric label="orders" value={item.orders} />
               <Metric label="revenue" value={som(item.revenue)} />
-              <Metric label="profit" value={som(item.profit)} />
+              <Metric label="gross" value={som(item.grossProfit)} />
+              <Metric label="ROAS" value={item.roas === null ? '—' : `${item.roas}×`} />
               <Metric label="ROI" value={item.roiPct === null ? '∞' : `${item.roiPct}%`} />
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={orderIds[item.campaign.id] ?? ''}
-                onChange={(e) => setOrderIds((current) => ({ ...current, [item.campaign.id]: e.target.value }))}
-                className={`${FIELD_CLASS} min-w-0 flex-1`}
-                placeholder="orderId"
-              />
-              <button
-                type="button"
-                disabled={busy === item.campaign.id}
-                onClick={() => onConvert(item.campaign.id)}
-                className="rounded-btn bg-[#1A1611] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-              >
-                +ROI
-              </button>
             </div>
           </li>
         ))}

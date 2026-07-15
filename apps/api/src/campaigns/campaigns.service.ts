@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Campaign, Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
@@ -7,6 +8,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { OutboxChannel } from '../outbox/outbox.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCampaignDto } from './campaigns.dto';
+import { CampaignAttributionService } from './campaign-attribution.service';
 import {
   AudienceCustomer,
   buildSegmentAudience,
@@ -27,6 +29,9 @@ export interface CampaignRoi {
   revenue: number;
   budget: number;
   profit: number;
+  grossProfit: number;
+  contribution: number;
+  roas: number | null;
   roiPct: number | null;
 }
 
@@ -36,6 +41,7 @@ export class CampaignsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly attribution: CampaignAttributionService,
   ) {}
 
   async preview(rules: SegmentRules) {
@@ -70,11 +76,20 @@ export class CampaignsService {
       }
       const campaign = await tx.campaign.create({
         data: {
+          name: dto.name?.trim() || `Campaign · ${dto.channel}`,
+          trackingCode: `cmp_${randomBytes(6).toString('base64url')}`,
+          source: dto.source?.trim() || 'alistore_crm',
+          medium: dto.medium?.trim() || dto.channel,
+          promotionCode: dto.promotionCode?.trim().toUpperCase() || null,
           segment: segmentLabel(normalized),
           channel: dto.channel,
           budget: dto.budget,
         },
       });
+      await tx.campaignRecipient.createMany({
+        data: audience.map((customer) => ({ campaignId: campaign.id, customerId: customer.id, consentAtSend: true })),
+      });
+      const trackingUrl = `/?utm_source=${encodeURIComponent(campaign.source)}&utm_medium=${encodeURIComponent(campaign.medium)}&utm_campaign=${encodeURIComponent(campaign.trackingCode)}`;
       for (const customer of audience) {
         await this.outbox.enqueueOnTx(tx, {
           channel: dto.channel as OutboxChannel,
@@ -85,6 +100,7 @@ export class CampaignsService {
             customerId: customer.id,
             message: dto.message ?? null,
             segment: describeSegment(normalized),
+            trackingUrl,
           },
         });
       }
@@ -107,6 +123,8 @@ export class CampaignsService {
               queued: audience.length,
               excludedNoConsent: matched.length - audience.length,
               segment: describeSegment(normalized),
+              trackingCode: campaign.trackingCode,
+              trackingUrl,
             },
             refs: [campaign.id, ...audience.map((customer) => customer.id)],
           },
@@ -117,35 +135,14 @@ export class CampaignsService {
 
   async recordConversion(id: string, orderId: string, actor: string) {
     return this.audit.transaction(async (tx) => {
-      const campaign = await tx.campaign.findUnique({ where: { id } });
-      if (!campaign) {
-        throw new ValidationError('campaign_not_found', `Кампания ${id} не найдена`);
-      }
-      const order = await tx.order.findUnique({ where: { id: orderId } });
-      if (!order) {
-        throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
-      }
-      const existing = await tx.auditEvent.findFirst({
-        where: { type: EventType.CampaignConverted, refs: { hasEvery: [id, orderId] } },
-      });
-      if (existing) {
-        return { result: this.roiView(campaign), events: [] };
-      }
-      const revenue = await this.orderRevenue(tx, orderId);
-      const updated = await tx.campaign.update({
-        where: { id },
-        data: { orders: { increment: 1 }, revenue: { increment: revenue } },
-      });
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      await this.attribution.attachForBackfill(tx, id, orderId);
+      const events: Parameters<CampaignAttributionService['convertPaidOrderOnTx']>[3] = [];
+      await this.attribution.convertPaidOrderOnTx(tx, orderId, actor, events);
+      const updated = await tx.campaign.findUniqueOrThrow({ where: { id } });
       return {
         result: this.roiView(updated),
-        events: [
-          {
-            type: EventType.CampaignConverted,
-            actor,
-            payload: { campaignId: id, orderId, customerId: order.customerId, revenue },
-            refs: [id, orderId, order.customerId],
-          },
-        ],
+        events,
       };
     });
   }
@@ -188,16 +185,8 @@ export class CampaignsService {
     }));
   }
 
-  private async orderRevenue(tx: Prisma.TransactionClient, orderId: string): Promise<number> {
-    const payments = await tx.payment.findMany({
-      where: { orderId, status: 'received', amount: { gt: 0 } },
-      select: { amount: true },
-    });
-    return payments.reduce((sum, payment) => sum + payment.amount, 0);
-  }
-
   private roiView(campaign: Campaign): CampaignRoi {
-    const profit = campaign.revenue - campaign.budget;
+    const contribution = campaign.grossProfit - campaign.budget;
     const rules = parseSegmentLabel(campaign.segment);
     return {
       campaign,
@@ -206,8 +195,11 @@ export class CampaignsService {
       orders: campaign.orders,
       revenue: campaign.revenue,
       budget: campaign.budget,
-      profit,
-      roiPct: campaign.budget > 0 ? Math.round((profit / campaign.budget) * 1000) / 10 : null,
+      profit: contribution,
+      grossProfit: campaign.grossProfit,
+      contribution,
+      roas: campaign.budget > 0 ? Math.round((campaign.revenue / campaign.budget) * 100) / 100 : null,
+      roiPct: campaign.budget > 0 ? Math.round((contribution / campaign.budget) * 1000) / 10 : null,
     };
   }
 

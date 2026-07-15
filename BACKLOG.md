@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- `MKT-005` Make campaign ROI operational: persist UTM/source/medium/campaign attribution from first touch through order/payment, bind promotion and campaign conversions once, expose marketer spend/revenue/ROAS by channel and prove consent-safe campaign → storefront → checkout attribution E2E.
+- `MKT-006` Make campaign economics net and funnel-aware: compensate attributed revenue/gross profit after approved refunds, add immutable visit/click/checkout funnel facts without storing raw PII, expose conversion rate and net ROAS by source/medium/campaign, and prove payment → partial/full refund reconciliation without double adjustment.
 - `ECO-001` Restore or explicitly retire the 64 missing `.dc.html` files linked by the 23 committed handoffs; maintain `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md` until every row has route/app, API/model, RBAC, Ledger, role E2E and visual evidence. Gate: `npm run ecosystem:audit:strict` no longer reports missing design evidence.
 - `ECO-002` Add one reconciled all-role ecosystem E2E and packaged-app acceptance: customer-to-payment-to-stock-to-pickup/courier/POS/refund, all staff roles, iOS XCUITest targets, connected tests in each Android app module and committed visual goldens. Gate: `ios:ui`, packaged-module `android:ui` and `ecosystem:e2e` commands exist and pass, then `npm run ecosystem:audit:strict` accepts their contract evidence.
 - Run first-store HR acceptance with real schedules, payroll, cash handover and physical Staff devices; certify APNs/FCM delivery plus scanner/camera behavior without changing the now-verified native attendance contracts.
@@ -24,6 +24,7 @@
 - Activate social login providers in production after Apple/Telegram credentials are available: configure `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callbacks, and live client SDK QA.
 
 ## Done
+- `MKT-005` Make campaign ROI operational: persist consent-safe first/last UTM attribution from storefront through checkout, bind promotion fallback and campaign conversion exactly once on fully received payment, snapshot server product cost, expose marketer spend/revenue/gross profit/ROAS and prove campaign → storefront → payment → ERP consequence E2E.
 - `MKT-004` Replace fixed storefront composition with owner/marketer-managed hero, promo, info and collection blocks: explicit order and desktop/mobile targeting, draft/scheduled/published/archived lifecycle, HTTPS/link/product validation, non-overlapping hero schedules, RBAC, Ledger and exact ERP-to-desktop/mobile visual consequence E2E.
 - `MKT-003` Replace hard-coded checkout discounts with owner/marketer-managed promotion codes: draft/active/paused plus derived scheduled/expired states, date window, total/per-customer limits, product/category/minimum-subtotal rules, canonical server quote and atomic application, replay-safe redemption, RBAC, Ledger, ERP Marketing CMS and checkout consequence E2E.
 - `MKT-002` Make customer reviews safe and operational: purchased reviews enter a private pending queue; only approved rows affect public cards and catalog ratings; marketer/admin/owner can approve or reject with a required reason, seller access is denied, repeated decisions are idempotent and every submission/decision is Event Ledger-backed. ERP-to-product Playwright proves the publication consequence.

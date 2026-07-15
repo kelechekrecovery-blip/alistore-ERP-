@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -38,11 +39,23 @@ export class SegmentRulesDto {
 }
 
 export class CreateCampaignDto extends SegmentRulesDto {
+  @ApiPropertyOptional({ example: 'VIP аксессуары · июль' })
+  @IsOptional() @IsString() @MaxLength(120) name?: string;
+
   @ApiProperty({ enum: CAMPAIGN_CHANNELS, example: 'sms' })
   @IsIn(CAMPAIGN_CHANNELS as unknown as string[]) channel!: (typeof CAMPAIGN_CHANNELS)[number];
 
   @ApiProperty({ example: 10000 })
   @Type(() => Number) @IsInt() @Min(0) budget!: number;
+
+  @ApiPropertyOptional({ example: 'alistore_crm' })
+  @IsOptional() @IsString() @MaxLength(80) source?: string;
+
+  @ApiPropertyOptional({ example: 'whatsapp' })
+  @IsOptional() @IsString() @MaxLength(80) medium?: string;
+
+  @ApiPropertyOptional({ example: 'VIP10' })
+  @IsOptional() @IsString() @MaxLength(64) promotionCode?: string;
 
   @ApiPropertyOptional({ example: 'campaign_offer' })
   @IsOptional() @IsString() template?: string;

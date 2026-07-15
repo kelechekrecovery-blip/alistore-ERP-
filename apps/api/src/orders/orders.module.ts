@@ -9,9 +9,10 @@ import { OutboxModule } from '../outbox/outbox.module';
 import { LogisticsModule } from '../logistics/logistics.module';
 import { ReceiptsModule } from '../receipts/receipts.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { CampaignsModule } from '../campaigns/campaigns.module';
 
 @Module({
-  imports: [UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule, PromotionsModule],
+  imports: [UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule, PromotionsModule, CampaignsModule],
   providers: [OrdersService],
   controllers: [OrdersController],
   exports: [OrdersService],

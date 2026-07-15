@@ -12,6 +12,7 @@ import {
 import { Type } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
+import { OrderAttributionDto } from '../campaigns/attribution.dto';
 
 const CHANNELS = ['web', 'app', 'mobile', 'staff_mobile', 'pos', 'telegram'] as const;
 const FULFILLMENT_TYPES = ['pickup', 'courier', 'express', 'store'] as const;
@@ -83,6 +84,12 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   promoCode?: string;
+
+  @ApiPropertyOptional({ type: OrderAttributionDto, description: 'First/last marketing touch captured by the storefront.' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => OrderAttributionDto)
+  attribution?: OrderAttributionDto;
 
   @ApiPropertyOptional({ minimum: 0, example: 4820, description: 'Authenticated checkout only; validated against the server ledger.' })
   @IsOptional()

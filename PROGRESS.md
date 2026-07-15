@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-005
+
+- Iteration ID: `MKT-005`.
+- Task: connect consent-safe campaign acquisition on the customer storefront to authoritative paid-order economics in ERP.
+- Files changed: campaign/recipient/order-attribution Prisma schema and migration, first/last-touch capture, campaign and order/payment services, server product-cost snapshot, Ledger events, typed web clients, root attribution capture, checkout payload, ERP Campaigns workspace and API/browser acceptance.
+- Result: campaign launch receives a server-generated tracking code and queues only consented recipients. The storefront retains bounded first/last UTM facts for 30 days; checkout sends them as untrusted attribution input, while the API resolves campaign identity and canonical source/medium from the server campaign or applied promotion. A fully received payment converts the order once in the same transaction, snapshots revenue and gross profit, and updates campaign orders/revenue/gross profit. Partial payment and replay do not convert twice. ERP now shows tracking URL, spend, orders, paid revenue, gross profit, ROAS and contribution ROI; manual order assignment was removed from the operator UI and remains only as a permissioned locked backfill endpoint.
+- Checks run: Prisma generation; clean isolated PostgreSQL migration deploy 66/66; targeted campaigns/attribution API 2 suites and 3 tests; API and Next production builds; targeted full campaign → storefront → checkout → sandbox payment → ERP browser acceptance 1/1; full Playwright 43/43; detached committed baseline 127/127 suites and 499/499 tests on a freshly migrated database. The broad current worktree additionally passed all 501 runnable tests, with four unrelated suites compile-blocked only by parallel unstaged AI moderation work. Detached build attempts were intentionally not counted because the temporary worktree's external `node_modules` symlink is rejected by TypeScript portable declaration paths and Turbopack filesystem-root validation; the normal-worktree production builds are the build evidence.
+- Acceptance: `accepted` for paid gross campaign attribution and ERP/site integration. Revenue and ROAS are deliberately gross of approved refunds; refund compensation and privacy-safe visit/click funnel metrics are tracked as `MKT-006` rather than being falsely included here.
+- Next backlog ID: `MKT-006` net campaign economics and funnel measurement.
+
 ## 2026-07-15 — MKT-004
 
 - Iteration ID: `MKT-004`.

@@ -51,6 +51,9 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.outboxMessage.deleteMany();
     await prisma.campaign.deleteMany();
+    await prisma.reservation.deleteMany();
+    await prisma.orderBundleAllocation.deleteMany();
+    await prisma.orderQuantityAllocation.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -136,6 +139,7 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
       .expect(201);
 
     expect(created.body).toMatchObject({ queued: 1, excludedNoConsent: 1 });
+    expect(created.body.campaign).toMatchObject({ source: 'alistore_crm', medium: 'whatsapp' });
 
     const outbox = await prisma.outboxMessage.findMany({ orderBy: { createdAt: 'asc' } });
     expect(outbox).toHaveLength(1);
@@ -144,6 +148,10 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
       recipient: eligible.customer.phone,
       template: 'campaign_offer',
       status: 'pending',
+    });
+    expect(outbox[0].payload).toMatchObject({
+      campaignId: created.body.campaign.id,
+      trackingUrl: expect.stringContaining(`utm_campaign=${created.body.campaign.trackingCode}`),
     });
     expect(outbox[0].recipient).not.toBe(optedOut.customer.phone);
 
@@ -172,6 +180,8 @@ describe('Campaigns (segment builder, consent filter, ROI)', () => {
       revenue: 80000,
       budget: 10000,
       profit: 70000,
+      grossProfit: 80000,
+      roas: 8,
       roiPct: 700,
     });
 

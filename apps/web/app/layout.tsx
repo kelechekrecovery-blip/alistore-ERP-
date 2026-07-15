@@ -7,6 +7,7 @@ import { AuthProvider } from '@/lib/auth';
 import { FavoritesProvider } from '@/lib/favorites';
 import { CompareProvider } from '@/lib/compare';
 import { DemoModeBanner } from '@/components/DemoModeBanner';
+import { AttributionCapture } from '@/components/AttributionCapture';
 
 export const metadata: Metadata = {
   title: 'AliStore — электроника с гарантией в Кыргызстане',
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       </head>
       <body className="min-h-screen bg-[#0E0C0A]">
+        <AttributionCapture />
         <AuthProvider>
           <CartProvider>
             <FavoritesProvider>
