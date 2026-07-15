@@ -1,4 +1,4 @@
-import { ChatMessage, openRouterChat, OpenRouterOptions } from './openrouter-provider';
+import { ChatMessage } from './openrouter-provider';
 
 export interface MarketListing {
   title?: string;
@@ -131,15 +131,18 @@ export function parsePriceScoutResponse(content: string): Omit<PriceScoutResult,
   };
 }
 
-export class OpenRouterPriceScoutProvider {
-  readonly source: string;
-
-  constructor(private readonly opts: OpenRouterOptions) {
-    this.source = `openrouter:${opts.model ?? 'openai/gpt-4o-mini'}`;
-  }
-
-  async scout(input: PriceScoutInput): Promise<PriceScoutResult> {
-    const content = await openRouterChat(buildPriceScoutMessages(input), this.opts);
-    return { source: this.source, ...parsePriceScoutResponse(content) };
-  }
-}
+/** JSON Schema for structured price-scout output (Claude `output_config.format`). */
+export const PRICE_SCOUT_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    marketLow: { type: 'number' },
+    marketMedian: { type: 'number' },
+    marketHigh: { type: 'number' },
+    recommendedPrice: { type: 'number' },
+    confidence: { type: 'number' },
+    signals: { type: 'array', items: { type: 'string' } },
+    notes: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['marketLow', 'marketMedian', 'marketHigh', 'recommendedPrice', 'confidence', 'signals', 'notes'],
+};

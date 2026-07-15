@@ -1,0 +1,14 @@
+[
+  { "text": "Отличный телефон, быстрая доставка, рекомендую", "expectedAllowed": true },
+  { "text": "Хорошее состояние, продавец вежливый, всё честно", "expectedAllowed": true },
+  { "text": "Батарея держит весь день, экран как новый", "expectedAllowed": true },
+  { "text": "Гарантия сработала без вопросов, спасибо магазину", "expectedAllowed": true },
+  { "text": "Курьер приехал вовремя, упаковка целая", "expectedAllowed": true },
+  { "text": "Немного дороже, чем в других местах, но качество на уровне", "expectedAllowed": true },
+  { "text": "Это полный fuck, не берите тут", "expectedAllowed": false },
+  { "text": "shit product, waste of money", "expectedAllowed": false },
+  { "text": "Смотрите casino и porn на моём сайте", "expectedAllowed": false },
+  { "text": "Перейдите на https://spam.example для скидки", "expectedAllowed": false },
+  { "text": "Быстрый заработок, пиши в личку прямо сейчас", "expectedAllowed": false },
+  { "text": "buy viagra now cheap", "expectedAllowed": false }
+]

@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
+import { ModerationService } from '../ai/moderation.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +24,7 @@ export class StorefrontBlocksService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly catalog: CatalogService,
+    private readonly moderation: ModerationService,
   ) {}
 
   list() {
@@ -159,18 +161,34 @@ export class StorefrontBlocksService {
     if (ctaHref && !ctaHref.startsWith('/') && !isHttps(ctaHref)) throw new ValidationError('storefront_block_cta_invalid', 'Ссылка должна начинаться с / или https://');
     const imageUrl = optional(dto.imageUrl);
     if (imageUrl && !isHttps(imageUrl)) throw new ValidationError('storefront_block_image_invalid', 'Изображение должно использовать HTTPS');
+    const eyebrow = optional(dto.eyebrow);
+    const body = optional(dto.body);
+    const ctaLabel = optional(dto.ctaLabel);
+    // Screen the human-readable banner copy before persisting (URLs are validated above,
+    // not moderated). Runs pre-transaction in both create and update. ModerationService
+    // never throws — falls back to keyless rules / no-op without a provider key.
+    await this.assertContentClean([title, eyebrow, body, ctaLabel]);
     return {
       type: dto.type,
       device: dto.device ?? 'all',
       title,
-      eyebrow: optional(dto.eyebrow),
-      body: optional(dto.body),
-      ctaLabel: optional(dto.ctaLabel),
+      eyebrow,
+      body,
+      ctaLabel,
       ctaHref,
       imageUrl,
       tone: dto.tone ?? 'dark',
       productIds,
     };
+  }
+
+  private async assertContentClean(parts: (string | null)[]) {
+    const text = parts.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).join('\n');
+    if (!text) return;
+    const verdict = await this.moderation.moderate(text);
+    if (!verdict.allowed) {
+      throw new ValidationError('storefront_block_flagged', verdict.reason || verdict.categories.join(', '));
+    }
   }
 
   private async assertNoHeroScheduleOverlap(tx: Prisma.TransactionClient, device: StorefrontBlockDevice, startsAt: Date, endsAt: Date | null, excludeId: string) {

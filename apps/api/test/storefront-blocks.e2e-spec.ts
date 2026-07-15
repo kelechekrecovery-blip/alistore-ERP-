@@ -85,4 +85,21 @@ describe('Storefront blocks CMS', () => {
     expect(publicRows.body).toEqual([]);
     expect(await prisma.auditEvent.count({ where: { type: 'storefront.blocks_reordered', refs: { has: promo.body.id } } })).toBe(1);
   });
+
+  it('rejects flagged banner copy on create and update', async () => {
+    const flagged = await request(app.getHttpServer())
+      .post('/storefront-blocks')
+      .set(auth())
+      .send(block('FLAG', { title: `${run} fuck shit` }))
+      .expect(422);
+    expect(flagged.body.code).toBe('storefront_block_flagged');
+
+    const clean = await request(app.getHttpServer()).post('/storefront-blocks').set(auth()).send(block('CLEAN')).expect(201);
+    const badUpdate = await request(app.getHttpServer())
+      .post(`/storefront-blocks/${clean.body.id}/update`)
+      .set(auth())
+      .send({ body: 'porn casino заработок' })
+      .expect(422);
+    expect(badUpdate.body.code).toBe('storefront_block_flagged');
+  });
 });

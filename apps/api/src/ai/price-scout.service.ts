@@ -1,13 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveLlmClient } from './llm/llm.factory';
 import {
-  OpenRouterPriceScoutProvider,
+  buildPriceScoutMessages,
+  parsePriceScoutResponse,
   PriceScoutInput,
   PriceScoutResult,
+  PRICE_SCOUT_SCHEMA,
   scoutPriceByRules,
 } from './price-scout';
 
+/**
+ * Market price scout (Phase 11). Keyless percentiles over manually-supplied listings by
+ * default; when a provider (Claude or OpenRouter) is configured it asks the LLM behind the
+ * shared LlmClient port (structured output on Anthropic) and falls back to rules on any
+ * error — so the endpoint never fails because the AI API is down. Keys stay server-side.
+ */
 @Injectable()
 export class PriceScoutService {
   private readonly logger = new Logger(PriceScoutService.name);
@@ -23,14 +32,21 @@ export class PriceScoutService {
   }): Promise<PriceScoutResult> {
     const input = await this.resolve(dto);
     const fallback = scoutPriceByRules(input);
-    const key = process.env.AI_PROVIDER_KEY ?? process.env.OPENROUTER_API_KEY;
-    if (!key) return fallback;
+    const client = resolveLlmClient();
+    if (!client) return fallback;
 
     try {
-      return await new OpenRouterPriceScoutProvider({ apiKey: key, model: process.env.AI_MODEL }).scout(input);
+      const [system, user] = buildPriceScoutMessages(input);
+      const res = await client.chat([{ role: 'user', content: user.content }], {
+        system: system.content,
+        cacheSystem: true,
+        jsonSchema: PRICE_SCOUT_SCHEMA,
+        maxTokens: 700,
+      });
+      return { source: res.source, ...parsePriceScoutResponse(res.text) };
     } catch (err) {
       this.logger.warn(`AI price scout failed, using rule fallback: ${String(err)}`);
-      return { ...fallback, source: 'rules (fallback)' };
+      return { ...fallback, source: `${fallback.source} (fallback)` };
     }
   }
 

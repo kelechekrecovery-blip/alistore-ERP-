@@ -1,4 +1,6 @@
 import { ChatMessage, openRouterChat, OpenRouterOptions } from './openrouter-provider';
+import type { LlmMessage } from './llm/llm-client';
+import type { ResolvedPhoto } from './llm/image-resolver';
 import { DeviceGrade } from './valuation';
 
 export interface PhotoEvidence {
@@ -96,6 +98,67 @@ export function gradePhotosByRules(input: PhotoGradingInput): PhotoGradingResult
   if (defects.includes('battery_wear')) recommendedChecks.push('Снять battery health / cycle count');
 
   return { source: 'rules', grade, confidence, defects, notes, recommendedChecks };
+}
+
+/** Shared grading persona — used by both the text (OpenRouter) and vision (Claude) paths. */
+const GRADING_SYSTEM = [
+  'Ты — эксперт приёмки Б/У электроники AliStore.',
+  'Оцени реальное состояние устройства и верни строгий результат.',
+  'grade: A (как новый), B (следы использования), C (существенный износ/риск ремонта или блокировки).',
+  'Смотри на дефекты: трещины и сколы экрана/корпуса, царапины, вздутие/деформация (возможный аккумулятор),',
+  'следы влаги/окисления, отсутствие/повреждение камеры, признаки вскрытия. Не выдумывай факты:',
+  'если на фото не видно дефекта — не заявляй его; если фото недоступны или неинформативны — снижай confidence.',
+  'confidence 0..1. defects — короткие машинные метки, notes и recommendedChecks — на русском.',
+].join(' ');
+
+/** JSON Schema for structured grading output (Claude `output_config.format`). */
+export const PHOTO_GRADING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    grade: { type: 'string', enum: ['A', 'B', 'C'] },
+    confidence: { type: 'number' },
+    defects: { type: 'array', items: { type: 'string' } },
+    notes: { type: 'array', items: { type: 'string' } },
+    recommendedChecks: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['grade', 'confidence', 'defects', 'notes', 'recommendedChecks'],
+};
+
+/** Text context (no pixels) accompanying the images. */
+function gradingContextText(input: PhotoGradingInput, resolvedCount: number): string {
+  const ctx = {
+    model: input.model ?? null,
+    imei: input.imei ?? null,
+    claimedGrade: input.claimedGrade ?? null,
+    observedDefects: input.observedDefects ?? [],
+    photosProvided: input.photos.length,
+    photosResolved: resolvedCount,
+  };
+  return [
+    'Оцени устройство по приложенным фото и данным анкеты (JSON ниже).',
+    resolvedCount === 0
+      ? 'Фото не удалось загрузить — оценивай осторожно и снижай confidence.'
+      : `Приложено фото: ${resolvedCount}.`,
+    `Анкета: ${JSON.stringify(ctx)}`,
+  ].join('\n');
+}
+
+/**
+ * Build a multimodal grading turn for a vision-capable provider: one user message with a
+ * text context block followed by the actual photo pixels. This is the real-vision path
+ * (Claude), unlike `buildPhotoGradingMessages` which only sends labels/URLs as text.
+ */
+export function buildVisionGradingMessages(input: PhotoGradingInput, images: ResolvedPhoto[]): LlmMessage[] {
+  const content: LlmMessage['content'] = [
+    { type: 'text', text: gradingContextText(input, images.length) },
+    ...images.map((img) => ({ type: 'image' as const, mediaType: img.mediaType, dataBase64: img.dataBase64 })),
+  ];
+  return [{ role: 'user', content }];
+}
+
+export function gradingSystemPrompt(): string {
+  return GRADING_SYSTEM;
 }
 
 export function buildPhotoGradingMessages(input: PhotoGradingInput): ChatMessage[] {

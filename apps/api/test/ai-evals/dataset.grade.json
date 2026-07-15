@@ -1,0 +1,14 @@
+[
+  { "labels": ["front", "back", "edges", "screen-on"], "expected": "A" },
+  { "labels": ["front", "back", "edges"], "expected": "A" },
+  { "labels": ["front", "back", "edges", "extra angle"], "expected": "A" },
+  { "labels": ["front", "back", "screen scratch"], "expected": "B" },
+  { "labels": ["front корпус скол", "back", "edges"], "expected": "B" },
+  { "labels": ["front износ", "back", "edges"], "expected": "B" },
+  { "labels": ["front", "back", "edges", "camera issue"], "expected": "B" },
+  { "labels": ["front", "back"], "expected": "B" },
+  { "labels": ["front water damage", "back"], "expected": "C" },
+  { "labels": ["screen crack", "battery", "back"], "expected": "C" },
+  { "labels": ["front icloud locked", "back", "edges"], "expected": "C" },
+  { "labels": ["front", "back", "edges", "screen-on"], "claimedGrade": "C", "expected": "C" }
+]

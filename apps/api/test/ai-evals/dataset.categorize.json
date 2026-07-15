@@ -1,0 +1,15 @@
+[
+  { "name": "iPhone 15 Pro Max 256GB", "expected": "Смартфоны" },
+  { "name": "Samsung Galaxy S24 Ultra", "expected": "Смартфоны" },
+  { "name": "Redmi Note 13", "expected": "Смартфоны" },
+  { "name": "MacBook Air M3 13\"", "expected": "Ноутбуки" },
+  { "name": "Lenovo ThinkPad X1 Carbon", "expected": "Ноутбуки" },
+  { "name": "ASUS Zenbook 14 OLED", "expected": "Ноутбуки" },
+  { "name": "iPad Air 11 2024", "expected": "Планшеты" },
+  { "name": "Samsung Galaxy Tab S9", "expected": "Планшеты" },
+  { "name": "AirPods Pro 2", "expected": "Аудио" },
+  { "name": "JBL Charge 5", "attrs": { "тип": "колонка" }, "expected": "Аудио" },
+  { "name": "Sony WH-1000XM5", "attrs": { "тип": "наушники" }, "expected": "Аудио" },
+  { "name": "Apple Watch Series 9", "expected": "Часы" },
+  { "name": "Xiaomi Smart Band 8", "expected": "Часы" }
+]

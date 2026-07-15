@@ -83,10 +83,10 @@ const CHECKS: CheckDefinition[] = [
     id: 'ai_provider',
     area: 'ai',
     title: 'Hosted AI provider',
-    requiredAny: [['AI_PROVIDER_KEY'], ['OPENROUTER_API_KEY']],
-    optionalEnv: ['AI_MODEL'],
+    requiredAny: [['ANTHROPIC_API_KEY'], ['AI_PROVIDER_KEY'], ['OPENROUTER_API_KEY']],
+    optionalEnv: ['AI_PROVIDER', 'ANTHROPIC_MODEL', 'AI_MODEL', 'AI_FAST_MODEL'],
     blocking: true,
-    note: 'Unlocks LLM/vision/market-scout paths; keyless rule engines remain available.',
+    note: 'Unlocks LLM/vision/tool-use/moderation paths (Anthropic or OpenRouter); keyless rule engines remain available.',
   },
   {
     id: 'telegram_bot',

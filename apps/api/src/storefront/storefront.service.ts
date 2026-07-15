@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { CatalogService } from '../catalog/catalog.service';
 import { ConflictError, ValidationError } from '../common/errors';
+import { ModerationService } from '../ai/moderation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStorefrontContentDto, ScheduleStorefrontContentDto, StorefrontBenefitDto } from './storefront.dto';
 
@@ -41,6 +42,7 @@ export class StorefrontService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly catalog: CatalogService,
+    private readonly moderation: ModerationService,
   ) {}
 
   async publicContent() {
@@ -79,6 +81,7 @@ export class StorefrontService {
 
   async createDraft(dto: CreateStorefrontContentDto, actor: string) {
     const normalized = this.normalize(dto);
+    await this.assertContentClean(normalized);
     return this.audit.transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('storefront-content-version'))`;
       await this.assertFeaturedProducts(tx, normalized.featuredProductIds);
@@ -222,6 +225,48 @@ export class StorefrontService {
     });
     if (products.length !== ids.length) {
       throw new ValidationError('storefront_featured_product_invalid', 'Подборка содержит отсутствующий или архивный товар');
+    }
+  }
+
+  /**
+   * Screen the human-readable draft copy (hero/about/delivery + financing + benefits) for
+   * disallowed content before persisting. Runs outside the transaction — the LLM call must
+   * not hold a DB tx. Blocks the draft with a clear error when flagged; the moderation
+   * service falls back to keyless rules / no-op without a provider key, so this never fails
+   * a legitimate draft because the AI API is down.
+   */
+  private async assertContentClean(content: {
+    heroEyebrow: string;
+    heroTitle: string;
+    heroBody: string;
+    heroCtaLabel: string;
+    financingText: string | null;
+    aboutTitle: string;
+    aboutBody: string;
+    deliveryTitle: string;
+    deliveryBody: string;
+    featuredTitle: string;
+    benefits: { title: string; body: string }[];
+  }): Promise<void> {
+    const text = [
+      content.heroEyebrow,
+      content.heroTitle,
+      content.heroBody,
+      content.heroCtaLabel,
+      content.financingText,
+      content.aboutTitle,
+      content.aboutBody,
+      content.deliveryTitle,
+      content.deliveryBody,
+      content.featuredTitle,
+      ...content.benefits.flatMap((b) => [b.title, b.body]),
+    ]
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      .join('\n');
+    if (!text) return;
+    const verdict = await this.moderation.moderate(text);
+    if (!verdict.allowed) {
+      throw new ValidationError('storefront_content_flagged', verdict.reason || verdict.categories.join(', '));
     }
   }
 

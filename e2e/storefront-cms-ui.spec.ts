@@ -96,6 +96,32 @@ test('marketer composes and reorders published storefront blocks without a code 
   );
 });
 
+test('marketer edits an existing draft storefront block', async ({ page }) => {
+  await resetDb();
+  const { username, password } = await seedStaffCredentials('marketer', 'e2e-block-edit');
+
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /CMS витрины/ }).click();
+  await expect(page.getByRole('heading', { name: 'Баннеры, подборки и порядок' })).toBeVisible();
+
+  await page.getByLabel('Заголовок').fill('Черновик до правки');
+  await page.getByRole('button', { name: 'Создать черновик' }).click();
+  await expect(page.getByText('Черновик блока создан')).toBeVisible();
+
+  const row = page.getByRole('article').filter({ hasText: 'Черновик до правки' });
+  await row.getByRole('button', { name: 'Изменить' }).click();
+  await expect(page.getByRole('heading', { name: 'Редактирование блока' })).toBeVisible();
+  await page.getByLabel('Заголовок').fill('Черновик после правки');
+  await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+  await expect(page.getByText('Черновик обновлён')).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'Черновик после правки' })).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'Черновик до правки' })).toHaveCount(0);
+});
+
 test('customer review stays private until a marketer approves it in ERP', async ({ page, request }) => {
   await resetDb();
   const { username, password } = await seedStaffCredentials('marketer', 'e2e-review');

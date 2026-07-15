@@ -46,6 +46,10 @@ export function createStorefrontBlock(input: StorefrontBlockInput, accessToken: 
   return postAuthJson<StorefrontBlock>('/storefront-blocks', input, accessToken);
 }
 
+export function updateStorefrontBlock(id: string, input: Partial<StorefrontBlockInput>, accessToken: string) {
+  return postAuthJson<StorefrontBlock>(`/storefront-blocks/${encodeURIComponent(id)}/update`, input, accessToken);
+}
+
 export function publishStorefrontBlock(id: string, accessToken: string) {
   return postAuthJson<StorefrontBlock>(`/storefront-blocks/${encodeURIComponent(id)}/publish`, {}, accessToken);
 }

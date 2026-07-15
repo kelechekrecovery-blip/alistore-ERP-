@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "preflight": "ts-node scripts/print-production-preflight.ts",
     "readiness": "ts-node scripts/print-readiness.ts",
+    "ai:eval": "ts-node test/ai-evals/run.ts",
     "test": "NODE_PATH=./node_modules jest",
     "test:watch": "NODE_PATH=./node_modules jest --watch"
   },
@@ -23,6 +24,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@aws-sdk/client-s3": "^3.1079.0",
     "@aws-sdk/s3-request-presigner": "^3.1085.0",
     "@nestjs/common": "^11.1.28",

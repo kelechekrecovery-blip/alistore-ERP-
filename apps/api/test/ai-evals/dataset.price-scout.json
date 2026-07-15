@@ -1,0 +1,12 @@
+[
+  { "name": "iPhone 15 128GB", "basePrice": 120000, "observedListings": [{ "price": 95000 }, { "price": 100000 }, { "price": 105000 }], "expectedPrice": 100000 },
+  { "name": "MacBook Air M3", "basePrice": 220000, "observedListings": [{ "price": 180000 }, { "price": 185000 }, { "price": 190000 }, { "price": 195000 }, { "price": 200000 }], "expectedPrice": 190000 },
+  { "name": "Galaxy S23", "basePrice": 90000, "observedListings": [{ "price": 70000 }, { "price": 75000 }, { "price": 80000 }], "expectedPrice": 75000 },
+  { "name": "iPad Air", "basePrice": 60000, "expectedPrice": 54000 },
+  { "name": "Dell XPS 13", "basePrice": 150000, "expectedPrice": 135000 },
+  { "name": "Sony WH-1000XM5", "basePrice": 300000, "observedListings": [{ "price": 250000 }, { "price": 260000 }, { "price": 270000 }], "expectedPrice": 260000 },
+  { "name": "Redmi Note 13", "basePrice": 45000, "observedListings": [{ "price": 30000 }, { "price": 32000 }, { "price": 34000 }, { "price": 36000 }, { "price": 38000 }], "expectedPrice": 34000 },
+  { "name": "Apple Watch S9", "basePrice": 500000, "expectedPrice": 450000 },
+  { "name": "AirPods Pro 2 (дефицит)", "basePrice": 80000, "observedListings": [{ "price": 95000 }, { "price": 98000 }, { "price": 100000 }], "expectedPrice": 98000 },
+  { "name": "iPhone 14 (с выбросом)", "basePrice": 110000, "observedListings": [{ "price": 94000 }, { "price": 99000 }, { "price": 101000 }, { "price": 106000 }, { "price": 450000 }], "expectedPrice": 100000 }
+]

@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/tdd-reminder.js\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git -C \"$CLAUDE_PROJECT_DIR\" diff --quiet -- apps/api/src apps/web 2>/dev/null || echo '[verify] Есть незакоммиченные изменения в исходниках — прогоните verification-before-completion (tsc + jest + mvp:verify).'"
+          }
+        ]
+      }
+    ]
+  }
+}

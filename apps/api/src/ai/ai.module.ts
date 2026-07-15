@@ -7,6 +7,8 @@ import { InsightsController } from './insights.controller';
 import { ValuationService } from './valuation.service';
 import { ValuationController } from './valuation.controller';
 import { CategorizeController } from './categorize.controller';
+import { CategorizeService } from './categorize.service';
+import { ModerationModule } from './moderation.module';
 import { PricingService } from './pricing.service';
 import { PricingController } from './pricing.controller';
 import { ReorderService } from './reorder.service';
@@ -19,7 +21,7 @@ import { PriceScoutService } from './price-scout.service';
 import { PriceScoutController } from './price-scout.controller';
 
 @Module({
-  imports: [ReportsModule, StaffAuthModule, AuthzModule],
+  imports: [ReportsModule, StaffAuthModule, AuthzModule, ModerationModule],
   providers: [
     InsightsService,
     ValuationService,
@@ -28,6 +30,7 @@ import { PriceScoutController } from './price-scout.controller';
     DescribeService,
     GradingService,
     PriceScoutService,
+    CategorizeService,
   ],
   controllers: [
     InsightsController,
