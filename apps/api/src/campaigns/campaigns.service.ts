@@ -8,6 +8,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { OutboxChannel } from '../outbox/outbox.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CampaignAttributionService } from './campaign-attribution.service';
+import { CampaignCreativePolicyService } from './campaign-creative-policy.service';
 import { CreateCampaignDto, RecordCampaignSpendDto, UpdateCampaignDto } from './campaigns.dto';
 import {
   AudienceCustomer,
@@ -56,6 +57,7 @@ export class CampaignsService {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly attribution: CampaignAttributionService,
+    private readonly creativePolicy?: CampaignCreativePolicyService,
   ) {}
 
   async preview(rules: SegmentRules) {
@@ -81,6 +83,7 @@ export class CampaignsService {
   }
 
   async create(dto: CreateCampaignDto, actor: string) {
+    await this.creativePolicy?.assertAllowed(dto);
     const normalized = normalizeSegmentRules(dto);
     const creative = this.creativeInput(dto);
     return this.audit.transaction(async (tx) => {
@@ -112,6 +115,7 @@ export class CampaignsService {
   }
 
   async update(id: string, dto: UpdateCampaignDto, actor: string) {
+    await this.creativePolicy?.assertAllowed(dto);
     return this.audit.transaction(async (tx) => {
       const campaign = await this.lockCampaign(tx, id);
       if (campaign.status !== 'draft') {

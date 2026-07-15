@@ -7,11 +7,13 @@ import { CampaignsService } from './campaigns.service';
 import { CampaignAttributionService } from './campaign-attribution.service';
 import { CampaignTrackingController } from './campaign-tracking.controller';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
+import { ModerationModule } from '../ai/moderation.module';
+import { CampaignCreativePolicyService } from './campaign-creative-policy.service';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule, OutboxModule, RateLimitModule],
+  imports: [StaffAuthModule, AuthzModule, OutboxModule, RateLimitModule, ModerationModule],
   controllers: [CampaignsController, CampaignTrackingController],
-  providers: [CampaignsService, CampaignAttributionService],
+  providers: [CampaignsService, CampaignAttributionService, CampaignCreativePolicyService],
   exports: [CampaignsService, CampaignAttributionService],
 })
 export class CampaignsModule {}
