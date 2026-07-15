@@ -71,6 +71,16 @@ describe('Returns and exchanges RBAC split', () => {
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.$transaction([
+      prisma.accountingJournalLine.deleteMany({
+        where: { entry: { sourceType: { in: ['exchange.return', 'exchange.sale', 'exchange.surcharge', 'inventory.cogs', 'inventory.return'] } } },
+      }),
+      prisma.accountingJournalEntry.deleteMany({
+        where: { sourceType: { in: ['exchange.return', 'exchange.sale', 'exchange.surcharge', 'inventory.cogs', 'inventory.return'] } },
+      }),
+    ]);
+    await prisma.inventoryValuationIssue.deleteMany();
+    await prisma.inventoryValuationLayer.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.reservation.deleteMany();
@@ -110,11 +120,14 @@ describe('Returns and exchanges RBAC split', () => {
       data: {
         customerId: customer.id,
         channel: 'pos',
+        storePointCode: 'B',
+        fulfillmentLocation: 'B',
         total: oldPrice,
         status: 'paid',
         items: { create: [{ sku: oldProduct.sku, qty: 1, price: oldPrice, imei: oldImei }] },
       },
     });
+    await prisma.deviceUnit.update({ where: { imei: oldImei }, data: { orderId: order.id } });
     return { customer, order, oldImei, newProduct };
   }
 
@@ -169,6 +182,7 @@ describe('Returns and exchanges RBAC split', () => {
     expect(reviewed?.actor).toBe(warehouseId);
 
     const exchange = await paidOrderFixture(100000, 130000);
+    const shift = await prisma.cashShift.create({ data: { staffId: cashierId, point: 'B', openCash: 0 } });
     await request(app.getHttpServer()).get(`/units/${exchange.oldImei}`).expect(401);
     await request(app.getHttpServer())
       .get(`/units/${exchange.oldImei}`)
@@ -186,6 +200,7 @@ describe('Returns and exchanges RBAC split', () => {
         oldImei: exchange.oldImei,
         newProductId: exchange.newProduct.id,
         method: 'cash',
+        shiftId: shift.id,
       })
       .expect(401);
     await request(app.getHttpServer())
@@ -207,6 +222,7 @@ describe('Returns and exchanges RBAC split', () => {
         oldImei: exchange.oldImei,
         newProductId: exchange.newProduct.id,
         method: 'cash',
+        shiftId: shift.id,
       })
       .expect(201);
 

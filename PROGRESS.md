@@ -1831,3 +1831,12 @@
 - Outcome: `INV-VAL-001B` is accepted at local software level and the branch no longer relies on uncommitted return-valuation functions. Quarantine disposition, valuation-aware adjustments/transfers and inventory-to-GL reconciliation remain open. Local dev migration history also has pre-existing drift and must be normalized before staging.
 - Commit: `beb45ab` (`feat(inventory): reverse return valuation and COGS`).
 - Next step: complete exchange accounting on this now self-contained return valuation boundary, then add the inventory valuation subledger reconciliation report.
+
+## 2026-07-15
+
+- Task: complete atomic exchange accounting across customer credit, replacement sale, surcharge, serialized inventory and COGS.
+- Files changed: exchange DTO/module/service; exchange and RBAC integration fixtures; backlog/progress.
+- Result: the API locks the original order, verifies exact sold/new IMEI ownership and location, rejects consignment ambiguity and cheaper replacement, creates a reconciled return line, restores the returned unit and its immutable cost, freezes replacement tax/cost snapshots, sells the replacement through the shared inventory boundary and posts balanced `exchange.return`, `exchange.sale`, `exchange.surcharge`, `inventory.return` and `inventory.cogs` journals. Cash surcharge requires the actor's open shift; non-cash surcharge requires a provider reference. The customer credit plus surcharge clears exchange AR exactly, equal-price exchange creates no synthetic payment, and exact command replay creates no duplicate order, return, payment, journal or valuation issue.
+- Checks run: exchange integration 5/5; exchange/RBAC integration 7/7; related exchange/return/payment-race/expense suites 24/24; API production build; final full API 135/135 suites and 553/553 tests; targeted `git diff --check`.
+- Outcome: `FIN-003D` is complete at local software level for debt/COD/exchange accounting. The broader accounting goal remains open: multi-tender refund allocation, opening balances/payroll/fixed assets/advances/AR aging, inventory-to-GL reconciliation and supplier AP lifecycle remain. Prototype-required exchange approval, Evidence and quarantine/diagnosis are now explicit `EXCH-001`; live accountant/provider/POS UAT remains external.
+- Next step: implement `FIN-003E` multi-tender refund allocation, then `EXCH-001` approved evidence-backed exchange execution and `INV-VAL-001` inventory-to-GL reconciliation.
