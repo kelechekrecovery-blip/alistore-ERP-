@@ -15,11 +15,12 @@ import {
 } from '@/lib/api';
 import { ReviewModerationView } from './ReviewModerationView';
 import { PromotionsView } from './PromotionsView';
+import { StorefrontBlocksView } from './StorefrontBlocksView';
 
 const FIELD = 'w-full rounded-[8px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none focus:border-coral';
 
 export function StorefrontView({ accessToken }: { accessToken: string }) {
-  const [mode, setMode] = useState<'content' | 'promotions' | 'reviews'>('content');
+  const [mode, setMode] = useState<'blocks' | 'content' | 'promotions' | 'reviews'>('blocks');
   const [form, setForm] = useState<StorefrontContent | null>(null);
   const [revisions, setRevisions] = useState<StorefrontContent[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -60,10 +61,11 @@ export function StorefrontView({ accessToken }: { accessToken: string }) {
 
   const byId = useMemo(() => new Map(knownProducts.map((product) => [product.id, product])), [knownProducts]);
 
-  const tabs = <div className="mb-4 flex flex-wrap gap-2"><button type="button" onClick={() => setMode('content')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'content' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Витрина и подборки</button><button type="button" onClick={() => setMode('promotions')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'promotions' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Промокоды</button><button type="button" onClick={() => setMode('reviews')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'reviews' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Модерация отзывов</button></div>;
+  const tabs = <div className="mb-4 flex flex-wrap gap-2"><button type="button" onClick={() => setMode('blocks')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'blocks' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Витрина (баннеры)</button><button type="button" onClick={() => setMode('content')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'content' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Тексты и подборка</button><button type="button" onClick={() => setMode('promotions')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'promotions' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Промокоды</button><button type="button" onClick={() => setMode('reviews')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'reviews' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Модерация отзывов</button></div>;
 
   if (mode === 'reviews') return <>{tabs}<ReviewModerationView accessToken={accessToken} /></>;
   if (mode === 'promotions') return <>{tabs}<PromotionsView accessToken={accessToken} /></>;
+  if (mode === 'blocks') return <>{tabs}<StorefrontBlocksView accessToken={accessToken} /></>;
   if (!form) return <>{tabs}<div className="text-sm text-[#8A7F76]">Загрузка CMS витрины...</div></>;
 
   const set = (key: keyof StorefrontContent, value: string) => {

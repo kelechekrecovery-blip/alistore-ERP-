@@ -13,6 +13,7 @@ test('ERP publishes an ordered product collection to the desktop storefront', as
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /CMS витрины/ }).click();
+  await page.getByRole('button', { name: 'Тексты и подборка' }).click();
 
   await expect(page.getByRole('heading', { name: 'Контент клиентского сайта' })).toBeVisible();
   await page.getByLabel('Заголовок подборки').fill('Выбор команды AliStore');
@@ -32,6 +33,64 @@ test('ERP publishes an ordered product collection to the desktop storefront', as
   await expect(cards).toHaveCount(2);
   await expect(cards.nth(0)).toContainText(second.product.name);
   await expect(cards.nth(1)).toContainText(first.product.name);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+});
+
+test('marketer composes and reorders published storefront blocks without a code release', async ({ page }) => {
+  await resetDb();
+  const { username, password } = await seedStaffCredentials('marketer', 'e2e-blocks');
+  const { product } = await seedProduct('Block Collection Phone', 132_000, 101_000);
+
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /CMS витрины/ }).click();
+  await expect(page.getByRole('heading', { name: 'Баннеры, подборки и порядок' })).toBeVisible();
+
+  await page.getByLabel('Устройства').selectOption('desktop');
+  await page.getByLabel('Заголовок').fill('Сервис и доставка AliStore');
+  await page.getByLabel('Описание').fill('Условия подтверждаются при оформлении');
+  await page.getByRole('button', { name: 'Создать черновик' }).click();
+  await expect(page.getByText('Черновик блока создан')).toBeVisible();
+  await page.getByRole('button', { name: 'Включить' }).click();
+  await expect(page.getByText('Блок опубликован')).toBeVisible();
+
+  await page.getByLabel('Тип').selectOption('collection');
+  await page.getByLabel('Устройства').selectOption('desktop');
+  await page.getByLabel('Заголовок').fill('Выбор недели');
+  await page.getByRole('button', { name: new RegExp(product.name) }).click();
+  await page.getByRole('button', { name: 'Создать черновик' }).click();
+  await page.getByRole('button', { name: 'Включить' }).click();
+  await expect(page.getByText('Блок опубликован')).toBeVisible();
+  const collectionRow = page.getByRole('article').filter({ hasText: 'Выбор недели' });
+  await collectionRow.getByTitle('Выше').click();
+  await expect(page.getByText('Порядок блоков обновлён')).toBeVisible();
+
+  await page.getByLabel('Тип').selectOption('hero');
+  await page.getByLabel('Устройства').selectOption('mobile');
+  await page.getByLabel('Заголовок').fill('Мобильная акция AliStore');
+  await page.getByLabel('Описание').fill('Этот баннер виден только на телефоне');
+  await page.getByRole('button', { name: 'Создать черновик' }).click();
+  await page.getByRole('button', { name: 'Включить' }).click();
+  await expect(page.getByText('Блок опубликован')).toBeVisible();
+
+  await page.goto('/');
+  const blocks = page.locator('[data-testid="managed-storefront-blocks"] > [data-storefront-block]');
+  await expect(blocks).toHaveCount(2);
+  await expect(blocks.nth(0)).toContainText('Выбор недели');
+  await expect(blocks.nth(0)).toContainText(product.name);
+  await expect(blocks.nth(1)).toContainText('Сервис и доставка AliStore');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+  await page.setViewportSize({ width: 402, height: 874 });
+  await page.goto('/');
+  await expect(page.getByText('Мобильная акция AliStore')).toBeVisible();
+  await expect(page.getByText('Сервис и доставка AliStore')).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => document.documentElement.clientWidth),
   );

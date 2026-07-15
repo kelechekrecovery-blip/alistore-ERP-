@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-004
+
+- Iteration ID: `MKT-004`.
+- Task: let Marketing CMS control the actual storefront composition without a developer or code release.
+- Files changed: StorefrontBlock schema/migration, dedicated DTO/service/controller/module, RBAC and Ledger catalogue, typed web API, ERP banner/block composer, desktop/mobile renderer, database reset and API/browser acceptance.
+- Result: marketer/admin/owner can create hero, promo, info and product-collection blocks, target all/desktop/mobile, publish or archive, schedule non-overlapping hero campaigns and reorder every live block. Public clients read only effective published blocks in server order; collection products are canonical catalog projections, unsafe assets/links and archived products fail closed, and the legacy storefront revision remains a safe fallback when no block is published.
+- Checks run: Prisma generation; clean isolated PostgreSQL migration deploy 65/65; targeted block API 1 suite and 2 tests; API and Next production builds; targeted ERP-to-desktop/mobile browser acceptance 4/4 plus repeated exact MKT-004 flow 1/1; full Playwright 42/42; detached committed baseline API 126/126 suites and 498/498 tests. The broader current worktree executed 130 suites: 126 suites and all 500 runnable tests passed, while four suites were compile-blocked only by a parallel unstaged `ProductsService` moderation constructor change.
+- Acceptance: `accepted` for the full committed Marketing CMS handoff: banners/blocks, managed promotion codes and review moderation now have authoritative API, RBAC, Ledger and storefront consequence evidence. Real production media/channel credentials and campaign ROI remain separate launch work.
+- Next backlog ID: `MKT-005` closes campaign attribution and ROAS rather than adding more decorative CMS controls.
+
 ## 2026-07-15 — MKT-003
 
 - Iteration ID: `MKT-003`.

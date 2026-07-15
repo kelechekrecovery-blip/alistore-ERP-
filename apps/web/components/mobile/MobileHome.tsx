@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
 import { Pressable, Stagger, StaggerItem } from '@/components/motion/primitives';
-import { fetchCatalog, fetchStorefrontContent, type CatalogProduct, type StorefrontPayload } from '@/lib/api';
+import { fetchCatalog, fetchPublicStorefrontBlocks, fetchStorefrontContent, type CatalogProduct, type StorefrontBlock, type StorefrontPayload } from '@/lib/api';
 
 const CATS: [string, string][] = [
   ['📱', 'Смартфоны'],
@@ -19,10 +20,12 @@ const CATS: [string, string][] = [
 export default function MobileHome() {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
+  const [blocks, setBlocks] = useState<StorefrontBlock[]>([]);
 
   useEffect(() => {
-    fetchStorefrontContent().then(async (payload) => {
+    Promise.all([fetchStorefrontContent(), fetchPublicStorefrontBlocks('mobile')]).then(async ([payload, publishedBlocks]) => {
       setStorefront(payload);
+      setBlocks(publishedBlocks);
       if (payload?.featuredProducts.length) {
         setProducts(payload.featuredProducts);
         return;
@@ -36,6 +39,10 @@ export default function MobileHome() {
   return (
     <MobileFrame active="home">
       <Stagger className="px-4 pb-6 pt-1">
+        {blocks.map((block) => block.type === 'collection'
+          ? <StaggerItem key={block.id} className="mb-5" data-storefront-block={block.id}><div className="mb-3 flex items-center"><span className="font-display text-[18px] font-bold text-white">{block.title}</span>{block.ctaHref && <Link href={block.ctaHref} className="ml-auto text-[13px] text-lime">{block.ctaLabel ?? 'Все'} →</Link>}</div><div className="grid grid-cols-2 gap-3">{block.products?.slice(0, 6).map((product, index) => <MobileProductCard key={product.id} product={product} priority={index === 0} />)}</div></StaggerItem>
+          : <StaggerItem key={block.id} className="mb-4" data-storefront-block={block.id}><Link href={block.ctaHref ?? '/catalog'} className={`relative block min-h-[168px] overflow-hidden rounded-[20px] border p-[22px] ${mobileTone(block.tone)}`}><div className="relative z-10 max-w-[72%]">{block.eyebrow && <div className="font-mono text-[11px] text-lime">{block.eyebrow}</div>}<div className={`${block.type === 'hero' ? 'text-[24px]' : 'text-[20px]'} mt-2 font-display font-extrabold leading-[1.05]`}>{block.title}</div>{block.body && <div className="mt-2 text-[12px] opacity-70">{block.body}</div>}{block.ctaLabel && <span className="mt-4 inline-block rounded-[9px] bg-white px-4 py-2 text-[12px] font-bold text-black">{block.ctaLabel}</span>}</div>{block.imageUrl && <Image src={block.imageUrl} alt="" width={180} height={180} unoptimized className="absolute -bottom-4 -right-3 h-[150px] w-[150px] object-contain" />}</Link></StaggerItem>)}
+
         {/* delivery banner */}
         <StaggerItem className="mb-3.5 flex gap-2">
           <Pressable className="flex-1" hover={false}>
@@ -77,7 +84,7 @@ export default function MobileHome() {
         </StaggerItem>
 
         {/* hero promo */}
-        <StaggerItem className="mb-[22px]">
+        {blocks.length === 0 && <StaggerItem className="mb-[22px]">
           <Pressable hover={false}>
             <Link
               href={storefront?.content.heroCtaHref ?? '/catalog'}
@@ -92,10 +99,10 @@ export default function MobileHome() {
               <div className="pointer-events-none absolute -bottom-2.5 -right-2.5 text-[90px] opacity-[0.15]">📱</div>
             </Link>
           </Pressable>
-        </StaggerItem>
+        </StaggerItem>}
 
         {/* hits */}
-        <StaggerItem className="mb-3 flex items-center">
+        {!blocks.some((block) => block.type === 'collection') && <><StaggerItem className="mb-3 flex items-center">
           <span className="font-display text-[18px] font-bold text-white">{storefront?.content.featuredTitle ?? 'Товары в каталоге'}</span>
           <Link href="/catalog" className="ml-auto text-[13px] text-lime">
             Все →
@@ -120,8 +127,15 @@ export default function MobileHome() {
               Открыть каталог
             </Link>
           </div>
-        )}
+        )}</>}
       </Stagger>
     </MobileFrame>
   );
+}
+
+function mobileTone(tone: StorefrontBlock['tone']) {
+  if (tone === 'coral') return 'border-coral bg-coral text-white';
+  if (tone === 'light') return 'border-white bg-white text-[#14110E]';
+  if (tone === 'lime') return 'border-lime bg-lime text-lime-ink';
+  return 'border-[#2E2822] bg-[#16130F] text-white';
 }

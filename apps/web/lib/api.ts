@@ -30,5 +30,6 @@ export * from './api/service-center';
 export * from './api/storefront';
 export * from './api/reviews';
 export * from './api/promotions';
+export * from './api/storefront-blocks';
 export * from './pos-offline';
 export * from './pos-hardware';

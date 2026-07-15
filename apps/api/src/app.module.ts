@@ -50,6 +50,7 @@ import { LogisticsModule } from './logistics/logistics.module';
 import { ServiceCenterModule } from './service-center/service-center.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { PromotionsModule } from './promotions/promotions.module';
+import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.module';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { PromotionsModule } from './promotions/promotions.module';
     ServiceCenterModule,
     StorefrontModule,
     PromotionsModule,
+    StorefrontBlocksModule,
   ],
 })
 export class AppModule {}
