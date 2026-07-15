@@ -180,8 +180,9 @@ describe('Cash shift reconciliation (integration)', () => {
   it('attributes a payment tagged with shiftId to the drawer end-to-end', async () => {
     seq += 1;
     const suffix = seq.toString().padStart(3, '0');
+    const staffId = staff();
     const shift = await shifts.open(
-      { staffId: staff(), point: 'BISHKEK-1', openCash: 0 },
+      { staffId, point: 'BISHKEK-1', openCash: 0 },
       'cashier',
     );
     const customer = await prisma.customer.create({
@@ -206,6 +207,7 @@ describe('Cash shift reconciliation (integration)', () => {
     const paid = await payments.pay(
       { orderId: order.id, method: 'cash', amount: 100000, shiftId: shift.id },
       'cashier',
+      { staffId, idempotencyKey: `shift-payment-${suffix}` },
     );
     expect(paid.payment.shiftId).toBe(shift.id);
 

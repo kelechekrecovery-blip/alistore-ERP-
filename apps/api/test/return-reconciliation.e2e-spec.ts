@@ -57,7 +57,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
   }
 
   async function refundReturn(returnId: string, paymentId: string, amount: number) {
-    const request = await payments.refund(paymentId, amount, 'accepted return', 'staff:returns', returnId);
+    const request = await payments.refund(paymentId, amount, 'accepted return', 'staff:returns', returnId, { externalReference: `return-provider-${returnId}` });
     await approvals.decide(request.approvalId, {
       status: 'approved',
       approver: 'owner:refunds',
@@ -328,7 +328,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       },
     });
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: 50000, method: 'cash', status: 'received' },
+      data: { orderId: order.id, amount: 50000, method: 'card', status: 'received' },
     });
     const ret = await returns.request(order.id, 'consignment return', customer.id, customer.id, `return-${suffix}`);
     await moveToProcessing(ret.id);
@@ -391,7 +391,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       },
     })));
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: 100000, method: 'cash', status: 'received' },
+      data: { orderId: order.id, amount: 100000, method: 'card', status: 'received' },
     });
     const ret = await returns.request(order.id, 'two consignment items', customer.id, customer.id, `return-${suffix}`);
     await moveToProcessing(ret.id);

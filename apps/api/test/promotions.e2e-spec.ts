@@ -38,6 +38,14 @@ describe('Managed promotion codes', () => {
   afterAll(async () => { await app.close(); });
 
   beforeEach(async () => {
+    const promoOrders = await prisma.order.findMany({
+      where: { idempotencyKey: { startsWith: `promo-${run}` } },
+      select: { id: true },
+    });
+    const promoOrderIds = promoOrders.map((order) => order.id);
+    await prisma.reservation.deleteMany({ where: { orderId: { in: promoOrderIds } } });
+    await prisma.payment.deleteMany({ where: { orderId: { in: promoOrderIds } } });
+    await prisma.orderItem.deleteMany({ where: { orderId: { in: promoOrderIds } } });
     await prisma.order.deleteMany({ where: { idempotencyKey: { startsWith: `promo-${run}` } } });
     await prisma.promotionRedemption.deleteMany({ where: { promotion: { code: { startsWith: `PROMO${run.replace(/\D/g, '').slice(-8)}` } } } });
     await prisma.promotionCode.deleteMany({ where: { code: { startsWith: `PROMO${run.replace(/\D/g, '').slice(-8)}` } } });

@@ -49,6 +49,7 @@ describe('Finance expenses (integration + RBAC)', () => {
     await prisma.financeBudgetCommand.deleteMany();
     await prisma.financeBudget.deleteMany();
     await prisma.$transaction([
+      prisma.payment.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
       prisma.accountingJournalLine.deleteMany(),
       prisma.accountingJournalEntry.deleteMany(),
     ]);
@@ -134,7 +135,10 @@ describe('Finance expenses (integration + RBAC)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
     expect(trialBalance.body).toMatchObject({ totalDebit: 120_000, totalCredit: 120_000, balanced: true });
-    expect(trialBalance.body.coverage).toMatchObject({ complete: false, sourceTypes: ['expense.payment'] });
+    expect(trialBalance.body.coverage).toMatchObject({
+      complete: false,
+      sourceTypes: ['expense.payment', 'payment.receipt', 'payment.refund'],
+    });
     const journal = await request(app.getHttpServer())
       .get(`/finance/journal?from=${encodeURIComponent(new Date(now - 86_400_000).toISOString())}&to=${encodeURIComponent(new Date(now + 86_400_000).toISOString())}&accountCode=6200`)
       .set('Authorization', `Bearer ${ownerToken}`)

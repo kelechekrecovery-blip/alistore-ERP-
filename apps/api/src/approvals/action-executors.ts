@@ -6,6 +6,7 @@ import { canTransition } from '../orders/order-state-machine';
 import { insertDebt } from '../debts/debt-insert';
 import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
 import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
+import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
@@ -97,12 +98,27 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   const paymentId = String(payload['paymentId']);
   const amount = Number(payload['amount']);
   const returnId = payload['returnId'] ? String(payload['returnId']) : null;
+  const shiftId = payload['shiftId'] ? String(payload['shiftId']) : null;
+  const externalReference = payload['externalReference'] ? String(payload['externalReference']).trim() : null;
+  const cashierStaffId = payload['cashierStaffId'] ? String(payload['cashierStaffId']) : null;
   const original = await tx.payment.findUnique({ where: { id: paymentId } });
   if (!original) {
     throw new ValidationError('payment_not_found', 'Платёж для возврата не найден');
   }
   if (amount <= 0 || amount > original.amount) {
     throw new ValidationError('invalid_refund_amount', 'Некорректная сумма возврата');
+  }
+  let payoutShiftId: string | null = null;
+  if (original.method === 'cash') {
+    if (!shiftId || !cashierStaffId) throw new ValidationError('cash_refund_shift_required', 'Для возврата наличными нужна смена инициатора');
+    await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
+    const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
+    if (!shift || shift.closedAt) throw new ConflictError('cash_refund_shift_closed', 'Смена возврата закрыта или не найдена');
+    if (shift.staffId !== cashierStaffId) throw new ConflictError('cash_refund_shift_foreign', 'Смена возврата принадлежит другому сотруднику');
+    if (original.point && shift.point !== original.point) throw new ConflictError('cash_refund_shift_wrong_point', 'Смена возврата открыта в другой точке');
+    payoutShiftId = shift.id;
+  } else if (original.method !== 'gift_card' && !externalReference) {
+    throw new ValidationError('refund_external_reference_required', 'Для безналичного возврата нужен референс провайдера или банка');
   }
   await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${paymentId} FOR UPDATE`;
   const tenderRefunds = await tx.payment.aggregate({
@@ -171,13 +187,32 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
       amount: -Math.abs(amount),
       method: original.method,
       status: 'refunded',
+      shiftId: payoutShiftId,
+      accountCode: original.accountCode ?? paymentAccountCode(original.method),
+      idempotencyKey: `refund:${approvalId}`,
+      txnId: externalReference ? `refund:${original.method}:${externalReference}` : `refund:${approvalId}`,
+      receivedBy: cashierStaffId ?? approver,
+      point: original.point,
     },
+  });
+  const accountingEntry = await postPaymentEntryOnTx(tx, {
+    payment: compensating,
+    idempotencyKey: `refund:${approvalId}`,
+    point: original.point,
+    actor: approver,
+    receivedBy: cashierStaffId,
   });
   events.push({
     type: EventType.PaymentRefunded,
     actor: approver,
     payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, returnId, amount },
     refs: [original.orderId, original.serviceWorkOrderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
+  });
+  events.push({
+    type: EventType.AccountingEntryPosted,
+    actor: approver,
+    payload: { accountingEntryId: accountingEntry.id, sourceType: 'payment.refund', sourceRef: compensating.id },
+    refs: [accountingEntry.id, compensating.id, paymentId],
   });
   if (original.orderId) {
     await applyCampaignRefundOnTx(tx, {

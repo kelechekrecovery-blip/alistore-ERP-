@@ -28,14 +28,14 @@ describe('Refund cumulative limit (invariant #1)', () => {
       data: { customerId: customer.id, channel: 'pos', total: 100000, status: 'paid' },
     });
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: 100000, method: 'cash', status: 'received' },
+      data: { orderId: order.id, amount: 100000, method: 'card', status: 'received' },
     });
 
     const doRefund = (amount: number) =>
       prisma.$transaction((tx) =>
         ACTION_EXECUTORS.refund(
           tx,
-          { paymentId: payment.id, amount },
+          { paymentId: payment.id, amount, externalReference: `refund-limit-${amount}` },
           'admin-1',
           `appr-${amount}`,
           [],
@@ -64,14 +64,14 @@ describe('Refund cumulative limit (invariant #1)', () => {
       data: { customerId: customer.id, channel: 'pos', total: 100000, status: 'paid' },
     });
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: 100000, method: 'cash', status: 'received' },
+      data: { orderId: order.id, amount: 100000, method: 'card', status: 'received' },
     });
 
     const doRefund = () =>
       prisma.$transaction((tx) =>
         ACTION_EXECUTORS.refund(
           tx,
-          { paymentId: payment.id, amount: 100000 },
+          { paymentId: payment.id, amount: 100000, externalReference: 'refund-race-provider' },
           'admin-1',
           'appr-race',
           [],
@@ -116,14 +116,14 @@ describe('Refund cumulative limit (invariant #1)', () => {
       },
     });
     const cash = await prisma.payment.create({
-      data: { serviceWorkOrderId: workOrder.id, amount: 2500, method: 'cash', status: 'received' },
+      data: { serviceWorkOrderId: workOrder.id, amount: 2500, method: 'card', status: 'received' },
     });
     await prisma.payment.create({
       data: { serviceWorkOrderId: workOrder.id, amount: 4000, method: 'card', status: 'received' },
     });
     const events: Parameters<typeof ACTION_EXECUTORS.refund>[4] = [];
     const refundCash = (amount: number) => prisma.$transaction((tx) =>
-      ACTION_EXECUTORS.refund(tx, { paymentId: cash.id, amount }, 'owner-1', `service-refund-${amount}`, events),
+      ACTION_EXECUTORS.refund(tx, { paymentId: cash.id, amount, externalReference: `service-refund-provider-${amount}` }, 'owner-1', `service-refund-${amount}`, events),
     );
 
     await refundCash(2000);
@@ -137,11 +137,12 @@ describe('Refund cumulative limit (invariant #1)', () => {
       orderBy: { amount: 'asc' },
     });
     expect(cashRefunds.map(({ amount, method, serviceWorkOrderId, originalPaymentId }) => ({ amount, method, serviceWorkOrderId, originalPaymentId }))).toEqual([
-      { amount: -2000, method: 'cash', serviceWorkOrderId: workOrder.id, originalPaymentId: cash.id },
-      { amount: -500, method: 'cash', serviceWorkOrderId: workOrder.id, originalPaymentId: cash.id },
+      { amount: -2000, method: 'card', serviceWorkOrderId: workOrder.id, originalPaymentId: cash.id },
+      { amount: -500, method: 'card', serviceWorkOrderId: workOrder.id, originalPaymentId: cash.id },
     ]);
     const net = await prisma.payment.aggregate({ where: { serviceWorkOrderId: workOrder.id }, _sum: { amount: true } });
     expect(net._sum.amount).toBe(4000);
-    expect(events).toHaveLength(2);
+    expect(events.filter((event) => event.type === 'payment.refunded')).toHaveLength(2);
+    expect(events.filter((event) => event.type === 'accounting.entry_posted')).toHaveLength(2);
   });
 });

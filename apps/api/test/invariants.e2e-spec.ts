@@ -82,7 +82,7 @@ describe('Business invariants (integration)', () => {
     );
     await orders.reserve(o1.id, 'seller');
     await payments.pay(
-      { orderId: o1.id, method: 'cash', amount: 100000 },
+      { orderId: o1.id, method: 'card', amount: 100000, txnId: 'invariant-sale-a' },
       'cashier',
     );
 
@@ -121,7 +121,7 @@ describe('Business invariants (integration)', () => {
     );
 
     const err = await payments
-      .pay({ orderId: order.id, method: 'cash', amount: 50000 }, 'cashier')
+      .pay({ orderId: order.id, method: 'cash', amount: 50000, txnId: 'invariant-unreserved' }, 'cashier')
       .catch((e) => e);
     expect(err).toBeInstanceOf(ConflictError);
     expect(err.getStatus()).toBe(409);
@@ -148,7 +148,7 @@ describe('Business invariants (integration)', () => {
     );
     await orders.reserve(order.id, 'seller');
     await payments.pay(
-      { orderId: order.id, method: 'cash', amount: 100000 },
+      { orderId: order.id, method: 'card', amount: 100000, txnId: 'invariant-sale-b' },
       'cashier',
     );
 

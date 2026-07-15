@@ -134,7 +134,7 @@ describe('Quantity consignment inventory (integration)', () => {
   it('accrues, pays and compensates a returned quantity owner liability exactly once', async () => {
     const { product, customer, lot } = await setup();
     const order = await reserve(product, customer.id, 2);
-    await payments.pay({ orderId: order.id, amount: 2_000, method: 'cash', txnId: `qcons-sale-${seq}` }, 'cashier:qcons');
+    await payments.pay({ orderId: order.id, amount: 2_000, method: 'card', txnId: `qcons-sale-${seq}` }, 'cashier:qcons');
     const allocation = await prisma.quantityConsignmentAllocation.findFirstOrThrow({ where: { saleOrderId: order.id } });
     expect(allocation).toMatchObject({ qty: 2, status: 'sold', salePrice: 2_000, commissionAmount: 200, ownerAmount: 1_800 });
     expect(await prisma.quantityConsignmentLot.findUnique({ where: { id: lot.id } })).toMatchObject({ availableQty: 3, reservedQty: 0 });
@@ -156,7 +156,7 @@ describe('Quantity consignment inventory (integration)', () => {
   it('keeps the unreturned quantity payable after a partial return is reconciled', async () => {
     const { product, customer } = await setup();
     const order = await reserve(product, customer.id, 2);
-    await payments.pay({ orderId: order.id, amount: 2_000, method: 'cash', txnId: `qcons-partial-${seq}` }, 'cashier:qcons');
+    await payments.pay({ orderId: order.id, amount: 2_000, method: 'card', txnId: `qcons-partial-${seq}` }, 'cashier:qcons');
     await prisma.order.update({ where: { id: order.id }, data: { status: 'completed' } });
     const orderItem = await prisma.orderItem.findFirstOrThrow({ where: { orderId: order.id } });
     const allocation = await prisma.quantityConsignmentAllocation.findFirstOrThrow({ where: { saleOrderId: order.id } });

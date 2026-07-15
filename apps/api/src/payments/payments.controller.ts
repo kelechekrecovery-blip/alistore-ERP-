@@ -71,6 +71,7 @@ export class PaymentsController {
   async pay(
     @CurrentUser() user: AuthPrincipal | undefined,
     @Headers('x-guest-capability') capability: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: PayDto,
   ) {
     // Cash/card/installment must be taken by staff (counter/POS) or confirmed by the
@@ -85,7 +86,7 @@ export class PaymentsController {
     }
     if (user?.typ === 'staff') {
       const staffId = await requireActiveStaff(user, this.staffAuth);
-      return this.payments.pay(dto, `staff:${staffId}`);
+      return this.payments.pay(dto, `staff:${staffId}`, { staffId, idempotencyKey });
     }
     const guest = requireGuestCapability(capability, 'payments:gift_card');
     return this.payments.payForCustomer(guest.sub, dto, `guest:${guest.sub}`);
@@ -153,6 +154,9 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('payments', 'refund')
   refund(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: RefundDto) {
-    return this.payments.refund(id, dto.amount, dto.reason, user.customerId, dto.returnId);
+    return this.payments.refund(id, dto.amount, dto.reason, user.customerId, dto.returnId, {
+      shiftId: dto.shiftId,
+      externalReference: dto.externalReference,
+    });
   }
 }

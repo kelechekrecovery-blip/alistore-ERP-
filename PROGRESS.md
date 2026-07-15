@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — FIN-003A
+
+- Iteration ID: `FIN-003A`.
+- Task: bind order/service payment receipts and approved refunds to the accounting journal and cashier provenance.
+- Files changed: Payment/Accounting Prisma contract and migration, receipt/refund journal posting, payment idempotency and cash-shift guards, refund settlement guards, POS/controller context propagation, payment and accounting regressions.
+- Result: every service-created non-pending receipt now records account, point, actor, stable idempotency and a balanced journal entry. Cash can only be accepted by the staff member who owns an open shift at the order point. Approved cash refunds require that same shift; non-cash refunds require a provider/bank settlement reference at execution. Refunds post compensating journal entries and preserve approval/Event Ledger history. Serialized orders may derive a missing legacy point from the authoritative IMEI location; new checkout still remains point-bound.
+- Checks run: test database reset with current Prisma schema; focused payment/POS/refund/shift/consignment suites 10/10 suites, 62/62 tests; full API Jest 107/107 suites, 399/399 tests; Prisma migrate deploy with no pending migrations; API build; Next production build; `git diff --check` was blocked only by an unrelated pre-existing blank line in `apps/api/src/ai/grading.ts`.
+- Acceptance: `accepted` for receipt/refund accounting provenance and cash/provider settlement guards. Accounting remains incomplete until COD handover, debt receipts, payroll/consignment payouts, inventory valuation/COGS, supplier AP and period controls are implemented and reconciled.
+- Next step: `INV-VAL-001` immutable inventory valuation and COGS, while continuing the remaining `FIN-003` settlement contours.
+
 ## 2026-07-15 — AUT-001 autonomous multi-lane coordination
 
 - Started five disjoint lanes: Web 1:1, iOS Client, Android Client, ERP/CMS integration and QA/E2E.

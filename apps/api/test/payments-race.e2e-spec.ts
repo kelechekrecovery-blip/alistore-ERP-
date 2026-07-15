@@ -50,10 +50,11 @@ describe('Payments — concurrency (accessory order)', () => {
 
   it('does not double-pay under two concurrent full payments', async () => {
     const order = await accessoryOrder(50000);
-    // Two full cash payments fired together, no shared txnId → only one may complete.
+    await prisma.order.update({ where: { id: order.id }, data: { fulfillmentLocation: 'BISHKEK-1' } });
+    // Two full card payments fired together with distinct provider ids: only one may complete.
     const results = await Promise.allSettled([
-      payments.pay({ orderId: order.id, method: 'cash', amount: 50000 }, 'system'),
-      payments.pay({ orderId: order.id, method: 'cash', amount: 50000 }, 'system'),
+      payments.pay({ orderId: order.id, method: 'card', amount: 50000, txnId: 'race-payment-a' }, 'system'),
+      payments.pay({ orderId: order.id, method: 'card', amount: 50000, txnId: 'race-payment-b' }, 'system'),
     ]);
     const ok = results.filter((r) => r.status === 'fulfilled');
     expect(ok).toHaveLength(1); // exactly one wins; the other hits payment_without_reservation

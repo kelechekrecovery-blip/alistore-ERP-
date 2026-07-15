@@ -94,7 +94,7 @@ describe('Serialized consignment inventory (integration)', () => {
       items: [{ sku, qty: 1, price: 50_000, imei }],
     }, 'cashier-consignment-test');
     await orders.reserve(order.id, 'cashier-consignment-test');
-    await payments.pay({ orderId: order.id, amount: 50_000, method: 'cash', txnId: `sale-${imei}` }, 'cashier-consignment-test');
+    await payments.pay({ orderId: order.id, amount: 50_000, method: 'card', txnId: `sale-${imei}` }, 'cashier-consignment-test');
     return order;
   }
 
@@ -125,7 +125,7 @@ describe('Serialized consignment inventory (integration)', () => {
     const product = await serializedProduct();
     const item = await receive(product.id);
     const order = await sell(product.id, product.sku, item.unit.imei);
-    await payments.pay({ orderId: order.id, amount: 50_000, method: 'cash', txnId: `sale-${item.unit.imei}` }, 'cashier-consignment-test');
+    await payments.pay({ orderId: order.id, amount: 50_000, method: 'card', txnId: `sale-${item.unit.imei}` }, 'cashier-consignment-test');
 
     expect(await prisma.consignmentItem.findUnique({ where: { id: item.id } })).toMatchObject({
       status: 'sold',

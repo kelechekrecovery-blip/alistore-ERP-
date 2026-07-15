@@ -38,6 +38,7 @@ describe('Gift cards / store credit (integration)', () => {
     await prisma.giftCard.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.cashShift.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.inventoryMovement.deleteMany();
@@ -92,16 +93,19 @@ describe('Gift cards / store credit (integration)', () => {
   it('issues a card and pays a reserved order with gift-card + cash split tender', async () => {
     const { order } = await reservedOrder();
     const card = await giftcards.issue({ code: 'gc-split', amount: 50000 }, 'cashier');
+    const staffId = 'giftcard-cashier';
+    const shift = await prisma.cashShift.create({ data: { staffId, point: 'BISHKEK-1', openCash: 0 } });
 
     const paid = await payments.payMany(
       {
         orderId: order.id,
         payments: [
-          { method: 'gift_card', amount: 30000, giftCardCode: card.code },
-          { method: 'cash', amount: 70000 },
+          { method: 'gift_card', amount: 30000, giftCardCode: card.code, txnId: 'gc-split-card' },
+          { method: 'cash', amount: 70000, txnId: 'gc-split-cash' },
         ],
       },
       'cashier',
+      { staffId },
     );
 
     expect(paid.order?.status).toBe('paid');

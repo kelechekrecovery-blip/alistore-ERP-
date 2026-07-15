@@ -237,6 +237,7 @@ export class PosService {
         })),
       },
       actor,
+      { staffId: dto.staffId },
     );
 
     return {

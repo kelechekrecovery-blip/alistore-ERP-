@@ -63,14 +63,14 @@ describe('Refund approval cycle (integration)', () => {
       'seller',
     );
     await orders.reserve(order.id, 'seller');
-    const paid = await payments.pay({ orderId: order.id, method: 'cash', amount: 100000 }, 'cashier');
+    const paid = await payments.pay({ orderId: order.id, method: 'card', amount: 100000, txnId: `refund-payment-${seq}` }, 'cashier');
     return { orderId: order.id, paymentId: paid.payment.id };
   }
 
   it('parks a refund as an approval without moving money, then executes on approve', async () => {
     const { orderId, paymentId } = await paidOrder();
 
-    const req = await payments.refund(paymentId, 100000, 'брак', 'senior_azamat');
+    const req = await payments.refund(paymentId, 100000, 'брак', 'senior_azamat', undefined, { externalReference: 'provider-refund-1' });
     expect(req.approvalId).toBeDefined();
     expect(req.status).toBe('requested');
 
@@ -95,7 +95,7 @@ describe('Refund approval cycle (integration)', () => {
 
   it('moves no money when the refund is rejected, and blocks a second decision', async () => {
     const { paymentId } = await paidOrder();
-    const req = await payments.refund(paymentId, 50000, 'спорно', 'senior_azamat');
+    const req = await payments.refund(paymentId, 50000, 'спорно', 'senior_azamat', undefined, { externalReference: 'provider-refund-2' });
 
     await approvals.decide(req.approvalId, { status: 'rejected', approver: 'admin_gulnara', approverRole: 'admin' });
     expect(await prisma.payment.count({ where: { amount: { lt: 0 } } })).toBe(0);
@@ -109,7 +109,7 @@ describe('Refund approval cycle (integration)', () => {
 
   it('rejects an approval decision by an unauthorized role (403)', async () => {
     const { paymentId } = await paidOrder();
-    const req = await payments.refund(paymentId, 10000, 'спорно', 'seller_bob');
+    const req = await payments.refund(paymentId, 10000, 'спорно', 'seller_bob', undefined, { externalReference: 'provider-refund-3' });
     const err = await approvals
       .decide(req.approvalId, { status: 'approved', approver: 'seller_bob', approverRole: 'seller' })
       .catch((e) => e);

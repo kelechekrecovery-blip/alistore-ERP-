@@ -89,7 +89,11 @@ export class FinanceService {
     return {
       from: period.from, to: period.to, point: point || null, totalDebit, totalCredit,
       balanced: totalDebit === totalCredit,
-      coverage: { complete: false, sourceTypes: ['expense.payment'], note: 'Пока включены только выплаты операционных расходов' },
+      coverage: {
+        complete: false,
+        sourceTypes: ['expense.payment', 'payment.receipt', 'payment.refund'],
+        note: 'Включены операционные расходы, продажи и возвраты; COD, долги, payroll, consignment и складская стоимость ещё не проведены полностью',
+      },
       rows,
     };
   }

@@ -46,4 +46,10 @@ export class RefundDto {
 
   @ApiPropertyOptional({ example: 'clx_return_001', description: 'Approved return this refund settles.' })
   @IsOptional() @IsString() returnId?: string;
+
+  @ApiPropertyOptional({ example: 'clx_shift_001', description: 'Open requester-owned shift used for a cash payout.' })
+  @IsOptional() @IsString() shiftId?: string;
+
+  @ApiPropertyOptional({ example: 'acquirer-refund-001', description: 'Provider/bank refund reference for non-cash tenders.' })
+  @IsOptional() @IsString() externalReference?: string;
 }

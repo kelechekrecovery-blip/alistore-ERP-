@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { type Payment } from '@prisma/client';
+import { Prisma, type Payment } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -12,6 +12,7 @@ import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service'
 import { PayDto } from './payments.dto';
 import { accrueConsignmentSalesOnTx, accrueQuantityConsignmentSalesOnTx } from '../inventory/consignment-accounting';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
+import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -20,7 +21,13 @@ interface PaymentTender {
   method: PayDto['method'];
   amount: number;
   txnId?: string;
+  idempotencyKey?: string;
   giftCardCode?: string;
+}
+
+interface PaymentContext {
+  staffId?: string;
+  idempotencyKey?: string;
 }
 
 @Injectable()
@@ -40,7 +47,14 @@ export class PaymentsService {
    * Администратор). Enforces invariant #1: refund needs an existing positive
    * payment and amount ≤ it. Returns an approvalId; money moves only on approve.
    */
-  async refund(paymentId: string, amount: number, reason: string, requester: string, returnId?: string) {
+  async refund(
+    paymentId: string,
+    amount: number,
+    reason: string,
+    requester: string,
+    returnId?: string,
+    settlement: { shiftId?: string; externalReference?: string } = {},
+  ) {
     const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
     if (!payment) {
       throw new ValidationError('payment_not_found', `Платёж ${paymentId} не найден`);
@@ -77,7 +91,14 @@ export class PaymentsService {
       action: 'refund',
       requester,
       reason,
-      payload: { paymentId, amount, returnId: returnId ?? null },
+      payload: {
+        paymentId,
+        amount,
+        returnId: returnId ?? null,
+        shiftId: settlement.shiftId?.trim() || null,
+        externalReference: settlement.externalReference?.trim() || null,
+        cashierStaffId: requester,
+      },
     });
   }
 
@@ -97,13 +118,16 @@ export class PaymentsService {
     return this.pay(dto, actor);
   }
 
-  async pay(dto: PayDto, actor: string) {
-    // Idempotent dedup by txnId (webhook may fire twice) — checked before the tx.
-    if (dto.txnId) {
+  async pay(dto: PayDto, actor: string, context: PaymentContext = {}) {
+    const idempotencyKey = context.idempotencyKey?.trim() || dto.txnId?.trim();
+    // Provider transaction ids and staff idempotency keys both replay the exact
+    // original movement. Changed reuse is rejected instead of returning a false success.
+    if (idempotencyKey) {
       const existing = await this.prisma.payment.findUnique({
-        where: { txnId: dto.txnId },
+        where: { idempotencyKey },
       });
       if (existing) {
+        this.assertPaymentReplay(existing, dto, dto.orderId);
         const order = await this.prisma.order.findUnique({
           where: { id: existing.orderId ?? dto.orderId },
         });
@@ -120,11 +144,13 @@ export class PaymentsService {
             method: dto.method,
             amount: dto.amount,
             txnId: dto.txnId,
+            idempotencyKey,
             giftCardCode: dto.giftCardCode,
           },
         ],
       },
       actor,
+      context,
     );
     return { ...paid, payment: paid.payments[0] };
   }
@@ -137,8 +163,12 @@ export class PaymentsService {
   async payMany(
     dto: { orderId: string; shiftId?: string; payments: PaymentTender[] },
     actor: string,
+    context: PaymentContext = {},
   ) {
-    const tenders = dto.payments.map((payment) => this.normalizeTender(payment, dto.orderId));
+    const tenders = dto.payments.map((payment) => {
+      const normalized = this.normalizeTender(payment, dto.orderId);
+      return { ...normalized, idempotencyKey: normalized.idempotencyKey?.trim() || normalized.txnId?.trim() };
+    });
     if (tenders.length === 0) {
       throw new ValidationError('payment_required', 'Нужен хотя бы один платёж');
     }
@@ -150,21 +180,28 @@ export class PaymentsService {
     if (missingGiftCard) {
       throw new ValidationError('giftcard_code_required', 'Для оплаты подарочной картой нужен код');
     }
-    const txnIds = tenders.map((payment) => payment.txnId).filter((id): id is string => Boolean(id));
-    if (new Set(txnIds).size !== txnIds.length) {
-      throw new ValidationError('duplicate_payment_txn', 'txnId платежей не должны повторяться');
+    const missingIdempotency = tenders.find((payment) => !payment.idempotencyKey);
+    if (missingIdempotency) {
+      throw new ValidationError('payment_idempotency_required', 'Для каждого платежа нужен постоянный Idempotency-Key');
     }
+    const idempotencyKeys = tenders.map((payment) => payment.idempotencyKey as string);
+    if (new Set(idempotencyKeys).size !== idempotencyKeys.length) {
+      throw new ValidationError('duplicate_payment_idempotency', 'Idempotency-Key платежей не должны повторяться');
+    }
+    const txnIds = tenders.map((payment) => payment.txnId).filter((id): id is string => Boolean(id));
+    if (new Set(txnIds).size !== txnIds.length) throw new ValidationError('duplicate_payment_txn', 'txnId платежей не должны повторяться');
 
-    // Split POS retries dedupe by the first txnId; the batch transaction is all-or-nothing.
-    if (txnIds[0]) {
+    // Split retries dedupe by the first command key; the batch transaction is all-or-nothing.
+    if (idempotencyKeys[0]) {
       const existing = await this.prisma.payment.findUnique({
-        where: { txnId: txnIds[0] },
+        where: { idempotencyKey: idempotencyKeys[0] },
       });
       if (existing) {
+        this.assertPaymentReplay(existing, tenders[0], dto.orderId);
         const [order, payments] = await Promise.all([
           this.prisma.order.findUnique({ where: { id: existing.orderId ?? dto.orderId } }),
           this.prisma.payment.findMany({
-            where: { orderId: existing.orderId ?? dto.orderId },
+            where: { idempotencyKey: { in: idempotencyKeys } },
             orderBy: { createdAt: 'asc' },
           }),
         ]);
@@ -188,7 +225,7 @@ export class PaymentsService {
 
       const order = await tx.order.findUnique({
         where: { id: dto.orderId },
-        include: { items: true },
+        include: { items: true, storePoint: { select: { inventoryLocation: true } } },
       });
       if (!order) {
         throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
@@ -208,12 +245,30 @@ export class PaymentsService {
         );
       }
 
+      let point = order.fulfillmentLocation?.trim() || order.storePoint?.inventoryLocation.trim();
+      if (!point) {
+        const imeis = order.items.map((item) => item.imei).filter((imei): imei is string => Boolean(imei));
+        if (imeis.length > 0) {
+          const locations = await tx.deviceUnit.findMany({
+            where: { imei: { in: imeis } },
+            select: { location: true },
+            distinct: ['location'],
+          });
+          if (locations.length === 1) point = locations[0].location.trim();
+        }
+      }
+      if (!point) {
+        throw new ValidationError('payment_point_required', 'У заказа должна быть определена точка исполнения');
+      }
       const received = await tx.payment.aggregate({
         where: { orderId: order.id, amount: { gt: 0 } },
         _sum: { amount: true },
       });
       const alreadyReceived = received._sum.amount ?? 0;
       const batchTotal = tenders.reduce((sum, payment) => sum + payment.amount, 0);
+      const cashShift = tenders.some((payment) => payment.method === 'cash')
+        ? await this.resolveCashShiftOnTx(tx, dto.shiftId, context.staffId, point)
+        : null;
       const events: AuditInput[] = [];
       const payments: Payment[] = [];
       for (const tender of tenders) {
@@ -237,15 +292,40 @@ export class PaymentsService {
             method: tender.method,
             status: 'received',
             txnId: tender.txnId,
-            shiftId: dto.shiftId,
+            shiftId: tender.method === 'cash' ? cashShift?.id : null,
+            accountCode: paymentAccountCode(tender.method),
+            idempotencyKey: tender.idempotencyKey,
+            receivedBy: actor,
+            point,
           },
         });
-        payments.push(payment);
+        const accountingEntry = await postPaymentEntryOnTx(tx, {
+          payment,
+          idempotencyKey: tender.idempotencyKey as string,
+          point,
+          actor,
+        });
+        const postedPayment = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+        payments.push(postedPayment);
         events.push({
           type: EventType.PaymentReceived,
           actor,
-          payload: { orderId: order.id, amount: tender.amount, method: tender.method },
+          payload: {
+            orderId: order.id,
+            amount: tender.amount,
+            method: tender.method,
+            point,
+            accountCode: postedPayment.accountCode,
+            shiftId: postedPayment.shiftId,
+            accountingEntryId: accountingEntry.id,
+          },
           refs: [order.id, payment.id],
+        });
+        events.push({
+          type: EventType.AccountingEntryPosted,
+          actor,
+          payload: { accountingEntryId: accountingEntry.id, sourceType: 'payment.receipt', sourceRef: payment.id },
+          refs: [accountingEntry.id, payment.id, order.id],
         });
       }
 
@@ -344,6 +424,40 @@ export class PaymentsService {
       return payment;
     }
     const code = normalizeCode(payment.giftCardCode);
-    return { ...payment, giftCardCode: code, txnId: `giftcard:${code}:${orderId}` };
+    const key = `giftcard:${code}:${orderId}`;
+    return { ...payment, giftCardCode: code, txnId: key, idempotencyKey: key };
+  }
+
+  private assertPaymentReplay(existing: Payment, tender: Pick<PaymentTender, 'method' | 'amount' | 'txnId'>, orderId: string) {
+    if (
+      existing.orderId !== orderId ||
+      existing.method !== tender.method ||
+      existing.amount !== tender.amount ||
+      (tender.txnId && existing.txnId !== tender.txnId)
+    ) {
+      throw new ConflictError('payment_idempotency_conflict', 'Idempotency-Key уже использован для другого платежа');
+    }
+  }
+
+  private async resolveCashShiftOnTx(
+    tx: Prisma.TransactionClient,
+    requestedShiftId: string | undefined,
+    staffId: string | undefined,
+    point: string,
+  ) {
+    if (!staffId) {
+      throw new ValidationError('cash_staff_required', 'Наличные принимает только авторизованный сотрудник');
+    }
+    const candidate = requestedShiftId
+      ? await tx.cashShift.findUnique({ where: { id: requestedShiftId }, select: { id: true } })
+      : await tx.cashShift.findFirst({ where: { staffId, closedAt: null }, select: { id: true }, orderBy: { openedAt: 'desc' } });
+    if (!candidate) throw new ConflictError('cash_shift_required', 'Для наличного платежа нужна открытая кассовая смена');
+    await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${candidate.id} FOR UPDATE`;
+    const shift = await tx.cashShift.findUnique({ where: { id: candidate.id } });
+    if (!shift) throw new ConflictError('cash_shift_required', 'Кассовая смена не найдена');
+    if (shift.staffId !== staffId) throw new ConflictError('cash_shift_foreign', 'Кассовая смена принадлежит другому сотруднику');
+    if (shift.closedAt) throw new ConflictError('cash_shift_closed', 'Нельзя добавить платёж в закрытую кассовую смену');
+    if (shift.point !== point) throw new ConflictError('cash_shift_wrong_point', 'Кассовая смена открыта в другой точке');
+    return shift;
   }
 }

@@ -183,6 +183,8 @@ describe('Campaign attribution → paid conversion (integration)', () => {
       4500,
       'partial campaign return',
       'support-mkt006',
+      undefined,
+      { externalReference: `campaign-provider-${run}` },
     );
     await approvals.decide(partialRefund.approvalId, {
       status: 'approved', approver: 'admin-mkt006', approverRole: 'admin',
@@ -214,6 +216,8 @@ describe('Campaign attribution → paid conversion (integration)', () => {
       4500,
       'final campaign return',
       'support-mkt006',
+      undefined,
+      { externalReference: `campaign-provider-final-${run}` },
     );
     await approvals.decide(finalRefund.approvalId, {
       status: 'approved', approver: 'admin-mkt006', approverRole: 'admin',

@@ -13,6 +13,7 @@ beforeAll(async () => {
       { code: '2000', name: 'Задолженность поставщикам', type: 'liability' },
       { code: '2100', name: 'Задолженность по зарплате', type: 'liability' },
       { code: '2200', name: 'Налоги к уплате', type: 'liability' },
+      { code: '2300', name: 'Обязательства по подарочным картам', type: 'liability' },
       { code: '3000', name: 'Капитал владельца', type: 'equity' },
       { code: '4000', name: 'Выручка от продаж', type: 'revenue' },
       { code: '4100', name: 'Выручка сервисного центра', type: 'revenue' },

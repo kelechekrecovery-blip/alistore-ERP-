@@ -939,26 +939,35 @@ model OrderItem {
 }
 
 model Payment {
-  id                 String            @id @default(cuid())
-  order              Order?            @relation(fields: [orderId], references: [id])
+  id                 String                  @id @default(cuid())
+  order              Order?                  @relation(fields: [orderId], references: [id])
   orderId            String?
-  serviceWorkOrder   ServiceWorkOrder? @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
+  serviceWorkOrder   ServiceWorkOrder?       @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
   serviceWorkOrderId String?
-  originalPayment    Payment?          @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPayment    Payment?                @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
   originalPaymentId  String?
-  refunds            Payment[]         @relation("PaymentRefunds")
+  refunds            Payment[]               @relation("PaymentRefunds")
   amount             Int // отрицательное = возврат
   method             PaymentMethod
-  status             PaymentStatus     @default(pending)
-  shift              CashShift?        @relation(fields: [shiftId], references: [id])
+  status             PaymentStatus           @default(pending)
+  shift              CashShift?              @relation(fields: [shiftId], references: [id])
   shiftId            String?
-  txnId              String?           @unique // идемпотентность webhook (dedup)
-  createdAt          DateTime          @default(now())
+  account            AccountingAccount?      @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode        String?
+  accountingEntry    AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId  String?                 @unique
+  idempotencyKey     String?                 @unique
+  receivedBy         String?
+  point              String?
+  txnId              String?                 @unique // идемпотентность webhook (dedup)
+  createdAt          DateTime                @default(now())
 
   @@index([orderId])
   @@index([serviceWorkOrderId])
   @@index([originalPaymentId])
   @@index([shiftId])
+  @@index([accountCode, createdAt])
+  @@index([point, createdAt])
   @@index([status, createdAt]) // dashboards/KPI/payroll filter by status + date window
 }
 
@@ -1296,6 +1305,7 @@ model AccountingAccount {
   system    Boolean                 @default(true)
   active    Boolean                 @default(true)
   lines     AccountingJournalLine[]
+  payments  Payment[]
   createdAt DateTime                @default(now())
 
   @@index([type, active])
@@ -1313,6 +1323,7 @@ model AccountingJournalEntry {
   postedAt       DateTime                @default(now())
   createdBy      String
   lines          AccountingJournalLine[]
+  payment        Payment?
 
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])
