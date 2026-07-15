@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-002
+
+- Iteration ID: `MKT-002`.
+- Task: stop unmoderated customer reviews from changing public trust signals and give Marketing CMS a real moderation queue.
+- Files changed: ProductReview moderation schema/migration, approved-only public/catalog projections, customer submission and staff decision Ledger events, RBAC endpoints, typed web client, ERP moderation workspace, customer confirmation copy and API/browser acceptance.
+- Result: verified purchasers submit `pending` reviews; pending/rejected rows never affect public count or average. Marketer/admin/owner can approve or reject with a reason, seller is denied, repeated same decisions are idempotent, and the approved review appears on the product page immediately.
+- Checks run: clean PostgreSQL migration deploy (63/63); targeted review/catalog/storefront API 3 suites and 12 tests; full current worktree API 127/127 suites and 513/513 tests (includes parallel unstaged AI suites); API and Next production builds; ERP CMS + storefront + checkout Playwright 14/14; `git diff --check` passed.
+- Acceptance: `accepted` for review moderation. Promotion-code management and banner/block entities remain open; no full Marketing CMS completion is claimed.
+- Next backlog ID: `MKT-003` replaces hard-coded promo behavior with an ERP-managed, server-authoritative promotion lifecycle.
+
 ## 2026-07-15 — MKT-001
 
 - Iteration ID: `MKT-001`.

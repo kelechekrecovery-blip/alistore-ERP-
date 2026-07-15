@@ -26,7 +26,9 @@ import {
   CreateProductDto,
   CreateProductReviewDto,
   DeleteProductDto,
+  ModerateProductReviewDto,
   ProductListQueryDto,
+  ProductReviewModerationQueryDto,
   UpdateProductDto,
 } from './products.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -40,6 +42,28 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
+
+  @ApiOperation({ summary: 'List reviews awaiting or completed marketing moderation' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('storefront', 'read')
+  @Get('reviews/moderation')
+  moderationQueue(@Query() query: ProductReviewModerationQueryDto) {
+    return this.products.reviewModerationQueue(query.status ?? 'pending');
+  }
+
+  @ApiOperation({ summary: 'Approve or reject a customer review before storefront publication' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('storefront', 'update')
+  @Post('reviews/:reviewId/moderate')
+  moderateReview(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('reviewId') reviewId: string,
+    @Body() dto: ModerateProductReviewDto,
+  ) {
+    return this.products.moderateReview(reviewId, dto, user.customerId);
+  }
 
   @ApiOperation({ summary: 'List products for staff management' })
   @ApiBearerAuth()

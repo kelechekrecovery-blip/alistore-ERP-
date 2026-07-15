@@ -391,7 +391,7 @@ export class CatalogService {
   private async enrichReviews(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
     if (items.length === 0) return items;
     const rows = await this.prisma.productReview.groupBy({
-      by: ['productId'], where: { productId: { in: items.map((item) => item.id) } },
+      by: ['productId'], where: { productId: { in: items.map((item) => item.id) }, status: 'approved' },
       _count: { _all: true }, _avg: { rating: true },
     });
     const summaries = new Map(rows.map((row) => [row.productId, { reviewCount: row._count._all, avgRating: row._avg.rating === null ? null : Math.round(row._avg.rating * 10) / 10 }]));

@@ -110,7 +110,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       );
       setReviewForm({ rating: 5, text: "" });
       setReviews(await fetchProductReviews(product.id));
-      setReviewMsg("Спасибо, отзыв опубликован.");
+      setReviewMsg("Спасибо, отзыв отправлен на модерацию.");
     } catch (error) {
       setReviewMsg(
         error instanceof Error ? error.message : "Не удалось сохранить отзыв",

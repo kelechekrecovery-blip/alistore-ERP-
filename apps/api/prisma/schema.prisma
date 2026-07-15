@@ -447,10 +447,15 @@ model ProductReview {
   orderId      String
   rating       Int
   text         String?
+  status       String   @default("pending")
+  moderatedBy  String?
+  moderatedAt  DateTime?
+  moderationReason String?
   createdAt    DateTime @default(now())
 
   @@unique([productId, customerId, orderId])
   @@index([productId])
+  @@index([status, createdAt])
   @@index([customerId])
   @@index([orderId])
 }

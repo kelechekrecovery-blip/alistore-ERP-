@@ -13,10 +13,12 @@ import {
   type CatalogProduct,
   type StorefrontContent,
 } from '@/lib/api';
+import { ReviewModerationView } from './ReviewModerationView';
 
 const FIELD = 'w-full rounded-[8px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none focus:border-coral';
 
 export function StorefrontView({ accessToken }: { accessToken: string }) {
+  const [mode, setMode] = useState<'content' | 'reviews'>('content');
   const [form, setForm] = useState<StorefrontContent | null>(null);
   const [revisions, setRevisions] = useState<StorefrontContent[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -57,7 +59,10 @@ export function StorefrontView({ accessToken }: { accessToken: string }) {
 
   const byId = useMemo(() => new Map(knownProducts.map((product) => [product.id, product])), [knownProducts]);
 
-  if (!form) return <div className="text-sm text-[#8A7F76]">Загрузка CMS витрины...</div>;
+  const tabs = <div className="mb-4 flex flex-wrap gap-2"><button type="button" onClick={() => setMode('content')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'content' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Витрина и подборки</button><button type="button" onClick={() => setMode('reviews')} className={`rounded-[7px] border px-4 py-2 text-xs font-bold ${mode === 'reviews' ? 'border-coral bg-coral text-white' : 'border-[#2E2822] bg-[#1A1611] text-[#A79C92]'}`}>Модерация отзывов</button></div>;
+
+  if (mode === 'reviews') return <>{tabs}<ReviewModerationView accessToken={accessToken} /></>;
+  if (!form) return <>{tabs}<div className="text-sm text-[#8A7F76]">Загрузка CMS витрины...</div></>;
 
   const set = (key: keyof StorefrontContent, value: string) => {
     setForm((current) => current ? { ...current, [key]: value } : current);
@@ -132,7 +137,7 @@ export function StorefrontView({ accessToken }: { accessToken: string }) {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.35fr_.85fr]">
+    <>{tabs}<div className="grid gap-4 xl:grid-cols-[1.35fr_.85fr]">
       <section className="rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -199,7 +204,7 @@ export function StorefrontView({ accessToken }: { accessToken: string }) {
           {revisions.map((revision) => <div key={revision.id} className="rounded-[8px] border border-[#2E2822] bg-[#221E19] p-3"><div className="flex items-center justify-between"><b>v{revision.version}</b><Status value={revision.status} /></div><div className="mt-1 text-xs text-[#A79C92]">{revision.heroTitle}</div><div className="mt-1 text-[11px] text-[#8A7F76]">{revision.featuredProductIds.length} товаров в подборке</div>{revision.startsAt && <div className="mt-2 text-[11px] text-[#E5B23C]">{formatPeriod(revision.startsAt, revision.endsAt)}</div>}<div className="mt-3 flex flex-wrap gap-2">{revision.status === 'draft' && <><button disabled={busy} onClick={() => run(() => publishStorefrontRevision(revision.id, accessToken), `Версия v${revision.version} опубликована`)} className="rounded-[7px] bg-coral px-3 py-1.5 text-xs font-bold text-white">Опубликовать сейчас</button><button disabled={busy || !startsAt} onClick={() => run(() => scheduleStorefrontRevision(revision.id, { startsAt: new Date(startsAt).toISOString(), ...(endsAt ? { endsAt: new Date(endsAt).toISOString() } : {}) }, accessToken), `Версия v${revision.version} запланирована`)} className="rounded-[7px] border border-lime px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40">Запланировать</button></>}{revision.status === 'scheduled' && <button disabled={busy} onClick={() => run(() => cancelStorefrontSchedule(revision.id, accessToken), `Расписание v${revision.version} отменено`)} className="rounded-[7px] border border-[#E5B23C] px-3 py-1.5 text-xs font-bold text-[#E5B23C]">Отменить расписание</button>}</div></div>)}
         </div>
       </aside>
-    </div>
+    </div></>
   );
 }
 

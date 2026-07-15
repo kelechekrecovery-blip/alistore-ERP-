@@ -208,3 +208,18 @@ export class CreateProductReviewDto {
   @ApiPropertyOptional({ description: 'Specific paid/completed order to attach the review to.' })
   @IsOptional() @IsString() orderId?: string;
 }
+
+export const PRODUCT_REVIEW_STATUSES = ['pending', 'approved', 'rejected'] as const;
+
+export class ProductReviewModerationQueryDto {
+  @ApiPropertyOptional({ enum: PRODUCT_REVIEW_STATUSES, default: 'pending' })
+  @IsOptional() @IsIn(PRODUCT_REVIEW_STATUSES as unknown as string[]) status?: (typeof PRODUCT_REVIEW_STATUSES)[number];
+}
+
+export class ModerateProductReviewDto {
+  @ApiProperty({ enum: ['approve', 'reject'] })
+  @IsIn(['approve', 'reject']) action!: 'approve' | 'reject';
+
+  @ApiPropertyOptional({ maxLength: 300, example: 'Спам или внешняя ссылка' })
+  @IsOptional() @IsString() @MaxLength(300) reason?: string;
+}

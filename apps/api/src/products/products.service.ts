@@ -9,6 +9,7 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 import {
   CreateProductDto,
   CreateProductReviewDto,
+  ModerateProductReviewDto,
   ProductBundleComponentDto,
   ProductListQueryDto,
   UpdateProductDto,
@@ -266,12 +267,12 @@ export class ProductsService {
 
     const [summary, items] = await this.prisma.$transaction([
       this.prisma.productReview.aggregate({
-        where: { productId },
+        where: { productId, status: 'approved' },
         _count: { _all: true },
         _avg: { rating: true },
       }),
       this.prisma.productReview.findMany({
-        where: { productId },
+        where: { productId, status: 'approved' },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
@@ -332,16 +333,83 @@ export class ProductsService {
 
     const text = dto.text?.trim() || null;
     const customerName = order.customer.name.trim() || this.maskPhone(order.customer.phone);
-    return this.prisma.productReview.create({
-      data: {
-        productId,
-        sku: product.sku,
-        customerId: user.customerId,
-        customerName,
-        orderId: order.id,
-        rating: dto.rating,
-        text,
-      },
+    return this.audit.transaction(async (tx) => {
+      const review = await tx.productReview.create({
+        data: {
+          productId,
+          sku: product.sku,
+          customerId: user.customerId,
+          customerName,
+          orderId: order.id,
+          rating: dto.rating,
+          text,
+          status: 'pending',
+        },
+      });
+      return {
+        result: review,
+        events: [{
+          type: EventType.ProductReviewSubmitted,
+          actor: user.customerId,
+          payload: { reviewId: review.id, productId, orderId: order.id, rating: dto.rating },
+          refs: [review.id, productId, order.id, user.customerId],
+        }],
+      };
+    });
+  }
+
+  async reviewModerationQueue(status: 'pending' | 'approved' | 'rejected') {
+    const reviews = await this.prisma.productReview.findMany({
+      where: { status },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: 100,
+    });
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: reviews.map((review) => review.productId) } },
+      select: { id: true, name: true },
+    });
+    const names = new Map(products.map((product) => [product.id, product.name]));
+    return {
+      status,
+      items: reviews.map((review) => ({
+        ...review,
+        productName: names.get(review.productId) ?? review.sku,
+      })),
+    };
+  }
+
+  async moderateReview(reviewId: string, dto: ModerateProductReviewDto, actor: string) {
+    const targetStatus = dto.action === 'approve' ? 'approved' : 'rejected';
+    const reason = dto.reason?.trim() || null;
+    if (targetStatus === 'rejected' && !reason) {
+      throw new ValidationError('review_rejection_reason_required', 'Укажите причину отклонения');
+    }
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`product-review:${reviewId}`}))`;
+      const review = await tx.productReview.findUnique({ where: { id: reviewId } });
+      if (!review) throw new ValidationError('review_not_found', 'Отзыв не найден');
+      if (review.status === targetStatus) return { result: review, events: [] };
+      if (review.status !== 'pending') {
+        throw new ConflictError('review_already_moderated', 'Решение по отзыву уже принято');
+      }
+      const moderated = await tx.productReview.update({
+        where: { id: reviewId },
+        data: {
+          status: targetStatus,
+          moderatedBy: actor,
+          moderatedAt: new Date(),
+          moderationReason: reason,
+        },
+      });
+      return {
+        result: moderated,
+        events: [{
+          type: targetStatus === 'approved' ? EventType.ProductReviewApproved : EventType.ProductReviewRejected,
+          actor,
+          payload: { reviewId, productId: review.productId, status: targetStatus, reason },
+          refs: [reviewId, review.productId, review.orderId, review.customerId],
+        }],
+      };
     });
   }
 
