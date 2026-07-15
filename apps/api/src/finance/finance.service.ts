@@ -15,6 +15,8 @@ import {
   CloseAccountingPeriodDto,
   SupplierAgingQueryDto,
   ReverseAccountingEntryDto,
+  ImportBankStatementDto,
+  ReconcileBankStatementLineDto,
   SetFinanceBudgetDto,
   SETTLEMENT_SOURCE_TYPES,
 } from './finance.dto';
@@ -50,6 +52,75 @@ export class FinanceService {
 
   listAccountingPeriods() {
     return this.prisma.accountingPeriod.findMany({ orderBy: { period: 'desc' }, take: 120 });
+  }
+
+  listBankStatements(accountCode?: string) {
+    return this.prisma.bankStatement.findMany({
+      where: accountCode?.trim() ? { accountCode: accountCode.trim() } : undefined,
+      include: { lines: { orderBy: { occurredAt: 'asc' } } },
+      orderBy: { periodStart: 'desc' },
+      take: 120,
+    });
+  }
+
+  async importBankStatement(dto: ImportBankStatementDto, actor: string) {
+    const periodStart = new Date(dto.periodStart);
+    const periodEnd = new Date(dto.periodEnd);
+    if (Number.isNaN(periodStart.getTime()) || Number.isNaN(periodEnd.getTime()) || periodStart >= periodEnd) {
+      throw new ValidationError('invalid_bank_statement_period', 'Период банковской выписки некорректен');
+    }
+    if (dto.lines.some((line) => line.amount === 0) || new Set(dto.lines.map((line) => line.externalId.trim())).size !== dto.lines.length) {
+      throw new ValidationError('invalid_bank_statement_lines', 'Строки выписки должны иметь уникальный внешний ID и ненулевую сумму');
+    }
+    const movement = dto.lines.reduce((sum, line) => sum + line.amount, 0);
+    if (dto.openingBalance + movement !== dto.closingBalance) {
+      throw new ConflictError('bank_statement_balance_mismatch', 'Начальный баланс плюс движения не равен конечному балансу');
+    }
+    const existing = await this.prisma.bankStatement.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { lines: true } });
+    if (existing) {
+      if (existing.statementNumber !== dto.statementNumber.trim() || existing.closingBalance !== dto.closingBalance) throw new ConflictError('bank_statement_idempotency_conflict', 'Ключ выписки уже использован для других данных');
+      return { ...existing, idempotent: true };
+    }
+    return this.audit.transaction(async (tx) => {
+      const account = await tx.accountingAccount.findUnique({ where: { code: dto.accountCode.trim() } });
+      if (!account || account.type !== 'asset' || !account.active) throw new ValidationError('bank_statement_account_invalid', 'Счёт выписки должен быть активным счётом актива');
+      const statement = await tx.bankStatement.create({
+        data: {
+          accountCode: account.code,
+          statementNumber: dto.statementNumber.trim(),
+          idempotencyKey: dto.idempotencyKey,
+          periodStart,
+          periodEnd,
+          openingBalance: dto.openingBalance,
+          closingBalance: dto.closingBalance,
+          createdBy: actor,
+          lines: { create: dto.lines.map((line) => ({ externalId: line.externalId.trim(), occurredAt: new Date(line.occurredAt), amount: line.amount, reference: line.reference?.trim() || null })) },
+        },
+        include: { lines: true },
+      });
+      return { result: statement, events: [{ type: 'finance.bank_statement.imported', actor, payload: { statementId: statement.id, accountCode: account.code, lineCount: statement.lines.length, closingBalance: statement.closingBalance }, refs: [statement.id, account.code] }] };
+    });
+  }
+
+  async reconcileBankStatementLine(id: string, dto: ReconcileBankStatementLineDto, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "BankStatementLine" WHERE id = ${id} FOR UPDATE`;
+      const line = await tx.bankStatementLine.findUnique({ where: { id }, include: { statement: true } });
+      if (!line) throw new ValidationError('bank_statement_line_not_found', `Строка выписки ${id} не найдена`);
+      if (line.reconciliationKey === dto.idempotencyKey) return { result: { ...line, idempotent: true }, events: [] };
+      if (line.status === 'matched') throw new ConflictError('bank_statement_line_matched', 'Строка уже сверена другим ключом');
+      const entry = await tx.accountingJournalEntry.findUnique({ where: { id: dto.journalEntryId }, include: { lines: true } });
+      if (!entry) throw new ValidationError('accounting_entry_not_found', `Проводка ${dto.journalEntryId} не найдена`);
+      if (entry.occurredAt < line.statement.periodStart || entry.occurredAt >= line.statement.periodEnd) throw new ConflictError('bank_statement_entry_outside_period', 'Проводка находится вне периода выписки');
+      const movement = entry.lines.filter((current) => current.accountCode === line.statement.accountCode).reduce((sum, current) => sum + current.debit - current.credit, 0);
+      if (movement !== line.amount) throw new ConflictError('bank_statement_amount_mismatch', 'Сумма строки не совпадает с движением по банковскому счёту в проводке');
+      const duplicate = await tx.bankStatementLine.findUnique({ where: { matchedEntryId: entry.id }, select: { id: true } });
+      if (duplicate && duplicate.id !== id) throw new ConflictError('accounting_entry_already_reconciled', 'Проводка уже связана с другой строкой выписки');
+      const matched = await tx.bankStatementLine.update({ where: { id }, data: { status: 'matched', reconciliationKey: dto.idempotencyKey, matchedEntryId: entry.id, matchedBy: actor, matchedAt: new Date() } });
+      const remaining = await tx.bankStatementLine.count({ where: { statementId: line.statementId, status: { not: 'matched' } } });
+      const statement = await tx.bankStatement.update({ where: { id: line.statementId }, data: { status: remaining === 0 ? 'reconciled' : 'imported' } });
+      return { result: { ...matched, statement, statementStatus: statement.status, idempotent: false }, events: [{ type: 'finance.bank_statement_line_reconciled', actor, payload: { lineId: id, statementId: line.statementId, journalEntryId: entry.id, amount: line.amount }, refs: [id, line.statementId, entry.id] }] };
+    });
   }
 
   async closeAccountingPeriod(rawPeriod: string, dto: CloseAccountingPeriodDto, actor: string) {

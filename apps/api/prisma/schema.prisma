@@ -244,6 +244,25 @@ enum SupplierInvoiceStatus {
   cancelled
 }
 
+enum SupplierCreditNoteStatus {
+  draft
+  approved
+  applied
+  cancelled
+}
+
+enum BankStatementStatus {
+  imported
+  reconciled
+  disputed
+}
+
+enum BankStatementLineStatus {
+  unmatched
+  matched
+  disputed
+}
+
 enum ExpenseStatus {
   submitted
   approved
@@ -1372,6 +1391,7 @@ model AccountingAccount {
   system    Boolean                 @default(true)
   active    Boolean                 @default(true)
   lines     AccountingJournalLine[]
+  bankStatements BankStatement[]
   payments  Payment[]
   createdAt DateTime                @default(now())
 
@@ -1394,6 +1414,7 @@ model AccountingJournalEntry {
   purchaseReceipt PurchaseReceipt?
   supplierInvoice SupplierInvoice?
   supplierCreditNote SupplierCreditNote?
+  bankStatementLine BankStatementLine?
   reversalOfId    String?                 @unique
   reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversal        AccountingJournalEntry? @relation("AccountingReversal")
@@ -1626,6 +1647,47 @@ model SupplierCreditNote {
   @@unique([supplierId, noteNumber])
   @@index([invoiceId, status])
   @@index([supplierId, createdAt])
+}
+
+model BankStatement {
+  id              String                @id @default(cuid())
+  account         AccountingAccount     @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode     String
+  statementNumber String                @unique
+  idempotencyKey   String               @unique
+  periodStart     DateTime
+  periodEnd       DateTime
+  openingBalance  Int
+  closingBalance  Int
+  status          BankStatementStatus   @default(imported)
+  createdBy       String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  lines           BankStatementLine[]
+
+  @@index([accountCode, periodStart, periodEnd])
+  @@index([status, createdAt])
+}
+
+model BankStatementLine {
+  id               String                  @id @default(cuid())
+  statement        BankStatement            @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statementId      String
+  externalId       String
+  occurredAt       DateTime
+  amount           Int
+  reference        String?
+  status           BankStatementLineStatus @default(unmatched)
+  reconciliationKey String?                @unique
+  matchedEntryId   String?                 @unique
+  matchedEntry     AccountingJournalEntry? @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
+  matchedBy        String?
+  matchedAt        DateTime?
+  createdAt        DateTime                @default(now())
+
+  @@unique([statementId, externalId])
+  @@index([statementId, status])
+  @@index([occurredAt, amount])
 }
 
 // Возврат брака поставщику (RMA). Машина статусов + SLA; просрочка → Risk Center.

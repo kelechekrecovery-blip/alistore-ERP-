@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — ACC-002D
+
+- Iteration ID: `ACC-002D`.
+- Task: add bank statement import and journal reconciliation.
+- Files changed: bank statement/line Prisma models and migration, Finance DTO/controller/service, reconciliation fixture cleanup and integration tests.
+- Result: imported statements require unique external IDs and opening-plus-movements equals closing; each line can be matched once to a journal entry only when account, period and signed amount agree. Statement status becomes reconciled only when all lines match, with Ledger evidence for import and matching.
+- Checks run: Prisma generate/validate, API build, reset Finance integration suite 10/10.
+- Acceptance: `accepted` for bank statement software reconciliation. Live bank format adapters, cash incassation, tax/currency and production provider certification remain open.
+- Next step: add tax/currency snapshots and cash-order reconciliation, then connect the controls to the ERP Finance workspace.
+
 ## 2026-07-15 — AP-001D
 
 - Iteration ID: `AP-001D`.

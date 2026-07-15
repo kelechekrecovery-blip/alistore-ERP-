@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 export const EXPENSE_CATEGORIES = [
   'rent',
@@ -53,6 +53,30 @@ export class FinancePeriodQueryDto {
 export class SupplierAgingQueryDto {
   @IsOptional() @IsISO8601({ strict: true }) asOf?: string;
   @IsOptional() @IsString() @MaxLength(64) supplierId?: string;
+}
+
+export class BankStatementLineDto {
+  @IsString() @MinLength(1) @MaxLength(128) externalId!: string;
+  @IsISO8601({ strict: true }) occurredAt!: string;
+  @IsInt() amount!: number;
+  @IsOptional() @IsString() @MaxLength(500) reference?: string;
+}
+
+export class ImportBankStatementDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(64) statementNumber!: string;
+  @IsString() @MaxLength(32) accountCode!: string;
+  @IsISO8601({ strict: true }) periodStart!: string;
+  @IsISO8601({ strict: true }) periodEnd!: string;
+  @IsInt() openingBalance!: number;
+  @IsInt() closingBalance!: number;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10_000) @ValidateNested({ each: true }) @Type(() => BankStatementLineDto)
+  lines!: BankStatementLineDto[];
+}
+
+export class ReconcileBankStatementLineDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(64) journalEntryId!: string;
 }
 
 export class CloseAccountingPeriodDto {

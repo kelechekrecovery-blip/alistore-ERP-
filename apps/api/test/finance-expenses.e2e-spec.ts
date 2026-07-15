@@ -50,6 +50,7 @@ describe('Finance expenses (integration + RBAC)', () => {
     await prisma.financeBudget.deleteMany();
     await prisma.$transaction([
       prisma.accountingPeriod.deleteMany(),
+      prisma.bankStatement.deleteMany(),
       prisma.payment.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
       prisma.accountingJournalLine.deleteMany(),
       prisma.accountingJournalEntry.deleteMany(),
@@ -232,6 +233,45 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(response.body.journal.debit).toBe(response.body.journal.credit);
     expect(response.body.balanceSheet.balanced).toBe(true);
     expect(response.body.profitAndLoss.netProfit).toBe(0);
+  });
+
+  it('imports bank statements with balance control and exposes unmatched lines', async () => {
+    const now = new Date();
+    const payload = {
+      idempotencyKey: `bank-${run}`,
+      statementNumber: `BANK-${run}`,
+      accountCode: '1010',
+      periodStart: new Date(now.getTime() - 86_400_000).toISOString(),
+      periodEnd: new Date(now.getTime() + 86_400_000).toISOString(),
+      openingBalance: 10_000,
+      closingBalance: 12_000,
+      lines: [{ externalId: `bank-line-${run}`, occurredAt: now.toISOString(), amount: 2_000, reference: 'TEST' }],
+    };
+    await request(app.getHttpServer()).post('/finance/bank-statements').expect(401);
+    const imported = await request(app.getHttpServer()).post('/finance/bank-statements').set('Authorization', `Bearer ${ownerToken}`).send(payload).expect(201);
+    expect(imported.body.status).toBe('imported');
+    expect(imported.body.lines).toHaveLength(1);
+    const journal = await prisma.accountingJournalEntry.create({
+      data: {
+        idempotencyKey: `bank-journal-${run}`,
+        sourceType: 'test.bank.receipt',
+        sourceRef: `bank-${run}`,
+        description: 'Тестовое поступление на расчётный счёт',
+        occurredAt: now,
+        createdBy: ownerId,
+        lines: { create: [{ accountCode: '1010', debit: 2_000, credit: 0 }, { accountCode: '4000', debit: 0, credit: 2_000 }] },
+      },
+    });
+    const matched = await request(app.getHttpServer())
+      .post(`/finance/bank-statements/lines/${imported.body.lines[0].id}/reconcile`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `bank-reconcile-${run}`, journalEntryId: journal.id })
+      .expect(201);
+    expect(matched.body.status).toBe('matched');
+    expect(matched.body.statementStatus).toBe('reconciled');
+    const replay = await request(app.getHttpServer()).post('/finance/bank-statements').set('Authorization', `Bearer ${ownerToken}`).send(payload).expect(201);
+    expect(replay.body.idempotent).toBe(true);
+    await request(app.getHttpServer()).post('/finance/bank-statements').set('Authorization', `Bearer ${ownerToken}`).send({ ...payload, idempotencyKey: `bank-${run}-bad`, closingBalance: 13_000 }).expect(409);
   });
 
   it('reverses a posted journal entry without mutating the original', async () => {
