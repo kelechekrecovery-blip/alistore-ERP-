@@ -208,6 +208,18 @@ describe('Finance expenses (integration + RBAC)', () => {
       .expect(409);
   });
 
+  it('exposes supplier AP aging with permission and a stable empty report', async () => {
+    await request(app.getHttpServer()).get('/finance/ap-aging').expect(401);
+    const report = await request(app.getHttpServer())
+      .get('/finance/ap-aging')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(report.body.rows).toEqual([]);
+    expect(report.body.totalOutstanding).toBe(0);
+    expect(report.body.supplierCount).toBe(0);
+    expect(report.body.totals).toMatchObject({ current: 0, '1_30': 0, '90_plus': 0, paid: 0 });
+  });
+
   it('returns a deterministic conflict when two expenses reuse one payment key', async () => {
     const createApproved = async (suffix: string) => {
       const created = await request(app.getHttpServer())

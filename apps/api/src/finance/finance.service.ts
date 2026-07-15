@@ -13,6 +13,7 @@ import {
   PayExpenseDto,
   ResolveFinanceSettlementDto,
   CloseAccountingPeriodDto,
+  SupplierAgingQueryDto,
   SetFinanceBudgetDto,
   SETTLEMENT_SOURCE_TYPES,
 } from './finance.dto';
@@ -87,6 +88,34 @@ export class FinanceService {
       orderBy: [{ occurredAt: 'desc' }, { postedAt: 'desc' }],
       take: 500,
     });
+  }
+
+  async supplierAging(query: SupplierAgingQueryDto) {
+    const asOf = query.asOf ? new Date(query.asOf) : new Date();
+    if (Number.isNaN(asOf.getTime())) throw new ValidationError('invalid_ap_as_of', 'Дата AP aging некорректна');
+    const invoices = await this.prisma.supplierInvoice.findMany({
+      where: {
+        status: { in: ['approved', 'paid'] },
+        ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+        createdAt: { lte: asOf },
+      },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        purchaseOrder: { select: { id: true, number: true } },
+        accountingEntry: { select: { id: true, sourceType: true, sourceRef: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+    });
+    const rows = invoices.map((invoice) => {
+      const outstanding = invoice.status === 'paid' || (invoice.paidAt && invoice.paidAt <= asOf) ? 0 : invoice.amount;
+      const dueDate = invoice.dueDate ?? invoice.createdAt;
+      const ageDays = Math.max(0, Math.floor((asOf.getTime() - dueDate.getTime()) / 86_400_000));
+      const bucket = outstanding === 0 ? 'paid' : ageDays === 0 ? 'current' : ageDays <= 30 ? '1_30' : ageDays <= 60 ? '31_60' : ageDays <= 90 ? '61_90' : '90_plus';
+      return { id: invoice.id, invoiceNumber: invoice.invoiceNumber, supplier: invoice.supplier, purchaseOrder: invoice.purchaseOrder, amount: invoice.amount, outstanding, dueDate, ageDays, bucket, status: invoice.status, accountingEntry: invoice.accountingEntry };
+    });
+    const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
+    const totals = Object.fromEntries(buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0)]));
+    return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size };
   }
 
   async trialBalance(query: FinanceAccountingQueryDto) {

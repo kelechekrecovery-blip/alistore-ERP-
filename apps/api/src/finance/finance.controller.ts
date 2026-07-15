@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateExpenseDto, CreateFinanceSettlementDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, SetFinanceBudgetDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -70,6 +70,12 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'approve')
   closePeriod(@CurrentUser() user: AuthPrincipal, @Param('period') period: string, @Body() dto: CloseAccountingPeriodDto) {
     return this.finance.closeAccountingPeriod(period, dto, user.customerId);
+  }
+
+  @Get('ap-aging')
+  @RequirePermission('finance', 'read')
+  apAging(@Query() query: SupplierAgingQueryDto) {
+    return this.finance.supplierAging(query);
   }
 
   @Get('journal')

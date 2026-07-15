@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — AP-001C
+
+- Iteration ID: `AP-001C`.
+- Task: expose supplier AP aging and statement drill-down in Finance API.
+- Files changed: supplier aging DTO/controller/service and Finance integration regression.
+- Result: approved and paid supplier invoices are reported as current, overdue buckets or paid as of a requested date, grouped with supplier/PO/journal references. Draft and cancelled documents are excluded; paid invoices never inflate outstanding liability.
+- Checks run: Prisma generation, API build, reset Finance integration suite 7/7.
+- Acceptance: `accepted` for read-only AP aging software contour. Credit notes, advances/partial payments, landed cost allocation and supplier statement reconciliation remain open.
+- Next step: implement credit notes and reversal documents, then add the first P&L/balance-sheet statement slices.
+
 ## 2026-07-15 — AP-001B
 
 - Iteration ID: `AP-001B`.
@@ -8,7 +18,7 @@
 - Result: invoices cannot be created before receipt, invoice amount must equal received PO value, approval rechecks the match, and payment clears supplier liability `2000` into the selected funding account with stable replay protection and journal/Ledger links.
 - Checks run: Prisma generate/validate, API build, reset procurement suite 6/6, clean migration deploy through 77 migrations.
 - Acceptance: `accepted` for receipt/invoice/AP payment contour. Credit notes, advances/partial payments, landed cost, supplier statement and AP aging remain open.
-- Next step: add supplier statement/AP aging and credit-note controls.
+- Next step: add credit notes and reversal documents; AP aging is covered by `AP-001C`.
 
 ## 2026-07-15 — ACC-002A
 
