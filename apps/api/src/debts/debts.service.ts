@@ -8,6 +8,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { insertDebt } from './debt-insert';
 import { CreateDebtDto, DebtPaymentDto } from './debts.dto';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
 /** Debt above this (сом) requires approval (Approval Rules Matrix, action=debt). */
 export const DEBT_LIMIT = 50_000;
@@ -81,6 +82,16 @@ export class DebtsService {
   /** Record a payment against a debt; settles it when the balance reaches zero. */
   async pay(id: string, dto: DebtPaymentDto, actor: string) {
     return this.audit.transaction(async (tx) => {
+      const commandKey = dto.idempotencyKey?.trim() || null;
+      if (commandKey) {
+        const replay = await tx.payment.findUnique({ where: { idempotencyKey: `debt:${commandKey}` } });
+        if (replay) {
+          if (replay.orderId === null || replay.amount !== dto.amount) throw new ConflictError('debt_payment_idempotency_conflict', 'Ключ погашения уже использован с другой суммой');
+          const replayDebt = await tx.debtPlan.findUniqueOrThrow({ where: { id } });
+          if (replayDebt.orderId !== replay.orderId) throw new ConflictError('debt_payment_idempotency_conflict', 'Ключ погашения принадлежит другому долгу');
+          return { result: { debt: replayDebt, paymentId: replay.id, settled: replayDebt.status === 'settled', idempotent: true }, events: [] };
+        }
+      }
       const debt = await tx.debtPlan.findUnique({ where: { id } });
       if (!debt) {
         throw new ValidationError('debt_not_found', `Долг ${id} не найден`);
@@ -110,8 +121,29 @@ export class DebtsService {
         ? await tx.debtPlan.update({ where: { id }, data: { status: 'settled' } })
         : decremented;
       const payment = await tx.payment.create({
-        data: { orderId: debt.orderId, amount: dto.amount, method: 'installment', status: 'received' },
+        data: {
+          orderId: debt.orderId,
+          amount: dto.amount,
+          method: 'installment',
+          status: 'received',
+          accountCode: '1000',
+          idempotencyKey: commandKey ? `debt:${commandKey}` : undefined,
+          receivedBy: actor,
+        },
       });
+      const accountingEntry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:debt.payment:${payment.id}`,
+        sourceType: 'debt.payment',
+        sourceRef: payment.id,
+        description: `Погашение долга ${id}`,
+        occurredAt: payment.createdAt,
+        createdBy: actor,
+        lines: [
+          { accountCode: '1000', debit: dto.amount, memo: 'Получение платежа по рассрочке' },
+          { accountCode: '1100', credit: dto.amount, memo: 'Уменьшение дебиторской задолженности' },
+        ],
+      });
+      await tx.payment.update({ where: { id: payment.id }, data: { accountingEntryId: accountingEntry.id } });
       const events: AuditInput[] = [
         {
           type: EventType.DebtPaid,
@@ -120,6 +152,12 @@ export class DebtsService {
           refs: [id, debt.orderId, payment.id],
         },
       ];
+      events.push({
+        type: EventType.AccountingEntryPosted,
+        actor,
+        payload: { accountingEntryId: accountingEntry.id, sourceType: 'debt.payment', sourceRef: payment.id, debtId: id, amount: dto.amount },
+        refs: [accountingEntry.id, payment.id, id],
+      });
       if (settled) {
         events.push({
           type: EventType.DebtSettled,
@@ -128,7 +166,7 @@ export class DebtsService {
           refs: [id, debt.orderId, debt.customerId],
         });
       }
-      return { result: { debt: updated, paymentId: payment.id, settled }, events };
+      return { result: { debt: updated, paymentId: payment.id, settled, idempotent: false }, events };
     });
   }
 

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError } from '../common/errors';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
 /** Accrue the immutable owner liability when a serialized consignment unit is sold. */
 export async function accrueConsignmentSalesOnTx(
@@ -38,6 +39,20 @@ export async function accrueConsignmentSalesOnTx(
       },
     });
     if (accrued.count === 1) {
+      if (ownerAmount > 0) {
+        await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:owner-liability:consignment-sale:${item.id}`,
+          sourceType: 'consignment.sale',
+          sourceRef: item.id,
+          description: `Обязательство владельцу по продаже ${item.id}`,
+          occurredAt: new Date(),
+          createdBy: input.actor,
+          lines: [
+            { accountCode: '4000', debit: ownerAmount, memo: 'Выделение доли владельца из выручки' },
+            { accountCode: '2000', credit: ownerAmount, memo: 'Обязательство перед владельцем комиссионного товара' },
+          ],
+        });
+      }
       input.events.push({
         type: EventType.ConsignmentSold,
         actor: input.actor,
@@ -160,6 +175,20 @@ export async function accrueQuantityConsignmentSalesOnTx(
     });
     if (accrued.count !== 1) {
       throw new ConflictError('quantity_consignment_sale_conflict', `Распределение ${allocation.id} уже изменено`);
+    }
+    if (ownerAmount > 0) {
+      await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:owner-liability:quantity-consignment-sale:${allocation.id}`,
+        sourceType: 'quantity-consignment.sale',
+        sourceRef: allocation.id,
+        description: `Обязательство владельцу по продаже ${allocation.id}`,
+        occurredAt: new Date(),
+        createdBy: input.actor,
+        lines: [
+          { accountCode: '4000', debit: ownerAmount, memo: 'Выделение доли владельца из выручки' },
+          { accountCode: '2000', credit: ownerAmount, memo: 'Обязательство перед владельцем комиссионного товара' },
+        ],
+      });
     }
     input.events.push({
       type: EventType.ConsignmentSold,

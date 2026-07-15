@@ -7,6 +7,7 @@ import { ConflictError, ForbiddenError, ValidationError } from '../common/errors
 import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
 import { OutboxService } from '../outbox/outbox.service';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
@@ -209,12 +210,44 @@ export class CourierService {
             handedOverAt: new Date(),
           },
         });
+        const accountingEntry = run.codTotal > 0
+          ? await postAccountingEntryOnTx(tx, {
+            idempotencyKey: `accounting:cod.handover:${dto.runId}:${key}`,
+            sourceType: 'cod.handover',
+            sourceRef: `${dto.runId}:${key}`,
+            description: `Сдача COD по рейсу ${dto.runId}`,
+            occurredAt: settled.handedOverAt ?? new Date(),
+            createdBy: actor,
+            lines: dto.amount === run.codTotal
+              ? [
+                { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
+                { accountCode: '1100', credit: run.codTotal, memo: 'Погашение дебиторской задолженности по COD' },
+              ]
+              : dto.amount < run.codTotal
+                ? [
+                  { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
+                  { accountCode: '6990', debit: run.codTotal - dto.amount, memo: 'Недостача COD' },
+                  { accountCode: '1100', credit: run.codTotal, memo: 'Погашение COD с расхождением' },
+                ]
+                : [
+                  { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
+                  { accountCode: '1100', credit: run.codTotal, memo: 'Погашение дебиторской задолженности по COD' },
+                  { accountCode: '6990', credit: dto.amount - run.codTotal, memo: 'Излишек COD' },
+                ],
+          })
+          : null;
         const events: AuditInput[] = [{
           type: EventType.CashHandover,
           actor,
           payload: { runId: dto.runId, codTotal: run.codTotal, amount: dto.amount, diff, reason: normalized.reason },
           refs: [dto.runId],
         }];
+        if (accountingEntry) events.push({
+          type: EventType.AccountingEntryPosted,
+          actor,
+          payload: { accountingEntryId: accountingEntry.id, sourceType: 'cod.handover', sourceRef: `${dto.runId}:${key}`, amount: dto.amount, expected: run.codTotal, diff },
+          refs: [accountingEntry.id, dto.runId],
+        });
         if (diff !== 0) events.push({
           type: EventType.CashShortage,
           actor,

@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — FIN-003B
+
+- Iteration ID: `FIN-003B`.
+- Task: extend the accounting journal to COD handover, debt instalment receipts and consignment owner settlement.
+- Files changed: courier COD handover, debt payment DTO/service, consignment sale/payout accounting and related idempotency namespaces.
+- Result: COD handover posts cash/debt and records shortage or overage in `6990`; debt payments post cash/provider to receivables; serialized and quantity consignment sales reclassify the owner share from revenue to liability `2000`; payout clears that liability through the funding account. Replays use stable, domain-scoped keys and cannot be confused with payment keys.
+- Checks run: Prisma schema push on a reset test database; API build; targeted consignment, quantity-consignment, courier-handover and debt suites passed after isolating the accounting key namespace. A full post-change `mvp:verify` remains pending.
+- Acceptance: `accepted` for COD/debt/consignment settlement journal posting. Remaining `FIN-003` scope is payroll payouts, return compensation/reversal journals and broader settlement controls; production certification is not claimed.
+- Next step: expose valuation/COGS and settlement journals in ERP reports, then close payroll and consignment return compensation gaps.
+
 ## 2026-07-15 — INV-VAL-001A
 
 - Iteration ID: `INV-VAL-001A`.

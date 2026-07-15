@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDebtDto {
@@ -24,6 +24,9 @@ export class CreateDebtDto {
 export class DebtPaymentDto {
   @ApiProperty({ minimum: 1, example: 12000, description: 'Payment amount (сом)' })
   @IsInt() @Min(1) amount!: number;
+
+  @ApiPropertyOptional({ example: 'debt-payment-2026-001' })
+  @IsOptional() @IsString() @MaxLength(128) idempotencyKey?: string;
 
   @ApiPropertyOptional({ example: 'cashier_01' })
   @IsOptional() @IsString() actor?: string;

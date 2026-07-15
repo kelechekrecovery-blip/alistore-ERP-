@@ -17,6 +17,7 @@ import {
   TransferQuantityDto,
 } from './inventory.dto';
 import { transferQuantityConsignmentOnTx } from './consignment-accounting';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -517,6 +518,20 @@ export class InventoryService {
         data: { status: 'paid', paymentKey: dto.paymentKey, paidBy: actor, paidAt: new Date() },
         include: { items: true, quantityAllocations: true },
       });
+      if (paid.ownerAmount > 0) {
+        await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:consignment.payout:${id}:${dto.paymentKey}`,
+          sourceType: 'consignment.payout',
+          sourceRef: `${id}:${dto.paymentKey}`,
+          description: `Выплата владельцу комиссионного товара ${id}`,
+          occurredAt: paid.paidAt ?? new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: '2000', debit: paid.ownerAmount, memo: 'Погашение обязательства перед владельцем' },
+            { accountCode: '1000', credit: paid.ownerAmount, memo: 'Выплата владельцу' },
+          ],
+        });
+      }
       await tx.consignmentItem.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
       await tx.quantityConsignmentAllocation.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
       return {
