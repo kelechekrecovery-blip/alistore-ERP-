@@ -6,6 +6,12 @@ test.afterEach(async () => resetDb());
 test('ERP point availability immediately controls public checkout options', async ({ page, request }) => {
   await resetDb();
   const owner = await seedStaffCredentials('owner', 'e2e-store-point-owner');
+  await page.addInitScript(() => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([
+      { id: 'point-availability', sku: 'POINT-AVAILABILITY', name: 'Point availability', price: 1_000, qty: 1 },
+    ]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  });
 
   await page.goto('/erp');
   await page.getByPlaceholder('username').fill(owner.username);
@@ -23,13 +29,25 @@ test('ERP point availability immediately controls public checkout options', asyn
   expect(response.ok()).toBeTruthy();
   expect((await response.json()).pickupPoints).toEqual([]);
 
-  await point.getByRole('button', { name: 'Отключена' }).click();
-  await expect(point.getByRole('button', { name: 'Активна' })).toBeVisible();
+  await page.goto('/checkout');
+  await expect(page.getByText('Сейчас нет доступных точек самовывоза.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeDisabled();
+
+  await page.goto('/erp');
+  await page.getByRole('button', { name: /Логистика/ }).click();
+  await page.getByRole('tab', { name: 'Точки выдачи' }).click();
+  const disabledPoint = page.getByTestId('store-point-alistore-bishkek-1');
+  await disabledPoint.getByRole('button', { name: 'Отключена' }).click();
+  await expect(disabledPoint.getByRole('button', { name: 'Активна' })).toBeVisible();
   response = await request.get(`${API_BASE}/logistics/checkout-options`);
   expect(response.ok()).toBeTruthy();
   expect((await response.json()).pickupPoints).toEqual(
     expect.arrayContaining([expect.objectContaining({ id: 'alistore-bishkek-1', inventoryLocation: 'BISHKEK-1' })]),
   );
+
+  await page.goto('/checkout');
+  await expect(page.getByRole('button', { name: /^AliStore Центр Бишкек,/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeEnabled();
 });
 
 test('owner creates delivery capacity and dispatches a packed order', async ({ page }) => {
