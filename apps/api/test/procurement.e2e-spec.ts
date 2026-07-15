@@ -50,6 +50,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   async function cleanFixtures() {
     await prisma.auditEvent.deleteMany();
+    await prisma.supplierCreditNote.deleteMany();
     await prisma.supplierInvoice.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.supplierRma.deleteMany();
@@ -251,6 +252,29 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .send({ paymentKey: `supplier-bank-${RUN}`, paymentAccountCode: '1010', paymentReference: 'BANK-STATEMENT-1' })
       .expect(201);
     expect(replay.body.id).toBe(invoice.body.id);
+    const creditPayload = { idempotencyKey: `credit-${RUN}`, noteNumber: `CN-${RUN}`, supplierId: supplier.id, invoiceId: invoice.body.id, amount: 10000, reason: 'Возврат дефектной единицы' };
+    const credit = await request(app.getHttpServer())
+      .post('/procurement/supplier-credit-notes')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(creditPayload)
+      .expect(201);
+    expect(credit.body.status).toBe('draft');
+    await request(app.getHttpServer())
+      .post(`/procurement/supplier-credit-notes/${credit.body.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201)
+      .expect(({ body }) => expect(body.status).toBe('approved'));
+    const applied = await request(app.getHttpServer())
+      .post(`/procurement/supplier-credit-notes/${credit.body.id}/apply`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201);
+    expect(applied.body.status).toBe('applied');
+    const creditEntry = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: applied.body.accountingEntryId }, include: { lines: true } });
+    expect(creditEntry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 10000 }),
+      expect.objectContaining({ accountCode: '1200', credit: 10000 }),
+    ]));
+    expect(await prisma.auditEvent.count({ where: { type: 'supplier.credit_note.applied', refs: { has: credit.body.id } } })).toBe(1);
     await request(app.getHttpServer())
       .post('/procurement/supplier-invoices')
       .set('Authorization', `Bearer ${adminToken}`)

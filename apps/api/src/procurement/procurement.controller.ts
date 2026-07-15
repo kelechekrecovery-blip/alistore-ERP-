@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreatePurchaseOrderDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { ProcurementService } from './procurement.service';
 
 @ApiTags('procurement')
@@ -82,5 +82,37 @@ export class SupplierInvoiceController {
   @RequirePermission('procurement', 'receive')
   pay(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: PaySupplierInvoiceDto) {
     return this.procurement.paySupplierInvoice(id, dto, user.customerId);
+  }
+}
+
+@ApiTags('procurement')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@Controller('procurement/supplier-credit-notes')
+export class SupplierCreditNoteController {
+  constructor(private readonly procurement: ProcurementService) {}
+
+  @Get()
+  @RequirePermission('procurement', 'read')
+  list(@Query('supplierId') supplierId?: string) {
+    return this.procurement.listCreditNotes(supplierId);
+  }
+
+  @Post()
+  @RequirePermission('procurement', 'create')
+  create(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateSupplierCreditNoteDto) {
+    return this.procurement.createCreditNote(dto, user.customerId);
+  }
+
+  @Post(':id/approve')
+  @RequirePermission('procurement', 'send')
+  approve(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.procurement.approveCreditNote(id, user.customerId);
+  }
+
+  @Post(':id/apply')
+  @RequirePermission('procurement', 'receive')
+  apply(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.procurement.applyCreditNote(id, user.customerId);
   }
 }

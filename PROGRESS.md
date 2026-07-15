@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — AP-001D
+
+- Iteration ID: `AP-001D`.
+- Task: add supplier credit notes as immutable AP documents.
+- Files changed: credit-note Prisma model/migration, procurement DTO/controller/service, AP aging credit-note totals and procurement regression.
+- Result: a credit note is created, approved and applied independently of the original invoice. Application posts `2000/1200` for unpaid invoices or `1100/1200` after payment, links the journal and Ledger event, and prevents total credits from exceeding the invoice.
+- Checks run: Prisma generate/validate, API build, reset procurement suite 6/6.
+- Acceptance: `accepted` for supplier credit-note software contour. Partial supplier payments/advances, landed-cost allocation and bank reconciliation remain open.
+- Next step: add tax/currency snapshots and bank/cash reconciliation; then expose AP controls in the ERP finance workspace.
+
 ## 2026-07-15 — ACC-002C
 
 - Iteration ID: `ACC-002C`.

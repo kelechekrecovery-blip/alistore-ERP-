@@ -5,7 +5,7 @@ import { AuditService, AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePurchaseOrderDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
@@ -369,6 +369,72 @@ export class ProcurementService {
       };
     });
   }
+
+  listCreditNotes(supplierId?: string) {
+    return this.prisma.supplierCreditNote.findMany({
+      where: supplierId ? { supplierId } : undefined,
+      include: { supplier: { select: { id: true, name: true } }, invoice: { select: { id: true, invoiceNumber: true, status: true } }, accountingEntry: { include: { lines: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  async createCreditNote(dto: CreateSupplierCreditNoteDto, actor: string) {
+    const existing = await this.prisma.supplierCreditNote.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+    if (existing) return replayCreditNote(existing, dto);
+    return this.audit.transaction(async (tx) => {
+      const invoice = await tx.supplierInvoice.findUnique({ where: { id: dto.invoiceId }, include: { creditNotes: true } });
+      if (!invoice) throw new ValidationError('supplier_invoice_not_found', `Счёт ${dto.invoiceId} не найден`);
+      if (invoice.supplierId !== dto.supplierId) throw new ConflictError('credit_note_supplier_mismatch', 'Кредит-нота не соответствует поставщику счёта');
+      if (invoice.status === 'cancelled') throw new ConflictError('credit_note_invoice_cancelled', 'Нельзя оформить кредит-ноту по отменённому счёту');
+      const committed = invoice.creditNotes.filter((note) => note.status !== 'cancelled').reduce((sum, note) => sum + note.amount, 0);
+      if (committed + dto.amount > invoice.amount) throw new ConflictError('credit_note_exceeds_invoice', 'Сумма кредит-нот превышает сумму счёта');
+      const note = await tx.supplierCreditNote.create({
+        data: { supplierId: dto.supplierId, invoiceId: dto.invoiceId, noteNumber: dto.noteNumber.trim(), idempotencyKey: dto.idempotencyKey, amount: dto.amount, reason: dto.reason.trim(), createdBy: actor },
+        include: { supplier: { select: { id: true, name: true } }, invoice: { select: { id: true, invoiceNumber: true, status: true } } },
+      });
+      return { result: note, events: [{ type: 'supplier.credit_note.created', actor, payload: { creditNoteId: note.id, invoiceId: note.invoiceId, amount: note.amount }, refs: [note.id, note.invoiceId, note.supplierId] }] };
+    });
+  }
+
+  async approveCreditNote(id: string, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "SupplierCreditNote" WHERE id = ${id} FOR UPDATE`;
+      const note = await tx.supplierCreditNote.findUnique({ where: { id }, include: { invoice: { include: { creditNotes: true } } } });
+      if (!note) throw new ValidationError('supplier_credit_note_not_found', `Кредит-нота ${id} не найдена`);
+      if (note.status === 'approved' || note.status === 'applied') return { result: note, events: [] };
+      if (note.status !== 'draft') throw new ConflictError('credit_note_state', 'Кредит-ноту нельзя утвердить в текущем статусе');
+      const committed = note.invoice.creditNotes.filter((current) => current.id !== id && current.status !== 'cancelled').reduce((sum, current) => sum + current.amount, 0);
+      if (committed + note.amount > note.invoice.amount) throw new ConflictError('credit_note_exceeds_invoice', 'Сумма кредит-нот превышает сумму счёта');
+      const approved = await tx.supplierCreditNote.update({ where: { id }, data: { status: 'approved', approvedBy: actor, approvedAt: new Date() } });
+      return { result: approved, events: [{ type: 'supplier.credit_note.approved', actor, payload: { creditNoteId: id, amount: approved.amount }, refs: [id, note.invoiceId, note.supplierId] }] };
+    });
+  }
+
+  async applyCreditNote(id: string, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "SupplierCreditNote" WHERE id = ${id} FOR UPDATE`;
+      const note = await tx.supplierCreditNote.findUnique({ where: { id }, include: { invoice: true } });
+      if (!note) throw new ValidationError('supplier_credit_note_not_found', `Кредит-нота ${id} не найдена`);
+      if (note.status === 'applied') return { result: note, events: [] };
+      if (note.status !== 'approved') throw new ConflictError('credit_note_not_approved', 'Применить можно только утверждённую кредит-ноту');
+      const accountCode = note.invoice.status === 'paid' ? '1100' : '2000';
+      const entry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:supplier-credit-note:${id}`,
+        sourceType: 'supplier.credit-note',
+        sourceRef: id,
+        description: `Кредит-нота поставщика ${note.id}`,
+        occurredAt: new Date(),
+        createdBy: actor,
+        lines: [
+          { accountCode, debit: note.amount, memo: note.invoice.status === 'paid' ? 'Дебиторская задолженность поставщика' : 'Уменьшение задолженности поставщику' },
+          { accountCode: '1200', credit: note.amount, memo: 'Уменьшение стоимости запасов по кредит-ноте' },
+        ],
+      });
+      const applied = await tx.supplierCreditNote.update({ where: { id }, data: { status: 'applied', appliedBy: actor, appliedAt: new Date(), accountingEntryId: entry.id }, include: { invoice: true, accountingEntry: { include: { lines: true } } } });
+      return { result: { ...applied, idempotent: false }, events: [{ type: 'supplier.credit_note.applied', actor, payload: { creditNoteId: id, amount: note.amount, accountingEntryId: entry.id }, refs: [id, note.invoiceId, entry.id] }, { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: entry.id, sourceType: 'supplier.credit-note', sourceRef: id, amount: note.amount }, refs: [entry.id, id] }] };
+    });
+  }
 }
 
 function receiptMatch(items: Array<{ orderedQty: number; receivedQty: number; unitCost: number }>) {
@@ -383,6 +449,13 @@ function replaySupplierInvoice(invoice: Prisma.SupplierInvoiceGetPayload<{}>, dt
     throw new ConflictError('supplier_invoice_idempotency_mismatch', 'Ключ счёта уже использован с другими данными');
   }
   return { ...invoice, idempotent: true };
+}
+
+function replayCreditNote(note: Prisma.SupplierCreditNoteGetPayload<{}>, dto: CreateSupplierCreditNoteDto) {
+  if (note.supplierId !== dto.supplierId || note.invoiceId !== dto.invoiceId || note.noteNumber !== dto.noteNumber.trim() || note.amount !== dto.amount) {
+    throw new ConflictError('supplier_credit_note_idempotency_mismatch', 'Ключ кредит-ноты уже использован с другими данными');
+  }
+  return { ...note, idempotent: true };
 }
 
 function purchaseOrderNumber(): string {

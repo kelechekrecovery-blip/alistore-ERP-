@@ -1328,6 +1328,7 @@ model Supplier {
   rmas           SupplierRma[]
   purchaseOrders PurchaseOrder[]
   invoices       SupplierInvoice[]
+  creditNotes    SupplierCreditNote[]
   expenses       Expense[]
   createdAt      DateTime        @default(now())
 }
@@ -1392,6 +1393,7 @@ model AccountingJournalEntry {
   payment        Payment?
   purchaseReceipt PurchaseReceipt?
   supplierInvoice SupplierInvoice?
+  supplierCreditNote SupplierCreditNote?
   reversalOfId    String?                 @unique
   reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversal        AccountingJournalEntry? @relation("AccountingReversal")
@@ -1589,6 +1591,7 @@ model SupplierInvoice {
   paidAt            DateTime?
   accountingEntryId String?                @unique
   accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  creditNotes         SupplierCreditNote[]
   createdBy         String
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
@@ -1597,6 +1600,32 @@ model SupplierInvoice {
   @@index([status, dueDate])
   @@index([supplierId, createdAt])
   @@index([purchaseOrderId])
+}
+
+model SupplierCreditNote {
+  id                String                  @id @default(cuid())
+  supplier          Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId        String
+  invoice           SupplierInvoice         @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceId         String
+  noteNumber        String
+  idempotencyKey    String                  @unique
+  amount            Int
+  reason            String
+  status            SupplierCreditNoteStatus @default(draft)
+  approvedBy        String?
+  approvedAt        DateTime?
+  appliedBy         String?
+  appliedAt         DateTime?
+  accountingEntryId String?                 @unique
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  createdBy         String
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([supplierId, noteNumber])
+  @@index([invoiceId, status])
+  @@index([supplierId, createdAt])
 }
 
 // Возврат брака поставщику (RMA). Машина статусов + SLA; просрочка → Risk Center.
