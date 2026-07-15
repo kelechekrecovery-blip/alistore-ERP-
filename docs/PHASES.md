@@ -325,16 +325,19 @@ unchanged 1, Product count stays 1.
   тикетов с фильтрами по статусу + переходы + эскалация) и Customer 360 карточка (потрачено/
   заказы/долг/гарантии/обращения + consent-переключатель). Вкладка использует общий staff
   session; API-клиенты в `lib/crm.ts`.
-- ✅ Segment Builder + net Campaign ROI: `/campaigns/preview` строит аудиторию по level/city/
-  tags/spend/ltv и всегда фильтрует `Customer.consent`; `POST /campaigns` создаёт серверный
-  tracking code, фиксирует consenting recipients и ставит outbox только для них. Витрина
+- ✅ Segment Builder + advertiser lifecycle + net Campaign ROI: `/campaigns/preview` строит
+  аудиторию по level/city/tags/spend/ltv и всегда фильтрует `Customer.consent`; `POST /campaigns`
+  создаёт только draft. Бюджет проходит four-eye Approval, а approved/paused кампания при
+  активации заново проверяет consent, фиксирует recipients и ставит campaign-linked Outbox.
+  Pause/completion и исчерпание owner-reconciled actual spend отменяют pending delivery. Витрина
   сохраняет ограниченные first/last UTM, заказ принимает их как недоверенный input, а API
   канонизирует campaign/source/medium. Полностью полученная оплата один раз пишет
   `campaign.converted` и обновляет paid revenue и server-cost gross profit. Публичный
   rate-limited funnel сохраняет только SHA-256 journey hash и идемпотентные click/visit/
   checkout/conversion. Approved refund пишет отдельную immutable adjustment, компенсирует
-  revenue/cost ровно один раз и не переписывает paid history. ERP даёт preview, запуск,
-  tracking URL, conversion rate, paid/net revenue, net gross, paid/net ROAS и contribution ROI;
+  revenue/cost ровно один раз и не переписывает paid history. ERP даёт preview, lifecycle,
+  creative/destination, budget cap, actual spend, delivery, tracking URL, conversion rate,
+  paid/net revenue, net gross, paid/net ROAS и contribution ROI;
   ручная привязка убрана из UI и оставлена только как permissioned locked backfill.
 **Проверка:** ✅ Support: 6 тестов зелёные + HTTP-смоук (open→escalate normal→high→urgent→
 transition new→in_progress→resolved→closed; ledger ticket.created→escalated×2→…→closed;
@@ -347,7 +350,8 @@ campaign → storefront UTM → checkout → sandbox payment → partial/full re
 (tracking URL, funnel, paid/net revenue, net gross and ROAS, no overflow) с БД-сверкой
 attribution/adjustment/Ledger. Outbox recipients
 include consenting customer and exclude opted-out customer. Refund-adjusted net ROAS и
-visit/click funnel закрыты в MKT-006. ✅ Transactional
+visit/click funnel закрыты в MKT-006; approval/spend/channel activation закрыты в MKT-007.
+Live provider import/certification остаётся MKT-008. ✅ Transactional
 notifications: targeted e2e verifies order/warranty templates, consent filtering, debt opt-out
 reminders, and reservation expiry without an opted-out notice.
 

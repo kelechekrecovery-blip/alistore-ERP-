@@ -88,6 +88,9 @@ export class OutboxService {
 
   private toData(input: OutboxInput): Prisma.OutboxMessageCreateInput {
     return {
+      ...(input.campaignId
+        ? { campaign: { connect: { id: input.campaignId } } }
+        : {}),
       channel: input.channel,
       recipient: input.recipient,
       template: input.template,

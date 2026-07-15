@@ -15,8 +15,8 @@ export class CampaignAttributionService {
   constructor(private readonly prisma: PrismaService) {}
 
   async trackPublic(input: CampaignFunnelDto) {
-    const campaign = await this.prisma.campaign.findUnique({
-      where: { trackingCode: input.trackingCode },
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { trackingCode: input.trackingCode, status: { in: ['active', 'paused'] } },
       select: { id: true },
     });
     if (!campaign) return { accepted: true, recorded: false };
@@ -38,10 +38,15 @@ export class CampaignAttributionService {
     if (!input && !promotionCode) return null;
     const trackingCode = input?.last.campaign ?? input?.first.campaign;
     const campaign = trackingCode
-      ? await tx.campaign.findUnique({ where: { trackingCode } })
+      ? await tx.campaign.findFirst({
+          where: { trackingCode, status: { in: ['active', 'paused'] } },
+        })
       : promotionCode
         ? await tx.campaign.findFirst({
-            where: { promotionCode: { equals: promotionCode, mode: 'insensitive' } },
+            where: {
+              promotionCode: { equals: promotionCode, mode: 'insensitive' },
+              status: { in: ['active', 'paused'] },
+            },
             orderBy: { createdAt: 'desc' },
           })
         : null;

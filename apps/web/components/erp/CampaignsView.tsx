@@ -4,9 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { som } from '@/lib/format';
 import {
+  activateCampaign,
+  completeCampaign,
   createCampaign,
   fetchCampaigns,
+  pauseCampaign,
   previewCampaign,
+  submitCampaign,
   type CampaignPreview,
   type CampaignRoi,
   type SegmentRules,
@@ -25,6 +29,8 @@ type CampaignForm = {
   budget: string;
   channel: (typeof CHANNELS)[number];
   message: string;
+  assetUrl: string;
+  destinationUrl: string;
   source: string;
   promotionCode: string;
 };
@@ -38,6 +44,8 @@ const INITIAL_FORM: CampaignForm = {
   budget: '10000',
   channel: 'sms',
   message: 'VIP-предложение AliStore',
+  assetUrl: '',
+  destinationUrl: '/catalog',
   source: 'alistore_crm',
   promotionCode: '',
 };
@@ -77,9 +85,9 @@ export function CampaignsView() {
     }
   }
 
-  async function launch() {
+  async function createDraft() {
     if (!session) return;
-    setBusy('launch');
+    setBusy('create');
     setNotice('');
     try {
       const created = await createCampaign(
@@ -88,16 +96,39 @@ export function CampaignsView() {
           name: form.name.trim(),
           channel: form.channel,
           budget: numberOrZero(form.budget),
-          message: form.message.trim() || undefined,
+          creativeHeadline: form.name.trim(),
+          creativeBody: form.message.trim() || undefined,
+          creativeType: form.assetUrl.trim() ? 'image' : 'text',
+          creativeAssetUrl: form.assetUrl.trim() || undefined,
+          creativeCtaLabel: 'Смотреть предложение',
+          destinationUrl: form.destinationUrl.trim() || '/',
           source: form.source.trim() || undefined,
           promotionCode: form.promotionCode.trim() || undefined,
         },
         session.accessToken,
       );
-      setNotice(`Кампания создана, в outbox поставлено ${created.queued}`);
+      setNotice('Черновик создан. Отправьте его на согласование бюджета.');
       await load();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : 'Кампания не создана');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runAction(id: string, action: 'submit' | 'activate' | 'pause' | 'complete') {
+    if (!session) return;
+    setBusy(`${action}:${id}`);
+    setNotice('');
+    try {
+      if (action === 'submit') await submitCampaign(id, session.accessToken);
+      if (action === 'activate') await activateCampaign(id, session.accessToken);
+      if (action === 'pause') await pauseCampaign(id, session.accessToken);
+      if (action === 'complete') await completeCampaign(id, session.accessToken);
+      setNotice(action === 'submit' ? 'Кампания отправлена в Approval Inbox.' : 'Статус кампании обновлён.');
+      await load();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Действие не выполнено');
     } finally {
       setBusy(null);
     }
@@ -180,6 +211,12 @@ export function CampaignsView() {
               className={`${FIELD_CLASS} min-h-24 resize-none`}
             />
           </Field>
+          <Field label="Медиа (HTTPS, необязательно)">
+            <input value={form.assetUrl} onChange={(e) => setFormValue(setForm, 'assetUrl', e.target.value)} className={FIELD_CLASS} placeholder="https://media.alistore.kg/campaign.jpg" />
+          </Field>
+          <Field label="Куда ведёт кампания">
+            <input value={form.destinationUrl} onChange={(e) => setFormValue(setForm, 'destinationUrl', e.target.value)} className={FIELD_CLASS} placeholder="/catalog" />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Источник">
               <input value={form.source} onChange={(e) => setFormValue(setForm, 'source', e.target.value)} className={FIELD_CLASS} placeholder="alistore_crm" />
@@ -193,8 +230,8 @@ export function CampaignsView() {
           <button type="button" disabled={busy === 'preview'} onClick={runPreview} className="rounded-btn bg-[#221E19] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             Предпросмотр
           </button>
-          <button type="button" disabled={busy === 'launch'} onClick={launch} className="rounded-btn bg-lime px-4 py-2 text-sm font-extrabold text-lime-ink disabled:opacity-50">
-            Запустить
+          <button type="button" disabled={busy === 'create'} onClick={createDraft} className="rounded-btn bg-lime px-4 py-2 text-sm font-extrabold text-lime-ink disabled:opacity-50">
+            Создать черновик
           </button>
         </div>
         {notice && <p className="mt-3 text-sm text-[#E5B23C]">{notice}</p>}
@@ -202,7 +239,7 @@ export function CampaignsView() {
 
       <section className="grid gap-4">
         <PreviewPanel preview={preview} />
-        <CampaignList campaigns={campaigns} />
+        <CampaignList campaigns={campaigns} busy={busy} onAction={runAction} />
       </section>
     </div>
   );
@@ -242,8 +279,10 @@ function PreviewPanel({ preview }: { preview: CampaignPreview | null }) {
   );
 }
 
-function CampaignList({ campaigns }: {
+function CampaignList({ campaigns, busy, onAction }: {
   campaigns: CampaignRoi[];
+  busy: string | null;
+  onAction: (id: string, action: 'submit' | 'activate' | 'pause' | 'complete') => void;
 }) {
   return (
     <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
@@ -258,6 +297,7 @@ function CampaignList({ campaigns }: {
                 <div className="mt-1 text-xs text-[#8A7F76]">{item.description}</div>
               </div>
               <span className="rounded-chip bg-[#1A1611] px-2.5 py-1 text-[11px] font-bold text-[#C6FF3D]">{item.campaign.channel}</span>
+              <span className="rounded-chip border border-[#41382F] px-2.5 py-1 text-[11px] font-bold text-[#E5B23C]">{statusLabel(item.campaign.status)}</span>
             </div>
             <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] bg-[#1A1611] px-3 py-2 font-mono text-[11px] text-[#A79C92]" data-testid={`campaign-link-${item.campaign.id}`}>
               /?utm_source={item.campaign.source}&amp;utm_medium={item.campaign.medium}&amp;utm_campaign={item.campaign.trackingCode}
@@ -277,11 +317,32 @@ function CampaignList({ campaigns }: {
               <Metric label="net ROAS" value={item.roas === null ? '—' : `${item.roas}×`} />
               <Metric label="net ROI" value={item.roiPct === null ? '∞' : `${item.roiPct}%`} />
             </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <Metric label="budget cap" value={som(item.budget)} />
+              <Metric label="actual spend" value={som(item.spend)} />
+              <Metric label="sent / pending" value={`${item.delivery.sent} / ${item.delivery.pending}`} />
+              <Metric label="failed / cancelled" value={`${item.delivery.failed} / ${item.delivery.cancelled}`} />
+            </div>
+            {item.campaign.rejectionReason && <p className="mt-3 text-xs text-[#F08A7C]">Причина: {item.campaign.rejectionReason}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {item.campaign.status === 'draft' && <ActionButton label="На согласование" busy={busy === `submit:${item.campaign.id}`} onClick={() => onAction(item.campaign.id, 'submit')} />}
+              {(item.campaign.status === 'approved' || item.campaign.status === 'paused') && <ActionButton label={item.campaign.status === 'paused' ? 'Возобновить' : 'Активировать'} busy={busy === `activate:${item.campaign.id}`} onClick={() => onAction(item.campaign.id, 'activate')} />}
+              {item.campaign.status === 'active' && <ActionButton label="Пауза" busy={busy === `pause:${item.campaign.id}`} onClick={() => onAction(item.campaign.id, 'pause')} />}
+              {['approved', 'active', 'paused'].includes(item.campaign.status) && <ActionButton label="Завершить" busy={busy === `complete:${item.campaign.id}`} onClick={() => onAction(item.campaign.id, 'complete')} />}
+            </div>
           </li>
         ))}
       </ul>
     </div>
   );
+}
+
+function ActionButton({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
+  return <button type="button" disabled={busy} onClick={onClick} className="rounded-btn border border-[#41382F] px-3 py-2 text-xs font-bold text-white hover:border-lime disabled:opacity-50">{label}</button>;
+}
+
+function statusLabel(status: CampaignRoi['campaign']['status']) {
+  return ({ draft: 'Черновик', review: 'На согласовании', approved: 'Согласована', active: 'Активна', paused: 'Пауза', completed: 'Завершена' } as const)[status];
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

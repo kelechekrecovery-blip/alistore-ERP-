@@ -1,5 +1,15 @@
 # PROGRESS
 
+## 2026-07-15 — MKT-007
+
+- Iteration ID: `MKT-007`.
+- Task: turn the advertiser cabinet from immediate send plus assumed budget spend into an approved, measurable operational lifecycle.
+- Files changed: campaign lifecycle/creative/spend/outbox Prisma schema and migration; campaign DTO/controller/service, attribution eligibility, Approval executors, four-eye rule, RBAC and Ledger events; typed web client and ERP Campaigns controls; campaign/attribution/browser fixtures and acceptance; backlog/readiness/phase/traceability documents.
+- Result: campaign creation is now draft-only and cannot affect delivery. A separate owner/admin approves the exact submitted budget before activation; rejection returns an editable draft with reason. Activation re-evaluates current consent and audience, creates campaign-linked Outbox rows and exposes only active/paused attribution. Pause/completion cancel pending messages. Owner-only idempotent spend entries drive ROAS and automatically pause an active campaign at its budget cap. ERP separates budget, actual spend and delivery states and exposes valid lifecycle actions.
+- Checks run: Prisma format/generation; clean isolated PostgreSQL migration deploy 68/68; targeted lifecycle/attribution API 2 suites and 3 tests; API and Next production builds. Browser checkout verification in the broad worktree was compile-blocked by unrelated parallel unstaged AI work and is rerun from the committed detached worktree before acceptance.
+- Acceptance: pending detached committed full API/browser verification. Live ad-platform spend import and channel/provider certification remain `MKT-008`; no production-provider readiness is claimed.
+- Next backlog ID: `MKT-008` live provider linkage after credentials; otherwise continue `ECO-001` design evidence recovery.
+
 ## 2026-07-15 — MKT-006
 
 - Iteration ID: `MKT-006`.

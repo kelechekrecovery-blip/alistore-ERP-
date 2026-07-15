@@ -21,6 +21,77 @@ export type ActionExecutor = (
   events: AuditInput[],
 ) => Promise<void>;
 
+export type ActionRejectionExecutor = (
+  tx: Prisma.TransactionClient,
+  payload: Record<string, unknown>,
+  approver: string,
+  approvalId: string,
+  reason: string | null,
+  events: AuditInput[],
+) => Promise<void>;
+
+/** campaign_budget — approve the exact budget snapshot submitted for review. */
+const campaign_budget: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const campaignId = String(payload['campaignId']);
+  const budget = Number(payload['budget']);
+  await tx.$queryRaw`SELECT id FROM "Campaign" WHERE id = ${campaignId} FOR UPDATE`;
+  const campaign = await tx.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new ValidationError('campaign_not_found', 'Кампания не найдена');
+  if (campaign.status !== 'review' || campaign.approvalId !== approvalId) {
+    throw new ConflictError('campaign_review_changed', 'Кампания больше не ожидает это согласование');
+  }
+  if (campaign.budget !== budget) {
+    throw new ConflictError('campaign_budget_changed', 'Бюджет изменился после отправки на согласование');
+  }
+  await tx.campaign.update({
+    where: { id: campaignId },
+    data: {
+      status: 'approved',
+      approvedBy: approver,
+      approvedAt: new Date(),
+      updatedBy: approver,
+      rejectionReason: null,
+    },
+  });
+  events.push({
+    type: EventType.CampaignApproved,
+    actor: approver,
+    payload: { campaignId, approvalId, budget },
+    refs: [campaignId, approvalId],
+  });
+};
+
+const reject_campaign_budget: ActionRejectionExecutor = async (
+  tx,
+  payload,
+  approver,
+  approvalId,
+  reason,
+  events,
+) => {
+  const campaignId = String(payload['campaignId']);
+  await tx.$queryRaw`SELECT id FROM "Campaign" WHERE id = ${campaignId} FOR UPDATE`;
+  const campaign = await tx.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new ValidationError('campaign_not_found', 'Кампания не найдена');
+  if (campaign.status !== 'review' || campaign.approvalId !== approvalId) {
+    throw new ConflictError('campaign_review_changed', 'Кампания больше не ожидает это согласование');
+  }
+  await tx.campaign.update({
+    where: { id: campaignId },
+    data: {
+      status: 'draft',
+      rejectionReason: reason ?? 'Бюджет отклонён',
+      updatedBy: approver,
+    },
+  });
+  events.push({
+    type: EventType.CampaignReviewRejected,
+    actor: approver,
+    payload: { campaignId, approvalId, reason },
+    refs: [campaignId, approvalId],
+  });
+};
+
 /** refund — compensating negative Payment, order → refunded (invariant #1). */
 const refund: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const paymentId = String(payload['paymentId']);
@@ -286,10 +357,15 @@ const debt: ActionExecutor = async (tx, payload, approver, _approvalId, events) 
 };
 
 export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
+  campaign_budget,
   refund,
   price,
   write_off,
   stock_adjust,
   delete: del,
   debt,
+};
+
+export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {
+  campaign_budget: reject_campaign_budget,
 };

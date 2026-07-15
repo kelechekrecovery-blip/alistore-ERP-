@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
@@ -51,6 +52,9 @@ describe('Campaign attribution → paid conversion (integration)', () => {
     await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
     await prisma.promotionCode.deleteMany({ where: { code: { startsWith: 'MKT005' } } });
+    await prisma.campaignSpendEntry.deleteMany({
+      where: { campaign: { trackingCode: { startsWith: `cmp_${run}` } } },
+    });
     await prisma.campaign.deleteMany({ where: { trackingCode: { startsWith: `cmp_${run}` } } });
     await prisma.inventoryBalance.deleteMany({ where: { product: { sku: { startsWith: `MKT005-${run}` } } } });
     await prisma.product.deleteMany({ where: { sku: { startsWith: `MKT005-${run}` } } });
@@ -83,7 +87,14 @@ describe('Campaign attribution → paid conversion (integration)', () => {
       data: {
         name: 'July paid social', trackingCode: `cmp_${run}`, source: 'instagram', medium: 'paid_social',
         promotionCode: `MKT005${run.slice(-6)}`,
-        segment: '{}', channel: 'push', budget: 2000,
+        segment: '{}', channel: 'push', budget: 2000, status: 'active',
+        creativeHeadline: 'July paid social', createdBy: 'mkt005-test', updatedBy: 'mkt005-test',
+      },
+    });
+    await prisma.campaignSpendEntry.create({
+      data: {
+        campaignId: campaign.id, idempotencyKey: randomUUID(), provider: 'test',
+        externalRef: `spend-${run}`, amount: 2000, occurredAt: new Date(), actor: 'mkt005-test',
       },
     });
     await prisma.promotionCode.create({

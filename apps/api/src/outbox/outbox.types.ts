@@ -13,6 +13,7 @@ export type OutboxChannel =
   | 'webhook';
 
 export interface OutboxInput {
+  campaignId?: string;
   channel: OutboxChannel;
   recipient: string;
   template: string;

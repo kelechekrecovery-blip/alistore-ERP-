@@ -5,7 +5,7 @@ import { EventType } from '../audit/event-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { canApprove, Role } from '../rbac/permissions';
-import { ACTION_EXECUTORS } from './action-executors';
+import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
@@ -99,6 +99,12 @@ export class ApprovalsService {
           `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
+      if (approval.action === 'campaign_budget' && approval.requester === input.approver) {
+        throw new ForbiddenError(
+          'four_eye_approval_required',
+          'Автор кампании не может согласовать собственный бюджет',
+        );
+      }
 
       // Atomically claim the decision — two concurrent decides cannot both flip
       // requested→(approved|rejected). count===0 ⇒ another decider won the race
@@ -117,16 +123,23 @@ export class ApprovalsService {
       const updated = await tx.approval.findUnique({ where: { id } });
 
       if (input.status === 'rejected') {
+        const events: AuditInput[] = [
+          {
+            type: EventType.ApprovalRejected,
+            actor: input.approver,
+            payload: { approvalId: id, action: approval.action, reason: input.reason ?? null },
+            refs: [id],
+          },
+        ];
+        const payload = (approval.evidence as { payload?: Record<string, unknown> } | null)
+          ?.payload;
+        const reject = ACTION_REJECTION_EXECUTORS[approval.action];
+        if (reject && payload) {
+          await reject(tx, payload, input.approver, id, input.reason ?? null, events);
+        }
         return {
           result: updated,
-          events: [
-            {
-              type: EventType.ApprovalRejected,
-              actor: input.approver,
-              payload: { approvalId: id, action: approval.action, reason: input.reason ?? null },
-              refs: [id],
-            },
-          ],
+          events,
         };
       }
       const events: AuditInput[] = [

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { sign } from 'jsonwebtoken';
 import { API_BASE, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
@@ -9,7 +10,14 @@ test('campaign UTM survives navigation, converts on payment once, and appears as
   const campaign = await prisma.campaign.create({
     data: {
       name: 'Instagram · живой checkout', trackingCode, source: 'instagram', medium: 'paid_social',
-      segment: '{}', channel: 'push', budget: 5_000,
+      segment: '{}', channel: 'push', budget: 5_000, status: 'active',
+      creativeHeadline: 'Живой checkout', createdBy: 'e2e', updatedBy: 'e2e',
+    },
+  });
+  await prisma.campaignSpendEntry.create({
+    data: {
+      campaignId: campaign.id, idempotencyKey: randomUUID(), provider: 'e2e',
+      externalRef: `e2e-${trackingCode}`, amount: 5_000, occurredAt: new Date(), actor: 'e2e',
     },
   });
   const { username, password } = await seedStaffCredentials('owner', 'e2e-attribution');

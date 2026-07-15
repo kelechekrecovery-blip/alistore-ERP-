@@ -301,6 +301,21 @@ enum CampaignFunnelStage {
   conversion
 }
 
+enum CampaignLifecycleStatus {
+  draft
+  review
+  approved
+  active
+  paused
+  completed
+}
+
+enum CampaignCreativeType {
+  text
+  image
+  video
+}
+
 // ---------- CORE ----------
 model Customer {
   id                   String                @id @default(cuid())
@@ -1512,12 +1527,30 @@ model Campaign {
   id                String                     @id @default(cuid())
   name              String                     @default("Campaign")
   trackingCode      String                     @unique
+  status            CampaignLifecycleStatus    @default(draft)
   source            String                     @default("alistore")
   medium            String
   promotionCode     String?
   segment           String
   channel           String
   budget            Int
+  creativeType      CampaignCreativeType       @default(text)
+  creativeHeadline  String
+  creativeBody      String?
+  creativeAssetUrl  String?
+  creativeCtaLabel  String?
+  destinationUrl    String                     @default("/")
+  template          String                     @default("campaign_offer")
+  approvalId        String?                    @unique
+  rejectionReason   String?
+  createdBy         String
+  updatedBy         String
+  approvedBy        String?
+  reviewedAt        DateTime?
+  approvedAt        DateTime?
+  activatedAt       DateTime?
+  pausedAt          DateTime?
+  completedAt       DateTime?
   orders            Int                        @default(0)
   revenue           Int                        @default(0)
   grossProfit       Int                        @default(0)
@@ -1525,9 +1558,13 @@ model Campaign {
   attributions      OrderAttribution[]
   funnelEvents      CampaignFunnelEvent[]
   refundAdjustments CampaignRefundAdjustment[]
+  spendEntries      CampaignSpendEntry[]
+  outboxMessages    OutboxMessage[]
   createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
   // аудитория фильтруется по Customer.consent
 
+  @@index([status, createdAt])
   @@index([channel, createdAt])
   @@index([promotionCode])
 }
@@ -1606,6 +1643,22 @@ model CampaignRefundAdjustment {
 
   @@index([campaignId, createdAt])
   @@index([attributionId, createdAt])
+}
+
+model CampaignSpendEntry {
+  id             String   @id @default(cuid())
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignId     String
+  idempotencyKey String   @unique
+  provider       String
+  externalRef    String
+  amount         Int
+  occurredAt     DateTime
+  actor          String
+  createdAt      DateTime @default(now())
+
+  @@unique([provider, externalRef])
+  @@index([campaignId, occurredAt])
 }
 
 model StorefrontContentRevision {
@@ -1768,24 +1821,28 @@ enum OutboxStatus {
   pending
   sent
   failed
+  cancelled
 }
 
 // Transactional outbox for guaranteed-delivery side-effects (notifications,
 // webhook follow-ups). Producers write a message in the SAME transaction as the
 // business change (invariant #10); a pg-boss relay delivers it with retries.
 model OutboxMessage {
-  id        String       @id @default(cuid())
-  channel   String // sms | email | push | telegram | webhook
-  recipient String
-  template  String
-  payload   Json
-  status    OutboxStatus @default(pending)
-  attempts  Int          @default(0)
-  lastError String?
-  createdAt DateTime     @default(now())
-  sentAt    DateTime?
+  id         String       @id @default(cuid())
+  campaign   Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId String?
+  channel    String // sms | email | push | telegram | webhook
+  recipient  String
+  template   String
+  payload    Json
+  status     OutboxStatus @default(pending)
+  attempts   Int          @default(0)
+  lastError  String?
+  createdAt  DateTime     @default(now())
+  sentAt     DateTime?
 
   @@index([status])
+  @@index([campaignId, status])
 }
 
 // ---------- STAFF AUTH ----------

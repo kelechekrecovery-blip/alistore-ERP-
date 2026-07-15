@@ -6,6 +6,7 @@ import { Heart, MapPin, Menu, Phone, Scale, Search, ShoppingBag, User, X } from 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
+import { useCompare } from '@/lib/compare';
 import { useFavorites } from '@/lib/favorites';
 import { ScrollProgress } from './storefront/Motion';
 import { fetchStorefrontContent, type StorefrontPayload } from '@/lib/api';
@@ -33,6 +34,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { count, hydrated: cartHydrated } = useCart();
   const { count: favoritesCount } = useFavorites();
+  const { count: compareCount } = useCompare();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
@@ -75,7 +77,7 @@ export function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-0.5 md:gap-1">
           <HeaderTool href="/favorites" label="Избранное" icon={<Heart size={22} />} count={favoritesCount} hideLabel />
-          <HeaderTool href="/compare" label="Сравнить" icon={<Scale size={22} />} hideLabel />
+          <HeaderTool href="/compare" label="Сравнить" icon={<Scale size={22} />} count={compareCount} hideLabel />
           <HeaderTool href={user ? '/account' : '/login'} label={user ? 'Профиль' : 'Войти'} icon={<User size={22} />} hideLabel />
           <HeaderTool href="/cart" label="Корзина" icon={<ShoppingBag size={22} />} count={cartHydrated ? count : 0} />
           <button type="button" onClick={() => setOpen((value) => !value)} className="grid h-11 w-11 place-items-center rounded-lg text-[#4a4a4a] md:hidden" aria-label={open ? 'Закрыть меню' : 'Открыть меню'}>
