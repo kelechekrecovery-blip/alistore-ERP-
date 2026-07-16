@@ -940,6 +940,213 @@ private struct OrdersView: View {
     }
 }
 
+private struct CustomerReturnsView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var returns: [CustomerReturn] = []
+    @State private var orders: [CustomerOrder] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showingRequest = false
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем возвраты").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if returns.isEmpty {
+                            EmptyStateView(title: "Возвратов пока нет", detail: "Заявку можно оформить по завершённому заказу.", symbol: "arrow.uturn.backward.circle")
+                        } else {
+                            ForEach(returns) { item in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Возврат #\(item.id.suffix(6))")
+                                            .font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                                        Spacer()
+                                        Text(statusLabel(item.status))
+                                            .font(ClientTheme.body(11, weight: .semibold))
+                                            .foregroundStyle(statusColor(item.status))
+                                    }
+                                    Text(item.reason)
+                                        .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).lineLimit(2)
+                                    HStack {
+                                        Text(item.isFullOrder ? "Весь заказ" : "Частичный возврат")
+                                        Spacer()
+                                        Text(item.refundAmount.formatted(.currency(code: "KGS")))
+                                            .font(ClientTheme.body(13, weight: .bold)).foregroundStyle(.white)
+                                    }
+                                    .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                    Text(item.createdAt, format: .dateTime.day().month().year())
+                                        .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                }
+                                .padding(13)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                            }
+                        }
+
+                        Button { showingRequest = true } label: {
+                            Label("Оформить возврат", systemImage: "arrow.uturn.backward")
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(orders.isEmpty)
+                        if orders.isEmpty {
+                            Text("Нет заказов для оформления возврата")
+                                .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Возвраты")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+        .sheet(isPresented: $showingRequest) {
+            NavigationStack {
+                CustomerReturnRequestView(environment: environment, auth: auth, orders: orders) {
+                    showingRequest = false
+                    Task { await load() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            async let loadedReturns: [CustomerReturn] = APIClient(baseURL: environment.apiBaseURL).get("returns/mine", token: token)
+            async let loadedOrders: [CustomerOrder] = APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
+            returns = try await loadedReturns
+            orders = try await loadedOrders
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        ["requested": "Заявка создана", "under_review": "На проверке", "approved": "Одобрено", "rejected": "Отклонено", "processing": "Обрабатывается", "paid": "Возврат выполнен", "reconciled": "Сверено"][status] ?? status
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "rejected": return ClientTheme.coral
+        case "paid", "reconciled", "approved": return ClientTheme.lime
+        default: return .orange
+        }
+    }
+}
+
+private struct CustomerReturnRequestView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let orders: [CustomerOrder]
+    let onCreated: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var orderId: String
+    @State private var reason = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    init(environment: AppEnvironment, auth: CustomerAuthStore, orders: [CustomerOrder], onCreated: @escaping () -> Void) {
+        self.environment = environment
+        self.auth = auth
+        self.orders = orders
+        self.onCreated = onCreated
+        _orderId = State(initialValue: orders.first?.id ?? "")
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Новая заявка")
+                        .font(ClientTheme.display(24, weight: .black)).foregroundStyle(.white)
+                    Text("Сервер проверит доступность возврата и рассчитает сумму. Оплата не считается выполненной до отдельного refund-процесса.")
+                        .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).lineSpacing(3)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Заказ").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+                        Picker("Заказ", selection: $orderId) {
+                            ForEach(orders) { order in
+                                Text("#\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
+                                    .tag(order.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(ClientTheme.lime)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Причина").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+                        TextField("Опишите причину возврата", text: $reason, axis: .vertical)
+                            .lineLimit(3...7)
+                            .foregroundStyle(.white).padding(13)
+                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                    }
+                    if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
+                    Button { Task { await submit() } } label: {
+                        HStack { Spacer(); if isSubmitting { ProgressView().tint(.black) } else { Text("Отправить заявку") }; Spacer() }
+                            .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black).frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSubmitting || orderId.isEmpty || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(18)
+            }
+        }
+        .navigationTitle("Оформить возврат")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Отмена") { dismiss() } } }
+        .tint(ClientTheme.lime)
+    }
+
+    @MainActor
+    private func submit() async {
+        guard let token = auth.session?.accessToken else { return }
+        let cleanReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            let _: CustomerReturn = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "returns/mine",
+                body: CreateCustomerReturnRequest(orderId: orderId, reason: cleanReason),
+                token: token,
+                idempotencyKey: UUID().uuidString
+            )
+            onCreated()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 private struct AccountView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
@@ -1001,6 +1208,9 @@ private struct AccountView: View {
                 .foregroundStyle(ClientTheme.muted)
             AccountMenuRow(title: "Мои заказы", detail: "Статусы, выдача и доставка", symbol: "shippingbox.fill") {
                 OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
+            }
+            AccountMenuRow(title: "Возвраты", detail: "Заявки, статусы и сумма возврата", symbol: "arrow.uturn.backward.circle.fill") {
+                CustomerReturnsView(environment: environment, auth: auth)
             }
             AccountMenuRow(title: "Устройства и гарантия", detail: "IMEI, срок и обращение", symbol: "shield.checkered") {
                 DevicesView(environment: environment, auth: auth)

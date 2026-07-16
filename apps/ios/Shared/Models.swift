@@ -271,6 +271,50 @@ public struct UpdateCustomerSettingsRequest: Encodable, Sendable {
     }
 }
 
+public struct CustomerReturn: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderId: String
+    public let reason: String
+    public let status: String
+    public let refundId: String?
+    public let refundAmount: Int
+    public let isFullOrder: Bool
+    public let createdAt: Date
+    public let items: [CustomerReturnItem]
+    public let order: CustomerReturnOrder?
+}
+
+public struct CustomerReturnItem: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderItemId: String
+    public let qty: Int
+    public let refundAmount: Int
+}
+
+public struct CustomerReturnOrder: Decodable, Sendable {
+    public let id: String
+    public let total: Int
+    public let createdAt: Date
+    public let items: [CustomerReturnOrderItem]
+}
+
+public struct CustomerReturnOrderItem: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let sku: String
+    public let qty: Int
+    public let price: Int
+}
+
+public struct CreateCustomerReturnRequest: Encodable, Sendable {
+    public let orderId: String
+    public let reason: String
+
+    public init(orderId: String, reason: String) {
+        self.orderId = orderId
+        self.reason = reason
+    }
+}
+
 public struct RefreshRequest: Encodable, Sendable {
     public let refreshToken: String
 

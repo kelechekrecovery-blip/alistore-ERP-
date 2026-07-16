@@ -2235,3 +2235,12 @@
 - Checks run: Client simulator build passed; targeted Client XCUITest `4/4`; aggregate iOS UI gate passed for Client `4/4`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
 - Outcome: the available customer account API surface is now connected in iOS Client. Full 17-screen parity, dynamic notification inbox, return/trade-in screens, physical-device biometrics/push, production credentials and signed store submission remain open.
 - Next step: implement the next unblocked native Client route (returns/trade-in) and add signed-in UI coverage without weakening the guest-only test bootstrap.
+
+## 2026-07-17
+
+- Task: add customer-owned native return requests to the Client account cabinet.
+- Files changed: `apps/ios/Shared/Models.swift`, `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: the Client now lists server-owned return requests, shows status/reason/refund amount, loads the authenticated order list for selection, and creates a full-order return through `POST /returns/mine` with a stable idempotency key. The UI explicitly explains that request creation is separate from refund execution and keeps loading/empty/error/retry states.
+- Checks run: Client simulator build passed; targeted Client XCUITest `4/4`; aggregate iOS UI gate passed for Client `4/4`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
+- Outcome: native iOS Client return request software is implemented and simulator-verified. Partial line selection, refund approval/execution UI, trade-in parity, physical-device checks and store release remain open. Native trade-in is intentionally blocked until the customer endpoint stops trusting `customerId` from request body and gains a retry-safe mutation contract.
+- Next step: close the trade-in API ownership/idempotency contract, then add the native customer flow on top of that corrected API.
