@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gate": "courier-cod-reconciliation",
+  "command": "npm run ecosystem:courier-cod:e2e",
+  "exitCode": 0,
+  "packageCommandSha256": "f74acd96d40d5da00ebb9ae10ba686fa74e0779d9359cf17b026485cb093121d",
+  "sourceTreeSha256": "a3b3ee65757a1cc19295379450aca8bb9ea23fe5ae76881296157c66e9b55b5c",
+  "sourceCommit": "0fdbff60714359d97d1bd052b56cec56a1dbff07",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "toolchain": "v25.9.0"
+  },
+  "executionEnvironmentSha256": "fe638b46bf31fa36e3d711c261a2f0e1746440eb275e0c226012c23c72f1809c",
+  "completedAt": "2026-07-16T13:08:42.126Z"
+}

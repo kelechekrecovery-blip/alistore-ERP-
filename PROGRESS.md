@@ -2005,3 +2005,12 @@
 - Checks run: Prisma validate/generate; four populated migration-upgrade harnesses including `order_payment_mode`; clean reset through 96 migrations; API/Web production builds; mobile typecheck; full API `142/142` suites and `643/643` tests; full Playwright `52/52`; targeted exchange `12/12`; targeted COD/exchange/CMS browser group `8/8`; strengthened CMS authoritative payment browser suite `5/5`; `git diff --check`; ecosystem audit. Initial independent reviews found payment-mode, mixed-consignment, zero-loyalty, serialized-cost and migration rollout defects; all were fixed. Final review had no Critical/High finding and its one Medium authoritative-payment assertion gap was fixed and rerun.
 - Outcome: the bounded COD/courier software vertical is implemented and the implementation gate is green. External readiness remains blocked: `ready=1`, `missing=10`, `manual=1`, `blocking=11`. The clean-tree hash-verified evidence artifact is intentionally deferred until this reviewed implementation commit exists.
 - Next step: commit the implementation, record and commit `courier-cod-reconciliation` evidence from the clean source commit, then continue the remaining warranty/service/loaner/procurement and deep native journey matrix without marking the broad ecosystem gate complete.
+
+## 2026-07-16
+
+- Task: record durable `courier-cod-reconciliation` evidence on clean source commit `0fdbff6`.
+- Files changed: ecosystem evidence manifest, immutable content-addressed courier/COD result artifact and progress record.
+- Result: the clean-tree recorder reran Web COD checkout, warehouse fulfillment, courier delivery, idempotent cash handover and concurrent completion successfully. The result is bound to source-tree SHA-256 `a3b3ee65757a1cc19295379450aca8bb9ea23fe5ae76881296157c66e9b55b5c`, source commit `0fdbff60714359d97d1bd052b56cec56a1dbff07`, the exact package command and host/Node environment.
+- Checks run: `npm run ecosystem:evidence -- courier-cod-reconciliation`; Playwright `1/1`; independent SHA-256 verification matched artifact filename and manifest; source command exited zero.
+- Outcome: durable exact money, inventory and Event Ledger evidence is recorded for the bounded courier/COD vertical. The broad reconciled ecosystem, deep native journey, visual corpus and external provider/hardware gates remain open.
+- Next step: commit the immutable evidence, verify the clean-tree courier/COD audit gate passes, then implement the next bounded warranty/service/loaner or procurement journey.

@@ -45,10 +45,16 @@
       ]
     },
     "courier-cod-reconciliation": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "ecosystem:courier-cod:e2e",
-      "command": null,
-      "artifacts": []
+      "command": "npm run ecosystem:courier-cod:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-e5ebb47d7350ce53eb1959b91ec90dca67149b61a2cb3acc7f4055eb14596d90.json",
+          "sha256": "e5ebb47d7350ce53eb1959b91ec90dca67149b61a2cb3acc7f4055eb14596d90"
+        }
+      ]
     },
     "reconciled-e2e": {
       "status": "partial",
