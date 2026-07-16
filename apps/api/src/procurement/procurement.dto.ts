@@ -106,6 +106,15 @@ export class ReconcileSupplierStatementLineDto {
   @IsString() @MinLength(1) @MaxLength(64) journalEntryId!: string;
 }
 
+export class CreateLandedCostDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(128) documentNumber!: string;
+  @IsString() @MaxLength(64) purchaseOrderId!: string;
+  @IsInt() @Min(1) amount!: number;
+  @IsIn(['2000', '1010', '1020', '6600']) creditAccountCode!: '2000' | '1010' | '1020' | '6600';
+  @IsString() @MinLength(3) @MaxLength(500) description!: string;
+}
+
 export class CreateSupplierCreditNoteDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsString() @MinLength(1) @MaxLength(128) noteNumber!: string;

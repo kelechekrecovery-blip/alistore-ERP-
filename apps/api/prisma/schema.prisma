@@ -575,6 +575,7 @@ model Product {
   valuationLayers             InventoryValuationLayer[]
   valuationIssues             InventoryValuationIssue[]
   valuationReversals          InventoryValuationReversal[]
+  landedCostAllocations       LandedCostAllocation[]
   exchangeReplacementRequests ExchangeRequest[]            @relation("ExchangeReplacementProduct")
 
   @@index([category])
@@ -654,6 +655,7 @@ model DeviceUnit {
   quarantineCases             InventoryQuarantineCase[]
   exchangeReturnRequests      ExchangeRequest[]         @relation("ExchangeReturnedUnit")
   exchangeReplacementRequests ExchangeRequest[]         @relation("ExchangeReplacementUnit")
+  landedCostAllocations       LandedCostAllocation[]
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -1651,6 +1653,7 @@ model Supplier {
   creditNotes    SupplierCreditNote[]
   advances       SupplierAdvance[]
   statements     SupplierStatement[]
+  landedCosts    LandedCost[]
   expenses       Expense[]
   createdAt      DateTime             @default(now())
 }
@@ -1756,6 +1759,7 @@ model AccountingJournalEntry {
   supplierAdvance          SupplierAdvance?
   supplierAdvanceAllocation SupplierInvoiceAdvanceAllocation?
   supplierStatementLine    SupplierStatementLine?
+  landedCost               LandedCost?
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -1921,6 +1925,7 @@ model PurchaseOrder {
   items          PurchaseOrderItem[]
   receipts       PurchaseReceipt[]
   invoices       SupplierInvoice[]
+  landedCosts    LandedCost[]
 
   @@index([supplierId, createdAt])
   @@index([status, createdAt])
@@ -2087,6 +2092,49 @@ model SupplierStatementLine {
   @@unique([statementId, externalId])
   @@index([statementId, status])
   @@index([occurredAt, amount])
+}
+
+// Additional acquisition costs are capitalized into the received serialized
+// units and the inventory asset account in one immutable document.
+model LandedCost {
+  id                 String                  @id @default(cuid())
+  purchaseOrder      PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrderId    String
+  supplier           Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId         String
+  idempotencyKey     String                  @unique
+  documentNumber     String                  @unique
+  amount             Int
+  creditAccountCode  String
+  description        String
+  appliedBy          String
+  appliedAt          DateTime                @default(now())
+  accountingEntryId  String                  @unique
+  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  allocations        LandedCostAllocation[]
+  createdAt          DateTime                @default(now())
+
+  @@index([purchaseOrderId, createdAt])
+  @@index([supplierId, createdAt])
+}
+
+model LandedCostAllocation {
+  id              String     @id @default(cuid())
+  landedCost      LandedCost @relation(fields: [landedCostId], references: [id], onDelete: Restrict)
+  landedCostId    String
+  unit            DeviceUnit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unitId          String
+  imei            String
+  product         Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId       String
+  baseCost        Int
+  allocatedAmount Int
+  resultingCost   Int
+  createdAt       DateTime   @default(now())
+
+  @@unique([landedCostId, unitId])
+  @@index([unitId, createdAt])
+  @@index([productId, createdAt])
 }
 
 model SupplierCreditNote {

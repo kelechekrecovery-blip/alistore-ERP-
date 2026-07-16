@@ -5,7 +5,7 @@ import { AuditService, AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
+import { ApplySupplierAdvanceDto, CreateLandedCostDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
@@ -669,6 +669,7 @@ export class ProcurementService {
           supplierInvoicePayment: { select: { invoice: { select: { supplierId: true } } } },
           supplierAdvanceAllocation: { select: { invoice: { select: { supplierId: true } } } },
           supplierCreditNote: { select: { supplierId: true } },
+          landedCost: { select: { supplierId: true } },
         },
       });
       if (!entry) throw new ValidationError('accounting_entry_not_found', `Проводка ${dto.journalEntryId} не найдена`);
@@ -678,7 +679,8 @@ export class ProcurementService {
       const entrySupplierId = entry.purchaseReceipt?.purchaseOrder.supplierId
         ?? entry.supplierInvoicePayment?.invoice.supplierId
         ?? entry.supplierAdvanceAllocation?.invoice.supplierId
-        ?? entry.supplierCreditNote?.supplierId;
+        ?? entry.supplierCreditNote?.supplierId
+        ?? entry.landedCost?.supplierId;
       if (!entrySupplierId) throw new ConflictError('supplier_statement_entry_supplier_unknown', 'Нельзя определить поставщика проводки');
       if (entrySupplierId !== line.statement.supplierId) throw new ConflictError('supplier_statement_supplier_mismatch', 'Проводка принадлежит другому поставщику');
       const duplicate = await tx.supplierStatementLine.findUnique({ where: { matchedEntryId: entry.id }, select: { id: true } });
@@ -692,6 +694,156 @@ export class ProcurementService {
         events: [{ type: 'supplier.statement.line_reconciled', actor, payload: { lineId: id, statementId: line.statementId, journalEntryId: entry.id, amount: line.amount, supplierId: line.statement.supplierId }, refs: [id, line.statementId, entry.id, line.statement.supplierId] }],
       };
     });
+  }
+
+  listLandedCosts(purchaseOrderId?: string) {
+    return this.prisma.landedCost.findMany({
+      where: purchaseOrderId ? { purchaseOrderId } : undefined,
+      include: {
+        supplier: { select: { id: true, name: true } },
+        purchaseOrder: { select: { id: true, number: true, location: true } },
+        accountingEntry: { include: { lines: true } },
+        allocations: {
+          include: { unit: { select: { imei: true, status: true, acquisitionCost: true } }, product: { select: { id: true, sku: true, name: true } } },
+          orderBy: { imei: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  async createLandedCost(dto: CreateLandedCostDto, actor: string) {
+    const documentNumber = dto.documentNumber.trim();
+    const description = dto.description.trim();
+    if (!documentNumber || !description) throw new ValidationError('landed_cost_fields_required', 'Укажите документ и описание landed cost');
+    const existing = await this.prisma.landedCost.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { allocations: true, accountingEntry: { include: { lines: true } } },
+    });
+    if (existing) return replayLandedCost(existing, dto, documentNumber, description);
+
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "PurchaseOrder" WHERE id = ${dto.purchaseOrderId} FOR UPDATE`;
+        const replay = await tx.landedCost.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+          include: { allocations: true, accountingEntry: { include: { lines: true } } },
+        });
+        if (replay) return { result: replayLandedCost(replay, dto, documentNumber, description), events: [] };
+
+        const order = await tx.purchaseOrder.findUnique({ where: { id: dto.purchaseOrderId }, include: { items: true, receipts: true } });
+        if (!order) throw new ValidationError('purchase_order_not_found', `PO ${dto.purchaseOrderId} не найден`);
+        if (order.status === 'cancelled') throw new ConflictError('landed_cost_purchase_order_cancelled', 'Нельзя капитализировать расходы отменённого PO');
+
+        const itemsById = new Map(order.items.map((item) => [item.id, item]));
+        const received: Array<{ imei: string; productId: string; baseCost: number }> = [];
+        for (const receipt of order.receipts) {
+          if (!Array.isArray(receipt.payload)) continue;
+          for (const rawLine of receipt.payload) {
+            if (!rawLine || typeof rawLine !== 'object') throw new ValidationError('landed_cost_receipt_payload_invalid', 'Найден некорректный payload приёмки');
+            const line = rawLine as { itemId?: unknown; imeis?: unknown };
+            const item = typeof line.itemId === 'string' ? itemsById.get(line.itemId) : undefined;
+            if (!item || !Array.isArray(line.imeis)) throw new ValidationError('landed_cost_receipt_payload_invalid', 'Строка приёмки не соответствует PO');
+            for (const rawImei of line.imeis) {
+              if (typeof rawImei !== 'string' || !rawImei.trim()) throw new ValidationError('landed_cost_imei_invalid', 'В приёмке найден пустой IMEI');
+              received.push({ imei: rawImei.trim(), productId: item.productId, baseCost: item.unitCost });
+            }
+          }
+        }
+        if (received.length === 0) throw new ConflictError('landed_cost_no_received_units', 'Сначала оприходуйте хотя бы одну позицию PO');
+        if (new Set(received.map((unit) => unit.imei)).size !== received.length) throw new ConflictError('landed_cost_duplicate_unit', 'Один IMEI повторяется в истории приёмки');
+
+        const imeis = received.map((unit) => unit.imei);
+        await tx.$queryRaw`SELECT id FROM "DeviceUnit" WHERE imei IN (${Prisma.join(imeis)}) FOR UPDATE`;
+        const units = await tx.deviceUnit.findMany({ where: { imei: { in: imeis } }, select: { id: true, imei: true, productId: true, status: true, acquisitionCost: true } });
+        const unitsByImei = new Map(units.map((unit) => [unit.imei, unit]));
+        if (units.length !== received.length) throw new ConflictError('landed_cost_unit_missing', 'Не все принятые единицы найдены в складе');
+        const unavailable = units.filter((unit) => unit.status !== 'in_stock' && unit.status !== 'reserved');
+        if (unavailable.length) throw new ConflictError('landed_cost_unit_not_on_hand', 'Landed cost можно применить только к единицам на остатке');
+        if (units.some((unit) => unit.acquisitionCost === null)) throw new ConflictError('landed_cost_missing_acquisition_cost', 'У единицы отсутствует базовая себестоимость');
+
+        const totalBase = received.reduce((sum, unit) => sum + unit.baseCost, 0);
+        if (!Number.isSafeInteger(totalBase) || totalBase <= 0) throw new ValidationError('landed_cost_base_invalid', 'База распределения landed cost должна быть положительной');
+        const shares = received.map((unit) => ({ ...unit, allocatedAmount: Math.floor((dto.amount * unit.baseCost) / totalBase) }));
+        let remainder = dto.amount - shares.reduce((sum, unit) => sum + unit.allocatedAmount, 0);
+        for (const share of [...shares].sort((a, b) => a.imei.localeCompare(b.imei))) {
+          if (remainder <= 0) break;
+          share.allocatedAmount += 1;
+          remainder -= 1;
+        }
+        if (remainder !== 0) throw new ValidationError('landed_cost_allocation_failed', 'Не удалось распределить landed cost без потери копеек');
+
+        const landedCostId = randomUUID();
+        const accountingEntry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:procurement.landed-cost:${landedCostId}`,
+          sourceType: 'procurement.landed-cost',
+          sourceRef: landedCostId,
+          description,
+          point: order.location,
+          documentAmount: dto.amount,
+          baseAmount: dto.amount,
+          occurredAt: new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: '1200', debit: dto.amount, memo: 'Капитализация дополнительных затрат в товарный запас' },
+            { accountCode: dto.creditAccountCode, credit: dto.amount, memo: 'Источник дополнительных затрат закупки' },
+          ],
+        });
+        const landedCost = await tx.landedCost.create({
+          data: {
+            id: landedCostId,
+            purchaseOrderId: order.id,
+            supplierId: order.supplierId,
+            idempotencyKey: dto.idempotencyKey,
+            documentNumber,
+            amount: dto.amount,
+            creditAccountCode: dto.creditAccountCode,
+            description,
+            appliedBy: actor,
+            accountingEntryId: accountingEntry.id,
+            allocations: {
+              create: shares.map((share) => {
+                const unit = unitsByImei.get(share.imei)!;
+                return {
+                  unitId: unit.id,
+                  imei: share.imei,
+                  productId: share.productId,
+                  baseCost: share.baseCost,
+                  allocatedAmount: share.allocatedAmount,
+                  resultingCost: unit.acquisitionCost! + share.allocatedAmount,
+                };
+              }),
+            },
+          },
+          include: { allocations: true, accountingEntry: { include: { lines: true } } },
+        });
+        for (const share of shares) {
+          const unit = unitsByImei.get(share.imei)!;
+          await tx.deviceUnit.update({ where: { id: unit.id }, data: { acquisitionCost: { increment: share.allocatedAmount } } });
+        }
+        const productTotals = new Map<string, number>();
+        for (const share of shares) productTotals.set(share.productId, (productTotals.get(share.productId) ?? 0) + share.allocatedAmount);
+        for (const [productId, totalValue] of productTotals) {
+          await tx.inventoryMovement.create({
+            data: { productId, qty: 0, valuationQty: 0, type: 'received', to: order.location, reason: `${documentNumber}:landed-cost`, totalValue },
+          });
+        }
+        return {
+          result: { ...landedCost, idempotent: false },
+          events: [
+            { type: 'procurement.landed_cost.applied', actor, payload: { landedCostId, purchaseOrderId: order.id, supplierId: order.supplierId, amount: dto.amount, allocations: shares.length }, refs: [landedCostId, order.id, order.supplierId, accountingEntry.id] },
+            { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'procurement.landed-cost', sourceRef: landedCostId, amount: dto.amount }, refs: [accountingEntry.id, landedCostId, order.id, order.supplierId] },
+          ],
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replay = await this.prisma.landedCost.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { allocations: true, accountingEntry: { include: { lines: true } } } });
+        if (replay) return replayLandedCost(replay, dto, documentNumber, description);
+      }
+      throw error;
+    }
   }
 
   listCreditNotes(supplierId?: string) {
@@ -831,6 +983,22 @@ function replaySupplierStatementLine(
     throw new ConflictError('supplier_statement_reconciliation_conflict', 'Ключ сверки уже использован для другой строки или проводки');
   }
   return { ...line, idempotent: true };
+}
+
+function replayLandedCost(
+  landedCost: Prisma.LandedCostGetPayload<{ include: { allocations: true; accountingEntry: { include: { lines: true } } } }>,
+  dto: CreateLandedCostDto,
+  documentNumber: string,
+  description: string,
+) {
+  if (landedCost.purchaseOrderId !== dto.purchaseOrderId
+    || landedCost.documentNumber !== documentNumber
+    || landedCost.amount !== dto.amount
+    || landedCost.creditAccountCode !== dto.creditAccountCode
+    || landedCost.description !== description) {
+    throw new ConflictError('landed_cost_idempotency_conflict', 'Ключ landed cost уже использован для других данных');
+  }
+  return { ...landedCost, idempotent: true };
 }
 
 function purchaseOrderNumber(): string {

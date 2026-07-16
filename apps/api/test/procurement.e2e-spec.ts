@@ -51,6 +51,8 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   async function cleanFixtures() {
     await prisma.auditEvent.deleteMany();
+    await prisma.landedCostAllocation.deleteMany();
+    await prisma.landedCost.deleteMany();
     await prisma.supplierStatementLine.deleteMany();
     await prisma.supplierStatement.deleteMany();
     await prisma.supplierInvoiceAdvanceAllocation.deleteMany();
@@ -533,6 +535,57 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .expect(200);
     expect(listed.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: imported.body.id, status: 'reconciled', lines: expect.arrayContaining([expect.objectContaining({ id: lineId, matchedEntry: expect.objectContaining({ id: paymentEntryId }) })]) })]));
     expect(await prisma.auditEvent.count({ where: { type: 'supplier.statement.line_reconciled', refs: { has: lineId } } })).toBe(1);
+  });
+
+  it('capitalizes landed cost across received units exactly once', async () => {
+    const { supplier, product } = await fixture();
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `create-${RUN}-landed`, supplierId: supplier.id, location: 'BISHKEK-1', items: [{ productId: product.id, qty: 2, unitCost: 70000 }] })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/purchase-orders/${created.body.id}/send`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ idempotencyKey: `receipt-${RUN}-landed`, lines: [{ itemId: created.body.items[0].id, imeis: [`PO-LANDED-${RUN}-1`, `PO-LANDED-${RUN}-2`] }] })
+      .expect(201);
+
+    const payload = {
+      idempotencyKey: `landed-${RUN}`,
+      documentNumber: `FREIGHT-${RUN}`,
+      purchaseOrderId: created.body.id,
+      amount: 10000,
+      creditAccountCode: '2000',
+      description: 'Доставка партии до склада',
+    };
+    await request(app.getHttpServer()).post('/procurement/landed-costs').expect(401);
+    await request(app.getHttpServer()).post('/procurement/landed-costs').set('Authorization', `Bearer ${sellerToken}`).send(payload).expect(403);
+    const applied = await request(app.getHttpServer())
+      .post('/procurement/landed-costs')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(payload)
+      .expect(201);
+    expect(applied.body).toMatchObject({ purchaseOrderId: created.body.id, supplierId: supplier.id, amount: 10000, creditAccountCode: '2000', idempotent: false });
+    expect(applied.body.allocations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ imei: `PO-LANDED-${RUN}-1`, baseCost: 70000, allocatedAmount: 5000, resultingCost: 75000 }),
+      expect.objectContaining({ imei: `PO-LANDED-${RUN}-2`, baseCost: 70000, allocatedAmount: 5000, resultingCost: 75000 }),
+    ]));
+    const replay = await request(app.getHttpServer()).post('/procurement/landed-costs').set('Authorization', `Bearer ${adminToken}`).send(payload).expect(201);
+    expect(replay.body).toMatchObject({ id: applied.body.id, idempotent: true });
+    await request(app.getHttpServer()).post('/procurement/landed-costs').set('Authorization', `Bearer ${adminToken}`).send({ ...payload, amount: 10001 }).expect(409);
+
+    const units = await prisma.deviceUnit.findMany({ where: { imei: { startsWith: `PO-LANDED-${RUN}` } }, orderBy: { imei: 'asc' } });
+    expect(units.map((unit) => unit.acquisitionCost)).toEqual([75000, 75000]);
+    const entry = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: applied.body.accountingEntryId }, include: { lines: true, landedCost: true } });
+    expect(entry.sourceType).toBe('procurement.landed-cost');
+    expect(entry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1200', debit: 10000, credit: 0 }),
+      expect.objectContaining({ accountCode: '2000', debit: 0, credit: 10000 }),
+    ]));
+    expect(entry.landedCost?.supplierId).toBe(supplier.id);
+    expect(await prisma.inventoryMovement.count({ where: { reason: `${payload.documentNumber}:landed-cost`, totalValue: 10000 } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'procurement.landed_cost.applied', refs: { has: applied.body.id } } })).toBe(1);
   });
 
   it('serializes concurrent receipts so ordered quantity cannot be exceeded', async () => {

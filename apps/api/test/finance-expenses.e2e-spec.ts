@@ -61,6 +61,8 @@ describe('Finance expenses (integration + RBAC)', () => {
       prisma.supplierCreditNote.updateMany({ where: { accountingEntryId: { not: null } }, data: { accountingEntryId: null } }),
       prisma.supplierStatementLine.deleteMany(),
       prisma.supplierStatement.deleteMany(),
+      prisma.landedCostAllocation.deleteMany(),
+      prisma.landedCost.deleteMany(),
       prisma.supplierInvoiceAdvanceAllocation.deleteMany(),
       prisma.supplierAdvance.deleteMany(),
       prisma.supplierInvoicePayment.deleteMany(),

@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
+import { ApplySupplierAdvanceDto, CreateLandedCostDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
 import { ProcurementService } from './procurement.service';
 
 @ApiTags('procurement')
@@ -172,5 +172,25 @@ export class SupplierStatementController {
   @RequirePermission('procurement', 'receive')
   reconcile(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReconcileSupplierStatementLineDto) {
     return this.procurement.reconcileSupplierStatementLine(id, dto, user.customerId);
+  }
+}
+
+@ApiTags('procurement')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@Controller('procurement/landed-costs')
+export class LandedCostController {
+  constructor(private readonly procurement: ProcurementService) {}
+
+  @Get()
+  @RequirePermission('procurement', 'read')
+  list(@Query('purchaseOrderId') purchaseOrderId?: string) {
+    return this.procurement.listLandedCosts(purchaseOrderId);
+  }
+
+  @Post()
+  @RequirePermission('procurement', 'receive')
+  apply(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateLandedCostDto) {
+    return this.procurement.createLandedCost(dto, user.customerId);
   }
 }
