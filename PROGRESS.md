@@ -2262,3 +2262,12 @@
 - Checks run: Client simulator build passed; targeted Client XCUITest passed `4/4`; aggregate iOS UI gate completed successfully with the existing Client/Staff/Courier/POS bundles; non-fatal existing POS actor-isolation and LLDB debugger-store warnings remain.
 - Outcome: native iOS Client trade-in software is implemented and simulator-verified. Android Compose parity, evidence camera upload/retry, physical-device checks, live providers and store release remain open.
 - Next step: implement the same customer-owned trade-in flow in Android Compose using Keystore-backed session and stable WorkManager/idempotency semantics.
+
+## 2026-07-17
+
+- Task: add the API-backed Android Client trade-in route with owner-scoped history, retry-safe submission and offline queue fallback.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/Models.kt`, `apps/android/core/src/main/java/kg/alistore/core/CheckoutManager.kt`, `apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt`, `apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt`, `apps/android/core/src/main/java/kg/alistore/core/ClientTradeInScreen.kt`, `apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt`.
+- Result: signed-in Client users can list their own trade-ins, submit a model/IMEI/grade/price/passport assessment without a customerId body field, retry a 401 refresh with the same idempotency key, and queue network failures through the existing SQLite/WorkManager replay path. The API parser exposes only the masked passport returned by the server.
+- Checks run: Android `:core:compileDebugKotlin` and `:core:testDebugUnitTest` passed; `:core:compileDebugAndroidTestKotlin` passed; connected `ClientTradeInScreenTest` passed `1/1`; `git diff --check` passed. The required JDK 17 was supplied by the already-installed Homebrew `openjdk@17` runtime because the shell had no default Java runtime.
+- Outcome: Android Client trade-in software is implemented and emulator-verified. Evidence camera upload/retry, process-level draft restoration, physical-device biometrics/network checks, live providers and store release remain open.
+- Next step: add native trade-in evidence capture/retry and then move to the next unblocked Android Client parity route.

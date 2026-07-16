@@ -86,6 +86,13 @@ fun CreateReturnRequest.toJson(): JSONObject = JSONObject()
   .put("orderId", orderId)
   .put("reason", reason)
 
+fun CreateTradeInRequest.toJson(): JSONObject = JSONObject()
+  .put("model", model)
+  .put("imei", imei ?: JSONObject.NULL)
+  .put("grade", grade)
+  .put("price", price)
+  .put("sellerPassport", sellerPassport)
+
 fun CreateCustomerAddressRequest.toJson(): JSONObject = JSONObject()
   .put("title", title)
   .put("text", text)

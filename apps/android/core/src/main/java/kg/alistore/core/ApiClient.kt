@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
-  CustomerSupportGateway, CustomerReturnsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
+  CustomerSupportGateway, CustomerReturnsGateway, CustomerTradeInsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
   StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway,
   PushRegistrationGateway, CourierGateway, PosGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
@@ -130,6 +130,18 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   ): CustomerReturn = this.request(
     "returns/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
   ).customerReturn()
+
+  override suspend fun tradeIns(token: String): List<CustomerTradeIn> = requestArray("tradeins/mine", token).let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).customerTradeIn()) }
+  }
+
+  override suspend fun createTradeIn(
+    request: CreateTradeInRequest,
+    token: String,
+    idempotencyKey: String,
+  ): CustomerTradeIn = this.request(
+    "tradeins", "POST", request.toJson(), token, idempotencyKey = idempotencyKey,
+  ).customerTradeIn()
 
   override suspend fun loyalty(token: String): CustomerLoyalty = request("customers/me/loyalty", "GET", token = token).loyalty()
 
@@ -748,6 +760,17 @@ private fun JSONObject.customerReturn() = CustomerReturn(
       }.orEmpty(),
     )
   },
+)
+
+private fun JSONObject.customerTradeIn() = CustomerTradeIn(
+  id = getString("id"),
+  customerId = getString("customerId"),
+  model = getString("model"),
+  imei = nullableString("imei"),
+  grade = getString("grade"),
+  price = getInt("price"),
+  contractId = nullableString("contractId"),
+  sellerPassportMasked = getString("sellerPassportMasked"),
 )
 
 private fun JSONObject.loyalty() = CustomerLoyalty(

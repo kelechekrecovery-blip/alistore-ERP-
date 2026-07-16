@@ -164,6 +164,10 @@ private fun SignedInAccount(
     ClientReturnsScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
   }
+  if (route == "tradeins") {
+    ClientTradeInsScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    return
+  }
   if (route == "bonuses") {
     ClientBonusesScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
@@ -183,7 +187,7 @@ private fun SignedInAccount(
       Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("account-title"))
       Text(state.user.phone ?: "Профиль AliStore", color = AuthLime, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
     }
-    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Возвраты", "Адреса", "Поддержка", "Настройки")) { title ->
+    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Возвраты", "Trade-in", "Адреса", "Поддержка", "Настройки")) { title ->
       Text(
         title,
         color = Color.White,
@@ -192,6 +196,7 @@ private fun SignedInAccount(
             onRoute(when (title) {
               "Мои заказы" -> "orders"
               "Возвраты" -> "returns"
+              "Trade-in" -> "tradeins"
               "Поддержка" -> "support"
               "Бонусы" -> "bonuses"
               "Адреса" -> "addresses"

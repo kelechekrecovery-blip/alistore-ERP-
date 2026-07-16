@@ -343,6 +343,25 @@ data class CustomerReturn(
 
 data class CreateReturnRequest(val orderId: String, val reason: String)
 
+data class CustomerTradeIn(
+  val id: String,
+  val customerId: String,
+  val model: String,
+  val imei: String?,
+  val grade: String,
+  val price: Int,
+  val contractId: String?,
+  val sellerPassportMasked: String,
+)
+
+data class CreateTradeInRequest(
+  val model: String,
+  val imei: String?,
+  val grade: String,
+  val price: Int,
+  val sellerPassport: String,
+)
+
 data class EvidenceAttachment(val key: String, val url: String)
 
 data class LoyaltyCoupon(
