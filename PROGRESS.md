@@ -2208,3 +2208,12 @@
 - Checks run: XcodeGen; Client simulator build; unsigned generic iOS Release archive with `API_BASE_URL=https://api.alistore.kg/api`; archive plist inspection confirmed the HTTPS URL and two privacy manifests; invalid issuer preflight exited `1` as required.
 - Outcome: Release configuration is buildable and fail-closed, but the archive is intentionally unsigned: the local machine has Apple certificates, while no provisioning profile or verified App Store Connect issuer was available. App Store/TestFlight publication is not claimed.
 - Next step: complete remaining Client routes and add verified signing/profile credentials to the protected release environment before attempting upload.
+
+## 2026-07-17
+
+- Task: wire the available Client prototype utility routes and keep comparison state across presentations.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: the Client header now exposes accessible Search, Compare and Notifications actions; Search filters the available catalog and opens product detail, Compare supports up to four products with persistent selection across reopen, and Notifications has a prototype-aligned dark inbox shell.
+- Checks run: targeted Client XCUITest `3/3`; aggregate iOS UI gate Client `3/3`, Staff `1/1`, Courier `1/1`, POS `1/1`; unsigned generic iOS Release archive succeeded; archive inspection confirmed HTTPS API URL and two privacy manifests; `git diff --check` passed.
+- Outcome: this bounded Client shell iteration is accepted on the simulator and release-build level. Notification data, account-backed compare sync, full 17-screen parity, physical-device biometrics/push and signed submission remain open.
+- Next step: implement the next API-backed Client account route, then refresh the native and release evidence after the route is covered by UI tests.

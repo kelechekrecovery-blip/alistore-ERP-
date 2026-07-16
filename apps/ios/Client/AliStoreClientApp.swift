@@ -24,6 +24,12 @@ private enum ClientTab: Hashable {
     case home, catalog, favorites, cart, account
 }
 
+private enum ClientOverlay: String, Identifiable {
+    case search, compare, notifications
+
+    var id: String { rawValue }
+}
+
 private enum ClientTheme {
     static let background = Color(red: 0.055, green: 0.047, blue: 0.039)
     static let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
@@ -114,20 +120,20 @@ private struct ClientHeader: View {
                     .accessibilityLabel("Уведомления")
             }
             .foregroundStyle(.white)
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
-                Text("Поиск техники, брендов…")
-                    .font(ClientTheme.body(14))
-                    .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
-                Spacer()
+            Button(action: onSearch) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                    Text("Поиск техники, брендов…")
+                        .font(ClientTheme.body(14))
+                        .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
             }
-            .padding(.horizontal, 14)
-            .frame(height: 44)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
-            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onSearch)
-            .accessibilityElement(children: .combine)
+            .buttonStyle(.plain)
             .accessibilityLabel("Поиск техники и брендов")
         }
         .padding(.horizontal, 16)
@@ -295,6 +301,205 @@ private struct ClientLoginView: View {
     }
 }
 
+private struct ClientOverlayView: View {
+    let screen: ClientOverlay
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    @Binding var compared: Set<String>
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    private var matchingProducts: [Product] {
+        let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return products }
+        return products.filter {
+            $0.name.localizedCaseInsensitiveContains(value) ||
+            $0.category.localizedCaseInsensitiveContains(value) ||
+            $0.sku.localizedCaseInsensitiveContains(value)
+        }
+    }
+
+    private var comparedProducts: [Product] {
+        products.filter { compared.contains($0.id) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                switch screen {
+                case .search:
+                    searchContent
+                case .compare:
+                    compareContent
+                case .notifications:
+                    notificationContent
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Закрыть", systemImage: "xmark") { dismiss() }
+                        .accessibilityLabel("Закрыть")
+                }
+            }
+        }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+    }
+
+    private var title: String {
+        switch screen {
+        case .search: "Поиск"
+        case .compare: "Сравнение"
+        case .notifications: "Уведомления"
+        }
+    }
+
+    @ViewBuilder
+    private var searchContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(ClientTheme.muted)
+                    TextField("Техника, бренды, SKU", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .foregroundStyle(.white)
+                }
+                .padding(14)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                if products.isEmpty {
+                    EmptyStateView(title: "Каталог недоступен", detail: "Проверьте соединение и повторите поиск.", symbol: "wifi.exclamationmark")
+                } else if matchingProducts.isEmpty {
+                    EmptyStateView(title: "Ничего не найдено", detail: "Измените запрос или попробуйте название бренда.", symbol: "magnifyingglass")
+                } else {
+                    LazyVStack(spacing: 10) {
+                        ForEach(matchingProducts) { product in
+                            NavigationLink {
+                                ProductDetail(product: product, cart: $cart, favorites: $favorites)
+                            } label: {
+                                searchRow(product)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    @ViewBuilder
+    private var compareContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("До 4 товаров")
+                    .font(ClientTheme.body(12, weight: .semibold))
+                    .foregroundStyle(ClientTheme.muted)
+                if comparedProducts.isEmpty {
+                    EmptyStateView(title: "Нет товаров для сравнения", detail: "Откройте поиск и добавьте технику к сравнению.", symbol: "arrow.left.arrow.right")
+                } else {
+                    ForEach(comparedProducts) { product in
+                        compareRow(product, selected: true)
+                    }
+                }
+                if !products.isEmpty {
+                    Text("Добавить товар")
+                        .font(ClientTheme.display(16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.top, 8)
+                    ForEach(products.filter { !compared.contains($0.id) }.prefix(8)) { product in
+                        compareRow(product, selected: false)
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private var notificationContent: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                ClientNotificationRow(symbol: "shield.fill", title: "Гарантия скоро истекает", detail: "Проверьте гарантию AirPods Pro", time: "вчера")
+                ClientNotificationRow(symbol: "gift.fill", title: "Бонусы начислены", detail: "+300 бонусов за отзыв с фото", time: "2 дня назад")
+                ClientNotificationRow(symbol: "shippingbox.fill", title: "Статус заказа обновлён", detail: "Заказ готовится к выдаче", time: "3 дня назад")
+            }
+            .padding(16)
+        }
+    }
+
+    private func searchRow(_ product: Product) -> some View {
+        HStack(spacing: 12) {
+            ClientProductImage(product: product, cornerRadius: 11)
+                .frame(width: 76, height: 76)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(product.name).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
+                Text(product.category).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.display(14, weight: .bold)).foregroundStyle(.white)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
+        }
+        .padding(10)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    private func compareRow(_ product: Product, selected: Bool) -> some View {
+        HStack(spacing: 10) {
+            ClientProductImage(product: product, cornerRadius: 9).frame(width: 58, height: 58)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+            Spacer()
+            Button {
+                if selected {
+                    compared.remove(product.id)
+                } else if compared.count < 4 {
+                    compared.insert(product.id)
+                }
+            } label: {
+                Image(systemName: selected ? "minus.circle.fill" : "plus.circle")
+                    .font(.title3)
+                    .foregroundStyle(selected ? ClientTheme.coral : ClientTheme.lime)
+            }
+            .accessibilityLabel(selected ? "Убрать из сравнения" : "Добавить к сравнению")
+        }
+        .padding(10)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+}
+
+private struct ClientNotificationRow: View {
+    let symbol: String
+    let title: String
+    let detail: String
+    let time: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .foregroundStyle(ClientTheme.lime)
+                .frame(width: 36, height: 36)
+                .background(ClientTheme.lime.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                Text(detail).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+            Spacer()
+            Text(time).font(ClientTheme.body(10)).foregroundStyle(ClientTheme.muted)
+        }
+        .padding(12)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+}
+
 @main
 struct AliStoreClientApp: App {
     @UIApplicationDelegateAdaptor(ClientAppDelegate.self) private var appDelegate
@@ -316,6 +521,8 @@ private struct ClientRootView: View {
     @State private var favorites: Set<String> = []
     @State private var selectedTab: ClientTab = .home
     @State private var guestMode: Bool
+    @State private var overlay: ClientOverlay?
+    @State private var compared: Set<String> = []
     @State private var orderRefreshRevision = 0
     @State private var pushStatus = "Push не настроен"
     @Environment(\.modelContext) private var modelContext
@@ -339,7 +546,7 @@ private struct ClientRootView: View {
             } else {
                 VStack(spacing: 0) {
                     ClientStatusBar()
-                    ClientHeader(onCompare: { selectedTab = .catalog }, onNotifications: { selectedTab = .account }, onSearch: { selectedTab = .catalog })
+                    ClientHeader(onCompare: { overlay = .compare }, onNotifications: { overlay = .notifications }, onSearch: { overlay = .search })
                     ZStack {
                         switch selectedTab {
                         case .home:
@@ -368,6 +575,9 @@ private struct ClientRootView: View {
             if auth.requiresQuickUnlock, let session = auth.session {
                 QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout(); guestMode = false } })
             }
+        }
+        .fullScreenCover(item: $overlay) { screen in
+            ClientOverlayView(screen: screen, products: products, cart: $cart, favorites: $favorites, compared: $compared)
         }
         .task {
             async let restore: Void = auth.restore()
