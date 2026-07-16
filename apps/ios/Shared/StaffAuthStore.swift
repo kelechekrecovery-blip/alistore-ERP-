@@ -14,11 +14,15 @@ public final class StaffAuthStore {
     private let tokens: SecureTokenStore
     public let quickUnlockService: String
 
-    public init(environment: AppEnvironment, keychainService: String) {
+    public init(environment: AppEnvironment, keychainService: String, restoresStoredSession: Bool = true) {
         self.api = APIClient(baseURL: environment.apiBaseURL)
         self.tokens = SecureTokenStore(service: keychainService)
         self.quickUnlockService = keychainService
-        Task { await self.restore() }
+        if restoresStoredSession {
+            Task { await self.restore() }
+        } else {
+            isRestoring = false
+        }
     }
 
     public func restore() async {

@@ -60,7 +60,10 @@ private struct ClientRootView: View {
 
     init(environment: AppEnvironment) {
         self.environment = environment
-        _auth = State(initialValue: CustomerAuthStore(environment: environment))
+        _auth = State(initialValue: CustomerAuthStore(
+            environment: environment,
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore
+        ))
     }
 
     var body: some View {

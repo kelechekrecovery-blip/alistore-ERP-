@@ -4,7 +4,15 @@ import SwiftUI
 
 @main
 struct AliStorePOSApp: App {
-    @State private var auth = StaffAuthStore(environment: .live(), keychainService: "kg.alistore.pos")
+    @State private var auth: StaffAuthStore
+
+    init() {
+        _auth = State(initialValue: StaffAuthStore(
+            environment: .live(),
+            keychainService: "kg.alistore.pos",
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore
+        ))
+    }
 
     var body: some Scene {
         WindowGroup {

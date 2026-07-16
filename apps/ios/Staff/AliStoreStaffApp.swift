@@ -35,7 +35,15 @@ private final class StaffAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
 @main
 struct AliStoreStaffApp: App {
     @UIApplicationDelegateAdaptor(StaffAppDelegate.self) private var appDelegate
-    @State private var auth = StaffAuthStore(environment: .live(), keychainService: "kg.alistore.staff")
+    @State private var auth: StaffAuthStore
+
+    init() {
+        _auth = State(initialValue: StaffAuthStore(
+            environment: .live(),
+            keychainService: "kg.alistore.staff",
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore
+        ))
+    }
 
     var body: some Scene {
         WindowGroup {

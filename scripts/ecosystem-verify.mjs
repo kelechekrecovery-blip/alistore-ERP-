@@ -21,6 +21,9 @@ if (!skipIos) {
     ['iOS all-target simulator build', 'npm', ['run', 'ios:build']],
     ['iOS shared XCTest contracts', 'npm', ['run', 'ios:test']],
   );
+  if (nativeUi) {
+    steps.push(['iOS packaged application UI smoke', 'npm', ['run', 'ios:ui']]);
+  }
 }
 
 if (!skipAndroid) {
@@ -55,4 +58,7 @@ console.log('\nEcosystem software verification complete.');
 if (!nativeUi) {
   console.log('Android connected UI tests were not run; use npm run ecosystem:verify:ui with a booted emulator/device.');
 }
-console.log('iOS XCUITest targets and physical push/camera/maps/scanner/printer/payment-terminal certification remain separate release gates.');
+if (!nativeUi) {
+  console.log('iOS packaged XCUITest smoke was not run; use npm run ecosystem:verify:ui with an available simulator.');
+}
+console.log('XCUITest does not replace physical push/camera/maps/scanner/printer/payment-terminal certification, which remains a separate release gate.');

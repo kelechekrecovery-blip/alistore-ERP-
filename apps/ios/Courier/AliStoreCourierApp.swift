@@ -35,7 +35,15 @@ final class CourierAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
 @main
 struct AliStoreCourierApp: App {
     @UIApplicationDelegateAdaptor(CourierAppDelegate.self) private var appDelegate
-    @State private var auth = StaffAuthStore(environment: .live(), keychainService: "kg.alistore.courier")
+    @State private var auth: StaffAuthStore
+
+    init() {
+        _auth = State(initialValue: StaffAuthStore(
+            environment: .live(),
+            keychainService: "kg.alistore.courier",
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore
+        ))
+    }
 
     var body: some Scene {
         WindowGroup {

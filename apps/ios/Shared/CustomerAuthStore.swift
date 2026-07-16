@@ -14,14 +14,22 @@ public final class CustomerAuthStore {
 
     private let api: APIClient
     private let tokens: SecureTokenStore
+    private let restoresStoredSession: Bool
 
-    public init(environment: AppEnvironment, keychainService: String = "kg.alistore.client.auth") {
+    public init(
+        environment: AppEnvironment,
+        keychainService: String = "kg.alistore.client.auth",
+        restoresStoredSession: Bool = true
+    ) {
         self.api = APIClient(baseURL: environment.apiBaseURL)
         self.tokens = SecureTokenStore(service: keychainService)
         self.quickUnlockService = keychainService
+        self.restoresStoredSession = restoresStoredSession
+        if !restoresStoredSession { isRestoring = false }
     }
 
     public func restore() async {
+        guard restoresStoredSession else { return }
         defer { isRestoring = false }
         guard let stored = try? readSession() else { return }
         do {

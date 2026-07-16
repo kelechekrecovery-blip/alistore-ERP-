@@ -15,13 +15,18 @@
 		252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */; };
 		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */; };
+		615203EBFF70A2140FAB6A11 /* AliStoreStaffUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */; };
 		652FDF2063F51338694979A9 /* StaffWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7596CAED282254008F7309B8 /* StaffWorkView.swift */; };
 		72577A15EB13D14CB354087E /* CustomerAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */; };
+		72ED8339516944CFBCBD7C65 /* AliStoreCourierUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9576E77974E52F36135B72C9 /* AliStoreCourierUITests.swift */; };
+		73F2797F50FCEB22F130961A /* AliStoreClientUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */; };
 		77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */; };
 		7F516A224125BB6E327DCD90 /* POSSaleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C7F7335AA46910CF656B72 /* POSSaleView.swift */; };
 		8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */; };
 		8C5A4F7C9419670E633A9668 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EBC4D5C06A5630E3B7D69D /* Models.swift */; };
 		8DD0417F646F1BEC0FF7830A /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		8E922FEB132920BF2ABED19D /* AliStorePOSUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DA82D99B1EEA4943E5783E /* AliStorePOSUITests.swift */; };
 		95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04AAB6220384C05861A21153 /* NativeShell.swift */; };
 		A562636391B66F2B1BED55CA /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		A6B3E652D932FE6D10C39B25 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */; };
@@ -54,6 +59,20 @@
 			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
 			remoteInfo = AliStoreCore;
 		};
+		3718E4F1A1661860D242E9A6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 72054852527678365D2752CC;
+			remoteInfo = AliStoreCourier;
+		};
+		73AED76557330A995F4052B5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A363FAEC848E9A2E1504F4F1;
+			remoteInfo = AliStoreStaff;
+		};
 		85C7B61B68AD63E7CA9CE9B6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
@@ -61,12 +80,26 @@
 			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
 			remoteInfo = AliStoreCore;
 		};
+		9959E8D0EBAF81C048A63D2D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2443E875BF45E22BBB848960;
+			remoteInfo = AliStoreClient;
+		};
 		A35D5F7D6213D19D9F199A39 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = CA8BF2CD39686C821BDE5345;
 			remoteInfo = AliStoreCore;
+		};
+		ADA49E244511041A39BAA24D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB2BE8DFF4C369828C62B817 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DC8CC0056CE6295039B84B22;
+			remoteInfo = AliStorePOS;
 		};
 		B2859D65C78ECD058C961930 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -151,10 +184,14 @@
 		42436819B18857A22AC06504 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		48457E88937519CA203EA7DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		524C0236048CC4F9188201E1 /* AliStoreCourier.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreCourier.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		557B30E507B5DA9C404D290C /* AliStorePOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStorePOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		599A4AFDBA80DE5C617B96C9 /* AliStoreCourierUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreCourierUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerAuthStore.swift; sourceTree = "<group>"; };
 		72CCB230F61743790D08A7C6 /* POSOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSOperationsView.swift; sourceTree = "<group>"; };
 		7596CAED282254008F7309B8 /* StaffWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffWorkView.swift; sourceTree = "<group>"; };
+		7B1EBE9146CA6573C91B73B8 /* AliStoreStaffUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreStaffUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStorePOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7F3BF5A1B6E49634345025FF /* AliStoreClientUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		82C7F7335AA46910CF656B72 /* POSSaleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSSaleView.swift; sourceTree = "<group>"; };
 		83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -163,11 +200,16 @@
 		915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAuthStore.swift; sourceTree = "<group>"; };
 		92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffApp.swift; sourceTree = "<group>"; };
 		942E788E79F852B2161181F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9576E77974E52F36135B72C9 /* AliStoreCourierUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierUITests.swift; sourceTree = "<group>"; };
 		9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStorePOSApp.swift; sourceTree = "<group>"; };
+		A7DA82D99B1EEA4943E5783E /* AliStorePOSUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStorePOSUITests.swift; sourceTree = "<group>"; };
 		A9EBC4D5C06A5630E3B7D69D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Staff.entitlements; sourceTree = "<group>"; };
 		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientUITests.swift; sourceTree = "<group>"; };
+		EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestBootstrap.swift; sourceTree = "<group>"; };
 		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -228,6 +270,7 @@
 				3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */,
 				915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */,
 				2A617D85C85DD435B687E350 /* StaffLoginView.swift */,
+				EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -242,6 +285,15 @@
 				7596CAED282254008F7309B8 /* StaffWorkView.swift */,
 			);
 			path = Staff;
+			sourceTree = "<group>";
+		};
+		1E3305AE1F101B36F90EE541 /* Client */ = {
+			isa = PBXGroup;
+			children = (
+				CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */,
+			);
+			name = Client;
+			path = UITests/Client;
 			sourceTree = "<group>";
 		};
 		29CB0946D745BDD994C57D0E /* POS */ = {
@@ -270,26 +322,52 @@
 			isa = PBXGroup;
 			children = (
 				AFE690C0BC04797125C4CBEF /* Client */,
+				1E3305AE1F101B36F90EE541 /* Client */,
 				30160F294B75A406B6360903 /* Courier */,
+				95AE28122B34FF4703842A38 /* Courier */,
 				29CB0946D745BDD994C57D0E /* POS */,
+				7370DE16A39530E37069267B /* POS */,
 				0C5B852F9D1EE5188942BAA0 /* Shared */,
 				1BB465B1D36CFDB9F5FF6922 /* Staff */,
+				D818FBCBD977BA2365A777E2 /* Staff */,
 				DEA3F994B811795AA50AEFDB /* Tests */,
 				88AE5FDBFD9B360957B0229C /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		7370DE16A39530E37069267B /* POS */ = {
+			isa = PBXGroup;
+			children = (
+				A7DA82D99B1EEA4943E5783E /* AliStorePOSUITests.swift */,
+			);
+			name = POS;
+			path = UITests/POS;
 			sourceTree = "<group>";
 		};
 		88AE5FDBFD9B360957B0229C /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */,
+				7F3BF5A1B6E49634345025FF /* AliStoreClientUITests.xctest */,
 				3397795D183792BD78015F89 /* AliStoreCore.framework */,
 				83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */,
 				524C0236048CC4F9188201E1 /* AliStoreCourier.app */,
+				599A4AFDBA80DE5C617B96C9 /* AliStoreCourierUITests.xctest */,
 				7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */,
+				557B30E507B5DA9C404D290C /* AliStorePOSUITests.xctest */,
 				B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */,
+				7B1EBE9146CA6573C91B73B8 /* AliStoreStaffUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		95AE28122B34FF4703842A38 /* Courier */ = {
+			isa = PBXGroup;
+			children = (
+				9576E77974E52F36135B72C9 /* AliStoreCourierUITests.swift */,
+			);
+			name = Courier;
+			path = UITests/Courier;
 			sourceTree = "<group>";
 		};
 		AFE690C0BC04797125C4CBEF /* Client */ = {
@@ -300,6 +378,15 @@
 				48457E88937519CA203EA7DE /* Info.plist */,
 			);
 			path = Client;
+			sourceTree = "<group>";
+		};
+		D818FBCBD977BA2365A777E2 /* Staff */ = {
+			isa = PBXGroup;
+			children = (
+				B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */,
+			);
+			name = Staff;
+			path = UITests/Staff;
 			sourceTree = "<group>";
 		};
 		DEA3F994B811795AA50AEFDB /* Tests */ = {
@@ -313,6 +400,42 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0A264A93E783C619ED392423 /* AliStoreCourierUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3114AF0DCBBD1E7CCA323D81 /* Build configuration list for PBXNativeTarget "AliStoreCourierUITests" */;
+			buildPhases = (
+				B886035F2B9FD059186A7EAF /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				314AE80E160828DD1D82958B /* PBXTargetDependency */,
+			);
+			name = AliStoreCourierUITests;
+			packageProductDependencies = (
+			);
+			productName = AliStoreCourierUITests;
+			productReference = 599A4AFDBA80DE5C617B96C9 /* AliStoreCourierUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		1A61F1A30DE64F6262D665D1 /* AliStoreClientUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 19FF51B4BCC6A7ACDAA4591B /* Build configuration list for PBXNativeTarget "AliStoreClientUITests" */;
+			buildPhases = (
+				FFB501B79328CC03566E2E4A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				406D474EF89CE0BA1EF93041 /* PBXTargetDependency */,
+			);
+			name = AliStoreClientUITests;
+			packageProductDependencies = (
+			);
+			productName = AliStoreClientUITests;
+			productReference = 7F3BF5A1B6E49634345025FF /* AliStoreClientUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		2443E875BF45E22BBB848960 /* AliStoreClient */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = ABBBAFA58E438391703AA7AC /* Build configuration list for PBXNativeTarget "AliStoreClient" */;
@@ -332,6 +455,24 @@
 			productName = AliStoreClient;
 			productReference = C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */;
 			productType = "com.apple.product-type.application";
+		};
+		6D43053968F49FEF0FAC8594 /* AliStoreStaffUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 064C663C713384DA75EB5609 /* Build configuration list for PBXNativeTarget "AliStoreStaffUITests" */;
+			buildPhases = (
+				8B96144BD71ECD845DF4ED44 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FB70000E4523D16C1B669DF0 /* PBXTargetDependency */,
+			);
+			name = AliStoreStaffUITests;
+			packageProductDependencies = (
+			);
+			productName = AliStoreStaffUITests;
+			productReference = 7B1EBE9146CA6573C91B73B8 /* AliStoreStaffUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		72054852527678365D2752CC /* AliStoreCourier */ = {
 			isa = PBXNativeTarget;
@@ -393,6 +534,24 @@
 			productReference = 83830830CE1F5A5EACC1C10A /* AliStoreCoreTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C54029E46181F92621A856A3 /* AliStorePOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 937F895BBC1D54A4BCBFD844 /* Build configuration list for PBXNativeTarget "AliStorePOSUITests" */;
+			buildPhases = (
+				F222B2C0BAA4A4B0CF4AA668 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F05BF6E5229BC9F9162FAF0F /* PBXTargetDependency */,
+			);
+			name = AliStorePOSUITests;
+			packageProductDependencies = (
+			);
+			productName = AliStorePOSUITests;
+			productReference = 557B30E507B5DA9C404D290C /* AliStorePOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		CA8BF2CD39686C821BDE5345 /* AliStoreCore */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8561EC62D37111A7CE0F4353 /* Build configuration list for PBXNativeTarget "AliStoreCore" */;
@@ -439,9 +598,24 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					0A264A93E783C619ED392423 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 72054852527678365D2752CC;
+					};
+					1A61F1A30DE64F6262D665D1 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 2443E875BF45E22BBB848960;
+					};
 					2443E875BF45E22BBB848960 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
+					};
+					6D43053968F49FEF0FAC8594 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = A363FAEC848E9A2E1504F4F1;
 					};
 					72054852527678365D2752CC = {
 						DevelopmentTeam = "";
@@ -454,6 +628,11 @@
 					BD21F76168637D79959BA6FB = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
+					};
+					C54029E46181F92621A856A3 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = DC8CC0056CE6295039B84B22;
 					};
 					CA8BF2CD39686C821BDE5345 = {
 						DevelopmentTeam = "";
@@ -480,11 +659,15 @@
 			projectRoot = "";
 			targets = (
 				2443E875BF45E22BBB848960 /* AliStoreClient */,
+				1A61F1A30DE64F6262D665D1 /* AliStoreClientUITests */,
 				CA8BF2CD39686C821BDE5345 /* AliStoreCore */,
 				BD21F76168637D79959BA6FB /* AliStoreCoreTests */,
 				72054852527678365D2752CC /* AliStoreCourier */,
+				0A264A93E783C619ED392423 /* AliStoreCourierUITests */,
 				DC8CC0056CE6295039B84B22 /* AliStorePOS */,
+				C54029E46181F92621A856A3 /* AliStorePOSUITests */,
 				A363FAEC848E9A2E1504F4F1 /* AliStoreStaff */,
+				6D43053968F49FEF0FAC8594 /* AliStoreStaffUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -527,6 +710,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8B96144BD71ECD845DF4ED44 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				615203EBFF70A2140FAB6A11 /* AliStoreStaffUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B46D93D44AA22409AEEF28FB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -549,6 +740,31 @@
 				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,
 				77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */,
 				E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */,
+				4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B886035F2B9FD059186A7EAF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				72ED8339516944CFBCBD7C65 /* AliStoreCourierUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F222B2C0BAA4A4B0CF4AA668 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8E922FEB132920BF2ABED19D /* AliStorePOSUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FFB501B79328CC03566E2E4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				73F2797F50FCEB22F130961A /* AliStoreClientUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -559,6 +775,16 @@
 			isa = PBXTargetDependency;
 			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
 			targetProxy = 85C7B61B68AD63E7CA9CE9B6 /* PBXContainerItemProxy */;
+		};
+		314AE80E160828DD1D82958B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 72054852527678365D2752CC /* AliStoreCourier */;
+			targetProxy = 3718E4F1A1661860D242E9A6 /* PBXContainerItemProxy */;
+		};
+		406D474EF89CE0BA1EF93041 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2443E875BF45E22BBB848960 /* AliStoreClient */;
+			targetProxy = 9959E8D0EBAF81C048A63D2D /* PBXContainerItemProxy */;
 		};
 		49BA464E644F8F9B93155CED /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -579,6 +805,16 @@
 			isa = PBXTargetDependency;
 			target = CA8BF2CD39686C821BDE5345 /* AliStoreCore */;
 			targetProxy = 074F76269C2BA59CB22450E3 /* PBXContainerItemProxy */;
+		};
+		F05BF6E5229BC9F9162FAF0F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DC8CC0056CE6295039B84B22 /* AliStorePOS */;
+			targetProxy = ADA49E244511041A39BAA24D /* PBXContainerItemProxy */;
+		};
+		FB70000E4523D16C1B669DF0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A363FAEC848E9A2E1504F4F1 /* AliStoreStaff */;
+			targetProxy = 73AED76557330A995F4052B5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -637,6 +873,57 @@
 			};
 			name = Release;
 		};
+		33EF963FF6748679C0FF57C4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.pos.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStorePOS;
+			};
+			name = Debug;
+		};
+		34983CCBC2F012C2B249DC0D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.client.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStoreClient;
+			};
+			name = Release;
+		};
+		4531971EB68BB296B51E3329 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.courier.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStoreCourier;
+			};
+			name = Release;
+		};
 		5BA03919C44C1429936ED28F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -676,6 +963,23 @@
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		6388FEECAEE6FB4C0B7AA819 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.pos.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStorePOS;
 			};
 			name = Release;
 		};
@@ -740,6 +1044,23 @@
 			};
 			name = Release;
 		};
+		6974796B38F8F1FC7D518004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.staff.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStoreStaff;
+			};
+			name = Release;
+		};
 		70DC337812F9AAA29422D547 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -779,6 +1100,23 @@
 				PRODUCT_NAME = AliStoreStaff;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		895F98781D9F9DC0BFFF1E4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.staff.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStoreStaff;
 			};
 			name = Debug;
 		};
@@ -905,6 +1243,40 @@
 			};
 			name = Debug;
 		};
+		B63C1725CF24ABD8D50D451B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.courier.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStoreCourier;
+			};
+			name = Debug;
+		};
+		DC1C003A6A290A25B7A7116C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "kg.alistore.client.ui-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AliStoreClient;
+			};
+			name = Debug;
+		};
 		EA264166879AF3811BD43088 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -943,11 +1315,38 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		064C663C713384DA75EB5609 /* Build configuration list for PBXNativeTarget "AliStoreStaffUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				895F98781D9F9DC0BFFF1E4A /* Debug */,
+				6974796B38F8F1FC7D518004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		080C24DEE8C0E45FE5C079AD /* Build configuration list for PBXNativeTarget "AliStorePOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A4E62A5DA36EE4DCC2752338 /* Debug */,
 				AA0226E24573AF3215AA27A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		19FF51B4BCC6A7ACDAA4591B /* Build configuration list for PBXNativeTarget "AliStoreClientUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC1C003A6A290A25B7A7116C /* Debug */,
+				34983CCBC2F012C2B249DC0D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3114AF0DCBBD1E7CCA323D81 /* Build configuration list for PBXNativeTarget "AliStoreCourierUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B63C1725CF24ABD8D50D451B /* Debug */,
+				4531971EB68BB296B51E3329 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -975,6 +1374,15 @@
 			buildConfigurations = (
 				5BA03919C44C1429936ED28F /* Debug */,
 				13CAD953B982589FF2366315 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		937F895BBC1D54A4BCBFD844 /* Build configuration list for PBXNativeTarget "AliStorePOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33EF963FF6748679C0FF57C4 /* Debug */,
+				6388FEECAEE6FB4C0B7AA819 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

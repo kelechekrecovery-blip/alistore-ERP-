@@ -147,6 +147,46 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.core.tests
         GENERATE_INFOPLIST_FILE: YES
+  AliStoreClientUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/Client
+    dependencies:
+      - target: AliStoreClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.client.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreStaffUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/Staff
+    dependencies:
+      - target: AliStoreStaff
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.staff.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreCourierUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/Courier
+    dependencies:
+      - target: AliStoreCourier
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.courier.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStorePOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/POS
+    dependencies:
+      - target: AliStorePOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.pos.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   AliStoreClient:
     build:
@@ -175,3 +215,16 @@ schemes:
         AliStorePOS: all
     run:
       config: Debug
+  AliStoreUITests:
+    build:
+      targets:
+        AliStoreClient: all
+        AliStoreStaff: all
+        AliStoreCourier: all
+        AliStorePOS: all
+    test:
+      targets:
+        - AliStoreClientUITests
+        - AliStoreStaffUITests
+        - AliStoreCourierUITests
+        - AliStorePOSUITests
