@@ -2125,3 +2125,11 @@
 - Checks run: visual baseline generation `3/3`; exact JSON-reported no-update comparison `3/3`; no-argument runner rejection; manual PNG inspection; Node syntax; JSON parsing; artifact SHA-256 inventory; `git diff --check`; independent review initially found one High skipped-test acceptance path and one Medium year-rollover instability, both fixed; final review Critical/High/Medium `0/0/0` with APPROVE.
 - Outcome: the implementation is reviewed and ready to commit. The visual audit row intentionally remains GAP until the implementation commit is followed by a clean committed-HEAD evidence run.
 - Next step: commit the visual contract, record trusted visual evidence and rerun the strict audit.
+
+## 2026-07-16
+
+- Task: record durable `visual` evidence for the committed `ECO-002H` contract.
+- Result: the committed-HEAD bootstrap executed the exact JSON-validated visual runner; storefront desktop/mobile and ERP desktop matched all three committed PNG goldens with no skipped, flaky or interrupted result.
+- Checks run: exact Playwright screenshot tests `3/3`; source-tree SHA-256 `00840f38304fb58a4f396709da313e9ace7107b31b836b080fd32e13eceb06d0`; result artifact SHA-256 `b775b0a2c4382935cdf5a0df4668a4ff84e20c54bf4c6b3bfa7468e5a5b5835d`; recorder exited zero.
+- Outcome: the bounded visual gate is accepted for the current source tree. The 64 absent handoffs remain unresolved and are not covered by these baselines.
+- Next step: commit the visual result, refresh native and reconciliation evidence on the new common source hash, then run the strict audit.

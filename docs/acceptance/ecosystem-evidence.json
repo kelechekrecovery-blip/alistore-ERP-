@@ -3,10 +3,16 @@
   "designRetirements": [],
   "gates": {
     "visual": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "visual:e2e",
-      "command": null,
-      "artifacts": []
+      "command": "npm run visual:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/visual-b775b0a2c4382935cdf5a0df4668a4ff84e20c54bf4c6b3bfa7468e5a5b5835d.json",
+          "sha256": "b775b0a2c4382935cdf5a0df4668a4ff84e20c54bf4c6b3bfa7468e5a5b5835d"
+        }
+      ]
     },
     "ios-app-ui": {
       "status": "accepted",
