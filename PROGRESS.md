@@ -2169,3 +2169,10 @@
 - Checks run: API `1/1` suite and `6/6` tests; Playwright `1/1`; artifact SHA-256 `bcdb39a07112a52728e4f34432f4c3d10201d5e189794c75e3404ed2c9c5f5d1`; trusted recorder exited zero.
 - Outcome: procurement, AP receipt, serialized stock and POS sale evidence is current again; both native rows remain to refresh.
 - Next step: commit and refresh iOS/Android packaged UI evidence.
+
+## 2026-07-17
+
+- Task: refresh `ios-app-ui` on the visual-contract source hash.
+- Checks run: four XCUITest bundles `4/4`, zero failures; artifact SHA-256 `8237873a2593486399a76dbc92287bc6c85eea4099afadb44b90a30f28dfe7cd`; trusted recorder exited zero.
+- Outcome: packaged iOS launch evidence is current again; deep journeys and physical-device certification remain open.
+- Next step: commit and refresh Android packaged UI evidence.
