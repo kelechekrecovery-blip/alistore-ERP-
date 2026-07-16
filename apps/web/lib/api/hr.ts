@@ -29,7 +29,8 @@ export type HrPayrollPreview = {
 };
 export type HrPayrollRun = {
   id: string; period: string; point: string; status: 'posted' | 'paid'; totalBase: number; totalCommission: number;
-  totalAdjustments: number; totalPayout: number; externalRef: string | null; paidAt: string | null; lines: HrPayrollLine[];
+  totalAdjustments: number; totalPayout: number; externalRef: string | null; paidAt: string | null;
+  accrualAccountingEntryId: string | null; payoutAccountingEntryId: string | null; lines: HrPayrollLine[];
 };
 
 export function fetchHrWeek(weekStart: string, point: string, token: string) {
@@ -77,6 +78,6 @@ export function postHrPayroll(period: string, point: string, token: string) {
   return postAuthJson<HrPayrollRun>('/hr/payroll/runs', { period, point: point.trim() }, token, { 'idempotency-key': crypto.randomUUID() });
 }
 
-export function payHrPayroll(id: string, externalRef: string, token: string) {
-  return postAuthJson<HrPayrollRun>(`/hr/payroll/runs/${encodeURIComponent(id)}/pay`, { externalRef }, token, { 'idempotency-key': crypto.randomUUID() });
+export function payHrPayroll(id: string, externalRef: string, token: string, fundingAccountCode: '1000' | '1010' | '1020' = '1010') {
+  return postAuthJson<HrPayrollRun>(`/hr/payroll/runs/${encodeURIComponent(id)}/pay`, { externalRef, fundingAccountCode }, token, { 'idempotency-key': crypto.randomUUID() });
 }

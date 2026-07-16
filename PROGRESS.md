@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003B
+
+- Iteration ID: `ACC-003B`.
+- Task: bind the existing attendance-derived HR payroll snapshot to immutable accounting accrual and payout journals.
+- Files changed: payroll journal relations/migration, HR service/controller/DTO, typed ERP payroll client, HR integration cleanup and accounting assertions.
+- Result: payroll posting now rejects zero totals and atomically creates a `6100` debit / `2100` credit accrual at the period end, linked to the immutable payroll run. Payout requires that accrual, accepts an optional server-validated `1000`/`1010`/`1020` funding account (default `1010` for compatibility), creates a `2100` debit / funding credit settlement at execution time, binds both entries to the run and records separate HR and accounting Ledger events. Existing snapshot/replay and period locks remain authoritative.
+- Checks run: `npm run prisma:generate`; `npx prisma validate`; API production build; `prisma migrate deploy` on `alistore_dev`; direct SQL migration on `alistore_test`; HR integration 4/4 after one transient socket/HTTP parser rerun; full API Jest 143/143 suites, 658/658 tests; `git diff --check`.
+- Acceptance: `accepted` for local attendance-derived payroll accounting. Fixed assets/depreciation, accountable advances, AR aging, primary-document exports, live payment/bank settlement, staging/production deployment and first-store accountant/device validation remain open. Production readiness remains `RED`.
+- Commit: pending.
+- Next step: implement the next bounded `ACC-003` slice, prioritizing fixed-asset acquisition and depreciation journals or accountable-person advances after reviewing the existing domain contracts.
+
 # 2026-07-17 — ACC-003A
 
 - Iteration ID: `ACC-003A`.

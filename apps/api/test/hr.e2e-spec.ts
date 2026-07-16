@@ -41,10 +41,18 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     secondSellerToken = (await session('seller', 'foreign')).token;
   });
 
-  beforeEach(async () => {
+  async function cleanPayroll() {
     await prisma.hrPayrollCommand.deleteMany();
     await prisma.hrPayrollLine.deleteMany();
     await prisma.hrPayrollRun.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`DELETE FROM "AccountingJournalLine" WHERE "entryId" IN (SELECT id FROM "AccountingJournalEntry" WHERE "sourceType" IN ('hr.payroll.accrual', 'hr.payroll.payout'))`;
+      await tx.$executeRaw`DELETE FROM "AccountingJournalEntry" WHERE "sourceType" IN ('hr.payroll.accrual', 'hr.payroll.payout')`;
+    });
+  }
+
+  beforeEach(async () => {
+    await cleanPayroll();
     await prisma.payment.deleteMany({ where: { shift: { staffId: sellerId } } });
     await prisma.cashShift.deleteMany({ where: { staffId: sellerId } });
     await prisma.hrAttendance.deleteMany();
@@ -55,9 +63,7 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
   });
 
   afterAll(async () => {
-    await prisma.hrPayrollCommand.deleteMany();
-    await prisma.hrPayrollLine.deleteMany();
-    await prisma.hrPayrollRun.deleteMany();
+    await cleanPayroll();
     await prisma.payment.deleteMany({ where: { shift: { staffId: sellerId } } });
     await prisma.cashShift.deleteMany({ where: { staffId: sellerId } });
     await prisma.hrAttendance.deleteMany();
@@ -151,6 +157,13 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
 
     const payload = { period: '2026-07', point: payrollPoint };
     const posted = await request(app.getHttpServer()).post('/hr/payroll/runs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-post-${run}`).send(payload).expect(201);
+    expect(posted.body.accrualAccountingEntryId).toBeTruthy();
+    const accrual = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: posted.body.accrualAccountingEntryId }, include: { lines: { orderBy: { accountCode: 'asc' } } } });
+    expect(accrual).toMatchObject({ sourceType: 'hr.payroll.accrual', sourceRef: posted.body.id, point: payrollPoint });
+    expect(accrual.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '2100', debit: 0, credit: 16_551 }),
+      expect.objectContaining({ accountCode: '6100', debit: 16_551, credit: 0 }),
+    ]));
     const replay = await request(app.getHttpServer()).post('/hr/payroll/runs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-post-${run}`).send(payload).expect(201);
     expect(replay.body.id).toBe(posted.body.id);
     await request(app.getHttpServer()).post('/hr/payroll/runs').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-post-duplicate-${run}`).send(payload).expect(409);
@@ -159,10 +172,16 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     const runs = await request(app.getHttpServer()).get(`/hr/payroll/runs?period=2026-07&point=${payrollPoint}`).set('Authorization', `Bearer ${ownerToken}`).expect(200);
     expect(runs.body[0].lines[0]).toMatchObject({ overtimeMinutes: 25, total: 16_551 });
 
-    const paid = await request(app.getHttpServer()).post(`/hr/payroll/runs/${posted.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-pay-${run}`).send({ externalRef: 'BANK-2026-07-001' }).expect(201);
-    await request(app.getHttpServer()).post(`/hr/payroll/runs/${posted.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-pay-${run}`).send({ externalRef: 'BANK-2026-07-001' }).expect(201);
-    expect(paid.body).toMatchObject({ status: 'paid', externalRef: 'BANK-2026-07-001', totalPayout: 16_551 });
+    const paid = await request(app.getHttpServer()).post(`/hr/payroll/runs/${posted.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-pay-${run}`).send({ externalRef: 'BANK-2026-07-001', fundingAccountCode: '1010' }).expect(201);
+    await request(app.getHttpServer()).post(`/hr/payroll/runs/${posted.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-payroll-pay-${run}`).send({ externalRef: 'BANK-2026-07-001', fundingAccountCode: '1010' }).expect(201);
+    expect(paid.body).toMatchObject({ status: 'paid', externalRef: 'BANK-2026-07-001', totalPayout: 16_551, payoutAccountingEntryId: expect.any(String) });
+    const payout = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: paid.body.payoutAccountingEntryId }, include: { lines: { orderBy: { accountCode: 'asc' } } } });
+    expect(payout).toMatchObject({ sourceType: 'hr.payroll.payout', sourceRef: posted.body.id, point: payrollPoint });
+    expect(payout.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1010', debit: 0, credit: 16_551 }),
+      expect.objectContaining({ accountCode: '2100', debit: 16_551, credit: 0 }),
+    ]));
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: posted.body.id } }, orderBy: { ts: 'asc' } });
-    expect(events.map((event) => event.type)).toEqual(['hr.payroll_posted', 'hr.payroll_paid']);
+    expect(events.map((event) => event.type)).toEqual(['hr.payroll_posted', 'accounting.entry_posted', 'hr.payroll_paid', 'accounting.entry_posted']);
   });
 });

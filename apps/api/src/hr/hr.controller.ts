@@ -87,6 +87,6 @@ export class HrController {
   @UseGuards(PermissionGuard)
   @RequirePermission('hr', 'manage')
   payPayroll(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Headers('idempotency-key') key: string | undefined, @Body() dto: PayHrPayrollDto) {
-    return this.hr.payPayroll(id, dto.externalRef, user.customerId, key);
+    return this.hr.payPayroll(id, dto.externalRef, user.customerId, key, dto.fundingAccountCode);
   }
 }

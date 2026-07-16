@@ -1762,6 +1762,8 @@ model AccountingJournalEntry {
   supplierStatementLine    SupplierStatementLine?
   landedCost               LandedCost?
   openingBalance        AccountingOpeningBalance?
+  hrPayrollAccrual       HrPayrollRun?          @relation("HrPayrollAccrual")
+  hrPayrollPayout        HrPayrollRun?          @relation("HrPayrollPayout")
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -2864,6 +2866,10 @@ model HrPayrollRun {
   paidBy               String?
   paidAt               DateTime?
   externalRef          String?
+  accrualAccountingEntryId String?             @unique
+  accrualAccountingEntry   AccountingJournalEntry? @relation("HrPayrollAccrual", fields: [accrualAccountingEntryId], references: [id], onDelete: Restrict)
+  payoutAccountingEntryId  String?             @unique
+  payoutAccountingEntry    AccountingJournalEntry? @relation("HrPayrollPayout", fields: [payoutAccountingEntryId], references: [id], onDelete: Restrict)
   lines                HrPayrollLine[]
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt

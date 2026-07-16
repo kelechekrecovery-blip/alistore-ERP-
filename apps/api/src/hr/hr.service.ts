@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { HrAbsenceStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHrScheduleDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 
@@ -140,25 +142,46 @@ export class HrService {
       if (await tx.hrPayrollRun.findUnique({ where: { period_point: { period, point } } })) throw new ConflictError('hr_payroll_already_posted', 'Начисление за этот период уже проведено');
       const preview = await this.calculatePayroll(tx, period, point);
       if (!preview.lines.length) throw new ValidationError('hr_payroll_empty', 'Нет смен или продаж для начисления');
+      if (!Number.isSafeInteger(preview.totals.payout) || preview.totals.payout <= 0) throw new ValidationError('hr_payroll_zero', 'Нельзя провести нулевое начисление');
+      const runId = randomUUID();
+      const accrual = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:hr-payroll:accrual:${runId}`,
+        sourceType: 'hr.payroll.accrual',
+        sourceRef: runId,
+        description: `Начисление зарплаты ${period} · ${point}`,
+        point,
+        occurredAt: new Date(payrollBounds(period).end.getTime() - 1),
+        createdBy: actor,
+        lines: [
+          { accountCode: '6100', debit: preview.totals.payout, memo: 'Расходы на зарплату по утверждённому payroll snapshot' },
+          { accountCode: '2100', credit: preview.totals.payout, memo: 'Задолженность по зарплате' },
+        ],
+      });
       const run = await tx.hrPayrollRun.create({
         data: {
+          id: runId,
           period, point, ...PAYROLL_CONFIG, totalBase: preview.totals.base, totalCommission: preview.totals.commission,
-          totalAdjustments: preview.totals.adjustments, totalPayout: preview.totals.payout, createdBy: actor,
+          totalAdjustments: preview.totals.adjustments, totalPayout: preview.totals.payout, createdBy: actor, accrualAccountingEntryId: accrual.id,
           lines: { create: preview.lines },
         },
         include: { lines: { orderBy: { username: 'asc' } } },
       });
       const response = jsonValue(run);
       await tx.hrPayrollCommand.create({ data: { idempotencyKey: key, action: 'post', runId: run.id, request, response } });
-      return { result: response, events: [{ type: EventType.HrPayrollPosted, actor, payload: { runId: run.id, period, point, totalPayout: run.totalPayout, lineCount: run.lines.length }, refs: [run.id, ...run.lines.map((line) => line.staffId)] }] };
+      return { result: response, events: [
+        { type: EventType.HrPayrollPosted, actor, payload: { runId: run.id, period, point, totalPayout: run.totalPayout, lineCount: run.lines.length, accountingEntryId: accrual.id }, refs: [run.id, ...run.lines.map((line) => line.staffId)] },
+        { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accrual.id, sourceType: 'hr.payroll.accrual', sourceRef: run.id, amount: run.totalPayout }, refs: [accrual.id, run.id, period] },
+      ] };
     });
   }
 
-  async payPayroll(runId: string, rawExternalRef: string, actor: string, rawKey?: string) {
+  async payPayroll(runId: string, rawExternalRef: string, actor: string, rawKey?: string, rawFundingAccountCode?: string) {
     const key = requireKey(rawKey);
     const externalRef = rawExternalRef.trim();
     if (!externalRef) throw new ValidationError('hr_payroll_external_ref_required', 'Укажите номер платёжного документа');
-    const request = { runId, externalRef };
+    const fundingAccountCode = rawFundingAccountCode?.trim() || '1010';
+    if (!['1000', '1010', '1020'].includes(fundingAccountCode)) throw new ValidationError('hr_payroll_funding_account_invalid', 'Недопустимый счёт выплаты зарплаты');
+    const request = { runId, externalRef, fundingAccountCode };
     return this.audit.transaction(async (tx) => {
       const replay = await tx.hrPayrollCommand.findUnique({ where: { idempotencyKey: key } });
       if (replay) {
@@ -169,10 +192,30 @@ export class HrService {
       const current = await tx.hrPayrollRun.findUnique({ where: { id: runId } });
       if (!current) throw new ValidationError('hr_payroll_not_found', 'Начисление не найдено');
       if (current.status === 'paid') throw new ConflictError('hr_payroll_already_paid', 'Начисление уже выплачено');
-      const paid = await tx.hrPayrollRun.update({ where: { id: runId }, data: { status: 'paid', paidBy: actor, paidAt: new Date(), externalRef }, include: { lines: { orderBy: { username: 'asc' } } } });
+      if (!current.accrualAccountingEntryId) throw new ConflictError('hr_payroll_accrual_missing', 'Для payroll отсутствует проводка начисления');
+      const paidAt = new Date();
+      const payout = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:hr-payroll:payout:${key}`,
+        sourceType: 'hr.payroll.payout',
+        sourceRef: runId,
+        description: `Выплата зарплаты ${current.period} · ${current.point}`,
+        point: current.point,
+        documentAmount: current.totalPayout,
+        baseAmount: current.totalPayout,
+        occurredAt: paidAt,
+        createdBy: actor,
+        lines: [
+          { accountCode: '2100', debit: current.totalPayout, memo: 'Погашение задолженности по зарплате' },
+          { accountCode: fundingAccountCode, credit: current.totalPayout, memo: `Выплата по документу ${externalRef}` },
+        ],
+      });
+      const paid = await tx.hrPayrollRun.update({ where: { id: runId }, data: { status: 'paid', paidBy: actor, paidAt, externalRef, payoutAccountingEntryId: payout.id }, include: { lines: { orderBy: { username: 'asc' } } } });
       const response = jsonValue(paid);
       await tx.hrPayrollCommand.create({ data: { idempotencyKey: key, action: 'pay', runId, request, response } });
-      return { result: response, events: [{ type: EventType.HrPayrollPaid, actor, payload: { runId, period: paid.period, point: paid.point, totalPayout: paid.totalPayout, externalRef }, refs: [runId, ...paid.lines.map((line) => line.staffId)] }] };
+      return { result: response, events: [
+        { type: EventType.HrPayrollPaid, actor, payload: { runId, period: paid.period, point: paid.point, totalPayout: paid.totalPayout, externalRef, fundingAccountCode, accountingEntryId: payout.id }, refs: [runId, ...paid.lines.map((line) => line.staffId)] },
+        { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: payout.id, sourceType: 'hr.payroll.payout', sourceRef: runId, amount: paid.totalPayout }, refs: [payout.id, runId, paid.period] },
+      ] };
     });
   }
 
