@@ -25,6 +25,18 @@ type Row = {
 
 const amount = (): Amount => ({ quantity: 0, value: 0 });
 
+type RawAggregate = {
+  productId: string;
+  location: string;
+  bucket: Bucket;
+  openingQty: bigint | number;
+  openingValue: bigint | number;
+  periodQty: bigint | number;
+  periodValue: bigint | number;
+};
+
+const numeric = (value: unknown) => Number(value ?? 0);
+
 export async function inventoryValuationRollForward(
   prisma: Prisma.TransactionClient,
   fromInput: string,
@@ -38,65 +50,175 @@ export async function inventoryValuationRollForward(
   if (to.getTime() - from.getTime() > MAX_REPORT_SPAN_MS) {
     throw new ValidationError('valuation_period_too_large', 'Период отчёта не может превышать 366 дней');
   }
+  // Prisma DateTime columns are timestamp without time zone; bind the same UTC wall-clock value used by Prisma.
+  const dbFrom = from.toISOString().slice(0, -1);
+  const dbTo = to.toISOString().slice(0, -1);
 
-  const [layers, issues, reversals, transfers, serializedReceipts, serviceConsumptions, quantityBalances, glLines, reversalCoverage] = await Promise.all([
-    prisma.inventoryValuationLayer.findMany({
-      where: { createdAt: { lt: to }, sourceType: { not: 'inventory.transfer' } },
-      include: { product: { select: { sku: true, name: true } } },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    }),
-    prisma.inventoryValuationIssue.findMany({
-      where: { createdAt: { lt: to } },
-      include: {
-        product: { select: { sku: true, name: true } },
-        unit: { select: { consignmentItem: { select: { id: true } } } },
-      },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    }),
-    prisma.inventoryValuationReversal.findMany({
-      where: { createdAt: { lt: to } },
-      include: {
-        product: { select: { sku: true, name: true } },
-        issue: { select: { unit: { select: { consignmentItem: { select: { id: true } } } } } },
-      },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    }),
-    prisma.inventoryMovement.findMany({
-      where: { type: 'moved', createdAt: { lt: to } },
-      include: { product: { select: { sku: true, name: true } } },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    }),
-    prisma.inventoryMovement.findMany({
-      where: {
-        type: 'received',
-        createdAt: { lt: to },
-        product: { trackingMode: 'serialized' },
-      },
-      include: { product: { select: { sku: true, name: true } } },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    }),
-    prisma.inventoryMovement.findMany({
-      where: { type: 'service_consumed', createdAt: { lt: to } },
-      select: { id: true, valuationQty: true, totalValue: true },
-    }),
-    prisma.inventoryBalance.findMany({
-      where: { product: { trackingMode: 'quantity' } },
-      select: {
-        onHand: true,
-        inventoryValue: true,
-        valuationLayers: { where: { quantityRemaining: { gt: 0 } }, select: { quantityRemaining: true, unitCost: true } },
-        quantityConsignmentLots: { select: { availableQty: true, reservedQty: true } },
-      },
-    }),
-    prisma.accountingJournalLine.findMany({
-      where: { accountCode: '1200', entry: { occurredAt: { lt: to } } },
-      include: { entry: { select: { occurredAt: true } } },
-    }),
-    prisma.inventoryValuationIssue.findMany({
-      where: { reversedQty: { gt: 0 }, createdAt: { lt: to } },
-      select: { id: true, reversedQty: true, location: true, reversals: { select: { quantity: true } } },
-    }),
+  const [layerAggregates, issueAggregates, reversalAggregates, transferAggregates, serializedReceiptAggregates,
+    incompleteTransferCount, incompleteSerializedReceiptCount, incompleteServiceConsumptionCount,
+    missingReversalQuantityRows, unknownIssueLocationCount, unknownReversalLocationCount, legacyConsignmentIssueCount,
+    incompleteQuantityBalanceCount, glTotals] = await Promise.all([
+    prisma.$queryRaw<RawAggregate[]>`
+      SELECT "productId", "location",
+        CASE WHEN "sourceType" = 'inventory.adjustment' THEN 'adjustmentsIn' ELSE 'receipts' END::text AS bucket,
+        COALESCE(SUM(CASE WHEN "createdAt" < ${dbFrom}::timestamp THEN "quantityReceived" ELSE 0 END), 0)::bigint AS "openingQty",
+        COALESCE(SUM(CASE WHEN "createdAt" < ${dbFrom}::timestamp THEN "quantityReceived" * "unitCost" ELSE 0 END), 0)::bigint AS "openingValue",
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${dbFrom}::timestamp THEN "quantityReceived" ELSE 0 END), 0)::bigint AS "periodQty",
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${dbFrom}::timestamp THEN "quantityReceived" * "unitCost" ELSE 0 END), 0)::bigint AS "periodValue"
+      FROM "InventoryValuationLayer"
+      WHERE "createdAt" < ${dbTo}::timestamp AND "sourceType" NOT IN ('inventory.transfer', 'inventory.return')
+      GROUP BY "productId", "location", "sourceType"
+    `,
+    prisma.$queryRaw<RawAggregate[]>`
+      SELECT issue."productId", COALESCE(issue."location", 'UNKNOWN') AS location,
+        CASE WHEN issue."sourceType" = 'sale' THEN 'issues' ELSE 'adjustmentsOut' END::text AS bucket,
+        COALESCE(SUM(CASE WHEN issue."createdAt" < ${dbFrom}::timestamp THEN issue."quantity" ELSE 0 END), 0)::bigint AS "openingQty",
+        COALESCE(SUM(CASE WHEN issue."createdAt" < ${dbFrom}::timestamp THEN issue."totalCost" ELSE 0 END), 0)::bigint AS "openingValue",
+        COALESCE(SUM(CASE WHEN issue."createdAt" >= ${dbFrom}::timestamp THEN issue."quantity" ELSE 0 END), 0)::bigint AS "periodQty",
+        COALESCE(SUM(CASE WHEN issue."createdAt" >= ${dbFrom}::timestamp THEN issue."totalCost" ELSE 0 END), 0)::bigint AS "periodValue"
+      FROM "InventoryValuationIssue" issue
+      LEFT JOIN "DeviceUnit" unit ON unit."imei" = issue."imei"
+      LEFT JOIN "ConsignmentItem" consignment ON consignment."unitId" = unit."id"
+      WHERE issue."createdAt" < ${dbTo}::timestamp AND consignment."id" IS NULL
+      GROUP BY issue."productId", COALESCE(issue."location", 'UNKNOWN'), issue."sourceType"
+    `,
+    prisma.$queryRaw<RawAggregate[]>`
+      SELECT reversal."productId", reversal."location", 'returns'::text AS bucket,
+        COALESCE(SUM(CASE WHEN reversal."createdAt" < ${dbFrom}::timestamp THEN reversal."quantity" ELSE 0 END), 0)::bigint AS "openingQty",
+        COALESCE(SUM(CASE WHEN reversal."createdAt" < ${dbFrom}::timestamp THEN reversal."totalCost" ELSE 0 END), 0)::bigint AS "openingValue",
+        COALESCE(SUM(CASE WHEN reversal."createdAt" >= ${dbFrom}::timestamp THEN reversal."quantity" ELSE 0 END), 0)::bigint AS "periodQty",
+        COALESCE(SUM(CASE WHEN reversal."createdAt" >= ${dbFrom}::timestamp THEN reversal."totalCost" ELSE 0 END), 0)::bigint AS "periodValue"
+      FROM "InventoryValuationReversal" reversal
+      JOIN "InventoryValuationIssue" issue ON issue."id" = reversal."issueId"
+      LEFT JOIN "DeviceUnit" unit ON unit."imei" = issue."imei"
+      LEFT JOIN "ConsignmentItem" consignment ON consignment."unitId" = unit."id"
+      WHERE reversal."createdAt" < ${dbTo}::timestamp AND consignment."id" IS NULL
+      GROUP BY reversal."productId", reversal."location"
+    `,
+    prisma.$queryRaw<RawAggregate[]>`
+      SELECT "productId", "from" AS location, 'transferOut'::text AS bucket,
+        COALESCE(SUM(CASE WHEN "createdAt" < ${dbFrom}::timestamp THEN COALESCE("valuationQty", 0) ELSE 0 END), 0)::bigint AS "openingQty",
+        COALESCE(SUM(CASE WHEN "createdAt" < ${dbFrom}::timestamp THEN COALESCE("totalValue", 0) ELSE 0 END), 0)::bigint AS "openingValue",
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${dbFrom}::timestamp THEN COALESCE("valuationQty", 0) ELSE 0 END), 0)::bigint AS "periodQty",
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${dbFrom}::timestamp THEN COALESCE("totalValue", 0) ELSE 0 END), 0)::bigint AS "periodValue"
+      FROM "InventoryMovement"
+      WHERE "type" = 'moved' AND "from" IS NOT NULL AND "createdAt" < ${dbTo}::timestamp
+      GROUP BY "productId", "from"
+      UNION ALL
+      SELECT "productId", "to" AS location, 'transferIn'::text AS bucket,
+        COALESCE(SUM(CASE WHEN "createdAt" < ${dbFrom}::timestamp THEN COALESCE("valuationQty", 0) ELSE 0 END), 0)::bigint AS "openingQty",
+        COALESCE(SUM(CASE WHEN "createdAt" < ${dbFrom}::timestamp THEN COALESCE("totalValue", 0) ELSE 0 END), 0)::bigint AS "openingValue",
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${dbFrom}::timestamp THEN COALESCE("valuationQty", 0) ELSE 0 END), 0)::bigint AS "periodQty",
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${dbFrom}::timestamp THEN COALESCE("totalValue", 0) ELSE 0 END), 0)::bigint AS "periodValue"
+      FROM "InventoryMovement"
+      WHERE "type" = 'moved' AND "to" IS NOT NULL AND "createdAt" < ${dbTo}::timestamp
+      GROUP BY "productId", "to"
+    `,
+    prisma.$queryRaw<RawAggregate[]>`
+      SELECT movement."productId", movement."to" AS location, 'receipts'::text AS bucket,
+        COALESCE(SUM(CASE WHEN movement."createdAt" < ${dbFrom}::timestamp THEN movement."qty" ELSE 0 END), 0)::bigint AS "openingQty",
+        COALESCE(SUM(CASE WHEN movement."createdAt" < ${dbFrom}::timestamp THEN COALESCE(movement."totalValue", 0) ELSE 0 END), 0)::bigint AS "openingValue",
+        COALESCE(SUM(CASE WHEN movement."createdAt" >= ${dbFrom}::timestamp THEN movement."qty" ELSE 0 END), 0)::bigint AS "periodQty",
+        COALESCE(SUM(CASE WHEN movement."createdAt" >= ${dbFrom}::timestamp THEN COALESCE(movement."totalValue", 0) ELSE 0 END), 0)::bigint AS "periodValue"
+      FROM "InventoryMovement" movement
+      JOIN "Product" product ON product."id" = movement."productId"
+      WHERE movement."type" = 'received' AND movement."to" IS NOT NULL
+        AND movement."createdAt" < ${dbTo}::timestamp AND product."trackingMode" = 'serialized'
+      GROUP BY movement."productId", movement."to"
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count FROM "InventoryMovement"
+      WHERE "type" = 'moved' AND "createdAt" < ${dbTo}::timestamp AND ("totalValue" IS NULL OR "valuationQty" IS NULL)
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count FROM "InventoryMovement" movement
+      JOIN "Product" product ON product."id" = movement."productId"
+      WHERE movement."type" = 'received' AND movement."createdAt" < ${dbTo}::timestamp
+        AND product."trackingMode" = 'serialized' AND movement."totalValue" IS NULL
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count FROM "InventoryMovement"
+      WHERE "type" = 'service_consumed' AND "createdAt" < ${dbTo}::timestamp
+        AND ("totalValue" IS NULL OR "valuationQty" IS NULL)
+    `,
+    prisma.$queryRaw<Array<{ quantity: bigint | number }>>`
+      SELECT COALESCE(SUM(issue."reversedQty" - COALESCE(reversal_totals."quantity", 0)), 0)::bigint AS quantity
+      FROM "InventoryValuationIssue" issue
+      LEFT JOIN (
+        SELECT "issueId", SUM("quantity")::bigint AS quantity
+        FROM "InventoryValuationReversal"
+        GROUP BY "issueId"
+      ) reversal_totals ON reversal_totals."issueId" = issue."id"
+      WHERE issue."reversedQty" > 0 AND issue."createdAt" < ${dbTo}::timestamp
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count FROM "InventoryValuationIssue" issue
+      LEFT JOIN "DeviceUnit" unit ON unit."imei" = issue."imei"
+      LEFT JOIN "ConsignmentItem" consignment ON consignment."unitId" = unit."id"
+      WHERE issue."createdAt" < ${dbTo}::timestamp AND consignment."id" IS NULL
+        AND (issue."location" IS NULL OR issue."location" = 'UNKNOWN')
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count FROM "InventoryValuationReversal" reversal
+      JOIN "InventoryValuationIssue" issue ON issue."id" = reversal."issueId"
+      LEFT JOIN "DeviceUnit" unit ON unit."imei" = issue."imei"
+      LEFT JOIN "ConsignmentItem" consignment ON consignment."unitId" = unit."id"
+      WHERE reversal."createdAt" < ${dbTo}::timestamp AND consignment."id" IS NULL AND reversal."location" = 'UNKNOWN'
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count FROM "InventoryValuationIssue" issue
+      LEFT JOIN "DeviceUnit" unit ON unit."imei" = issue."imei"
+      LEFT JOIN "ConsignmentItem" consignment ON consignment."unitId" = unit."id"
+      WHERE issue."createdAt" < ${dbTo}::timestamp AND consignment."id" IS NOT NULL
+    `,
+    prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM (
+        SELECT balance."id"
+        FROM "InventoryBalance" balance
+        JOIN "Product" product ON product."id" = balance."productId"
+        LEFT JOIN (
+          SELECT "balanceId", SUM("quantityRemaining")::bigint AS quantity,
+            SUM("quantityRemaining" * "unitCost")::bigint AS value
+          FROM "InventoryValuationLayer"
+          WHERE "quantityRemaining" > 0
+          GROUP BY "balanceId"
+        ) layers ON layers."balanceId" = balance."id"
+        LEFT JOIN (
+          SELECT "balanceId", SUM("availableQty" + "reservedQty")::bigint AS quantity
+          FROM "QuantityConsignmentLot"
+          GROUP BY "balanceId"
+        ) consignment ON consignment."balanceId" = balance."id"
+        WHERE product."trackingMode" = 'quantity'
+          AND (
+            balance."onHand" - COALESCE(consignment.quantity, 0) < 0
+            OR COALESCE(layers.quantity, 0) <> balance."onHand" - COALESCE(consignment.quantity, 0)
+            OR COALESCE(layers.value, 0) <> balance."inventoryValue"
+          )
+      ) inconsistent
+    `,
+    prisma.$queryRaw<Array<{ opening: bigint | number; movement: bigint | number }>>`
+      SELECT
+        COALESCE(SUM(CASE WHEN entry."occurredAt" < ${dbFrom}::timestamp THEN line."debit" - line."credit" ELSE 0 END), 0)::bigint AS opening,
+        COALESCE(SUM(CASE WHEN entry."occurredAt" >= ${dbFrom}::timestamp THEN line."debit" - line."credit" ELSE 0 END), 0)::bigint AS movement
+      FROM "AccountingJournalLine" line
+      JOIN "AccountingJournalEntry" entry ON entry."id" = line."entryId"
+      WHERE line."accountCode" = '1200' AND entry."occurredAt" < ${dbTo}::timestamp
+    `,
   ]);
+
+  const aggregates = [
+    ...layerAggregates,
+    ...issueAggregates,
+    ...reversalAggregates,
+    ...transferAggregates,
+    ...serializedReceiptAggregates,
+  ];
+  const productIds = [...new Set(aggregates.map((aggregate) => aggregate.productId))];
+  const products = productIds.length
+    ? await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, sku: true, name: true } })
+    : [];
+  const productsById = new Map(products.map((product) => [product.id, product]));
 
   const rows = new Map<string, Row>();
   const getRow = (productId: string, sku: string, name: string, location: string) => {
@@ -111,49 +233,15 @@ export async function inventoryValuationRollForward(
     rows.set(key, created);
     return created;
   };
-  const add = (
-    at: Date,
-    product: { id: string; sku: string; name: string },
-    location: string,
-    bucket: Bucket,
-    quantity: number,
-    value: number,
-  ) => {
-    const row = getRow(product.id, product.sku, product.name, location);
-    if (at < from) {
-      const sign = bucket === 'issues' || bucket === 'transferOut' || bucket === 'adjustmentsOut' ? -1 : 1;
-      row.opening.quantity += sign * quantity;
-      row.opening.value += sign * value;
-      return;
-    }
-    row[bucket].quantity += quantity;
-    row[bucket].value += value;
-  };
-
-  for (const layer of layers) {
-    if (layer.sourceType === 'inventory.return') continue;
-    const bucket: Bucket = layer.sourceType === 'inventory.adjustment' ? 'adjustmentsIn' : 'receipts';
-    add(layer.createdAt, { id: layer.productId, ...layer.product }, layer.location, bucket, layer.quantityReceived, layer.quantityReceived * layer.unitCost);
-  }
-  for (const movement of serializedReceipts) {
-    if (!movement.to) continue;
-    add(movement.createdAt, { id: movement.productId, ...movement.product }, movement.to, 'receipts', movement.qty, movement.totalValue ?? 0);
-  }
-  const ownedReversals = reversals.filter((reversal) => !reversal.issue.unit?.consignmentItem);
-  const ownedIssues = issues.filter((issue) => !issue.unit?.consignmentItem);
-  for (const reversal of ownedReversals) {
-    add(reversal.createdAt, { id: reversal.productId, ...reversal.product }, reversal.location, 'returns', reversal.quantity, reversal.totalCost);
-  }
-  for (const issue of ownedIssues) {
-    const bucket: Bucket = issue.sourceType === 'sale' ? 'issues' : 'adjustmentsOut';
-    add(issue.createdAt, { id: issue.productId, ...issue.product }, issue.location ?? 'UNKNOWN', bucket, issue.quantity, issue.totalCost);
-  }
-  for (const movement of transfers) {
-    const quantity = movement.valuationQty ?? 0;
-    const value = movement.totalValue ?? 0;
-    const product = { id: movement.productId, ...movement.product };
-    if (movement.from) add(movement.createdAt, product, movement.from, 'transferOut', quantity, value);
-    if (movement.to) add(movement.createdAt, product, movement.to, 'transferIn', quantity, value);
+  for (const aggregate of aggregates) {
+    const product = productsById.get(aggregate.productId);
+    if (!product || !aggregate.location) continue;
+    const row = getRow(product.id, product.sku, product.name, aggregate.location);
+    const openingSign = aggregate.bucket === 'issues' || aggregate.bucket === 'transferOut' || aggregate.bucket === 'adjustmentsOut' ? -1 : 1;
+    row.opening.quantity += openingSign * numeric(aggregate.openingQty);
+    row.opening.value += openingSign * numeric(aggregate.openingValue);
+    row[aggregate.bucket].quantity += numeric(aggregate.periodQty);
+    row[aggregate.bucket].value += numeric(aggregate.periodValue);
   }
 
   for (const row of rows.values()) {
@@ -168,34 +256,17 @@ export async function inventoryValuationRollForward(
   const orderedRows = [...rows.values()].sort((a, b) => a.location.localeCompare(b.location) || a.sku.localeCompare(b.sku));
   const openingValue = orderedRows.reduce((sum, row) => sum + row.opening.value, 0);
   const closingValue = orderedRows.reduce((sum, row) => sum + row.closing.value, 0);
-  const glOpening = glLines.filter((line) => line.entry.occurredAt < from).reduce((sum, line) => sum + line.debit - line.credit, 0);
-  const glMovement = glLines.filter((line) => line.entry.occurredAt >= from).reduce((sum, line) => sum + line.debit - line.credit, 0);
+  const glOpening = numeric(glTotals[0]?.opening);
+  const glMovement = numeric(glTotals[0]?.movement);
   const glClosing = glOpening + glMovement;
-  const missingReversalQuantity = reversalCoverage.reduce(
-    (sum, issue) => sum + issue.reversedQty - issue.reversals.reduce((covered, reversal) => covered + reversal.quantity, 0),
-    0,
-  );
-  const incompleteTransfers = transfers.filter((movement) => movement.totalValue === null || movement.valuationQty === null).length;
-  const incompleteSerializedReceipts = serializedReceipts.filter((movement) => movement.totalValue === null).length;
-  const incompleteServiceConsumptions = serviceConsumptions.filter(
-    (movement) => movement.totalValue === null || movement.valuationQty === null,
-  ).length;
-  const unknownIssueLocations = ownedIssues.filter((issue) => !issue.location || issue.location === 'UNKNOWN').length;
-  const unknownReversalLocations = ownedReversals.filter((reversal) => reversal.location === 'UNKNOWN').length;
-  const legacyConsignmentIssues = issues.length - ownedIssues.length;
-  const incompleteQuantityBalances = quantityBalances.filter((balance) => {
-    const consignmentQty = balance.quantityConsignmentLots.reduce(
-      (sum, lot) => sum + lot.availableQty + lot.reservedQty,
-      0,
-    );
-    const ownedPhysicalQty = balance.onHand - consignmentQty;
-    const layerQty = balance.valuationLayers.reduce((sum, layer) => sum + layer.quantityRemaining, 0);
-    const layerValue = balance.valuationLayers.reduce(
-      (sum, layer) => sum + layer.quantityRemaining * layer.unitCost,
-      0,
-    );
-    return ownedPhysicalQty < 0 || layerQty !== ownedPhysicalQty || layerValue !== balance.inventoryValue;
-  }).length;
+  const missingReversalQuantity = numeric(missingReversalQuantityRows[0]?.quantity);
+  const incompleteTransfers = numeric(incompleteTransferCount[0]?.count);
+  const incompleteSerializedReceipts = numeric(incompleteSerializedReceiptCount[0]?.count);
+  const incompleteServiceConsumptions = numeric(incompleteServiceConsumptionCount[0]?.count);
+  const unknownIssueLocations = numeric(unknownIssueLocationCount[0]?.count);
+  const unknownReversalLocations = numeric(unknownReversalLocationCount[0]?.count);
+  const legacyConsignmentIssues = numeric(legacyConsignmentIssueCount[0]?.count);
+  const incompleteQuantityBalances = numeric(incompleteQuantityBalanceCount[0]?.count);
   const complete = missingReversalQuantity === 0
     && incompleteTransfers === 0
     && incompleteSerializedReceipts === 0
