@@ -2092,3 +2092,11 @@
 - Checks run: API `3/3` suites and `9/9` tests; Playwright `3/3`; artifact SHA-256 `e96cd1f192afb26f66ac5f22b333c7797365f05ac9c32183bc9514deee0247ad`; recorder exited zero.
 - Outcome: the bounded service/loaner audit row is current again; procurement/sale is the final bounded artifact requiring refresh.
 - Next step: commit this artifact, then refresh procurement/sale evidence.
+
+## 2026-07-16
+
+- Task: refresh bounded `procurement-sale-reconciliation` evidence after the trusted-gate source commit.
+- Result: committed-HEAD recorder reran replay-safe purchase ordering, partial and complete serialized receiving, AP receipt journals, exactly-once POS sale, tax, COGS, remaining stock and Event Ledger reconciliation against source commit `95860e7`.
+- Checks run: API `1/1` suite and `6/6` tests; Playwright `1/1`; artifact SHA-256 `e64a235fddef0a080e165f6048e26fea1b3c7154430e2635ebeb79e437da2aa8`; recorder exited zero.
+- Outcome: all four bounded reconciliation rows and the broad reconciled software matrix now have current evidence for the same source tree.
+- Next step: commit this artifact and run the strict committed-HEAD ecosystem audit to identify only the remaining native and visual gates.
