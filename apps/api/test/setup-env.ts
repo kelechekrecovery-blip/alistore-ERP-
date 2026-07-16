@@ -3,7 +3,7 @@
 import { config } from 'dotenv';
 
 process.env.NODE_ENV ??= 'test';
-config();
+if (process.env.ALISTORE_EVIDENCE_MODE !== '1') config();
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (!testDatabaseUrl) throw new Error('TEST_DATABASE_URL is required for API tests');
 const parsed = new URL(testDatabaseUrl);

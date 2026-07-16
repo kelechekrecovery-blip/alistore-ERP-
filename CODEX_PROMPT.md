@@ -58,7 +58,7 @@ never invent exact pixel acceptance for them.
 ## Autonomous iteration loop
 
 1. Check branch/worktree; read backlog, progress, audit row and exact handoff.
-2. Run `npm run ecosystem:audit` and select the highest-impact unblocked vertical consequence.
+2. Run the committed-HEAD bootstrap from `docs/TRUSTED-ECOSYSTEM-GATE.md` and select the highest-impact unblocked vertical consequence.
 3. Define acceptance before editing: schema/API/RBAC/Ledger/UI/E2E/visual evidence.
 4. Trace every participating surface and existing local patterns.
 5. Implement the authoritative domain path first, then typed clients and role UI states.
@@ -179,7 +179,7 @@ rewritten, but new entries must be auditable.
 Run locally:
 
 ```bash
-npm run ecosystem:audit
+# Run the committed-HEAD audit command from docs/TRUSTED-ECOSYSTEM-GATE.md
 npm run mvp:verify
 npm run ecosystem:component-verify
 npm run ecosystem:verify:ui

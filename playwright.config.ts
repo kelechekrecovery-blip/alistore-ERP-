@@ -7,6 +7,9 @@ const databaseUrl =
   process.env.DATABASE_URL ??
   'postgresql://alistore@localhost:5432/alistore_test?schema=public';
 const mediaLocalDir = `/tmp/alistore-e2e-media-${apiPort}`;
+const reuseExistingServer = process.env.E2E_REUSE_EXISTING_SERVER
+  ? process.env.E2E_REUSE_EXISTING_SERVER === 'true'
+  : !process.env.CI;
 
 export default defineConfig({
   testDir: './e2e',
@@ -41,7 +44,7 @@ export default defineConfig({
     {
       command: `NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" npm exec -w @alistore/web -- next dev -p ${webPort}`,
       url: `http://127.0.0.1:${webPort}/checkout`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer,
       timeout: 120_000,
     },
   ],

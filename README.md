@@ -82,8 +82,7 @@ npm run launch:preflight        # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness        # отчёт по apps/api/.env.production
 npm run launch:check            # strict preflight + strict external readiness
 npm run launch:readiness:strict # strict gate для внешних production-блокеров
-npm run ecosystem:audit        # readable ecosystem/design acceptance report
-npm run ecosystem:audit:json   # writes machine contract to .artifacts/ecosystem-audit.json
+# See docs/TRUSTED-ECOSYSTEM-GATE.md; execute the bootstrap committed in HEAD.
 ```
 
 `mvp:verify` требует отдельную test-БД с сегментом `test` в имени и явное

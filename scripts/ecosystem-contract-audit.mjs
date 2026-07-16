@@ -5,6 +5,8 @@ import process from 'node:process';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { inspectHeadWorktree, resolveTrustedGit, trustedGitArgs } from './trusted-git.mjs';
+import { resolveTrustedNpm, verifyTrustedBootstrap } from './trusted-npm.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const screensDir = path.join(root, 'design_handoff_alistore', 'screens');
@@ -13,37 +15,39 @@ const strict = args.has('--strict');
 const json = args.has('--json');
 const outputIndex = process.argv.indexOf('--output');
 const outputPath = outputIndex >= 0 ? process.argv[outputIndex + 1] : null;
+verifyTrustedBootstrap(root);
+const npm = resolveTrustedNpm(root);
+const trustedGit = resolveTrustedGit(root);
 
 const normalize = (value) => value.normalize('NFC');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const git = (args, options = {}) => execFileSync(
+  trustedGit.executablePath,
+  trustedGitArgs(trustedGit, root, args),
+  { cwd: root, env: trustedGit.environment, ...options },
+);
 
-const sourceFiles = execFileSync(
-  'git',
-  [
-    'ls-files',
-    '-z',
-    '--',
-    'apps',
-    'e2e',
-    'scripts',
-    'design_handoff_alistore/screens',
-    'package.json',
-    'package-lock.json',
-    'playwright.config.ts',
-  ],
-  { cwd: root, encoding: 'utf8' },
-)
-  .split('\0')
-  .filter(Boolean)
-  .sort();
+const sourcePaths = [
+  'apps',
+  'e2e',
+  'scripts',
+  'design_handoff_alistore/screens',
+  'package.json',
+  'package-lock.json',
+  'playwright.config.ts',
+];
+const sourceHeadStatus = inspectHeadWorktree(trustedGit, root, sourcePaths);
+const sourceFiles = sourceHeadStatus.files;
+const currentSourceCommit = git(['rev-list', '-1', 'HEAD', '--', ...sourcePaths], {
+  encoding: 'utf8',
+}).trim();
 const sourceTreeHash = crypto.createHash('sha256');
 for (const file of sourceFiles) {
   sourceTreeHash.update(file).update('\0').update(fs.readFileSync(path.join(root, file))).update('\0');
 }
 const sourceTreeSha256 = sourceTreeHash.digest('hex');
-const dirtySourceTree = execFileSync(
-  'git',
+const dirtySourceTree = git(
   [
     'status',
     '--porcelain',
@@ -57,13 +61,12 @@ const dirtySourceTree = execFileSync(
     'package-lock.json',
     'playwright.config.ts',
   ],
-  { cwd: root, encoding: 'utf8' },
+  { encoding: 'utf8' },
 ).trim();
 
-const trackedFiles = execFileSync(
-  'git',
+const trackedFiles = git(
   ['ls-files', '-z', '--', 'design_handoff_alistore/screens/*.dc.html'],
-  { cwd: root, encoding: 'utf8' },
+  { encoding: 'utf8' },
 )
   .split('\0')
   .filter(Boolean)
@@ -92,18 +95,41 @@ const scripts = packageJson.scripts ?? {};
 const ecosystemVerify = read('scripts/ecosystem-verify.mjs');
 const evidencePath = 'docs/acceptance/ecosystem-evidence.json';
 const evidence = JSON.parse(read(evidencePath));
-const dirtyEvidence = execFileSync(
-  'git',
+const evidenceHeadStatus = inspectHeadWorktree(trustedGit, root, [
+  'design_handoff_alistore/screens',
+  evidencePath,
+]);
+const dirtyEvidence = git(
   ['status', '--porcelain', '--', 'design_handoff_alistore/screens', evidencePath],
-  { cwd: root, encoding: 'utf8' },
+  { encoding: 'utf8' },
 ).trim();
 const masterPrompt = fs.existsSync(path.join(root, 'CODEX_PROMPT.md'))
   ? read('CODEX_PROMPT.md')
   : '';
 
 const isNoop = (command = '') => /^(?:true|:|echo(?:\s+.+)?|printf(?:\s+.+)?)$/u.test(command.trim());
+const posRefundCommand = 'playwright test e2e/ecosystem-reconciliation.spec.ts';
+const courierCodCommand = 'playwright test e2e/ecosystem-courier-cod.spec.ts';
 const serviceLoanerCommand = 'npm --prefix apps/api test -- --runInBand test/service-center.e2e-spec.ts test/service-loaner.e2e-spec.ts test/warranty-rbac.e2e-spec.ts && playwright test e2e/service-center-ui.spec.ts';
 const procurementSaleCommand = 'npm --prefix apps/api test -- --runInBand test/procurement.e2e-spec.ts && playwright test e2e/ecosystem-procurement-sale.spec.ts';
+const reconciledE2eCommand = 'node scripts/run-reconciled-ecosystem-e2e.mjs';
+const reconciledProfile = JSON.parse(read('scripts/ecosystem-reconciliation-profile.json'));
+const expectedReconciledProfile = {
+  schemaVersion: 1,
+  steps: [
+    { id: 'pos-refund', packageScript: 'ecosystem:pos-refund:e2e' },
+    { id: 'courier-cod', packageScript: 'ecosystem:courier-cod:e2e' },
+    { id: 'service-loaner', packageScript: 'ecosystem:service-loaner:e2e' },
+    { id: 'procurement-sale', packageScript: 'ecosystem:procurement-sale:e2e' },
+  ],
+};
+const reconciledProfileExact =
+  JSON.stringify(reconciledProfile) === JSON.stringify(expectedReconciledProfile);
+const reconciledCommandsExact =
+  scripts['ecosystem:pos-refund:e2e'] === posRefundCommand &&
+  scripts['ecosystem:courier-cod:e2e'] === courierCodCommand &&
+  scripts['ecosystem:service-loaner:e2e'] === serviceLoanerCommand &&
+  scripts['ecosystem:procurement-sale:e2e'] === procurementSaleCommand;
 const acceptedGateScripts = new Map([
   ['visual', 'e2e'],
   ['ios-app-ui', 'ios:ui'],
@@ -144,16 +170,15 @@ const acceptedGate = (id, commandPattern) => {
     const artifactRoot = fs.realpathSync(path.join(root, 'docs', 'acceptance', 'artifacts'));
     const artifactRealPath = fs.realpathSync(absolute);
     if (!artifactRealPath.startsWith(`${artifactRoot}${path.sep}`)) return false;
+    if (!inspectHeadWorktree(trustedGit, root, [normalizedPath]).matches) return false;
     try {
-      execFileSync('git', ['ls-files', '--error-unmatch', '--', normalizedPath], {
-        cwd: root,
+      git(['ls-files', '--error-unmatch', '--', normalizedPath], {
         stdio: 'ignore',
       });
     } catch {
       return false;
     }
-    const artifactDirty = execFileSync('git', ['status', '--porcelain', '--', normalizedPath], {
-      cwd: root,
+    const artifactDirty = git(['status', '--porcelain', '--', normalizedPath], {
       encoding: 'utf8',
     }).trim();
     if (artifactDirty) return false;
@@ -164,6 +189,9 @@ const acceptedGate = (id, commandPattern) => {
         const result = JSON.parse(fs.readFileSync(absolute, 'utf8'));
         const completedAt = Date.parse(result.completedAt ?? '');
         const environment = result.executionEnvironment;
+        const expectedExecutionCommand = id === 'reconciled-e2e'
+          ? `${process.execPath} scripts/run-reconciled-ecosystem-e2e.mjs`
+          : declaredCommand;
         const currentToolchain = (() => {
           try {
             if (id === 'ios-app-ui') {
@@ -190,8 +218,7 @@ const acceptedGate = (id, commandPattern) => {
         })();
         const sourceCommitExists = /^[a-f0-9]{40}$/u.test(result.sourceCommit ?? '') && (() => {
           try {
-            execFileSync('git', ['merge-base', '--is-ancestor', result.sourceCommit, 'HEAD'], {
-              cwd: root,
+            git(['merge-base', '--is-ancestor', result.sourceCommit, 'HEAD'], {
               stdio: 'ignore',
             });
             return true;
@@ -201,13 +228,38 @@ const acceptedGate = (id, commandPattern) => {
         })();
         resultEvidenceFound =
           result.command === declaredCommand &&
+          result.executionCommand === expectedExecutionCommand &&
           result.exitCode === 0 &&
           result.packageCommandSha256 === sha256(packageCommand) &&
           result.sourceTreeSha256 === sourceTreeSha256 &&
+          result.sourceCommit === currentSourceCommit &&
           sourceCommitExists &&
           environment?.platform === process.platform &&
           environment?.architecture === process.arch &&
           environment?.node === process.version &&
+          environment?.gitPath === trustedGit.executablePath &&
+          environment?.gitSha256 === trustedGit.executableSha256 &&
+          environment?.npmCliPath === npm.cliPath &&
+          environment?.npmCliSha256 === npm.cliSha256 &&
+          environment?.npmTreeSha256 === npm.npmTreeSha256 &&
+          environment?.scriptShellPath === npm.scriptShellPath &&
+          environment?.scriptShellSha256 === npm.scriptShellSha256 &&
+          environment?.nodePath === npm.nodePath &&
+          environment?.nodeSha256 === npm.nodeSha256 &&
+          environment?.nodeKegSha256 === npm.nodeKegSha256 &&
+          environment?.nodeRuntimeLibrariesSha256 === npm.nodeRuntimeLibrariesSha256 &&
+          environment?.browserPath === npm.browserPath &&
+          environment?.browserSha256 === npm.browserSha256 &&
+          environment?.browserAppTreeSha256 === npm.browserAppTreeSha256 &&
+          environment?.packageLockSha256 === npm.packageLockSha256 &&
+          environment?.nodeModulesTreeSha256 === npm.nodeModulesTreeSha256 &&
+          environment?.playwrightCliPath === npm.playwrightCliPath &&
+          environment?.playwrightCliSha256 === npm.playwrightCliSha256 &&
+          JSON.stringify(environment?.playwrightShim) === JSON.stringify(npm.playwrightShim) &&
+          environment?.jestCliPath === npm.jestCliPath &&
+          environment?.jestCliSha256 === npm.jestCliSha256 &&
+          JSON.stringify(environment?.jestShim) === JSON.stringify(npm.jestShim) &&
+          environment?.acceptanceDatabaseIdentity === npm.acceptanceDatabaseIdentity &&
           environment?.toolchain === currentToolchain &&
           result.executionEnvironmentSha256 === sha256(JSON.stringify(environment)) &&
           Number.isFinite(completedAt) &&
@@ -256,13 +308,13 @@ const checks = [
   },
   {
     id: 'clean-design-evidence',
-    pass: dirtyEvidence.length === 0,
-    detail: 'Tracked handoffs and the acceptance manifest have no working-tree changes.',
+    pass: dirtyEvidence.length === 0 && evidenceHeadStatus.matches,
+    detail: 'Tracked handoffs and the acceptance manifest exactly match HEAD without special index flags.',
   },
   {
     id: 'clean-source-tree',
-    pass: dirtySourceTree.length === 0,
-    detail: 'Tested source, dependency lockfile and handoffs have no tracked or untracked changes.',
+    pass: dirtySourceTree.length === 0 && sourceHeadStatus.matches,
+    detail: 'Tested source exactly matches HEAD, has no untracked changes or special index flags.',
   },
   {
     id: 'approved-design-retirements',
@@ -326,10 +378,11 @@ const checks = [
   {
     id: 'reconciled-ecosystem-e2e',
     pass:
-      /(?:playwright|jest|node\s+scripts\/)/u.test(scripts['ecosystem:e2e'] ?? '') &&
-      !isNoop(scripts['ecosystem:e2e']) &&
-      acceptedGate('reconciled-e2e', /(?:playwright|jest|node\s+scripts\/)/u),
-    detail: 'Cross-role reconciliation has an executable command and hash-verified result evidence.',
+      scripts['ecosystem:e2e'] === reconciledE2eCommand &&
+      reconciledProfileExact &&
+      reconciledCommandsExact &&
+      acceptedGate('reconciled-e2e', /^node scripts\/run-reconciled-ecosystem-e2e\.mjs$/u),
+    detail: 'The exact four-vertical software matrix has fail-fast, hash-verified reconciliation evidence.',
   },
   {
     id: 'ecosystem-gate-discloses-native-limit',

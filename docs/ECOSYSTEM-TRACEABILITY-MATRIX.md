@@ -10,8 +10,8 @@ Missing design files are missing acceptance evidence, even when related software
 The graph contains 104 link occurrences, 70 of them broken, and implies 87 distinct designs
 when committed handoffs and referenced targets are combined. No missing original was found
 elsewhere on this machine or in Git history during the independent audit.
-Run `npm run ecosystem:audit` to recalculate these facts from the committed corpus and
-`npm run ecosystem:audit:strict` as the fail-closed completion gate. The strict gate is
+Run the committed-HEAD bootstrap documented in `docs/TRUSTED-ECOSYSTEM-GATE.md` to recalculate these facts and
+append `--strict` as the fail-closed completion gate. The strict gate is
 expected to remain red until missing handoffs and packaged native/ecosystem E2E commands exist.
 
 | Handoff | Routes / apps | API, model and control evidence | Automated evidence | Status and remaining acceptance |

@@ -72,7 +72,7 @@ credentials, legal approval or physical hardware.
 8. The 23 tracked handoffs link to 74 design files, but 64 linked `.dc.html` files are
    absent. See `ECOSYSTEM-TRACEABILITY-MATRIX.md`; absent references cannot be accepted visually.
 
-These gaps are now machine-reported by `npm run ecosystem:audit`. The strict form is a
+These gaps are now machine-reported by the committed-HEAD bootstrap in `docs/TRUSTED-ECOSYSTEM-GATE.md`. The strict form appends `--strict` and is a
 completion gate, not a routine component gate. It derives the design corpus from Git and
 validates `docs/acceptance/ecosystem-evidence.json`; an accepted gate needs a real command
 plus committed artifacts whose SHA-256 values match the command and tested source-tree

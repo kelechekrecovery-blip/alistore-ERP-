@@ -40,7 +40,7 @@ iOS/Android. Монорепо на npm workspaces.
 | E2E (Playwright) | `npm run e2e` (сам поднимает API:4200/web:3200) |
 | Быстрый гейт | `npm run mvp:verify -- --skip-e2e` |
 | Полный / релиз | `npm run mvp:verify` / `npm run mvp:verify -- --strict-external` |
-| Acceptance-аудит | `npm run ecosystem:audit` |
+| Acceptance-аудит | Committed-HEAD bootstrap из `docs/TRUSTED-ECOSYSTEM-GATE.md` |
 | Схема в test-БД (разово) | `DATABASE_URL="postgresql://alistore@localhost:5432/alistore_test?schema=public" npm exec -w @alistore/api -- prisma db push --skip-generate` |
 
 ## Предусловия и особенности (не удивляйся)
