@@ -2162,3 +2162,10 @@
 - Checks run: API `3/3` suites and `9/9` tests; Playwright `3/3`; artifact SHA-256 `173ee9ecfe6983169f11c6508a79ac9b34655e2788b2918d5210a1f17d9d46e4`; trusted recorder exited zero.
 - Outcome: warranty, paid service and loaner custody evidence is current again.
 - Next step: commit and refresh procurement/sale.
+
+## 2026-07-16
+
+- Task: refresh `procurement-sale-reconciliation` on the visual-contract source hash.
+- Checks run: API `1/1` suite and `6/6` tests; Playwright `1/1`; artifact SHA-256 `bcdb39a07112a52728e4f34432f4c3d10201d5e189794c75e3404ed2c9c5f5d1`; trusted recorder exited zero.
+- Outcome: procurement, AP receipt, serialized stock and POS sale evidence is current again; both native rows remain to refresh.
+- Next step: commit and refresh iOS/Android packaged UI evidence.
