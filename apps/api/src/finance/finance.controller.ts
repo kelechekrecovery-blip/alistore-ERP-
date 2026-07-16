@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { AccountableAdvanceQueryDto, CloseAccountableAdvanceDto, CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateAccountableAdvanceDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleAccountableAdvanceDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
+import { AccountableAdvanceQueryDto, ArAgingQueryDto, CloseAccountableAdvanceDto, CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateAccountableAdvanceDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleAccountableAdvanceDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -173,6 +173,18 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   apAging(@Query() query: SupplierAgingQueryDto) {
     return this.finance.supplierAging(query);
+  }
+
+  @Get('ar-aging')
+  @RequirePermission('finance', 'read')
+  arAging(@Query() query: ArAgingQueryDto) {
+    return this.finance.customerAging(query);
+  }
+
+  @Get('ar-aging/:id')
+  @RequirePermission('finance', 'read')
+  arAgingDocument(@Param('id') id: string, @Query() query: ArAgingQueryDto) {
+    return this.finance.customerDebtDrilldown(id, query);
   }
 
   @Get('journal')

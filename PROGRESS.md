@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003E
+
+- Iteration ID: `ACC-003E`.
+- Task: add server-derived Finance AR aging and primary-document drill-down for customer debt/installment balances.
+- Files changed: Finance AR query DTO/controller/service and a dedicated `accounting-ar-aging.e2e-spec.ts` integration suite.
+- Result: `GET /finance/ar-aging` supports an as-of date plus customer/status filters, exposes current/1-30/31-60/61-90/90+ and paid buckets, and returns principal/paid/outstanding totals. Historical balances are reconstructed from the authoritative current `DebtPlan.balance` plus installment payments after the selected date; only server-owned customer/order summaries and journal-backed debt/payment documents are exposed. `GET /finance/ar-aging/:id` returns the full primary-document drill-down. Finance RBAC remains enforced and no client-supplied balance/status is accepted.
+- Checks run: API production build; targeted AR aging integration 2/2; full API Jest gate passed; `git diff --check`.
+- Acceptance: `accepted` for the local AR aging/drill-down software contour. Manual adjustment approval, primary-document export, accountant/tax validation, staging/production deployment, physical hardware and first-store reconciliation remain open. Production readiness remains `RED` because external credentials, devices, provider certification, staging soak and missing design references are not available.
+- Commit: dedicated implementation commit created after this gate (`feat(finance): add AR aging drilldown`).
+- Next step: implement primary-document export or close the manual-adjustment approval boundary after reviewing the existing journal/export contracts.
+
 # 2026-07-17 — ACC-003D
 
 - Iteration ID: `ACC-003D`.

@@ -28,6 +28,7 @@ import {
   DepreciateFixedAssetDto,
   CreateOpeningBalanceDto,
   AccountableAdvanceQueryDto,
+  ArAgingQueryDto,
   CreateAccountableAdvanceDto,
   SettleAccountableAdvanceDto,
   CloseAccountableAdvanceDto,
@@ -831,6 +832,153 @@ export class FinanceService {
     const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
     const totals = Object.fromEntries(buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0)]));
     return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), totalCreditReceivable: rows.reduce((sum, row) => sum + row.creditReceivable, 0), totalCreditApplied: rows.reduce((sum, row) => sum + row.creditApplied, 0), totalAdvanceApplied: rows.reduce((sum, row) => sum + row.advanceApplied, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size };
+  }
+
+  async customerAging(query: ArAgingQueryDto) {
+    const asOf = query.asOf ? new Date(query.asOf) : new Date();
+    if (Number.isNaN(asOf.getTime())) throw new ValidationError('invalid_ar_as_of', 'Дата AR aging некорректна');
+
+    const debts = await this.prisma.debtPlan.findMany({
+      where: {
+        createdAt: { lte: asOf },
+        ...(query.customerId ? { customerId: query.customerId } : {}),
+      },
+      include: {
+        accountingEntry: {
+          select: {
+            id: true,
+            sourceType: true,
+            sourceRef: true,
+            description: true,
+            documentAmount: true,
+            taxAmount: true,
+            occurredAt: true,
+            postedAt: true,
+            createdBy: true,
+            lines: { select: { accountCode: true, debit: true, credit: true, memo: true }, orderBy: { accountCode: 'asc' } },
+          },
+        },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+      take: 500,
+    });
+
+    const orderIds = debts.map((debt) => debt.orderId);
+    const customerIds = [...new Set(debts.map((debt) => debt.customerId))];
+    const [customers, orders] = await Promise.all([
+      customerIds.length === 0
+        ? []
+        : this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, name: true } }),
+      orderIds.length === 0
+        ? []
+        : this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, channel: true, total: true, status: true, createdAt: true } }),
+    ]);
+    const customerById = new Map(customers.map((customer) => [customer.id, customer]));
+    const orderById = new Map(orders.map((order) => [order.id, order]));
+    const payments = orderIds.length === 0
+      ? []
+      : await this.prisma.payment.findMany({
+        where: {
+          orderId: { in: orderIds },
+          method: 'installment',
+          amount: { gt: 0 },
+          status: { in: ['received', 'reconciled'] },
+        },
+        select: {
+          id: true,
+          orderId: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+          receivedBy: true,
+          point: true,
+          txnId: true,
+          accountingEntry: {
+            select: {
+              id: true,
+              sourceType: true,
+              sourceRef: true,
+              description: true,
+              occurredAt: true,
+              postedAt: true,
+              lines: { select: { accountCode: true, debit: true, credit: true, memo: true }, orderBy: { accountCode: 'asc' } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+    const paymentsByOrder = new Map<string, typeof payments>();
+    for (const payment of payments) {
+      const orderPayments = paymentsByOrder.get(payment.orderId ?? '') ?? [];
+      orderPayments.push(payment);
+      paymentsByOrder.set(payment.orderId ?? '', orderPayments);
+    }
+
+    const rows = debts.map((debt) => {
+      const orderPayments = paymentsByOrder.get(debt.orderId) ?? [];
+      const paymentsAtAsOf = orderPayments.filter((payment) => payment.createdAt <= asOf);
+      const paymentsAfterAsOf = orderPayments.filter((payment) => payment.createdAt > asOf);
+      // DebtPlan.balance is the authoritative current snapshot. Adding only
+      // later payments reconstructs an earlier balance without trusting a
+      // client-provided amount or duplicating the debt ledger.
+      const historicalBalance = Math.min(
+        debt.principal,
+        Math.max(0, debt.balance + paymentsAfterAsOf.reduce((sum, payment) => sum + payment.amount, 0)),
+      );
+      const outstanding = historicalBalance;
+      const paidAmount = debt.principal - outstanding;
+      const dueDate = debt.dueDate;
+      const ageDays = Math.max(0, Math.floor((asOf.getTime() - dueDate.getTime()) / 86_400_000));
+      const bucket = outstanding === 0
+        ? 'paid'
+        : ageDays === 0
+          ? 'current'
+          : ageDays <= 30
+            ? '1_30'
+            : ageDays <= 60
+              ? '31_60'
+              : ageDays <= 90
+                ? '61_90'
+                : '90_plus';
+      return {
+        id: debt.id,
+        customer: customerById.get(debt.customerId) ?? { id: debt.customerId, name: 'Удалённый клиент' },
+        order: orderById.get(debt.orderId) ?? { id: debt.orderId, channel: 'unknown', total: debt.principal, status: 'unknown', createdAt: debt.createdAt },
+        principal: debt.principal,
+        balance: outstanding,
+        outstanding,
+        currentBalance: debt.balance,
+        paidAmount,
+        installments: debt.installments,
+        dueDate,
+        ageDays,
+        bucket,
+        status: outstanding === 0 ? 'settled' : 'open',
+        accountingEntry: debt.accountingEntry,
+        payments: paymentsAtAsOf,
+      };
+    }).filter((row) => !query.status || row.status === query.status);
+
+    const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
+    const totals = Object.fromEntries(
+      buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.outstanding, 0)]),
+    );
+    return {
+      asOf,
+      rows,
+      totals,
+      totalPrincipal: rows.reduce((sum, row) => sum + row.principal, 0),
+      totalPaid: rows.reduce((sum, row) => sum + row.paidAmount, 0),
+      totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0),
+      customerCount: new Set(rows.map((row) => row.customer.id)).size,
+    };
+  }
+
+  async customerDebtDrilldown(id: string, query: ArAgingQueryDto) {
+    const report = await this.customerAging({ ...query, status: undefined });
+    const row = report.rows.find((candidate) => candidate.id === id);
+    if (!row) throw new ValidationError('ar_document_not_found', `Долг ${id} не найден на выбранную дату`);
+    return { asOf: report.asOf, ...row };
   }
 
   async reverseAccountingEntry(id: string, dto: ReverseAccountingEntryDto, actor: string) {

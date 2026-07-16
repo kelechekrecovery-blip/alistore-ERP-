@@ -72,6 +72,12 @@ export class SupplierAgingQueryDto {
   @IsOptional() @IsString() @MaxLength(64) supplierId?: string;
 }
 
+export class ArAgingQueryDto {
+  @IsOptional() @IsISO8601({ strict: true }) asOf?: string;
+  @IsOptional() @IsString() @MaxLength(64) customerId?: string;
+  @IsOptional() @IsIn(['open', 'settled']) status?: 'open' | 'settled';
+}
+
 export class BankStatementLineDto {
   @IsString() @MinLength(1) @MaxLength(128) externalId!: string;
   @IsISO8601({ strict: true }) occurredAt!: string;
