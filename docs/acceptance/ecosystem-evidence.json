@@ -56,6 +56,12 @@
         }
       ]
     },
+    "service-loaner-reconciliation": {
+      "status": "partial",
+      "packageScript": "ecosystem:service-loaner:e2e",
+      "command": null,
+      "artifacts": []
+    },
     "reconciled-e2e": {
       "status": "partial",
       "packageScript": "ecosystem:e2e",

@@ -2014,3 +2014,12 @@
 - Checks run: `npm run ecosystem:evidence -- courier-cod-reconciliation`; Playwright `1/1`; independent SHA-256 verification matched artifact filename and manifest; source command exited zero.
 - Outcome: durable exact money, inventory and Event Ledger evidence is recorded for the bounded courier/COD vertical. The broad reconciled ecosystem, deep native journey, visual corpus and external provider/hardware gates remain open.
 - Next step: commit the immutable evidence, verify the clean-tree courier/COD audit gate passes, then implement the next bounded warranty/service/loaner or procurement journey.
+
+## 2026-07-16
+
+- Task: implement `ECO-002E`, a deterministic warranty repair, paid-service settlement and loaner-custody reconciliation gate.
+- Files changed: strengthened Service Center browser reconciliation; composite API/browser package command; fail-closed ecosystem audit and evidence-recorder registration; acceptance manifest scaffold; backlog/progress evidence.
+- Result: warranty repair proves one consumed service part, one exact FIFO valuation issue, remaining layer quantity/value, balanced `5000/1200` journal and exact service events with no payment. Paid service proves exact 2,500 cash plus 4,000 card Payments, tender-specific `1000/1020` debits, `4100` net revenue, `2200` output tax, payment-to-journal links, tax metadata, independently balanced entries and exact commands/Ledger multiplicity. Loaner custody proves registration, issued/returned device states, zero unaccounted deposit, exact commands/events, retained distinct trusted staff Evidence objects and removal from the customer account after return.
+- Checks run: composite API profile `3/3` suites and `9/9` tests; Playwright Service Center `3/3`; targeted paid-service rerun `1/1`; Node syntax for both evidence scripts; JSON parse; ecosystem audit; `git diff --check`. The audit intentionally retains the new gate as GAP until clean-tree evidence is recorded after the implementation commit.
+- Outcome: the bounded local software vertical is implemented. It does not certify service refunds, non-zero loaner-deposit money handling, native/physical device operation, providers, complete visual acceptance or the broad ecosystem gate. Production readiness remains RED with the known external credential/hardware blockers.
+- Next step: commit the reviewed implementation, record and commit clean-tree `service-loaner-reconciliation` evidence, then implement the procurement → partial receiving → stock → sale reconciliation journey.

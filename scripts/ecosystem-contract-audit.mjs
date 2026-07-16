@@ -102,12 +102,14 @@ const masterPrompt = fs.existsSync(path.join(root, 'CODEX_PROMPT.md'))
   : '';
 
 const isNoop = (command = '') => /^(?:true|:|echo(?:\s+.+)?|printf(?:\s+.+)?)$/u.test(command.trim());
+const serviceLoanerCommand = 'npm --prefix apps/api test -- --runInBand test/service-center.e2e-spec.ts test/service-loaner.e2e-spec.ts test/warranty-rbac.e2e-spec.ts && playwright test e2e/service-center-ui.spec.ts';
 const acceptedGateScripts = new Map([
   ['visual', 'e2e'],
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
   ['courier-cod-reconciliation', 'ecosystem:courier-cod:e2e'],
+  ['service-loaner-reconciliation', 'ecosystem:service-loaner:e2e'],
   ['reconciled-e2e', 'ecosystem:e2e'],
 ]);
 const acceptedGate = (id, commandPattern) => {
@@ -304,6 +306,13 @@ const checks = [
       /playwright/u.test(scripts['ecosystem:courier-cod:e2e'] ?? '') &&
       acceptedGate('courier-cod-reconciliation', /playwright/u),
     detail: 'Web COD checkout, warehouse picking, courier delivery, cash handover and exact accounting/inventory reconciliation have hash-verified evidence.',
+  },
+  {
+    id: 'service-loaner-reconciliation-gate',
+    pass:
+      scripts['ecosystem:service-loaner:e2e'] === serviceLoanerCommand &&
+      acceptedGate('service-loaner-reconciliation', /^npm --prefix apps\/api test -- --runInBand test\/service-center\.e2e-spec\.ts test\/service-loaner\.e2e-spec\.ts test\/warranty-rbac\.e2e-spec\.ts && playwright test e2e\/service-center-ui\.spec\.ts$/u),
+    detail: 'Warranty repair, paid service collection and loaner custody have hash-verified money, inventory and Event Ledger evidence.',
   },
   {
     id: 'reconciled-ecosystem-e2e',
