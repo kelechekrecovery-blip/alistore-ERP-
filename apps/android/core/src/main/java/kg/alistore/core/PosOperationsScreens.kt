@@ -100,15 +100,16 @@ fun PosApp(apiBaseUrl: String) {
   val quickUnlock = remember { QuickUnlockStore(context, "pos") }
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(auth) { state = auth.restore() }
+  val logout: () -> Unit = { quickUnlock.clear(); state = auth.logout() }
   MaterialTheme {
     when (val current = state) {
       StaffAuthState.Restoring -> PosLoading()
       StaffAuthState.SignedOut -> PosLogin(auth) { state = it }
       is StaffAuthState.Failed -> PosLogin(auth, current.message) { state = it }
       is StaffAuthState.SignedIn -> if (current.session.role in setOf("cashier", "admin", "owner")) {
-        val workspace: @Composable () -> Unit = { PosWorkspace(current.session, api, apiBaseUrl) { state = auth.logout() } }
-        if (auth.requiresQuickUnlock) QuickUnlockGate("AliStore POS", current.session.username, quickUnlock, auth::unlock, { state = auth.logout() }, workspace) else workspace()
-      } else PosLogin(auth, "У роли ${current.session.role} нет доступа к кассе") { state = auth.logout() }
+        val workspace: @Composable () -> Unit = { PosWorkspace(current.session, api, apiBaseUrl, logout) }
+        if (auth.requiresQuickUnlock) QuickUnlockGate("AliStore POS", current.session.username, quickUnlock, auth::unlock, logout, workspace) else workspace()
+      } else PosLogin(auth, "У роли ${current.session.role} нет доступа к кассе") { logout() }
     }
   }
 }

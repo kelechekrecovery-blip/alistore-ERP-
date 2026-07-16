@@ -34,6 +34,7 @@ public final class StaffAuthStore {
             requiresQuickUnlock = true
         } catch {
             try? tokens.clear()
+            clearQuickUnlock()
         }
     }
 
@@ -46,6 +47,7 @@ public final class StaffAuthStore {
                 "staff-auth/login",
                 body: StaffLogin(username: username, password: password)
             )
+            clearQuickUnlock()
             try tokens.save(session.accessToken)
             self.session = session
             requiresQuickUnlock = false
@@ -56,6 +58,7 @@ public final class StaffAuthStore {
 
     public func logout() {
         do {
+            clearQuickUnlock()
             try tokens.clear()
             session = nil
             requiresQuickUnlock = false
@@ -66,4 +69,9 @@ public final class StaffAuthStore {
     }
 
     public func unlock() { requiresQuickUnlock = false }
+
+    private func clearQuickUnlock() {
+        try? tokens.clear(account: "quick-unlock-pin")
+        try? tokens.clear(account: "quick-unlock-pin-attempts")
+    }
 }

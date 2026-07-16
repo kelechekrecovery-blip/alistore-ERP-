@@ -76,6 +76,7 @@ public final class CustomerAuthStore {
                 customerId: principal.customerId,
                 phone: principal.phone ?? phone
             )
+            clearQuickUnlock()
             try save(next)
             session = next
             requiresQuickUnlock = false
@@ -89,6 +90,7 @@ public final class CustomerAuthStore {
         if let refreshToken = session?.refreshToken {
             try? await api.postNoContent("auth/logout", body: RefreshRequest(refreshToken: refreshToken))
         }
+        clearQuickUnlock()
         try? tokens.clear(account: "customer-session")
         session = nil
         requiresQuickUnlock = false
@@ -113,12 +115,18 @@ public final class CustomerAuthStore {
             session = next
             requiresQuickUnlock = true
         } catch {
+            clearQuickUnlock()
             try? tokens.clear(account: "customer-session")
             session = nil
         }
     }
 
     public func unlock() { requiresQuickUnlock = false }
+
+    private func clearQuickUnlock() {
+        try? tokens.clear(account: "quick-unlock-pin")
+        try? tokens.clear(account: "quick-unlock-pin-attempts")
+    }
 
     private func save(_ session: CustomerSession) throws {
         let data = try JSONEncoder().encode(session)

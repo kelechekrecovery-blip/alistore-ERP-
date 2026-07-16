@@ -97,6 +97,7 @@ fun StaffApp(
   val quickUnlock = remember { QuickUnlockStore(context, "staff") }
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(manager) { state = manager.restore() }
+  val logout: () -> Unit = { quickUnlock.clear(); state = manager.logout() }
 
   MaterialTheme {
     when (val current = state) {
@@ -104,10 +105,10 @@ fun StaffApp(
       StaffAuthState.SignedOut -> StaffLoginScreen(manager) { state = it }
       is StaffAuthState.Failed -> StaffLoginScreen(manager, current.message) { state = it }
       is StaffAuthState.SignedIn -> if (manager.requiresQuickUnlock) {
-        QuickUnlockGate("AliStore Staff", current.session.username, quickUnlock, manager::unlock, { state = manager.logout() }) {
-          StaffSignedInScreen(current.session, api, api, api, api, deepLinkUrl, deepLinkRevision, pushRegistrar, { state = manager.logout() }, apiBaseUrl)
+        QuickUnlockGate("AliStore Staff", current.session.username, quickUnlock, manager::unlock, logout) {
+          StaffSignedInScreen(current.session, api, api, api, api, deepLinkUrl, deepLinkRevision, pushRegistrar, logout, apiBaseUrl)
         }
-      } else StaffSignedInScreen(current.session, api, api, api, api, deepLinkUrl, deepLinkRevision, pushRegistrar, { state = manager.logout() }, apiBaseUrl)
+      } else StaffSignedInScreen(current.session, api, api, api, api, deepLinkUrl, deepLinkRevision, pushRegistrar, logout, apiBaseUrl)
     }
   }
 }
