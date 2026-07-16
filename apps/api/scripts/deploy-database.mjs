@@ -10,6 +10,7 @@ if (!databaseUrl) {
 }
 
 run('npx', ['prisma', 'migrate', 'deploy']);
+run('node', ['scripts/check-inventory-valuation-locations.mjs']);
 run('node', ['scripts/postdeploy-indexes.mjs']);
 
 function run(command, args) {

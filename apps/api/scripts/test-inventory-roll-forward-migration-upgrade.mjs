@@ -8,6 +8,7 @@ import 'dotenv/config';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const migrationsRoot = path.resolve(here, '../prisma/migrations');
 const targetMigration = '20260716120000_inventory_valuation_roll_forward';
+const locationContractMigration = '20260717120000_inventory_valuation_location_contract';
 const sourceUrl = process.env.TEST_DATABASE_URL;
 
 if (!sourceUrl) throw new Error('TEST_DATABASE_URL is required');
@@ -118,6 +119,51 @@ try {
       await db.query('ROLLBACK');
       if (error instanceof Error && error.message === 'Immutable reversal update unexpectedly committed') throw error;
     }
+
+    await db.query(`UPDATE "InventoryValuationIssue" SET location = 'UNKNOWN' WHERE id = 'roll-issue'`);
+    let blocked = false;
+    try {
+      await applyMigration(db, locationContractMigration);
+    } catch (error) {
+      blocked = error instanceof Error && error.message.includes('inventory valuation location contract blocked');
+    }
+    if (!blocked) throw new Error('Location contract migration did not fail closed on UNKNOWN issue location');
+
+    await db.query(`UPDATE "InventoryValuationIssue" SET location = 'ROLL-A' WHERE id = 'roll-issue'`);
+    await applyMigration(db, locationContractMigration);
+
+    const contract = await db.query(`
+      SELECT column_name, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'InventoryValuationIssue' AND column_name = 'location';
+    `);
+    if (contract.rows.length !== 1 || contract.rows[0].is_nullable !== 'NO') {
+      throw new Error(`Inventory valuation issue location is still nullable: ${JSON.stringify(contract.rows)}`);
+    }
+
+    let issueConstraintBlocked = false;
+    try {
+      await db.query(`UPDATE "InventoryValuationIssue" SET location = 'UNKNOWN' WHERE id = 'roll-issue'`);
+    } catch (error) {
+      issueConstraintBlocked = error instanceof Error && error.message.includes('InventoryValuationIssue_location_contract');
+    }
+    if (!issueConstraintBlocked) throw new Error('Issue location CHECK did not reject UNKNOWN');
+
+    let reversalConstraintBlocked = false;
+    try {
+      await db.query(`
+        INSERT INTO "InventoryValuationReversal" (
+          id, "issueId", "productId", "returnId", "sourceType", "sourceRef",
+          location, quantity, "unitCost", "totalCost"
+        ) VALUES (
+          'unknown-location-reversal', 'roll-issue', 'roll-product', 'roll-return-2',
+          'inventory.return', 'roll-return-2:roll-issue:unknown', 'UNKNOWN', 1, 100, 100
+        );
+      `);
+    } catch (error) {
+      reversalConstraintBlocked = error instanceof Error && error.message.includes('InventoryValuationReversal_location_contract');
+    }
+    if (!reversalConstraintBlocked) throw new Error('Reversal location CHECK did not reject UNKNOWN');
   } finally {
     await db.end();
   }

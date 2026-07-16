@@ -15,6 +15,7 @@
     "db:seed": "ts-node prisma/seed.ts",
     "test:refund-migration-upgrade": "node scripts/test-refund-migration-upgrade.mjs",
     "test:inventory-roll-forward-migration-upgrade": "node scripts/test-inventory-roll-forward-migration-upgrade.mjs",
+    "db:check-inventory-valuation-locations": "node scripts/check-inventory-valuation-locations.mjs",
     "test:exchange-migration-upgrade": "node scripts/test-exchange-migration-upgrade.mjs",
     "test:order-payment-mode-migration-upgrade": "node scripts/test-order-payment-mode-migration-upgrade.mjs",
     "db:studio": "prisma studio",

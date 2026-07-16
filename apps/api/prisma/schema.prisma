@@ -1316,7 +1316,7 @@ model InventoryValuationIssue {
   orderId     String?
   sourceType  String
   sourceRef   String
-  location    String?
+  location    String
   quantity    Int
   reversedQty Int                          @default(0)
   unitCost    Int
