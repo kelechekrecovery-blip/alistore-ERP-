@@ -8,6 +8,7 @@ import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
 import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
+import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
@@ -418,12 +419,33 @@ const write_off: ActionExecutor = async (tx, payload, approver, approvalId, even
   const movement = await tx.inventoryMovement.create({
     data: { productId, qty: -Math.abs(qty), type: 'write_off', from: location, reason },
   });
+  const valuation = await adjustQuantityValuationOnTx(tx, {
+    movementId: movement.id,
+    productId,
+    balanceId: balance.id,
+    location,
+    quantityDelta: -Math.abs(qty),
+    actor: approver,
+    sourceType: 'inventory.write_off',
+  });
+  await tx.inventoryMovement.update({
+    where: { id: movement.id },
+    data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue },
+  });
   events.push({
     type: EventType.StockWrittenOff,
     actor: approver,
-    payload: { approvalId, productId, location, qty, movementId: movement.id, reason },
+    payload: { approvalId, productId, location, qty, movementId: movement.id, reason, totalValue: valuation.totalValue },
     refs: [productId, movement.id],
   });
+  if (valuation.entry) {
+    events.push({
+      type: EventType.AccountingEntryPosted,
+      actor: approver,
+      payload: { accountingEntryId: valuation.entry.id, sourceType: 'inventory.write_off', sourceRef: movement.id, amount: valuation.totalValue },
+      refs: [valuation.entry.id, movement.id, productId],
+    });
+  }
 };
 
 /** stock_adjust — record a stock adjustment movement (owner-approved). */
@@ -433,20 +455,22 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   const location = String(payload['location'] ?? '').trim();
   const direction = String(payload['direction'] ?? 'increase');
   const reason = payload['reason'] ? String(payload['reason']) : null;
+  const unitCost = Number(payload['unitCost'] ?? 0);
   if (!location) throw new ValidationError('location_required', 'Укажите склад корректировки');
   if (direction !== 'increase' && direction !== 'decrease') {
     throw new ValidationError('invalid_adjustment_direction', 'Неизвестное направление корректировки');
   }
   const delta = direction === 'decrease' ? -Math.abs(qty) : Math.abs(qty);
+  let balance: Awaited<ReturnType<typeof lockQuantityBalance>>;
   if (delta < 0) {
-    const balance = await lockQuantityBalance(tx, productId, location);
+    balance = await lockQuantityBalance(tx, productId, location);
     if (balance.onHand - balance.reserved < Math.abs(delta)) {
       throw new ConflictError('insufficient_available_stock', 'Корректировка превышает свободный остаток');
     }
     await assertStoreOwnedAvailable(tx, balance.id, balance.onHand - balance.reserved, Math.abs(delta));
     await tx.inventoryBalance.update({ where: { id: balance.id }, data: { onHand: { decrement: Math.abs(delta) } } });
   } else {
-    await tx.inventoryBalance.upsert({
+    balance = await tx.inventoryBalance.upsert({
       where: { productId_location: { productId, location } },
       create: { productId, location, onHand: delta },
       update: { onHand: { increment: delta } },
@@ -455,12 +479,34 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   const movement = await tx.inventoryMovement.create({
     data: { productId, qty: delta, type: 'adjust', from: location, reason },
   });
+  const valuation = await adjustQuantityValuationOnTx(tx, {
+    movementId: movement.id,
+    productId,
+    balanceId: balance.id,
+    location,
+    quantityDelta: delta,
+    unitCost,
+    actor: approver,
+    sourceType: 'inventory.adjustment',
+  });
+  await tx.inventoryMovement.update({
+    where: { id: movement.id },
+    data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue },
+  });
   events.push({
     type: EventType.StockAdjusted,
     actor: approver,
-    payload: { approvalId, productId, location, qty: delta, direction, movementId: movement.id, reason },
+    payload: { approvalId, productId, location, qty: delta, direction, movementId: movement.id, reason, totalValue: valuation.totalValue },
     refs: [productId, movement.id],
   });
+  if (valuation.entry) {
+    events.push({
+      type: EventType.AccountingEntryPosted,
+      actor: approver,
+      payload: { accountingEntryId: valuation.entry.id, sourceType: 'inventory.adjustment', sourceRef: movement.id, amount: valuation.totalValue },
+      refs: [valuation.entry.id, movement.id, productId],
+    });
+  }
 };
 
 async function lockQuantityBalance(tx: Prisma.TransactionClient, productId: string, location: string) {

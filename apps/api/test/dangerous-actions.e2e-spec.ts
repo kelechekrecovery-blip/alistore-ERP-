@@ -103,6 +103,84 @@ describe('Dangerous actions via approval (integration)', () => {
     expect(types).toContain('stock.written_off');
   });
 
+  it('consumes FIFO value and posts the approved write-off to inventory GL', async () => {
+    const p = await product(100000, 'quantity');
+    await inventory.receiveQuantity({
+      productId: p.id, location: 'BISHKEK-1', quantity: 3, unitCost: 1000,
+    }, 'warehouse');
+    await inventory.receiveQuantity({
+      productId: p.id, location: 'BISHKEK-1', quantity: 2, unitCost: 1500,
+    }, 'warehouse');
+    const requested = await inventory.movement({
+      productId: p.id, qty: 2, type: 'write_off', location: 'BISHKEK-1', reason: 'бой',
+    }, 'warehouse') as { approvalId: string };
+
+    await approvals.decide(requested.approvalId, {
+      status: 'approved', approver: 'owner', approverRole: 'owner',
+    });
+
+    const movement = await prisma.inventoryMovement.findFirstOrThrow({
+      where: { productId: p.id, type: 'write_off' },
+    });
+    expect(movement).toMatchObject({ qty: -2, unitCost: 1000, totalValue: 2000 });
+    expect(await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId_location: { productId: p.id, location: 'BISHKEK-1' } },
+    })).toMatchObject({ onHand: 3, inventoryValue: 4000 });
+    expect(await prisma.inventoryValuationIssue.aggregate({
+      where: { sourceType: 'inventory.write_off', sourceRef: { startsWith: `${movement.id}:` } },
+      _sum: { quantity: true, totalCost: true },
+    })).toMatchObject({ _sum: { quantity: 2, totalCost: 2000 } });
+    expect(await prisma.accountingJournalEntry.findFirst({
+      where: { sourceType: 'inventory.write_off', sourceRef: movement.id },
+      include: { lines: true },
+    })).toMatchObject({
+      lines: expect.arrayContaining([
+        expect.objectContaining({ accountCode: '6900', debit: 2000 }),
+        expect.objectContaining({ accountCode: '1200', credit: 2000 }),
+      ]),
+    });
+    expect(await prisma.auditEvent.count({
+      where: { type: 'accounting.entry_posted', refs: { has: movement.id } },
+    })).toBe(1);
+  });
+
+  it('freezes increase-adjustment unit cost in the approval snapshot', async () => {
+    const p = await product(100000, 'quantity');
+    const requested = await inventory.movement({
+      productId: p.id,
+      location: 'BISHKEK-1',
+      qty: 2,
+      type: 'adjust',
+      direction: 'increase',
+      reason: 'излишек инвентаризации',
+    }, 'warehouse') as { approvalId: string };
+    await prisma.product.update({ where: { id: p.id }, data: { cost: 90000 } });
+
+    await approvals.decide(requested.approvalId, {
+      status: 'approved', approver: 'owner', approverRole: 'owner',
+    });
+
+    const movement = await prisma.inventoryMovement.findFirstOrThrow({
+      where: { productId: p.id, type: 'adjust' },
+    });
+    expect(movement).toMatchObject({ qty: 2, unitCost: 80000, totalValue: 160000 });
+    expect(await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId_location: { productId: p.id, location: 'BISHKEK-1' } },
+    })).toMatchObject({ onHand: 2, inventoryValue: 160000 });
+    expect(await prisma.inventoryValuationLayer.findFirst({
+      where: { sourceType: 'inventory.adjustment', sourceRef: movement.id },
+    })).toMatchObject({ unitCost: 80000, quantityRemaining: 2 });
+    expect(await prisma.accountingJournalEntry.findFirst({
+      where: { sourceType: 'inventory.adjustment', sourceRef: movement.id },
+      include: { lines: true },
+    })).toMatchObject({
+      lines: expect.arrayContaining([
+        expect.objectContaining({ accountCode: '1200', debit: 160000 }),
+        expect.objectContaining({ accountCode: '6900', credit: 160000 }),
+      ]),
+    });
+  });
+
   it('does not apply a rejected write-off', async () => {
     const p = await product(100000, 'quantity');
     const res = (await inventory.movement(

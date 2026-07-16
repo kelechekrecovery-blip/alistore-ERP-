@@ -55,7 +55,14 @@ export class InventoryService {
       action: ACTION_BY_TYPE[dto.type],
       requester,
       reason: dto.reason,
-      payload: { productId: dto.productId, qty: dto.qty, location, direction, reason: dto.reason },
+      payload: {
+        productId: dto.productId,
+        qty: dto.qty,
+        location,
+        direction,
+        reason: dto.reason,
+        unitCost: direction === 'increase' ? product.cost : undefined,
+      },
     });
   }
 

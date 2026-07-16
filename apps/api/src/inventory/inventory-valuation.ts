@@ -4,6 +4,135 @@ import { ConflictError } from '../common/errors';
 
 export const INVENTORY_ASSET_ACCOUNT = '1200';
 export const COGS_ACCOUNT = '5000';
+export const INVENTORY_VARIANCE_ACCOUNT = '6900';
+
+export async function adjustQuantityValuationOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    movementId: string;
+    productId: string;
+    balanceId: string;
+    location: string;
+    quantityDelta: number;
+    unitCost?: number;
+    actor: string;
+    sourceType: 'inventory.write_off' | 'inventory.adjustment';
+  },
+) {
+  if (input.quantityDelta > 0) {
+    const unitCost = input.unitCost ?? 0;
+    const totalValue = input.quantityDelta * unitCost;
+    await tx.inventoryValuationLayer.create({
+      data: {
+        productId: input.productId,
+        balanceId: input.balanceId,
+        location: input.location,
+        sourceType: input.sourceType,
+        sourceRef: input.movementId,
+        unitCost,
+        quantityReceived: input.quantityDelta,
+        quantityRemaining: input.quantityDelta,
+      },
+    });
+    if (totalValue > 0) {
+      await tx.inventoryBalance.update({
+        where: { id: input.balanceId },
+        data: { inventoryValue: { increment: totalValue } },
+      });
+    }
+    const entry = totalValue > 0
+      ? await postInventoryVarianceOnTx(tx, input, totalValue, true)
+      : null;
+    return { totalValue, unitCost, entry };
+  }
+
+  const quantity = Math.abs(input.quantityDelta);
+  const balance = await tx.inventoryBalance.findUniqueOrThrow({
+    where: { id: input.balanceId },
+    select: { inventoryValue: true },
+  });
+  if (balance.inventoryValue === 0) {
+    return { totalValue: 0, unitCost: null as number | null, entry: null };
+  }
+  const layers = await tx.inventoryValuationLayer.findMany({
+    where: { balanceId: input.balanceId, quantityRemaining: { gt: 0 } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  let remaining = quantity;
+  let totalValue = 0;
+  const unitCosts = new Set<number>();
+  for (const layer of layers) {
+    if (remaining === 0) break;
+    const consumed = Math.min(remaining, layer.quantityRemaining);
+    const claimed = await tx.inventoryValuationLayer.updateMany({
+      where: { id: layer.id, quantityRemaining: { gte: consumed } },
+      data: { quantityRemaining: { decrement: consumed } },
+    });
+    if (claimed.count !== 1) {
+      throw new ConflictError('valuation_layer_race', `Слой себестоимости ${layer.id} уже изменён`);
+    }
+    await tx.inventoryValuationIssue.create({
+      data: {
+        productId: input.productId,
+        layerId: layer.id,
+        sourceType: input.sourceType,
+        sourceRef: `${input.movementId}:${layer.id}`,
+        quantity: consumed,
+        unitCost: layer.unitCost,
+        totalCost: consumed * layer.unitCost,
+      },
+    });
+    remaining -= consumed;
+    totalValue += consumed * layer.unitCost;
+    unitCosts.add(layer.unitCost);
+  }
+  if (remaining > 0) {
+    throw new ConflictError(
+      'inventory_valuation_missing',
+      `Для движения ${input.movementId} не найдено достаточно слоёв себестоимости`,
+    );
+  }
+  const updated = await tx.inventoryBalance.updateMany({
+    where: { id: input.balanceId, inventoryValue: { gte: totalValue } },
+    data: { inventoryValue: { decrement: totalValue } },
+  });
+  if (updated.count !== 1) {
+    throw new ConflictError('inventory_value_mismatch', 'Стоимость остатка меньше стоимости складского движения');
+  }
+  const entry = totalValue > 0
+    ? await postInventoryVarianceOnTx(tx, input, totalValue, false)
+    : null;
+  return { totalValue, unitCost: unitCosts.size === 1 ? [...unitCosts][0] : null, entry };
+}
+
+async function postInventoryVarianceOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    movementId: string;
+    actor: string;
+    sourceType: 'inventory.write_off' | 'inventory.adjustment';
+  },
+  totalValue: number,
+  increase: boolean,
+) {
+  return postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:${input.sourceType}:${input.movementId}`,
+    sourceType: input.sourceType,
+    sourceRef: input.movementId,
+    description: `${increase ? 'Оприходование' : 'Списание'} запасов по движению ${input.movementId}`,
+    occurredAt: new Date(),
+    createdBy: input.actor,
+    lines: increase
+      ? [
+        { accountCode: INVENTORY_ASSET_ACCOUNT, debit: totalValue, memo: 'Увеличение стоимости запасов' },
+        { accountCode: INVENTORY_VARIANCE_ACCOUNT, credit: totalValue, memo: 'Излишек по складской корректировке' },
+      ]
+      : [
+        { accountCode: INVENTORY_VARIANCE_ACCOUNT, debit: totalValue, memo: 'Недостача или списание запасов' },
+        { accountCode: INVENTORY_ASSET_ACCOUNT, credit: totalValue, memo: 'Уменьшение стоимости запасов' },
+      ],
+  });
+}
 
 export async function transferQuantityValuationOnTx(
   tx: Prisma.TransactionClient,
