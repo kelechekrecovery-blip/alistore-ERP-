@@ -10,6 +10,45 @@ import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } fro
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 
+const manual_adjustment: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const documentNumber = String(payload['documentNumber'] ?? '').trim();
+  const description = String(payload['description'] ?? '').trim();
+  const occurredAt = new Date(String(payload['occurredAt']));
+  const amount = Number(payload['amount']);
+  const point = payload['point'] ? String(payload['point']).trim() : null;
+  const linesPayload = payload['lines'];
+  if (!documentNumber || !description || Number.isNaN(occurredAt.getTime()) || !Number.isSafeInteger(amount) || amount <= 0 || !Array.isArray(linesPayload)) {
+    throw new ValidationError('manual_adjustment_snapshot_invalid', 'Снимок ручной корректировки повреждён');
+  }
+  const lines = linesPayload.map((line) => ({
+    accountCode: String((line as Record<string, unknown>)['accountCode'] ?? '').trim(),
+    debit: Number((line as Record<string, unknown>)['debit'] ?? 0),
+    credit: Number((line as Record<string, unknown>)['credit'] ?? 0),
+    memo: (line as Record<string, unknown>)['memo'] ? String((line as Record<string, unknown>)['memo']) : null,
+  }));
+  const debit = lines.reduce((sum, line) => sum + line.debit, 0);
+  const credit = lines.reduce((sum, line) => sum + line.credit, 0);
+  if (lines.length < 2 || debit !== credit || debit !== amount || lines.some((line) => !/^\d{4}$/.test(line.accountCode) || !Number.isSafeInteger(line.debit) || !Number.isSafeInteger(line.credit) || (line.debit > 0) === (line.credit > 0))) {
+    throw new ValidationError('manual_adjustment_snapshot_invalid', 'Снимок ручной корректировки не сбалансирован');
+  }
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:manual-adjustment:${approvalId}`,
+    sourceType: 'finance.manual_adjustment',
+    sourceRef: documentNumber,
+    description,
+    point,
+    documentAmount: amount,
+    baseAmount: amount,
+    occurredAt,
+    createdBy: approver,
+    lines,
+  });
+  events.push(
+    { type: EventType.FinanceManualAdjustmentPosted, actor: approver, payload: { approvalId, documentNumber, amount, accountingEntryId: entry.id }, refs: [approvalId, documentNumber, entry.id] },
+    { type: EventType.AccountingEntryPosted, actor: approver, payload: { accountingEntryId: entry.id, sourceType: 'finance.manual_adjustment', sourceRef: documentNumber, amount }, refs: [entry.id, approvalId] },
+  );
+};
+
 /**
  * Executors for approved dangerous actions. Each runs inside the approval's
  * transaction (with the approval.approved event), takes the parked payload, and
@@ -696,6 +735,7 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   quarantine_write_off,
   delete: del,
   debt,
+  manual_adjustment,
 };
 
 export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {

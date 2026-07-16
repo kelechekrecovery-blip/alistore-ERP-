@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003G
+
+- Iteration ID: `ACC-003G`.
+- Task: add approval-gated manual accounting adjustments and protect the ERP Finance boundary.
+- Files changed: Approval idempotency/document fields and migration, Finance DTO/controller/service, approval RBAC/four-eyes policy, accounting action executor, Ledger event catalogue and dedicated API integration coverage.
+- Result: Finance users submit a frozen balanced snapshot with a unique document number and stable idempotency key. No journal entry exists before approval; replay returns the same approval, conflicting reuse fails closed, requester self-approval is rejected, and a separate owner/admin approval posts a server-validated `finance.manual_adjustment` journal entry through the shared period/account/balance checks. The ERP can list pending/approved/rejected snapshots with linked journal provenance.
+- Checks run: `npx prisma validate`; Prisma Client generation; API production build; dev migration deploy; manual-adjustment API integration 2/2; `git diff --check`. The isolated test database has pre-existing migration drift (`20260717030000_supplier_invoice_payments` is unmarked although its table exists), so only the new columns/indexes were applied there for this targeted run.
+- Acceptance: `accepted` for the local manual-adjustment approval software contour. Accountant/tax validation, broader FX controls, staging/production deployment, physical hardware, provider certification and first-store reconciliation remain open. Production readiness remains `RED`.
+- Commit: dedicated implementation commit pending after the final clean-tree gate.
+- Next step: run the broader Finance/API regression, then continue the next open high-value ecosystem slice while keeping external launch gates explicit.
+
 # 2026-07-17 — ACC-003F
 
 - Iteration ID: `ACC-003F`.

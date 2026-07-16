@@ -34,6 +34,7 @@ export const APPROVAL_APPROVER_ROLES: Record<string, Role[]> = {
   delete: ['owner'],
   pii: ['admin', 'owner'],
   campaign_budget: ['admin', 'owner'],
+  manual_adjustment: ['admin', 'owner'],
 };
 
 /** Thresholds beyond which an action must be parked for approval. */

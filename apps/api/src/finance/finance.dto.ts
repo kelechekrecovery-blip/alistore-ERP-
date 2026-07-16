@@ -62,6 +62,23 @@ export class ReverseAccountingEntryDto {
   @IsOptional() @IsISO8601({ strict: true }) occurredAt?: string;
 }
 
+export class ManualAdjustmentLineDto {
+  @IsString() @Matches(/^\d{4}$/) accountCode!: string;
+  @IsOptional() @IsInt() @Min(0) @Max(2147483647) debit?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(2147483647) credit?: number;
+  @IsOptional() @IsString() @MaxLength(240) memo?: string;
+}
+
+export class CreateManualAdjustmentDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(128) @Matches(/\S/) documentNumber!: string;
+  @IsString() @MinLength(3) @MaxLength(500) @Matches(/\S/) description!: string;
+  @IsOptional() @IsString() @MaxLength(120) point?: string;
+  @IsISO8601({ strict: true }) occurredAt!: string;
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ManualAdjustmentLineDto)
+  lines!: ManualAdjustmentLineDto[];
+}
+
 export class FinancePeriodQueryDto {
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
   @IsOptional() @IsString() @MaxLength(100) point?: string;

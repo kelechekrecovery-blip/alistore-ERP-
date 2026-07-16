@@ -25,6 +25,7 @@ import {
   SETTLEMENT_SOURCE_TYPES,
   SettleTaxPeriodDto,
   CreateFixedAssetDto,
+  CreateManualAdjustmentDto,
   DepreciateFixedAssetDto,
   CreateOpeningBalanceDto,
   AccountableAdvanceQueryDto,
@@ -1009,6 +1010,87 @@ export class FinanceService {
       line.memo,
     ]));
     return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
+  }
+
+  async listManualAdjustments(status?: string) {
+    const allowed = ['requested', 'approved', 'rejected'];
+    if (status && !allowed.includes(status)) {
+      throw new ValidationError('invalid_manual_adjustment_status', `Неизвестный статус ручной корректировки: ${status}`);
+    }
+    const approvals = await this.prisma.approval.findMany({
+      where: { action: 'manual_adjustment', ...(status ? { status: status as never } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const sourceRefs = approvals.map((approval) => approval.sourceRef).filter((value): value is string => Boolean(value));
+    const entries = await this.prisma.accountingJournalEntry.findMany({
+      where: { sourceType: 'finance.manual_adjustment', sourceRef: { in: sourceRefs } },
+      include: { lines: { include: { account: true }, orderBy: { accountCode: 'asc' } } },
+    });
+    const bySourceRef = new Map(entries.map((entry) => [entry.sourceRef, entry]));
+    return approvals.map((approval) => ({
+      id: approval.id,
+      approvalId: approval.id,
+      action: approval.action,
+      requester: approval.requester,
+      approver: approval.approver,
+      status: approval.status,
+      reason: approval.reason,
+      idempotencyKey: approval.idempotencyKey,
+      sourceRef: approval.sourceRef,
+      createdAt: approval.createdAt,
+      snapshot: (approval.evidence as { payload?: unknown } | null)?.payload ?? null,
+      accountingEntry: approval.sourceRef ? bySourceRef.get(approval.sourceRef) ?? null : null,
+    }));
+  }
+
+  async createManualAdjustment(dto: CreateManualAdjustmentDto, actor: string) {
+    const description = dto.description.trim();
+    const documentNumber = dto.documentNumber.trim();
+    const point = dto.point?.trim() || null;
+    const occurredAt = new Date(dto.occurredAt);
+    if (Number.isNaN(occurredAt.getTime())) throw new ValidationError('manual_adjustment_date_invalid', 'Дата корректировки некорректна');
+    const lines = dto.lines.map((line) => ({
+      accountCode: line.accountCode.trim(),
+      debit: line.debit ?? 0,
+      credit: line.credit ?? 0,
+      memo: line.memo?.trim() || null,
+    }));
+    const debit = lines.reduce((sum, line) => sum + line.debit, 0);
+    const credit = lines.reduce((sum, line) => sum + line.credit, 0);
+    if (lines.length < 2 || debit <= 0 || debit !== credit || lines.some((line) => (line.debit > 0) === (line.credit > 0))) {
+      throw new ValidationError('manual_adjustment_unbalanced', 'Ручная корректировка должна содержать сбалансированные строки');
+    }
+    const payload = { documentNumber, description, point, occurredAt: occurredAt.toISOString(), amount: debit, lines };
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`manual-adjustment-key:${dto.idempotencyKey}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`manual-adjustment-document:${documentNumber}`}))`;
+      const existing = await tx.approval.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+      if (existing) {
+        const existingPayload = (existing.evidence as { payload?: unknown } | null)?.payload;
+        if (existing.action !== 'manual_adjustment' || stableJson(existingPayload) !== stableJson(payload)) {
+          throw new ConflictError('manual_adjustment_idempotency_conflict', 'Idempotency key уже использован для другой корректировки');
+        }
+        return { result: { approvalId: existing.id, status: existing.status, idempotent: true, snapshot: existingPayload }, events: [] };
+      }
+      const sameDocument = await tx.approval.findUnique({ where: { sourceRef: documentNumber } });
+      if (sameDocument) throw new ConflictError('manual_adjustment_document_exists', 'Первичный документ корректировки уже зарегистрирован');
+      const approval = await tx.approval.create({
+        data: {
+          action: 'manual_adjustment',
+          requester: actor,
+          reason: description,
+          idempotencyKey: dto.idempotencyKey,
+          sourceRef: documentNumber,
+          status: 'requested',
+          evidence: { payload, evidence: { documentNumber, amount: debit } } as Prisma.InputJsonValue,
+        },
+      });
+      return {
+        result: { approvalId: approval.id, status: approval.status, idempotent: false, snapshot: payload },
+        events: [{ type: EventType.FinanceManualAdjustmentRequested, actor, payload: { approvalId: approval.id, documentNumber, amount: debit }, refs: [approval.id, documentNumber] }],
+      };
+    });
   }
 
   async reverseAccountingEntry(id: string, dto: ReverseAccountingEntryDto, actor: string) {

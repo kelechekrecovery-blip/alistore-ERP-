@@ -116,7 +116,7 @@ export class ApprovalsService {
           `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
-      if (['campaign_budget', 'refund', 'quarantine_write_off', 'exchange'].includes(approval.action)
+      if (['campaign_budget', 'refund', 'quarantine_write_off', 'exchange', 'manual_adjustment'].includes(approval.action)
         && approval.requester === input.approver) {
         throw new ForbiddenError(
           'four_eye_approval_required',

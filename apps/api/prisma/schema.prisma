@@ -1731,64 +1731,64 @@ model AccountingCurrencyRate {
 // Balanced accounting ledger. AuditEvent explains what happened; these rows
 // prove where value moved and that every posted entry balances.
 model AccountingAccount {
-  code           String                  @id
-  name           String
-  type           AccountingAccountType
-  system         Boolean                 @default(true)
-  active         Boolean                 @default(true)
-  lines          AccountingJournalLine[]
+  code                String                         @id
+  name                String
+  type                AccountingAccountType
+  system              Boolean                        @default(true)
+  active              Boolean                        @default(true)
+  lines               AccountingJournalLine[]
   openingBalanceLines AccountingOpeningBalanceLine[]
-  bankStatements BankStatement[]
-  payments       Payment[]
-  createdAt      DateTime                @default(now())
+  bankStatements      BankStatement[]
+  payments            Payment[]
+  createdAt           DateTime                       @default(now())
 
   @@index([type, active])
 }
 
 model AccountingJournalEntry {
-  id                 String                   @id @default(cuid())
-  idempotencyKey     String                   @unique
-  sourceType         String
-  sourceRef          String
-  description        String
-  point              String?
-  currency           String                   @default("KGS")
-  documentAmount     Int?
-  exchangeRateMicros Int                      @default(1000000)
-  baseAmount         Int?
-  taxCode            String                   @default("none")
-  taxRateBps         Int                      @default(0)
-  taxAmount          Int                      @default(0)
-  occurredAt         DateTime
-  postedAt           DateTime                 @default(now())
-  createdBy          String
-  lines              AccountingJournalLine[]
-  payment            Payment?
-  refundAllocation   RefundAllocation?
-  purchaseReceipt    PurchaseReceipt?
-  supplierInvoice    SupplierInvoice?
-  supplierCreditNote SupplierCreditNote?
-  supplierInvoicePayment SupplierInvoicePayment?
-  supplierAdvance          SupplierAdvance?
-  supplierAdvanceAllocation SupplierInvoiceAdvanceAllocation?
-  supplierStatementLine    SupplierStatementLine?
-  landedCost               LandedCost?
-  openingBalance        AccountingOpeningBalance?
-  hrPayrollAccrual       HrPayrollRun?          @relation("HrPayrollAccrual")
-  hrPayrollPayout        HrPayrollRun?          @relation("HrPayrollPayout")
-  fixedAssetAcquisition  FixedAsset?            @relation("FixedAssetAcquisition")
-  fixedAssetDepreciation FixedAssetDepreciation? @relation("FixedAssetDepreciation")
-  accountableAdvanceIssue         AccountableAdvance?             @relation("AccountableAdvanceIssue")
-  accountableAdvanceSettlement    AccountableAdvanceSettlement?   @relation("AccountableAdvanceSettlement")
-  accountableAdvanceReturn        AccountableAdvanceReturn?        @relation("AccountableAdvanceReturn")
+  id                              String                            @id @default(cuid())
+  idempotencyKey                  String                            @unique
+  sourceType                      String
+  sourceRef                       String
+  description                     String
+  point                           String?
+  currency                        String                            @default("KGS")
+  documentAmount                  Int?
+  exchangeRateMicros              Int                               @default(1000000)
+  baseAmount                      Int?
+  taxCode                         String                            @default("none")
+  taxRateBps                      Int                               @default(0)
+  taxAmount                       Int                               @default(0)
+  occurredAt                      DateTime
+  postedAt                        DateTime                          @default(now())
+  createdBy                       String
+  lines                           AccountingJournalLine[]
+  payment                         Payment?
+  refundAllocation                RefundAllocation?
+  purchaseReceipt                 PurchaseReceipt?
+  supplierInvoice                 SupplierInvoice?
+  supplierCreditNote              SupplierCreditNote?
+  supplierInvoicePayment          SupplierInvoicePayment?
+  supplierAdvance                 SupplierAdvance?
+  supplierAdvanceAllocation       SupplierInvoiceAdvanceAllocation?
+  supplierStatementLine           SupplierStatementLine?
+  landedCost                      LandedCost?
+  openingBalance                  AccountingOpeningBalance?
+  hrPayrollAccrual                HrPayrollRun?                     @relation("HrPayrollAccrual")
+  hrPayrollPayout                 HrPayrollRun?                     @relation("HrPayrollPayout")
+  fixedAssetAcquisition           FixedAsset?                       @relation("FixedAssetAcquisition")
+  fixedAssetDepreciation          FixedAssetDepreciation?           @relation("FixedAssetDepreciation")
+  accountableAdvanceIssue         AccountableAdvance?               @relation("AccountableAdvanceIssue")
+  accountableAdvanceSettlement    AccountableAdvanceSettlement?     @relation("AccountableAdvanceSettlement")
+  accountableAdvanceReturn        AccountableAdvanceReturn?         @relation("AccountableAdvanceReturn")
   accountableAdvanceReimbursement AccountableAdvanceReimbursement?  @relation("AccountableAdvanceReimbursement")
-  bankStatementLine  BankStatementLine?
-  cashIncassation    CashIncassation?
-  taxSettlement      AccountingTaxSettlement?
-  debtPlan           DebtPlan?
-  reversalOfId       String?                  @unique
-  reversalOf         AccountingJournalEntry?  @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversal           AccountingJournalEntry?  @relation("AccountingReversal")
+  bankStatementLine               BankStatementLine?
+  cashIncassation                 CashIncassation?
+  taxSettlement                   AccountingTaxSettlement?
+  debtPlan                        DebtPlan?
+  reversalOfId                    String?                           @unique
+  reversalOf                      AccountingJournalEntry?           @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal                        AccountingJournalEntry?           @relation("AccountingReversal")
 
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])
@@ -1796,29 +1796,29 @@ model AccountingJournalEntry {
 }
 
 model AccountingOpeningBalance {
-  id                String                   @id @default(cuid())
-  period            String                   @unique
-  documentNumber    String                   @unique
-  idempotencyKey    String                   @unique
+  id                String                         @id @default(cuid())
+  period            String                         @unique
+  documentNumber    String                         @unique
+  idempotencyKey    String                         @unique
   description       String
   createdBy         String
-  accountingEntryId String                   @unique
-  accountingEntry   AccountingJournalEntry  @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String                         @unique
+  accountingEntry   AccountingJournalEntry         @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   lines             AccountingOpeningBalanceLine[]
-  createdAt         DateTime                 @default(now())
+  createdAt         DateTime                       @default(now())
 
   @@index([createdAt])
 }
 
 model AccountingOpeningBalanceLine {
-  id                String                  @id @default(cuid())
-  openingBalance    AccountingOpeningBalance @relation(fields: [openingBalanceId], references: [id], onDelete: Restrict)
-  openingBalanceId  String
-  account           AccountingAccount       @relation(fields: [accountCode], references: [code], onDelete: Restrict)
-  accountCode       String
-  debit             Int                     @default(0)
-  credit            Int                     @default(0)
-  memo              String?
+  id               String                   @id @default(cuid())
+  openingBalance   AccountingOpeningBalance @relation(fields: [openingBalanceId], references: [id], onDelete: Restrict)
+  openingBalanceId String
+  account          AccountingAccount        @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode      String
+  debit            Int                      @default(0)
+  credit           Int                      @default(0)
+  memo             String?
 
   @@unique([openingBalanceId, accountCode])
   @@index([accountCode, openingBalanceId])
@@ -1841,7 +1841,7 @@ model FixedAsset {
   idempotencyKey               String                   @unique
   createdBy                    String
   acquisitionAccountingEntryId String                   @unique
-  acquisitionAccountingEntry   AccountingJournalEntry  @relation("FixedAssetAcquisition", fields: [acquisitionAccountingEntryId], references: [id], onDelete: Restrict)
+  acquisitionAccountingEntry   AccountingJournalEntry   @relation("FixedAssetAcquisition", fields: [acquisitionAccountingEntryId], references: [id], onDelete: Restrict)
   depreciationEntries          FixedAssetDepreciation[]
   createdAt                    DateTime                 @default(now())
   updatedAt                    DateTime                 @updatedAt
@@ -1851,95 +1851,95 @@ model FixedAsset {
 }
 
 model FixedAssetDepreciation {
-  id                 String                  @id @default(cuid())
-  fixedAsset         FixedAsset              @relation(fields: [fixedAssetId], references: [id], onDelete: Restrict)
+  id                 String                 @id @default(cuid())
+  fixedAsset         FixedAsset             @relation(fields: [fixedAssetId], references: [id], onDelete: Restrict)
   fixedAssetId       String
   period             String
   amount             Int
   openingAccumulated Int
   closingAccumulated Int
-  idempotencyKey     String                  @unique
-  accountingEntryId  String                  @unique
+  idempotencyKey     String                 @unique
+  accountingEntryId  String                 @unique
   accountingEntry    AccountingJournalEntry @relation("FixedAssetDepreciation", fields: [accountingEntryId], references: [id], onDelete: Restrict)
   postedBy           String
-  postedAt           DateTime                @default(now())
+  postedAt           DateTime               @default(now())
 
   @@unique([fixedAssetId, period])
   @@index([period, postedAt])
 }
 
 model AccountableAdvance {
-  id                 String                   @id @default(cuid())
-  staff              StaffUser                @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  id                 String                            @id @default(cuid())
+  staff              StaffUser                         @relation(fields: [staffId], references: [id], onDelete: Restrict)
   staffId            String
-  idempotencyKey     String                   @unique
+  idempotencyKey     String                            @unique
   purpose            String
   point              String
   amount             Int
-  settledAmount      Int                      @default(0)
-  returnedAmount     Int                      @default(0)
-  reimbursedAmount   Int                      @default(0)
-  status             AccountableAdvanceStatus @default(open)
+  settledAmount      Int                               @default(0)
+  returnedAmount     Int                               @default(0)
+  reimbursedAmount   Int                               @default(0)
+  status             AccountableAdvanceStatus          @default(open)
   fundingAccountCode String
   paymentReference   String
   issuedBy           String
-  issuedAt           DateTime                 @default(now())
+  issuedAt           DateTime                          @default(now())
   dueAt              DateTime?
-  accountingEntryId  String                   @unique
-  accountingEntry    AccountingJournalEntry  @relation("AccountableAdvanceIssue", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId  String                            @unique
+  accountingEntry    AccountingJournalEntry            @relation("AccountableAdvanceIssue", fields: [accountingEntryId], references: [id], onDelete: Restrict)
   settlements        AccountableAdvanceSettlement[]
   returns            AccountableAdvanceReturn[]
   reimbursements     AccountableAdvanceReimbursement[]
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
 
   @@index([staffId, status, createdAt])
   @@index([point, status, dueAt])
 }
 
 model AccountableAdvanceSettlement {
-  id                 String                  @id @default(cuid())
-  advance            AccountableAdvance      @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  id                 String                 @id @default(cuid())
+  advance            AccountableAdvance     @relation(fields: [advanceId], references: [id], onDelete: Restrict)
   advanceId          String
-  idempotencyKey     String                  @unique
+  idempotencyKey     String                 @unique
   amount             Int
   expenseAccountCode String
   description        String
   settledBy          String
-  settledAt          DateTime                @default(now())
-  accountingEntryId  String                  @unique
+  settledAt          DateTime               @default(now())
+  accountingEntryId  String                 @unique
   accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceSettlement", fields: [accountingEntryId], references: [id], onDelete: Restrict)
 
   @@index([advanceId, settledAt])
 }
 
 model AccountableAdvanceReturn {
-  id                 String                  @id @default(cuid())
-  advance            AccountableAdvance      @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  id                 String                 @id @default(cuid())
+  advance            AccountableAdvance     @relation(fields: [advanceId], references: [id], onDelete: Restrict)
   advanceId          String
-  idempotencyKey     String                  @unique
+  idempotencyKey     String                 @unique
   amount             Int
   fundingAccountCode String
   paymentReference   String
   returnedBy         String
-  returnedAt         DateTime                @default(now())
-  accountingEntryId  String                  @unique
+  returnedAt         DateTime               @default(now())
+  accountingEntryId  String                 @unique
   accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceReturn", fields: [accountingEntryId], references: [id], onDelete: Restrict)
 
   @@index([advanceId, returnedAt])
 }
 
 model AccountableAdvanceReimbursement {
-  id                 String                  @id @default(cuid())
-  advance            AccountableAdvance      @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  id                 String                 @id @default(cuid())
+  advance            AccountableAdvance     @relation(fields: [advanceId], references: [id], onDelete: Restrict)
   advanceId          String
-  idempotencyKey     String                  @unique
+  idempotencyKey     String                 @unique
   amount             Int
   fundingAccountCode String
   paymentReference   String
   reimbursedBy       String
-  reimbursedAt       DateTime                @default(now())
-  accountingEntryId  String                  @unique
+  reimbursedAt       DateTime               @default(now())
+  accountingEntryId  String                 @unique
   accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceReimbursement", fields: [accountingEntryId], references: [id], onDelete: Restrict)
 
   @@index([advanceId, reimbursedAt])
@@ -2133,32 +2133,32 @@ model PurchaseReceipt {
 }
 
 model SupplierInvoice {
-  id                  String                  @id @default(cuid())
-  supplier            Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  id                  String                             @id @default(cuid())
+  supplier            Supplier                           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   supplierId          String
-  purchaseOrder       PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrder       PurchaseOrder                      @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
   purchaseOrderId     String
   invoiceNumber       String
-  idempotencyKey      String                  @unique
+  idempotencyKey      String                             @unique
   amount              Int
   matchedReceiptValue Int
   dueDate             DateTime?
-  status              SupplierInvoiceStatus   @default(draft)
+  status              SupplierInvoiceStatus              @default(draft)
   approvedBy          String?
   approvedAt          DateTime?
-  paymentKey          String?                 @unique
+  paymentKey          String?                            @unique
   paymentAccountCode  String?
   paymentReference    String?
   paidBy              String?
   paidAt              DateTime?
-  accountingEntryId   String?                 @unique
-  accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId   String?                            @unique
+  accountingEntry     AccountingJournalEntry?            @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   payments            SupplierInvoicePayment[]
   advanceAllocations  SupplierInvoiceAdvanceAllocation[]
   creditNotes         SupplierCreditNote[]
   createdBy           String
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
+  createdAt           DateTime                           @default(now())
+  updatedAt           DateTime                           @updatedAt
 
   @@unique([supplierId, invoiceNumber])
   @@index([status, dueDate])
@@ -2167,59 +2167,59 @@ model SupplierInvoice {
 }
 
 model SupplierInvoicePayment {
-  id                 String                  @id @default(cuid())
-  invoice            SupplierInvoice         @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  id                 String                 @id @default(cuid())
+  invoice            SupplierInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   invoiceId          String
-  idempotencyKey     String                  @unique
-  paymentKey         String                  @unique
+  idempotencyKey     String                 @unique
+  paymentKey         String                 @unique
   amount             Int
   paymentAccountCode String
   paymentReference   String
   paidBy             String
-  paidAt             DateTime                @default(now())
-  accountingEntryId  String                  @unique
+  paidAt             DateTime               @default(now())
+  accountingEntryId  String                 @unique
   accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  createdAt          DateTime                @default(now())
+  createdAt          DateTime               @default(now())
 
   @@index([invoiceId, paidAt])
   @@index([paymentAccountCode, paidAt])
 }
 
 model SupplierAdvance {
-  id                 String               @id @default(cuid())
-  supplier           Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  id                 String                             @id @default(cuid())
+  supplier           Supplier                           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   supplierId         String
-  idempotencyKey     String               @unique
-  paymentKey         String               @unique
+  idempotencyKey     String                             @unique
+  paymentKey         String                             @unique
   amount             Int
-  appliedAmount      Int                  @default(0)
-  status             SupplierAdvanceStatus @default(open)
+  appliedAmount      Int                                @default(0)
+  status             SupplierAdvanceStatus              @default(open)
   paymentAccountCode String
   paymentReference   String
   paidBy             String
-  paidAt             DateTime             @default(now())
-  accountingEntryId  String               @unique
-  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  paidAt             DateTime                           @default(now())
+  accountingEntryId  String                             @unique
+  accountingEntry    AccountingJournalEntry             @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   allocations        SupplierInvoiceAdvanceAllocation[]
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
 
   @@index([supplierId, status, createdAt])
   @@index([status, paidAt])
 }
 
 model SupplierInvoiceAdvanceAllocation {
-  id                 String          @id @default(cuid())
-  advance            SupplierAdvance @relation(fields: [advanceId], references: [id], onDelete: Restrict)
-  advanceId          String
-  invoice            SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
-  invoiceId          String
-  idempotencyKey     String          @unique
-  amount             Int
-  accountingEntryId  String          @unique
-  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  appliedBy          String
-  appliedAt          DateTime        @default(now())
+  id                String                 @id @default(cuid())
+  advance           SupplierAdvance        @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId         String
+  invoice           SupplierInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceId         String
+  idempotencyKey    String                 @unique
+  amount            Int
+  accountingEntryId String                 @unique
+  accountingEntry   AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  appliedBy         String
+  appliedAt         DateTime               @default(now())
 
   @@index([advanceId, appliedAt])
   @@index([invoiceId, appliedAt])
@@ -2246,20 +2246,20 @@ model SupplierStatement {
 }
 
 model SupplierStatementLine {
-  id                String                       @id @default(cuid())
-  statement         SupplierStatement            @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  id                String                      @id @default(cuid())
+  statement         SupplierStatement           @relation(fields: [statementId], references: [id], onDelete: Cascade)
   statementId       String
   externalId        String
   occurredAt        DateTime
   amount            Int
   reference         String?
-  status            SupplierStatementLineStatus  @default(unmatched)
-  reconciliationKey String?                      @unique
-  matchedEntryId    String?                      @unique
-  matchedEntry      AccountingJournalEntry?      @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
+  status            SupplierStatementLineStatus @default(unmatched)
+  reconciliationKey String?                     @unique
+  matchedEntryId    String?                     @unique
+  matchedEntry      AccountingJournalEntry?     @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
   matchedBy         String?
   matchedAt         DateTime?
-  createdAt         DateTime                     @default(now())
+  createdAt         DateTime                    @default(now())
 
   @@unique([statementId, externalId])
   @@index([statementId, status])
@@ -2269,22 +2269,22 @@ model SupplierStatementLine {
 // Additional acquisition costs are capitalized into the received serialized
 // units and the inventory asset account in one immutable document.
 model LandedCost {
-  id                 String                  @id @default(cuid())
-  purchaseOrder      PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
-  purchaseOrderId    String
-  supplier           Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  supplierId         String
-  idempotencyKey     String                  @unique
-  documentNumber     String                  @unique
-  amount             Int
-  creditAccountCode  String
-  description        String
-  appliedBy          String
-  appliedAt          DateTime                @default(now())
-  accountingEntryId  String                  @unique
-  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  allocations        LandedCostAllocation[]
-  createdAt          DateTime                @default(now())
+  id                String                 @id @default(cuid())
+  purchaseOrder     PurchaseOrder          @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrderId   String
+  supplier          Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId        String
+  idempotencyKey    String                 @unique
+  documentNumber    String                 @unique
+  amount            Int
+  creditAccountCode String
+  description       String
+  appliedBy         String
+  appliedAt         DateTime               @default(now())
+  accountingEntryId String                 @unique
+  accountingEntry   AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  allocations       LandedCostAllocation[]
+  createdAt         DateTime               @default(now())
 
   @@index([purchaseOrderId, createdAt])
   @@index([supplierId, createdAt])
@@ -2466,6 +2466,8 @@ model Approval {
   action                String // discount | refund | write_off | quarantine_write_off | price | debt | delete | stock_adjust | pii
   requester             String
   approver              String?
+  idempotencyKey        String?                  @unique
+  sourceRef             String?                  @unique
   status                ApprovalStatus           @default(requested)
   reason                String
   evidence              Json? // обязательно для high-risk
@@ -2894,25 +2896,25 @@ model MediaCleanupTask {
 // Staff login carries a role in the JWT so dangerous actions are authorized on
 // the server (Role Permission Matrix), not trusted from the request body.
 model StaffUser {
-  id             String          @id @default(cuid())
-  username       String          @unique
-  passwordHash   String
-  role           Role
-  point          String          @default("BISHKEK-1")
-  active         Boolean         @default(true)
-  totpSecret     String?
-  totpEnabled    Boolean         @default(false)
-  totpLastToken  String? // last used TOTP code — single-use guard (anti-replay)
-  pushTokens     PushToken[]
-  assignedTasks  StaffTask[]     @relation("StaffTaskAssignee")
-  createdTasks   StaffTask[]     @relation("StaffTaskCreator")
-  courierOrders  Order[]         @relation("OrderCourier")
-  hrSchedules    HrSchedule[]
-  hrAttendances  HrAttendance[]
-  hrAbsences     HrAbsence[]
-  hrPayrollLines HrPayrollLine[]
+  id                  String               @id @default(cuid())
+  username            String               @unique
+  passwordHash        String
+  role                Role
+  point               String               @default("BISHKEK-1")
+  active              Boolean              @default(true)
+  totpSecret          String?
+  totpEnabled         Boolean              @default(false)
+  totpLastToken       String? // last used TOTP code — single-use guard (anti-replay)
+  pushTokens          PushToken[]
+  assignedTasks       StaffTask[]          @relation("StaffTaskAssignee")
+  createdTasks        StaffTask[]          @relation("StaffTaskCreator")
+  courierOrders       Order[]              @relation("OrderCourier")
+  hrSchedules         HrSchedule[]
+  hrAttendances       HrAttendance[]
+  hrAbsences          HrAbsence[]
+  hrPayrollLines      HrPayrollLine[]
   accountableAdvances AccountableAdvance[]
-  createdAt      DateTime        @default(now())
+  createdAt           DateTime             @default(now())
 
   @@index([role])
 }
@@ -2990,29 +2992,29 @@ model HrAbsence {
 }
 
 model HrPayrollRun {
-  id                   String          @id @default(cuid())
-  period               String
-  point                String
-  status               HrPayrollStatus @default(posted)
-  baseAmount           Int
-  commissionBps        Int
-  latePenaltyPerMinute Int
-  overtimePayPerMinute Int
-  totalBase            Int
-  totalCommission      Int
-  totalAdjustments     Int
-  totalPayout          Int
-  createdBy            String
-  paidBy               String?
-  paidAt               DateTime?
-  externalRef          String?
-  accrualAccountingEntryId String?             @unique
+  id                       String                  @id @default(cuid())
+  period                   String
+  point                    String
+  status                   HrPayrollStatus         @default(posted)
+  baseAmount               Int
+  commissionBps            Int
+  latePenaltyPerMinute     Int
+  overtimePayPerMinute     Int
+  totalBase                Int
+  totalCommission          Int
+  totalAdjustments         Int
+  totalPayout              Int
+  createdBy                String
+  paidBy                   String?
+  paidAt                   DateTime?
+  externalRef              String?
+  accrualAccountingEntryId String?                 @unique
   accrualAccountingEntry   AccountingJournalEntry? @relation("HrPayrollAccrual", fields: [accrualAccountingEntryId], references: [id], onDelete: Restrict)
-  payoutAccountingEntryId  String?             @unique
+  payoutAccountingEntryId  String?                 @unique
   payoutAccountingEntry    AccountingJournalEntry? @relation("HrPayrollPayout", fields: [payoutAccountingEntryId], references: [id], onDelete: Restrict)
-  lines                HrPayrollLine[]
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  lines                    HrPayrollLine[]
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 
   @@unique([period, point])
   @@index([status, createdAt])

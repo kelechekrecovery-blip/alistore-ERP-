@@ -70,6 +70,8 @@ export const EventType = {
   AccountableAdvanceSettled: 'finance.accountable_advance_settled',
   AccountableAdvanceReturned: 'finance.accountable_advance_returned',
   AccountableAdvanceReimbursed: 'finance.accountable_advance_reimbursed',
+  FinanceManualAdjustmentRequested: 'finance.manual_adjustment_requested',
+  FinanceManualAdjustmentPosted: 'finance.manual_adjustment_posted',
   // delivery
   DeliveryAssigned: 'delivery.assigned',
   DeliveryOut: 'delivery.out',
