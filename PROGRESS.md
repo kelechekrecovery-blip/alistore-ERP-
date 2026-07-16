@@ -1,5 +1,14 @@
 # PROGRESS
 
+# 2026-07-17 — STORE-OPS-001 verification follow-up
+
+- Iteration ID: `STORE-OPS-001` verification follow-up.
+- Result: the complete Playwright suite passes `58/58`, including the Store Operations ERP journey and the refreshed ERP desktop visual golden for the intentional sidebar addition.
+- Checks run: Store Operations API `2/2`; targeted Staff session suite `12/12`; complete Playwright `58/58`; Store Operations ERP visual test `1/1`; `git diff --check`.
+- Full-gate note: the long `mvp:verify` Jest process completed `147/148` suites and `665/670` tests; five existing `staff-session-ops.e2e-spec.ts` tests exceeded the 30-second timeout in that resource-heavy aggregate run, while the same suite passes independently. The overall MVP gate therefore remains `RED` pending a repeatable long-run Jest/resource fix.
+- Commit: `b03450a` (`feat(erp): add store operations controls`); visual verification follow-up is pending in this commit.
+- Next step: isolate the aggregate Jest timeout/resource behavior or proceed with the next locally unblocked ERP/native slice; external production gates remain open.
+
 # 2026-07-17 — STORE-OPS-001
 
 - Iteration ID: `STORE-OPS-001`.
