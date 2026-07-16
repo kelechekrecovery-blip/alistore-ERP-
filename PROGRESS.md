@@ -2199,3 +2199,12 @@
 - Checks run: `xcodebuild` Client simulator build passed; aggregate `AliStoreUITests` passed with Client `2/2`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check` passed; manual iPhone 17 Pro simulator screenshots verified login and guest/home rendering.
 - Outcome: this bounded native Client visual iteration is implemented and simulator-verified. Full 17-screen parity, live API data, Face ID on a physical device, release signing, TestFlight and App Store Connect submission remain open.
 - Next step: finish the Client hero/product visual pass, add privacy/release preflight metadata, and test a signed Release archive against a production HTTPS API URL.
+
+## 2026-07-17
+
+- Task: add the native Client release safety boundary and App Store preflight materials.
+- Files changed: `apps/ios/Client/PrivacyInfo.xcprivacy`, `apps/ios/Shared/PrivacyInfo.xcprivacy`, `apps/ios/scripts/store-preflight.sh`, `apps/ios/store/release-runbook.md`, generated Xcode project metadata.
+- Result: both the Client app and `AliStoreCore.framework` bundle the required-reason UserDefaults privacy manifest; the preflight rejects non-HTTPS/local/staging/sandbox endpoints, invalid Apple team IDs, missing key files, and non-UUID App Store Connect issuers. The runbook documents archive, export, upload and mandatory physical-device checks without storing credentials.
+- Checks run: XcodeGen; Client simulator build; unsigned generic iOS Release archive with `API_BASE_URL=https://api.alistore.kg/api`; archive plist inspection confirmed the HTTPS URL and two privacy manifests; invalid issuer preflight exited `1` as required.
+- Outcome: Release configuration is buildable and fail-closed, but the archive is intentionally unsigned: the local machine has Apple certificates, while no provisioning profile or verified App Store Connect issuer was available. App Store/TestFlight publication is not claimed.
+- Next step: complete remaining Client routes and add verified signing/profile credentials to the protected release environment before attempting upload.

@@ -35,6 +35,8 @@
 		B92D85D26242A0D8F65E1A52 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F23ACBE05CF3A0E1499E0B /* APIClient.swift */; };
 		CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */; };
+		D10A68419B9AC3F5E5048EBC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 34EA386491279732C58F06E5 /* PrivacyInfo.xcprivacy */; };
+		D8540E88D9B3581F66746FF8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */; };
 		DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */; };
 		E3B3670272FF6B5A0E381FFE /* CourierOperationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */; };
 		E4AFBA9E7AA4F56F3FB28A7E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -179,6 +181,8 @@
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierOperationsView.swift; sourceTree = "<group>"; };
 		3397795D183792BD78015F89 /* AliStoreCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = AliStoreCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		34EA386491279732C58F06E5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureTokenStore.swift; sourceTree = "<group>"; };
 		3DDD9376D59012178E0570F2 /* StaffScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffScannerView.swift; sourceTree = "<group>"; };
 		41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientApp.swift; sourceTree = "<group>"; };
@@ -268,6 +272,7 @@
 				A9EBC4D5C06A5630E3B7D69D /* Models.swift */,
 				04AAB6220384C05861A21153 /* NativeShell.swift */,
 				8A5A549F226050ACB113FF4E /* OfflineQueue.swift */,
+				3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */,
 				1835E8741DBB19503E6334A1 /* QuickUnlock.swift */,
 				3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */,
 				915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */,
@@ -379,6 +384,7 @@
 				E3930B564A069DBB66A1EF6E /* Assets.xcassets */,
 				8C948B07F1B2BB3F577E75BC /* Client.entitlements */,
 				48457E88937519CA203EA7DE /* Info.plist */,
+				34EA386491279732C58F06E5 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Client;
 			sourceTree = "<group>";
@@ -561,6 +567,7 @@
 			buildConfigurationList = 8561EC62D37111A7CE0F4353 /* Build configuration list for PBXNativeTarget "AliStoreCore" */;
 			buildPhases = (
 				B63ED0FCA8EEF9046820F85A /* Sources */,
+				3C93B46EC5B6F88C513514E1 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -677,11 +684,20 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3C93B46EC5B6F88C513514E1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D8540E88D9B3581F66746FF8 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7BBF5A1180968AA4C9C937D7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				AD8F4AD7E5412004A4DE7F90 /* Assets.xcassets in Resources */,
+				D10A68419B9AC3F5E5048EBC /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
