@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gate": "procurement-sale-reconciliation",
+  "command": "npm run ecosystem:procurement-sale:e2e",
+  "exitCode": 0,
+  "packageCommandSha256": "bc646f75d031a3f6e417265f3d9b31863198a930b0ca40e4cafc0e7c910c3992",
+  "sourceTreeSha256": "8402904c91398975e239294fbd55128bf26b128fb0e9268a029819ab9a7d7960",
+  "sourceCommit": "c1481e1c1674595f94b5f4cbe3411969f0fc9734",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "toolchain": "v25.9.0"
+  },
+  "executionEnvironmentSha256": "fe638b46bf31fa36e3d711c261a2f0e1746440eb275e0c226012c23c72f1809c",
+  "completedAt": "2026-07-16T15:41:21.907Z"
+}

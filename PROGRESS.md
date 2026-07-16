@@ -2041,3 +2041,12 @@
 - Checks run: Prisma schema validation/generation and migration deploy on development/test databases; POS, product-bundle and business-invariant API regressions `3/3` suites and `33/33` tests; procurement API `1/1` suite and `6/6` tests; API production build; Playwright procurement/POS reconciliation `1/1`; Node syntax for evidence scripts; acceptance JSON parse; `git diff --check`. The audit intentionally retains this gate as GAP until clean-tree evidence is recorded after the implementation commit.
 - Outcome: the bounded local software vertical is implemented. It does not certify broader AP/invoice/payment workflows, landed cost, physical POS equipment, complete visual/native journeys, providers or the broad reconciled ecosystem gate.
 - Next step: commit the reviewed implementation, record and commit clean-tree `procurement-sale-reconciliation` evidence, then advance the remaining broad ecosystem/visual/native acceptance matrix.
+
+## 2026-07-16
+
+- Task: record durable `procurement-sale-reconciliation` evidence on clean source commit `c1481e1`.
+- Files changed: ecosystem evidence manifest, immutable content-addressed procurement/POS result artifact and progress record.
+- Result: the clean-tree recorder reran owner PO creation, partial/complete serialized receiving, AP receipt journals, idempotent POS sale, payment/tax/COGS, remaining stock and exact Event Ledger checks. The result is bound to source-tree SHA-256 `8402904c91398975e239294fbd55128bf26b128fb0e9268a029819ab9a7d7960`, source commit `c1481e1c1674595f94b5f4cbe3411969f0fc9734`, the exact package command and Node/host environment.
+- Checks run: `npm run ecosystem:evidence -- procurement-sale-reconciliation`; procurement API `1/1` suite and `6/6` tests; Playwright `1/1`; independent SHA-256 verification matched artifact filename and manifest.
+- Outcome: durable exact procurement, AP, inventory, POS money and Ledger evidence is recorded for this bounded vertical. The broad reconciled ecosystem, complete visual corpus, deeper native journeys and external provider/hardware certification remain open.
+- Next step: commit the immutable evidence, verify the clean-tree procurement audit gate becomes PASS, then implement the next bounded gap in the broad ecosystem matrix.

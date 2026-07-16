@@ -69,10 +69,16 @@
       ]
     },
     "procurement-sale-reconciliation": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "ecosystem:procurement-sale:e2e",
-      "command": null,
-      "artifacts": []
+      "command": "npm run ecosystem:procurement-sale:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-d64b0ec46582a4cebb01b3bc7b86aa2543c3dddd0ff778be2af65cc4a3165e64.json",
+          "sha256": "d64b0ec46582a4cebb01b3bc7b86aa2543c3dddd0ff778be2af65cc4a3165e64"
+        }
+      ]
     },
     "reconciled-e2e": {
       "status": "partial",
