@@ -177,6 +177,100 @@ public struct CustomerSession: Codable, Sendable {
     public let phone: String
 }
 
+public struct CustomerLoyalty: Decodable, Sendable {
+    public let balance: Int
+    public let conversion: Int
+    public let level: String
+    public let nextLevelSpend: Int
+    public let coupons: [CustomerCoupon]
+    public let history: [LoyaltyHistoryEntry]
+}
+
+public struct CustomerCoupon: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let code: String
+    public let valueLabel: String
+    public let expiresAt: Date?
+    public let active: Bool
+}
+
+public struct LoyaltyHistoryEntry: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let kind: String
+    public let label: String
+    public let amount: Int
+    public let expiresAt: Date?
+    public let createdAt: Date
+}
+
+public struct CustomerAddress: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let text: String
+    public let comment: String?
+    public let isPrimary: Bool
+    public let createdAt: Date
+    public let updatedAt: Date
+}
+
+public struct CreateCustomerAddressRequest: Encodable, Sendable {
+    public let title: String
+    public let text: String
+    public let comment: String?
+    public let isPrimary: Bool
+
+    public init(title: String, text: String, comment: String?, isPrimary: Bool) {
+        self.title = title
+        self.text = text
+        self.comment = comment
+        self.isPrimary = isPrimary
+    }
+}
+
+public struct UpdateCustomerAddressRequest: Encodable, Sendable {
+    public let title: String
+    public let text: String
+    public let comment: String?
+    public let isPrimary: Bool
+
+    public init(title: String, text: String, comment: String?, isPrimary: Bool) {
+        self.title = title
+        self.text = text
+        self.comment = comment
+        self.isPrimary = isPrimary
+    }
+}
+
+public struct CustomerSettings: Decodable, Sendable {
+    public let id: String
+    public let phone: String
+    public let name: String
+    public let consent: Bool
+    public let push: Bool
+    public let whatsapp: Bool
+    public let service: Bool
+    public let promos: Bool
+}
+
+public struct UpdateCustomerSettingsRequest: Encodable, Sendable {
+    public let name: String
+    public let consent: Bool
+    public let push: Bool
+    public let whatsapp: Bool
+    public let service: Bool
+    public let promos: Bool
+
+    public init(name: String, consent: Bool, push: Bool, whatsapp: Bool, service: Bool, promos: Bool) {
+        self.name = name
+        self.consent = consent
+        self.push = push
+        self.whatsapp = whatsapp
+        self.service = service
+        self.promos = promos
+    }
+}
+
 public struct RefreshRequest: Encodable, Sendable {
     public let refreshToken: String
 

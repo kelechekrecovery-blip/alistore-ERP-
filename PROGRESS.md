@@ -2226,3 +2226,12 @@
 - Checks run: Client XCUITest `4/4`; Client simulator build passed; `git diff --check` passed.
 - Outcome: guest cabinet navigation and signed-in route composition are now visually consistent with the Client prototype. Bonuses, addresses, notification preferences and full API-backed account parity remain open.
 - Next step: run the aggregate iOS UI gate on this cabinet commit, then continue with the next API-backed account contract.
+
+## 2026-07-17
+
+- Task: connect the remaining native Client account services to the authenticated customer API.
+- Files changed: `apps/ios/Shared/Models.swift`, `apps/ios/Shared/APIClient.swift`, `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: bonuses now load the server-owned balance, level, coupons and ledger history; addresses support owner-scoped list/create/update/delete with a stable idempotency key for creation; settings load and persist profile, consent and notification preferences. All routes expose loading, empty, error and retry states and keep the dark Client prototype shell.
+- Checks run: Client simulator build passed; targeted Client XCUITest `4/4`; aggregate iOS UI gate passed for Client `4/4`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
+- Outcome: the available customer account API surface is now connected in iOS Client. Full 17-screen parity, dynamic notification inbox, return/trade-in screens, physical-device biometrics/push, production credentials and signed store submission remain open.
+- Next step: implement the next unblocked native Client route (returns/trade-in) and add signed-in UI coverage without weakening the guest-only test bootstrap.

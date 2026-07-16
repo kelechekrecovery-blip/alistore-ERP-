@@ -184,6 +184,7 @@
 - Add native warranty case opening from signed-in device cards and JWT-aware warranty owner guard.
 - Add native customer support tickets and close the support ticket list owner-scope gap.
 - Add native customer devices and warranty state in the signed-in account cabinet via `GET /customers/me/devices`.
+- Connect native Client bonuses, addresses CRUD and notification/profile settings to the owner-scoped customer API with loading/empty/error states and idempotent address creation. (Implemented on 2026-07-17; returns/trade-in/notification inbox remain open.)
 - Add native customer order history in the signed-in account cabinet via `GET /orders/mine`.
 - Add native customer OTP account session for App Store / Google Play app: SecureStore persistence, refresh-on-restore, signed-in checkout, and customer-bound push registration.
 - Bind native staff push registration to the stored staff JWT in the POS app.

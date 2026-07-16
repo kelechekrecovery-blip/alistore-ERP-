@@ -1014,9 +1014,15 @@ private struct AccountView: View {
             Text("Сервисы")
                 .font(ClientTheme.body(12, weight: .semibold))
                 .foregroundStyle(ClientTheme.muted)
-            AccountUnavailableRow(title: "Бонусы", detail: "Скоро появятся в кабинете", symbol: "gift.fill")
-            AccountUnavailableRow(title: "Адреса доставки", detail: "Управление адресами подключается", symbol: "mappin.and.ellipse")
-            AccountUnavailableRow(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3")
+            AccountMenuRow(title: "Бонусы", detail: "Баланс, купоны и история начислений", symbol: "gift.fill") {
+                CustomerLoyaltyView(environment: environment, auth: auth)
+            }
+            AccountMenuRow(title: "Адреса доставки", detail: "Сохранённые адреса и адрес по умолчанию", symbol: "mappin.and.ellipse") {
+                CustomerAddressesView(environment: environment, auth: auth)
+            }
+            AccountMenuRow(title: "Настройки", detail: "Профиль, уведомления и согласия", symbol: "slider.horizontal.3") {
+                CustomerSettingsView(environment: environment, auth: auth)
+            }
         }
 
         VStack(alignment: .leading, spacing: 10) {
@@ -1149,27 +1155,497 @@ private struct AccountMenuRow<Destination: View>: View {
     }
 }
 
-private struct AccountUnavailableRow: View {
-    let title: String
-    let detail: String
-    let symbol: String
+private struct CustomerLoyaltyView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var loyalty: CustomerLoyalty?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .foregroundStyle(ClientTheme.muted)
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем бонусы").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else if let loyalty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("БАЛАНС БОНУСОВ")
+                                .font(ClientTheme.body(11, weight: .bold))
+                                .foregroundStyle(ClientTheme.lime)
+                            Text("\(loyalty.balance)")
+                                .font(ClientTheme.display(36, weight: .black))
+                                .foregroundStyle(.white)
+                            Text("уровень \(loyalty.level) · 1 бонус = \(loyalty.conversion) сом")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(ClientTheme.muted)
+                            if loyalty.nextLevelSpend > 0 {
+                                Text("До следующего уровня: \(loyalty.nextLevelSpend.formatted(.number)) сом покупок")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text("Максимальный уровень достигнут")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(ClientTheme.lime)
+                            }
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+
+                        if !loyalty.coupons.isEmpty {
+                            Text("Купоны")
+                                .font(ClientTheme.body(12, weight: .semibold))
+                                .foregroundStyle(ClientTheme.muted)
+                            ForEach(loyalty.coupons) { coupon in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack {
+                                        Text(coupon.title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                                        Spacer()
+                                        Text(coupon.valueLabel).font(ClientTheme.body(13, weight: .bold)).foregroundStyle(ClientTheme.coral)
+                                    }
+                                    Text(coupon.code).font(.system(size: 12, design: .monospaced)).foregroundStyle(ClientTheme.lime)
+                                    if let expiresAt = coupon.expiresAt {
+                                        Text("Действует до \(expiresAt, format: .dateTime.day().month().year())")
+                                            .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                    }
+                                }
+                                .padding(13)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                            }
+                        }
+
+                        Text("История")
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        if loyalty.history.isEmpty {
+                            EmptyStateView(title: "История пока пуста", detail: "Начисления и списания появятся после покупки.", symbol: "clock.arrow.circlepath")
+                        } else {
+                            ForEach(loyalty.history) { entry in
+                                HStack(spacing: 12) {
+                                    Image(systemName: entry.amount >= 0 ? "plus.circle.fill" : "minus.circle.fill")
+                                        .foregroundStyle(entry.amount >= 0 ? ClientTheme.lime : ClientTheme.coral)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(entry.label).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                                        Text(entry.createdAt, format: .dateTime.day().month().year())
+                                            .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                    }
+                                    Spacer()
+                                    Text("\(entry.amount >= 0 ? "+" : "")\(entry.amount)")
+                                        .font(ClientTheme.body(14, weight: .bold))
+                                        .foregroundStyle(entry.amount >= 0 ? ClientTheme.lime : ClientTheme.coral)
+                                }
+                                .padding(12)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Бонусы")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            loyalty = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/loyalty", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CustomerAddressesView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var addresses: [CustomerAddress] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var editor: AddressEditorRoute?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем адреса").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if addresses.isEmpty {
+                            EmptyStateView(title: "Адресов пока нет", detail: "Добавьте адрес, чтобы быстрее оформить доставку.", symbol: "mappin.and.ellipse")
+                        } else {
+                            ForEach(addresses) { address in
+                                Button { editor = AddressEditorRoute(address: address) } label: {
+                                    addressRow(address)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        Button { editor = AddressEditorRoute(address: nil) } label: {
+                            Label("Добавить адрес", systemImage: "plus")
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Адреса доставки")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+        .sheet(item: $editor) { route in
+            NavigationStack {
+                CustomerAddressEditorView(environment: environment, auth: auth, address: route.address) {
+                    editor = nil
+                    Task { await load() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    private func addressRow(_ address: CustomerAddress) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: address.isPrimary ? "mappin.and.ellipse" : "mappin")
+                .foregroundStyle(address.isPrimary ? ClientTheme.lime : ClientTheme.muted)
                 .frame(width: 38, height: 38)
                 .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(address.title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                    if address.isPrimary {
+                        Text("По умолчанию").font(ClientTheme.body(10, weight: .semibold)).foregroundStyle(ClientTheme.lime)
+                    }
+                }
+                Text(address.text).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.leading)
+                if let comment = address.comment, !comment.isEmpty {
+                    Text(comment).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted.opacity(0.8))
+                }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            addresses = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/addresses", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct AddressEditorRoute: Identifiable {
+    let id = UUID()
+    let address: CustomerAddress?
+}
+
+private struct CustomerAddressEditorView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let address: CustomerAddress?
+    let onSaved: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var title: String
+    @State private var text: String
+    @State private var comment: String
+    @State private var isPrimary: Bool
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(environment: AppEnvironment, auth: CustomerAuthStore, address: CustomerAddress?, onSaved: @escaping () -> Void) {
+        self.environment = environment
+        self.auth = auth
+        self.address = address
+        self.onSaved = onSaved
+        _title = State(initialValue: address?.title ?? "Дом")
+        _text = State(initialValue: address?.text ?? "")
+        _comment = State(initialValue: address?.comment ?? "")
+        _isPrimary = State(initialValue: address?.isPrimary ?? false)
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(address == nil ? "Новый адрес" : "Изменить адрес")
+                        .font(ClientTheme.display(24, weight: .black)).foregroundStyle(.white)
+                    clientField("Название", text: $title, placeholder: "Дом, работа")
+                    clientField("Адрес", text: $text, placeholder: "Улица, дом, квартира", axis: .vertical)
+                    clientField("Комментарий", text: $comment, placeholder: "Подъезд, этаж", axis: .vertical)
+                    Toggle("Использовать по умолчанию", isOn: $isPrimary)
+                        .font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                        .tint(ClientTheme.lime)
+                    if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
+                    Button { Task { await save() } } label: {
+                        HStack { Spacer(); if isSaving { ProgressView().tint(.black) } else { Text("Сохранить") }; Spacer() }
+                            .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black).frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if address != nil {
+                        Button(role: .destructive) { Task { await delete() } } label: {
+                            Text("Удалить адрес").font(ClientTheme.body(14, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .disabled(isSaving)
+                    }
+                }
+                .padding(18)
+            }
+        }
+        .navigationTitle(address == nil ? "Добавить адрес" : "Адрес")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Отмена") { dismiss() } } }
+        .tint(ClientTheme.lime)
+    }
+
+    private func clientField(_ label: String, text: Binding<String>, placeholder: String, axis: Axis = .horizontal) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label).font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+            TextField(placeholder, text: text, axis: axis)
+                .lineLimit(3...6)
+                .foregroundStyle(.white).padding(13)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = auth.session?.accessToken else { return }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanComment = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            if let address {
+                let _: CustomerAddress = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                    "customers/me/addresses/\(address.id)",
+                    body: UpdateCustomerAddressRequest(title: cleanTitle, text: cleanText, comment: cleanComment.isEmpty ? nil : cleanComment, isPrimary: isPrimary),
+                    token: token
+                )
+            } else {
+                let _: CustomerAddress = try await APIClient(baseURL: environment.apiBaseURL).post(
+                    "customers/me/addresses",
+                    body: CreateCustomerAddressRequest(title: cleanTitle, text: cleanText, comment: cleanComment.isEmpty ? nil : cleanComment, isPrimary: isPrimary),
+                    token: token,
+                    idempotencyKey: UUID().uuidString
+                )
+            }
+            onSaved()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func delete() async {
+        guard let token = auth.session?.accessToken, let address else { return }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let _: DeleteCustomerAddressResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me/addresses/\(address.id)", token: token)
+            onSaved()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct DeleteCustomerAddressResponse: Decodable, Sendable {
+    let id: String
+}
+
+private struct CustomerSettingsView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var settings: CustomerSettings?
+    @State private var name = ""
+    @State private var consent = false
+    @State private var push = true
+    @State private var whatsapp = true
+    @State private var service = true
+    @State private var promos = false
+    @State private var isLoading = true
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var savedMessage: String?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем настройки").tint(ClientTheme.lime)
+            } else if let errorMessage, settings == nil {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Профиль")
+                            .font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+                        TextField("Имя", text: $name)
+                            .foregroundStyle(.white).padding(13)
+                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                        if let settings {
+                            Text(settings.phone).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                        }
+
+                        Text("Уведомления")
+                            .font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted).padding(.top, 8)
+                        settingsToggle("Push-уведомления", detail: "Статусы заказов и важные события", isOn: $push)
+                        settingsToggle("Сервисные сообщения", detail: "Гарантия, поддержка и доставка", isOn: $service)
+                        settingsToggle("WhatsApp", detail: "Сообщения по выбранным заказам", isOn: $whatsapp)
+                        settingsToggle("Промо и предложения", detail: "Скидки, акции и бонусные кампании", isOn: $promos)
+                        settingsToggle("Маркетинговое согласие", detail: "Разрешение на персональные предложения", isOn: $consent)
+
+                        if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
+                        if let savedMessage { Text(savedMessage).font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.lime) }
+                        Button { Task { await save() } } label: {
+                            HStack { Spacer(); if isSaving { ProgressView().tint(.black) } else { Text("Сохранить настройки") }; Spacer() }
+                                .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black).frame(height: 50)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSaving)
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Настройки")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func settingsToggle(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
                 Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
             }
             Spacer()
-            Text("Скоро").font(ClientTheme.body(10, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+            Toggle("", isOn: isOn).labelsHidden().tint(ClientTheme.lime)
         }
-        .padding(12)
-        .background(ClientTheme.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14))
+        .padding(13)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let loaded: CustomerSettings = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/settings", token: token)
+            settings = loaded
+            name = loaded.name
+            consent = loaded.consent
+            push = loaded.push
+            whatsapp = loaded.whatsapp
+            service = loaded.service
+            promos = loaded.promos
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = auth.session?.accessToken else { return }
+        isSaving = true
+        errorMessage = nil
+        savedMessage = nil
+        defer { isSaving = false }
+        do {
+            let updated: CustomerSettings = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                "customers/me/settings",
+                body: UpdateCustomerSettingsRequest(name: name.trimmingCharacters(in: .whitespacesAndNewlines), consent: consent, push: push, whatsapp: whatsapp, service: service, promos: promos),
+                token: token
+            )
+            settings = updated
+            name = updated.name
+            consent = updated.consent
+            push = updated.push
+            whatsapp = updated.whatsapp
+            service = updated.service
+            promos = updated.promos
+            savedMessage = "Настройки сохранены"
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientDataErrorView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark").font(.title).foregroundStyle(ClientTheme.coral)
+            Text("Данные временно недоступны").font(ClientTheme.body(16, weight: .bold)).foregroundStyle(.white)
+            Text(message).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.center)
+            Button("Повторить", systemImage: "arrow.clockwise", action: retry)
+                .font(ClientTheme.body(13, weight: .semibold)).tint(ClientTheme.lime)
+        }
+        .padding(24)
+        .frame(maxWidth: 330)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
     }
 }
 

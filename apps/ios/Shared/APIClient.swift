@@ -117,6 +117,14 @@ public actor APIClient {
         return try await request(path, method: "PATCH", token: token, body: encoded, as: type)
     }
 
+    public func delete<Response: Decodable & Sendable>(
+        _ path: String,
+        token: String? = nil,
+        as type: Response.Type = Response.self
+    ) async throws -> Response {
+        try await request(path, method: "DELETE", token: token, body: nil, as: type)
+    }
+
     public func uploadEvidence(
         imageData: Data,
         entityType: String,
