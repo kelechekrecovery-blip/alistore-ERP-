@@ -1978,3 +1978,12 @@
 - Checks run: `npm run ecosystem:evidence -- pos-refund-reconciliation`; Playwright 1/1; independent artifact SHA-256 comparison. Audit correctly retains GAP before the artifact commit because uncommitted evidence is never accepted.
 - Outcome: durable exact financial/inventory/Ledger evidence is recorded for this bounded vertical only. Broad checkout/courier/COD/warranty/procurement/native journey and visual/design-corpus gates remain open.
 - Next step: commit the evidence, verify the bounded audit gate becomes PASS from a clean tree, then refresh native evidence for the new source SHA or advance the broader scenario matrix.
+
+## 2026-07-16
+
+- Task: refresh durable `ios-app-ui` acceptance evidence after the accepted POS/refund source changes.
+- Files changed: ecosystem evidence manifest, immutable content-addressed iOS result artifact and progress record.
+- Result: the aggregate XCUITest scheme rebuilt, installed and cold-launched AliStore Client, Staff, Courier and POS from source commit `ccdcdf7`. Client again proved its packaged tab shell; Staff, Courier and POS proved their role-specific signed-out login surfaces. All four UI bundles passed and the recorder bound the result to source-tree SHA-256 `2d091fd48a72d02c395c87e92e4b1af474c81c25232d18407d305eda1da6c575`.
+- Checks run: `npm run ecosystem:evidence -- ios-app-ui`; XCUITest 4/4; independent SHA-256 verification matched artifact filename and manifest; `git diff --check`.
+- Outcome: current-source iOS packaged launch evidence is refreshed. It remains a launch/role-shell gate and does not certify OTP, checkout, operational workflows, push, camera, maps, offline recovery, hardware or a physical iPhone.
+- Next step: commit this immutable evidence, confirm the clean-tree iOS audit gate passes, then refresh Android packaged evidence on the API 36 emulator.
