@@ -44,7 +44,9 @@ describe('Finance AR aging and primary-document drilldown', () => {
   });
 
   async function clean() {
-    const staleDebts = await prisma.debtPlan.findMany({ where: { idempotencyKey: { startsWith: 'ar-' } }, select: { id: true } });
+    // The API suite shares one isolated database, so remove any debt fixture
+    // left by an earlier suite before asserting an unfiltered AR snapshot.
+    const staleDebts = await prisma.debtPlan.findMany({ select: { id: true } });
     const staleOrders = await prisma.order.findMany({ where: { channel: 'ar-test' }, select: { id: true } });
     const staleCustomers = await prisma.customer.findMany({ where: { phone: { startsWith: '+996799' } }, select: { id: true } });
     const debtIds = [...new Set([...ownedDebtIds, ...staleDebts.map((debt) => debt.id)])];
@@ -54,8 +56,8 @@ describe('Finance AR aging and primary-document drilldown', () => {
     if (debtIds.length > 0) {
       await prisma.$transaction(async (tx) => {
         await tx.debtPlan.updateMany({ where: { id: { in: debtIds } }, data: { accountingEntryId: null } });
-        await tx.accountingJournalLine.deleteMany({ where: { entry: { sourceType: 'debt.origination', sourceRef: { in: debtIds } } } });
-        await tx.accountingJournalEntry.deleteMany({ where: { sourceType: 'debt.origination', sourceRef: { in: debtIds } } });
+        await tx.accountingJournalLine.deleteMany({ where: { entry: { sourceType: { startsWith: 'debt.' } } } });
+        await tx.accountingJournalEntry.deleteMany({ where: { sourceType: { startsWith: 'debt.' } } });
         await tx.debtPlan.deleteMany({ where: { id: { in: debtIds } } });
         await tx.auditEvent.deleteMany({ where: { refs: { hasSome: debtIds } } });
       });
