@@ -8,6 +8,7 @@ import {
   fetchAccountingAccounts,
   fetchAccountingCurrencyRates,
   fetchExpenses,
+  fetchFxExposure,
   fetchFinancePlanFact,
   fetchTrialBalance,
   payExpense,
@@ -16,6 +17,7 @@ import {
   type Expense,
   type AccountingAccount,
   type AccountingCurrencyRate,
+  type FxExposureReport,
   type FinancePlanFact,
   type TrialBalance,
 } from '@/lib/api';
@@ -56,6 +58,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const [planningMessage, setPlanningMessage] = useState('');
   const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
   const [currencyRates, setCurrencyRates] = useState<AccountingCurrencyRate[]>([]);
+  const [fxExposure, setFxExposure] = useState<FxExposureReport | null>(null);
   const [rateCurrency, setRateCurrency] = useState('USD');
   const [rateValue, setRateValue] = useState('');
   const [rateDate, setRateDate] = useState(new Date().toISOString().slice(0, 10));
@@ -90,6 +93,14 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   }, [accessToken]);
 
   useEffect(() => reloadCurrencyRates(), [reloadCurrencyRates]);
+
+  const reloadFxExposure = useCallback(() => {
+    fetchFxExposure(new Date().toISOString(), '', planPoint, accessToken)
+      .then(setFxExposure)
+      .catch(() => setFxExposure(null));
+  }, [accessToken, planPoint]);
+
+  useEffect(() => reloadFxExposure(), [reloadFxExposure]);
 
   useEffect(() => {
     if (currency === 'KGS') {
@@ -129,6 +140,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
       await action();
       reload();
       reloadPlanning();
+      reloadFxExposure();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Операция не выполнена');
     } finally {
@@ -155,6 +167,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
       setDescription('');
       setAmount('');
       reload();
+      reloadFxExposure();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось создать расход');
     } finally {
@@ -309,6 +322,25 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             {!currencyRates.length && <span className="text-[11px] text-[#6E645C]">Иностранные курсы ещё не зарегистрированы</span>}
           </div>
         </form>
+        <section aria-labelledby="fx-exposure-title" className="border-t border-[#2E2822] pt-5">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="font-display text-sm font-bold" id="fx-exposure-title">Открытая валютная экспозиция</div>
+            <span className="text-[10px] text-[#8A7F76]">на сегодня</span>
+          </div>
+          <p className="mb-3 text-xs leading-5 text-[#8A7F76]">Только незакрытые расходы. Разница расчётная, проводка не создаётся.</p>
+          <div className="grid gap-2">
+            {(fxExposure?.totals ?? []).map((total) => (
+              <div key={total.currency} className="rounded-[6px] border border-[#2E2822] bg-[#16130F] p-3">
+                <div className="flex items-center justify-between text-xs"><strong className="text-[#D8CFC6]">{total.currency}</strong><span className="text-[#8A7F76]">{total.openDocuments} док.</span></div>
+                <div className="mt-2 flex justify-between text-[11px] text-[#8A7F76]"><span>По документам</span><span className="font-mono text-[#D8CFC6]">{som(total.originalBaseAmount)}</span></div>
+                <div className="mt-1 flex justify-between text-[11px] text-[#8A7F76]"><span>По текущему курсу</span><span className="font-mono text-[#FFB86B]">{total.missingRateDocuments || total.overflowDocuments ? 'нет полной оценки' : som(total.currentBaseAmount)}</span></div>
+                {!total.missingRateDocuments && !total.overflowDocuments && <div className={`mt-1 flex justify-between text-[11px] ${total.valuationDelta > 0 ? 'text-[#FF8A7A]' : 'text-[#7FD3A0]'}`}><span>Расчётная разница</span><span className="font-mono">{total.valuationDelta > 0 ? '+' : ''}{som(total.valuationDelta)}</span></div>}
+                {(total.missingRateDocuments > 0 || total.overflowDocuments > 0) && <div className="mt-2 text-[10px] text-[#FFB5AA]">{total.missingRateDocuments ? `${total.missingRateDocuments} без курса` : ''}{total.missingRateDocuments && total.overflowDocuments ? ' · ' : ''}{total.overflowDocuments ? `${total.overflowDocuments} вне диапазона` : ''}</div>}
+              </div>
+            ))}
+            {!fxExposure?.totals.length && <span className="text-[11px] text-[#6E645C]">Открытых расходов в иностранной валюте нет</span>}
+          </div>
+        </section>
         <form onSubmit={submit} className="border-t border-[#2E2822] pt-5">
           <div className="mb-3 font-display text-sm font-bold">Новый расход</div>
           <div className="grid gap-2">

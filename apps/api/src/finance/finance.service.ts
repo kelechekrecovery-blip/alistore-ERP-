@@ -33,6 +33,7 @@ import {
   CreateAccountableAdvanceDto,
   SettleAccountableAdvanceDto,
   CloseAccountableAdvanceDto,
+  FxExposureQueryDto,
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
 import { expenseAccountingSnapshot } from './expense-accounting';
@@ -522,6 +523,103 @@ export class FinanceService {
       }
       throw error;
     }
+  }
+
+  async fxExposure(query: FxExposureQueryDto) {
+    const asOf = query.asOf ? new Date(query.asOf) : new Date();
+    if (Number.isNaN(asOf.getTime())) throw new ValidationError('invalid_fx_exposure_as_of', 'Дата FX-отчёта некорректна');
+    const currency = query.currency?.trim().toUpperCase();
+    const point = normalizePoint(query.point);
+    const expenses = await this.prisma.expense.findMany({
+      where: {
+        currency: currency ? currency : { not: 'KGS' },
+        status: { in: [ExpenseStatus.submitted, ExpenseStatus.approved] },
+        incurredAt: { lte: asOf },
+        ...(point ? { point } : {}),
+      },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        exchangeRate: { select: { id: true, currency: true, baseCurrency: true, rateMicros: true, effectiveAt: true, source: true } },
+      },
+      orderBy: [{ currency: 'asc' }, { incurredAt: 'asc' }, { createdAt: 'asc' }],
+      take: 500,
+    });
+    const rates = await this.prisma.accountingCurrencyRate.findMany({
+      where: { baseCurrency: 'KGS', effectiveAt: { lte: asOf }, ...(currency ? { currency } : {}) },
+      orderBy: [{ currency: 'asc' }, { effectiveAt: 'desc' }, { createdAt: 'desc' }],
+      take: 2_000,
+    });
+    const currentRates = new Map<string, (typeof rates)[number]>();
+    for (const rate of rates) if (!currentRates.has(rate.currency)) currentRates.set(rate.currency, rate);
+
+    const rows = expenses.map((expense) => {
+      const currentRate = currentRates.get(expense.currency) ?? null;
+      let currentBaseAmount: number | null = null;
+      let valuationStatus: 'ready' | 'missing_rate' | 'overflow' = currentRate ? 'ready' : 'missing_rate';
+      if (currentRate) {
+        try {
+          currentBaseAmount = expenseAccountingSnapshot({
+            documentAmount: expense.documentAmount,
+            exchangeRateMicros: currentRate.rateMicros,
+            taxMode: expense.taxMode,
+            taxRateBps: expense.taxRateBps,
+          }).amount;
+        } catch (error) {
+          if (error instanceof ValidationError && error.code === 'expense_amount_overflow') {
+            valuationStatus = 'overflow';
+          } else {
+            throw error;
+          }
+        }
+      }
+      return {
+        id: expense.id,
+        description: expense.description,
+        status: expense.status,
+        point: expense.point,
+        supplier: expense.supplier,
+        incurredAt: expense.incurredAt,
+        currency: expense.currency,
+        documentAmount: expense.documentAmount,
+        originalRateMicros: expense.exchangeRateMicros,
+        originalBaseAmount: expense.amount,
+        currentRate: currentRate ? {
+          id: currentRate.id,
+          rateMicros: currentRate.rateMicros,
+          effectiveAt: currentRate.effectiveAt,
+          source: currentRate.source,
+        } : null,
+        currentBaseAmount,
+        valuationDelta: currentBaseAmount === null ? null : currentBaseAmount - expense.amount,
+        valuationStatus,
+      };
+    });
+    const totals = new Map<string, { documentAmount: number; originalBaseAmount: number; currentBaseAmount: number; valuationDelta: number; openDocuments: number; missingRateDocuments: number; overflowDocuments: number }>();
+    for (const row of rows) {
+      const total = totals.get(row.currency) ?? { documentAmount: 0, originalBaseAmount: 0, currentBaseAmount: 0, valuationDelta: 0, openDocuments: 0, missingRateDocuments: 0, overflowDocuments: 0 };
+      total.documentAmount += row.documentAmount;
+      total.originalBaseAmount += row.originalBaseAmount;
+      total.currentBaseAmount += row.currentBaseAmount ?? 0;
+      total.valuationDelta += row.valuationDelta ?? 0;
+      total.openDocuments += 1;
+      if (row.valuationStatus === 'missing_rate') total.missingRateDocuments += 1;
+      if (row.valuationStatus === 'overflow') total.overflowDocuments += 1;
+      totals.set(row.currency, total);
+    }
+    return {
+      asOf,
+      baseCurrency: 'KGS',
+      reportType: 'open_foreign_expense_documents',
+      rows,
+      totals: [...totals.entries()].map(([rowCurrency, total]) => ({ currency: rowCurrency, ...total })),
+      coverage: {
+        complete: true,
+        statuses: [ExpenseStatus.submitted, ExpenseStatus.approved],
+        limit: 500,
+        truncated: expenses.length === 500,
+        note: 'Показываются только незакрытые иностранные расходы. Разница является расчётной и не признаётся прибылью или убытком без отдельной утверждённой переоценки.',
+      },
+    };
   }
 
   listBankStatements(accountCode?: string) {

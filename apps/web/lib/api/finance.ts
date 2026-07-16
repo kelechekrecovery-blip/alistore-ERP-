@@ -44,6 +44,41 @@ export interface AccountingCurrencyRate {
   idempotent?: boolean;
 }
 
+export interface FxExposureRow {
+  id: string;
+  description: string;
+  status: 'submitted' | 'approved';
+  point: string | null;
+  supplier: { id: string; name: string } | null;
+  incurredAt: string;
+  currency: string;
+  documentAmount: number;
+  originalRateMicros: number;
+  originalBaseAmount: number;
+  currentRate: { id: string; rateMicros: number; effectiveAt: string; source: string } | null;
+  currentBaseAmount: number | null;
+  valuationDelta: number | null;
+  valuationStatus: 'ready' | 'missing_rate' | 'overflow';
+}
+
+export interface FxExposureReport {
+  asOf: string;
+  baseCurrency: 'KGS';
+  reportType: 'open_foreign_expense_documents';
+  rows: FxExposureRow[];
+  totals: Array<{
+    currency: string;
+    documentAmount: number;
+    originalBaseAmount: number;
+    currentBaseAmount: number;
+    valuationDelta: number;
+    openDocuments: number;
+    missingRateDocuments: number;
+    overflowDocuments: number;
+  }>;
+  coverage: { complete: boolean; statuses: string[]; limit: number; truncated: boolean; note: string };
+}
+
 export interface AccountingAccount {
   code: string;
   name: string;
@@ -268,6 +303,14 @@ export const fetchAccountingAccounts = (accessToken: string) =>
 
 export const fetchAccountingCurrencyRates = (accessToken: string) =>
   getJson<AccountingCurrencyRate[]>('/finance/currency-rates', accessToken);
+
+export const fetchFxExposure = (asOf: string, currency: string, point: string, accessToken: string) => {
+  const query = new URLSearchParams();
+  if (asOf) query.set('asOf', asOf);
+  if (currency.trim()) query.set('currency', currency.trim().toUpperCase());
+  if (point.trim()) query.set('point', point.trim());
+  return getJson<FxExposureReport>(`/finance/fx-exposure?${query.toString()}`, accessToken);
+};
 
 export const createAccountingCurrencyRate = (
   input: { currency: string; rateMicros: number; effectiveAt: string; source: string },

@@ -94,6 +94,58 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
   await expect.poll(() => prisma.auditEvent.count({ where: { refs: { has: budget.id } } })).toBe(1);
 });
 
+test('owner sees the server-calculated open foreign-currency exposure in ERP', async ({ page }) => {
+  await resetDb();
+  const username = `e2e-fx-${Date.now().toString(36)}`;
+  const password = 'pass-e2e';
+  const staff = await prisma.staffUser.create({
+    data: { username, passwordHash: await argon2.hash(password), role: 'owner' },
+  });
+  const rate = await prisma.accountingCurrencyRate.create({
+    data: {
+      idempotencyKey: `e2e-fx-rate-${Date.now()}`,
+      currency: 'USD',
+      baseCurrency: 'KGS',
+      rateMicros: 90_000_000,
+      effectiveAt: new Date(Date.now() - 86_400_000),
+      source: 'NBKR',
+      createdBy: staff.id,
+    },
+  });
+  await prisma.expense.create({
+    data: {
+      idempotencyKey: `e2e-fx-expense-${Date.now()}`,
+      category: 'rent',
+      description: 'Открытая USD аренда',
+      amount: 90_000,
+      documentAmount: 1_000,
+      currency: 'USD',
+      exchangeRateMicros: rate.rateMicros,
+      exchangeRateId: rate.id,
+      taxMode: 'none',
+      taxCode: 'none',
+      taxRateBps: 0,
+      taxBaseAmount: 90_000,
+      taxAmount: 0,
+      point: 'BISHKEK-1',
+      status: 'submitted',
+      requestedBy: staff.id,
+    },
+  });
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('button', { name: /Финансы/ }).click();
+
+  const exposure = page.locator('section[aria-labelledby="fx-exposure-title"]');
+  await expect(exposure.getByText('Открытая валютная экспозиция')).toBeVisible();
+  await expect(exposure).toContainText('USD');
+  await expect(exposure).toContainText(/90\s*000/);
+  await expect(exposure).toContainText('1 док.');
+});
+
 test('owner creates and closes an authoritative provider settlement in ERP', async ({ page }) => {
   await resetDb();
   const username = `e2e-settlement-${Date.now().toString(36)}`;

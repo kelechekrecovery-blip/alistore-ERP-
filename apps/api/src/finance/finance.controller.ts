@@ -7,7 +7,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { AccountableAdvanceQueryDto, ArAgingQueryDto, CloseAccountableAdvanceDto, CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateAccountableAdvanceDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateManualAdjustmentDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleAccountableAdvanceDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
+import { AccountableAdvanceQueryDto, ArAgingQueryDto, CloseAccountableAdvanceDto, CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateAccountableAdvanceDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateManualAdjustmentDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, FxExposureQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleAccountableAdvanceDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -65,6 +65,12 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   currencyRates(@Query() query: CurrencyRateQueryDto) {
     return this.finance.listCurrencyRates(query);
+  }
+
+  @Get('fx-exposure')
+  @RequirePermission('finance', 'read')
+  fxExposure(@Query() query: FxExposureQueryDto) {
+    return this.finance.fxExposure(query);
   }
 
   @Post('currency-rates')

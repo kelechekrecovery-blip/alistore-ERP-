@@ -275,6 +275,71 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(await prisma.auditEvent.count({ where: { type: 'finance.currency_rate_recorded', refs: { has: rate.body.id } } })).toBe(1);
   });
 
+  it('reports open foreign-currency exposure from the server rate snapshot', async () => {
+    const oldEffectiveAt = new Date(Date.now() - 172_800_000);
+    const currentEffectiveAt = new Date(Date.now() - 86_400_000);
+    const oldRate = await request(app.getHttpServer())
+      .post('/finance/currency-rates')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `fx-exposure-old-rate-${run}`, currency: 'USD', rateMicros: 87_500_000, effectiveAt: oldEffectiveAt.toISOString(), source: 'NBKR historical' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/finance/currency-rates')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `fx-exposure-current-rate-${run}`, currency: 'USD', rateMicros: 90_000_000, effectiveAt: currentEffectiveAt.toISOString(), source: 'NBKR current' })
+      .expect(201);
+
+    const incurredAt = new Date(oldEffectiveAt.getTime() + 3_600_000);
+    const openExpense = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        idempotencyKey: `fx-exposure-open-${run}`,
+        category: 'rent',
+        description: 'Открытая валютная аренда',
+        amount: 1_000,
+        currency: 'USD',
+        exchangeRateId: oldRate.body.id,
+        point: 'BISHKEK-1',
+        incurredAt: incurredAt.toISOString(),
+      })
+      .expect(201);
+    const paidExpense = await request(app.getHttpServer())
+      .post('/finance/expenses')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        idempotencyKey: `fx-exposure-paid-${run}`,
+        category: 'rent',
+        description: 'Уже оплаченная валютная аренда',
+        amount: 500,
+        currency: 'USD',
+        exchangeRateId: oldRate.body.id,
+        incurredAt: incurredAt.toISOString(),
+      })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/finance/expenses/${paidExpense.body.id}/approve`).set('Authorization', `Bearer ${ownerToken}`).expect(201);
+    await request(app.getHttpServer()).post(`/finance/expenses/${paidExpense.body.id}/pay`).set('Authorization', `Bearer ${ownerToken}`).send({ idempotencyKey: `fx-exposure-paid-payment-${run}`, fundingAccountCode: '1010' }).expect(201);
+
+    await request(app.getHttpServer()).get('/finance/fx-exposure').expect(401);
+    await request(app.getHttpServer()).get('/finance/fx-exposure').set('Authorization', `Bearer ${sellerToken}`).expect(403);
+
+    const beforeCurrentRate = await request(app.getHttpServer())
+      .get(`/finance/fx-exposure?currency=USD&point=BISHKEK-1&asOf=${encodeURIComponent(new Date(currentEffectiveAt.getTime() - 1).toISOString())}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(beforeCurrentRate.body.rows).toHaveLength(1);
+    expect(beforeCurrentRate.body.rows[0]).toMatchObject({ id: openExpense.body.id, originalBaseAmount: 87_500, currentBaseAmount: 87_500, valuationDelta: 0, valuationStatus: 'ready' });
+
+    const report = await request(app.getHttpServer())
+      .get(`/finance/fx-exposure?currency=USD&point=BISHKEK-1&asOf=${encodeURIComponent(new Date().toISOString())}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(report.body).toMatchObject({ baseCurrency: 'KGS', reportType: 'open_foreign_expense_documents', coverage: { complete: true, truncated: false } });
+    expect(report.body.rows).toHaveLength(1);
+    expect(report.body.rows[0]).toMatchObject({ id: openExpense.body.id, originalRateMicros: 87_500_000, originalBaseAmount: 87_500, currentBaseAmount: 90_000, valuationDelta: 2_500, valuationStatus: 'ready', currentRate: { rateMicros: 90_000_000, source: 'NBKR current' } });
+    expect(report.body.totals).toEqual([expect.objectContaining({ currency: 'USD', documentAmount: 1_000, originalBaseAmount: 87_500, currentBaseAmount: 90_000, valuationDelta: 2_500, openDocuments: 1 })]);
+  });
+
   it('soft-closes, settles output/input VAT, then hard-closes the period', async () => {
     const now = new Date();
     const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;

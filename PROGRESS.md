@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003H
+
+- Iteration ID: `ACC-003H`.
+- Task: add a server-authoritative open foreign-currency exposure report and connect it to ERP Finance.
+- Files changed: Finance DTO/controller/service, typed web Finance client, ERP `FinanceView`, Finance API integration coverage and Finance Playwright coverage.
+- Result: `GET /finance/fx-exposure` accepts an as-of date, currency and point filter, includes only submitted/approved non-KGS expenses, selects the latest registered KGS rate at the as-of boundary, recalculates the tax-aware current base amount and returns per-currency totals. Missing-rate and overflow states are explicit; paid expenses are excluded. ERP renders the report with a clear statement that the delta is informational and does not create a journal entry.
+- Checks run: API Finance integration `15/15`; API production build; Web production build; Finance Playwright `3/3`; `git diff --check`.
+- Acceptance: `accepted` for the local FX exposure reporting contour. Posted FX revaluation/gain-loss, supplier/payment foreign-currency balances, accountant/tax validation, staging/production deployment, live providers, physical devices and missing design references remain open. Production readiness remains `RED`.
+- Next step: define and implement the approved revaluation aggregate only after the gain/loss account policy is confirmed; otherwise continue staging-independent ERP/native parity work without posting an unapproved accounting treatment.
+
 # 2026-07-17 — INV-VAL-001I (local benchmark)
 
 - Iteration ID: `INV-VAL-001I`.

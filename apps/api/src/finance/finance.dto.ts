@@ -30,6 +30,12 @@ export class CurrencyRateQueryDto {
   @IsOptional() @IsISO8601({ strict: true }) asOf?: string;
 }
 
+export class FxExposureQueryDto {
+  @IsOptional() @IsString() @Matches(/^[A-Z]{3}$/) currency?: string;
+  @IsOptional() @IsString() @MaxLength(100) point?: string;
+  @IsOptional() @IsISO8601({ strict: true }) asOf?: string;
+}
+
 export class CreateCurrencyRateDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsString() @Matches(/^[A-Z]{3}$/) currency!: string;
