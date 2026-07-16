@@ -1987,3 +1987,12 @@
 - Checks run: `npm run ecosystem:evidence -- ios-app-ui`; XCUITest 4/4; independent SHA-256 verification matched artifact filename and manifest; `git diff --check`.
 - Outcome: current-source iOS packaged launch evidence is refreshed. It remains a launch/role-shell gate and does not certify OTP, checkout, operational workflows, push, camera, maps, offline recovery, hardware or a physical iPhone.
 - Next step: commit this immutable evidence, confirm the clean-tree iOS audit gate passes, then refresh Android packaged evidence on the API 36 emulator.
+
+## 2026-07-16
+
+- Task: refresh durable `android-app-ui` acceptance evidence after the accepted POS/refund source changes.
+- Files changed: ecosystem evidence manifest, immutable content-addressed Android result artifact and progress record.
+- Result: `savio_api36_arm64` API 36 executed the shared Compose behavior suite and all four packaged APK smoke tests from source tree `2d091fd48a72d02c395c87e92e4b1af474c81c25232d18407d305eda1da6c575`. Core passed 26/26; Client, Staff, Courier and POS each passed their real-`MainActivity` test, for 30/30 total and `BUILD SUCCESSFUL`.
+- Checks run: `npm run ecosystem:evidence -- android-app-ui`; five connected-test tasks; independent SHA-256 verification matched artifact filename and manifest; `git diff --check`. Android instrumentation emitted a non-fatal Netty classloader warning during the sequential run, but no test or Gradle task failed. The emulator was stopped after evidence capture.
+- Outcome: current-source Android packaged launch/role-wiring evidence is refreshed. It does not certify deeper Client/Staff/Courier/POS journeys, FCM, biometrics, offline recovery, camera/maps/scanner/printer/terminal or a physical Android device.
+- Next step: commit this immutable evidence and rerun the clean-tree contract audit; then implement the next bounded ecosystem scenario while the broad cross-role and visual gates remain open.
