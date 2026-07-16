@@ -5,6 +5,74 @@ import { ConflictError } from '../common/errors';
 export const INVENTORY_ASSET_ACCOUNT = '1200';
 export const COGS_ACCOUNT = '5000';
 
+export async function transferQuantityValuationOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    movementId: string;
+    productId: string;
+    sourceBalanceId: string;
+    destinationBalanceId: string;
+    destination: string;
+    quantity: number;
+  },
+) {
+  if (input.quantity === 0) return { totalValue: 0, unitCost: null as number | null };
+
+  const layers = await tx.inventoryValuationLayer.findMany({
+    where: { balanceId: input.sourceBalanceId, quantityRemaining: { gt: 0 } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  let remaining = input.quantity;
+  let totalValue = 0;
+  const unitCosts = new Set<number>();
+
+  for (const layer of layers) {
+    if (remaining === 0) break;
+    const quantity = Math.min(remaining, layer.quantityRemaining);
+    const claimed = await tx.inventoryValuationLayer.updateMany({
+      where: { id: layer.id, quantityRemaining: { gte: quantity } },
+      data: { quantityRemaining: { decrement: quantity } },
+    });
+    if (claimed.count !== 1) {
+      throw new ConflictError('valuation_layer_race', `Слой себестоимости ${layer.id} уже изменён`);
+    }
+    await tx.inventoryValuationLayer.create({
+      data: {
+        productId: input.productId,
+        balanceId: input.destinationBalanceId,
+        location: input.destination,
+        sourceType: 'inventory.transfer',
+        sourceRef: `${input.movementId}:${layer.id}`,
+        unitCost: layer.unitCost,
+        quantityReceived: quantity,
+        quantityRemaining: quantity,
+      },
+    });
+    remaining -= quantity;
+    totalValue += quantity * layer.unitCost;
+    unitCosts.add(layer.unitCost);
+  }
+
+  if (remaining > 0) {
+    throw new ConflictError(
+      'inventory_valuation_missing',
+      `Для перемещения ${input.movementId} не найдено достаточно слоёв себестоимости`,
+    );
+  }
+  const sourceValue = await tx.inventoryBalance.updateMany({
+    where: { id: input.sourceBalanceId, inventoryValue: { gte: totalValue } },
+    data: { inventoryValue: { decrement: totalValue } },
+  });
+  if (sourceValue.count !== 1) {
+    throw new ConflictError('inventory_value_mismatch', 'Стоимость исходного остатка меньше стоимости перемещения');
+  }
+  await tx.inventoryBalance.update({
+    where: { id: input.destinationBalanceId },
+    data: { inventoryValue: { increment: totalValue } },
+  });
+  return { totalValue, unitCost: unitCosts.size === 1 ? [...unitCosts][0] : null };
+}
+
 export async function postCogsOnTx(
   tx: Prisma.TransactionClient,
   input: {

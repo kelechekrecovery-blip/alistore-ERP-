@@ -158,7 +158,7 @@ describe('Quantity inventory (integration)', () => {
     const first = await inventory.transferQuantity(command, 'warehouse');
     const replay = await inventory.transferQuantity(command, 'warehouse');
     expect(first).toMatchObject({ qty: 5, idempotent: false });
-    expect(replay).toMatchObject({ movementId: first.movementId, idempotent: true });
+    expect(replay).toMatchObject({ movementId: first.movementId, totalValue: 6000, idempotent: true });
     expect(await prisma.inventoryBalance.findUnique({
       where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
     })).toMatchObject({ onHand: 3, reserved: 3 });
@@ -171,6 +171,70 @@ describe('Quantity inventory (integration)', () => {
       .rejects.toMatchObject({ code: 'idempotency_key_reused' });
     await expect(inventory.transferQuantity({ ...command, idempotencyKey: `${command.idempotencyKey}-new`, qty: 1 }, 'warehouse'))
       .rejects.toMatchObject({ code: 'insufficient_available_stock' });
+  });
+
+  it('moves FIFO valuation with quantity stock without changing total inventory value', async () => {
+    const product = await quantityProduct();
+    await inventory.receiveQuantity({
+      productId: product.id, location: 'BISHKEK-1', quantity: 3, unitCost: 1000,
+    }, 'warehouse');
+    await inventory.receiveQuantity({
+      productId: product.id, location: 'BISHKEK-1', quantity: 4, unitCost: 1500,
+    }, 'warehouse');
+
+    const moved = await inventory.transferQuantity({
+      idempotencyKey: `quantity-value-transfer-${seq}`,
+      productId: product.id,
+      from: 'BISHKEK-1',
+      to: 'BISHKEK-2',
+      qty: 5,
+    }, 'warehouse');
+
+    expect(moved).toMatchObject({ qty: 5, consignmentQty: 0, totalValue: 6000 });
+    const balances = await prisma.inventoryBalance.findMany({
+      where: { productId: product.id },
+      orderBy: { location: 'asc' },
+    });
+    expect(balances).toMatchObject([
+      { location: 'BISHKEK-1', onHand: 2, inventoryValue: 3000 },
+      { location: 'BISHKEK-2', onHand: 5, inventoryValue: 6000 },
+    ]);
+    expect(balances.reduce((sum, balance) => sum + balance.inventoryValue, 0)).toBe(9000);
+    expect(await prisma.inventoryValuationLayer.findMany({
+      where: { balanceId: balances[1].id, quantityRemaining: { gt: 0 } },
+      orderBy: [{ unitCost: 'asc' }, { id: 'asc' }],
+      select: { unitCost: true, quantityReceived: true, quantityRemaining: true, sourceType: true },
+    })).toEqual([
+      { unitCost: 1000, quantityReceived: 3, quantityRemaining: 3, sourceType: 'inventory.transfer' },
+      { unitCost: 1500, quantityReceived: 2, quantityRemaining: 2, sourceType: 'inventory.transfer' },
+    ]);
+    expect(await prisma.inventoryMovement.findUnique({ where: { id: moved.movementId } }))
+      .toMatchObject({ totalValue: 6000, unitCost: null });
+  });
+
+  it('serializes competing quantity transfers from the same balance', async () => {
+    const product = await quantityProduct();
+    await inventory.receiveQuantity({
+      productId: product.id, location: 'BISHKEK-1', quantity: 5, unitCost: 1100,
+    }, 'warehouse');
+
+    const results = await Promise.allSettled(['BISHKEK-2', 'BISHKEK-3'].map((to, index) => inventory.transferQuantity({
+      idempotencyKey: `quantity-racing-transfer-${seq}-${index}`,
+      productId: product.id,
+      from: 'BISHKEK-1',
+      to,
+      qty: 4,
+    }, 'warehouse')));
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(await prisma.inventoryBalance.aggregate({
+      where: { productId: product.id },
+      _sum: { onHand: true, inventoryValue: true },
+    })).toMatchObject({ _sum: { onHand: 5, inventoryValue: 5500 } });
+    expect(await prisma.inventoryMovement.count({
+      where: { productId: product.id, type: 'moved' },
+    })).toBe(1);
   });
 
   it('prevents tracking-mode changes once stock exists', async () => {

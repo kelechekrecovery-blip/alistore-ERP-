@@ -18,6 +18,7 @@ import {
 } from './inventory.dto';
 import { transferQuantityConsignmentOnTx } from './consignment-accounting';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { transferQuantityValuationOnTx } from './inventory-valuation';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -642,6 +643,7 @@ export class InventoryService {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'quantity-transfer:' + dto.idempotencyKey}))::text AS locked`;
       const replay = await tx.inventoryMovement.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
       if (replay) return { result: replayQuantityTransfer(replay, dto), events: [] };
+      await tx.$queryRaw`SELECT id FROM "InventoryBalance" WHERE "productId" = ${dto.productId} AND location = ${from} FOR UPDATE`;
       const source = await tx.inventoryBalance.findUnique({
         where: { productId_location: { productId: dto.productId, location: from } },
       });
@@ -676,6 +678,18 @@ export class InventoryService {
         qty: dto.qty,
         actor,
       });
+      const valuation = await transferQuantityValuationOnTx(tx, {
+        movementId: movement.id,
+        productId: dto.productId,
+        sourceBalanceId: source.id,
+        destinationBalanceId: destination.id,
+        destination: to,
+        quantity: dto.qty - consignmentQty,
+      });
+      await tx.inventoryMovement.update({
+        where: { id: movement.id },
+        data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue },
+      });
       return {
         result: {
           movementId: movement.id,
@@ -684,12 +698,13 @@ export class InventoryService {
           to,
           qty: dto.qty,
           consignmentQty,
+          totalValue: valuation.totalValue,
           idempotent: false,
         },
         events: [{
           type: EventType.StockMoved,
           actor,
-          payload: { movementId: movement.id, productId: dto.productId, trackingMode: 'quantity', from, to, qty: dto.qty, consignmentQty },
+          payload: { movementId: movement.id, productId: dto.productId, trackingMode: 'quantity', from, to, qty: dto.qty, consignmentQty, totalValue: valuation.totalValue },
           refs: [movement.id, dto.productId],
         }],
       };
@@ -701,7 +716,18 @@ function sameIds(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((id, index) => id === right[index]);
 }
 
-function replayQuantityTransfer(movement: { id: string; productId: string; qty: number; type: string; from: string | null; to: string | null }, dto: TransferQuantityDto) {
+function replayQuantityTransfer(
+  movement: {
+    id: string;
+    productId: string;
+    qty: number;
+    type: string;
+    from: string | null;
+    to: string | null;
+    totalValue: number | null;
+  },
+  dto: TransferQuantityDto,
+) {
   if (movement.type !== 'moved'
     || movement.productId !== dto.productId
     || movement.qty !== dto.qty
@@ -715,6 +741,7 @@ function replayQuantityTransfer(movement: { id: string; productId: string; qty: 
     from: movement.from,
     to: movement.to,
     qty: movement.qty,
+    totalValue: movement.totalValue ?? 0,
     idempotent: true,
   };
 }
