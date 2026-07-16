@@ -2326,3 +2326,13 @@
 - Checks run: `npm run e2e` passed `56/56` with exit code `0`; isolated exchange, trade-in and delivery scenarios passed; `npm run api:build` passed; `npm run build -w @alistore/web` passed; `git diff --check` passed.
 - Outcome: `AUT-001` local Web/E2E gate is accepted. This does not certify live providers, staging, physical devices, signed mobile release or the 64 missing design references.
 - Next step: implement the next bounded finance/ERP item, prioritizing `INV-VAL-001I` or `AP-001` while retaining provider/device/staging blockers explicitly.
+
+## 2026-07-17
+
+- Task: replace lifetime in-memory inventory valuation roll-forward scans with database-side aggregates.
+- Files changed: `apps/api/src/inventory/inventory-roll-forward.ts`.
+- Result: opening/period movements for layers, issues, reversals, transfers and serialized receipts, GL 1200 totals, incomplete counters, reversal coverage and quantity-balance checks are computed in SQL inside Repeatable Read; only aggregate rows and product metadata are materialized in application memory. Raw timestamp parameters are explicitly cast to `timestamp` to preserve Prisma's UTC wall-clock semantics on the Asia/Bishkek test database.
+- Checks run: `npm run api:build` passed; targeted roll-forward suite passed 3/3; `npm run api:test` passed 143/143 suites and 653/653 tests; `git diff --check` passed.
+- Implementation commit: `0861ab2` (`perf(inventory): aggregate valuation roll-forward in database`).
+- Outcome: local correctness/performance implementation is accepted; staging-shaped multi-year latency/memory certification remains open and `INV-VAL-001I` must not be called fully done yet.
+- Next step: run a staging-shaped synthetic-history benchmark once staging data access is available, then continue `AP-001` or `ACC-003`.
