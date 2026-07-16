@@ -66,6 +66,10 @@ export const EventType = {
   FinanceSettlementClosed: 'finance.settlement_closed',
   FixedAssetAcquired: 'finance.fixed_asset_acquired',
   FixedAssetDepreciated: 'finance.fixed_asset_depreciated',
+  AccountableAdvanceIssued: 'finance.accountable_advance_issued',
+  AccountableAdvanceSettled: 'finance.accountable_advance_settled',
+  AccountableAdvanceReturned: 'finance.accountable_advance_returned',
+  AccountableAdvanceReimbursed: 'finance.accountable_advance_reimbursed',
   // delivery
   DeliveryAssigned: 'delivery.assigned',
   DeliveryOut: 'delivery.out',

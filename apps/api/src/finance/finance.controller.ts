@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
+import { AccountableAdvanceQueryDto, CloseAccountableAdvanceDto, CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateAccountableAdvanceDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleAccountableAdvanceDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -119,6 +119,36 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'approve')
   depreciateFixedAsset(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DepreciateFixedAssetDto) {
     return this.finance.depreciateFixedAsset(id, dto, user.customerId);
+  }
+
+  @Get('accountable-advances')
+  @RequirePermission('finance', 'read')
+  accountableAdvances(@Query() query: AccountableAdvanceQueryDto) {
+    return this.finance.listAccountableAdvances(query);
+  }
+
+  @Post('accountable-advances')
+  @RequirePermission('finance', 'pay')
+  createAccountableAdvance(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateAccountableAdvanceDto) {
+    return this.finance.createAccountableAdvance(dto, user.customerId);
+  }
+
+  @Post('accountable-advances/:id/settle')
+  @RequirePermission('finance', 'approve')
+  settleAccountableAdvance(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: SettleAccountableAdvanceDto) {
+    return this.finance.settleAccountableAdvance(id, dto, user.customerId);
+  }
+
+  @Post('accountable-advances/:id/return')
+  @RequirePermission('finance', 'pay')
+  returnAccountableAdvance(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CloseAccountableAdvanceDto) {
+    return this.finance.returnAccountableAdvance(id, dto, user.customerId);
+  }
+
+  @Post('accountable-advances/:id/reimburse')
+  @RequirePermission('finance', 'pay')
+  reimburseAccountableAdvance(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CloseAccountableAdvanceDto) {
+    return this.finance.reimburseAccountableAdvance(id, dto, user.customerId);
   }
 
   @Post('periods/:period/close')

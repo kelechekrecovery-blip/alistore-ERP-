@@ -5,6 +5,7 @@ export const ACCOUNTING_ACCOUNT_SEED = [
   { code: '1100', name: 'Дебиторская задолженность', type: 'asset' },
   { code: '1200', name: 'Товарные запасы', type: 'asset' },
   { code: '1300', name: 'Авансы поставщикам', type: 'asset' },
+  { code: '1250', name: 'Расчёты с подотчётными лицами', type: 'asset' },
   { code: '1400', name: 'Основные средства', type: 'asset' },
   { code: '1410', name: 'Накопленная амортизация', type: 'asset' },
   { code: '2000', name: 'Задолженность поставщикам', type: 'liability' },

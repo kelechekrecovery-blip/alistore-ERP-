@@ -146,6 +146,38 @@ export class DepreciateFixedAssetDto {
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
 }
 
+export const ACCOUNTABLE_ADVANCE_EXPENSE_ACCOUNTS = ['6200', '6300', '6400', '6500', '6600', '6900'] as const;
+
+export class AccountableAdvanceQueryDto {
+  @IsOptional() @IsString() @MaxLength(64) staffId?: string;
+  @IsOptional() @IsIn(['open', 'partially_settled', 'settled']) status?: 'open' | 'partially_settled' | 'settled';
+}
+
+export class CreateAccountableAdvanceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(64) staffId!: string;
+  @IsInt() @Min(1) @Max(2147483647) amount!: number;
+  @IsString() @MinLength(3) @MaxLength(500) @Matches(/\S/) purpose!: string;
+  @IsOptional() @IsString() @MaxLength(120) point?: string;
+  @IsOptional() @IsISO8601({ strict: true }) dueAt?: string;
+  @IsIn(['1000', '1010', '1020']) fundingAccountCode!: '1000' | '1010' | '1020';
+  @IsString() @MinLength(1) @MaxLength(160) @Matches(/\S/) paymentReference!: string;
+}
+
+export class SettleAccountableAdvanceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsInt() @Min(1) @Max(2147483647) amount!: number;
+  @IsIn(ACCOUNTABLE_ADVANCE_EXPENSE_ACCOUNTS) expenseAccountCode!: (typeof ACCOUNTABLE_ADVANCE_EXPENSE_ACCOUNTS)[number];
+  @IsString() @MinLength(3) @MaxLength(500) @Matches(/\S/) description!: string;
+}
+
+export class CloseAccountableAdvanceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsInt() @Min(1) @Max(2147483647) amount!: number;
+  @IsIn(['1000', '1010', '1020']) fundingAccountCode!: '1000' | '1010' | '1020';
+  @IsString() @MinLength(1) @MaxLength(160) @Matches(/\S/) paymentReference!: string;
+}
+
 export class SettleTaxPeriodDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsOptional() @IsString() @MaxLength(100) point?: string;

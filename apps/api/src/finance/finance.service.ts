@@ -27,6 +27,10 @@ import {
   CreateFixedAssetDto,
   DepreciateFixedAssetDto,
   CreateOpeningBalanceDto,
+  AccountableAdvanceQueryDto,
+  CreateAccountableAdvanceDto,
+  SettleAccountableAdvanceDto,
+  CloseAccountableAdvanceDto,
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
 import { expenseAccountingSnapshot } from './expense-accounting';
@@ -80,6 +84,185 @@ export class FinanceService {
       },
       orderBy: [{ status: 'asc' }, { inServiceAt: 'asc' }],
       take: 500,
+    });
+  }
+
+  listAccountableAdvances(query: AccountableAdvanceQueryDto) {
+    return this.prisma.accountableAdvance.findMany({
+      where: {
+        ...(query.staffId ? { staffId: query.staffId.trim() } : {}),
+        ...(query.status ? { status: query.status } : {}),
+      },
+      include: {
+        staff: { select: { id: true, username: true, role: true, point: true } },
+        accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } },
+        settlements: { include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } } }, orderBy: { settledAt: 'asc' } },
+        returns: { include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } } }, orderBy: { returnedAt: 'asc' } },
+        reimbursements: { include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } } }, orderBy: { reimbursedAt: 'asc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    }).then((rows) => rows.map((row) => accountableAdvanceResponse(row)));
+  }
+
+  async createAccountableAdvance(dto: CreateAccountableAdvanceDto, actor: string) {
+    const purpose = dto.purpose.trim();
+    const paymentReference = dto.paymentReference.trim();
+    const dueAt = optionalFinanceDate(dto.dueAt, 'dueAt');
+    const existing = await this.prisma.accountableAdvance.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true },
+    });
+    if (existing) return replayAccountableAdvance(existing, { staffId: dto.staffId, amount: dto.amount, purpose, point: dto.point?.trim() || existing.point, dueAt, fundingAccountCode: dto.fundingAccountCode, paymentReference });
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accountable-advance-key:${dto.idempotencyKey}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accountable-advance-staff:${dto.staffId}`}))`;
+      const replay = await tx.accountableAdvance.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true },
+      });
+      if (replay) return { result: replayAccountableAdvance(replay, { staffId: dto.staffId, amount: dto.amount, purpose, point: dto.point?.trim() || replay.point, dueAt, fundingAccountCode: dto.fundingAccountCode, paymentReference }), events: [] };
+      const staff = await tx.staffUser.findUnique({ where: { id: dto.staffId }, select: { id: true, username: true, role: true, point: true, active: true } });
+      if (!staff) throw new ValidationError('accountable_advance_staff_not_found', 'Сотрудник для аванса не найден');
+      if (!staff.active) throw new ConflictError('accountable_advance_staff_inactive', 'Неактивному сотруднику нельзя выдать аванс');
+      const point = dto.point?.trim() || staff.point;
+      if (dueAt && dueAt < new Date()) throw new ValidationError('accountable_advance_due_date_invalid', 'Срок отчёта не может быть в прошлом');
+      const advanceId = randomUUID();
+      const entry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:accountable-advance:issue:${advanceId}`,
+        sourceType: 'finance.accountable_advance.issue',
+        sourceRef: advanceId,
+        description: `Выдача подотчётного аванса ${paymentReference}`,
+        point,
+        documentAmount: dto.amount,
+        baseAmount: dto.amount,
+        occurredAt: new Date(),
+        createdBy: actor,
+        lines: [
+          { accountCode: '1250', debit: dto.amount, memo: `Подотчёт: ${staff.username} · ${purpose}` },
+          { accountCode: dto.fundingAccountCode, credit: dto.amount, memo: `Выдача по документу ${paymentReference}` },
+        ],
+      });
+      const advance = await tx.accountableAdvance.create({
+        data: { id: advanceId, staffId: dto.staffId, idempotencyKey: dto.idempotencyKey, purpose, point, amount: dto.amount, fundingAccountCode: dto.fundingAccountCode, paymentReference, issuedBy: actor, dueAt, accountingEntryId: entry.id },
+        include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true },
+      });
+      return {
+        result: { ...accountableAdvanceResponse(advance), idempotent: false },
+        events: [
+          { type: EventType.AccountableAdvanceIssued, actor, payload: { advanceId, staffId: dto.staffId, amount: dto.amount, point, accountingEntryId: entry.id }, refs: [advanceId, dto.staffId, entry.id] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: entry.id, sourceType: 'finance.accountable_advance.issue', sourceRef: advanceId, amount: dto.amount }, refs: [entry.id, advanceId, dto.staffId] },
+        ],
+      };
+    });
+  }
+
+  async settleAccountableAdvance(id: string, dto: SettleAccountableAdvanceDto, actor: string) {
+    const description = dto.description.trim();
+    const existing = await this.prisma.accountableAdvanceSettlement.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { advance: { include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } }, accountingEntry: { include: { lines: true } } },
+    });
+    if (existing) return replayAccountableAdvanceSettlement(existing, id, dto.amount, dto.expenseAccountCode, description);
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accountable-advance:${id}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accountable-advance-settlement-key:${dto.idempotencyKey}`}))`;
+      const replay = await tx.accountableAdvanceSettlement.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { advance: { include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } }, accountingEntry: { include: { lines: true } } },
+      });
+      if (replay) return { result: replayAccountableAdvanceSettlement(replay, id, dto.amount, dto.expenseAccountCode, description), events: [] };
+      const advance = await tx.accountableAdvance.findUnique({ where: { id }, include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } });
+      if (!advance) throw new ValidationError('accountable_advance_not_found', 'Подотчётный аванс не найден');
+      if (advance.status === 'settled') throw new ConflictError('accountable_advance_settled', 'Закрытый подотчётный аванс нельзя дополнить расходом');
+      const settlementId = randomUUID();
+      const entry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:accountable-advance:settle:${settlementId}`,
+        sourceType: 'finance.accountable_advance.settlement',
+        sourceRef: settlementId,
+        description,
+        point: advance.point,
+        documentAmount: dto.amount,
+        baseAmount: dto.amount,
+        occurredAt: new Date(),
+        createdBy: actor,
+        lines: [
+          { accountCode: dto.expenseAccountCode, debit: dto.amount, memo: description },
+          { accountCode: '1250', credit: dto.amount, memo: `Закрытие подотчёта ${advance.staff.username}` },
+        ],
+      });
+      const settlement = await tx.accountableAdvanceSettlement.create({ data: { id: settlementId, advanceId: id, idempotencyKey: dto.idempotencyKey, amount: dto.amount, expenseAccountCode: dto.expenseAccountCode, description, settledBy: actor, accountingEntryId: entry.id }, include: { advance: true, accountingEntry: { include: { lines: true } } } });
+      const settledAmount = advance.settledAmount + dto.amount;
+      const status = accountableAdvanceStatus(advance.amount, settledAmount, advance.returnedAmount, advance.reimbursedAmount);
+      const updated = await tx.accountableAdvance.update({ where: { id }, data: { settledAmount, status }, include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } });
+      return {
+        result: { advance: accountableAdvanceResponse(updated), settlement: accountableAdvanceActionResponse(settlement), idempotent: false },
+        events: [
+          { type: EventType.AccountableAdvanceSettled, actor, payload: { advanceId: id, settlementId, staffId: advance.staffId, amount: dto.amount, balance: accountableAdvanceBalance(updated), accountingEntryId: entry.id }, refs: [id, settlementId, advance.staffId, entry.id] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: entry.id, sourceType: 'finance.accountable_advance.settlement', sourceRef: settlementId, amount: dto.amount }, refs: [entry.id, settlementId, id] },
+        ],
+      };
+    });
+  }
+
+  async returnAccountableAdvance(id: string, dto: CloseAccountableAdvanceDto, actor: string) {
+    return this.closeAccountableAdvance(id, dto, actor, 'return');
+  }
+
+  async reimburseAccountableAdvance(id: string, dto: CloseAccountableAdvanceDto, actor: string) {
+    return this.closeAccountableAdvance(id, dto, actor, 'reimburse');
+  }
+
+  private async closeAccountableAdvance(id: string, dto: CloseAccountableAdvanceDto, actor: string, kind: 'return' | 'reimburse') {
+    const existing = kind === 'return'
+      ? await this.prisma.accountableAdvanceReturn.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { advance: { include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } }, accountingEntry: { include: { lines: true } } } })
+      : await this.prisma.accountableAdvanceReimbursement.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { advance: { include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } }, accountingEntry: { include: { lines: true } } } });
+    if (existing) return replayAccountableAdvanceClose(existing, id, dto, kind);
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accountable-advance:${id}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`accountable-advance-close-key:${dto.idempotencyKey}`}))`;
+      const advance = await tx.accountableAdvance.findUnique({ where: { id }, include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } });
+      if (!advance) throw new ValidationError('accountable_advance_not_found', 'Подотчётный аванс не найден');
+      const balance = accountableAdvanceBalance(advance);
+      if (kind === 'return' && balance <= 0) throw new ConflictError('accountable_advance_no_return_due', 'Нет остатка аванса для возврата');
+      if (kind === 'reimburse' && balance >= 0) throw new ConflictError('accountable_advance_no_reimbursement_due', 'Нет перерасхода для компенсации');
+      const due = kind === 'return' ? balance : -balance;
+      if (dto.amount > due) throw new ConflictError('accountable_advance_close_exceeds_balance', `Сумма превышает доступный остаток: ${due}`);
+      const actionId = randomUUID();
+      const sourceType = kind === 'return' ? 'finance.accountable_advance.return' : 'finance.accountable_advance.reimbursement';
+      const entry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:accountable-advance:${kind}:${actionId}`,
+        sourceType,
+        sourceRef: actionId,
+        description: `${kind === 'return' ? 'Возврат остатка' : 'Компенсация перерасхода'} подотчётного аванса ${advance.staff.username}`,
+        point: advance.point,
+        documentAmount: dto.amount,
+        baseAmount: dto.amount,
+        occurredAt: new Date(),
+        createdBy: actor,
+        lines: kind === 'return'
+          ? [{ accountCode: dto.fundingAccountCode, debit: dto.amount, memo: `Возврат ${dto.paymentReference}` }, { accountCode: '1250', credit: dto.amount, memo: 'Уменьшение подотчётного аванса' }]
+          : [{ accountCode: '1250', debit: dto.amount, memo: 'Компенсация расходов сотрудника' }, { accountCode: dto.fundingAccountCode, credit: dto.amount, memo: `Компенсация ${dto.paymentReference}` }],
+      });
+      const settledAmount = advance.settledAmount;
+      const returnedAmount = advance.returnedAmount + (kind === 'return' ? dto.amount : 0);
+      const reimbursedAmount = advance.reimbursedAmount + (kind === 'reimburse' ? dto.amount : 0);
+      const action = kind === 'return'
+        ? await tx.accountableAdvanceReturn.create({ data: { id: actionId, advanceId: id, idempotencyKey: dto.idempotencyKey, amount: dto.amount, fundingAccountCode: dto.fundingAccountCode, paymentReference: dto.paymentReference.trim(), returnedBy: actor, accountingEntryId: entry.id }, include: { accountingEntry: { include: { lines: true } } } })
+        : await tx.accountableAdvanceReimbursement.create({ data: { id: actionId, advanceId: id, idempotencyKey: dto.idempotencyKey, amount: dto.amount, fundingAccountCode: dto.fundingAccountCode, paymentReference: dto.paymentReference.trim(), reimbursedBy: actor, accountingEntryId: entry.id }, include: { accountingEntry: { include: { lines: true } } } });
+      const status = accountableAdvanceStatus(advance.amount, settledAmount, returnedAmount, reimbursedAmount);
+      const updated = await tx.accountableAdvance.update({ where: { id }, data: { returnedAmount, reimbursedAmount, status }, include: { staff: true, accountingEntry: { include: { lines: true } }, settlements: true, returns: true, reimbursements: true } });
+      const eventType = kind === 'return' ? EventType.AccountableAdvanceReturned : EventType.AccountableAdvanceReimbursed;
+      return {
+        result: { advance: accountableAdvanceResponse(updated), [kind]: action, idempotent: false },
+        events: [
+          { type: eventType, actor, payload: { advanceId: id, actionId, staffId: advance.staffId, amount: dto.amount, balance: accountableAdvanceBalance(updated), accountingEntryId: entry.id }, refs: [id, actionId, advance.staffId, entry.id] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: entry.id, sourceType, sourceRef: actionId, amount: dto.amount }, refs: [entry.id, actionId, id] },
+        ],
+      };
     });
   }
 
@@ -1441,6 +1624,11 @@ function fixedAssetDate(value: string, field: string) {
   return date;
 }
 
+function optionalFinanceDate(value: string | undefined, field: string) {
+  if (!value) return null;
+  return fixedAssetDate(value, field);
+}
+
 function monthKey(date: Date) {
   return date.toISOString().slice(0, 7);
 }
@@ -1495,6 +1683,81 @@ function replayFixedAssetDepreciation(
     throw new ConflictError('fixed_asset_depreciation_idempotency_conflict', 'Ключ амортизации уже использован для другого актива или периода');
   }
   return { ...depreciation, idempotent: true };
+}
+
+type AccountableAdvanceBalanceShape = {
+  amount: number;
+  settledAmount: number;
+  returnedAmount: number;
+  reimbursedAmount: number;
+};
+
+function accountableAdvanceBalance(advance: AccountableAdvanceBalanceShape) {
+  return advance.amount - advance.settledAmount - advance.returnedAmount + advance.reimbursedAmount;
+}
+
+function accountableAdvanceStatus(amount: number, settledAmount: number, returnedAmount: number, reimbursedAmount: number) {
+  const balance = amount - settledAmount - returnedAmount + reimbursedAmount;
+  if (balance === 0) return 'settled' as const;
+  if (settledAmount === 0 && returnedAmount === 0 && reimbursedAmount === 0) return 'open' as const;
+  return 'partially_settled' as const;
+}
+
+function accountableAdvanceResponse<T extends AccountableAdvanceBalanceShape>(advance: T) {
+  return { ...advance, balance: accountableAdvanceBalance(advance) };
+}
+
+function replayAccountableAdvance<T extends AccountableAdvanceBalanceShape & { staffId: string; purpose: string; point: string; dueAt: Date | null; fundingAccountCode: string; paymentReference: string }>(
+  advance: T,
+  input: { staffId: string; amount: number; purpose: string; point: string; dueAt: Date | null; fundingAccountCode: string; paymentReference: string },
+) {
+  const same = advance.staffId === input.staffId
+    && advance.amount === input.amount
+    && advance.purpose === input.purpose
+    && advance.point === input.point
+    && (advance.dueAt?.getTime() ?? null) === (input.dueAt?.getTime() ?? null)
+    && advance.fundingAccountCode === input.fundingAccountCode
+    && advance.paymentReference === input.paymentReference;
+  if (!same) throw new ConflictError('accountable_advance_idempotency_conflict', 'Ключ подотчётного аванса уже использован для других данных');
+  return { ...accountableAdvanceResponse(advance), idempotent: true };
+}
+
+function replayAccountableAdvanceSettlement<T extends { id: string; advanceId: string; idempotencyKey: string; amount: number; accountingEntryId: string; accountingEntry: unknown; expenseAccountCode: string; description: string; settledBy?: string; settledAt?: Date; advance: AccountableAdvanceBalanceShape }>(
+  settlement: T,
+  advanceId: string,
+  amount: number,
+  expenseAccountCode: string,
+  description: string,
+) {
+  if (settlement.advanceId !== advanceId || settlement.amount !== amount || settlement.expenseAccountCode !== expenseAccountCode || settlement.description !== description) {
+    throw new ConflictError('accountable_advance_settlement_idempotency_conflict', 'Ключ закрытия расхода уже использован для других данных');
+  }
+  return { advance: accountableAdvanceResponse(settlement.advance), settlement: accountableAdvanceActionResponse(settlement), idempotent: true };
+}
+
+function accountableAdvanceActionResponse<T extends { id: string; advanceId: string; idempotencyKey: string; amount: number; accountingEntryId: string; accountingEntry: unknown; expenseAccountCode?: string; description?: string; settledBy?: string; settledAt?: Date; fundingAccountCode?: string; paymentReference?: string }>(action: T) {
+  return {
+    id: action.id,
+    advanceId: action.advanceId,
+    idempotencyKey: action.idempotencyKey,
+    amount: action.amount,
+    accountingEntryId: action.accountingEntryId,
+    accountingEntry: action.accountingEntry,
+    ...(action.expenseAccountCode !== undefined ? { expenseAccountCode: action.expenseAccountCode, description: action.description, settledBy: action.settledBy, settledAt: action.settledAt } : {}),
+    ...(action.fundingAccountCode !== undefined ? { fundingAccountCode: action.fundingAccountCode, paymentReference: action.paymentReference } : {}),
+  };
+}
+
+function replayAccountableAdvanceClose<T extends { advanceId: string; amount: number; fundingAccountCode: string; paymentReference: string; advance: AccountableAdvanceBalanceShape }>(
+  action: T,
+  advanceId: string,
+  dto: CloseAccountableAdvanceDto,
+  kind: 'return' | 'reimburse',
+) {
+  if (action.advanceId !== advanceId || action.amount !== dto.amount || action.fundingAccountCode !== dto.fundingAccountCode || action.paymentReference !== dto.paymentReference.trim()) {
+    throw new ConflictError('accountable_advance_close_idempotency_conflict', 'Ключ закрытия подотчёта уже использован для других данных');
+  }
+  return { advance: accountableAdvanceResponse(action.advance), [kind]: action, idempotent: true };
 }
 
 function replayCurrencyRate(

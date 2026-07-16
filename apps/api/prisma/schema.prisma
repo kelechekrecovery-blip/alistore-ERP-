@@ -382,6 +382,12 @@ enum FixedAssetStatus {
   disposed
 }
 
+enum AccountableAdvanceStatus {
+  open
+  partially_settled
+  settled
+}
+
 enum PromotionStatus {
   draft
   active
@@ -1772,6 +1778,10 @@ model AccountingJournalEntry {
   hrPayrollPayout        HrPayrollRun?          @relation("HrPayrollPayout")
   fixedAssetAcquisition  FixedAsset?            @relation("FixedAssetAcquisition")
   fixedAssetDepreciation FixedAssetDepreciation? @relation("FixedAssetDepreciation")
+  accountableAdvanceIssue         AccountableAdvance?             @relation("AccountableAdvanceIssue")
+  accountableAdvanceSettlement    AccountableAdvanceSettlement?   @relation("AccountableAdvanceSettlement")
+  accountableAdvanceReturn        AccountableAdvanceReturn?        @relation("AccountableAdvanceReturn")
+  accountableAdvanceReimbursement AccountableAdvanceReimbursement?  @relation("AccountableAdvanceReimbursement")
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -1856,6 +1866,83 @@ model FixedAssetDepreciation {
 
   @@unique([fixedAssetId, period])
   @@index([period, postedAt])
+}
+
+model AccountableAdvance {
+  id                 String                   @id @default(cuid())
+  staff              StaffUser                @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  staffId            String
+  idempotencyKey     String                   @unique
+  purpose            String
+  point              String
+  amount             Int
+  settledAmount      Int                      @default(0)
+  returnedAmount     Int                      @default(0)
+  reimbursedAmount   Int                      @default(0)
+  status             AccountableAdvanceStatus @default(open)
+  fundingAccountCode String
+  paymentReference   String
+  issuedBy           String
+  issuedAt           DateTime                 @default(now())
+  dueAt              DateTime?
+  accountingEntryId  String                   @unique
+  accountingEntry    AccountingJournalEntry  @relation("AccountableAdvanceIssue", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  settlements        AccountableAdvanceSettlement[]
+  returns            AccountableAdvanceReturn[]
+  reimbursements     AccountableAdvanceReimbursement[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([staffId, status, createdAt])
+  @@index([point, status, dueAt])
+}
+
+model AccountableAdvanceSettlement {
+  id                 String                  @id @default(cuid())
+  advance            AccountableAdvance      @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  idempotencyKey     String                  @unique
+  amount             Int
+  expenseAccountCode String
+  description        String
+  settledBy          String
+  settledAt          DateTime                @default(now())
+  accountingEntryId  String                  @unique
+  accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceSettlement", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, settledAt])
+}
+
+model AccountableAdvanceReturn {
+  id                 String                  @id @default(cuid())
+  advance            AccountableAdvance      @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  idempotencyKey     String                  @unique
+  amount             Int
+  fundingAccountCode String
+  paymentReference   String
+  returnedBy         String
+  returnedAt         DateTime                @default(now())
+  accountingEntryId  String                  @unique
+  accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceReturn", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, returnedAt])
+}
+
+model AccountableAdvanceReimbursement {
+  id                 String                  @id @default(cuid())
+  advance            AccountableAdvance      @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  idempotencyKey     String                  @unique
+  amount             Int
+  fundingAccountCode String
+  paymentReference   String
+  reimbursedBy       String
+  reimbursedAt       DateTime                @default(now())
+  accountingEntryId  String                  @unique
+  accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceReimbursement", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, reimbursedAt])
 }
 
 model AccountingPeriod {
@@ -2824,6 +2911,7 @@ model StaffUser {
   hrAttendances  HrAttendance[]
   hrAbsences     HrAbsence[]
   hrPayrollLines HrPayrollLine[]
+  accountableAdvances AccountableAdvance[]
   createdAt      DateTime        @default(now())
 
   @@index([role])

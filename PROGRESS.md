@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003D
+
+- Iteration ID: `ACC-003D`.
+- Task: add accountable-person advances with issue, expense settlement, unused-balance return and overspend reimbursement.
+- Files changed: accountable-advance Prisma models/migration, `1250` accounting account seed, Finance DTO/controller/service, Ledger event catalogue and a dedicated API integration suite.
+- Result: finance users can issue an advance only to an active staff member, post `1250` debit against cash/bank, settle approved expense account lines against `1250`, return positive balances or reimburse negative balances. The aggregate locks its own mutation boundary, derives balance/status on the server, rejects closed/over-limit operations, replays identical idempotency keys and records one accounting plus one domain Ledger event per committed action.
+- Checks run: `npm run prisma:generate`; `npx prisma validate`; API production build; `prisma migrate deploy` on `alistore_dev`; direct SQL migration on `alistore_test`; accountable-advance integration 2/2; full API Jest 144/144 suites, 661/661 tests; `git diff --check`.
+- Acceptance: `accepted` for the local accountable-advance software contour. Write-offs, manual adjustment approval, AR aging, primary-document exports, accountant/tax validation, staging/production deployment, physical hardware and first-store reconciliation remain open. Production readiness remains `RED` because external credentials, devices, provider certification, staging soak and missing design references are not available.
+- Commit: dedicated implementation commit created after this gate.
+- Next step: implement the next bounded `ACC-003` slice, prioritizing write-off/manual-adjustment approval boundaries or AR aging/primary-document drill-down.
+
 # 2026-07-17 — ACC-003C
 
 - Iteration ID: `ACC-003C`.
