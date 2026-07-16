@@ -43,3 +43,61 @@ test('ERP loads protected reports and AI with a staff session', async ({ page, r
 
   expect(protectedResponses.filter((r) => r.status === 401 || r.status === 403)).toEqual([]);
 });
+
+test('ERP keeps Finance and Administration reachable through mobile navigation', async ({ page }) => {
+  await resetDb();
+  const { username, password } = await seedStaffCredentials('owner', 'e2e-erp-mobile');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(username);
+  await page.getByPlaceholder('password').fill(password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+
+  const openNavigation = page.getByRole('button', { name: 'Открыть навигацию' });
+  const main = page.getByTestId('erp-main');
+  const sidebar = page.getByTestId('erp-sidebar');
+  await expect(openNavigation).toBeVisible();
+  await expect(main).toHaveCSS('width', '390px');
+  await expect(sidebar).toHaveAttribute('inert', '');
+
+  await openNavigation.click();
+  await expect(page.getByTestId('erp-navigation-overlay')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Закрыть меню' })).toBeFocused();
+  await sidebar.getByRole('button', { name: /Финансы/ }).click();
+  await expect(page.getByRole('heading', { name: 'Учетный контроль' })).toBeVisible();
+  await expect(page.getByTestId('erp-navigation-overlay')).toBeHidden();
+  await expect
+    .poll(async () => (await sidebar.boundingBox())?.x ?? 0)
+    .toBeLessThan(0);
+  await expect(page.getByLabel('Период отчетов')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Обновить' })).toBeVisible();
+  await expect(openNavigation).toBeFocused();
+  expect(await main.evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(
+    await main.evaluate((element) => element.clientWidth),
+  );
+
+  await openNavigation.click();
+  await expect(page.getByRole('button', { name: 'Закрыть меню' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('erp-navigation-overlay')).toBeHidden();
+  await expect(sidebar).toHaveAttribute('inert', '');
+  await expect(openNavigation).toBeFocused();
+
+  await openNavigation.click();
+  await sidebar.getByRole('button', { name: /Администрирование/ }).click();
+  await expect(page.getByRole('heading', { name: 'Администрирование AliStore' })).toBeVisible();
+  await expect
+    .poll(async () => (await sidebar.boundingBox())?.x ?? 0)
+    .toBeLessThan(0);
+  await expect(page.getByRole('button', { name: /Админка сайта/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Согласования и 2FA/ })).toBeVisible();
+  await expect(openNavigation).toBeFocused();
+  expect(await main.evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(
+    await main.evaluate((element) => element.clientWidth),
+  );
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+});

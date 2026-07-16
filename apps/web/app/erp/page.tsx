@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { LogOut, Menu, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchDashboard,
   fetchInsights,
@@ -118,9 +119,34 @@ export default function ErpPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [readiness, setReadiness] = useState<ExternalReadinessReport | null>(null);
   const [readinessError, setReadinessError] = useState('');
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [mobileNavigation, setMobileNavigation] = useState(false);
+  const navigationTriggerRef = useRef<HTMLButtonElement>(null);
+  const navigationRef = useRef<HTMLElement>(null);
+  const navigationCloseRef = useRef<HTMLButtonElement>(null);
+
+  const closeNavigation = useCallback((restoreFocus = true) => {
+    setNavigationOpen(false);
+    if (restoreFocus && window.matchMedia('(max-width: 639px)').matches) {
+      window.requestAnimationFrame(() => navigationTriggerRef.current?.focus());
+    }
+  }, []);
+
+  function navigate(next: Route) {
+    setRoute(next);
+    closeNavigation();
+  }
 
   useEffect(() => {
     setSession(loadStaffSession());
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 639px)');
+    const syncNavigationMode = () => setMobileNavigation(media.matches);
+    syncNavigationMode();
+    media.addEventListener('change', syncNavigationMode);
+    return () => media.removeEventListener('change', syncNavigationMode);
   }, []);
 
   useEffect(() => {
@@ -146,6 +172,35 @@ export default function ErpPage() {
     fetchRevenue(period, session.accessToken).then(setRevenue).catch(() => setRevenue([]));
     fetchRevenueTrend(period, session.accessToken).then(setTrend).catch(() => setTrend(null));
   }, [period, session]);
+
+  useEffect(() => {
+    if (!mobileNavigation || !navigationOpen) return;
+    navigationCloseRef.current?.focus();
+    const handleNavigationKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeNavigation();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(
+        navigationRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleNavigationKeys);
+    return () => window.removeEventListener('keydown', handleNavigationKeys);
+  }, [closeNavigation, mobileNavigation, navigationOpen]);
 
   /** Command Center: jump from a risk signal to the screen that resolves it. */
   function actOnSignal(kind: string) {
@@ -173,26 +228,48 @@ export default function ErpPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-[#0E0C0A] p-5 font-sans text-white">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden bg-[#0E0C0A] font-sans text-white sm:items-center sm:overflow-auto sm:p-5">
       <div
         data-testid="erp-shell"
-        className="flex h-[820px] max-h-full w-full max-w-[1280px] overflow-hidden rounded-[20px] border border-[#2E2822] bg-[#16130F] shadow-2xl"
+        className="relative flex h-full w-full max-w-[1280px] overflow-hidden bg-[#16130F] shadow-2xl sm:h-[820px] sm:max-h-full sm:rounded-[20px] sm:border sm:border-[#2E2822]"
       >
+      {navigationOpen && (
+        <button
+          type="button"
+          aria-label="Закрыть навигацию"
+          data-testid="erp-navigation-overlay"
+          onClick={() => closeNavigation()}
+          className="fixed inset-0 z-30 bg-black/60 sm:hidden"
+        />
+      )}
       {/* SIDEBAR */}
-      <aside data-testid="erp-sidebar" className="flex w-[230px] flex-shrink-0 flex-col border-r border-[#2E2822] bg-[#1A1611] px-3 py-[18px]">
+      <aside
+        id="erp-navigation"
+        ref={navigationRef}
+        role={mobileNavigation ? 'dialog' : undefined}
+        aria-label={mobileNavigation ? 'Навигация ERP' : undefined}
+        aria-modal={mobileNavigation && navigationOpen ? true : undefined}
+        aria-hidden={mobileNavigation && !navigationOpen ? true : undefined}
+        inert={mobileNavigation && !navigationOpen ? true : undefined}
+        data-testid="erp-sidebar"
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-shrink-0 flex-col border-r border-[#2E2822] bg-[#1A1611] px-3 py-[18px] shadow-2xl transition-transform duration-200 sm:relative sm:z-auto sm:w-[230px] sm:translate-x-0 sm:shadow-none ${navigationOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
         <div className="flex items-center gap-2.5 px-2 pb-4">
           <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-coral font-display text-base font-extrabold text-white">A</span>
           <div>
             <div className="font-display text-sm font-extrabold">AliStore ERP</div>
             <div className="text-[10px] text-[#8A7F76]">Владелец</div>
           </div>
+          <button ref={navigationCloseRef} type="button" onClick={() => closeNavigation()} aria-label="Закрыть меню" className="ml-auto grid h-9 w-9 place-items-center rounded-[8px] text-[#A79C92] hover:bg-[#221E19] hover:text-white sm:hidden">
+            <X size={18} />
+          </button>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           {CORE_NAV.map((m) => (
             <button
               key={m.id}
               type="button"
-              onClick={() => setRoute(m.id)}
+              onClick={() => navigate(m.id)}
               className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] transition ${
                 route === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
               }`}
@@ -214,7 +291,7 @@ export default function ErpPage() {
             <button
               key={m.id}
               type="button"
-              onClick={() => setRoute(m.id)}
+              onClick={() => navigate(m.id)}
               className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-[13px] transition ${
                 route === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
               }`}
@@ -235,19 +312,23 @@ export default function ErpPage() {
       </aside>
 
       {/* MAIN */}
-      <main data-testid="erp-main" className="min-w-0 flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center border-b border-[#2E2822] bg-[#16130F] px-[26px] py-4">
-          <div>
-            <div className="font-display text-xl font-bold">{TITLES[route][0]}</div>
-            <div className="text-xs text-[#8A7F76]">{TITLES[route][1]}</div>
+      <main inert={mobileNavigation && navigationOpen ? true : undefined} data-testid="erp-main" className="min-w-0 w-full flex-1 overflow-y-auto">
+        <div className="sticky top-0 z-20 flex min-h-[68px] items-center border-b border-[#2E2822] bg-[#16130F]/95 px-3 py-3 backdrop-blur sm:px-[26px] sm:py-4">
+          <button ref={navigationTriggerRef} type="button" aria-label="Открыть навигацию" aria-controls="erp-navigation" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)} className="mr-2 grid h-10 w-10 flex-none place-items-center rounded-[8px] border border-[#2E2822] bg-[#1A1611] text-[#D8CFC6] sm:hidden">
+            <Menu size={19} />
+          </button>
+          <div className="min-w-0">
+            <div className="truncate font-display text-base font-bold sm:text-xl">{TITLES[route][0]}</div>
+            <div className="hidden truncate text-xs text-[#8A7F76] sm:block">{TITLES[route][1]}</div>
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex flex-none items-center gap-1.5 sm:gap-3">
             <button
               type="button"
-              onClick={() => setRoute('ai')}
-              className="rounded-[10px] bg-gradient-to-br from-coral to-deep px-4 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+              onClick={() => navigate('ai')}
+              aria-label="Открыть AI-ассистент"
+              className="flex h-10 items-center gap-2 rounded-[8px] bg-coral px-3 text-xs font-semibold text-white transition hover:brightness-110 sm:px-4"
             >
-              🤖 AI-ассистент
+              <Sparkles size={16} /><span className="hidden lg:inline">AI-ассистент</span>
             </button>
             <button
               type="button"
@@ -255,15 +336,16 @@ export default function ErpPage() {
                 clearStaffSession();
                 setSession(null);
               }}
-              className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+              aria-label="Выйти из staff-сессии"
+              className="flex h-10 items-center gap-2 rounded-[8px] bg-[#221E19] px-3 text-xs font-semibold text-white/80 hover:text-white sm:px-4"
             >
-              Выйти staff
+              <LogOut size={16} /><span className="hidden lg:inline">Выйти staff</span>
             </button>
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-[#2A241F] text-sm">В</span>
+            <span className="hidden h-9 w-9 place-items-center rounded-full bg-[#2A241F] text-sm md:grid">В</span>
           </div>
         </div>
 
-        <div className="px-[26px] py-[22px]">
+        <div className="min-w-0 px-3 py-4 sm:px-[26px] sm:py-[22px]">
           {route === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
