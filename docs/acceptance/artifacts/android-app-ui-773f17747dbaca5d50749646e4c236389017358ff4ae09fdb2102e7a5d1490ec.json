@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gate": "android-app-ui",
+  "command": "npm run android:ui",
+  "exitCode": 0,
+  "packageCommandSha256": "976b672c6757de21fa7a3aac08211d3640d52c24961c853a21882ea21fbc381e",
+  "sourceTreeSha256": "1200ac5446a49d3eecc41394beb81edbcb048dc7ca406497ebb0ea76f3f4b5d3",
+  "sourceCommit": "1b830262110f15282e98efd959c8d987fc882572",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "toolchain": "Android Debug Bridge version 1.0.41\nVersion 37.0.0-14910828\nInstalled as /Users/alistore/Library/Android/sdk/platform-tools/adb\nRunning on Darwin 25.3.0 (arm64)"
+  },
+  "executionEnvironmentSha256": "be29a21b0cc24d0f0ff4e871181cf9aaf11632abee63db1c888ae1a609000b74",
+  "completedAt": "2026-07-16T09:25:41.121Z"
+}

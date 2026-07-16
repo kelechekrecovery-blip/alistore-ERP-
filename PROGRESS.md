@@ -1951,3 +1951,12 @@
 - Checks run: `npm run ecosystem:evidence -- ios-app-ui`; XCUITest 4/4; artifact SHA-256 independently matched its filename and manifest. The audit correctly retained GAP before this artifact commit because uncommitted evidence is never accepted.
 - Outcome: durable iOS packaged cold-launch evidence is recorded. This remains launch/role-shell coverage only and does not certify OTP, checkout, operations, push, camera, maps, offline replay, hardware or a physical iPhone.
 - Next step: commit this evidence, confirm the iOS audit gate passes from the clean tree, then record the Android packaged gate on the API 36 emulator.
+
+## 2026-07-16
+
+- Task: record durable `android-app-ui` acceptance evidence on clean source commit `1b83026`.
+- Files changed: ecosystem evidence manifest and immutable content-addressed Android result artifact; progress record.
+- Result: the sequential gate installed and exercised the shared Compose behavior suite and all four packaged APKs on `savio_api36_arm64` API 36. Core passed 26/26; Client, Staff, Courier and POS each passed their real-`MainActivity` packaged smoke, for 30/30 total and `BUILD SUCCESSFUL`. The recorder bound the result to the same source-tree hash as iOS plus the exact command, source commit, Node and ADB versions.
+- Checks run: `npm run ecosystem:evidence -- android-app-ui`; connected tests 30/30; artifact SHA-256 independently matched its filename and manifest.
+- Outcome: durable Android packaged cold-launch/role-wiring evidence is recorded. It does not certify the deeper Client, Staff, Courier or POS journeys, FCM, biometrics, offline recovery, camera/maps/scanner/printer/terminal or a physical Android device.
+- Next step: commit this evidence, confirm both native application audit gates pass, stop the emulator, then implement the deterministic reconciled cross-role `ecosystem:e2e` gate.
