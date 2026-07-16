@@ -360,6 +360,16 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     token: String,
   ): EvidenceAttachment = uploadEvidenceRequest(entityType, entityId, "Фото клиента", fileName, mimeType, bytes, token)
 
+  override suspend fun uploadEvidenceWithKey(
+    entityType: String,
+    entityId: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
+    idempotencyKey: String,
+  ): EvidenceAttachment = uploadEvidenceRequest(entityType, entityId, "Фото клиента", fileName, mimeType, bytes, token, idempotencyKey)
+
   override suspend fun uploadStaffEvidence(
     entityType: String,
     entityId: String,
@@ -378,12 +388,14 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     mimeType: String,
     bytes: ByteArray,
     token: String,
+    idempotencyKey: String = UUID.randomUUID().toString(),
   ): EvidenceAttachment = withContext(Dispatchers.IO) {
     val boundary = "AliStore-${UUID.randomUUID()}"
     val connection = open("evidence/images", "POST")
     try {
       connection.doOutput = true
       connection.setRequestProperty("Authorization", "Bearer $token")
+      connection.setRequestProperty("Idempotency-Key", idempotencyKey)
       connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
       connection.outputStream.buffered().use { output ->
         fun field(name: String, value: String) {

@@ -1237,6 +1237,7 @@ private struct CustomerTradeInCard: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isUploadingEvidence = false
     @State private var evidenceMessage: String?
+    @State private var evidenceIdempotencyKey = UUID().uuidString
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1322,9 +1323,11 @@ private struct CustomerTradeInCard: View {
                 entityType: "tradein",
                 entityId: tradeIn.id,
                 label: "tradein_device",
-                token: token
+                token: token,
+                idempotencyKey: evidenceIdempotencyKey
             )
             evidenceMessage = "Фото добавлено в Evidence Vault"
+            evidenceIdempotencyKey = UUID().uuidString
         } catch is CancellationError {
         } catch {
             evidenceMessage = "Не удалось загрузить фото: \(error.localizedDescription)"

@@ -241,8 +241,8 @@
 - Harden staff JWT authorization for Customer PII reads and Approval Inbox decisions; approval role now comes from JWT, not request body.
 - Build offline POS queue/sync with `clientSaleId` idempotency, conflict states, scanner input, receipt printing, and terminal readiness fallback.
 - Add provider-shaped payment intents and sandbox webhook reconciliation for card, MBank QR, O!Деньги QR, and installments.
-- Add real Evidence Vault image upload flows for trade-in, returns, warranty, support, and warehouse operations on top of the media service.
+- Add real Evidence Vault image upload flows for trade-in, returns, warranty, support, and warehouse operations on top of the media service. (Implemented; `/evidence/images` now requires a bounded idempotency key and persists replay state. Private signed reads, retention and restore remain open.)
 - Complete customer app ecosystem routes: search, bonuses, addresses, notifications/preferences, support tickets, returns, and customer trade-in.
-- Add native customer trade-in flow after the corrected API contract: derive ownership from JWT, keep guest capability scoped, use a stable customer-owned idempotency key, and cover owner-scoped read/status states in SwiftUI/Compose. (API, iOS Client and Android Compose implemented on 2026-07-17; evidence mutation idempotency and physical-device certification remain open.)
+- Add native customer trade-in flow after the corrected API contract: derive ownership from JWT, keep guest capability scoped, use a stable customer-owned idempotency key, and cover owner-scoped read/status states in SwiftUI/Compose. (API, iOS Client and Android Compose implemented on 2026-07-17; physical-device certification remains open.)
 - Finish native Client visual parity from `AliStore Клиент App 2.0`: custom SwiftUI shell, customer product assets, login/guest states, and simulator visual evidence.
 - Add signed native Client release preflight: production API validation, privacy manifest, App Store metadata, archive/export and App Store Connect submission verification.

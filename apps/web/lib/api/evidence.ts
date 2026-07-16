@@ -26,6 +26,7 @@ export async function uploadEvidenceImage(input: {
   actor?: string;
   accessToken?: string;
   guestCapability?: string;
+  idempotencyKey?: string;
 }): Promise<EvidenceAttachment> {
   const form = new FormData();
   form.append('file', input.file);
@@ -39,6 +40,7 @@ export async function uploadEvidenceImage(input: {
     headers: {
       ...(input.accessToken ? { authorization: `Bearer ${input.accessToken}` } : {}),
       ...(input.guestCapability ? { 'x-guest-capability': input.guestCapability } : {}),
+      'Idempotency-Key': input.idempotencyKey ?? crypto.randomUUID(),
     },
     body: form,
   });
@@ -60,7 +62,15 @@ export async function uploadEvidenceImages(input: {
 }): Promise<EvidenceAttachment[]> {
   const results: EvidenceAttachment[] = [];
   for (const file of input.files) {
-    results.push(await uploadEvidenceImage({ ...input, file }));
+    results.push(await uploadEvidenceImage({
+      file,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      label: input.label,
+      actor: input.actor,
+      accessToken: input.accessToken,
+      guestCapability: input.guestCapability,
+    }));
   }
   return results;
 }

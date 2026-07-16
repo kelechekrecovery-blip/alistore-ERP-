@@ -130,7 +130,8 @@ public actor APIClient {
         entityType: String,
         entityId: String,
         label: String?,
-        token: String
+        token: String,
+        idempotencyKey: String? = nil
     ) async throws -> EvidenceAttachment {
         let multipart = EvidenceMultipart.build(
             imageData: imageData,
@@ -149,6 +150,7 @@ public actor APIClient {
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(idempotencyKey ?? UUID().uuidString, forHTTPHeaderField: "Idempotency-Key")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {

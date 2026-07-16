@@ -83,6 +83,7 @@ internal fun ClientTradeInsScreen(
   var grade by rememberSaveable { mutableStateOf("A") }
   var price by rememberSaveable { mutableStateOf("") }
   var key by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
+  var evidenceKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var loading by remember { mutableStateOf(true) }
   var refreshing by remember { mutableIntStateOf(0) }
   var submitting by remember { mutableStateOf(false) }
@@ -110,6 +111,7 @@ internal fun ClientTradeInsScreen(
 
   fun rotateCommand() {
     key = UUID.randomUUID().toString()
+    evidenceKey = UUID.randomUUID().toString()
     submitError = null
     queued = false
     created = null
@@ -145,6 +147,7 @@ internal fun ClientTradeInsScreen(
             authManager = authManager,
             onAuthState = onAuthState,
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            idempotencyKey = evidenceKey,
           )
           Button(onClick = { created = null; rotateCommand() }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp), colors = ButtonDefaults.buttonColors(containerColor = TradeInLime, contentColor = TradeInInk), shape = RoundedCornerShape(8.dp)) { Text("Новая оценка") }
         }
@@ -186,6 +189,7 @@ internal fun ClientTradeInsScreen(
                   }
                 }
                 attempt.onSuccess { result ->
+                  evidenceKey = UUID.randomUUID().toString()
                   created = result
                   tradeIns = listOf(result) + tradeIns.filterNot { it.id == result.id }
                   submitError = null

@@ -30,6 +30,16 @@ interface CustomerEvidenceGateway {
     bytes: ByteArray,
     token: String,
   ): EvidenceAttachment
+
+  suspend fun uploadEvidenceWithKey(
+    entityType: String,
+    entityId: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
+    idempotencyKey: String,
+  ): EvidenceAttachment = uploadEvidence(entityType, entityId, fileName, mimeType, bytes, token)
 }
 
 @Composable
@@ -41,6 +51,7 @@ internal fun CustomerEvidencePicker(
   authManager: AuthSessionManager?,
   onAuthState: (AuthState) -> Unit,
   modifier: Modifier = Modifier,
+  idempotencyKey: String? = null,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -59,14 +70,17 @@ internal fun CustomerEvidencePicker(
         busy = false
         return@launch
       }
-      var attempt = runCatching {
-        gateway.uploadEvidence(entityType, entityId, "evidence.jpg", mime, bytes.getOrThrow(), session.tokens.accessToken)
+      suspend fun upload(token: String) = if (idempotencyKey == null) {
+        gateway.uploadEvidence(entityType, entityId, "evidence.jpg", mime, bytes.getOrThrow(), token)
+      } else {
+        gateway.uploadEvidenceWithKey(entityType, entityId, "evidence.jpg", mime, bytes.getOrThrow(), token, idempotencyKey)
       }
+      var attempt = runCatching { upload(session.tokens.accessToken) }
       if (attempt.exceptionOrNull().nativeUnauthorized() && authManager != null) {
         val refreshed = authManager.refresh(session)
         onAuthState(refreshed)
         if (refreshed is AuthState.SignedIn) {
-          attempt = runCatching { gateway.uploadEvidence(entityType, entityId, "evidence.jpg", mime, bytes.getOrThrow(), refreshed.tokens.accessToken) }
+          attempt = runCatching { upload(refreshed.tokens.accessToken) }
         }
       }
       attempt.onSuccess { message = "Фото добавлено в Evidence Vault" }

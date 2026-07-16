@@ -527,35 +527,35 @@ model PushToken {
 }
 
 model Product {
-  id                      String                    @id @default(cuid())
-  sku                     String                    @unique
-  barcode                 String?                   @unique
-  variantGroup            String?
-  name                    String
-  price                   Int
-  cost                    Int
-  category                String
-  taxCode                 String                    @default("vat_standard")
-  taxRateBps              Int                       @default(1200)
-  trackingMode            StockTrackingMode         @default(serialized)
-  attrs                   Json
-  archived                Boolean                   @default(false) // soft-delete: НЕ удалять физически
-  updatedAt               DateTime                  @default(now()) @updatedAt
-  units                   DeviceUnit[]
-  movements               InventoryMovement[]
-  balances                InventoryBalance[]
-  quantityAllocations     OrderQuantityAllocation[]
-  purchaseOrderItems      PurchaseOrderItem[]
-  bundleComponents        ProductBundleComponent[]  @relation("BundleProduct")
-  includedInBundles       ProductBundleComponent[]  @relation("BundleComponentProduct")
-  bundleAllocations       OrderBundleAllocation[]
-  consignmentItems        ConsignmentItem[]
-  quantityConsignmentLots QuantityConsignmentLot[]
-  serviceParts            ServicePart[]
-  valuationLayers         InventoryValuationLayer[]
-  valuationIssues         InventoryValuationIssue[]
-  valuationReversals      InventoryValuationReversal[]
-  exchangeReplacementRequests ExchangeRequest[] @relation("ExchangeReplacementProduct")
+  id                          String                       @id @default(cuid())
+  sku                         String                       @unique
+  barcode                     String?                      @unique
+  variantGroup                String?
+  name                        String
+  price                       Int
+  cost                        Int
+  category                    String
+  taxCode                     String                       @default("vat_standard")
+  taxRateBps                  Int                          @default(1200)
+  trackingMode                StockTrackingMode            @default(serialized)
+  attrs                       Json
+  archived                    Boolean                      @default(false) // soft-delete: НЕ удалять физически
+  updatedAt                   DateTime                     @default(now()) @updatedAt
+  units                       DeviceUnit[]
+  movements                   InventoryMovement[]
+  balances                    InventoryBalance[]
+  quantityAllocations         OrderQuantityAllocation[]
+  purchaseOrderItems          PurchaseOrderItem[]
+  bundleComponents            ProductBundleComponent[]     @relation("BundleProduct")
+  includedInBundles           ProductBundleComponent[]     @relation("BundleComponentProduct")
+  bundleAllocations           OrderBundleAllocation[]
+  consignmentItems            ConsignmentItem[]
+  quantityConsignmentLots     QuantityConsignmentLot[]
+  serviceParts                ServicePart[]
+  valuationLayers             InventoryValuationLayer[]
+  valuationIssues             InventoryValuationIssue[]
+  valuationReversals          InventoryValuationReversal[]
+  exchangeReplacementRequests ExchangeRequest[]            @relation("ExchangeReplacementProduct")
 
   @@index([category])
   @@index([variantGroup])
@@ -617,23 +617,23 @@ model ProductReview {
 }
 
 model DeviceUnit {
-  id                 String            @id @default(cuid())
-  imei               String            @unique // один IMEI нельзя продать дважды
-  product            Product           @relation(fields: [productId], references: [id])
-  productId          String
-  status             UnitStatus        @default(in_stock)
-  grade              Grade?
-  location           String
-  acquisitionCost    Int?
-  orderId            String?
-  updatedAt          DateTime          @default(now()) @updatedAt
-  consignmentItem    ConsignmentItem?
-  serviceReplacement ServiceWorkOrder? @relation("ServiceReplacementUnit")
-  loanerProfile      LoanerDevice?
-  valuationIssues    InventoryValuationIssue[]
-  quarantineCases    InventoryQuarantineCase[]
-  exchangeReturnRequests ExchangeRequest[] @relation("ExchangeReturnedUnit")
-  exchangeReplacementRequests ExchangeRequest[] @relation("ExchangeReplacementUnit")
+  id                          String                    @id @default(cuid())
+  imei                        String                    @unique // один IMEI нельзя продать дважды
+  product                     Product                   @relation(fields: [productId], references: [id])
+  productId                   String
+  status                      UnitStatus                @default(in_stock)
+  grade                       Grade?
+  location                    String
+  acquisitionCost             Int?
+  orderId                     String?
+  updatedAt                   DateTime                  @default(now()) @updatedAt
+  consignmentItem             ConsignmentItem?
+  serviceReplacement          ServiceWorkOrder?         @relation("ServiceReplacementUnit")
+  loanerProfile               LoanerDevice?
+  valuationIssues             InventoryValuationIssue[]
+  quarantineCases             InventoryQuarantineCase[]
+  exchangeReturnRequests      ExchangeRequest[]         @relation("ExchangeReturnedUnit")
+  exchangeReplacementRequests ExchangeRequest[]         @relation("ExchangeReplacementUnit")
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -823,8 +823,8 @@ model Order {
   refunds                  Refund[]
   attribution              OrderAttribution?
   returns                  Return[]
-  exchangeSourceRequests   ExchangeRequest[] @relation("ExchangeOriginalOrder")
-  exchangeOutputRequest    ExchangeRequest? @relation("ExchangeOutputOrder")
+  exchangeSourceRequests   ExchangeRequest[]               @relation("ExchangeOriginalOrder")
+  exchangeOutputRequest    ExchangeRequest?                @relation("ExchangeOutputOrder")
   createdAt                DateTime                        @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
@@ -1047,20 +1047,20 @@ model OrderQuantityAllocation {
 }
 
 model OrderBundleAllocation {
-  id                 String   @id @default(cuid())
-  order              Order    @relation(fields: [orderId], references: [id])
+  id                 String    @id @default(cuid())
+  order              Order     @relation(fields: [orderId], references: [id])
   orderId            String
   orderItemId        String
   bundleSku          String
-  componentProduct   Product  @relation(fields: [componentProductId], references: [id])
+  componentProduct   Product   @relation(fields: [componentProductId], references: [id])
   componentProductId String
   componentSku       String
   location           String
   imei               String
-  active             Boolean  @default(true)
+  active             Boolean   @default(true)
   releasedAt         DateTime?
   consumedAt         DateTime?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime  @default(now())
 
   @@index([orderId])
   @@index([orderId, active])
@@ -1070,55 +1070,55 @@ model OrderBundleAllocation {
 }
 
 model OrderItem {
-  id             String       @id @default(cuid())
-  order          Order        @relation(fields: [orderId], references: [id])
-  orderId        String
-  lineNumber     Int          @default(0)
-  sku            String
-  qty            Int
-  price          Int
-  unitCost       Int          @default(0)
-  discountAmount Int          @default(0)
-  taxCode        String       @default("vat_standard")
-  taxRateBps     Int          @default(1200)
-  taxBaseAmount  Int          @default(0)
-  taxAmount      Int          @default(0)
-  imei           String?
+  id                String       @id @default(cuid())
+  order             Order        @relation(fields: [orderId], references: [id])
+  orderId           String
+  lineNumber        Int          @default(0)
+  sku               String
+  qty               Int
+  price             Int
+  unitCost          Int          @default(0)
+  discountAmount    Int          @default(0)
+  taxCode           String       @default("vat_standard")
+  taxRateBps        Int          @default(1200)
+  taxBaseAmount     Int          @default(0)
+  taxAmount         Int          @default(0)
+  imei              String?
   inventorySnapshot Json?
-  returnItems    ReturnItem[]
+  returnItems       ReturnItem[]
 
   @@index([orderId])
   @@index([orderId, lineNumber])
 }
 
 model Payment {
-  id                 String                  @id @default(cuid())
-  order              Order?                  @relation(fields: [orderId], references: [id])
-  orderId            String?
-  serviceWorkOrder   ServiceWorkOrder?       @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
-  serviceWorkOrderId String?
-  originalPayment    Payment?                @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
-  originalPaymentId  String?
-  refunds            Payment[]               @relation("PaymentRefunds")
+  id                  String                  @id @default(cuid())
+  order               Order?                  @relation(fields: [orderId], references: [id])
+  orderId             String?
+  serviceWorkOrder    ServiceWorkOrder?       @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
+  serviceWorkOrderId  String?
+  originalPayment     Payment?                @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPaymentId   String?
+  refunds             Payment[]               @relation("PaymentRefunds")
   refundAllocations   RefundAllocation[]      @relation("RefundOriginalPayment")
   refundExecution     RefundAllocation?       @relation("RefundExecutionPayment")
   giftCard            GiftCard?               @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
   giftCardId          String?
   giftCardTransaction GiftCardTransaction?
-  amount             Int // отрицательное = возврат
-  method             PaymentMethod
-  status             PaymentStatus           @default(pending)
-  shift              CashShift?              @relation(fields: [shiftId], references: [id])
-  shiftId            String?
-  account            AccountingAccount?      @relation(fields: [accountCode], references: [code], onDelete: Restrict)
-  accountCode        String?
-  accountingEntry    AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  accountingEntryId  String?                 @unique
-  idempotencyKey     String?                 @unique
-  receivedBy         String?
-  point              String?
-  txnId              String?                 @unique // идемпотентность webhook (dedup)
-  createdAt          DateTime                @default(now())
+  amount              Int // отрицательное = возврат
+  method              PaymentMethod
+  status              PaymentStatus           @default(pending)
+  shift               CashShift?              @relation(fields: [shiftId], references: [id])
+  shiftId             String?
+  account             AccountingAccount?      @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode         String?
+  accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId   String?                 @unique
+  idempotencyKey      String?                 @unique
+  receivedBy          String?
+  point               String?
+  txnId               String?                 @unique // идемпотентность webhook (dedup)
+  createdAt           DateTime                @default(now())
 
   @@index([orderId])
   @@index([serviceWorkOrderId])
@@ -1147,18 +1147,18 @@ model OnlinePaymentIntentCommand {
 }
 
 model GiftCard {
-  id             String         @id @default(cuid())
-  code           String         @unique
+  id             String                @id @default(cuid())
+  code           String                @unique
   initialBalance Int
   balance        Int
-  currency       String         @default("KGS")
-  status         GiftCardStatus @default(active)
+  currency       String                @default("KGS")
+  status         GiftCardStatus        @default(active)
   customerId     String?
   issuedBy       String
   note           String?
   expiresAt      DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
   payments       Payment[]
   transactions   GiftCardTransaction[]
 
@@ -1167,16 +1167,16 @@ model GiftCard {
 }
 
 model CashShift {
-  id                  String    @id @default(cuid())
+  id                  String             @id @default(cuid())
   staffId             String
   point               String
   openCash            Int
   closeCash           Int?
   closeReason         String?
-  openIdempotencyKey  String?   @unique
-  closeIdempotencyKey String?   @unique
+  openIdempotencyKey  String?            @unique
+  closeIdempotencyKey String?            @unique
   diff                Int? // расхождение → approval + Risk
-  openedAt            DateTime  @default(now())
+  openedAt            DateTime           @default(now())
   closedAt            DateTime?
   payments            Payment[]
   refundAllocations   RefundAllocation[]
@@ -1189,20 +1189,20 @@ model CashShift {
 }
 
 model CashIncassation {
-  id              String                   @id @default(cuid())
-  idempotencyKey  String                   @unique
-  shift           CashShift                @relation(fields: [shiftId], references: [id], onDelete: Restrict)
-  shiftId         String
-  point           String
-  amount          Int
-  destinationCode String                   @default("1010")
-  reference       String?
-  status          CashIncassationStatus    @default(deposited)
-  depositedBy     String
-  depositedAt     DateTime                 @default(now())
-  reconciledAt    DateTime?
-  accountingEntry AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  accountingEntryId String?                @unique
+  id                String                  @id @default(cuid())
+  idempotencyKey    String                  @unique
+  shift             CashShift               @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId           String
+  point             String
+  amount            Int
+  destinationCode   String                  @default("1010")
+  reference         String?
+  status            CashIncassationStatus   @default(deposited)
+  depositedBy       String
+  depositedAt       DateTime                @default(now())
+  reconciledAt      DateTime?
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                 @unique
 
   @@index([shiftId, depositedAt])
   @@index([point, depositedAt])
@@ -1252,19 +1252,19 @@ model InventoryMovement {
 // Immutable cost provenance. Product.cost is only the current catalog default;
 // these rows are the accounting source for stock value and COGS.
 model InventoryValuationLayer {
-  id               String   @id @default(cuid())
-  product          Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
-  productId        String
-  balance          InventoryBalance @relation(fields: [balanceId], references: [id], onDelete: Cascade)
-  balanceId        String
-  location         String
-  sourceType       String
-  sourceRef        String
-  unitCost         Int
-  quantityReceived Int
+  id                String                    @id @default(cuid())
+  product           Product                   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId         String
+  balance           InventoryBalance          @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+  balanceId         String
+  location          String
+  sourceType        String
+  sourceRef         String
+  unitCost          Int
+  quantityReceived  Int
   quantityRemaining Int
-  createdAt        DateTime @default(now())
-  issues           InventoryValuationIssue[]
+  createdAt         DateTime                  @default(now())
+  issues            InventoryValuationIssue[]
 
   @@unique([sourceType, sourceRef])
   @@index([productId, location, createdAt])
@@ -1272,22 +1272,22 @@ model InventoryValuationLayer {
 }
 
 model InventoryValuationIssue {
-  id          String   @id @default(cuid())
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id          String                       @id @default(cuid())
+  product     Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId   String
-  layer       InventoryValuationLayer? @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  layer       InventoryValuationLayer?     @relation(fields: [layerId], references: [id], onDelete: Cascade)
   layerId     String?
-  unit        DeviceUnit? @relation(fields: [imei], references: [imei], onDelete: Cascade)
+  unit        DeviceUnit?                  @relation(fields: [imei], references: [imei], onDelete: Cascade)
   imei        String?
   orderId     String?
   sourceType  String
   sourceRef   String
   location    String?
   quantity    Int
-  reversedQty Int @default(0)
+  reversedQty Int                          @default(0)
   unitCost    Int
   totalCost   Int
-  createdAt   DateTime @default(now())
+  createdAt   DateTime                     @default(now())
   reversals   InventoryValuationReversal[]
 
   @@unique([sourceType, sourceRef])
@@ -1334,37 +1334,37 @@ model Reservation {
 }
 
 model Return {
-  id              String       @id @default(cuid())
-  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId         String
-  reason          String
-  status          ReturnStatus @default(requested)
-  refundId        String? // refund → approval, тем же способом
-  refundAmount    Int          @default(0)
-  isFullOrder     Boolean      @default(true)
-  idempotencyKey  String?      @unique
-  restockLocation String?
-  restockedAt     DateTime?
-  createdAt       DateTime     @default(now())
-  items           ReturnItem[]
-  refund          Refund?
-  quarantineCases InventoryQuarantineCase[]
+  id                 String                       @id @default(cuid())
+  order              Order                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId            String
+  reason             String
+  status             ReturnStatus                 @default(requested)
+  refundId           String? // refund → approval, тем же способом
+  refundAmount       Int                          @default(0)
+  isFullOrder        Boolean                      @default(true)
+  idempotencyKey     String?                      @unique
+  restockLocation    String?
+  restockedAt        DateTime?
+  createdAt          DateTime                     @default(now())
+  items              ReturnItem[]
+  refund             Refund?
+  quarantineCases    InventoryQuarantineCase[]
   valuationReversals InventoryValuationReversal[]
-  exchangeRequest ExchangeRequest?
+  exchangeRequest    ExchangeRequest?
 
   @@index([orderId])
   @@index([status])
 }
 
 model ReturnItem {
-  id           String    @id @default(cuid())
-  return       Return    @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  id           String       @id @default(cuid())
+  return       Return       @relation(fields: [returnId], references: [id], onDelete: Cascade)
   returnId     String
-  orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderItem    OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   orderItemId  String
   qty          Int
   refundAmount Int
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime     @default(now())
   refundLines  RefundLine[]
 
   @@unique([returnId, orderItemId])
@@ -1622,51 +1622,51 @@ model WarrantyOpenCommand {
 
 // Поставщик техники. Scorecard считается из связанных RMA.
 model Supplier {
-  id             String          @id @default(cuid())
-  name           String          @unique
+  id             String               @id @default(cuid())
+  name           String               @unique
   contact        String?
   rmas           SupplierRma[]
   purchaseOrders PurchaseOrder[]
   invoices       SupplierInvoice[]
   creditNotes    SupplierCreditNote[]
   expenses       Expense[]
-  createdAt      DateTime        @default(now())
+  createdAt      DateTime             @default(now())
 }
 
 model Expense {
-  id                 String        @id @default(cuid())
-  idempotencyKey     String        @unique
+  id                 String                  @id @default(cuid())
+  idempotencyKey     String                  @unique
   category           String
   description        String
   amount             Int
   documentAmount     Int
-  currency           String        @default("KGS")
-  exchangeRateMicros Int           @default(1000000)
+  currency           String                  @default("KGS")
+  exchangeRateMicros Int                     @default(1000000)
   exchangeRate       AccountingCurrencyRate? @relation(fields: [exchangeRateId], references: [id], onDelete: Restrict)
   exchangeRateId     String?
-  taxMode            ExpenseTaxMode @default(none)
-  taxCode            String        @default("none")
-  taxRateBps         Int           @default(0)
+  taxMode            ExpenseTaxMode          @default(none)
+  taxCode            String                  @default("none")
+  taxRateBps         Int                     @default(0)
   taxBaseAmount      Int
-  taxAmount          Int           @default(0)
+  taxAmount          Int                     @default(0)
   point              String?
-  supplier           Supplier?     @relation(fields: [supplierId], references: [id])
+  supplier           Supplier?               @relation(fields: [supplierId], references: [id])
   supplierId         String?
-  status             ExpenseStatus @default(submitted)
+  status             ExpenseStatus           @default(submitted)
   requestedBy        String
   approvedBy         String?
   rejectedBy         String?
   rejectionNote      String?
   paidBy             String?
-  paymentKey         String?       @unique
+  paymentKey         String?                 @unique
   paymentAccountCode String?
   paymentReference   String?
-  incurredAt         DateTime      @default(now())
+  incurredAt         DateTime                @default(now())
   approvedAt         DateTime?
   rejectedAt         DateTime?
   paidAt             DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@index([status, createdAt])
   @@index([category, incurredAt])
@@ -1694,49 +1694,49 @@ model AccountingCurrencyRate {
 // Balanced accounting ledger. AuditEvent explains what happened; these rows
 // prove where value moved and that every posted entry balances.
 model AccountingAccount {
-  code      String                  @id
-  name      String
-  type      AccountingAccountType
-  system    Boolean                 @default(true)
-  active    Boolean                 @default(true)
-  lines     AccountingJournalLine[]
+  code           String                  @id
+  name           String
+  type           AccountingAccountType
+  system         Boolean                 @default(true)
+  active         Boolean                 @default(true)
+  lines          AccountingJournalLine[]
   bankStatements BankStatement[]
-  payments  Payment[]
-  createdAt DateTime                @default(now())
+  payments       Payment[]
+  createdAt      DateTime                @default(now())
 
   @@index([type, active])
 }
 
 model AccountingJournalEntry {
-  id              String                  @id @default(cuid())
-  idempotencyKey  String                  @unique
-  sourceType      String
-  sourceRef       String
-  description     String
-  point           String?
-  currency        String                  @default("KGS")
-  documentAmount  Int?
-  exchangeRateMicros Int                  @default(1000000)
-  baseAmount      Int?
-  taxCode         String                  @default("none")
-  taxRateBps      Int                     @default(0)
-  taxAmount       Int                     @default(0)
-  occurredAt      DateTime
-  postedAt        DateTime                @default(now())
-  createdBy       String
-  lines           AccountingJournalLine[]
-  payment         Payment?
+  id                 String                   @id @default(cuid())
+  idempotencyKey     String                   @unique
+  sourceType         String
+  sourceRef          String
+  description        String
+  point              String?
+  currency           String                   @default("KGS")
+  documentAmount     Int?
+  exchangeRateMicros Int                      @default(1000000)
+  baseAmount         Int?
+  taxCode            String                   @default("none")
+  taxRateBps         Int                      @default(0)
+  taxAmount          Int                      @default(0)
+  occurredAt         DateTime
+  postedAt           DateTime                 @default(now())
+  createdBy          String
+  lines              AccountingJournalLine[]
+  payment            Payment?
   refundAllocation   RefundAllocation?
-  purchaseReceipt PurchaseReceipt?
-  supplierInvoice SupplierInvoice?
+  purchaseReceipt    PurchaseReceipt?
+  supplierInvoice    SupplierInvoice?
   supplierCreditNote SupplierCreditNote?
-  bankStatementLine BankStatementLine?
-  cashIncassation CashIncassation?
-  taxSettlement   AccountingTaxSettlement?
-  debtPlan        DebtPlan?
-  reversalOfId    String?                 @unique
-  reversalOf      AccountingJournalEntry? @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversal        AccountingJournalEntry? @relation("AccountingReversal")
+  bankStatementLine  BankStatementLine?
+  cashIncassation    CashIncassation?
+  taxSettlement      AccountingTaxSettlement?
+  debtPlan           DebtPlan?
+  reversalOfId       String?                  @unique
+  reversalOf         AccountingJournalEntry?  @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal           AccountingJournalEntry?  @relation("AccountingReversal")
 
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])
@@ -1915,45 +1915,45 @@ model PurchaseOrderItem {
 }
 
 model PurchaseReceipt {
-  id              String        @id @default(cuid())
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  purchaseOrderId String
-  idempotencyKey  String
-  actor           String
-  payload         Json
+  id                String                  @id @default(cuid())
+  purchaseOrder     PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId   String
+  idempotencyKey    String
+  actor             String
+  payload           Json
   accountingEntryId String?                 @unique
   accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  createdAt       DateTime      @default(now())
+  createdAt         DateTime                @default(now())
 
   @@unique([purchaseOrderId, idempotencyKey])
   @@index([purchaseOrderId, createdAt])
 }
 
 model SupplierInvoice {
-  id                String                 @id @default(cuid())
-  supplier          Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  supplierId        String
-  purchaseOrder     PurchaseOrder          @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
-  purchaseOrderId   String
-  invoiceNumber     String
-  idempotencyKey    String                 @unique
-  amount            Int
+  id                  String                  @id @default(cuid())
+  supplier            Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId          String
+  purchaseOrder       PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrderId     String
+  invoiceNumber       String
+  idempotencyKey      String                  @unique
+  amount              Int
   matchedReceiptValue Int
-  dueDate           DateTime?
-  status            SupplierInvoiceStatus  @default(draft)
-  approvedBy        String?
-  approvedAt        DateTime?
-  paymentKey        String?                @unique
-  paymentAccountCode String?
-  paymentReference  String?
-  paidBy            String?
-  paidAt            DateTime?
-  accountingEntryId String?                @unique
-  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  dueDate             DateTime?
+  status              SupplierInvoiceStatus   @default(draft)
+  approvedBy          String?
+  approvedAt          DateTime?
+  paymentKey          String?                 @unique
+  paymentAccountCode  String?
+  paymentReference    String?
+  paidBy              String?
+  paidAt              DateTime?
+  accountingEntryId   String?                 @unique
+  accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   creditNotes         SupplierCreditNote[]
-  createdBy         String
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  createdBy           String
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
   @@unique([supplierId, invoiceNumber])
   @@index([status, dueDate])
@@ -1962,13 +1962,13 @@ model SupplierInvoice {
 }
 
 model SupplierCreditNote {
-  id                String                  @id @default(cuid())
-  supplier          Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  id                String                   @id @default(cuid())
+  supplier          Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   supplierId        String
-  invoice           SupplierInvoice         @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoice           SupplierInvoice          @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   invoiceId         String
   noteNumber        String
-  idempotencyKey    String                  @unique
+  idempotencyKey    String                   @unique
   amount            Int
   reason            String
   status            SupplierCreditNoteStatus @default(draft)
@@ -1976,8 +1976,8 @@ model SupplierCreditNote {
   approvedAt        DateTime?
   appliedBy         String?
   appliedAt         DateTime?
-  accountingEntryId String?                 @unique
-  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                  @unique
+  accountingEntry   AccountingJournalEntry?  @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   createdBy         String
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
@@ -1988,19 +1988,19 @@ model SupplierCreditNote {
 }
 
 model BankStatement {
-  id              String                @id @default(cuid())
-  account         AccountingAccount     @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  id              String              @id @default(cuid())
+  account         AccountingAccount   @relation(fields: [accountCode], references: [code], onDelete: Restrict)
   accountCode     String
-  statementNumber String                @unique
-  idempotencyKey   String               @unique
+  statementNumber String              @unique
+  idempotencyKey  String              @unique
   periodStart     DateTime
   periodEnd       DateTime
   openingBalance  Int
   closingBalance  Int
-  status          BankStatementStatus   @default(imported)
+  status          BankStatementStatus @default(imported)
   createdBy       String
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
   lines           BankStatementLine[]
 
   @@index([accountCode, periodStart, periodEnd])
@@ -2008,20 +2008,20 @@ model BankStatement {
 }
 
 model BankStatementLine {
-  id               String                  @id @default(cuid())
-  statement        BankStatement            @relation(fields: [statementId], references: [id], onDelete: Cascade)
-  statementId      String
-  externalId       String
-  occurredAt       DateTime
-  amount           Int
-  reference        String?
-  status           BankStatementLineStatus @default(unmatched)
-  reconciliationKey String?                @unique
-  matchedEntryId   String?                 @unique
-  matchedEntry     AccountingJournalEntry? @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
-  matchedBy        String?
-  matchedAt        DateTime?
-  createdAt        DateTime                @default(now())
+  id                String                  @id @default(cuid())
+  statement         BankStatement           @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statementId       String
+  externalId        String
+  occurredAt        DateTime
+  amount            Int
+  reference         String?
+  status            BankStatementLineStatus @default(unmatched)
+  reconciliationKey String?                 @unique
+  matchedEntryId    String?                 @unique
+  matchedEntry      AccountingJournalEntry? @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
+  matchedBy         String?
+  matchedAt         DateTime?
+  createdAt         DateTime                @default(now())
 
   @@unique([statementId, externalId])
   @@index([statementId, status])
@@ -2075,25 +2075,25 @@ model TradeInDevice {
   contractId     String?
   sellerPassport String // защищённое поле + anti-fraud
   imei           String? // anti-fraud: тот же IMEI в скупке И в продаже → risk-флаг
-  idempotencyKey  String?  @unique
+  idempotencyKey String?  @unique
 
   @@index([customerId])
   @@index([imei])
 }
 
 model CourierRun {
-  id                     String    @id @default(cuid())
-  courierId              String
-  codTotal               Int // COD не сдан >24ч → Risk
-  handedOver             Boolean   @default(false)
-  collectedTotal         Int       @default(0)
-  assignmentIdempotencyKey String? @unique
-  handoverIdempotencyKey String?   @unique
-  handoverAmount         Int?
-  handoverReason         String?
-  handedOverAt           DateTime?
-  orders                 Order[]
-  createdAt              DateTime  @default(now())
+  id                       String    @id @default(cuid())
+  courierId                String
+  codTotal                 Int // COD не сдан >24ч → Risk
+  handedOver               Boolean   @default(false)
+  collectedTotal           Int       @default(0)
+  assignmentIdempotencyKey String?   @unique
+  handoverIdempotencyKey   String?   @unique
+  handoverAmount           Int?
+  handoverReason           String?
+  handedOverAt             DateTime?
+  orders                   Order[]
+  createdAt                DateTime  @default(now())
 
   @@index([courierId])
   @@index([handedOver])
@@ -2114,17 +2114,17 @@ model CourierCommand {
 }
 
 model Approval {
-  id        String         @id @default(cuid())
-  action    String // discount | refund | write_off | quarantine_write_off | price | debt | delete | stock_adjust | pii
-  requester String
-  approver  String?
-  status    ApprovalStatus @default(requested)
-  reason    String
-  evidence  Json? // обязательно для high-risk
-  createdAt DateTime       @default(now())
-  refund    Refund?
+  id                    String                   @id @default(cuid())
+  action                String // discount | refund | write_off | quarantine_write_off | price | debt | delete | stock_adjust | pii
+  requester             String
+  approver              String?
+  status                ApprovalStatus           @default(requested)
+  reason                String
+  evidence              Json? // обязательно для high-risk
+  createdAt             DateTime                 @default(now())
+  refund                Refund?
   quarantineDisposition InventoryQuarantineCase?
-  exchangeRequest ExchangeRequest?
+  exchangeRequest       ExchangeRequest?
 
   @@index([status])
   @@index([action])
@@ -2182,6 +2182,23 @@ model AuditEvent {
   @@index([type])
   @@index([actor])
   @@index([refs], type: Gin) // array-containment (has/hasEvery) needs GIN, not B-tree
+}
+
+// A successful multipart upload is replayable by its caller's idempotency key.
+// The stored asset is returned on retry and the EvidenceAttached ledger event
+// is emitted exactly once.
+model EvidenceUpload {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  actor          String
+  entityType     String
+  entityId       String
+  label          String?
+  fingerprint    String
+  asset          Json
+  createdAt      DateTime @default(now())
+
+  @@index([entityType, entityId])
 }
 
 model Campaign {
@@ -2510,17 +2527,17 @@ model OutboxMessage {
 // later database validation failed. Deletion is idempotent and retried until
 // the object store accepts it.
 model MediaCleanupTask {
-  id            String   @id @default(cuid())
-  objectKey     String   @unique
-  attempts      Int      @default(0)
-  deletePasses  Int      @default(0)
-  lastError     String?
-  nextAttemptAt DateTime @default(now())
+  id               String    @id @default(cuid())
+  objectKey        String    @unique
+  attempts         Int       @default(0)
+  deletePasses     Int       @default(0)
+  lastError        String?
+  nextAttemptAt    DateTime  @default(now())
   uploadLeaseUntil DateTime
-  claimedAt     DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  claimedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([completedAt, nextAttemptAt, uploadLeaseUntil, claimedAt])
 }

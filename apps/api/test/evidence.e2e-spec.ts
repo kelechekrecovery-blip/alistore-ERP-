@@ -131,6 +131,34 @@ describe('Evidence Vault (integration)', () => {
     });
   });
 
+  it('replays a keyed upload without duplicating the asset or ledger event', async () => {
+    const mv = await movement();
+    const image = await pngBuffer();
+    const key = `evidence-replay-${Date.now()}-${seq}`;
+    const first = await evidence.attachImage(image, {
+      entityType: 'inventory',
+      entityId: mv.id,
+      label: 'shelf_photo',
+      actor: 'warehouse',
+    }, false, key);
+    const replay = await evidence.attachImage(image, {
+      entityType: 'inventory',
+      entityId: mv.id,
+      label: 'shelf_photo',
+      actor: 'warehouse',
+    }, false, key);
+
+    expect(replay).toEqual(first);
+    expect(await prisma.evidenceUpload.count({ where: { idempotencyKey: key } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'evidence.attached', refs: { has: mv.id } } })).toBe(1);
+    await expect(evidence.attachImage(Buffer.from('different'), {
+      entityType: 'inventory',
+      entityId: mv.id,
+      label: 'shelf_photo',
+      actor: 'warehouse',
+    }, false, key)).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+  });
+
   it('rejects evidence for an unknown entity', async () => {
     const err = await evidence.attachImage(await pngBuffer(), {
       entityType: 'return',

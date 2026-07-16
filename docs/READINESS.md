@@ -4,11 +4,11 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **55 backend-модулей** (NestJS) · **39 веб-роутов** (Next.js) · **87 миграций**
-- Текущий полный worktree gate: **136/136 API suites / 582/582 тестов** на свежей БД после полного migration reset, rolling legacy upgrade-path и direct-URL post-deploy index recovery.
+- **53 backend-модуля** (NestJS) · **39 веб-роутов** (Next.js) · **100 миграций**
+- Текущий полный worktree gate: **142/142 API suites / 651/651 тестов** на изолированной test-БД после применения всех 100 миграций.
 - **46/46 Playwright flows подтверждены**, включая multi-tender refund, exchange, campaign → storefront → checkout, Marketing CMS, Finance и Service Center.
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
-- Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS API contracts pass **31/31** on iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **25/25** connected Compose tests pass on API 36, including Staff attendance with SQLite/WorkManager replay. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
+- Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS Client UI/XCTest passes on the iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **31/31** connected tests pass on API 36, including Client trade-in evidence and all packaged app smoke tests. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
 
 Легенда: ✅ готово · 🟡 частично · ⛔ ждёт внешних доступов (ключи/аккаунты/железо)
@@ -84,5 +84,5 @@ npm run ios:build                     # all four SwiftUI apps + shared core
 npm run ios:test                      # AliStoreCore tests on iPhone Simulator
 npm run android:build                 # four Kotlin/Compose debug APKs
 npm run android:test                  # JVM tests + Android Lint for all modules
-npm run android:ui                    # 25/25 Compose tests on API 36 emulator
+npm run android:ui                    # 31/31 connected tests on API 36 emulator
 ```

@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Headers, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Headers, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -49,7 +49,11 @@ export class EvidenceController {
     @Body() dto: EvidenceImageDto,
     @CurrentUser() user?: AuthPrincipal,
     @Headers('x-guest-capability') capability?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
+    const key = idempotencyKey?.trim();
+    if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+    if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
     if (!file) {
       throw new ValidationError('no_file', 'Файл не приложен (поле "file")');
     }
@@ -71,6 +75,6 @@ export class EvidenceController {
       await this.evidence.assertCustomerOwnsEntity(customerId, dto.entityType, dto.entityId);
     }
     const actor = user?.typ === 'staff' ? `staff:${user.customerId}` : user?.customerId ?? guestCustomerId!;
-    return this.evidence.attachImage(file.buffer, { ...dto, actor }, trustedStaffEvidence && user?.typ === 'staff');
+    return this.evidence.attachImage(file.buffer, { ...dto, actor }, trustedStaffEvidence && user?.typ === 'staff', key);
   }
 }

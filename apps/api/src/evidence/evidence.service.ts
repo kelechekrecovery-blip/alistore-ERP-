@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ValidationError } from '../common/errors';
+import { ConflictError, ValidationError } from '../common/errors';
 import { MediaService, type IngestedImage } from '../media/media.service';
 import { MediaCleanupService } from '../media/media-cleanup.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,9 +28,42 @@ export class EvidenceService {
     private readonly mediaCleanup: MediaCleanupService,
   ) {}
 
-  async attachImage(input: Buffer, dto: EvidenceImageDto, trustedStaffEvidence = false): Promise<EvidenceAttachment> {
+  async attachImage(
+    input: Buffer,
+    dto: EvidenceImageDto,
+    trustedStaffEvidence = false,
+    idempotencyKey?: string,
+  ): Promise<EvidenceAttachment> {
     await this.assertEntityExists(dto.entityType, dto.entityId);
+    const key = idempotencyKey?.trim() || undefined;
+    if (key && key.length > 128) {
+      throw new ValidationError('idempotency_key_too_long', 'Idempotency-Key слишком длинный');
+    }
     const label = dto.label?.trim() || null;
+    const actor = dto.actor ?? 'system';
+    const fingerprint = JSON.stringify({
+      actor,
+      entityType: dto.entityType,
+      entityId: dto.entityId,
+      label,
+      trustedStaffEvidence,
+      inputSha256: createHash('sha256').update(input).digest('hex'),
+    });
+
+    if (key) {
+      const existing = await this.prisma.evidenceUpload.findUnique({ where: { idempotencyKey: key } });
+      if (existing) {
+        if (existing.fingerprint !== fingerprint) {
+          throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован для другого файла');
+        }
+        return {
+          entityType: existing.entityType as EvidenceEntityType,
+          entityId: existing.entityId,
+          asset: existing.asset as unknown as IngestedImage,
+          label: existing.label,
+        };
+      }
+    }
     const prefix = `evidence/${dto.entityType}/${dto.entityId}`;
     const prepared = await this.media.prepareImage(input);
     const objectKey = this.media.createImageKey(prefix);
@@ -39,8 +74,30 @@ export class EvidenceService {
       objectKey,
     );
 
+    let replayed = false;
     try {
-      return await this.audit.transaction(async (tx) => {
+      const result = await this.audit.transaction(async (tx) => {
+        if (key) {
+          // Serialize requests for the same key before the unique insert. Two
+          // clients may upload the bytes concurrently after a network timeout.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`evidence:${key}`}))`;
+          const existing = await tx.evidenceUpload.findUnique({ where: { idempotencyKey: key } });
+          if (existing) {
+            if (existing.fingerprint !== fingerprint) {
+              throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован для другого файла');
+            }
+            replayed = true;
+            return {
+              result: {
+                entityType: existing.entityType as EvidenceEntityType,
+                entityId: existing.entityId,
+                asset: existing.asset as unknown as IngestedImage,
+                label: existing.label,
+              },
+              events: [],
+            };
+          }
+        }
         if (trustedStaffEvidence && dto.entityType === 'exchange') {
           await tx.$queryRaw`SELECT id FROM "ExchangeRequest" WHERE id = ${dto.entityId} FOR UPDATE`;
           const request = await tx.exchangeRequest.findUnique({
@@ -55,12 +112,25 @@ export class EvidenceService {
           }
         }
         await this.mediaCleanup.markRetainedOnTx(tx, asset.key);
+        if (key) {
+          await tx.evidenceUpload.create({
+            data: {
+              idempotencyKey: key,
+              actor,
+              entityType: dto.entityType,
+              entityId: dto.entityId,
+              label,
+              fingerprint,
+              asset: asset as unknown as Prisma.InputJsonValue,
+            },
+          });
+        }
         return {
           result: { entityType: dto.entityType, entityId: dto.entityId, asset, label },
           events: [
             {
               type: EventType.EvidenceAttached,
-              actor: dto.actor ?? 'system',
+              actor,
               payload: {
                 entityType: dto.entityType,
                 entityId: dto.entityId,
@@ -73,6 +143,8 @@ export class EvidenceService {
           ],
         };
       });
+      if (replayed) await this.mediaCleanup.deleteOrSchedule(asset.key);
+      return result;
     } catch (error) {
       await this.mediaCleanup.deleteOrSchedule(asset.key);
       throw error;

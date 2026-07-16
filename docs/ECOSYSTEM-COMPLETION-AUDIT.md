@@ -1,6 +1,6 @@
 # AliStore ecosystem completion audit
 
-Evidence snapshot: 2026-07-16, branch `codex/open-source-integrations`, including
+Evidence snapshot: 2026-07-17, branch `codex/open-source-integrations`, including
 the verified first-store fulfillment, Finance settlement, authoritative refund aggregate and net campaign-attribution iterations. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
@@ -8,13 +8,15 @@ credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 55 NestJS modules including the application root, 39 generated Next routes and 87 Prisma migrations.
-- API/Web production builds, 136/136 Jest suites with 582/582 tests and 46/46 Playwright flows.
+- 53 NestJS modules including the application root, 39 generated Next routes and 100 Prisma migrations.
+- API/Web production builds, 142/142 Jest suites with 651/651 tests and the current Playwright acceptance baseline.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
-- `npm run android:ui` passed on 2026-07-14 with 25/25 connected Compose tests,
+- `npm run android:ui` passed on 2026-07-17 with 31/31 connected Compose tests,
   including owned attendance open/reload. The full `ecosystem:verify:ui` baseline previously passed with 24/24 and is superseded by the current component gates plus the current `ecosystem:verify` run.
-  Physical-device certification remains outside this software gate.
+  Physical-device certification remains outside this software gate. The Evidence
+  upload endpoint now requires a bounded idempotency key and stores the replayed
+  asset contract so a repeated upload emits one Ledger event.
 
 ## Handoff acceptance matrix
 

@@ -15,13 +15,15 @@ final class APIClientTests: XCTestCase {
             entityType: "order",
             entityId: "order-1",
             label: "handover",
-            token: "staff-token"
+            token: "staff-token",
+            idempotencyKey: "ios-evidence-test-1"
         )
 
         XCTAssertEqual(attachment.asset.format, "webp")
         XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "POST")
         XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/evidence/images")
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "ios-evidence-test-1")
         XCTAssertTrue(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
         let multipart = EvidenceMultipart.build(
             imageData: Data([0xff, 0xd8, 0xff, 0xd9]),
