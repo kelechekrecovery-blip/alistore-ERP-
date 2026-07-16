@@ -66,6 +66,8 @@ describe('Finance expenses (integration + RBAC)', () => {
       prisma.supplierInvoiceAdvanceAllocation.deleteMany(),
       prisma.supplierAdvance.deleteMany(),
       prisma.supplierInvoicePayment.deleteMany(),
+      prisma.accountingOpeningBalanceLine.deleteMany(),
+      prisma.accountingOpeningBalance.deleteMany(),
       prisma.accountingJournalLine.deleteMany(),
       prisma.accountingJournalEntry.deleteMany(),
     ]);
@@ -483,6 +485,59 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(response.body.journal.debit).toBe(response.body.journal.credit);
     expect(response.body.balanceSheet.balanced).toBe(true);
     expect(response.body.profitAndLoss.netProfit).toBe(0);
+  });
+
+  it('creates a balanced opening balance once and protects period and idempotency invariants', async () => {
+    const payload = {
+      idempotencyKey: `opening-${run}`,
+      period: '2025-01',
+      documentNumber: `OPENING-${run}`,
+      description: 'Начальные остатки на дату перехода',
+      lines: [
+        { accountCode: '1000', debit: 120_000, credit: 0, memo: 'Касса' },
+        { accountCode: '3000', debit: 0, credit: 120_000, memo: 'Капитал' },
+      ],
+    };
+
+    await request(app.getHttpServer()).get('/finance/opening-balances').expect(401);
+    await request(app.getHttpServer()).post('/finance/opening-balances').set('Authorization', `Bearer ${sellerToken}`).send(payload).expect(403);
+
+    const created = await request(app.getHttpServer())
+      .post('/finance/opening-balances')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(payload)
+      .expect(201);
+    expect(created.body).toMatchObject({ period: '2025-01', documentNumber: payload.documentNumber, idempotent: false });
+    expect(created.body.lines).toEqual(expect.arrayContaining(payload.lines.map((line) => expect.objectContaining(line))));
+    expect(created.body.accountingEntry.lines).toEqual(expect.arrayContaining(payload.lines.map(({ accountCode, debit, credit }) => expect.objectContaining({ accountCode, debit, credit }))));
+
+    const replay = await request(app.getHttpServer())
+      .post('/finance/opening-balances')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(payload)
+      .expect(201);
+    expect(replay.body).toMatchObject({ id: created.body.id, idempotent: true });
+
+    await request(app.getHttpServer())
+      .post('/finance/opening-balances')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...payload, lines: [{ ...payload.lines[0], debit: 130_000 }, { ...payload.lines[1], credit: 130_000 }] })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post('/finance/opening-balances')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...payload, idempotencyKey: `opening-${run}-period-conflict`, documentNumber: `OPENING-${run}-2` })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post('/finance/opening-balances')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...payload, idempotencyKey: `opening-${run}-unbalanced`, period: '2025-02', documentNumber: `OPENING-${run}-3`, lines: [{ accountCode: '1000', debit: 100, credit: 0 }, { accountCode: '3000', debit: 0, credit: 90 }] })
+      .expect(422);
+
+    const rows = await request(app.getHttpServer()).get('/finance/opening-balances').set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(rows.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, period: '2025-01' })]));
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'finance.opening-balance', sourceRef: created.body.id } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'finance.opening_balance.created', refs: { has: created.body.id } } })).toBe(1);
   });
 
   it('imports bank statements with balance control and exposes unmatched lines', async () => {

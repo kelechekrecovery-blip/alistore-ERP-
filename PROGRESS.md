@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003A
+
+- Iteration ID: `ACC-003A`.
+- Task: add immutable opening-balance documents to the Finance accounting control plane.
+- Files changed: `AccountingOpeningBalance` and line Prisma models/migration, Finance DTO/controller/service, replay validation and Finance integration cleanup/regression.
+- Result: owner-approved `YYYY-MM` opening balances require unique active chart-of-account lines with exactly one debit or credit side per line and equal non-zero totals. The API posts one balanced journal entry dated at the period start, binds the document and lines to that entry, locks the period/idempotency boundary, exposes read access and records Event Ledger evidence. Replays return the same document; changed payloads and duplicate periods fail closed.
+- Checks run: `npm run prisma:generate`; `npx prisma validate`; API production build; `prisma migrate deploy` on `alistore_dev`; direct SQL migration on `alistore_test`; targeted Finance integration 13/13; full API Jest 143/143 suites, 658/658 tests; `git diff --check`.
+- Acceptance: `accepted` for the local opening-balance software contour. Payroll journals, fixed assets/depreciation, accountable advances, AR aging, primary-document exports, staging/production deployment and first-store accountant validation remain open. Production readiness remains `RED` because external credentials, devices, provider certification, staging soak and missing design references are not available.
+- Commit: pending.
+- Next step: implement the next bounded `ACC-003` ledger lifecycle slice, prioritizing payroll accrual and payout with immutable journal/Ledger provenance.
+
 ## 2026-07-15 — ACC-002G
 
 - Iteration ID: `ACC-002G`.

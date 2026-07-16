@@ -1725,6 +1725,7 @@ model AccountingAccount {
   system         Boolean                 @default(true)
   active         Boolean                 @default(true)
   lines          AccountingJournalLine[]
+  openingBalanceLines AccountingOpeningBalanceLine[]
   bankStatements BankStatement[]
   payments       Payment[]
   createdAt      DateTime                @default(now())
@@ -1760,6 +1761,7 @@ model AccountingJournalEntry {
   supplierAdvanceAllocation SupplierInvoiceAdvanceAllocation?
   supplierStatementLine    SupplierStatementLine?
   landedCost               LandedCost?
+  openingBalance        AccountingOpeningBalance?
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -1771,6 +1773,35 @@ model AccountingJournalEntry {
   @@unique([sourceType, sourceRef])
   @@index([occurredAt, point])
   @@index([sourceType, occurredAt])
+}
+
+model AccountingOpeningBalance {
+  id                String                   @id @default(cuid())
+  period            String                   @unique
+  documentNumber    String                   @unique
+  idempotencyKey    String                   @unique
+  description       String
+  createdBy         String
+  accountingEntryId String                   @unique
+  accountingEntry   AccountingJournalEntry  @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  lines             AccountingOpeningBalanceLine[]
+  createdAt         DateTime                 @default(now())
+
+  @@index([createdAt])
+}
+
+model AccountingOpeningBalanceLine {
+  id                String                  @id @default(cuid())
+  openingBalance    AccountingOpeningBalance @relation(fields: [openingBalanceId], references: [id], onDelete: Restrict)
+  openingBalanceId  String
+  account           AccountingAccount       @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode       String
+  debit             Int                     @default(0)
+  credit            Int                     @default(0)
+  memo              String?
+
+  @@unique([openingBalanceId, accountCode])
+  @@index([accountCode, openingBalanceId])
 }
 
 model AccountingPeriod {

@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CurrencyRateQueryDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -89,6 +89,18 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   periods() {
     return this.finance.listAccountingPeriods();
+  }
+
+  @Get('opening-balances')
+  @RequirePermission('finance', 'read')
+  openingBalances() {
+    return this.finance.listOpeningBalances();
+  }
+
+  @Post('opening-balances')
+  @RequirePermission('finance', 'approve')
+  openingBalance(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateOpeningBalanceDto) {
+    return this.finance.createOpeningBalance(dto, user.customerId);
   }
 
   @Post('periods/:period/close')

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ExpenseStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -23,6 +24,7 @@ import {
   CurrencyRateQueryDto,
   SETTLEMENT_SOURCE_TYPES,
   SettleTaxPeriodDto,
+  CreateOpeningBalanceDto,
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
 import { expenseAccountingSnapshot } from './expense-accounting';
@@ -58,6 +60,94 @@ export class FinanceService {
 
   listAccountingPeriods() {
     return this.prisma.accountingPeriod.findMany({ orderBy: { period: 'desc' }, take: 120 });
+  }
+
+  listOpeningBalances() {
+    return this.prisma.accountingOpeningBalance.findMany({
+      include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } }, lines: { orderBy: { accountCode: 'asc' } } },
+      orderBy: { period: 'desc' },
+      take: 120,
+    });
+  }
+
+  async createOpeningBalance(dto: CreateOpeningBalanceDto, actor: string) {
+    const period = validateMonth(dto.period);
+    const documentNumber = dto.documentNumber.trim();
+    const description = dto.description.trim();
+    const lines = dto.lines.map((line) => ({
+      accountCode: line.accountCode.trim(),
+      debit: line.debit,
+      credit: line.credit,
+      memo: line.memo?.trim() || null,
+    }));
+    if (new Set(lines.map((line) => line.accountCode)).size !== lines.length) {
+      throw new ValidationError('opening_balance_duplicate_account', 'Счёт может присутствовать в opening balance только один раз');
+    }
+    if (lines.some((line) => (line.debit > 0 && line.credit > 0) || (line.debit === 0 && line.credit === 0))) {
+      throw new ValidationError('opening_balance_line_side_invalid', 'Каждая строка opening balance должна иметь только дебет или кредит');
+    }
+    const debit = lines.reduce((sum, line) => sum + line.debit, 0);
+    const credit = lines.reduce((sum, line) => sum + line.credit, 0);
+    if (!Number.isSafeInteger(debit) || !Number.isSafeInteger(credit) || debit <= 0 || debit !== credit) {
+      throw new ValidationError('opening_balance_unbalanced', 'Opening balance должен быть сбалансирован и больше нуля');
+    }
+    const fingerprint = { period, documentNumber, description, lines: [...lines].sort((a, b) => a.accountCode.localeCompare(b.accountCode)) };
+    const existing = await this.prisma.accountingOpeningBalance.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { accountingEntry: { include: { lines: true } }, lines: true },
+    });
+    if (existing) return replayOpeningBalance(existing, fingerprint);
+
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`opening-balance:${period}`}))`;
+        const replay = await tx.accountingOpeningBalance.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+          include: { accountingEntry: { include: { lines: true } }, lines: true },
+        });
+        if (replay) return { result: replayOpeningBalance(replay, fingerprint), events: [] };
+        const periodExisting = await tx.accountingOpeningBalance.findUnique({ where: { period }, select: { id: true, documentNumber: true } });
+        if (periodExisting) throw new ConflictError('opening_balance_period_exists', `Opening balance за период ${period} уже создан`);
+
+        const openingBalanceId = randomUUID();
+        const occurredAt = periodBounds(period)[0];
+        const entry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:opening-balance:${openingBalanceId}`,
+          sourceType: 'finance.opening-balance',
+          sourceRef: openingBalanceId,
+          description,
+          occurredAt,
+          createdBy: actor,
+          lines: lines.map((line) => ({ accountCode: line.accountCode, debit: line.debit, credit: line.credit, memo: line.memo })),
+        });
+        const document = await tx.accountingOpeningBalance.create({
+          data: {
+            id: openingBalanceId,
+            period,
+            documentNumber,
+            idempotencyKey: dto.idempotencyKey,
+            description,
+            createdBy: actor,
+            accountingEntryId: entry.id,
+            lines: { create: lines },
+          },
+          include: { accountingEntry: { include: { lines: true } }, lines: { orderBy: { accountCode: 'asc' } } },
+        });
+        return {
+          result: { ...document, idempotent: false },
+          events: [
+            { type: 'finance.opening_balance.created', actor, payload: { openingBalanceId, period, documentNumber, amount: debit, lineCount: lines.length, accountingEntryId: entry.id }, refs: [openingBalanceId, entry.id, period] },
+            { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: entry.id, sourceType: 'finance.opening-balance', sourceRef: openingBalanceId, amount: debit }, refs: [entry.id, openingBalanceId, period] },
+          ],
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replay = await this.prisma.accountingOpeningBalance.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { accountingEntry: { include: { lines: true } }, lines: true } });
+        if (replay) return replayOpeningBalance(replay, fingerprint);
+      }
+      throw error;
+    }
   }
 
   listCurrencyRates(query: CurrencyRateQueryDto) {
@@ -1190,6 +1280,24 @@ function replayExpense(
     && (!input.incurredAt || expense.incurredAt.toISOString() === input.incurredAt.toISOString());
   if (!same) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим расходом');
   return { ...expense, idempotent: true };
+}
+
+function replayOpeningBalance(
+  document: Prisma.AccountingOpeningBalanceGetPayload<{ include: { accountingEntry: { include: { lines: true } }; lines: true } }>,
+  input: { period: string; documentNumber: string; description: string; lines: Array<{ accountCode: string; debit: number; credit: number; memo: string | null }> },
+) {
+  const actual = {
+    period: document.period,
+    documentNumber: document.documentNumber,
+    description: document.description,
+    lines: document.lines
+      .map((line) => ({ accountCode: line.accountCode, debit: line.debit, credit: line.credit, memo: line.memo }))
+      .sort((left, right) => left.accountCode.localeCompare(right.accountCode)),
+  };
+  if (stableJson(actual) !== stableJson(input)) {
+    throw new ConflictError('opening_balance_idempotency_conflict', 'Ключ opening balance уже использован для других данных');
+  }
+  return { ...document, idempotent: true };
 }
 
 function replayCurrencyRate(

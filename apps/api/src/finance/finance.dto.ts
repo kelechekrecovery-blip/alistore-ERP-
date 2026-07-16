@@ -111,6 +111,22 @@ export class CloseAccountingPeriodDto {
   @IsIn(['soft_closed', 'hard_closed']) status!: 'soft_closed' | 'hard_closed';
 }
 
+export class CreateOpeningBalanceLineDto {
+  @IsString() @Matches(/^\d{4}$/) accountCode!: string;
+  @IsInt() @Min(0) @Max(2147483647) debit!: number;
+  @IsInt() @Min(0) @Max(2147483647) credit!: number;
+  @IsOptional() @IsString() @MaxLength(240) memo?: string;
+}
+
+export class CreateOpeningBalanceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
+  @IsString() @MinLength(1) @MaxLength(128) @Matches(/\S/) documentNumber!: string;
+  @IsString() @MinLength(3) @MaxLength(500) @Matches(/\S/) description!: string;
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => CreateOpeningBalanceLineDto)
+  lines!: CreateOpeningBalanceLineDto[];
+}
+
 export class SettleTaxPeriodDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsOptional() @IsString() @MaxLength(100) point?: string;
