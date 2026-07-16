@@ -30,6 +30,7 @@
     "launch:readiness": "npm run readiness -w @alistore/api -- --env-file .env.production",
     "launch:readiness:strict": "npm run readiness -w @alistore/api -- --env-file .env.production --strict-external",
     "mvp:verify": "node scripts/mvp-verify.mjs",
+    "inventory:valuation:benchmark": "npm run api:build && npm run benchmark:inventory-valuation -w @alistore/api",
     "ecosystem:component-verify": "node scripts/ecosystem-verify.mjs",
     "ecosystem:verify": "node scripts/ecosystem-verify.mjs",
     "ecosystem:verify:ui": "node scripts/ecosystem-verify.mjs --native-ui",

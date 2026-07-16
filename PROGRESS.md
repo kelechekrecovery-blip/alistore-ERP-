@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — INV-VAL-001I (local benchmark)
+
+- Iteration ID: `INV-VAL-001I`.
+- Task: add a reproducible performance harness for the database-side valuation roll-forward.
+- Files changed: root/API benchmark commands, temporary test-only database benchmark script, backlog/progress evidence.
+- Result: the harness applies the complete migration history to an isolated database, generates 36 months of synthetic product/location valuation history with 27,648 layer/issue rows, executes the production roll-forward twice under `RepeatableRead`, compares the complete summary and rows, and removes the database even after failure. Default budgets are 5,000 ms and 256 MB RSS delta and can be overridden for staging without changing code.
+- Checks run: `npm run inventory:valuation:benchmark` passed with `81ms`, `4MB` RSS delta, `48` report rows, `complete=true`, `consistent=true`, `repeatableReadStable=true`; `git diff --check`.
+- Acceptance: `partial` for local performance/correctness evidence. `INV-VAL-001I` still requires the same command against a production-shaped staging database with an agreed latency/memory budget; no staging or production readiness claim is made.
+- Next step: run this harness against staging-shaped data when staging access is available, then continue `ACC-003`/`AP-001` or the next locally unblocked ERP slice.
+
 # 2026-07-17 — INV-VAL-001H
 
 - Iteration ID: `INV-VAL-001H`.
@@ -8,7 +18,7 @@
 - Result: deployment now blocks before post-deploy work when any owned valuation issue or reversal has a `NULL`, empty or `UNKNOWN` location. A clean database applies `NOT NULL` to issue locations and CHECK constraints to both issue and reversal locations; new/legacy ambiguous rows cannot re-enter the valuation subledger. The migration remains intentionally fail-closed for rolling deployments and does not guess a location from incomplete history.
 - Checks run: Prisma schema validation; Prisma Client generation; dev `prisma migrate deploy`; location preflight (`unknownIssueLocations=0`, `unknownReversalLocations=0`); inventory roll-forward clean/rolling upgrade test; `git diff --check`.
 - Acceptance: `accepted` for the local schema/deployment software gate. Staging/production still require draining all pre-roll-forward API instances, executing the same migration against a production-shaped snapshot and observing the preflight; `INV-VAL-001I` performance certification, provider/device gates and overall production readiness remain open.
-- Next step: run staging-shaped valuation performance certification (`INV-VAL-001I`) or continue the next finance/accounting slice while preserving the external launch blockers.
+- Next step: run the committed valuation performance harness, then repeat it against a staging-shaped database before accepting `INV-VAL-001I`.
 
 # 2026-07-17 — ACC-003G
 
