@@ -42,9 +42,10 @@ import { LogisticsView } from '@/components/erp/LogisticsView';
 import { ServiceCenterView } from '@/components/erp/ServiceCenterView';
 import { StorefrontView } from '@/components/erp/StorefrontView';
 import { AdminView } from '@/components/erp/AdminView';
+import { StoreOperationsView } from '@/components/erp/StoreOperationsView';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
-type Route = 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'service' | 'kpi' | 'crm' | 'campaigns' | 'storefront' | 'risks' | 'readiness' | 'ledger';
+type Route = 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns' | 'storefront' | 'risks' | 'readiness' | 'ledger';
 
 const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
@@ -53,6 +54,7 @@ const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'finance', icon: '💰', label: 'Финансы' },
   { id: 'hr', icon: '◫', label: 'HR · Смены' },
   { id: 'logistics', icon: '⌖', label: 'Логистика' },
+  { id: 'operations', icon: '✓', label: 'Операции точки' },
   { id: 'service', icon: '⚒', label: 'Сервис-центр' },
   { id: 'kpi', icon: '📈', label: 'Маржа · KPI' },
   { id: 'crm', icon: '💬', label: 'CRM · Инбокс' },
@@ -76,6 +78,7 @@ const TITLES: Record<Route, [string, string]> = {
   finance: ['Финансы', 'Деньги · P&L'],
   hr: ['Команда', 'График смен · табель · отсутствия'],
   logistics: ['Логистика', 'Зоны · слоты · маршруты'],
+  operations: ['Операции точки', 'Открытие · закрытие · инциденты'],
   service: ['Сервис-центр', 'Очередь · диагностика · сметы'],
   kpi: ['Маржа · KPI', 'Валовая маржа, средний чек, топ-товары'],
   stock: ['Склад', 'Остатки по статусам'],
@@ -356,6 +359,7 @@ export default function ErpPage() {
           {route === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
           {route === 'hr' && <HrView accessToken={session.accessToken} />}
           {route === 'logistics' && <LogisticsView accessToken={session.accessToken} />}
+          {route === 'operations' && <StoreOperationsView accessToken={session.accessToken} />}
           {route === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} role={session.role} />}
           {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {route === 'stock' && <StockView d={d} accessToken={session.accessToken} role={session.role} staffId={session.staffId} />}

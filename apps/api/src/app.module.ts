@@ -52,6 +52,7 @@ import { StorefrontModule } from './storefront/storefront.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.module';
 import { RefundsModule } from './refunds/refunds.module';
+import { StoreOperationsModule } from './store-operations/store-operations.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { RefundsModule } from './refunds/refunds.module';
     PromotionsModule,
     StorefrontBlocksModule,
     RefundsModule,
+    StoreOperationsModule,
   ],
 })
 export class AppModule {}

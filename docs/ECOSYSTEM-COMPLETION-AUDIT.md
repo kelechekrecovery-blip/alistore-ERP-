@@ -39,7 +39,7 @@ credentials, legal approval or physical hardware.
 | Logistics management | Partial | authoritative store/pickup points, point-local inventory reservation, exact guest address, ERP zones/slots/capacity, row-locked checkout reservation, cancellation release, dispatch board, courier assignment, route states, Evidence and COD handover | route optimization, rescheduling and live tracking |
 | Marketing CMS | Implemented | revisioned copy plus ordered storefront blocks, targeting/scheduling, approved review moderation, managed promotions, consent-filtered recipients, approved campaign lifecycle, four-eye budget approval, campaign-linked Outbox, owner-reconciled actual spend, budget auto-pause, server tracking codes, first/last UTM, hashed funnel and payment/refund-bound net ROAS with RBAC/Ledger and ERP/site E2E | production media, live channel/ad-platform certification and automated provider spend import |
 | Project overview | Reference | architecture/readiness/progress documents | keep generated facts synchronized with actual gates |
-| Store operations | Missing | cash shift and Evidence primitives only | opening/closing checklists, incidents, safety/security exceptions and escalation UI/API |
+| Store operations | Partial | `/erp` opening/closing checklists with server-owned templates, point/date scope, staff JWT identity, idempotency command ledger, incident register, RBAC resolution and Event Ledger events; API and Playwright acceptance | Evidence attachment, safety/security exception escalation, physical first-store opening/closing UAT and exact linked handoff visual acceptance |
 | Service center | Partial | warranty/paid intake, dedicated service/technician roles, diagnostics/customer approval, point-scoped POS settlement, store-owned parts, assigned repair lifecycle, automatic SLA breach Ledger, closure, 30-day repair warranty and DeviceUnit-backed loaner issue/return/Evidence/overdue custody | exact detail pixel acceptance remains blocked by absent linked handoffs; physical first-store service UAT remains |
 | Warehouse accounting | Partial | serialized IMEI plus quantity receive/count/transfer/approved adjustment, atomic quantity reservation/sale/release, line-level refund-bound quantity/direct/bundle IMEI restock, serialized and quantity consignment ownership/accrual/payout/partial-return compensation, procurement and bundles | completeness, missort and markdown workflows |
 | Staff App 2.0 | Partial | order/tasks/customer/support/warranty/scanner/Evidence plus owned schedule/attendance/offline replay on both platforms | complete visual acceptance, iOS app-level XCUITest and physical push/scanner/camera gate |
@@ -87,7 +87,7 @@ reconciled ecosystem E2E.
 ## Ordered remaining work
 
 1. Run first-store payroll/logistics/shift UAT and physical Staff device certification; native attendance software is complete, while route optimization/live tracking remain later scope.
-2. Complete the remaining service-center lifecycle, then add store operations, CMS, analytics and legal Waves B.
+2. Complete the remaining service-center lifecycle, then finish store-operations escalation/evidence and continue CMS, analytics and legal Waves B.
 3. Add franchise, advertising, referrals/Q&A, WhatsApp and production AI Waves C.
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.
 5. Add one cross-surface ecosystem E2E with database/Ledger reconciliation assertions.

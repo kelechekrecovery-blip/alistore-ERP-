@@ -208,6 +208,11 @@ export const EventType = {
   DeliverySlotCreated: 'logistics.slot_created',
   StorePointCreated: 'logistics.store_point_created',
   StorePointUpdated: 'logistics.store_point_updated',
+  StoreChecklistCreated: 'store.checklist_created',
+  StoreChecklistItemChecked: 'store.checklist_item_checked',
+  StoreChecklistCompleted: 'store.checklist_completed',
+  StoreIncidentCreated: 'store.incident_created',
+  StoreIncidentResolved: 'store.incident_resolved',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

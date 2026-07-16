@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — STORE-OPS-001
+
+- Iteration ID: `STORE-OPS-001`.
+- Task: add the opening/closing checklist and incident register vertical to ERP Store Operations.
+- Files changed: Store Operations Prisma models/migration, API module/DTO/service/controller, RBAC and Event Ledger event types, typed web API, ERP operations view, browser helpers and API/Playwright acceptance suites.
+- Result: the API creates server-owned opening and closing templates per point/date, accepts only the staff identity from the active JWT, rejects incomplete or completed checklist mutations, records incidents and restricts resolution to the `resolve` permission. Every mutation has a stable `Idempotency-Key`, replay/conflict protection in `StoreOperationCommand` and Event Ledger evidence. `/erp` renders point/date-scoped summaries, checklist progress, completion state and incident resolution controls.
+- Checks run: Prisma format/validation, dev migration deploy, isolated test database migration reset, Store Operations API `2/2`, API production build, Web production build with 39 routes, Store Operations Playwright `1/1`, `git diff --check`.
+- Acceptance: `accepted` for the local Store Operations software vertical. Evidence attachment, safety/security escalation, physical opening/closing UAT, live provider certification, staging/restore and full ecosystem visual/native gates remain open; production readiness remains `RED`.
+- Next step: continue the next locally unblocked ERP/native parity slice while keeping external launch blockers explicit.
+
 # 2026-07-17 — ACC-003H
 
 - Iteration ID: `ACC-003H`.

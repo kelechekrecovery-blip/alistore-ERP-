@@ -413,6 +413,29 @@ enum StorefrontBlockStatus {
   archived
 }
 
+enum StoreChecklistType {
+  opening
+  closing
+}
+
+enum StoreChecklistStatus {
+  open
+  completed
+}
+
+enum StoreIncidentSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum StoreIncidentStatus {
+  open
+  investigating
+  resolved
+}
+
 enum StorefrontBlockDevice {
   all
   desktop
@@ -736,6 +759,72 @@ model StorePointCommand {
   createdAt      DateTime   @default(now())
 
   @@index([storePointId, createdAt])
+}
+
+model StoreOperationChecklist {
+  id             String                        @id @default(cuid())
+  point          String
+  businessDate   DateTime                      @db.Date
+  type           StoreChecklistType
+  status         StoreChecklistStatus          @default(open)
+  startedBy      String
+  completedBy    String?
+  completedAt    DateTime?
+  idempotencyKey String                        @unique
+  items          StoreOperationChecklistItem[]
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  @@unique([point, businessDate, type])
+  @@index([point, businessDate, status])
+}
+
+model StoreOperationChecklistItem {
+  id          String                  @id @default(cuid())
+  checklist   StoreOperationChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  checklistId String
+  code        String
+  label       String
+  required    Boolean                 @default(true)
+  checked     Boolean                 @default(false)
+  checkedBy   String?
+  checkedAt   DateTime?
+  note        String?
+
+  @@unique([checklistId, code])
+  @@index([checklistId, checked])
+}
+
+model StoreIncident {
+  id             String                @id @default(cuid())
+  point          String
+  businessDate   DateTime              @db.Date
+  category       String
+  severity       StoreIncidentSeverity
+  status         StoreIncidentStatus   @default(open)
+  title          String
+  description    String
+  resolution     String?
+  createdBy      String
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  idempotencyKey String                @unique
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([point, businessDate, status])
+  @@index([severity, status])
+}
+
+model StoreOperationCommand {
+  idempotencyKey String   @id
+  resourceType   String
+  resourceId     String
+  fingerprint    String
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([resourceType, resourceId, createdAt])
 }
 
 model PromotionCode {
