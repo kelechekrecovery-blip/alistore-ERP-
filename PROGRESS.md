@@ -2280,3 +2280,12 @@
 - Checks run: Android `:core:compileDebugKotlin`, `:core:compileDebugAndroidTestKotlin` and `:core:testDebugUnitTest` passed; connected trade-in UI test passed `1/1`; `git diff --check` passed.
 - Outcome: Android trade-in evidence selection/upload is wired and emulator-verified. The current shared picker retries a failed upload by user action but does not yet attach a persistent evidence idempotency key; iOS evidence parity and physical-device camera/upload checks remain open.
 - Next step: mirror the evidence action in SwiftUI and then add a server-side idempotency contract for evidence uploads before broadening native parity.
+
+## 2026-07-17
+
+- Task: connect iOS Client trade-in cards to the customer Evidence Vault photo picker.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: each server-owned trade-in card now exposes PhotosPicker, uploads the selected image as `entityType=tradein`, displays the private Evidence Vault success/error state, and reuses the existing customer JWT and server ownership guard. Also corrected the card's literal grade/passport/IMEI labels to render their actual values.
+- Checks run: Client simulator build passed; `AliStoreUITests` Client-only test plan passed; `git diff --check` passed. Xcode emitted only the existing LLDB debugger-version-store warning during UI execution.
+- Outcome: iOS and Android trade-in evidence selection/upload now have native software parity. Evidence upload idempotency, persistent queued evidence replay, physical camera/device checks, live providers and store release remain open.
+- Next step: harden `/evidence/images` with an idempotency contract and replay tests before expanding native parity to the next unresolved account route.

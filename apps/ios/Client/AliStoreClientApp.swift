@@ -1,4 +1,5 @@
 import AliStoreCore
+import PhotosUI
 import SwiftData
 import SwiftUI
 import UIKit
@@ -1181,7 +1182,7 @@ private struct CustomerTradeInsView: View {
                             )
                         } else {
                             ForEach(tradeIns) { tradeIn in
-                                CustomerTradeInCard(tradeIn: tradeIn)
+                                CustomerTradeInCard(tradeIn: tradeIn, environment: environment, auth: auth)
                             }
                         }
 
@@ -1231,6 +1232,11 @@ private struct CustomerTradeInsView: View {
 
 private struct CustomerTradeInCard: View {
     let tradeIn: CustomerTradeIn
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var isUploadingEvidence = false
+    @State private var evidenceMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1254,22 +1260,75 @@ private struct CustomerTradeInCard: View {
                     .foregroundStyle(ClientTheme.lime)
             }
             HStack {
-                Text("Состояние: (tradeIn.grade)")
+                Text("Состояние: \(tradeIn.grade)")
                 Spacer()
-                Text("Паспорт (tradeIn.sellerPassportMasked)")
+                Text("Паспорт \(tradeIn.sellerPassportMasked)")
             }
             .font(ClientTheme.body(11))
             .foregroundStyle(ClientTheme.muted)
             if let imei = tradeIn.imei, !imei.isEmpty {
-                Text("IMEI (imei)")
+                Text("IMEI \(imei)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(ClientTheme.muted)
+            }
+            PhotosPicker(selection: $selectedPhoto, matching: .images, photoLibrary: .shared()) {
+                Label("Добавить фото устройства", systemImage: "camera.fill")
+                    .font(ClientTheme.body(12, weight: .semibold))
+                    .foregroundStyle(ClientTheme.lime)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .disabled(isUploadingEvidence)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tradein-evidence-\(tradeIn.id)")
+            if isUploadingEvidence {
+                ProgressView("Загружаем фото…")
+                    .tint(ClientTheme.lime)
+                    .font(ClientTheme.body(11))
+            }
+            if let evidenceMessage {
+                Text(evidenceMessage)
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(evidenceMessage == "Фото добавлено в Evidence Vault" ? ClientTheme.lime : ClientTheme.coral)
             }
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else { return }
+            Task { await uploadEvidence(item) }
+        }
+    }
+
+    @MainActor
+    private func uploadEvidence(_ item: PhotosPickerItem) async {
+        isUploadingEvidence = true
+        evidenceMessage = nil
+        defer {
+            isUploadingEvidence = false
+            selectedPhoto = nil
+        }
+        do {
+            guard let imageData = try await item.loadTransferable(type: Data.self) else {
+                throw APIError.invalidResponse
+            }
+            guard let token = auth.session?.accessToken else {
+                throw APIError.rejected(status: 401, message: "Войдите в аккаунт, чтобы прикрепить фото")
+            }
+            _ = try await APIClient(baseURL: environment.apiBaseURL).uploadEvidence(
+                imageData: imageData,
+                entityType: "tradein",
+                entityId: tradeIn.id,
+                label: "tradein_device",
+                token: token
+            )
+            evidenceMessage = "Фото добавлено в Evidence Vault"
+        } catch is CancellationError {
+        } catch {
+            evidenceMessage = "Не удалось загрузить фото: \(error.localizedDescription)"
+        }
     }
 }
 
