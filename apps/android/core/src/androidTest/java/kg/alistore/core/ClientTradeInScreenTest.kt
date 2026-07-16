@@ -63,6 +63,9 @@ private class UiTradeInsGateway(
 
   override suspend fun tradeIns(token: String) = emptyList<CustomerTradeIn>()
 
+  override suspend fun uploadEvidence(entityType: String, entityId: String, fileName: String, mimeType: String, bytes: ByteArray, token: String) =
+    EvidenceAttachment("evidence/tradein/$entityId/photo.webp", "https://media.alistore.kg/evidence.webp")
+
   override suspend fun createTradeIn(request: CreateTradeInRequest, token: String, idempotencyKey: String): CustomerTradeIn {
     openKeys += idempotencyKey
     requests += CustomerTradeInRequestSnapshot("customer-1", request)

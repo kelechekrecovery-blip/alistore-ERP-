@@ -49,7 +49,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
-interface CustomerTradeInsGateway {
+interface CustomerTradeInsGateway : CustomerEvidenceGateway {
   suspend fun tradeIns(token: String): List<CustomerTradeIn>
   suspend fun createTradeIn(request: CreateTradeInRequest, token: String, idempotencyKey: String): CustomerTradeIn
 }
@@ -137,6 +137,15 @@ internal fun ClientTradeInsScreen(
           Text(created!!.contractId ?: "Договор формируется", color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(top = 7.dp))
           Text("${created!!.model} · ${created!!.price} сом · класс ${created!!.grade}", color = TradeInMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
           Text("Паспорт хранится защищённо: ${created!!.sellerPassportMasked}", color = TradeInMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+          CustomerEvidencePicker(
+            entityType = "tradein",
+            entityId = created!!.id,
+            session = session,
+            gateway = gateway,
+            authManager = authManager,
+            onAuthState = onAuthState,
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+          )
           Button(onClick = { created = null; rotateCommand() }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp), colors = ButtonDefaults.buttonColors(containerColor = TradeInLime, contentColor = TradeInInk), shape = RoundedCornerShape(8.dp)) { Text("Новая оценка") }
         }
       }

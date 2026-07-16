@@ -2271,3 +2271,12 @@
 - Checks run: Android `:core:compileDebugKotlin` and `:core:testDebugUnitTest` passed; `:core:compileDebugAndroidTestKotlin` passed; connected `ClientTradeInScreenTest` passed `1/1`; `git diff --check` passed. The required JDK 17 was supplied by the already-installed Homebrew `openjdk@17` runtime because the shell had no default Java runtime.
 - Outcome: Android Client trade-in software is implemented and emulator-verified. Evidence camera upload/retry, process-level draft restoration, physical-device biometrics/network checks, live providers and store release remain open.
 - Next step: add native trade-in evidence capture/retry and then move to the next unblocked Android Client parity route.
+
+## 2026-07-17
+
+- Task: connect Android Client trade-in submissions to the customer Evidence Vault picker.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/ClientTradeInScreen.kt`, `apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt`.
+- Result: after a server-created trade-in, the signed-in customer can select an image for the `tradein` entity; the existing customer ownership guard, JWT refresh retry and private Evidence response are reused. The UI does not fabricate an evidence status and keeps the server response as the source of truth.
+- Checks run: Android `:core:compileDebugKotlin`, `:core:compileDebugAndroidTestKotlin` and `:core:testDebugUnitTest` passed; connected trade-in UI test passed `1/1`; `git diff --check` passed.
+- Outcome: Android trade-in evidence selection/upload is wired and emulator-verified. The current shared picker retries a failed upload by user action but does not yet attach a persistent evidence idempotency key; iOS evidence parity and physical-device camera/upload checks remain open.
+- Next step: mirror the evidence action in SwiftUI and then add a server-side idempotency contract for evidence uploads before broadening native parity.
