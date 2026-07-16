@@ -1942,3 +1942,12 @@
 - Checks run: Node syntax for recorder/auditor; dirty-source negative test correctly refused to run; audit retained native GAP before committed artifacts; tracked-secret scan; `git diff --check`. Independent review found an npm option-parsing bypass plus freshness, concurrent publication, rollback and symlink-path gaps; all were addressed before commit. No gate artifact is claimed by this tooling iteration because the recorder itself must first be committed into the source-tree hash.
 - Outcome: evidence generation is now repeatable and fail-closed, but iOS/Android gates remain `partial` until rerun on this clean committed SHA and their generated artifacts are committed.
 - Next step: record and commit `ios-app-ui`, then record and commit `android-app-ui` on the still-running API 36 AVD; rerun ecosystem audit after each evidence commit.
+
+## 2026-07-16
+
+- Task: record durable `ios-app-ui` acceptance evidence on clean source commit `c1c487f`.
+- Files changed: ecosystem evidence manifest and immutable content-addressed iOS result artifact; progress record.
+- Result: the aggregate scheme rebuilt, installed and launched AliStore Client, Staff, Courier and POS on the iPhone 17 Pro simulator. Client proved the packaged four-tab shell; Staff, Courier and POS proved their role-specific signed-out login surfaces. All four XCUITest bundles passed and the recorder bound the result to the exact source tree, package command, source commit, Node and Xcode versions.
+- Checks run: `npm run ecosystem:evidence -- ios-app-ui`; XCUITest 4/4; artifact SHA-256 independently matched its filename and manifest. The audit correctly retained GAP before this artifact commit because uncommitted evidence is never accepted.
+- Outcome: durable iOS packaged cold-launch evidence is recorded. This remains launch/role-shell coverage only and does not certify OTP, checkout, operations, push, camera, maps, offline replay, hardware or a physical iPhone.
+- Next step: commit this evidence, confirm the iOS audit gate passes from the clean tree, then record the Android packaged gate on the API 36 emulator.

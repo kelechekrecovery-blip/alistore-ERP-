@@ -9,10 +9,16 @@
       "artifacts": []
     },
     "ios-app-ui": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "ios:ui",
-      "command": null,
-      "artifacts": []
+      "command": "npm run ios:ui",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/ios-app-ui-c9979ec18d9f731a49b4780fb30ad195f9d55f376722a45e04558b5b8006221c.json",
+          "sha256": "c9979ec18d9f731a49b4780fb30ad195f9d55f376722a45e04558b5b8006221c"
+        }
+      ]
     },
     "android-app-ui": {
       "status": "partial",
