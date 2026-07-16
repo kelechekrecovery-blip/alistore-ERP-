@@ -2155,3 +2155,10 @@
 - Checks run: Playwright `1/1`; artifact SHA-256 `249efacb75bd8f48fe257baeec950691963bd499413dca0e773fcf0dff7376ed`; trusted recorder exited zero.
 - Outcome: Web COD, warehouse, courier and handover evidence is current again.
 - Next step: commit and refresh service/loaner.
+
+## 2026-07-16
+
+- Task: refresh `service-loaner-reconciliation` on the visual-contract source hash.
+- Checks run: API `3/3` suites and `9/9` tests; Playwright `3/3`; artifact SHA-256 `173ee9ecfe6983169f11c6508a79ac9b34655e2788b2918d5210a1f17d9d46e4`; trusted recorder exited zero.
+- Outcome: warranty, paid service and loaner custody evidence is current again.
+- Next step: commit and refresh procurement/sale.
