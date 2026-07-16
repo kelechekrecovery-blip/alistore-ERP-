@@ -22,6 +22,9 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
   await expect(controls.getByText('Исходящий НДС').first()).toBeVisible();
   await expect(controls.getByRole('heading', { name: 'Налоговый период' })).toBeVisible();
   await expect(controls.getByRole('heading', { name: /Дебиторка/ })).toBeVisible();
+  const journalDownload = page.waitForEvent('download');
+  await controls.getByRole('button', { name: 'Скачать журнал CSV' }).click();
+  await expect((await journalDownload).suggestedFilename()).toMatch(/^alistore-journal-\d{4}-\d{2}\.csv$/);
 
   const period = new Date().toISOString().slice(0, 7);
   const planning = page.locator('section[aria-labelledby="finance-plan-title"]');

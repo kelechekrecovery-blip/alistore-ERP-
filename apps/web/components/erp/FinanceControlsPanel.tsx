@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { closeAccountingPeriod, fetchAccountingPeriods, fetchBankStatements, fetchCashIncassations, fetchCustomerAging, fetchFinancialStatements, fetchSupplierAging, fetchTaxPeriod, settleTaxPeriod, type AccountingPeriod, type ArAgingReport, type BankStatementSummary, type CashIncassation, type FinancialStatements, type SupplierAgingReport, type TaxPeriodReport } from '@/lib/api';
+import { closeAccountingPeriod, downloadAccountingJournal, fetchAccountingPeriods, fetchBankStatements, fetchCashIncassations, fetchCustomerAging, fetchFinancialStatements, fetchSupplierAging, fetchTaxPeriod, settleTaxPeriod, type AccountingPeriod, type ArAgingReport, type BankStatementSummary, type CashIncassation, type FinancialStatements, type SupplierAgingReport, type TaxPeriodReport } from '@/lib/api';
 import { som } from '@/lib/format';
 
 export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
@@ -19,6 +19,7 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [action, setAction] = useState<'idle' | 'soft' | 'tax' | 'hard'>('idle');
   const [notice, setNotice] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const reload = useCallback(() => {
     setState('loading');
@@ -51,6 +52,25 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
     }
   };
 
+  const exportJournal = async () => {
+    setExporting(true);
+    setNotice('');
+    try {
+      const blob = await downloadAccountingJournal(period, point, accessToken);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `alistore-journal-${period}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice('Журнал скачан.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Не удалось скачать журнал');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <section aria-labelledby="finance-controls-title" className="border-b border-[#2E2822] pb-5">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -60,6 +80,7 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
           <label className="text-[11px] text-[#8A7F76]">AR на дату<input aria-label="Дата AR" type="date" value={arDate} onChange={(event) => setArDate(event.target.value)} className="mt-1 block h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-xs text-white" /></label>
           <label className="text-[11px] text-[#8A7F76]">Точка<input aria-label="Точка отчетов" value={point} onChange={(event) => setPoint(event.target.value)} placeholder="Все точки" className="mt-1 block h-9 w-32 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-3 text-xs text-white" /></label>
           <button type="button" onClick={reload} className="h-9 self-end rounded-[6px] border border-[#3A332C] px-3 text-xs text-[#D8CFC6] hover:border-[#C6FF3D] hover:text-[#C6FF3D]">Обновить</button>
+          <button type="button" onClick={exportJournal} disabled={exporting} className="h-9 self-end rounded-[6px] bg-[#C6FF3D] px-3 text-xs font-bold text-[#111] disabled:opacity-40">{exporting ? 'Готовим CSV…' : 'Скачать журнал CSV'}</button>
         </div>
       </div>
       {state === 'error' && <div className="mb-3 rounded-[6px] border border-[#6B3B32] bg-[#321F1A] px-3 py-2 text-xs text-[#FFB5AA]">Часть учетных данных недоступна для этой роли или сервиса.</div>}

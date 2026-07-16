@@ -41,6 +41,12 @@ const EXPENSE_INCLUDE = {
   exchangeRate: { select: { id: true, currency: true, baseCurrency: true, rateMicros: true, effectiveAt: true, source: true } },
 } satisfies Prisma.ExpenseInclude;
 
+function csvCell(value: unknown) {
+  const text = value instanceof Date ? value.toISOString() : value === null || value === undefined ? '' : String(value);
+  const safeText = typeof value === 'string' && /^[-=+@]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replaceAll('"', '""')}"`;
+}
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -979,6 +985,30 @@ export class FinanceService {
     const row = report.rows.find((candidate) => candidate.id === id);
     if (!row) throw new ValidationError('ar_document_not_found', `Долг ${id} не найден на выбранную дату`);
     return { asOf: report.asOf, ...row };
+  }
+
+  async accountingJournalExport(query: FinanceAccountingQueryDto) {
+    const entries = await this.accountingJournal(query);
+    const headers = ['entry_id', 'source_type', 'source_ref', 'description', 'point', 'currency', 'document_amount', 'tax_amount', 'occurred_at', 'posted_at', 'created_by', 'account_code', 'account_name', 'debit', 'credit', 'memo'];
+    const rows = entries.flatMap((entry) => entry.lines.map((line) => [
+      entry.id,
+      entry.sourceType,
+      entry.sourceRef,
+      entry.description,
+      entry.point,
+      entry.currency,
+      entry.documentAmount,
+      entry.taxAmount,
+      entry.occurredAt,
+      entry.postedAt,
+      entry.createdBy,
+      line.accountCode,
+      line.account.name,
+      line.debit,
+      line.credit,
+      line.memo,
+    ]));
+    return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
   }
 
   async reverseAccountingEntry(id: string, dto: ReverseAccountingEntryDto, actor: string) {

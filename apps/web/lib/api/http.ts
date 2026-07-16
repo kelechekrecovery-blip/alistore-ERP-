@@ -109,3 +109,13 @@ export async function getJson<T>(path: string, accessToken: string): Promise<T> 
   if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
 }
+
+/** Authenticated binary download for server-generated documents. */
+export async function getAuthBlob(path: string, accessToken: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw await responseError(res);
+  return res.blob();
+}

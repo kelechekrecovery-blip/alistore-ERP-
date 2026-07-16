@@ -1,4 +1,4 @@
-import { getJson, postAuthJson } from './http';
+import { getAuthBlob, getJson, postAuthJson } from './http';
 
 export type ExpenseStatus = 'submitted' | 'approved' | 'rejected' | 'paid';
 
@@ -318,6 +318,9 @@ export const fetchCustomerAging = (asOf: string, accessToken: string) => {
   const query = new URLSearchParams({ asOf: new Date(`${asOf}T23:59:59.999Z`).toISOString() });
   return getJson<ArAgingReport>(`/finance/ar-aging?${query.toString()}`, accessToken);
 };
+
+export const downloadAccountingJournal = (period: string, point: string, accessToken: string) =>
+  getAuthBlob(`/finance/journal/export?${accountingRange(period, point)}`, accessToken);
 
 export const fetchBankStatements = (accessToken: string) =>
   getJson<BankStatementSummary[]>('/finance/bank-statements', accessToken);

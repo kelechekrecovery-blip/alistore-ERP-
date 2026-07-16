@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -191,6 +192,17 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'read')
   journal(@Query() query: FinanceAccountingQueryDto) {
     return this.finance.accountingJournal(query);
+  }
+
+  @Get('journal/export')
+  @RequirePermission('finance', 'read')
+  async journalExport(@Query() query: FinanceAccountingQueryDto, @Res() response: Response) {
+    const csv = await this.finance.accountingJournalExport(query);
+    return response
+      .status(200)
+      .type('text/csv; charset=utf-8')
+      .setHeader('Content-Disposition', 'attachment; filename="alistore-journal.csv"')
+      .send(`\uFEFF${csv}`);
   }
 
   @Post('journal/:id/reverse')

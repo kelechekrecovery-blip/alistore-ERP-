@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003F
+
+- Iteration ID: `ACC-003F`.
+- Task: add protected primary-document journal export and connect it to ERP Finance.
+- Files changed: Finance CSV endpoint/service, API export integration suite, typed web blob client, Finance controls download action and browser acceptance.
+- Result: `GET /finance/journal/export` reuses the bounded server journal query and emits UTF-8 CSV rows with entry/source/document/tax/account/timestamp/point provenance. CSV escaping neutralizes formula-prefixed text. `/erp` downloads the selected period/point journal with the same Finance RBAC boundary; no client-side financial values are generated.
+- Checks run: API production build; web production build with 39 routes; journal export API integration 2/2; Finance Playwright 2/2; `git diff --check`.
+- Acceptance: `accepted` for the local journal export software contour. Manual adjustment approval, accountant/tax validation, staging/production deployment, physical hardware and first-store reconciliation remain open. Production readiness remains `RED` because external credentials, devices, provider certification, staging soak and missing design references are not available.
+- Commit: dedicated implementation commit created after this gate (`feat(finance): export journal documents`).
+- Next step: implement the remaining manual-adjustment approval boundary, then run the broader Finance/ERP regression before taking the next ecosystem module.
+
 # 2026-07-17 — ERP-FIN-002
 
 - Iteration ID: `ERP-FIN-002`.
