@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gate": "service-loaner-reconciliation",
+  "command": "npm run ecosystem:service-loaner:e2e",
+  "exitCode": 0,
+  "packageCommandSha256": "31cfc21819d1726c0aaa8f88f31c75d439e2544239b6a5fc7de8f11535e9cdc8",
+  "sourceTreeSha256": "1f3b88468502555e111f9d8cb718dff9bb325fa978b5128677c1053b418f8a0d",
+  "sourceCommit": "e378519cfdf732f2e0c774a39f8f87dff1427403",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "toolchain": "v25.9.0"
+  },
+  "executionEnvironmentSha256": "fe638b46bf31fa36e3d711c261a2f0e1746440eb275e0c226012c23c72f1809c",
+  "completedAt": "2026-07-16T15:06:32.042Z"
+}

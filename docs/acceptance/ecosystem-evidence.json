@@ -57,10 +57,16 @@
       ]
     },
     "service-loaner-reconciliation": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "ecosystem:service-loaner:e2e",
-      "command": null,
-      "artifacts": []
+      "command": "npm run ecosystem:service-loaner:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-5494e50302f3f3776781b735a973b7da0e1220436cac55a1c051b30acca7ac7d.json",
+          "sha256": "5494e50302f3f3776781b735a973b7da0e1220436cac55a1c051b30acca7ac7d"
+        }
+      ]
     },
     "reconciled-e2e": {
       "status": "partial",

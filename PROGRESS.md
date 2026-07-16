@@ -2023,3 +2023,12 @@
 - Checks run: composite API profile `3/3` suites and `9/9` tests; Playwright Service Center `3/3`; targeted paid-service rerun `1/1`; Node syntax for both evidence scripts; JSON parse; ecosystem audit; `git diff --check`. The audit intentionally retains the new gate as GAP until clean-tree evidence is recorded after the implementation commit.
 - Outcome: the bounded local software vertical is implemented. It does not certify service refunds, non-zero loaner-deposit money handling, native/physical device operation, providers, complete visual acceptance or the broad ecosystem gate. Production readiness remains RED with the known external credential/hardware blockers.
 - Next step: commit the reviewed implementation, record and commit clean-tree `service-loaner-reconciliation` evidence, then implement the procurement → partial receiving → stock → sale reconciliation journey.
+
+## 2026-07-16
+
+- Task: record durable `service-loaner-reconciliation` evidence on clean source commit `e378519`.
+- Files changed: ecosystem evidence manifest, immutable content-addressed Service Center result artifact and progress record.
+- Result: the clean-tree recorder reran the exact composite API/browser profile and bound success to source-tree SHA-256 `1f3b88468502555e111f9d8cb718dff9bb325fa978b5128677c1053b418f8a0d`, source commit `e378519cfdf732f2e0c774a39f8f87dff1427403`, package-command hash and Node/host environment. Artifact SHA-256 `5494e50302f3f3776781b735a973b7da0e1220436cac55a1c051b30acca7ac7d` matches its filename and manifest.
+- Checks run: `npm run ecosystem:evidence -- service-loaner-reconciliation`; API `3/3` suites and `9/9` tests; Playwright `3/3`; independent artifact digest comparison; source command exited zero.
+- Outcome: durable warranty inventory/FIFO, paid-service accounting and loaner-custody evidence is recorded for this bounded vertical. Service refund, non-zero deposit accounting, procurement, broad visual/native journeys and external provider/hardware certification remain open.
+- Next step: commit the evidence, verify the clean-tree Service Center audit gate becomes PASS, then implement procurement → partial receiving → stock → sale reconciliation.
