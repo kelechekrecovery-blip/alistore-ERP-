@@ -106,6 +106,7 @@ const acceptedGateScripts = new Map([
   ['visual', 'e2e'],
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
+  ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
   ['reconciled-e2e', 'ecosystem:e2e'],
 ]);
 const acceptedGate = (id, commandPattern) => {
@@ -177,10 +178,10 @@ const acceptedGate = (id, commandPattern) => {
               );
               return execFileSync(adb, ['version'], { encoding: 'utf8' }).trim();
             }
+            return execFileSync(process.execPath, ['--version'], { encoding: 'utf8' }).trim();
           } catch {
             return null;
           }
-          return null;
         })();
         const sourceCommitExists = /^[a-f0-9]{40}$/u.test(result.sourceCommit ?? '') && (() => {
           try {
@@ -288,6 +289,13 @@ const checks = [
         androidUi.includes(`:${module}:connectedDebugAndroidTest`),
       ) && acceptedGate('android-app-ui', /connectedDebugAndroidTest/u),
     detail: 'All four packaged Android modules have connected-test evidence.',
+  },
+  {
+    id: 'pos-refund-reconciliation-gate',
+    pass:
+      /playwright/u.test(scripts['ecosystem:pos-refund:e2e'] ?? '') &&
+      acceptedGate('pos-refund-reconciliation', /playwright/u),
+    detail: 'POS sale, customer return, approved refund and warehouse quarantine have hash-verified exact reconciliation evidence.',
   },
   {
     id: 'reconciled-ecosystem-e2e',

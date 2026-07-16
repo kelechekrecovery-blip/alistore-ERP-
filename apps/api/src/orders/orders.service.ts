@@ -824,7 +824,20 @@ export class OrdersService {
       // sold and the order becomes paid. No synthetic Payment row is created.
       if (order.total === 0) {
         for (const imei of assigned) {
-          await this.units.sellOnTx(tx, imei, order.id, actor);
+          const valuation = await this.units.sellOnTx(tx, imei, order.id, actor);
+          if (valuation?.entry) {
+            events.push({
+              type: EventType.AccountingEntryPosted,
+              actor,
+              payload: {
+                accountingEntryId: valuation.entry.id,
+                sourceType: 'inventory.cogs',
+                sourceRef: valuation.issue.id,
+                amount: valuation.issue.totalCost,
+              },
+              refs: [valuation.entry.id, valuation.issue.id, order.id, imei],
+            });
+          }
           events.push({
             type: EventType.UnitSold,
             actor,

@@ -275,6 +275,15 @@ describe('Orders by customer (account)', () => {
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
     expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: 'LOYALTY-ZERO-1' } })).toMatchObject({ status: 'sold', orderId: order.id });
     expect(await prisma.auditEvent.count({ where: { type: 'order.paid', refs: { has: order.id } } })).toBe(1);
+    const cogsIssue = await prisma.inventoryValuationIssue.findFirstOrThrow({
+      where: { orderId: order.id, imei: 'LOYALTY-ZERO-1', sourceType: 'sale' },
+    });
+    const cogsEntry = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { sourceType_sourceRef: { sourceType: 'inventory.cogs', sourceRef: cogsIssue.id } },
+    });
+    expect(await prisma.auditEvent.count({
+      where: { type: 'accounting.entry_posted', refs: { has: cogsEntry.id } },
+    })).toBe(1);
   });
 
   it('rejects native checkout when catalog stock is insufficient', async () => {

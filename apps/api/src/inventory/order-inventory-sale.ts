@@ -20,7 +20,20 @@ export async function finalizeOrderInventorySaleOnTx(
   });
   for (const reservation of reservedUnits) {
     if (!reservation.imei) continue;
-    await input.units.sellOnTx(tx, reservation.imei, input.orderId, input.actor);
+    const valuation = await input.units.sellOnTx(tx, reservation.imei, input.orderId, input.actor);
+    if (valuation?.entry) {
+      input.events.push({
+        type: EventType.AccountingEntryPosted,
+        actor: input.actor,
+        payload: {
+          accountingEntryId: valuation.entry.id,
+          sourceType: 'inventory.cogs',
+          sourceRef: valuation.issue.id,
+          amount: valuation.issue.totalCost,
+        },
+        refs: [valuation.entry.id, valuation.issue.id, input.orderId, reservation.imei],
+      });
+    }
     input.events.push({
       type: EventType.UnitSold,
       actor: input.actor,

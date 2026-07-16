@@ -2,6 +2,7 @@ import { APIRequestContext, expect } from '@playwright/test';
 import { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { sign } from 'jsonwebtoken';
+import { ACCOUNTING_ACCOUNT_SEED } from '../apps/api/src/finance/accounting-chart';
 
 const databaseUrl =
   process.env.E2E_DATABASE_URL ??
@@ -117,6 +118,10 @@ export async function resetDb() {
       createdBy: 'e2e-reset',
       idempotencyKey: 'e2e:store-point:bishkek-1',
     },
+  });
+  await prisma.accountingAccount.createMany({
+    data: ACCOUNTING_ACCOUNT_SEED.map((account) => ({ ...account })),
+    skipDuplicates: true,
   });
 }
 

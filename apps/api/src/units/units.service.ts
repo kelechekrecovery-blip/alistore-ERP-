@@ -103,7 +103,7 @@ export class UnitsService {
     imei: string,
     orderId: string,
     actor = 'system',
-  ): Promise<void> {
+  ) {
     const { count } = await tx.deviceUnit.updateMany({
       where: { imei, status: 'reserved', orderId },
       data: { status: 'sold' },
@@ -128,12 +128,12 @@ export class UnitsService {
         consignmentItem: { select: { id: true } },
       },
     });
-    if (sold.consignmentItem) return;
+    if (sold.consignmentItem) return null;
     const unitCost = sold.acquisitionCost ?? sold.product.cost;
     // Consignment/trade-in units can have no owned acquisition cost. They create
     // owner liability through consignment accounting, but must not create a
     // zero-value journal entry (the ledger rejects zero debit/credit lines).
-    await postCogsOnTx(tx, {
+    return postCogsOnTx(tx, {
       productId: sold.productId,
       orderId,
       sourceRef: `${orderId}:${imei}`,

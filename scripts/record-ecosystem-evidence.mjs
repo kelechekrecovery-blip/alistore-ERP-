@@ -11,6 +11,7 @@ const gateId = process.argv[2];
 const gateScripts = new Map([
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
+  ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
 ]);
 const evidencePath = path.join(root, 'docs', 'acceptance', 'ecosystem-evidence.json');
 const artifactDirectory = path.join(root, 'docs', 'acceptance', 'artifacts');
@@ -89,7 +90,9 @@ const executionEnvironment = () => ({
           ...process.env,
           DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
         })
-      : commandOutput(path.join(process.env.ANDROID_HOME ?? `${process.env.HOME}/Library/Android/sdk`, 'platform-tools', 'adb'), ['version']),
+      : gateId === 'android-app-ui'
+        ? commandOutput(path.join(process.env.ANDROID_HOME ?? `${process.env.HOME}/Library/Android/sdk`, 'platform-tools', 'adb'), ['version'])
+        : commandOutput(process.execPath, ['--version']),
 });
 
 if (process.env.ALISTORE_EVIDENCE_LOCK_HELD !== '1') {

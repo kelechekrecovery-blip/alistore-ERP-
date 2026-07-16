@@ -510,7 +510,7 @@ export class ExchangesService {
       } else {
         await this.units.reserveOnTx(tx, newUnit.imei, newOrder.id);
       }
-      await this.units.sellOnTx(tx, newUnit.imei, newOrder.id, actor);
+      const replacementValuation = await this.units.sellOnTx(tx, newUnit.imei, newOrder.id, actor);
       const newTaxMetadata = outputTaxMetadata(newTax.lines);
       const replacementSale = await postAccountingEntryOnTx(tx, {
         idempotencyKey: `accounting:exchange:sale:${newOrder.id}`,
@@ -532,15 +532,15 @@ export class ExchangesService {
         ],
       });
       events.push(accountingEvent(actor, replacementSale.id, 'exchange.sale', newOrder.id, newProduct.price, [newOrder.id, ret.id]));
-      const replacementIssue = await tx.inventoryValuationIssue.findFirst({
-        where: { orderId: newOrder.id, imei: newUnit.imei, sourceType: 'sale' },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (replacementIssue) {
-        const cogsEntry = await tx.accountingJournalEntry.findUnique({
-          where: { sourceType_sourceRef: { sourceType: 'inventory.cogs', sourceRef: replacementIssue.id } },
-        });
-        if (cogsEntry) events.push(accountingEvent(actor, cogsEntry.id, 'inventory.cogs', replacementIssue.id, replacementIssue.totalCost, [newOrder.id, newUnit.imei]));
+      if (replacementValuation?.entry) {
+        events.push(accountingEvent(
+          actor,
+          replacementValuation.entry.id,
+          'inventory.cogs',
+          replacementValuation.issue.id,
+          replacementValuation.issue.totalCost,
+          [newOrder.id, newUnit.imei],
+        ));
       }
       events.push(
         { type: EventType.OrderCreated, actor, payload: { orderId: newOrder.id, channel: 'exchange' }, refs: [newOrder.id] },
