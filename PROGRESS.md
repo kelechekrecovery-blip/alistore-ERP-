@@ -2100,3 +2100,11 @@
 - Checks run: API `1/1` suite and `6/6` tests; Playwright `1/1`; artifact SHA-256 `e64a235fddef0a080e165f6048e26fea1b3c7154430e2635ebeb79e437da2aa8`; recorder exited zero.
 - Outcome: all four bounded reconciliation rows and the broad reconciled software matrix now have current evidence for the same source tree.
 - Next step: commit this artifact and run the strict committed-HEAD ecosystem audit to identify only the remaining native and visual gates.
+
+## 2026-07-16
+
+- Task: refresh the packaged `ios-app-ui` evidence on the current trusted source tree.
+- Result: the aggregate XCUITest scheme built and launched AliStore Client, Staff, Courier and POS on the iPhone 17 Pro simulator; Client exposed its packaged tab shell and the three operational apps exposed their signed-out login shells.
+- Checks run: `xcodebuild test` through the committed-HEAD evidence bootstrap; four UI test bundles, `4/4` tests, zero failures; artifact SHA-256 `4d033249b8b43e475148fd3bd34a8a572ce264946d360798da102039f6043368`.
+- Outcome: the current iOS packaged launch gate has fresh evidence. Deep native journeys, visual parity, APNs/camera/Face ID and physical-device certification remain open.
+- Next step: commit this artifact, then refresh all four packaged Android connected-test modules.
