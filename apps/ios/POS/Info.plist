@@ -42,6 +42,8 @@
 	<string>Сканирование штрихкодов и IMEI на кассе</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Быстрый и защищённый вход в кассу</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Выбор фото состояния устройства для согласования обмена</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

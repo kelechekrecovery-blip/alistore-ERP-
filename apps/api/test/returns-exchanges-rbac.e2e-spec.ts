@@ -71,6 +71,7 @@ describe('Returns and exchanges RBAC split', () => {
 
   async function clean() {
     await prisma.auditEvent.deleteMany();
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ExchangeRequest" CASCADE');
     await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.$transaction(async (tx) => {
       await tx.inventoryValuationReversal.deleteMany();
@@ -231,10 +232,11 @@ describe('Returns and exchanges RBAC split', () => {
         method: 'cash',
         shiftId: shift.id,
       })
-      .expect(201);
+      .expect(202);
 
-    const exchanged = await prisma.auditEvent.findFirst({ where: { type: 'order.exchanged' } });
-    expect(exchanged?.actor).toBe(cashierId);
+    const requestedExchange = await prisma.exchangeRequest.findFirstOrThrow({ where: { requester: cashierId } });
+    expect(requestedExchange).toMatchObject({ status: 'requested', oldImei: exchange.oldImei });
+    expect(await prisma.auditEvent.count({ where: { type: 'order.exchanged' } })).toBe(0);
   });
 
   it('opens and lists native returns with owner scope and exact idempotent replay', async () => {

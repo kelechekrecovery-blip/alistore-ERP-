@@ -23,11 +23,15 @@ export async function fetchUnit(imei: string, accessToken: string): Promise<Unit
 }
 
 export interface ExchangeResult {
-  exchangeOrderId: string;
-  returnId: string;
-  surcharge: number;
+  exchangeRequestId: string;
+  approvalId: string;
+  status: 'requested' | 'executed' | 'rejected';
+  creditAmount: number;
+  surchargeAmount: number;
   oldImei: string;
   newImei: string;
+  evidenceRequired: boolean;
+  idempotent: boolean;
 }
 
 export function exchangeDevice(input: {
@@ -35,6 +39,8 @@ export function exchangeDevice(input: {
   oldImei: string;
   newProductId: string;
   method: string;
+  shiftId?: string;
+  externalReference?: string;
 }, accessToken: string, idempotencyKey: string): Promise<ExchangeResult> {
   return postAuthJson('/exchanges', input, accessToken, { 'idempotency-key': idempotencyKey });
 }

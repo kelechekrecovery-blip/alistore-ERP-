@@ -11,6 +11,7 @@ export const EVIDENCE_ENTITY_TYPES = [
   'shift',
   'loaner',
   'quarantine',
+  'exchange',
 ] as const;
 
 export type EvidenceEntityType = (typeof EVIDENCE_ENTITY_TYPES)[number];

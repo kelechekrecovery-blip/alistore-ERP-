@@ -15,6 +15,9 @@ export const EventType = {
   OrderCompleted: 'order.completed',
   OrderCancelled: 'order.cancelled',
   OrderExchanged: 'order.exchanged',
+  ExchangeExecuted: 'exchange.executed',
+  ExchangeRejected: 'exchange.rejected',
+  ExchangeExpired: 'exchange.expired',
   // payments
   PaymentReceived: 'payment.received',
   PaymentRefunded: 'payment.refunded',

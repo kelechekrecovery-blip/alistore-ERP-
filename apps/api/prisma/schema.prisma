@@ -555,6 +555,7 @@ model Product {
   valuationLayers         InventoryValuationLayer[]
   valuationIssues         InventoryValuationIssue[]
   valuationReversals      InventoryValuationReversal[]
+  exchangeReplacementRequests ExchangeRequest[] @relation("ExchangeReplacementProduct")
 
   @@index([category])
   @@index([variantGroup])
@@ -631,6 +632,8 @@ model DeviceUnit {
   loanerProfile      LoanerDevice?
   valuationIssues    InventoryValuationIssue[]
   quarantineCases    InventoryQuarantineCase[]
+  exchangeReturnRequests ExchangeRequest[] @relation("ExchangeReturnedUnit")
+  exchangeReplacementRequests ExchangeRequest[] @relation("ExchangeReplacementUnit")
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
@@ -815,6 +818,8 @@ model Order {
   refunds                  Refund[]
   attribution              OrderAttribution?
   returns                  Return[]
+  exchangeSourceRequests   ExchangeRequest[] @relation("ExchangeOriginalOrder")
+  exchangeOutputRequest    ExchangeRequest? @relation("ExchangeOutputOrder")
   createdAt                DateTime                        @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
 
@@ -1164,6 +1169,7 @@ model CashShift {
   payments            Payment[]
   refundAllocations   RefundAllocation[]
   incassations        CashIncassation[]
+  exchangeRequests    ExchangeRequest[]
 
   @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
   @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy
@@ -1331,6 +1337,7 @@ model Return {
   refund          Refund?
   quarantineCases InventoryQuarantineCase[]
   valuationReversals InventoryValuationReversal[]
+  exchangeRequest ExchangeRequest?
 
   @@index([orderId])
   @@index([status])
@@ -2102,9 +2109,50 @@ model Approval {
   createdAt DateTime       @default(now())
   refund    Refund?
   quarantineDisposition InventoryQuarantineCase?
+  exchangeRequest ExchangeRequest?
 
   @@index([status])
   @@index([action])
+}
+
+model ExchangeRequest {
+  id                String        @id @default(cuid())
+  idempotencyKey    String        @unique
+  approvalId        String        @unique
+  approval          Approval      @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+  status            String        @default("requested")
+  requester         String
+  originalOrder     Order         @relation("ExchangeOriginalOrder", fields: [originalOrderId], references: [id], onDelete: Restrict)
+  originalOrderId   String
+  oldUnit           DeviceUnit    @relation("ExchangeReturnedUnit", fields: [oldImei], references: [imei], onDelete: Restrict)
+  oldImei           String
+  newProduct        Product       @relation("ExchangeReplacementProduct", fields: [newProductId], references: [id], onDelete: Restrict)
+  newProductId      String
+  newUnit           DeviceUnit    @relation("ExchangeReplacementUnit", fields: [newUnitId], references: [id], onDelete: Restrict)
+  newUnitId         String
+  newImei           String
+  creditAmount      Int
+  surchargeAmount   Int
+  method            PaymentMethod
+  shift             CashShift?    @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId           String?
+  externalReference String?
+  exchangeOrder     Order?        @relation("ExchangeOutputOrder", fields: [exchangeOrderId], references: [id], onDelete: Restrict)
+  exchangeOrderId   String?       @unique
+  return            Return?       @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId          String?       @unique
+  expiresAt         DateTime
+  executedAt        DateTime?
+  rejectedAt        DateTime?
+  expiredAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([originalOrderId])
+  @@index([oldImei])
+  @@index([newImei])
+  @@index([newUnitId])
 }
 
 // Неизменяемо. Только append. Никаких update/delete. Источник правды.
@@ -2441,6 +2489,25 @@ model OutboxMessage {
 
   @@index([status])
   @@index([campaignId, status])
+}
+
+// Durable compensation queue for media objects that were uploaded before a
+// later database validation failed. Deletion is idempotent and retried until
+// the object store accepts it.
+model MediaCleanupTask {
+  id            String   @id @default(cuid())
+  objectKey     String   @unique
+  attempts      Int      @default(0)
+  deletePasses  Int      @default(0)
+  lastError     String?
+  nextAttemptAt DateTime @default(now())
+  uploadLeaseUntil DateTime
+  claimedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([completedAt, nextAttemptAt, uploadLeaseUntil, claimedAt])
 }
 
 // ---------- STAFF AUTH ----------

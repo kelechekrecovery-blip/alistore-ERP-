@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { PgBoss as PgBossClient } from 'pg-boss';
 import { ReservationsService } from './reservations.service';
+import { ExchangesService } from '../exchanges/exchanges.service';
 
 const QUEUE = 'reservation-expiry';
 const EVERY_MINUTE = '* * * * *';
@@ -29,6 +30,7 @@ export class ReservationsScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly reservations: ReservationsService,
+    private readonly exchanges: ExchangesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -55,8 +57,12 @@ export class ReservationsScheduler implements OnModuleInit, OnModuleDestroy {
       await this.boss.createQueue(QUEUE);
       await this.boss.work(QUEUE, async () => {
         const { released } = await this.reservations.releaseExpired();
+        const { expired } = await this.exchanges.sweepExpired();
         if (released > 0) {
           this.logger.log(`Released ${released} expired reservation(s)`);
+        }
+        if (expired > 0) {
+          this.logger.log(`Released ${expired} expired exchange request(s)`);
         }
       });
       await this.boss.schedule(QUEUE, EVERY_MINUTE);

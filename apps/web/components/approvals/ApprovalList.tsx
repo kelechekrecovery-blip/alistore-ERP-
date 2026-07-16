@@ -12,6 +12,7 @@ const ACTION_LABEL: Record<string, string> = {
   debt: 'Продажа в долг',
   delete: 'Удаление товара',
   pii: 'Доступ к PII',
+  exchange: 'Обмен устройства',
 };
 
 interface ApprovalListProps {
@@ -46,6 +47,15 @@ export function ApprovalList({ items, tabStatus, busy, onDecide }: ApprovalListP
               )}
             </div>
             <p className="mt-2 text-sm text-ink/70">Причина: {a.reason}</p>
+            {a.action === 'exchange' && a.evidence?.payload && (
+              <div className="mt-3 grid gap-1 rounded-md bg-ink/[0.03] p-3 text-xs text-ink/65 sm:grid-cols-2">
+                <span className="font-mono">{a.evidence.payload.oldImei} → {a.evidence.payload.newImei}</span>
+                <span>Зачёт {som(a.evidence.payload.creditAmount ?? 0)} · доплата {som(a.evidence.payload.surchargeAmount ?? 0)}</span>
+                <span>Оплата: {a.evidence.payload.method ?? '—'}</span>
+                <span className="font-mono">Смена/reference: {a.evidence.payload.shiftId ?? a.evidence.payload.externalReference ?? 'без доплаты'}</span>
+                <span className="sm:col-span-2">Фото состояния обязательно; исполнение использует только зафиксированный snapshot.</span>
+              </div>
+            )}
 
             {tabStatus === 'requested' ? (
               <div className="mt-4 flex gap-2">

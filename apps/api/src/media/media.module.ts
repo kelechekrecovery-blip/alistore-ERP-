@@ -5,6 +5,7 @@ import { MediaController } from './media.controller';
 import { LocalDiskStorage } from './storage/local-disk.storage';
 import { S3Storage } from './storage/s3.storage';
 import { MEDIA_STORAGE, MediaStorage } from './media-storage';
+import { MediaCleanupService } from './media-cleanup.service';
 
 /**
  * Image ingestion: sharp compression → pluggable storage. S3/MinIO when
@@ -14,6 +15,7 @@ import { MEDIA_STORAGE, MediaStorage } from './media-storage';
 @Module({
   providers: [
     MediaService,
+    MediaCleanupService,
     {
       provide: MEDIA_STORAGE,
       inject: [ConfigService],
@@ -24,6 +26,6 @@ import { MEDIA_STORAGE, MediaStorage } from './media-storage';
     },
   ],
   controllers: [MediaController],
-  exports: [MediaService],
+  exports: [MediaService, MediaCleanupService],
 })
 export class MediaModule {}

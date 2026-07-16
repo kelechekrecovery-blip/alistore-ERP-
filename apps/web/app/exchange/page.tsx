@@ -9,15 +9,16 @@ import {
   type CatalogProduct,
   type ExchangeResult,
   type UnitLookup,
+  uploadEvidenceImage,
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const METHODS = [
-  { id: 'cash', name: '💵 Наличные' },
-  { id: 'card', name: '💳 Карта' },
-  { id: 'qr_mbank', name: '📱 MBank' },
+  { id: 'cash', name: 'Наличные' },
+  { id: 'card', name: 'Карта' },
+  { id: 'qr_mbank', name: 'MBank' },
 ];
 export default function ExchangePage() {
   const [session, setSession] = useState<StaffSession | null>(null);
@@ -30,6 +31,7 @@ export default function ExchangePage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState<ExchangeResult | null>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const exchangeKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
@@ -40,7 +42,8 @@ export default function ExchangePage() {
 
   const newProduct = products.find((p) => p.id === newId) ?? null;
   const surcharge = unit && newProduct ? newProduct.price - unit.price : 0;
-  const canSubmit = !!unit && unit.status === 'sold' && !!unit.orderId && !!newProduct && surcharge >= 0;
+  const canSubmit = !!unit && unit.status === 'sold' && !!unit.orderId && !!newProduct
+    && surcharge >= 0 && !!evidenceFile && (surcharge === 0 || method === 'cash');
 
   async function lookup() {
     if (!imei.trim() || !session) return;
@@ -64,6 +67,13 @@ export default function ExchangePage() {
         newProductId: newProduct.id,
         method,
       }, session.accessToken, exchangeKey.current);
+      await uploadEvidenceImage({
+        file: evidenceFile!,
+        entityType: 'exchange',
+        entityId: r.exchangeRequestId,
+        label: 'exchange_condition',
+        accessToken: session.accessToken,
+      });
       setResult(r);
       exchangeKey.current = crypto.randomUUID();
     } catch (e) {
@@ -74,7 +84,7 @@ export default function ExchangePage() {
   }
 
   function reset() {
-    setImei(''); setUnit(null); setNewId(''); setResult(null); setErr('');
+    setImei(''); setUnit(null); setNewId(''); setResult(null); setEvidenceFile(null); setErr('');
   }
 
   function logout() {
@@ -118,14 +128,16 @@ export default function ExchangePage() {
         <div className="mx-auto max-w-[560px]">
           {result ? (
             <div className="rounded-[18px] border border-[#2E2822] bg-[#1A1611] p-7 text-center">
-              <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-lime/15 text-4xl text-lime">✓</div>
-              <div className="mt-4 font-display text-2xl font-extrabold">Обмен оформлен</div>
+              <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-warn/15 text-3xl font-bold text-warn">2FA</div>
+              <div className="mt-4 font-display text-2xl font-extrabold">Отправлено на одобрение</div>
               <div className="mt-2 text-sm text-[#A79C92]">
                 {result.oldImei} → {result.newImei}
               </div>
               <div className="mt-1 text-sm text-[#A79C92]">
-                Доплата: <span className="font-mono text-lime">{som(result.surcharge)}</span> · заказ #{result.exchangeOrderId.slice(-6)}
+                Доплата: <span className="font-mono text-warn">{som(result.surchargeAmount)}</span> · approval #{result.approvalId.slice(-6)}
               </div>
+              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-[#8A7F76]">Фото сохранено в Evidence Vault. Деньги и склад не изменены: второй сотрудник должен подтвердить точный IMEI и суммы в Approval Inbox.</p>
+              <Link href="/approvals" className="mt-5 inline-flex rounded-[11px] border border-warn/30 px-5 py-3 text-sm font-bold text-warn">Открыть Approval Inbox</Link>
               <button type="button" onClick={reset} className="mt-6 rounded-[11px] bg-lime px-6 py-3 font-bold text-lime-ink">Новый обмен</button>
             </div>
           ) : (
@@ -143,6 +155,15 @@ export default function ExchangePage() {
                   />
                   <button type="button" disabled={busy} onClick={lookup} className="rounded-[10px] bg-[#221E19] px-4 py-2.5 text-sm font-semibold text-[#D8CFC6] hover:bg-[#2A241F] disabled:opacity-40">Найти</button>
                 </div>
+                <label className="mt-3 block rounded-[10px] border border-dashed border-[#4A4139] bg-[#221E19] p-3 text-sm text-[#D8CFC6]">
+                  <span className="block text-xs font-semibold uppercase text-[#8A7F76]">Фото состояния до обмена</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)}
+                    className="mt-2 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-[#342D27] file:px-3 file:py-2 file:font-semibold file:text-white"
+                  />
+                </label>
                 {unit && (
                   <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
                     <div className="min-w-0 flex-1">
@@ -192,7 +213,7 @@ export default function ExchangePage() {
                     <button
                       key={m.id}
                       type="button"
-                      disabled={!canSubmit}
+                      disabled={!unit || !newProduct || (surcharge > 0 && m.id !== 'cash')}
                       onClick={() => setMethod(m.id)}
                       className={`flex-1 rounded-[10px] border px-3 py-2.5 text-sm font-semibold transition ${
                         method === m.id ? 'border-lime bg-lime/10 text-lime' : 'border-[#2E2822] bg-[#221E19] text-[#D8CFC6]'
@@ -202,13 +223,18 @@ export default function ExchangePage() {
                     </button>
                   ))}
                 </div>
+                {surcharge > 0 && (
+                  <p className="mt-2 text-xs leading-5 text-[#A79C92]">
+                    Безналичная доплата будет доступна после подключения подтверждённого payment capture.
+                  </p>
+                )}
                 <button
                   type="button"
                   disabled={!canSubmit || busy}
                   onClick={submit}
                   className="mt-4 w-full rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
                 >
-                  {busy ? 'Проводим…' : 'Оформить обмен'}
+                  {busy ? 'Отправляем…' : 'Запросить обмен'}
                 </button>
               </div>
 

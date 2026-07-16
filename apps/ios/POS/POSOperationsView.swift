@@ -1,4 +1,5 @@
 import AliStoreCore
+import PhotosUI
 import SwiftData
 import SwiftUI
 
@@ -170,6 +171,8 @@ struct POSOperationsView: View {
     @State private var newProductId = ""
     @State private var exchangeMethod = "cash"
     @State private var exchangeKey = UUID().uuidString
+    @State private var exchangePhotoItem: PhotosPickerItem?
+    @State private var exchangeEvidence: Data?
     @State private var isBusy = false
     @State private var message: String?
     @State private var errorMessage: String?
@@ -224,8 +227,14 @@ struct POSOperationsView: View {
                     Picker("Доплата", selection: $exchangeMethod) {
                         Text("Наличные").tag("cash"); Text("Карта").tag("card"); Text("MBank").tag("qr_mbank")
                     }
-                    Button("Выполнить обмен", systemImage: "arrow.left.arrow.right") { Task { await exchange() } }
-                        .disabled(orderId.isEmpty || oldIMEI.isEmpty || newProductId.isEmpty || isBusy)
+                    PhotosPicker(selection: $exchangePhotoItem, matching: .images) {
+                        Label(exchangeEvidence == nil ? "Фото состояния" : "Фото выбрано", systemImage: "camera.fill")
+                    }
+                    .onChange(of: exchangePhotoItem) { _, item in
+                        Task { exchangeEvidence = try? await item?.loadTransferable(type: Data.self) }
+                    }
+                    Button("Создать заявку на обмен", systemImage: "checkmark.shield") { Task { await exchange() } }
+                        .disabled(orderId.isEmpty || oldIMEI.isEmpty || newProductId.isEmpty || exchangeEvidence == nil || isBusy)
                 }
                 if isBusy { Section { ProgressView() } }
                 if let message { Section { Text(message).foregroundStyle(POSPalette.lime) } }
@@ -289,9 +298,17 @@ struct POSOperationsView: View {
                 token: session.accessToken,
                 idempotencyKey: exchangeKey
             )
-            message = "Обмен завершён · доплата \(result.surcharge) сом · новый IMEI …\(result.newImei.suffix(6))"
+            guard let exchangeEvidence else { return }
+            let _: EvidenceAttachment = try await api.uploadEvidence(
+                imageData: exchangeEvidence,
+                entityType: "exchange",
+                entityId: result.exchangeRequestId,
+                label: "exchange_condition",
+                token: session.accessToken
+            )
+            message = "Ожидает согласования #\(result.approvalId.suffix(8)) · доплата \(result.surchargeAmount) сом · IMEI …\(result.newImei.suffix(6))"
             exchangeKey = UUID().uuidString
-            oldIMEI = ""; newProductId = ""
+            oldIMEI = ""; newProductId = ""; exchangePhotoItem = nil; self.exchangeEvidence = nil
             await refresh()
         } catch { errorMessage = error.localizedDescription }
     }

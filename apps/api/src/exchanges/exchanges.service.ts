@@ -20,6 +20,7 @@ const SURCHARGE_METHODS = new Set<PaymentMethod>([
   PaymentMethod.bakai_pos,
   PaymentMethod.obank,
 ]);
+const EXCHANGE_REQUEST_TTL_MS = 30 * 60 * 1000;
 
 /**
  * Обмен товара — atomic return + sale + surcharge in one transaction:
@@ -37,13 +38,261 @@ export class ExchangesService {
     private readonly units: UnitsService,
   ) {}
 
-  async exchange(dto: ExchangeDto, actor: string, idempotencyKey?: string) {
-    const key = idempotencyKey?.trim() ? `exchange:${idempotencyKey.trim()}` : undefined;
-    if (key) {
-      const existing = await this.prisma.order.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
-      if (existing) return this.replayExchange(existing, dto);
-    }
+  async request(dto: ExchangeDto, actor: string, idempotencyKey: string) {
+    const key = `exchange-request:${idempotencyKey.trim()}`;
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))::text AS locked`;
+      const existing = await tx.exchangeRequest.findUnique({ where: { idempotencyKey: key } });
+      if (existing) {
+        this.assertRequestReplay(existing, dto, actor);
+        return {
+          result: this.requestResult(existing, true),
+          events: [],
+        };
+      }
+
+      const snapshot = await this.prepareSnapshotOnTx(tx, dto, actor);
+      const approval = await tx.approval.create({
+        data: {
+          action: 'exchange',
+          requester: actor,
+          reason: `Обмен ${snapshot.oldImei} на ${snapshot.newImei}`,
+          evidence: {
+            payload: {
+              originalOrderId: snapshot.originalOrderId,
+              oldImei: snapshot.oldImei,
+              newProductId: snapshot.newProductId,
+              newImei: snapshot.newImei,
+              creditAmount: snapshot.creditAmount,
+              surchargeAmount: snapshot.surchargeAmount,
+              method: snapshot.method,
+              shiftId: snapshot.shiftId,
+              externalReference: snapshot.externalReference,
+            },
+            evidence: { required: 'exchange_condition' },
+          },
+        },
+      });
+      const request = await tx.exchangeRequest.create({
+        data: {
+          ...snapshot,
+          idempotencyKey: key,
+          approvalId: approval.id,
+          requester: actor,
+          expiresAt: new Date(Date.now() + EXCHANGE_REQUEST_TTL_MS),
+        },
+      });
+      const held = await tx.deviceUnit.updateMany({
+        where: { id: request.newUnitId, status: 'in_stock', orderId: null },
+        data: { status: 'reserved' },
+      });
+      if (held.count !== 1) {
+        throw new ConflictError('exchange_replacement_race', 'Выбранный IMEI уже занят другой операцией');
+      }
+      return {
+        result: this.requestResult(request, false),
+        events: [{
+          type: EventType.ApprovalRequested,
+          actor,
+          payload: {
+            approvalId: approval.id,
+            action: 'exchange',
+            exchangeRequestId: request.id,
+            oldImei: request.oldImei,
+            newImei: request.newImei,
+            creditAmount: request.creditAmount,
+            surchargeAmount: request.surchargeAmount,
+          },
+          refs: [approval.id, request.id, request.originalOrderId, request.oldImei, request.newImei],
+        }],
+      };
+    });
+  }
+
+  async executeApprovedOnTx(
+    tx: Prisma.TransactionClient,
+    exchangeRequestId: string,
+    approver: string,
+    approvalId: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM "ExchangeRequest" WHERE id = ${exchangeRequestId} FOR UPDATE`;
+    const request = await tx.exchangeRequest.findUnique({ where: { id: exchangeRequestId } });
+    if (!request || request.approvalId !== approvalId) {
+      throw new ConflictError('exchange_approval_snapshot_changed', 'Заявка обмена не связана с этим approval');
+    }
+    if (request.status !== 'requested') {
+      throw new ConflictError('exchange_already_resolved', `Заявка обмена уже ${request.status}`);
+    }
+    if (request.expiresAt <= new Date()) {
+      throw new ConflictError('exchange_request_expired', 'Срок согласования обмена истёк');
+    }
+    if (request.requester === approver) {
+      throw new ConflictError('exchange_four_eyes_required', 'Инициатор не может одобрить собственный обмен');
+    }
+    const evidenceEvents = await tx.auditEvent.findMany({
+      where: { type: EventType.EvidenceAttached, refs: { has: request.id } },
+      orderBy: { ts: 'desc' },
+    });
+    const hasConditionEvidence = evidenceEvents.some((event) => {
+      const payload = event.payload as Record<string, unknown>;
+      const asset = payload.asset as Record<string, unknown> | undefined;
+      return payload.entityType === 'exchange'
+        && payload.entityId === request.id
+        && payload.label === 'exchange_condition'
+        && payload.trustedStaffEvidence === true
+        && event.actor === `staff:${request.requester}`
+        && typeof asset?.key === 'string'
+        && asset.key.length > 0;
+    });
+    if (!hasConditionEvidence) {
+      throw new ConflictError('exchange_evidence_required', 'Добавьте фото состояния устройства перед одобрением');
+    }
+
+    const dto: ExchangeDto = {
+      originalOrderId: request.originalOrderId,
+      oldImei: request.oldImei,
+      newProductId: request.newProductId,
+      method: request.method,
+      shiftId: request.shiftId ?? undefined,
+      externalReference: request.externalReference ?? undefined,
+    };
+    const execution = await this.executeOnTx(
+      tx,
+      dto,
+      request.requester,
+      `exchange:approval:${approvalId}`,
+      request.newImei,
+      request.id,
+      { creditAmount: request.creditAmount, surchargeAmount: request.surchargeAmount },
+    );
+    await tx.exchangeRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'executed',
+        exchangeOrderId: execution.result.exchangeOrderId,
+        returnId: execution.result.returnId,
+        executedAt: new Date(),
+      },
+    });
+    execution.events.push({
+      type: EventType.ExchangeExecuted,
+      actor: approver,
+      payload: {
+        exchangeRequestId: request.id,
+        approvalId,
+        exchangeOrderId: execution.result.exchangeOrderId,
+        returnId: execution.result.returnId,
+      },
+      refs: [request.id, approvalId, execution.result.exchangeOrderId, execution.result.returnId],
+    });
+    return execution;
+  }
+
+  async rejectApprovedOnTx(
+    tx: Prisma.TransactionClient,
+    exchangeRequestId: string,
+    approvalId: string,
+    actor: string,
+    reason: string | null,
+    events: AuditInput[],
+  ) {
+    const request = await tx.exchangeRequest.findUnique({ where: { id: exchangeRequestId } });
+    if (!request || request.approvalId !== approvalId || request.status !== 'requested') {
+      throw new ConflictError('exchange_approval_snapshot_changed', 'Заявка обмена больше не ожидает это согласование');
+    }
+    await tx.exchangeRequest.update({
+      where: { id: request.id },
+      data: { status: 'rejected', rejectedAt: new Date() },
+    });
+    const released = await tx.deviceUnit.updateMany({
+      where: { id: request.newUnitId, status: 'reserved', orderId: null },
+      data: { status: 'in_stock' },
+    });
+    if (released.count !== 1) {
+      throw new ConflictError('exchange_replacement_hold_lost', 'Резерв replacement IMEI больше не принадлежит заявке');
+    }
+    events.push({
+      type: EventType.ExchangeRejected,
+      actor,
+      payload: { exchangeRequestId: request.id, approvalId, reason },
+      refs: [request.id, approvalId, request.originalOrderId],
+    });
+  }
+
+  async sweepExpired(now: Date = new Date()): Promise<{ expired: number }> {
+    const candidates = await this.prisma.exchangeRequest.findMany({
+      where: { status: 'requested', expiresAt: { lte: now } },
+      select: { id: true, approvalId: true },
+    });
+    let expired = 0;
+    for (const candidate of candidates) {
+      const didExpire = await this.audit.transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Approval" WHERE id = ${candidate.approvalId} FOR UPDATE`;
+        const events: AuditInput[] = [];
+        const result = await this.expireIfPastDeadlineOnTx(
+          tx,
+          candidate.id,
+          candidate.approvalId,
+          now,
+          events,
+        );
+        return {
+          result,
+          events,
+        };
+      });
+      if (didExpire) expired += 1;
+    }
+    return { expired };
+  }
+
+  async expireIfPastDeadlineOnTx(
+    tx: Prisma.TransactionClient,
+    exchangeRequestId: string,
+    approvalId: string,
+    now: Date,
+    events: AuditInput[],
+  ): Promise<boolean> {
+    await tx.$queryRaw`SELECT id FROM "ExchangeRequest" WHERE id = ${exchangeRequestId} FOR UPDATE`;
+    const request = await tx.exchangeRequest.findUnique({ where: { id: exchangeRequestId } });
+    if (!request || request.approvalId !== approvalId) {
+      throw new ConflictError('exchange_approval_snapshot_changed', 'Заявка обмена не связана с этим approval');
+    }
+    if (request.status !== 'requested' || request.expiresAt > now) return false;
+
+    const released = await tx.deviceUnit.updateMany({
+      where: { id: request.newUnitId, status: 'reserved', orderId: null },
+      data: { status: 'in_stock' },
+    });
+    if (released.count !== 1) {
+      throw new ConflictError('exchange_replacement_hold_lost', 'Истёкший резерв replacement IMEI потерян');
+    }
+    await tx.exchangeRequest.update({
+      where: { id: request.id },
+      data: { status: 'expired', expiredAt: now },
+    });
+    await tx.approval.update({
+      where: { id: approvalId },
+      data: { status: 'rejected', approver: 'system' },
+    });
+    events.push({
+      type: EventType.ExchangeExpired,
+      actor: 'system',
+      payload: { exchangeRequestId: request.id, approvalId, expiresAt: request.expiresAt.toISOString() },
+      refs: [request.id, approvalId, request.newImei],
+    });
+    return true;
+  }
+
+  private async executeOnTx(
+    tx: Prisma.TransactionClient,
+    dto: ExchangeDto,
+    actor: string,
+    key?: string,
+    exactNewImei?: string,
+    exchangeRequestId?: string,
+    expectedAmounts?: { creditAmount: number; surchargeAmount: number },
+  ) {
       if (key) {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))::text AS locked`;
         const existing = await tx.order.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
@@ -94,11 +343,19 @@ export class ExchangesService {
       }
       const expectedLocation = order.fulfillmentLocation ?? order.storePointCode;
       const newUnit = await tx.deviceUnit.findFirst({
-        where: { productId: newProduct.id, status: 'in_stock', ...(expectedLocation ? { location: expectedLocation } : {}) },
+        where: {
+          productId: newProduct.id,
+          status: exchangeRequestId ? 'reserved' : 'in_stock',
+          consignmentItem: { is: null },
+          ...(exactNewImei ? { imei: exactNewImei } : {}),
+          ...(expectedLocation ? { location: expectedLocation } : {}),
+        },
         orderBy: { id: 'asc' },
       });
       if (!newUnit) {
-        throw new ConflictError('no_stock', `Нет свободных единиц ${newProduct.sku}`);
+        throw new ConflictError('no_stock', exactNewImei
+          ? `IMEI ${exactNewImei} из согласованного snapshot больше недоступен`
+          : `Нет свободных единиц ${newProduct.sku}`);
       }
       const newConsignment = await tx.consignmentItem.findUnique({ where: { unitId: newUnit.id }, select: { id: true } });
       if (newConsignment) {
@@ -110,8 +367,17 @@ export class ExchangesService {
       const cashShift = exactSurcharge > 0 && dto.method === PaymentMethod.cash
         ? await this.resolveCashShiftOnTx(tx, dto.shiftId, actor, point)
         : null;
-      if (exactSurcharge > 0 && dto.method !== PaymentMethod.cash && !externalReference) {
-        throw new ValidationError('exchange_external_reference_required', 'Для безналичной доплаты нужен внешний reference');
+      if (exactSurcharge > 0 && dto.method !== PaymentMethod.cash) {
+        throw new ValidationError(
+          'exchange_non_cash_provider_pending',
+          'Безналичная доплата станет доступна после provider-backed capture',
+        );
+      }
+      if (expectedAmounts && (
+        expectedAmounts.creditAmount !== creditAmount
+        || expectedAmounts.surchargeAmount !== exactSurcharge
+      )) {
+        throw new ConflictError('exchange_financial_snapshot_changed', 'Цена или зачёт изменились после запроса обмена');
       }
       const newTax = salesTaxSnapshot([{
         lineNumber: 1,
@@ -231,7 +497,19 @@ export class ExchangesService {
           }] },
         },
       });
-      await this.units.reserveOnTx(tx, newUnit.imei, newOrder.id);
+      if (exchangeRequestId) {
+        const request = await tx.exchangeRequest.findUnique({ where: { id: exchangeRequestId } });
+        if (!request || request.newUnitId !== newUnit.id || request.status !== 'requested') {
+          throw new ConflictError('exchange_replacement_hold_lost', 'Replacement IMEI больше не закреплён за заявкой');
+        }
+        const assigned = await tx.deviceUnit.updateMany({
+          where: { id: newUnit.id, status: 'reserved', orderId: null },
+          data: { orderId: newOrder.id },
+        });
+        if (assigned.count !== 1) throw new ConflictError('exchange_replacement_hold_lost', 'Replacement IMEI уже занят');
+      } else {
+        await this.units.reserveOnTx(tx, newUnit.imei, newOrder.id);
+      }
       await this.units.sellOnTx(tx, newUnit.imei, newOrder.id, actor);
       const newTaxMetadata = outputTaxMetadata(newTax.lines);
       const replacementSale = await postAccountingEntryOnTx(tx, {
@@ -334,7 +612,106 @@ export class ExchangesService {
         },
         events,
       };
+  }
+
+  private async prepareSnapshotOnTx(tx: Prisma.TransactionClient, dto: ExchangeDto, actor: string) {
+    const order = await tx.order.findUnique({ where: { id: dto.originalOrderId }, include: { items: true } });
+    if (!order) throw new ValidationError('order_not_found', `Заказ ${dto.originalOrderId} не найден`);
+    const oldItem = order.items.find((item) => item.imei === dto.oldImei);
+    if (!oldItem) throw new ValidationError('item_not_found', `IMEI ${dto.oldImei} не в этом заказе`);
+    const oldUnit = await tx.deviceUnit.findUnique({ where: { imei: dto.oldImei } });
+    if (!oldUnit || oldUnit.status !== 'sold' || oldUnit.orderId !== order.id || oldItem.qty !== 1) {
+      throw new ConflictError('not_exchangeable', `IMEI ${dto.oldImei} нельзя обменять`);
+    }
+    if (await tx.consignmentItem.findUnique({ where: { unitId: oldUnit.id }, select: { id: true } })) {
+      throw new ConflictError('exchange_consignment_requires_return', 'Комиссионный товар обменивается через обычный возврат');
+    }
+    assertTransition(order.status, 'exchanged');
+    const newProduct = await tx.product.findUnique({ where: { id: dto.newProductId } });
+    if (!newProduct) throw new ValidationError('product_not_found', 'Новый товар не найден');
+    const creditAmount = oldItem.price - oldItem.discountAmount;
+    const surchargeAmount = newProduct.price - creditAmount;
+    if (creditAmount <= 0) throw new ConflictError('exchange_credit_invalid', 'Нет положительной зачётной стоимости');
+    if (surchargeAmount < 0) throw new ValidationError('exchange_needs_refund', 'Новый товар дешевле — используйте возврат + refund');
+    if (!SURCHARGE_METHODS.has(dto.method)) throw new ValidationError('exchange_surcharge_method_invalid', 'Способ доплаты не поддерживается');
+    const location = order.fulfillmentLocation ?? order.storePointCode;
+    const newUnit = await tx.deviceUnit.findFirst({
+      where: {
+        productId: newProduct.id,
+        status: 'in_stock',
+        consignmentItem: { is: null },
+        ...(location ? { location } : {}),
+      },
+      orderBy: { id: 'asc' },
     });
+    if (!newUnit) throw new ConflictError('no_stock', `Нет свободных единиц ${newProduct.sku}`);
+    await tx.$queryRaw`SELECT id FROM "DeviceUnit" WHERE id = ${newUnit.id} FOR UPDATE`;
+    const lockedNewUnit = await tx.deviceUnit.findUnique({ where: { id: newUnit.id } });
+    if (!lockedNewUnit || lockedNewUnit.status !== 'in_stock' || lockedNewUnit.orderId) {
+      throw new ConflictError('exchange_replacement_race', 'Выбранный IMEI уже занят другой операцией');
+    }
+    const point = order.storePointCode ?? newUnit.location;
+    const externalReference = dto.externalReference?.trim() || null;
+    const shift = surchargeAmount > 0 && dto.method === PaymentMethod.cash
+      ? await this.resolveCashShiftOnTx(tx, dto.shiftId, actor, point)
+      : null;
+    if (surchargeAmount > 0 && dto.method !== PaymentMethod.cash) {
+      throw new ValidationError(
+        'exchange_non_cash_provider_pending',
+        'Безналичная доплата станет доступна после provider-backed capture',
+      );
+    }
+    return {
+      originalOrderId: order.id,
+      oldImei: dto.oldImei,
+      newProductId: newProduct.id,
+      newUnitId: lockedNewUnit.id,
+      newImei: lockedNewUnit.imei,
+      creditAmount,
+      surchargeAmount,
+      method: dto.method,
+      shiftId: shift?.id ?? null,
+      externalReference,
+    };
+  }
+
+  private assertRequestReplay(
+    request: {
+      requester: string; originalOrderId: string; oldImei: string; newProductId: string;
+      method: PaymentMethod; shiftId: string | null; externalReference: string | null;
+    },
+    dto: ExchangeDto,
+    actor: string,
+  ) {
+    if (
+      request.requester !== actor
+      || request.originalOrderId !== dto.originalOrderId
+      || request.oldImei !== dto.oldImei
+      || request.newProductId !== dto.newProductId
+      || request.method !== dto.method
+      || (dto.shiftId?.trim() ? request.shiftId !== dto.shiftId.trim() : false)
+      || request.externalReference !== (dto.externalReference?.trim() || null)
+    ) {
+      throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован для другой заявки обмена');
+    }
+  }
+
+  private requestResult(request: {
+    id: string; approvalId: string; status: string; oldImei: string; newImei: string;
+    creditAmount: number; surchargeAmount: number; expiresAt: Date;
+  }, idempotent: boolean) {
+    return {
+      exchangeRequestId: request.id,
+      approvalId: request.approvalId,
+      status: request.status,
+      oldImei: request.oldImei,
+      newImei: request.newImei,
+      creditAmount: request.creditAmount,
+      surchargeAmount: request.surchargeAmount,
+      evidenceRequired: true,
+      expiresAt: request.expiresAt.toISOString(),
+      idempotent,
+    };
   }
 
   private async replayExchange(

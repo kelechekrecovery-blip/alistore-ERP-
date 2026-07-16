@@ -1,8 +1,8 @@
-import { BadRequestException, Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
-  ApiCreatedResponse,
+  ApiAcceptedResponse,
   ApiOperation,
   ApiTags,
   ApiUnprocessableEntityResponse,
@@ -21,13 +21,12 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 export class ExchangesController {
   constructor(private readonly exchanges: ExchangesService) {}
 
-  @ApiOperation({
-    summary: 'Exchange a device: return old + sell new + collect surcharge (atomic)',
-  })
-  @ApiCreatedResponse({ description: 'Exchange completed; new paid order + ledger trail.' })
+  @ApiOperation({ summary: 'Park an exact exchange snapshot for evidence and senior approval' })
+  @ApiAcceptedResponse({ description: 'Exchange request created; no money or stock changed.' })
   @ApiConflictResponse({ description: 'Old unit not sold, or no stock for the new device.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order/item/product, or cheaper exchange.' })
   @Post()
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('exchanges', 'create')
@@ -39,6 +38,6 @@ export class ExchangesController {
     const key = idempotencyKey?.trim();
     if (!key) throw new BadRequestException('Idempotency-Key обязателен');
     if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
-    return this.exchanges.exchange(dto, user.customerId, key);
+    return this.exchanges.request(dto, user.customerId, key);
   }
 }

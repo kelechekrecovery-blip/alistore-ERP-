@@ -15,4 +15,9 @@ android {
   buildFeatures { compose = true; buildConfig = true }
 }
 kotlin { jvmToolchain(17) }
-dependencies { implementation(project(":core")); implementation(platform(libs.androidx.compose.bom)); implementation(libs.androidx.activity.compose) }
+dependencies {
+  implementation(project(":core"))
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.biometric)
+}

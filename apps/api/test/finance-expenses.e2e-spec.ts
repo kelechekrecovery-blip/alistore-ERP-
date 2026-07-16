@@ -553,7 +553,8 @@ describe('Finance expenses (integration + RBAC)', () => {
         .expect(201);
       return created.body.id as string;
     };
-    const [firstId, secondId] = await Promise.all([createApproved('shared-a'), createApproved('shared-b')]);
+    const firstId = await createApproved('shared-a');
+    const secondId = await createApproved('shared-b');
     const payload = { idempotencyKey: `expense-payment-${run}-shared`, fundingAccountCode: '1000' };
     const firstPayment = await request(app.getHttpServer())
       .post(`/finance/expenses/${firstId}/pay`)

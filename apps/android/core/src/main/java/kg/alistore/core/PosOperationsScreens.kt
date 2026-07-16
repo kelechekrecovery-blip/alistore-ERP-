@@ -390,6 +390,7 @@ private fun PosAfterSaleScreen(
   modifier: Modifier,
 ) {
   val scope = rememberCoroutineScope()
+  val context = LocalContext.current
   var returns by remember { mutableStateOf<List<PosReturn>>(emptyList()) }
   var orderId by rememberSaveable { mutableStateOf("") }
   var receipt by remember { mutableStateOf<PosReceipt?>(null) }
@@ -401,8 +402,21 @@ private fun PosAfterSaleScreen(
   var newProductId by rememberSaveable { mutableStateOf("") }
   var exchangeMethod by rememberSaveable { mutableStateOf("cash") }
   var exchangeKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
+  var exchangeEvidence by remember { mutableStateOf<StaffEvidenceDraft?>(null) }
   var busy by remember { mutableStateOf(false) }
   var message by remember { mutableStateOf<String?>(null) }
+  val exchangeEvidencePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    if (uri != null) {
+      val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+      if (bytes != null) {
+        exchangeEvidence = StaffEvidenceDraft(
+          bytes = bytes,
+          mimeType = context.contentResolver.getType(uri) ?: "image/jpeg",
+          fileName = "exchange-condition.jpg",
+        )
+      }
+    }
+  }
 
   fun refreshReturns() {
     scope.launch {
@@ -473,23 +487,33 @@ private fun PosAfterSaleScreen(
           Text("${product.name} · ${product.price} сом", fontSize = 11.sp)
         }
       }
+      OutlinedButton(
+        onClick = { exchangeEvidencePicker.launch("image/*") },
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("pos-exchange-evidence"),
+      ) { Text(if (exchangeEvidence == null) "Выбрать фото состояния" else "Фото состояния выбрано") }
       Button(
         onClick = {
           busy = true
           scope.launch {
             runCatching {
-              gateway.exchangePosDevice(PosExchangeRequest(orderId, oldImei, newProductId, exchangeMethod), session.accessToken, exchangeKey)
+              val result = gateway.exchangePosDevice(
+                PosExchangeRequest(orderId, oldImei, newProductId, exchangeMethod),
+                session.accessToken,
+                exchangeKey,
+              )
+              gateway.uploadPosExchangeEvidence(result.exchangeRequestId, requireNotNull(exchangeEvidence), session.accessToken)
+              result
             }.onSuccess {
-              message = "Обмен завершён · новый IMEI ${it.newImei.takeLast(8)} · доплата ${it.surcharge} сом"
-              exchangeKey = UUID.randomUUID().toString(); refreshReturns()
+              message = "Ожидает согласования #${it.approvalId.takeLast(8)} · IMEI ${it.newImei.takeLast(8)} · доплата ${it.surchargeAmount} сом"
+              exchangeKey = UUID.randomUUID().toString(); exchangeEvidence = null; oldImei = ""; newProductId = ""; refreshReturns()
             }.onFailure { message = it.message }
             busy = false
           }
         },
-        enabled = !busy && orderId.isNotBlank() && oldImei.isNotBlank() && newProductId.isNotBlank(),
+        enabled = !busy && orderId.isNotBlank() && oldImei.isNotBlank() && newProductId.isNotBlank() && exchangeEvidence != null,
         colors = ButtonDefaults.buttonColors(containerColor = PosLime, contentColor = PosInk),
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-exchange"),
-      ) { Text("Оформить обмен") }
+      ) { Text("Создать заявку на обмен") }
 
       Text("Очередь возвратов", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
     }

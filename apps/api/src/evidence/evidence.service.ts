@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { MediaService, type IngestedImage } from '../media/media.service';
+import { MediaCleanupService } from '../media/media-cleanup.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceEntityType, EvidenceImageDto } from './evidence.dto';
 import { ForbiddenException } from '@nestjs/common';
@@ -22,33 +23,60 @@ export class EvidenceService {
     private readonly audit: AuditService,
     private readonly media: MediaService,
     private readonly authz: AuthzService,
+    private readonly mediaCleanup: MediaCleanupService,
   ) {}
 
   async attachImage(input: Buffer, dto: EvidenceImageDto, trustedStaffEvidence = false): Promise<EvidenceAttachment> {
     await this.assertEntityExists(dto.entityType, dto.entityId);
     const label = dto.label?.trim() || null;
-    const asset = await this.media.ingestImage(
-      input,
-      `evidence/${dto.entityType}/${dto.entityId}`,
+    const prefix = `evidence/${dto.entityType}/${dto.entityId}`;
+    const prepared = await this.media.prepareImage(input);
+    const objectKey = this.media.createImageKey(prefix);
+    await this.mediaCleanup.registerIntent(objectKey);
+    const asset = await this.media.storePreparedImage(
+      prepared,
+      prefix,
+      objectKey,
     );
 
-    return this.audit.transaction(async () => ({
-      result: { entityType: dto.entityType, entityId: dto.entityId, asset, label },
-      events: [
-        {
-          type: EventType.EvidenceAttached,
-          actor: dto.actor ?? 'system',
-          payload: {
-            entityType: dto.entityType,
-            entityId: dto.entityId,
-            label,
-            asset,
-            trustedStaffEvidence,
-          },
-          refs: [dto.entityId, asset.key],
-        },
-      ],
-    }));
+    try {
+      return await this.audit.transaction(async (tx) => {
+        if (trustedStaffEvidence && dto.entityType === 'exchange') {
+          await tx.$queryRaw`SELECT id FROM "ExchangeRequest" WHERE id = ${dto.entityId} FOR UPDATE`;
+          const request = await tx.exchangeRequest.findUnique({
+            where: { id: dto.entityId },
+            select: { requester: true, status: true, expiresAt: true },
+          });
+          if (!request
+            || request.status !== 'requested'
+            || request.expiresAt <= new Date()
+            || dto.actor !== `staff:${request.requester}`) {
+            throw new ForbiddenException('exchange_evidence_request_changed');
+          }
+        }
+        await this.mediaCleanup.markRetainedOnTx(tx, asset.key);
+        return {
+          result: { entityType: dto.entityType, entityId: dto.entityId, asset, label },
+          events: [
+            {
+              type: EventType.EvidenceAttached,
+              actor: dto.actor ?? 'system',
+              payload: {
+                entityType: dto.entityType,
+                entityId: dto.entityId,
+                label,
+                asset,
+                trustedStaffEvidence,
+              },
+              refs: [dto.entityId, asset.key],
+            },
+          ],
+        };
+      });
+    } catch (error) {
+      await this.mediaCleanup.deleteOrSchedule(asset.key);
+      throw error;
+    }
   }
 
   async assertStaffCanAttachLoanerCustody(staffId: string, loanId: string): Promise<void> {
@@ -62,6 +90,22 @@ export class EvidenceService {
     if (!loan) throw new ValidationError('evidence_entity_not_found', `loaner ${loanId} не найден`);
     if (!['admin', 'owner'].includes(staff.role) && staff.point !== loan.workOrder.point) {
       throw new ForbiddenException('loaner_evidence_point_mismatch');
+    }
+  }
+
+  async assertStaffCanAttachExchange(staffId: string, exchangeRequestId: string): Promise<void> {
+    const request = await this.prisma.exchangeRequest.findUnique({
+      where: { id: exchangeRequestId },
+      select: { requester: true, status: true, expiresAt: true },
+    });
+    if (!request) {
+      throw new ValidationError('evidence_entity_not_found', `exchange ${exchangeRequestId} не найден`);
+    }
+    if (request.status !== 'requested' || request.expiresAt <= new Date()) {
+      throw new ForbiddenException('exchange_evidence_request_resolved');
+    }
+    if (request.requester !== staffId) {
+      throw new ForbiddenException('exchange_evidence_requester_mismatch');
     }
   }
 
@@ -93,6 +137,7 @@ export class EvidenceService {
       case 'inventory':
       case 'shift':
       case 'quarantine':
+      case 'exchange':
         throw new ForbiddenException('evidence_staff_only_entity');
     }
     if (!ownerId) throw new ValidationError('evidence_entity_not_found', `${type} ${id} не найден`);
@@ -126,6 +171,8 @@ export class EvidenceService {
         return this.prisma.loanerLoan.findUnique({ where: { id } });
       case 'quarantine':
         return this.prisma.inventoryQuarantineCase.findUnique({ where: { id } });
+      case 'exchange':
+        return this.prisma.exchangeRequest.findUnique({ where: { id } });
     }
   }
 }

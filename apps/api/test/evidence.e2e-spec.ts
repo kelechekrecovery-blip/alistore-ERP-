@@ -8,6 +8,7 @@ import { ValidationError } from '../src/common/errors';
 import { ForbiddenException } from '@nestjs/common';
 import { EvidenceService } from '../src/evidence/evidence.service';
 import { MediaService } from '../src/media/media.service';
+import { MediaCleanupService } from '../src/media/media-cleanup.service';
 import { LocalDiskStorage } from '../src/media/storage/local-disk.storage';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthzService } from '../src/authz/authz.service';
@@ -26,11 +27,13 @@ describe('Evidence Vault (integration)', () => {
       get: (key: string) =>
         ({ MEDIA_LOCAL_DIR: dir, MEDIA_PUBLIC_BASE: '/uploads' } as Record<string, string>)[key],
     } as unknown as ConfigService;
+    const media = new MediaService(new LocalDiskStorage(config));
     evidence = new EvidenceService(
       prisma,
       new AuditService(prisma),
-      new MediaService(new LocalDiskStorage(config)),
+      media,
       { can: async () => true } as unknown as AuthzService,
+      new MediaCleanupService(prisma, media),
     );
   });
 
@@ -40,7 +43,14 @@ describe('Evidence Vault (integration)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ExchangeRequest" CASCADE');
     await prisma.auditEvent.deleteMany();
+    await prisma.payment.deleteMany({ where: { serviceWorkOrderId: { not: null } } });
+    await prisma.loanerLoan.deleteMany();
+    await prisma.loanerDevice.deleteMany();
+    await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.servicePart.deleteMany();
+    await prisma.serviceWorkOrder.deleteMany();
     await prisma.supportTicket.deleteMany();
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
@@ -51,8 +61,6 @@ describe('Evidence Vault (integration)', () => {
     await prisma.customer.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.inventoryMovement.deleteMany();
-    await prisma.loanerLoan.deleteMany();
-    await prisma.loanerDevice.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
   });

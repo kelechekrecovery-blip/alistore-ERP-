@@ -9,4 +9,9 @@ interface PosGateway {
   suspend fun transitionPosReturn(returnId: String, status: String, token: String): PosReturn
   suspend fun requestPosRefund(paymentId: String, amount: Int, reason: String, token: String): String
   suspend fun exchangePosDevice(request: PosExchangeRequest, token: String, idempotencyKey: String): PosExchangeResult
+  suspend fun uploadPosExchangeEvidence(
+    exchangeRequestId: String,
+    file: StaffEvidenceDraft,
+    token: String,
+  ): EvidenceAttachment = error("POS exchange evidence is not configured")
 }

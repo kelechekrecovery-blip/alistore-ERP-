@@ -325,6 +325,20 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     idempotencyKey = idempotencyKey,
   ).posExchange()
 
+  override suspend fun uploadPosExchangeEvidence(
+    exchangeRequestId: String,
+    file: StaffEvidenceDraft,
+    token: String,
+  ): EvidenceAttachment = uploadEvidenceRequest(
+    "exchange",
+    exchangeRequestId,
+    "exchange_condition",
+    file.fileName,
+    file.mimeType,
+    file.bytes,
+    token,
+  )
+
   override suspend fun uploadEvidence(
     entityType: String,
     entityId: String,
@@ -589,8 +603,10 @@ private fun JSONObject.posReturn() = PosReturn(
 )
 
 private fun JSONObject.posExchange() = PosExchangeResult(
-  exchangeOrderId = getString("exchangeOrderId"), returnId = getString("returnId"),
-  surcharge = getInt("surcharge"), oldImei = getString("oldImei"), newImei = getString("newImei"),
+  exchangeRequestId = getString("exchangeRequestId"), approvalId = getString("approvalId"),
+  status = getString("status"), oldImei = getString("oldImei"), newImei = getString("newImei"),
+  surchargeAmount = getInt("surchargeAmount"), evidenceRequired = getBoolean("evidenceRequired"),
+  expiresAt = getString("expiresAt"), idempotent = getBoolean("idempotent"),
 )
 
 private fun JSONObject.cashShift() = CashShift(

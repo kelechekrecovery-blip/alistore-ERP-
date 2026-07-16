@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Role, StaffUser } from '@prisma/client';
+import { Prisma, Role, StaffUser } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForbiddenError, ValidationError } from '../common/errors';
@@ -152,6 +152,33 @@ export class StaffAuthService {
     // Consume atomically: two concurrent approval requests carrying the same current code
     // cannot both pass after reading the same previous value.
     const consumed = await this.prisma.staffUser.updateMany({
+      where: {
+        id: staffId,
+        OR: [{ totpLastToken: null }, { totpLastToken: { not: token } }],
+      },
+      data: { totpLastToken: token },
+    });
+    if (consumed.count === 0) {
+      throw new ForbiddenError('staff_2fa_token_reused', 'Код уже использован — дождитесь нового');
+    }
+  }
+
+  /** Transactional variant: a failed dangerous action rolls the consumed code back. */
+  async verifyStepUpOnTx(tx: Prisma.TransactionClient, staffId: string, token?: string) {
+    const staff = await tx.staffUser.findUnique({ where: { id: staffId } });
+    if (!staff || !staff.active) {
+      throw new ForbiddenError('staff_not_found', 'Сотрудник не найден или отключён');
+    }
+    if (!staff.totpEnabled || !staff.totpSecret) {
+      throw new ForbiddenError('staff_2fa_required', 'Включите 2FA перед одобрением опасных действий');
+    }
+    if (!token) {
+      throw new ForbiddenError('staff_2fa_token_required', 'Введите код 2FA');
+    }
+    if (!this.totp.verify(token, staff.totpSecret)) {
+      throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
+    }
+    const consumed = await tx.staffUser.updateMany({
       where: {
         id: staffId,
         OR: [{ totpLastToken: null }, { totpLastToken: { not: token } }],

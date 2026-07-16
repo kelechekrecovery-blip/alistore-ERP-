@@ -121,6 +121,7 @@ targets:
         UILaunchScreen: {}
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование штрихкодов и IMEI на кассе
+        NSPhotoLibraryUsageDescription: Выбор фото состояния устройства для согласования обмена
         NSFaceIDUsageDescription: Быстрый и защищённый вход в кассу
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.pos

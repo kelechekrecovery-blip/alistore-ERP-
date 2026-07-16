@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -6,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { canApprove, Role } from '../rbac/permissions';
 import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors';
+import { ExchangesService } from '../exchanges/exchanges.service';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
@@ -36,10 +38,12 @@ export class ApprovalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly exchanges?: ExchangesService,
+    @Optional() private readonly staffAuth?: StaffAuthService,
   ) {}
 
   get(id: string) {
-    return this.prisma.approval.findUnique({ where: { id } });
+    return this.prisma.approval.findUnique({ where: { id }, include: { exchangeRequest: true } });
   }
 
   list(status?: string) {
@@ -47,6 +51,7 @@ export class ApprovalsService {
       where: status ? { status: status as never } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 100,
+      include: { exchangeRequest: true },
     });
   }
 
@@ -81,8 +86,20 @@ export class ApprovalsService {
 
   /** Approve (executes the parked action) or reject an approval. */
   async decide(id: string, input: DecideInput) {
+    return this.audit.transaction((tx) => this.decideOnTx(tx, id, input));
+  }
+
+  async decideWithStepUp(id: string, input: DecideInput, totpToken?: string) {
     return this.audit.transaction(async (tx) => {
-      const approval = await tx.approval.findUnique({ where: { id } });
+      if (!this.staffAuth) throw new ConflictError('staff_auth_missing', 'Step-up executor не подключён');
+      await this.staffAuth.verifyStepUpOnTx(tx, input.approver, totpToken);
+      return this.decideOnTx(tx, id, input);
+    });
+  }
+
+  private async decideOnTx(tx: Prisma.TransactionClient, id: string, input: DecideInput) {
+      await tx.$queryRaw`SELECT id FROM "Approval" WHERE id = ${id} FOR UPDATE`;
+      const approval = await tx.approval.findUnique({ where: { id }, include: { exchangeRequest: true } });
       if (!approval) {
         throw new ValidationError('approval_not_found', `Approval ${id} не найден`);
       }
@@ -99,12 +116,32 @@ export class ApprovalsService {
           `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
-      if (['campaign_budget', 'refund', 'quarantine_write_off'].includes(approval.action)
+      if (['campaign_budget', 'refund', 'quarantine_write_off', 'exchange'].includes(approval.action)
         && approval.requester === input.approver) {
         throw new ForbiddenError(
           'four_eye_approval_required',
-          'Автор кампании не может согласовать собственный бюджет',
+          'Инициатор не может согласовать собственное материальное действие',
         );
+      }
+      if (approval.action === 'exchange') {
+        if (!this.exchanges) throw new ConflictError('exchange_executor_missing', 'Exchange executor не подключён');
+        if (!approval.exchangeRequest) {
+          throw new ConflictError('exchange_request_missing', 'Approval не связан с заявкой обмена');
+        }
+        const expiryEvents: AuditInput[] = [];
+        const expired = await this.exchanges.expireIfPastDeadlineOnTx(
+          tx,
+          approval.exchangeRequest.id,
+          id,
+          new Date(),
+          expiryEvents,
+        );
+        if (expired) {
+          return {
+            result: await tx.approval.findUnique({ where: { id } }),
+            events: expiryEvents,
+          };
+        }
       }
 
       // Atomically claim the decision — two concurrent decides cannot both flip
@@ -138,6 +175,17 @@ export class ApprovalsService {
         if (reject && payload) {
           await reject(tx, payload, input.approver, id, input.reason ?? null, events);
         }
+        if (approval.action === 'exchange' && approval.exchangeRequest) {
+          if (!this.exchanges) throw new ConflictError('exchange_executor_missing', 'Exchange executor не подключён');
+          await this.exchanges.rejectApprovedOnTx(
+            tx,
+            approval.exchangeRequest.id,
+            id,
+            input.approver,
+            input.reason ?? null,
+            events,
+          );
+        }
         return {
           result: updated,
           events,
@@ -159,8 +207,20 @@ export class ApprovalsService {
       if (execute && payload) {
         await execute(tx, payload, input.approver, id, events);
       }
+      if (approval.action === 'exchange') {
+        if (!this.exchanges) throw new ConflictError('exchange_executor_missing', 'Exchange executor не подключён');
+        if (!approval.exchangeRequest) {
+          throw new ConflictError('exchange_request_missing', 'Approval не связан с заявкой обмена');
+        }
+        const exchange = await this.exchanges.executeApprovedOnTx(
+          tx,
+          approval.exchangeRequest.id,
+          input.approver,
+          id,
+        );
+        events.push(...exchange.events);
+      }
 
       return { result: updated, events };
-    });
   }
 }

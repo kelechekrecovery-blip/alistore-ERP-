@@ -7,7 +7,18 @@ export interface Approval {
   approver?: string | null;
   status: string;
   reason: string;
-  evidence?: { payload?: { paymentId?: string; amount?: number } | null } | null;
+  evidence?: { payload?: {
+    paymentId?: string;
+    amount?: number;
+    oldImei?: string;
+    newImei?: string;
+    creditAmount?: number;
+    surchargeAmount?: number;
+    method?: string;
+    shiftId?: string | null;
+    externalReference?: string | null;
+  } | null } | null;
+  exchangeRequest?: { id: string; status: string } | null;
   createdAt: string;
 }
 

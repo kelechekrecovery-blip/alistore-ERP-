@@ -651,8 +651,8 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(approval.approvalId, "approval-refund-1")
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer cashier-token")
 
-        session = makeSession(status: 201, body: """
-        {"exchangeOrderId":"exchange-1","returnId":"return-1","surcharge":10000,"oldImei":"111111111111111","newImei":"222222222222222"}
+        session = makeSession(status: 202, body: """
+        {"exchangeRequestId":"exchange-request-1","approvalId":"approval-exchange-1","status":"requested","oldImei":"111111111111111","newImei":"222222222222222","creditAmount":100000,"surchargeAmount":10000,"evidenceRequired":true,"expiresAt":"2026-07-16T13:30:00.000Z","idempotent":false}
         """)
         client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
         let result: POSExchangeResult = try await client.post(
@@ -661,6 +661,8 @@ final class APIClientTests: XCTestCase {
             token: "cashier-token",
             idempotencyKey: "exchange-key-1"
         )
+        XCTAssertEqual(result.exchangeRequestId, "exchange-request-1")
+        XCTAssertEqual(result.approvalId, "approval-exchange-1")
         XCTAssertEqual(result.newImei, "222222222222222")
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "exchange-key-1")
     }

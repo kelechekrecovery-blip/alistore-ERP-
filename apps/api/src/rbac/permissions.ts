@@ -28,6 +28,7 @@ export const APPROVAL_APPROVER_ROLES: Record<string, Role[]> = {
   price: ['admin', 'owner'],
   write_off: ['owner'],
   quarantine_write_off: ['owner'],
+  exchange: ['senior_seller', 'admin', 'owner'],
   stock_adjust: ['owner'],
   debt: ['senior_seller', 'admin', 'owner'],
   delete: ['owner'],

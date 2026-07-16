@@ -38,6 +38,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Быстрый и защищённый вход в AliStore</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

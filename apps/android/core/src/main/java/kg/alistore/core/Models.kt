@@ -115,11 +115,15 @@ data class PosExchangeRequest(
   val method: String,
 )
 data class PosExchangeResult(
-  val exchangeOrderId: String,
-  val returnId: String,
-  val surcharge: Int,
+  val exchangeRequestId: String,
+  val approvalId: String,
+  val status: String,
   val oldImei: String,
   val newImei: String,
+  val surchargeAmount: Int,
+  val evidenceRequired: Boolean,
+  val expiresAt: String,
+  val idempotent: Boolean,
 )
 data class PosSaleRequest(
   val point: String,

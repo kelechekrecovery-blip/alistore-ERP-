@@ -128,7 +128,7 @@ async function clearImmutableFinanceAggregates() {
     throw new Error(`Refusing destructive E2E cleanup outside an explicit test database: ${database ?? 'unknown'}`);
   }
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "GiftCardTransaction", "RefundLine", "RefundAllocation", "Refund", "AccountingJournalEntry" CASCADE',
+    'TRUNCATE TABLE "ExchangeRequest", "GiftCardTransaction", "RefundLine", "RefundAllocation", "Refund", "AccountingJournalEntry" CASCADE',
   );
 }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { MediaStorage, StoredObject } from '../media-storage';
 
@@ -23,10 +23,17 @@ export class LocalDiskStorage implements MediaStorage {
     key: string,
     body: Buffer,
     _contentType: string,
+    signal?: AbortSignal,
   ): Promise<StoredObject> {
     const path = join(this.dir, key);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, body);
+    await writeFile(path, body, { signal });
     return { key, url: `${this.publicBase}/${key}`, bytes: body.byteLength };
+  }
+
+  async delete(key: string): Promise<void> {
+    await unlink(join(this.dir, key)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
   }
 }

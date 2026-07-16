@@ -751,9 +751,13 @@ public struct POSExchangeRequest: Encodable, Sendable {
 }
 
 public struct POSExchangeResult: Decodable, Sendable {
-    public let exchangeOrderId: String
-    public let returnId: String
-    public let surcharge: Int
+    public let exchangeRequestId: String
+    public let approvalId: String
+    public let status: String
     public let oldImei: String
     public let newImei: String
+    public let surchargeAmount: Int
+    public let evidenceRequired: Bool
+    public let expiresAt: String
+    public let idempotent: Bool
 }

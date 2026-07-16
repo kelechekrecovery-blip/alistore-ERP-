@@ -31,7 +31,7 @@ export class EvidenceController {
       required: ['file', 'entityType', 'entityId'],
       properties: {
         file: { type: 'string', format: 'binary' },
-        entityType: { type: 'string', enum: ['tradein', 'return', 'warranty', 'inventory', 'order', 'support', 'shift', 'loaner', 'quarantine'] },
+        entityType: { type: 'string', enum: ['tradein', 'return', 'warranty', 'inventory', 'order', 'support', 'shift', 'loaner', 'quarantine', 'exchange'] },
         entityId: { type: 'string' },
         label: { type: 'string' },
         actor: { type: 'string' },
@@ -55,13 +55,15 @@ export class EvidenceController {
     }
     const custodyEvidence = dto.entityType === 'loaner' && ['loaner_issue', 'loaner_return'].includes(dto.label?.trim() ?? '');
     const quarantineEvidence = dto.entityType === 'quarantine' && dto.label?.trim() === 'quarantine_diagnosis';
-    const trustedStaffEvidence = custodyEvidence || quarantineEvidence;
+    const exchangeEvidence = dto.entityType === 'exchange' && dto.label?.trim() === 'exchange_condition';
+    const trustedStaffEvidence = custodyEvidence || quarantineEvidence || exchangeEvidence;
     let guestCustomerId: string | undefined;
     if (user?.typ === 'staff') {
       await this.staffAuth.me(user.customerId);
       if (custodyEvidence) await this.evidence.assertStaffCanAttachLoanerCustody(user.customerId, dto.entityId);
+      if (exchangeEvidence) await this.evidence.assertStaffCanAttachExchange(user.customerId, dto.entityId);
     } else {
-      if (custodyEvidence) throw new ForbiddenException('loaner_evidence_staff_only');
+      if (custodyEvidence || exchangeEvidence) throw new ForbiddenException('staff_evidence_only');
       guestCustomerId = user?.typ === 'customer'
         ? undefined
         : requireGuestCapability(capability, 'evidence:write').sub;

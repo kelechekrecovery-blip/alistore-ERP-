@@ -13,8 +13,15 @@ export interface IngestedImage {
   format: 'webp';
 }
 
+export interface PreparedImage {
+  data: Buffer;
+  width: number;
+  height: number;
+}
+
 const MAX_DIMENSION = 1600; // downscale large uploads on the long edge
 const WEBP_QUALITY = 80;
+export const MEDIA_UPLOAD_TIMEOUT_MS = 2 * 60_000;
 
 /**
  * Ingest an uploaded image: downscale to <= MAX_DIMENSION on the long edge,
@@ -26,7 +33,16 @@ const WEBP_QUALITY = 80;
 export class MediaService {
   constructor(@Inject(MEDIA_STORAGE) private readonly storage: MediaStorage) {}
 
-  async ingestImage(input: Buffer, prefix = 'media'): Promise<IngestedImage> {
+  createImageKey(prefix = 'media'): string {
+    return `${prefix}/${randomUUID()}.webp`;
+  }
+
+  async ingestImage(input: Buffer, prefix = 'media', objectKey?: string): Promise<IngestedImage> {
+    const prepared = await this.prepareImage(input);
+    return this.storePreparedImage(prepared, prefix, objectKey);
+  }
+
+  async prepareImage(input: Buffer): Promise<PreparedImage> {
     if (!input || input.byteLength === 0) {
       throw new ValidationError('empty_upload', 'Пустой файл');
     }
@@ -47,15 +63,39 @@ export class MediaService {
       throw new ValidationError('not_an_image', 'Файл не является изображением');
     }
 
-    const key = `${prefix}/${randomUUID()}.webp`;
-    const stored = await this.storage.put(key, output.data, 'image/webp');
+    return {
+      data: output.data,
+      width: output.info.width,
+      height: output.info.height,
+    };
+  }
+
+  async storePreparedImage(
+    prepared: PreparedImage,
+    prefix = 'media',
+    objectKey?: string,
+  ): Promise<IngestedImage> {
+    const key = objectKey ?? this.createImageKey(prefix);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MEDIA_UPLOAD_TIMEOUT_MS);
+    timeout.unref();
+    let stored;
+    try {
+      stored = await this.storage.put(key, prepared.data, 'image/webp', controller.signal);
+    } finally {
+      clearTimeout(timeout);
+    }
     return {
       key: stored.key,
       url: stored.url,
-      width: output.info.width,
-      height: output.info.height,
+      width: prepared.width,
+      height: prepared.height,
       bytes: stored.bytes,
       format: 'webp',
     };
+  }
+
+  async deleteImage(key: string): Promise<void> {
+    await this.storage.delete(key);
   }
 }
