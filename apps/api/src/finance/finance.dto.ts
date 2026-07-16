@@ -127,6 +127,25 @@ export class CreateOpeningBalanceDto {
   lines!: CreateOpeningBalanceLineDto[];
 }
 
+export class CreateFixedAssetDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(64) @Matches(/\S/) assetNumber!: string;
+  @IsString() @MinLength(2) @MaxLength(200) @Matches(/\S/) name!: string;
+  @IsString() @MinLength(2) @MaxLength(100) @Matches(/\S/) category!: string;
+  @IsOptional() @IsString() @MaxLength(128) serialNumber?: string;
+  @IsInt() @Min(1) @Max(2147483647) acquisitionCost!: number;
+  @IsInt() @Min(1) @Max(600) usefulLifeMonths!: number;
+  @IsISO8601({ strict: true }) acquiredAt!: string;
+  @IsOptional() @IsISO8601({ strict: true }) inServiceAt?: string;
+  @IsOptional() @IsIn(['1000', '1010', '1020']) fundingAccountCode?: '1000' | '1010' | '1020';
+  @IsOptional() @IsString() @MaxLength(160) externalRef?: string;
+}
+
+export class DepreciateFixedAssetDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
+}
+
 export class SettleTaxPeriodDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsOptional() @IsString() @MaxLength(100) point?: string;

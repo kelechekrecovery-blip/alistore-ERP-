@@ -5,6 +5,8 @@ export const ACCOUNTING_ACCOUNT_SEED = [
   { code: '1100', name: 'Дебиторская задолженность', type: 'asset' },
   { code: '1200', name: 'Товарные запасы', type: 'asset' },
   { code: '1300', name: 'Авансы поставщикам', type: 'asset' },
+  { code: '1400', name: 'Основные средства', type: 'asset' },
+  { code: '1410', name: 'Накопленная амортизация', type: 'asset' },
   { code: '2000', name: 'Задолженность поставщикам', type: 'liability' },
   { code: '2100', name: 'Задолженность по зарплате', type: 'liability' },
   { code: '2200', name: 'Налоги к уплате', type: 'liability' },
@@ -19,6 +21,7 @@ export const ACCOUNTING_ACCOUNT_SEED = [
   { code: '6400', name: 'Маркетинг', type: 'expense' },
   { code: '6500', name: 'Коммунальные расходы', type: 'expense' },
   { code: '6600', name: 'Расходы на закупку', type: 'expense' },
+  { code: '6700', name: 'Расходы на амортизацию', type: 'expense' },
   { code: '6900', name: 'Прочие операционные расходы', type: 'expense' },
   { code: '6990', name: 'Финансовые расхождения', type: 'expense' },
 ] as const;

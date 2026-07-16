@@ -66,6 +66,8 @@ describe('Finance expenses (integration + RBAC)', () => {
       prisma.supplierInvoiceAdvanceAllocation.deleteMany(),
       prisma.supplierAdvance.deleteMany(),
       prisma.supplierInvoicePayment.deleteMany(),
+      prisma.fixedAssetDepreciation.deleteMany(),
+      prisma.fixedAsset.deleteMany(),
       prisma.accountingOpeningBalanceLine.deleteMany(),
       prisma.accountingOpeningBalance.deleteMany(),
       prisma.accountingJournalLine.deleteMany(),
@@ -538,6 +540,81 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(rows.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, period: '2025-01' })]));
     expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'finance.opening-balance', sourceRef: created.body.id } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'finance.opening_balance.created', refs: { has: created.body.id } } })).toBe(1);
+  });
+
+  it('registers fixed assets and posts sequential, replay-safe depreciation', async () => {
+    const payload = {
+      idempotencyKey: `fixed-asset-${run}`,
+      assetNumber: `FA-${run}`,
+      name: 'POS терминал',
+      category: 'equipment',
+      serialNumber: `POS-SN-${run}`,
+      acquisitionCost: 100_000,
+      usefulLifeMonths: 3,
+      acquiredAt: '2026-01-15T00:00:00.000Z',
+      inServiceAt: '2026-01-15T00:00:00.000Z',
+      fundingAccountCode: '1010',
+      externalRef: `FA-INVOICE-${run}`,
+    };
+
+    await request(app.getHttpServer()).get('/finance/fixed-assets').expect(401);
+    await request(app.getHttpServer()).post('/finance/fixed-assets').set('Authorization', `Bearer ${sellerToken}`).send(payload).expect(403);
+
+    const created = await request(app.getHttpServer())
+      .post('/finance/fixed-assets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(payload)
+      .expect(201);
+    expect(created.body).toMatchObject({ assetNumber: payload.assetNumber, acquisitionCost: 100_000, accumulatedDepreciation: 0, status: 'active', idempotent: false });
+    expect(created.body.acquisitionAccountingEntry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1400', debit: 100_000, credit: 0 }),
+      expect.objectContaining({ accountCode: '1010', debit: 0, credit: 100_000 }),
+    ]));
+
+    const replay = await request(app.getHttpServer())
+      .post('/finance/fixed-assets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(payload)
+      .expect(201);
+    expect(replay.body).toMatchObject({ id: created.body.id, idempotent: true });
+    await request(app.getHttpServer())
+      .post('/finance/fixed-assets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...payload, acquisitionCost: 110_000 })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post('/finance/fixed-assets')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ ...payload, idempotencyKey: `fixed-asset-${run}-number-conflict` })
+      .expect(409);
+
+    const depreciation = (period: string) => request(app.getHttpServer())
+      .post(`/finance/fixed-assets/${created.body.id}/depreciation`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ idempotencyKey: `fixed-asset-depreciation-${run}-${period}`, period });
+
+    const january = await depreciation('2026-01').expect(201);
+    expect(january.body).toMatchObject({ period: '2026-01', amount: 33_333, openingAccumulated: 0, closingAccumulated: 33_333, idempotent: false });
+    expect(january.body.accountingEntry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '6700', debit: 33_333, credit: 0 }),
+      expect.objectContaining({ accountCode: '1410', debit: 0, credit: 33_333 }),
+    ]));
+    const januaryReplay = await depreciation('2026-01').expect(201);
+    expect(januaryReplay.body).toMatchObject({ id: january.body.id, idempotent: true });
+    await depreciation('2026-03').expect(409);
+
+    const february = await depreciation('2026-02').expect(201);
+    expect(february.body).toMatchObject({ amount: 33_333, openingAccumulated: 33_333, closingAccumulated: 66_666 });
+    const march = await depreciation('2026-03').expect(201);
+    expect(march.body).toMatchObject({ amount: 33_334, openingAccumulated: 66_666, closingAccumulated: 100_000, fixedAsset: { status: 'fully_depreciated', accumulatedDepreciation: 100_000 } });
+    await depreciation('2026-04').expect(409);
+
+    const rows = await request(app.getHttpServer()).get('/finance/fixed-assets').set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(rows.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, status: 'fully_depreciated', accumulatedDepreciation: 100_000, depreciationEntries: expect.any(Array) })]));
+    expect(await prisma.fixedAssetDepreciation.count({ where: { fixedAssetId: created.body.id } })).toBe(3);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: { in: ['finance.fixed_asset.acquisition', 'finance.fixed_asset.depreciation'] } } })).toBe(4);
+    expect(await prisma.auditEvent.count({ where: { type: 'finance.fixed_asset_acquired', refs: { has: created.body.id } } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'finance.fixed_asset_depreciated', refs: { has: created.body.id } } })).toBe(3);
   });
 
   it('imports bank statements with balance control and exposes unmatched lines', async () => {

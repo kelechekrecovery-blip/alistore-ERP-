@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ACC-003C
+
+- Iteration ID: `ACC-003C`.
+- Task: add a server-authoritative fixed-asset register and sequential depreciation journals.
+- Files changed: fixed-asset Prisma models/migration, accounting chart, Finance DTO/controller/service, Ledger event catalogue and Finance integration coverage.
+- Result: owner-approved acquisitions persist inventory number, cost, useful life, dates, funding account and immutable acquisition journal provenance. The API posts balanced `1400`/`1000|1010|1020` entries, protects asset-number and idempotency boundaries, and replays the same aggregate only for an identical payload. Monthly straight-line depreciation is sequential from the service month, posts at the end of each calendar period to balanced `6700/1410` entries, applies deterministic final-month rounding, blocks over-depreciation/disposed assets and records acquisition/depreciation plus accounting Ledger events.
+- Checks run: `npm run prisma:generate`; `npx prisma validate`; API production build; `prisma migrate deploy` on `alistore_dev`; direct SQL migration on `alistore_test`; Finance integration 14/14; full API Jest 143/143 suites, 659/659 tests; `git diff --check`.
+- Acceptance: `accepted` for the local fixed-asset/depreciation software contour. Accountable advances, write-offs, manual adjustment approval, AR aging, primary-document exports, accountant/tax validation, staging/production deployment, physical hardware and first-store reconciliation remain open. Production readiness remains `RED` because external credentials, devices, provider certification, staging soak and missing design references are not available.
+- Commit: dedicated implementation commit created after this gate.
+- Next step: implement the next bounded `ACC-003` slice, prioritizing accountable-person advances and their settlement/reconciliation rules.
+
 # 2026-07-17 — ACC-003B
 
 - Iteration ID: `ACC-003B`.

@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
+import { CloseAccountingPeriodDto, CloseFinanceSettlementDto, CreateCashIncassationDto, CreateCurrencyRateDto, CreateExpenseDto, CreateFinanceSettlementDto, CreateFixedAssetDto, CreateOpeningBalanceDto, CurrencyRateQueryDto, DepreciateFixedAssetDto, FinanceAccountingQueryDto, FinancePeriodQueryDto, FinanceSettlementQueryDto, PayExpenseDto, RejectExpenseDto, ResolveFinanceSettlementDto, ReverseAccountingEntryDto, SetFinanceBudgetDto, SettleTaxPeriodDto, SupplierAgingQueryDto } from './finance.dto';
 import { FinanceService } from './finance.service';
 
 @ApiTags('finance')
@@ -101,6 +101,24 @@ export class FinancePlanningController {
   @RequirePermission('finance', 'approve')
   openingBalance(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateOpeningBalanceDto) {
     return this.finance.createOpeningBalance(dto, user.customerId);
+  }
+
+  @Get('fixed-assets')
+  @RequirePermission('finance', 'read')
+  fixedAssets() {
+    return this.finance.listFixedAssets();
+  }
+
+  @Post('fixed-assets')
+  @RequirePermission('finance', 'approve')
+  createFixedAsset(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateFixedAssetDto) {
+    return this.finance.createFixedAsset(dto, user.customerId);
+  }
+
+  @Post('fixed-assets/:id/depreciation')
+  @RequirePermission('finance', 'approve')
+  depreciateFixedAsset(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DepreciateFixedAssetDto) {
+    return this.finance.depreciateFixedAsset(id, dto, user.customerId);
   }
 
   @Post('periods/:period/close')

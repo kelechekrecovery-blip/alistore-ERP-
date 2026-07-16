@@ -376,6 +376,12 @@ enum HrPayrollStatus {
   paid
 }
 
+enum FixedAssetStatus {
+  active
+  fully_depreciated
+  disposed
+}
+
 enum PromotionStatus {
   draft
   active
@@ -1764,6 +1770,8 @@ model AccountingJournalEntry {
   openingBalance        AccountingOpeningBalance?
   hrPayrollAccrual       HrPayrollRun?          @relation("HrPayrollAccrual")
   hrPayrollPayout        HrPayrollRun?          @relation("HrPayrollPayout")
+  fixedAssetAcquisition  FixedAsset?            @relation("FixedAssetAcquisition")
+  fixedAssetDepreciation FixedAssetDepreciation? @relation("FixedAssetDepreciation")
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -1804,6 +1812,50 @@ model AccountingOpeningBalanceLine {
 
   @@unique([openingBalanceId, accountCode])
   @@index([accountCode, openingBalanceId])
+}
+
+model FixedAsset {
+  id                           String                   @id @default(cuid())
+  assetNumber                  String                   @unique
+  name                         String
+  category                     String
+  serialNumber                 String?
+  acquisitionCost              Int
+  accumulatedDepreciation      Int                      @default(0)
+  usefulLifeMonths             Int
+  acquiredAt                   DateTime
+  inServiceAt                  DateTime
+  fundingAccountCode           String
+  externalRef                  String?
+  status                       FixedAssetStatus         @default(active)
+  idempotencyKey               String                   @unique
+  createdBy                    String
+  acquisitionAccountingEntryId String                   @unique
+  acquisitionAccountingEntry   AccountingJournalEntry  @relation("FixedAssetAcquisition", fields: [acquisitionAccountingEntryId], references: [id], onDelete: Restrict)
+  depreciationEntries          FixedAssetDepreciation[]
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+
+  @@index([status, inServiceAt])
+  @@index([category, createdAt])
+}
+
+model FixedAssetDepreciation {
+  id                 String                  @id @default(cuid())
+  fixedAsset         FixedAsset              @relation(fields: [fixedAssetId], references: [id], onDelete: Restrict)
+  fixedAssetId       String
+  period             String
+  amount             Int
+  openingAccumulated Int
+  closingAccumulated Int
+  idempotencyKey     String                  @unique
+  accountingEntryId  String                  @unique
+  accountingEntry    AccountingJournalEntry @relation("FixedAssetDepreciation", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  postedBy           String
+  postedAt           DateTime                @default(now())
+
+  @@unique([fixedAssetId, period])
+  @@index([period, postedAt])
 }
 
 model AccountingPeriod {

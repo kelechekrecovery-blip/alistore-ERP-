@@ -24,6 +24,8 @@ import {
   CurrencyRateQueryDto,
   SETTLEMENT_SOURCE_TYPES,
   SettleTaxPeriodDto,
+  CreateFixedAssetDto,
+  DepreciateFixedAssetDto,
   CreateOpeningBalanceDto,
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
@@ -67,6 +69,137 @@ export class FinanceService {
       include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } }, lines: { orderBy: { accountCode: 'asc' } } },
       orderBy: { period: 'desc' },
       take: 120,
+    });
+  }
+
+  listFixedAssets() {
+    return this.prisma.fixedAsset.findMany({
+      include: {
+        acquisitionAccountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } },
+        depreciationEntries: { include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } } }, orderBy: { period: 'asc' } },
+      },
+      orderBy: [{ status: 'asc' }, { inServiceAt: 'asc' }],
+      take: 500,
+    });
+  }
+
+  async createFixedAsset(dto: CreateFixedAssetDto, actor: string) {
+    const acquiredAt = fixedAssetDate(dto.acquiredAt, 'acquiredAt');
+    const inServiceAt = fixedAssetDate(dto.inServiceAt ?? dto.acquiredAt, 'inServiceAt');
+    if (inServiceAt < acquiredAt) throw new ValidationError('fixed_asset_service_before_acquisition', 'Дата ввода в эксплуатацию не может быть раньше покупки');
+    if (dto.usefulLifeMonths > dto.acquisitionCost) throw new ValidationError('fixed_asset_useful_life_too_long', 'Срок амортизации в месяцах не может превышать стоимость в сомах');
+    const input = {
+      assetNumber: dto.assetNumber.trim(),
+      name: dto.name.trim(),
+      category: dto.category.trim(),
+      serialNumber: dto.serialNumber?.trim() || null,
+      acquisitionCost: dto.acquisitionCost,
+      usefulLifeMonths: dto.usefulLifeMonths,
+      acquiredAt,
+      inServiceAt,
+      fundingAccountCode: dto.fundingAccountCode ?? '1010',
+      externalRef: dto.externalRef?.trim() || null,
+    };
+    const existing = await this.prisma.fixedAsset.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { acquisitionAccountingEntry: { include: { lines: true } }, depreciationEntries: { orderBy: { period: 'asc' } } },
+    });
+    if (existing) return replayFixedAsset(existing, input);
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`fixed-asset:${input.assetNumber}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`fixed-asset-key:${dto.idempotencyKey}`}))`;
+      const replay = await tx.fixedAsset.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { acquisitionAccountingEntry: { include: { lines: true } }, depreciationEntries: { orderBy: { period: 'asc' } } },
+      });
+      if (replay) return { result: replayFixedAsset(replay, input), events: [] };
+      const byNumber = await tx.fixedAsset.findUnique({ where: { assetNumber: input.assetNumber }, select: { id: true } });
+      if (byNumber) throw new ConflictError('fixed_asset_number_exists', 'Инвентарный номер основного средства уже используется');
+
+      const assetId = randomUUID();
+      const accountingEntry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:fixed-asset:acquisition:${assetId}`,
+        sourceType: 'finance.fixed_asset.acquisition',
+        sourceRef: assetId,
+        description: `Приобретение основного средства ${input.assetNumber}`,
+        documentAmount: input.acquisitionCost,
+        baseAmount: input.acquisitionCost,
+        occurredAt: acquiredAt,
+        createdBy: actor,
+        lines: [
+          { accountCode: '1400', debit: input.acquisitionCost, memo: `Постановка на учёт: ${input.name}` },
+          { accountCode: input.fundingAccountCode, credit: input.acquisitionCost, memo: `Оплата основного средства${input.externalRef ? ` · ${input.externalRef}` : ''}` },
+        ],
+      });
+      const asset = await tx.fixedAsset.create({
+        data: { id: assetId, ...input, idempotencyKey: dto.idempotencyKey, createdBy: actor, acquisitionAccountingEntryId: accountingEntry.id },
+        include: { acquisitionAccountingEntry: { include: { lines: true } }, depreciationEntries: true },
+      });
+      return {
+        result: { ...asset, idempotent: false },
+        events: [
+          { type: EventType.FixedAssetAcquired, actor, payload: { fixedAssetId: asset.id, assetNumber: asset.assetNumber, acquisitionCost: asset.acquisitionCost, accountingEntryId: accountingEntry.id }, refs: [asset.id, asset.assetNumber, accountingEntry.id] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'finance.fixed_asset.acquisition', sourceRef: asset.id, amount: asset.acquisitionCost }, refs: [accountingEntry.id, asset.id, asset.assetNumber] },
+        ],
+      };
+    });
+  }
+
+  async depreciateFixedAsset(id: string, dto: DepreciateFixedAssetDto, actor: string) {
+    const period = validateMonth(dto.period);
+    const existing = await this.prisma.fixedAssetDepreciation.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { fixedAsset: true, accountingEntry: { include: { lines: true } } },
+    });
+    if (existing) return replayFixedAssetDepreciation(existing, id, period);
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`fixed-asset-depreciation:${id}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`fixed-asset-depreciation-key:${dto.idempotencyKey}`}))`;
+      const replay = await tx.fixedAssetDepreciation.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { fixedAsset: true, accountingEntry: { include: { lines: true } } },
+      });
+      if (replay) return { result: replayFixedAssetDepreciation(replay, id, period), events: [] };
+      const asset = await tx.fixedAsset.findUnique({ where: { id }, include: { depreciationEntries: { orderBy: { period: 'asc' } } } });
+      if (!asset) throw new ValidationError('fixed_asset_not_found', 'Основное средство не найдено');
+      if (asset.status === 'disposed') throw new ConflictError('fixed_asset_disposed', 'Для списанного основного средства амортизация запрещена');
+      const index = asset.depreciationEntries.length;
+      if (index >= asset.usefulLifeMonths || asset.accumulatedDepreciation >= asset.acquisitionCost) throw new ConflictError('fixed_asset_fully_depreciated', 'Основное средство уже полностью самортизировано');
+      const expectedPeriod = addMonthsToPeriod(monthKey(asset.inServiceAt), index);
+      if (period !== expectedPeriod) throw new ConflictError('fixed_asset_depreciation_sequence', `Следующий период амортизации: ${expectedPeriod}`);
+      const amount = fixedAssetDepreciationAmount(asset.acquisitionCost, asset.usefulLifeMonths, index);
+      const openingAccumulated = asset.accumulatedDepreciation;
+      const closingAccumulated = openingAccumulated + amount;
+      const depreciationId = randomUUID();
+      const accountingEntry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:fixed-asset:depreciation:${depreciationId}`,
+        sourceType: 'finance.fixed_asset.depreciation',
+        sourceRef: depreciationId,
+        description: `Амортизация ${asset.assetNumber} за ${period}`,
+        point: null,
+        documentAmount: amount,
+        baseAmount: amount,
+        occurredAt: new Date(periodBounds(period)[1].getTime() - 1),
+        createdBy: actor,
+        lines: [
+          { accountCode: '6700', debit: amount, memo: `Расходы на амортизацию: ${asset.name}` },
+          { accountCode: '1410', credit: amount, memo: `Накопленная амортизация: ${asset.assetNumber}` },
+        ],
+      });
+      const depreciation = await tx.fixedAssetDepreciation.create({
+        data: { id: depreciationId, fixedAssetId: asset.id, period, amount, openingAccumulated, closingAccumulated, idempotencyKey: dto.idempotencyKey, accountingEntryId: accountingEntry.id, postedBy: actor },
+        include: { fixedAsset: true, accountingEntry: { include: { lines: true } } },
+      });
+      const updatedAsset = await tx.fixedAsset.update({ where: { id: asset.id }, data: { accumulatedDepreciation: closingAccumulated, status: closingAccumulated >= asset.acquisitionCost ? 'fully_depreciated' : 'active' } });
+      return {
+        result: { ...depreciation, fixedAsset: updatedAsset, idempotent: false },
+        events: [
+          { type: EventType.FixedAssetDepreciated, actor, payload: { fixedAssetId: asset.id, depreciationId, assetNumber: asset.assetNumber, period, amount, accountingEntryId: accountingEntry.id }, refs: [asset.id, depreciationId, accountingEntry.id, period] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'finance.fixed_asset.depreciation', sourceRef: depreciationId, amount }, refs: [accountingEntry.id, depreciationId, asset.id, period] },
+        ],
+      };
     });
   }
 
@@ -1298,6 +1431,70 @@ function replayOpeningBalance(
     throw new ConflictError('opening_balance_idempotency_conflict', 'Ключ opening balance уже использован для других данных');
   }
   return { ...document, idempotent: true };
+}
+
+function fixedAssetDate(value: string, field: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new ValidationError('fixed_asset_invalid_date', `${field}: неверная дата`);
+  }
+  return date;
+}
+
+function monthKey(date: Date) {
+  return date.toISOString().slice(0, 7);
+}
+
+function addMonthsToPeriod(period: string, months: number) {
+  const [year, month] = period.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + months, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function fixedAssetDepreciationAmount(cost: number, usefulLifeMonths: number, index: number) {
+  const before = Math.floor((cost * index) / usefulLifeMonths);
+  const after = Math.floor((cost * (index + 1)) / usefulLifeMonths);
+  return after - before;
+}
+
+function replayFixedAsset(
+  asset: Prisma.FixedAssetGetPayload<{ include: { acquisitionAccountingEntry: { include: { lines: true } }; depreciationEntries: true } }>,
+  input: {
+    assetNumber: string;
+    name: string;
+    category: string;
+    serialNumber: string | null;
+    acquisitionCost: number;
+    usefulLifeMonths: number;
+    acquiredAt: Date;
+    inServiceAt: Date;
+    fundingAccountCode: string;
+    externalRef: string | null;
+  },
+) {
+  const same = asset.assetNumber === input.assetNumber
+    && asset.name === input.name
+    && asset.category === input.category
+    && asset.serialNumber === input.serialNumber
+    && asset.acquisitionCost === input.acquisitionCost
+    && asset.usefulLifeMonths === input.usefulLifeMonths
+    && asset.acquiredAt.getTime() === input.acquiredAt.getTime()
+    && asset.inServiceAt.getTime() === input.inServiceAt.getTime()
+    && asset.fundingAccountCode === input.fundingAccountCode
+    && asset.externalRef === input.externalRef;
+  if (!same) throw new ConflictError('fixed_asset_idempotency_conflict', 'Ключ основного средства уже использован для других данных');
+  return { ...asset, idempotent: true };
+}
+
+function replayFixedAssetDepreciation(
+  depreciation: Prisma.FixedAssetDepreciationGetPayload<{ include: { fixedAsset: true; accountingEntry: { include: { lines: true } } } }>,
+  fixedAssetId: string,
+  period: string,
+) {
+  if (depreciation.fixedAssetId !== fixedAssetId || depreciation.period !== period) {
+    throw new ConflictError('fixed_asset_depreciation_idempotency_conflict', 'Ключ амортизации уже использован для другого актива или периода');
+  }
+  return { ...depreciation, idempotent: true };
 }
 
 function replayCurrencyRate(
