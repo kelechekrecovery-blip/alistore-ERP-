@@ -2076,3 +2076,11 @@
 - Checks run: Playwright `1/1`; artifact SHA-256 `f4e6e85837d92df55abe02a75f81386d2e833c49cd22055e6c8a88a2d4c57f67`; recorder exited zero.
 - Outcome: the bounded POS/refund audit row is current again; courier/COD, service/loaner and procurement/sale bounded artifacts still require refresh on the same source commit.
 - Next step: commit this artifact, then refresh courier/COD evidence.
+
+## 2026-07-16
+
+- Task: refresh bounded `courier-cod-reconciliation` evidence after the trusted-gate source commit.
+- Result: committed-HEAD recorder reran Web COD checkout, warehouse fulfillment, courier completion and exactly-once cash handover against source commit `95860e7`.
+- Checks run: Playwright `1/1`; artifact SHA-256 `a3e1f174bf3b057a137affad8a5c38c5c705f659016c44b9f84d5addaac46263`; recorder exited zero.
+- Outcome: the bounded courier/COD audit row is current again; service/loaner and procurement/sale bounded artifacts still require refresh.
+- Next step: commit this artifact, then refresh service/loaner evidence.
