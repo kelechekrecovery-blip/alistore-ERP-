@@ -2116,3 +2116,12 @@
 - Checks run: Gradle connected tests through the committed-HEAD evidence bootstrap; core `26/26`, four app-module tests `4/4`, zero failures; artifact SHA-256 `61ec86df621ab1873d591476f8d5fd0d9e5fca58a4e8da24cf2088907edfa3f9`.
 - Outcome: the current Android packaged UI gate has fresh emulator evidence. Deep role journeys, visual parity, FCM/camera/maps/biometric and physical-device certification remain open.
 - Next step: commit this artifact, rerun the strict audit and implement the durable Web/ERP visual acceptance contract.
+
+## 2026-07-16
+
+- Task: implement `ECO-002H`, a durable bounded Web/ERP visual regression contract.
+- Files changed: deterministic Playwright visual suite and three PNG goldens; exact package command; trusted evidence recorder registration; fail-closed audit baseline checks; acceptance manifest and trusted-gate documentation.
+- Result: fixed server data now produces stable 1440px storefront, 402px Client-style storefront and 1440px ERP dashboard screenshots. The audit requires the exact visual command, `toHaveScreenshot`, at least three tracked PNG baselines matching `HEAD`, and a source-bound trusted result artifact. The contract is explicitly scoped to available shells and does not retire or accept missing design handoffs.
+- Checks run: visual baseline generation `3/3`; exact JSON-reported no-update comparison `3/3`; no-argument runner rejection; manual PNG inspection; Node syntax; JSON parsing; artifact SHA-256 inventory; `git diff --check`; independent review initially found one High skipped-test acceptance path and one Medium year-rollover instability, both fixed; final review Critical/High/Medium `0/0/0` with APPROVE.
+- Outcome: the implementation is reviewed and ready to commit. The visual audit row intentionally remains GAP until the implementation commit is followed by a clean committed-HEAD evidence run.
+- Next step: commit the visual contract, record trusted visual evidence and rerun the strict audit.

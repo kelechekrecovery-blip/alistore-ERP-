@@ -12,6 +12,7 @@
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api -- --runInBand",
     "e2e": "playwright test",
+    "visual:e2e": "node scripts/run-visual-acceptance.mjs",
     "mobile": "npm --prefix apps/mobile run start",
     "mobile:typecheck": "npm --prefix apps/mobile run typecheck",
     "mobile:store-preflight": "npm --prefix apps/mobile run store:preflight",

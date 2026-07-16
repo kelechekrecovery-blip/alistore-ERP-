@@ -131,7 +131,7 @@ const reconciledCommandsExact =
   scripts['ecosystem:service-loaner:e2e'] === serviceLoanerCommand &&
   scripts['ecosystem:procurement-sale:e2e'] === procurementSaleCommand;
 const acceptedGateScripts = new Map([
-  ['visual', 'e2e'],
+  ['visual', 'visual:e2e'],
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
@@ -140,6 +140,37 @@ const acceptedGateScripts = new Map([
   ['procurement-sale-reconciliation', 'ecosystem:procurement-sale:e2e'],
   ['reconciled-e2e', 'ecosystem:e2e'],
 ]);
+const visualSpecPath = 'e2e/visual-acceptance.spec.ts';
+const visualSnapshotDirectory = `${visualSpecPath}-snapshots`;
+const visualSpec = fs.existsSync(path.join(root, visualSpecPath)) ? read(visualSpecPath) : '';
+const visualSnapshots = fs.existsSync(path.join(root, visualSnapshotDirectory))
+  ? fs.readdirSync(path.join(root, visualSnapshotDirectory))
+      .filter((name) => name.endsWith('.png'))
+      .map((name) => path.join(visualSnapshotDirectory, name))
+      .sort()
+  : [];
+const expectedVisualSnapshots = [
+  'erp-desktop-chromium-darwin.png',
+  'storefront-desktop-chromium-darwin.png',
+  'storefront-mobile-chromium-darwin.png',
+].map((name) => path.join(visualSnapshotDirectory, name));
+const visualBaselinesAccepted =
+  scripts['visual:e2e'] === 'node scripts/run-visual-acceptance.mjs' &&
+  read('scripts/run-visual-acceptance.mjs').includes("stats.skipped === 0") &&
+  expectedVisualSnapshots.every((snapshot) =>
+    visualSpec.includes(path.basename(snapshot).replace('-chromium-darwin', '')),
+  ) &&
+  visualSnapshots.length === expectedVisualSnapshots.length &&
+  expectedVisualSnapshots.every((snapshot) => visualSnapshots.includes(snapshot)) &&
+  inspectHeadWorktree(trustedGit, root, [visualSpecPath, ...visualSnapshots]).matches &&
+  visualSnapshots.every((snapshot) => {
+    try {
+      git(['ls-files', '--error-unmatch', '--', snapshot], { stdio: 'ignore' });
+      return !git(['status', '--porcelain', '--', snapshot], { encoding: 'utf8' }).trim();
+    } catch {
+      return false;
+    }
+  });
 const acceptedGate = (id, commandPattern) => {
   const gate = evidence.gates?.[id];
   const packageCommand = scripts[gate?.packageScript] ?? '';
@@ -303,7 +334,7 @@ const checks = [
   },
   {
     id: 'durable-visual-acceptance-contract',
-    pass: acceptedGate('visual', /(?:playwright|screenshot|visual)/u),
+    pass: visualBaselinesAccepted && acceptedGate('visual', /^node scripts\/run-visual-acceptance\.mjs$/u),
     detail: 'Accepted visual command has committed, hash-verified baseline artifacts.',
   },
   {

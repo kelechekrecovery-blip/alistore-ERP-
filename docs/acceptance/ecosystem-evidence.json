@@ -4,7 +4,7 @@
   "gates": {
     "visual": {
       "status": "partial",
-      "packageScript": null,
+      "packageScript": "visual:e2e",
       "command": null,
       "artifacts": []
     },

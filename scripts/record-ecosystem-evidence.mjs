@@ -11,6 +11,7 @@ import { resolveTrustedNpm, trustedNpmEnvironment, verifyTrustedBootstrap } from
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const gateId = process.argv[2];
 const gateScripts = new Map([
+  ['visual', 'visual:e2e'],
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],

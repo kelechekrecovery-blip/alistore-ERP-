@@ -23,10 +23,15 @@ trap - EXIT HUP INT TERM
 exit "$gate_status"
 ```
 
-Append `--strict` for the release audit. To record the reconciled software matrix, replace the final argument with:
+Append `--strict` for the release audit. To record an accepted gate, replace the final argument with one of the following:
 
 ```text
+scripts/record-ecosystem-evidence.mjs visual
+scripts/record-ecosystem-evidence.mjs ios-app-ui
+scripts/record-ecosystem-evidence.mjs android-app-ui
 scripts/record-ecosystem-evidence.mjs reconciled-e2e
 ```
+
+The visual gate compares deterministic fixed-data storefront desktop/mobile and ERP desktop screenshots against committed Playwright PNG goldens. It is a bounded regression contract for currently implemented shells, not owner approval of absent `.dc.html` references.
 
 The committed bootstrap verifies its pinned Node runtime manifest with system `shasum` before Node starts, clears the process environment, and then the recorder/audit verifies the repository, toolchain and evidence contracts. Direct execution of the worktree bootstrap, direct Node execution and `npm run` are not authoritative evidence entrypoints.
