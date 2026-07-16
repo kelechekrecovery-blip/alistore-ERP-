@@ -397,7 +397,7 @@ export class FinanceService {
     if (Number.isNaN(asOf.getTime())) throw new ValidationError('invalid_ap_as_of', 'Дата AP aging некорректна');
     const invoices = await this.prisma.supplierInvoice.findMany({
       where: {
-        status: { in: ['approved', 'paid'] },
+        status: { in: ['approved', 'partially_paid', 'paid'] },
         ...(query.supplierId ? { supplierId: query.supplierId } : {}),
         createdAt: { lte: asOf },
       },
@@ -405,19 +405,20 @@ export class FinanceService {
         supplier: { select: { id: true, name: true } },
         purchaseOrder: { select: { id: true, number: true } },
         accountingEntry: { select: { id: true, sourceType: true, sourceRef: true } },
-        creditNotes: { where: { status: 'applied' }, select: { id: true, noteNumber: true, amount: true, accountingEntryId: true } },
+        creditNotes: { where: { status: 'applied', appliedAt: { lte: asOf } }, select: { id: true, noteNumber: true, amount: true, accountingEntryId: true, appliedAt: true } },
+        payments: { where: { paidAt: { lte: asOf } }, select: { id: true, amount: true, paymentAccountCode: true, paymentReference: true, paidAt: true, accountingEntryId: true } },
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
     });
     const rows = invoices.map((invoice) => {
       const creditApplied = invoice.creditNotes.reduce((sum, note) => sum + note.amount, 0);
-      const paid = invoice.status === 'paid' || (invoice.paidAt && invoice.paidAt <= asOf);
-      const outstanding = paid ? 0 : Math.max(0, invoice.amount - creditApplied);
-      const creditReceivable = paid ? creditApplied : 0;
+      const paidAmount = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const outstanding = Math.max(0, invoice.amount - paidAmount - creditApplied);
+      const creditReceivable = Math.max(0, paidAmount + creditApplied - invoice.amount);
       const dueDate = invoice.dueDate ?? invoice.createdAt;
       const ageDays = Math.max(0, Math.floor((asOf.getTime() - dueDate.getTime()) / 86_400_000));
       const bucket = outstanding === 0 ? 'paid' : ageDays === 0 ? 'current' : ageDays <= 30 ? '1_30' : ageDays <= 60 ? '31_60' : ageDays <= 90 ? '61_90' : '90_plus';
-      return { id: invoice.id, invoiceNumber: invoice.invoiceNumber, supplier: invoice.supplier, purchaseOrder: invoice.purchaseOrder, amount: invoice.amount, creditApplied, creditReceivable, outstanding, dueDate, ageDays, bucket, status: invoice.status, accountingEntry: invoice.accountingEntry, creditNotes: invoice.creditNotes };
+      return { id: invoice.id, invoiceNumber: invoice.invoiceNumber, supplier: invoice.supplier, purchaseOrder: invoice.purchaseOrder, amount: invoice.amount, paidAmount, creditApplied, creditReceivable, outstanding, dueDate, ageDays, bucket, status: invoice.status, accountingEntry: invoice.accountingEntry, payments: invoice.payments, creditNotes: invoice.creditNotes };
     });
     const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
     const totals = Object.fromEntries(buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0)]));

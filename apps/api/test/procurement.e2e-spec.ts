@@ -6,6 +6,7 @@ import { AuditModule } from '../src/audit/audit.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ProcurementModule } from '../src/procurement/procurement.module';
+import { FinanceModule } from '../src/finance/finance.module';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 
@@ -22,7 +23,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuditModule, StaffAuthModule, ProcurementModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuditModule, StaffAuthModule, ProcurementModule, FinanceModule],
     }).compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -50,6 +51,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   async function cleanFixtures() {
     await prisma.auditEvent.deleteMany();
+    await prisma.supplierInvoicePayment.deleteMany();
     await prisma.supplierCreditNote.deleteMany();
     await prisma.supplierInvoice.deleteMany();
     await prisma.purchaseOrder.deleteMany();
@@ -286,6 +288,64 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ ...invoicePayload, idempotencyKey: `invoice-${RUN}-mismatch`, invoiceNumber: `INV-${RUN}-MISMATCH`, amount: 70001 })
       .expect(409);
+  });
+
+  it('supports replay-safe partial supplier payments and reflects the remaining AP balance', async () => {
+    const { supplier, product } = await fixture();
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `create-${RUN}-partial-payment`, supplierId: supplier.id, location: 'BISHKEK-1', items: [{ productId: product.id, qty: 1, unitCost: 70000 }] })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/purchase-orders/${created.body.id}/send`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ idempotencyKey: `receipt-${RUN}-partial-payment`, lines: [{ itemId: created.body.items[0].id, imeis: [`PO-PARTIAL-${RUN}`] }] })
+      .expect(201);
+
+    const invoice = await request(app.getHttpServer())
+      .post('/procurement/supplier-invoices')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `invoice-${RUN}-partial-payment`, invoiceNumber: `INV-${RUN}-PARTIAL`, supplierId: supplier.id, purchaseOrderId: created.body.id, amount: 70000 })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/supplier-invoices/${invoice.body.id}/approve`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+
+    const firstPayload = { idempotencyKey: `invoice-payment-${RUN}-1`, paymentKey: `supplier-bank-${RUN}-partial-1`, amount: 30000, paymentAccountCode: '1010', paymentReference: 'BANK-PARTIAL-1' };
+    const first = await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(firstPayload)
+      .expect(201);
+    expect(first.body).toMatchObject({ id: invoice.body.id, status: 'partially_paid', payment: { amount: 30000 }, idempotent: false });
+
+    const replay = await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(firstPayload)
+      .expect(201);
+    expect(replay.body).toMatchObject({ id: invoice.body.id, status: 'partially_paid', payment: { amount: 30000 }, idempotent: true });
+    await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...firstPayload, amount: 31000 })
+      .expect(409);
+
+    const second = await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `invoice-payment-${RUN}-2`, paymentKey: `supplier-bank-${RUN}-partial-2`, amount: 40000, paymentAccountCode: '1020', paymentReference: 'CARD-FINAL' })
+      .expect(201);
+    expect(second.body).toMatchObject({ id: invoice.body.id, status: 'paid', payment: { amount: 40000 }, idempotent: false });
+    expect(await prisma.supplierInvoicePayment.count({ where: { invoiceId: invoice.body.id } })).toBe(2);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'supplier.invoice.payment', sourceRef: { startsWith: invoice.body.id } } })).toBe(2);
+
+    const aging = await request(app.getHttpServer())
+      .get('/finance/ap-aging')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(aging.body.rows).toEqual(expect.arrayContaining([expect.objectContaining({ id: invoice.body.id, paidAmount: 70000, outstanding: 0 })]));
+    expect(aging.body.totalOutstanding).toBe(0);
   });
 
   it('serializes concurrent receipts so ordered quantity cannot be exceeded', async () => {

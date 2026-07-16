@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { ProcurementService } from './procurement.service';
 
 @ApiTags('procurement')
@@ -82,6 +82,12 @@ export class SupplierInvoiceController {
   @RequirePermission('procurement', 'receive')
   pay(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: PaySupplierInvoiceDto) {
     return this.procurement.paySupplierInvoice(id, dto, user.customerId);
+  }
+
+  @Post(':id/payments')
+  @RequirePermission('procurement', 'receive')
+  createPayment(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CreateSupplierInvoicePaymentDto) {
+    return this.procurement.createSupplierInvoicePayment(id, dto, user.customerId);
   }
 }
 

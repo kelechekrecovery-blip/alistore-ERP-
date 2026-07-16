@@ -2336,3 +2336,13 @@
 - Implementation commit: `0861ab2` (`perf(inventory): aggregate valuation roll-forward in database`).
 - Outcome: local correctness/performance implementation is accepted; staging-shaped multi-year latency/memory certification remains open and `INV-VAL-001I` must not be called fully done yet.
 - Next step: run a staging-shaped synthetic-history benchmark once staging data access is available, then continue `AP-001` or `ACC-003`.
+
+## 2026-07-17
+
+- Iteration ID: `AP-001E`.
+- Task: add replay-safe partial supplier invoice payments and make AP aging payment-aware.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260717030000_supplier_invoice_payments/migration.sql`, `apps/api/src/procurement/procurement.dto.ts`, `apps/api/src/procurement/procurement.controller.ts`, `apps/api/src/procurement/procurement.service.ts`, `apps/api/src/finance/finance.service.ts`, `apps/api/test/procurement.e2e-spec.ts`, and `apps/api/test/finance-expenses.e2e-spec.ts`.
+- Result: an approved supplier invoice can receive multiple atomic payments with unique `idempotencyKey` and `paymentKey`; the API derives the remaining balance from immutable payments and applied credit notes, rejects overpayment/replay conflicts, posts one balanced `2000` liability-clearance journal per payment, transitions through `partially_paid` to `paid`, and keeps the legacy full-pay endpoint as a compatibility adapter. AP aging now reports payment totals, outstanding liability, credit receivable and payment drill-down as of the requested date.
+- Checks run: `npx prisma migrate deploy` passed on the development database; the migration SQL was applied successfully to the isolated `alistore_test` database; `npx prisma validate` passed; targeted procurement passed `7/7`; paired procurement/finance passed `19/19`; `npm run api:test` passed `143/143` suites and `654/654` tests; `git diff --check` passed.
+- Outcome: `AP-001E` is accepted at local software level. Supplier advances, landed cost allocation, supplier statement reconciliation, staging certification, live payment providers and first-store accounting validation remain open. Production readiness remains RED.
+- Next step: continue `AP-001` with supplier advances or landed-cost allocation, while retaining `INV-VAL-001H/I`, provider, staging, native physical-device and missing-design-reference gates explicitly.

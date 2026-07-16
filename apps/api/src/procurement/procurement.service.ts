@@ -5,7 +5,7 @@ import { AuditService, AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
@@ -271,7 +271,7 @@ export class ProcurementService {
     }
     return this.prisma.supplierInvoice.findMany({
       where: status ? { status: status as SupplierInvoiceStatus } : undefined,
-      include: { supplier: true, purchaseOrder: { select: { id: true, number: true, status: true } }, accountingEntry: { include: { lines: true } } },
+      include: { supplier: true, purchaseOrder: { select: { id: true, number: true, status: true } }, accountingEntry: { include: { lines: true } }, payments: { orderBy: { paidAt: 'asc' } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -331,19 +331,56 @@ export class ProcurementService {
   }
 
   async paySupplierInvoice(id: string, dto: PaySupplierInvoiceDto, actor: string) {
+    return this.recordSupplierInvoicePayment(id, {
+      idempotencyKey: `supplier.invoice.payment:${id}:${dto.paymentKey}`,
+      paymentKey: dto.paymentKey,
+      paymentAccountCode: dto.paymentAccountCode,
+      paymentReference: dto.paymentReference,
+    }, actor, true);
+  }
+
+  async createSupplierInvoicePayment(id: string, dto: CreateSupplierInvoicePaymentDto, actor: string) {
+    return this.recordSupplierInvoicePayment(id, dto, actor, false);
+  }
+
+  private async recordSupplierInvoicePayment(
+    id: string,
+    dto: Omit<CreateSupplierInvoicePaymentDto, 'amount'> & { amount?: number },
+    actor: string,
+    settleRemaining: boolean,
+  ) {
+    const existing = await this.prisma.supplierInvoicePayment.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { invoice: true },
+    });
+    if (existing) return replaySupplierInvoicePayment(existing, dto);
+
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "SupplierInvoice" WHERE id = ${id} FOR UPDATE`;
       const invoice = await tx.supplierInvoice.findUnique({ where: { id } });
       if (!invoice) throw new ValidationError('supplier_invoice_not_found', `Счёт ${id} не найден`);
       if (invoice.status === 'paid') {
-        if (invoice.paymentKey !== dto.paymentKey || invoice.paymentAccountCode !== dto.paymentAccountCode || invoice.paymentReference !== dto.paymentReference) {
-          throw new ConflictError('supplier_invoice_payment_replay_conflict', 'Ключ оплаты уже использован с другими реквизитами');
+        if (invoice.paymentKey === dto.paymentKey && invoice.paymentAccountCode === dto.paymentAccountCode && invoice.paymentReference === dto.paymentReference) {
+          return { result: { ...invoice, idempotent: true }, events: [] };
         }
-        return { result: invoice, events: [] };
+        throw new ConflictError('supplier_invoice_not_payable', 'Счёт поставщика уже погашен');
       }
-      if (invoice.status !== 'approved') throw new ConflictError('supplier_invoice_not_approved', 'Оплатить можно только утверждённый счёт');
-      const duplicate = await tx.supplierInvoice.findUnique({ where: { paymentKey: dto.paymentKey } });
+      if (invoice.status !== 'approved' && invoice.status !== 'partially_paid') {
+        throw new ConflictError('supplier_invoice_not_approved', 'Оплатить можно только утверждённый счёт');
+      }
+      const duplicate = await tx.supplierInvoicePayment.findUnique({ where: { paymentKey: dto.paymentKey } });
       if (duplicate) throw new ConflictError('supplier_invoice_payment_key_reused', 'Ключ оплаты уже использован');
+      const [payments, creditNotes] = await Promise.all([
+        tx.supplierInvoicePayment.findMany({ where: { invoiceId: id }, orderBy: { paidAt: 'asc' } }),
+        tx.supplierCreditNote.findMany({ where: { invoiceId: id, status: 'applied' }, select: { amount: true } }),
+      ]);
+      const paidBefore = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const creditApplied = creditNotes.reduce((sum, note) => sum + note.amount, 0);
+      const remaining = Math.max(0, invoice.amount - paidBefore - creditApplied);
+      const amount = settleRemaining ? remaining : dto.amount;
+      if (!amount || amount > remaining) {
+        throw new ConflictError('supplier_invoice_payment_exceeds_balance', `Оплата превышает остаток счёта: ${remaining}`);
+      }
       const accountingEntry = await postAccountingEntryOnTx(tx, {
         idempotencyKey: `accounting:supplier-invoice.payment:${id}:${dto.paymentKey}`,
         sourceType: 'supplier.invoice.payment',
@@ -352,19 +389,35 @@ export class ProcurementService {
         occurredAt: new Date(),
         createdBy: actor,
         lines: [
-          { accountCode: '2000', debit: invoice.amount, memo: 'Погашение обязательства перед поставщиком' },
-          { accountCode: dto.paymentAccountCode, credit: invoice.amount, memo: `Оплата поставщику: ${dto.paymentReference}` },
+          { accountCode: '2000', debit: amount, memo: 'Погашение обязательства перед поставщиком' },
+          { accountCode: dto.paymentAccountCode, credit: amount, memo: `Оплата поставщику: ${dto.paymentReference}` },
         ],
       });
+      const payment = await tx.supplierInvoicePayment.create({
+        data: {
+          invoiceId: id,
+          idempotencyKey: dto.idempotencyKey,
+          paymentKey: dto.paymentKey,
+          amount,
+          paymentAccountCode: dto.paymentAccountCode,
+          paymentReference: dto.paymentReference,
+          paidBy: actor,
+          accountingEntryId: accountingEntry.id,
+        },
+      });
+      const status: SupplierInvoiceStatus = paidBefore + creditApplied + amount >= invoice.amount ? 'paid' : 'partially_paid';
       const paid = await tx.supplierInvoice.update({
         where: { id },
-        data: { status: 'paid', paymentKey: dto.paymentKey, paymentAccountCode: dto.paymentAccountCode, paymentReference: dto.paymentReference, paidBy: actor, paidAt: new Date(), accountingEntryId: accountingEntry.id },
+        data: {
+          status,
+          ...(status === 'paid' ? { paymentKey: dto.paymentKey, paymentAccountCode: dto.paymentAccountCode, paymentReference: dto.paymentReference, paidBy: actor, paidAt: payment.paidAt, accountingEntryId: accountingEntry.id } : {}),
+        },
       });
       return {
-        result: paid,
+        result: { ...paid, payment, idempotent: false },
         events: [
-          { type: 'supplier.invoice.paid', actor, payload: { invoiceId: id, amount: invoice.amount, paymentKey: dto.paymentKey, accountingEntryId: accountingEntry.id }, refs: [id, invoice.supplierId, invoice.purchaseOrderId] },
-          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'supplier.invoice.payment', sourceRef: `${id}:${dto.paymentKey}`, amount: invoice.amount }, refs: [accountingEntry.id, id] },
+          { type: status === 'paid' ? 'supplier.invoice.paid' : 'supplier.invoice.partially_paid', actor, payload: { invoiceId: id, amount, outstanding: invoice.amount - paidBefore - creditApplied - amount, paymentKey: dto.paymentKey, accountingEntryId: accountingEntry.id }, refs: [id, invoice.supplierId, invoice.purchaseOrderId, payment.id] },
+          { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'supplier.invoice.payment', sourceRef: `${id}:${dto.paymentKey}`, amount }, refs: [accountingEntry.id, id, payment.id] },
         ],
       };
     });
@@ -456,6 +509,21 @@ function replayCreditNote(note: Prisma.SupplierCreditNoteGetPayload<{}>, dto: Cr
     throw new ConflictError('supplier_credit_note_idempotency_mismatch', 'Ключ кредит-ноты уже использован с другими данными');
   }
   return { ...note, idempotent: true };
+}
+
+function replaySupplierInvoicePayment(
+  payment: Prisma.SupplierInvoicePaymentGetPayload<{ include: { invoice: true } }>,
+  dto: Omit<CreateSupplierInvoicePaymentDto, 'amount'> & { amount?: number },
+) {
+  if (
+    (dto.amount !== undefined && payment.amount !== dto.amount)
+    || payment.paymentKey !== dto.paymentKey
+    || payment.paymentAccountCode !== dto.paymentAccountCode
+    || payment.paymentReference !== dto.paymentReference
+  ) {
+    throw new ConflictError('supplier_invoice_payment_idempotency_mismatch', 'Ключ платежа уже использован с другими данными');
+  }
+  return { ...payment.invoice, payment, idempotent: true };
 }
 
 function purchaseOrderNumber(): string {
