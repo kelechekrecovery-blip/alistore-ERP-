@@ -2108,3 +2108,11 @@
 - Checks run: `xcodebuild test` through the committed-HEAD evidence bootstrap; four UI test bundles, `4/4` tests, zero failures; artifact SHA-256 `4d033249b8b43e475148fd3bd34a8a572ce264946d360798da102039f6043368`.
 - Outcome: the current iOS packaged launch gate has fresh evidence. Deep native journeys, visual parity, APNs/camera/Face ID and physical-device certification remain open.
 - Next step: commit this artifact, then refresh all four packaged Android connected-test modules.
+
+## 2026-07-16
+
+- Task: refresh the packaged `android-app-ui` evidence on the current trusted source tree.
+- Result: after booting the API 36 `savio_api36_arm64` AVD, the aggregate connected-test gate ran the shared core instrumentation suite and packaged Client, Staff, Courier and POS smoke tests.
+- Checks run: Gradle connected tests through the committed-HEAD evidence bootstrap; core `26/26`, four app-module tests `4/4`, zero failures; artifact SHA-256 `61ec86df621ab1873d591476f8d5fd0d9e5fca58a4e8da24cf2088907edfa3f9`.
+- Outcome: the current Android packaged UI gate has fresh emulator evidence. Deep role journeys, visual parity, FCM/camera/maps/biometric and physical-device certification remain open.
+- Next step: commit this artifact, rerun the strict audit and implement the durable Web/ERP visual acceptance contract.
