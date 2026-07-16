@@ -1853,6 +1853,16 @@
 
 ## 2026-07-16
 
+- Task: complete `ERP-RESP-001` so the protected ERP remains usable and accessible at 390 px without changing its canonical desktop handoff.
+- Files changed: responsive ERP shell/navigation/header/content layout and protected Finance/Administration browser acceptance.
+- Result: mobile ERP now uses the full viewport and an explicit 280 px modal drawer instead of clipping the 230 px desktop sidebar into the content. The drawer closes after navigation, becomes inert while hidden, makes the main workspace inert while open, focuses its close action, traps Tab, supports Escape and restores focus to the labelled trigger. Finance and Administration retain all actions at 390 px; desktop remains a centered 1280x820 shell with a 230 px sidebar.
+- Checks run: Next production build with all 39 routes; protected ERP Playwright 2/2; live Chrome screenshots at 390x844 for Finance and Administration plus 1400x900 desktop under `.artifacts/erp-responsive`; mobile document/main widths 390/390 with no horizontal overflow, closed drawer `x=-280`; desktop shell 1280x820 and sidebar 230 px; zero console errors; `git diff --check`. The independent review first found missing dialog focus/inert behavior and an insufficient document-only overflow assertion; both were fixed, and the final re-review reported no actionable Critical, High or Medium findings.
+- Outcome: `ERP-RESP-001` is accepted at local web/API software level. Production Cloudflare Access, live roles and physical first-store UAT remain external release certification, not hidden completion claims.
+- Commit: `daf2b64` (`feat(erp): add responsive mobile navigation`).
+- Next step: implement the missing packaged native UI commands and application-level test targets under `ECO-002`, while provider-backed `EXCH-002` remains externally blocked.
+
+## 2026-07-16
+
 - Task: complete `FIN-003E` as an authoritative, provider-ready multi-tender refund aggregate.
 - Files changed: Refund/RefundAllocation/RefundLine/GiftCardTransaction Prisma models and bounded migrations; deferred database consistency triggers; concurrent post-deploy payment provenance index; refund API/worker/approval/payment/shift integration; ERP Refund Money Flow; deployment readiness; API and browser regressions; CI, backlog and readiness evidence.
 - Result: a Return creates one idempotent server-priced refund with immutable line-level tax snapshots and deterministic card/QR → gift-card → cash allocations. Four-eyes approval freezes execution, provider allocations progress in strict saga order with safe callback/retry semantics, successful allocations atomically create compensating Payment, Journal and Event Ledger rows, gift-card balances restore through their own journal, and pending cash allocations block shift close/handover. Deferred PostgreSQL constraints reject cross-order payments, foreign ReturnItems and aggregate total drift even under direct writes. The deprecated endpoint cannot create a product refund without Return provenance.
