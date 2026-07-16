@@ -2183,3 +2183,10 @@
 - Checks run: shared Android core `26/26`; packaged connected tests for Client, Staff, Courier and POS `4/4`; artifact SHA-256 `886e4b74401ac9ce819c1fb8fd282e720dff8a604c23602fdd83086caf988778`; trusted recorder exited zero.
 - Outcome: packaged Android launch evidence is current for source-tree SHA-256 `00840f38304fb58a4f396709da313e9ace7107b31b836b080fd32e13eceb06d0`; deep business journeys and physical-device certification remain open.
 - Next step: commit the evidence and run the strict committed-HEAD ecosystem audit.
+
+## 2026-07-17
+
+- Task: run the strict committed-HEAD ecosystem acceptance audit after refreshing every trusted evidence row.
+- Checks run: all `16/16` software-contract checks passed, including bounded visual acceptance, clean source/design evidence, Web/API and native gates, four bounded reconciliation rows and the broad four-vertical ecosystem matrix.
+- Outcome: the only strict audit blocker is `ECO-001`: `64` linked `.dc.html` handoffs are absent and have no owner-approved retirement. Local software evidence does not certify deep native journeys, physical devices, live providers or production infrastructure.
+- Next step: restore or explicitly retire the missing handoffs; meanwhile continue the independent software backlog with `EXCH-002`, remaining `AP-001` and `ACC-003` verticals.
