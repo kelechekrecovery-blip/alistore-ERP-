@@ -110,6 +110,36 @@ export interface SupplierAgingReport {
   rows: Array<{ id: string; invoiceNumber: string; amount: number; outstanding: number; supplier: { id: string; name: string }; status: string; dueDate: string }>;
 }
 
+export type ArAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus' | 'paid';
+
+export interface ArAgingRow {
+  id: string;
+  customer: { id: string; name: string };
+  order: { id: string; channel: string; total: number; status: string; createdAt: string };
+  principal: number;
+  balance: number;
+  outstanding: number;
+  currentBalance: number;
+  paidAmount: number;
+  installments: number;
+  dueDate: string;
+  ageDays: number;
+  bucket: ArAgingBucket;
+  status: 'open' | 'settled';
+  accountingEntry: { id: string; sourceType: string; sourceRef: string } | null;
+  payments: Array<{ id: string; amount: number; status: string; createdAt: string; receivedBy: string | null; point: string | null; txnId: string | null }>;
+}
+
+export interface ArAgingReport {
+  asOf: string;
+  rows: ArAgingRow[];
+  totals: Record<ArAgingBucket, number>;
+  totalPrincipal: number;
+  totalPaid: number;
+  totalOutstanding: number;
+  customerCount: number;
+}
+
 export interface FinancialStatements {
   from: string;
   to: string;
@@ -283,6 +313,11 @@ export const fetchFinancialStatements = (period: string, point: string, accessTo
 
 export const fetchSupplierAging = (accessToken: string) =>
   getJson<SupplierAgingReport>('/finance/ap-aging', accessToken);
+
+export const fetchCustomerAging = (asOf: string, accessToken: string) => {
+  const query = new URLSearchParams({ asOf: new Date(`${asOf}T23:59:59.999Z`).toISOString() });
+  return getJson<ArAgingReport>(`/finance/ar-aging?${query.toString()}`, accessToken);
+};
 
 export const fetchBankStatements = (accessToken: string) =>
   getJson<BankStatementSummary[]>('/finance/bank-statements', accessToken);

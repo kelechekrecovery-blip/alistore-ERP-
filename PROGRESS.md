@@ -1,5 +1,16 @@
 # PROGRESS
 
+# 2026-07-17 — ERP-FIN-002
+
+- Iteration ID: `ERP-FIN-002`.
+- Task: connect Finance AR aging to the authenticated ERP Finance workspace.
+- Files changed: typed Finance web client, `FinanceControlsPanel` and Finance browser acceptance.
+- Result: `/erp` now loads the server-authoritative AR report next to AP, shows an as-of date selector, AR outstanding metric, current/1-30/31-60/61-90/90+ bucket totals and customer drill-down summaries. The UI never accepts or edits balances; it only renders the finance API response and preserves existing loading/error/permission behavior.
+- Checks run: Next production build with 39 routes; Finance Playwright 2/2; `git diff --check`.
+- Acceptance: `accepted` for the local ERP AR visibility contour. Deep document navigation, export, accountant/tax validation, staging/production deployment, physical hardware and first-store reconciliation remain open. Production readiness remains `RED` because external credentials, devices, provider certification, staging soak and missing design references are not available.
+- Commit: dedicated implementation commit created after this gate (`feat(erp): surface AR aging`).
+- Next step: implement primary-document export or manual-adjustment approval, then connect those controls to Finance before broadening the 95-screen ERP scope.
+
 # 2026-07-17 — ACC-003E
 
 - Iteration ID: `ACC-003E`.

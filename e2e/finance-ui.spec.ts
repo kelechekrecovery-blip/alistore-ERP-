@@ -21,6 +21,7 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
   await expect(controls.getByRole('heading', { name: 'Учетный контроль' })).toBeVisible();
   await expect(controls.getByText('Исходящий НДС').first()).toBeVisible();
   await expect(controls.getByRole('heading', { name: 'Налоговый период' })).toBeVisible();
+  await expect(controls.getByRole('heading', { name: /Дебиторка/ })).toBeVisible();
 
   const period = new Date().toISOString().slice(0, 7);
   const planning = page.locator('section[aria-labelledby="finance-plan-title"]');
