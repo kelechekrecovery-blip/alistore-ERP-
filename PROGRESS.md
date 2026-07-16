@@ -2133,3 +2133,11 @@
 - Checks run: exact Playwright screenshot tests `3/3`; source-tree SHA-256 `00840f38304fb58a4f396709da313e9ace7107b31b836b080fd32e13eceb06d0`; result artifact SHA-256 `b775b0a2c4382935cdf5a0df4668a4ff84e20c54bf4c6b3bfa7468e5a5b5835d`; recorder exited zero.
 - Outcome: the bounded visual gate is accepted for the current source tree. The 64 absent handoffs remain unresolved and are not covered by these baselines.
 - Next step: commit the visual result, refresh native and reconciliation evidence on the new common source hash, then run the strict audit.
+
+## 2026-07-16
+
+- Task: refresh broad `reconciled-e2e` evidence after introducing the visual acceptance source files.
+- Result: all four exact software verticals passed again on source-tree SHA-256 `00840f38304fb58a4f396709da313e9ace7107b31b836b080fd32e13eceb06d0`.
+- Checks run: matrix `4/4`; API `4/4` suites and `15/15` tests; Playwright `6/6`; result artifact SHA-256 `808aa4315d8a8cc85bb4bdcf5b94e007c981271d812c2468c7029a25f6a63076`.
+- Outcome: broad reconciliation evidence is current; bounded rows and native package evidence still need refresh on the same hash.
+- Next step: commit this result, then refresh the four bounded reconciliation rows.
