@@ -38,6 +38,11 @@ export async function resetDb() {
   await prisma.campaignSpendEntry.deleteMany();
   await prisma.campaign.deleteMany();
   await prisma.inventoryQuarantineCase.deleteMany();
+  await prisma.$transaction(async (tx) => {
+    await tx.inventoryValuationReversal.deleteMany();
+    await tx.inventoryValuationIssue.deleteMany();
+  });
+  await prisma.inventoryValuationLayer.deleteMany();
   await prisma.serviceWorkOrderCommand.deleteMany();
   await prisma.financeSettlementCommand.deleteMany();
   await prisma.financeSettlementLine.deleteMany();
@@ -123,7 +128,7 @@ async function clearImmutableFinanceAggregates() {
     throw new Error(`Refusing destructive E2E cleanup outside an explicit test database: ${database ?? 'unknown'}`);
   }
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "GiftCardTransaction", "RefundLine", "RefundAllocation", "Refund"',
+    'TRUNCATE TABLE "GiftCardTransaction", "RefundLine", "RefundAllocation", "Refund", "AccountingJournalEntry" CASCADE',
   );
 }
 

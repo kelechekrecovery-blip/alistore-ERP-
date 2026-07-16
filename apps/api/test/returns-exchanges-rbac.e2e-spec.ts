@@ -63,13 +63,19 @@ describe('Returns and exchanges RBAC split', () => {
   });
 
   afterAll(async () => {
-    await prisma.inventoryQuarantineCase.deleteMany();
+    await clean();
     await app.close();
   });
 
-  beforeEach(async () => {
+  beforeEach(() => clean());
+
+  async function clean() {
     await prisma.auditEvent.deleteMany();
     await prisma.inventoryQuarantineCase.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationReversal.deleteMany();
+      await tx.inventoryValuationIssue.deleteMany();
+    });
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
@@ -81,7 +87,6 @@ describe('Returns and exchanges RBAC split', () => {
         where: { sourceType: { in: ['exchange.return', 'exchange.sale', 'exchange.surcharge', 'inventory.cogs', 'inventory.return'] } },
       }),
     ]);
-    await prisma.inventoryValuationIssue.deleteMany();
     await prisma.inventoryValuationLayer.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -97,7 +102,7 @@ describe('Returns and exchanges RBAC split', () => {
     await prisma.supplierRma.deleteMany();
     await prisma.supplier.deleteMany();
     await prisma.approval.deleteMany();
-  });
+  }
 
   function customerToken(customer: { id: string; phone: string }) {
     return jwt.sign({ sub: customer.id, typ: 'customer', phone: customer.phone });

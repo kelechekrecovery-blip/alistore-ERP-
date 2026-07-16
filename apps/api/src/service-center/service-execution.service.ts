@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
+import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 import { assertWarrantyTransition } from '../warranty/warranty-state';
 import { CompleteServiceRepairDto, ReplaceServiceDeviceDto, ReserveServicePartDto } from './service-center.dto';
 import {
@@ -174,6 +175,24 @@ export class ServiceExecutionService {
             reason: `Service work order ${id}`,
           },
         });
+        const valuation = await adjustQuantityValuationOnTx(tx, {
+          movementId: movement.id,
+          productId: part.productId,
+          balanceId: part.balanceId,
+          location: part.location,
+          quantityDelta: -part.qty,
+          actor,
+          sourceType: 'service.consumed',
+          debitAccount: '5000',
+        });
+        await tx.inventoryMovement.update({
+          where: { id: movement.id },
+          data: {
+            unitCost: valuation.unitCost,
+            totalValue: valuation.totalValue,
+            valuationQty: valuation.complete ? part.qty : null,
+          },
+        });
         await tx.servicePart.update({
           where: { id: part.id },
           data: { status: 'consumed', consumedBy: actor, consumedAt: new Date(), movementId: movement.id },
@@ -182,12 +201,20 @@ export class ServiceExecutionService {
         await recordCommand(tx, key, id, 'consume_part', request, result);
         return {
           result,
-          events: [{
-            type: EventType.ServicePartConsumed,
-            actor,
-            payload: { workOrderId: id, partId: part.id, productId: part.productId, qty: part.qty, movementId: movement.id, location: part.location },
-            refs: [id, workOrder.warrantyCaseId, part.id, part.productId, movement.id],
-          }],
+          events: [
+            {
+              type: EventType.ServicePartConsumed,
+              actor,
+              payload: { workOrderId: id, partId: part.id, productId: part.productId, qty: part.qty, movementId: movement.id, location: part.location, totalValue: valuation.totalValue },
+              refs: [id, workOrder.warrantyCaseId, part.id, part.productId, movement.id],
+            },
+            ...(valuation.entry ? [{
+              type: EventType.AccountingEntryPosted,
+              actor,
+              payload: { accountingEntryId: valuation.entry.id, sourceType: 'service.consumed', sourceRef: movement.id, amount: valuation.totalValue },
+              refs: [valuation.entry.id, movement.id, part.productId, id],
+            }] : []),
+          ],
         };
       });
     } catch (error) {

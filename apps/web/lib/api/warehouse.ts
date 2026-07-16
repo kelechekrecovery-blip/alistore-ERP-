@@ -73,6 +73,55 @@ export function fetchInventoryValuationReconciliation(
   return getJson('/inventory/valuation/reconciliation', accessToken);
 }
 
+export interface InventoryValuationRollForward {
+  generatedAt: string;
+  period: { from: string; to: string; semantics: '[from,to)' };
+  scope: 'owned_inventory';
+  summary: {
+    openingValue: number;
+    closingValue: number;
+    glOpening: number;
+    glMovement: number;
+    glClosing: number;
+    openingDifference: number;
+    closingDifference: number;
+    missingReversalQuantity: number;
+    incompleteTransfers: number;
+    incompleteSerializedReceipts: number;
+    incompleteServiceConsumptions: number;
+    unknownIssueLocations: number;
+    unknownReversalLocations: number;
+    legacyConsignmentIssues: number;
+    incompleteQuantityBalances: number;
+    complete: boolean;
+    consistent: boolean;
+  };
+  rows: Array<{
+    productId: string;
+    sku: string;
+    name: string;
+    location: string;
+    opening: { quantity: number; value: number };
+    receipts: { quantity: number; value: number };
+    returns: { quantity: number; value: number };
+    transferIn: { quantity: number; value: number };
+    transferOut: { quantity: number; value: number };
+    issues: { quantity: number; value: number };
+    adjustmentsIn: { quantity: number; value: number };
+    adjustmentsOut: { quantity: number; value: number };
+    closing: { quantity: number; value: number };
+  }>;
+}
+
+export function fetchInventoryValuationRollForward(
+  from: string,
+  to: string,
+  accessToken: string,
+): Promise<InventoryValuationRollForward> {
+  const query = new URLSearchParams({ from, to });
+  return getJson(`/inventory/valuation/roll-forward?${query}`, accessToken);
+}
+
 export type QuarantineDiagnosis = 'resellable' | 'repair' | 'write_off';
 export type QuarantineDisposition = 'restock' | 'repair' | 'write_off';
 

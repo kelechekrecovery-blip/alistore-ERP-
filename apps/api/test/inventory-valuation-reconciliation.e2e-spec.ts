@@ -28,7 +28,10 @@ describe('Inventory valuation reconciliation (integration)', () => {
     });
     await prisma.consignmentItem.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.deviceUnit.deleteMany({ where: { productId: { in: productIds } } });
-    await prisma.inventoryValuationIssue.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationReversal.deleteMany({ where: { productId: { in: productIds } } });
+      await tx.inventoryValuationIssue.deleteMany({ where: { productId: { in: productIds } } });
+    });
     await prisma.inventoryValuationLayer.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.quantityConsignmentLot.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.inventoryBalance.deleteMany({ where: { productId: { in: productIds } } });

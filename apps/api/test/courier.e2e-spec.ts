@@ -46,7 +46,10 @@ describe('Courier COD handover (integration)', () => {
         where: { OR: [{ sourceType: { startsWith: 'cod.' } }, { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } }] },
       }),
     ]);
-    await prisma.inventoryValuationIssue.deleteMany({ where: { id: { in: issueIds } } });
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationReversal.deleteMany({ where: { issueId: { in: issueIds } } });
+      await tx.inventoryValuationIssue.deleteMany({ where: { id: { in: issueIds } } });
+    });
     await prisma.inventoryValuationLayer.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.orderQuantityAllocation.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.orderItem.deleteMany();

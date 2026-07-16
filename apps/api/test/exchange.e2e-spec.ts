@@ -29,13 +29,19 @@ describe('Exchange (integration)', () => {
   });
 
   afterAll(async () => {
-    await prisma.inventoryQuarantineCase.deleteMany();
+    await clean();
     await prisma.$disconnect();
   });
 
-  beforeEach(async () => {
+  beforeEach(() => clean());
+
+  async function clean() {
     await prisma.auditEvent.deleteMany();
     await prisma.inventoryQuarantineCase.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationReversal.deleteMany();
+      await tx.inventoryValuationIssue.deleteMany();
+    });
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
@@ -47,7 +53,6 @@ describe('Exchange (integration)', () => {
         where: { sourceType: { in: ['payment.receipt', 'exchange.return', 'exchange.sale', 'exchange.surcharge', 'inventory.cogs', 'inventory.return'] } },
       }),
     ]);
-    await prisma.inventoryValuationIssue.deleteMany();
     await prisma.inventoryValuationLayer.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -57,7 +62,7 @@ describe('Exchange (integration)', () => {
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
-  });
+  }
 
   async function setup(oldPrice: number, newPrice: number, actor = 'exchange-cashier') {
     seq += 1;
@@ -113,6 +118,7 @@ describe('Exchange (integration)', () => {
       orderId: order.id,
       sourceRef: `${order.id}:${oldImei}`,
       imei: oldImei,
+      location: 'B',
       quantity: 1,
       unitCost: 70000,
       actor,

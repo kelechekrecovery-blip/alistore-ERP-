@@ -10,9 +10,11 @@ import {
   disposeInventoryQuarantine,
   fetchInventoryQuarantine,
   fetchInventoryValuationReconciliation,
+  fetchInventoryValuationRollForward,
   uploadEvidenceImage,
   type InventoryQuarantineCase,
   type InventoryValuationReconciliation,
+  type InventoryValuationRollForward,
   type QuarantineDiagnosis,
   type QuarantineDisposition,
 } from '@/lib/api';
@@ -45,6 +47,9 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [reconciliation, setReconciliation] = useState<InventoryValuationReconciliation | null>(null);
   const [reconciliationError, setReconciliationError] = useState('');
+  const [rollForward, setRollForward] = useState<InventoryValuationRollForward | null>(null);
+  const [rollForwardError, setRollForwardError] = useState('');
+  const [period, setPeriod] = useState(() => defaultValuationPeriod());
   const [quarantine, setQuarantine] = useState<InventoryQuarantineCase[] | null>(null);
   const [quarantineError, setQuarantineError] = useState('');
   const [busyCase, setBusyCase] = useState('');
@@ -74,6 +79,19 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
       .then(setReconciliation)
       .catch((error) => setReconciliationError(error instanceof Error ? error.message : 'Сверка недоступна'));
   }, [accessToken, canReadFinance]);
+
+  useEffect(() => {
+    if (!canReadFinance) return;
+    setRollForward(null);
+    setRollForwardError('');
+    fetchInventoryValuationRollForward(
+      bishkekDayBoundary(period.from),
+      bishkekDayBoundary(period.to),
+      accessToken,
+    )
+      .then(setRollForward)
+      .catch((error) => setRollForwardError(error instanceof Error ? error.message : 'Обороты недоступны'));
+  }, [accessToken, canReadFinance, period]);
 
   useEffect(() => {
     loadQuarantine();
@@ -322,6 +340,84 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
 
       {canReadFinance && (
         <Card>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="font-display text-[15px] font-bold text-white">Движение стоимости запасов</div>
+              <div className="mt-0.5 text-xs text-[#8A7F76]">Начало + поступления + возвраты ± перемещения и корректировки − выбытия = конец · время Бишкека</div>
+            </div>
+            {rollForward && (
+              <span className={`rounded-chip px-2 py-1 text-[11px] ${rollForward.summary.consistent ? 'bg-lime/10 text-lime' : 'bg-[#FF8A7A]/10 text-[#FF8A7A]'}`}>
+                {rollForward.summary.consistent ? 'Период сходится' : 'Есть расхождения'}
+              </span>
+            )}
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="grid gap-1 text-[11px] text-[#8A7F76]">
+                С
+                <input
+                  type="date"
+                  value={period.from}
+                  max={period.to}
+                  onChange={(event) => setPeriod((current) => ({ ...current, from: event.target.value }))}
+                  className="h-9 rounded-[6px] border border-[#3A342E] bg-[#171411] px-2 text-xs text-white"
+                />
+              </label>
+              <label className="grid gap-1 text-[11px] text-[#8A7F76]">
+                До (не включая)
+                <input
+                  type="date"
+                  value={period.to}
+                  min={period.from}
+                  onChange={(event) => setPeriod((current) => ({ ...current, to: event.target.value }))}
+                  className="h-9 rounded-[6px] border border-[#3A342E] bg-[#171411] px-2 text-xs text-white"
+                />
+              </label>
+            </div>
+          </div>
+          {rollForwardError && <div role="alert" className="rounded-[7px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/10 p-3 text-sm text-[#FF8A7A]">{rollForwardError}</div>}
+          {!rollForward && !rollForwardError && <div className="py-8 text-center text-sm text-[#8A7F76]">Собираем исторические обороты…</div>}
+          {rollForward && (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                <ValuationMetric label="Начало" value={som(rollForward.summary.openingValue)} />
+                <ValuationMetric label="GL на начало" value={som(rollForward.summary.glOpening)} />
+                <ValuationMetric label="Разница начала" value={som(rollForward.summary.openingDifference)} warning={rollForward.summary.openingDifference !== 0} />
+                <ValuationMetric label="Конец" value={som(rollForward.summary.closingValue)} />
+                <ValuationMetric label="GL на конец" value={som(rollForward.summary.glClosing)} />
+                <ValuationMetric label="Разница конца" value={som(rollForward.summary.closingDifference)} warning={rollForward.summary.closingDifference !== 0} />
+              </div>
+              {!rollForward.summary.complete && (
+                <div className="mt-3 rounded-[7px] border border-[#E5B23C]/30 bg-[#E5B23C]/10 p-3 text-xs text-[#E5B23C]">
+                  История неполна: возвраты без provenance {rollForward.summary.missingReversalQuantity}, перемещения {rollForward.summary.incompleteTransfers}, серийные поступления без стоимости {rollForward.summary.incompleteSerializedReceipts}, сервисные списания {rollForward.summary.incompleteServiceConsumptions}, quantity balances без полных слоёв {rollForward.summary.incompleteQuantityBalances}, склады выбытия {rollForward.summary.unknownIssueLocations}, склады возврата {rollForward.summary.unknownReversalLocations}, legacy consignment COGS {rollForward.summary.legacyConsignmentIssues}.
+                </div>
+              )}
+              <div className="mt-4 overflow-x-auto">
+                <div className="min-w-[980px]">
+                  <div className="grid grid-cols-[1.7fr_0.9fr_repeat(7,0.75fr)] border-b border-[#2E2822] pb-2 text-[11px] text-[#8A7F76]">
+                    <span>Товар</span><span>Склад</span><span className="text-right">Начало</span><span className="text-right">Приход</span><span className="text-right">Возврат</span><span className="text-right">Вход перем.</span><span className="text-right">Продажи</span><span className="text-right">Выход перем.</span><span className="text-right">Конец</span>
+                  </div>
+                  {rollForward.rows.map((row) => (
+                    <div key={`${row.productId}:${row.location}`} className="grid grid-cols-[1.7fr_0.9fr_repeat(7,0.75fr)] items-center border-b border-[#221E19] py-2.5 text-xs last:border-0">
+                      <span className="truncate pr-2 text-white">{row.name}<span className="ml-1 text-[#6F665E]">{row.sku}</span></span>
+                      <span className="truncate text-[#A79C92]">{row.location}</span>
+                      <RollForwardAmount value={row.opening.value} quantity={row.opening.quantity} />
+                      <RollForwardAmount value={row.receipts.value + row.adjustmentsIn.value} quantity={row.receipts.quantity + row.adjustmentsIn.quantity} />
+                      <RollForwardAmount value={row.returns.value} quantity={row.returns.quantity} />
+                      <RollForwardAmount value={row.transferIn.value} quantity={row.transferIn.quantity} />
+                      <RollForwardAmount value={row.issues.value + row.adjustmentsOut.value} quantity={row.issues.quantity + row.adjustmentsOut.quantity} />
+                      <RollForwardAmount value={row.transferOut.value} quantity={row.transferOut.quantity} />
+                      <RollForwardAmount value={row.closing.value} quantity={row.closing.quantity} strong />
+                    </div>
+                  ))}
+                  {rollForward.rows.length === 0 && <div className="py-6 text-center text-xs text-[#8A7F76]">За период движений нет</div>}
+                </div>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+
+      {canReadFinance && (
+        <Card>
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <div className="font-display text-[15px] font-bold text-white">Оценка запасов и GL 1200</div>
@@ -403,6 +499,25 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
 
 function dispositionFor(diagnosis: QuarantineDiagnosis): QuarantineDisposition {
   return diagnosis === 'resellable' ? 'restock' : diagnosis;
+}
+
+function defaultValuationPeriod() {
+  const now = new Date();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
+
+function bishkekDayBoundary(date: string) {
+  return new Date(`${date}T00:00:00+06:00`).toISOString();
+}
+
+function RollForwardAmount({ value, quantity, strong = false }: { value: number; quantity: number; strong?: boolean }) {
+  return (
+    <span className={`text-right font-mono ${strong ? 'font-semibold text-white' : 'text-[#D8CFC6]'}`} title={`${quantity} ед.`}>
+      {som(value)}<span className="ml-1 text-[10px] text-[#6F665E]">{quantity}</span>
+    </span>
+  );
 }
 
 function diagnosisLabel(diagnosis?: QuarantineDiagnosis | null) {

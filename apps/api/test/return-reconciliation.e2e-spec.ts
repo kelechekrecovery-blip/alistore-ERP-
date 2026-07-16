@@ -46,6 +46,10 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
     await prisma.inventoryQuarantineCase.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationReversal.deleteMany();
+      await tx.inventoryValuationIssue.deleteMany();
+    });
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
@@ -57,7 +61,6 @@ describe('Refund-bound return reconciliation (integration)', () => {
         where: { sourceType: { in: ['inventory.cogs', 'inventory.return'] } },
       }),
     ]);
-    await prisma.inventoryValuationIssue.deleteMany();
     await prisma.inventoryValuationLayer.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany();
     await prisma.orderBundleAllocation.deleteMany();
@@ -99,6 +102,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       orderId: order.id,
       sourceRef: `${order.id}:${imei}`,
       imei,
+      location: 'SALE',
       quantity: 1,
       unitCost: 800,
       actor: 'cashier',
@@ -186,6 +190,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       orderId: order.id,
       sourceRef: `${order.id}:${allocation.id}:${layer.id}`,
       layerId: layer.id,
+      location: saleBalance.location,
       quantity: 2,
       unitCost: 600,
       actor: 'cashier',

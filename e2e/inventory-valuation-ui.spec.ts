@@ -16,15 +16,25 @@ test('owner sees owned inventory valuation and GL reconciliation in ERP stock', 
 
   const reconciliationResponse = page.waitForResponse((response) =>
     response.url().includes('/api/inventory/valuation/reconciliation'));
+  const rollForwardResponse = page.waitForResponse((response) =>
+    response.url().includes('/api/inventory/valuation/roll-forward'));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/erp');
   await page.getByRole('button', { name: /Склад/ }).click();
 
   expect((await reconciliationResponse).status()).toBe(200);
+  expect((await rollForwardResponse).status()).toBe(200);
+  await expect(page.getByText('Движение стоимости запасов')).toBeVisible();
+  await expect(page.getByText('Начало + поступления + возвраты')).toBeVisible();
   await expect(page.getByText('Оценка запасов и GL 1200')).toBeVisible();
   await expect(page.getByText('Количественный')).toBeVisible();
   await expect(page.getByText('Серийный')).toBeVisible();
   await expect(page.getByText('GL 1200', { exact: true })).toBeVisible();
+  await expect(page.getByText('GL на начало', { exact: true })).toBeVisible();
+  await expect(page.getByText('Разница начала', { exact: true })).toBeVisible();
+  await expect(page.getByText('GL на конец', { exact: true })).toBeVisible();
+  await expect(page.getByText('Разница конца', { exact: true })).toBeVisible();
+  await expect(page.getByText('Период сходится', { exact: true })).toBeVisible();
   await expect(page.getByText('Количественных остатков нет')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => document.documentElement.clientWidth),
@@ -35,4 +45,9 @@ test('owner sees owned inventory valuation and GL reconciliation in ERP stock', 
     headers: { authorization: `Bearer ${warehouse.accessToken}` },
   });
   expect(forbidden.status()).toBe(403);
+  const forbiddenRollForward = await request.get(`${API_BASE}/inventory/valuation/roll-forward`, {
+    params: { from: '2026-07-01T00:00:00.000Z', to: '2026-08-01T00:00:00.000Z' },
+    headers: { authorization: `Bearer ${warehouse.accessToken}` },
+  });
+  expect(forbiddenRollForward.status()).toBe(403);
 });

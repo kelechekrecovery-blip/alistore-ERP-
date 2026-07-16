@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -22,6 +22,7 @@ import {
   ReceiveQuantityDto,
   TransferDto,
   TransferQuantityDto,
+  ValuationRollForwardQueryDto,
 } from './inventory.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -168,6 +169,17 @@ export class InventoryController {
   async valuationReconciliation(@CurrentUser() user: AuthPrincipal) {
     await requireActiveStaff(user, this.staffAuth);
     return this.inventory.valuationReconciliation();
+  }
+
+  @ApiOperation({ summary: 'Historical owned inventory valuation roll-forward for [from,to)' })
+  @Get('valuation/roll-forward')
+  @RequirePermission('finance', 'read')
+  async valuationRollForward(
+    @CurrentUser() user: AuthPrincipal,
+    @Query() query: ValuationRollForwardQueryDto,
+  ) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.valuationRollForward(query.from, query.to);
   }
 
   @ApiOperation({ summary: 'List serialized units awaiting or completing quarantine disposition' })

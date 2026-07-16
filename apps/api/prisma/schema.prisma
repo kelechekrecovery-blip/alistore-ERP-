@@ -554,6 +554,7 @@ model Product {
   serviceParts            ServicePart[]
   valuationLayers         InventoryValuationLayer[]
   valuationIssues         InventoryValuationIssue[]
+  valuationReversals      InventoryValuationReversal[]
 
   @@index([category])
   @@index([variantGroup])
@@ -1220,6 +1221,7 @@ model InventoryMovement {
   reason         String?
   unitCost       Int?
   totalValue     Int?
+  valuationQty   Int?
   createdAt      DateTime     @default(now())
   servicePart    ServicePart?
   // write_off / adjust → owner approval + evidence
@@ -1261,16 +1263,41 @@ model InventoryValuationIssue {
   orderId     String?
   sourceType  String
   sourceRef   String
+  location    String?
   quantity    Int
   reversedQty Int @default(0)
   unitCost    Int
   totalCost   Int
   createdAt   DateTime @default(now())
+  reversals   InventoryValuationReversal[]
 
   @@unique([sourceType, sourceRef])
   @@index([productId, createdAt])
+  @@index([productId, location, createdAt])
   @@index([orderId])
   @@index([imei])
+}
+
+model InventoryValuationReversal {
+  id         String                  @id @default(cuid())
+  issue      InventoryValuationIssue @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  issueId    String
+  product    Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId  String
+  return     Return                  @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId   String
+  sourceType String
+  sourceRef  String
+  location   String
+  quantity   Int
+  unitCost   Int
+  totalCost  Int
+  createdAt  DateTime                @default(now())
+
+  @@unique([sourceType, sourceRef])
+  @@index([issueId, createdAt])
+  @@index([productId, location, createdAt])
+  @@index([returnId])
 }
 
 model Reservation {
@@ -1303,6 +1330,7 @@ model Return {
   items           ReturnItem[]
   refund          Refund?
   quarantineCases InventoryQuarantineCase[]
+  valuationReversals InventoryValuationReversal[]
 
   @@index([orderId])
   @@index([status])

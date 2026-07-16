@@ -70,6 +70,12 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     await prisma.serviceWorkOrderCommand.deleteMany();
     await prisma.servicePart.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.accountingJournalLine.deleteMany({ where: { entry: { sourceType: 'service.consumed' } } });
+      await tx.accountingJournalEntry.deleteMany({ where: { sourceType: 'service.consumed' } });
+    });
+    await prisma.inventoryValuationIssue.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
+    await prisma.inventoryValuationLayer.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.quantityConsignmentLot.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.inventoryMovement.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.inventoryBalance.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
@@ -88,6 +94,12 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     await prisma.serviceWorkOrderCommand.deleteMany();
     await prisma.servicePart.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.accountingJournalLine.deleteMany({ where: { entry: { sourceType: 'service.consumed' } } });
+      await tx.accountingJournalEntry.deleteMany({ where: { sourceType: 'service.consumed' } });
+    });
+    await prisma.inventoryValuationIssue.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
+    await prisma.inventoryValuationLayer.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.quantityConsignmentLot.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.inventoryMovement.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
     await prisma.inventoryBalance.deleteMany({ where: { product: { sku: { startsWith: `SERVICE-${run}` } } } });
@@ -244,7 +256,19 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
       data: { sku: `SERVICE-${run}-PART`, name: 'Контроллер питания', price: 2500, cost: 1200, category: 'parts', trackingMode: 'quantity', attrs: {} },
     });
     const balance = await prisma.inventoryBalance.create({
-      data: { productId: partProduct.id, location: 'BISHKEK-2', onHand: 2 },
+      data: { productId: partProduct.id, location: 'BISHKEK-2', onHand: 2, inventoryValue: 1200 },
+    });
+    await prisma.inventoryValuationLayer.create({
+      data: {
+        productId: partProduct.id,
+        balanceId: balance.id,
+        location: 'BISHKEK-2',
+        sourceType: 'service.test.receive',
+        sourceRef: `service-part-layer-${run}`,
+        unitCost: 1200,
+        quantityReceived: 1,
+        quantityRemaining: 1,
+      },
     });
     await prisma.quantityConsignmentLot.create({
       data: {
@@ -348,8 +372,22 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     expect(new Date(closed.body.repairWarrantyUntil).getTime()).toBeGreaterThan(Date.now() + 29 * 86_400_000);
 
     const stock = await prisma.inventoryBalance.findUniqueOrThrow({ where: { id: balance.id } });
-    expect(stock).toMatchObject({ onHand: 1, reserved: 0 });
-    expect(await prisma.inventoryMovement.count({ where: { type: 'service_consumed', productId: partProduct.id } })).toBe(1);
+    expect(stock).toMatchObject({ onHand: 1, reserved: 0, inventoryValue: 0 });
+    const serviceMovement = await prisma.inventoryMovement.findFirstOrThrow({
+      where: { type: 'service_consumed', productId: partProduct.id },
+    });
+    expect(serviceMovement).toMatchObject({ qty: -1, valuationQty: 1, unitCost: 1200, totalValue: 1200 });
+    expect(await prisma.inventoryValuationIssue.count({
+      where: { sourceType: 'service.consumed', sourceRef: { startsWith: `${serviceMovement.id}:` }, totalCost: 1200 },
+    })).toBe(1);
+    const serviceJournal = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { sourceType_sourceRef: { sourceType: 'service.consumed', sourceRef: serviceMovement.id } },
+      include: { lines: true },
+    });
+    expect(serviceJournal.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '5000', debit: 1200, credit: 0 }),
+      expect.objectContaining({ accountCode: '1200', debit: 0, credit: 1200 }),
+    ]));
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } } });
     expect(events.map((event) => event.type)).toEqual(expect.arrayContaining([
       'service.technician_assigned',

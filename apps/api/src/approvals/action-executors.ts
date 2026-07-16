@@ -430,7 +430,7 @@ const write_off: ActionExecutor = async (tx, payload, approver, approvalId, even
   });
   await tx.inventoryMovement.update({
     where: { id: movement.id },
-    data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue },
+    data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue, valuationQty: valuation.complete ? Math.abs(qty) : null },
   });
   events.push({
     type: EventType.StockWrittenOff,
@@ -491,7 +491,7 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   });
   await tx.inventoryMovement.update({
     where: { id: movement.id },
-    data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue },
+    data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue, valuationQty: valuation.complete ? Math.abs(delta) : null },
   });
   events.push({
     type: EventType.StockAdjusted,
@@ -556,6 +556,7 @@ const quarantine_write_off: ActionExecutor = async (tx, payload, approver, appro
       imei: quarantine.unit.imei,
       sourceType: 'inventory.quarantine.write_off',
       sourceRef: quarantineId,
+      location: quarantine.unit.location,
       quantity: 1,
       unitCost,
       totalCost: unitCost,

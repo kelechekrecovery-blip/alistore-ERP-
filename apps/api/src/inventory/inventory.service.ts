@@ -22,6 +22,7 @@ import {
 import { transferQuantityConsignmentOnTx } from './consignment-accounting';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { transferQuantityValuationOnTx } from './inventory-valuation';
+import { inventoryValuationRollForward } from './inventory-roll-forward';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
@@ -175,6 +176,13 @@ export class InventoryService {
       quantity,
       serialized,
     };
+  }
+
+  valuationRollForward(from: string, to: string) {
+    return this.prisma.$transaction(
+      (tx) => inventoryValuationRollForward(tx, from, to),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   async listQuarantine() {
@@ -966,24 +974,34 @@ export class InventoryService {
 
   /** Move an in_stock unit to another branch/location (stock.moved). */
   async transfer(dto: TransferDto, actor: string) {
-    const unit = await this.prisma.deviceUnit.findUnique({ where: { imei: dto.imei } });
-    if (!unit) {
-      throw new ValidationError('unit_not_found', `IMEI ${dto.imei} не найден`);
-    }
-    if (unit.status !== 'in_stock') {
-      throw new ConflictError(
-        'not_transferable',
-        `IMEI ${dto.imei} нельзя перемещать (статус: ${unit.status})`,
-      );
-    }
-    if (unit.location === dto.to) {
-      throw new ValidationError('same_location', `IMEI ${dto.imei} уже на складе ${dto.to}`);
-    }
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "DeviceUnit" WHERE imei = ${dto.imei} FOR UPDATE`;
+      const unit = await tx.deviceUnit.findUnique({
+        where: { imei: dto.imei },
+        include: { consignmentItem: { select: { id: true } } },
+      });
+      if (!unit) throw new ValidationError('unit_not_found', `IMEI ${dto.imei} не найден`);
+      if (unit.status !== 'in_stock') {
+        throw new ConflictError('not_transferable', `IMEI ${dto.imei} нельзя перемещать (статус: ${unit.status})`);
+      }
+      if (unit.location === dto.to) {
+        throw new ValidationError('same_location', `IMEI ${dto.imei} уже на складе ${dto.to}`);
+      }
       const from = unit.location;
+      const ownedCost = unit.consignmentItem ? 0 : unit.acquisitionCost;
       await tx.deviceUnit.update({ where: { imei: dto.imei }, data: { location: dto.to } });
       const movement = await tx.inventoryMovement.create({
-        data: { productId: unit.productId, qty: 1, type: 'moved', from, to: dto.to, reason: dto.reason ?? null },
+        data: {
+          productId: unit.productId,
+          qty: 1,
+          type: 'moved',
+          from,
+          to: dto.to,
+          reason: dto.reason ?? null,
+          unitCost: ownedCost,
+          totalValue: ownedCost,
+          valuationQty: unit.consignmentItem ? 0 : (ownedCost === null ? null : 1),
+        },
       });
       return {
         result: { imei: dto.imei, from, to: dto.to, movementId: movement.id },
@@ -1063,7 +1081,11 @@ export class InventoryService {
       });
       await tx.inventoryMovement.update({
         where: { id: movement.id },
-        data: { unitCost: valuation.unitCost, totalValue: valuation.totalValue },
+        data: {
+          unitCost: valuation.unitCost,
+          totalValue: valuation.totalValue,
+          valuationQty: dto.qty - consignmentQty,
+        },
       });
       return {
         result: {

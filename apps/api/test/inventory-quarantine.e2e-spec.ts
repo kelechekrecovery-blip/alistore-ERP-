@@ -26,7 +26,10 @@ describe('Serialized inventory quarantine (integration)', () => {
     await prisma.approval.deleteMany({ where: { action: 'quarantine_write_off' } });
     await prisma.serviceWorkOrder.deleteMany({ where: { warrantyCase: { imei: { startsWith: 'QT-' } } } });
     await prisma.warrantyCase.deleteMany({ where: { imei: { startsWith: 'QT-' } } });
-    await prisma.inventoryValuationIssue.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationReversal.deleteMany({ where: { productId: { in: productIds } } });
+      await tx.inventoryValuationIssue.deleteMany({ where: { productId: { in: productIds } } });
+    });
     await prisma.$transaction([
       prisma.accountingJournalLine.deleteMany({
         where: { entry: { sourceType: 'inventory.quarantine.write_off', sourceRef: { in: quarantineIds } } },

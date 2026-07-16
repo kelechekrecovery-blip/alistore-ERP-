@@ -1,4 +1,4 @@
-import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CountDto {
@@ -105,6 +105,16 @@ export class DisposeQuarantineDto {
   @ApiProperty({ enum: ['restock', 'repair', 'write_off'] })
   @IsIn(['restock', 'repair', 'write_off'])
   disposition!: 'restock' | 'repair' | 'write_off';
+}
+
+export class ValuationRollForwardQueryDto {
+  @ApiProperty({ example: '2026-07-01T00:00:00.000Z' })
+  @IsISO8601({ strict: true })
+  from!: string;
+
+  @ApiProperty({ example: '2026-08-01T00:00:00.000Z' })
+  @IsISO8601({ strict: true })
+  to!: string;
 }
 
 export class ReceiveConsignmentDto {

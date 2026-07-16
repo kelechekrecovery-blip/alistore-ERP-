@@ -16,9 +16,11 @@ export async function adjustQuantityValuationOnTx(
     quantityDelta: number;
     unitCost?: number;
     actor: string;
-    sourceType: 'inventory.write_off' | 'inventory.adjustment';
+    sourceType: 'inventory.write_off' | 'inventory.adjustment' | 'service.consumed';
+    debitAccount?: string;
   },
 ) {
+  const occurredAt = new Date();
   if (input.quantityDelta > 0) {
     const unitCost = input.unitCost ?? 0;
     const totalValue = input.quantityDelta * unitCost;
@@ -32,6 +34,7 @@ export async function adjustQuantityValuationOnTx(
         unitCost,
         quantityReceived: input.quantityDelta,
         quantityRemaining: input.quantityDelta,
+        createdAt: occurredAt,
       },
     });
     if (totalValue > 0) {
@@ -41,23 +44,25 @@ export async function adjustQuantityValuationOnTx(
       });
     }
     const entry = totalValue > 0
-      ? await postInventoryVarianceOnTx(tx, input, totalValue, true)
+      ? await postInventoryVarianceOnTx(tx, { ...input, occurredAt }, totalValue, true)
       : null;
-    return { totalValue, unitCost, entry };
+    return { totalValue, unitCost, entry, complete: true };
   }
 
   const quantity = Math.abs(input.quantityDelta);
-  const balance = await tx.inventoryBalance.findUniqueOrThrow({
-    where: { id: input.balanceId },
-    select: { inventoryValue: true },
-  });
-  if (balance.inventoryValue === 0) {
-    return { totalValue: 0, unitCost: null as number | null, entry: null };
-  }
   const layers = await tx.inventoryValuationLayer.findMany({
     where: { balanceId: input.balanceId, quantityRemaining: { gt: 0 } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
+  if (layers.length === 0) {
+    const balance = await tx.inventoryBalance.findUniqueOrThrow({
+      where: { id: input.balanceId },
+      select: { inventoryValue: true },
+    });
+    if (balance.inventoryValue === 0) {
+      return { totalValue: 0, unitCost: null as number | null, entry: null, complete: false };
+    }
+  }
   let remaining = quantity;
   let totalValue = 0;
   const unitCosts = new Set<number>();
@@ -77,9 +82,11 @@ export async function adjustQuantityValuationOnTx(
         layerId: layer.id,
         sourceType: input.sourceType,
         sourceRef: `${input.movementId}:${layer.id}`,
+        location: input.location,
         quantity: consumed,
         unitCost: layer.unitCost,
         totalCost: consumed * layer.unitCost,
+        createdAt: occurredAt,
       },
     });
     remaining -= consumed;
@@ -100,9 +107,9 @@ export async function adjustQuantityValuationOnTx(
     throw new ConflictError('inventory_value_mismatch', 'Стоимость остатка меньше стоимости складского движения');
   }
   const entry = totalValue > 0
-    ? await postInventoryVarianceOnTx(tx, input, totalValue, false)
+    ? await postInventoryVarianceOnTx(tx, { ...input, occurredAt }, totalValue, false)
     : null;
-  return { totalValue, unitCost: unitCosts.size === 1 ? [...unitCosts][0] : null, entry };
+  return { totalValue, unitCost: unitCosts.size === 1 ? [...unitCosts][0] : null, entry, complete: true };
 }
 
 async function postInventoryVarianceOnTx(
@@ -110,7 +117,9 @@ async function postInventoryVarianceOnTx(
   input: {
     movementId: string;
     actor: string;
-    sourceType: 'inventory.write_off' | 'inventory.adjustment';
+    sourceType: 'inventory.write_off' | 'inventory.adjustment' | 'service.consumed';
+    debitAccount?: string;
+    occurredAt: Date;
   },
   totalValue: number,
   increase: boolean,
@@ -120,7 +129,7 @@ async function postInventoryVarianceOnTx(
     sourceType: input.sourceType,
     sourceRef: input.movementId,
     description: `${increase ? 'Оприходование' : 'Списание'} запасов по движению ${input.movementId}`,
-    occurredAt: new Date(),
+    occurredAt: input.occurredAt,
     createdBy: input.actor,
     lines: increase
       ? [
@@ -128,7 +137,7 @@ async function postInventoryVarianceOnTx(
         { accountCode: INVENTORY_VARIANCE_ACCOUNT, credit: totalValue, memo: 'Излишек по складской корректировке' },
       ]
       : [
-        { accountCode: INVENTORY_VARIANCE_ACCOUNT, debit: totalValue, memo: 'Недостача или списание запасов' },
+        { accountCode: input.debitAccount ?? INVENTORY_VARIANCE_ACCOUNT, debit: totalValue, memo: input.sourceType === 'service.consumed' ? 'Запчасти, использованные в ремонте' : 'Недостача или списание запасов' },
         { accountCode: INVENTORY_ASSET_ACCOUNT, credit: totalValue, memo: 'Уменьшение стоимости запасов' },
       ],
   });
@@ -210,6 +219,7 @@ export async function postCogsOnTx(
     sourceRef: string;
     imei?: string;
     layerId?: string;
+    location: string;
     quantity: number;
     unitCost: number;
     actor: string;
@@ -217,6 +227,7 @@ export async function postCogsOnTx(
   },
 ) {
   const totalCost = input.quantity * input.unitCost;
+  const occurredAt = input.occurredAt ?? new Date();
   const issue = await tx.inventoryValuationIssue.upsert({
     where: { sourceType_sourceRef: { sourceType: 'sale', sourceRef: input.sourceRef } },
     create: {
@@ -226,24 +237,28 @@ export async function postCogsOnTx(
       layerId: input.layerId,
       sourceType: 'sale',
       sourceRef: input.sourceRef,
+      location: input.location,
       quantity: input.quantity,
       unitCost: input.unitCost,
       totalCost,
+      createdAt: occurredAt,
     },
     update: {},
   });
-  const entry = await postAccountingEntryOnTx(tx, {
-    idempotencyKey: `accounting:inventory.cogs:${issue.id}`,
-    sourceType: 'inventory.cogs',
-    sourceRef: issue.id,
-    description: `Себестоимость продажи ${input.orderId}`,
-    occurredAt: input.occurredAt ?? new Date(),
-    createdBy: input.actor,
-    lines: [
-      { accountCode: COGS_ACCOUNT, debit: totalCost, memo: 'Себестоимость проданного товара' },
-      { accountCode: INVENTORY_ASSET_ACCOUNT, credit: totalCost, memo: 'Выбытие товарного запаса' },
-    ],
-  });
+  const entry = totalCost > 0
+    ? await postAccountingEntryOnTx(tx, {
+      idempotencyKey: `accounting:inventory.cogs:${issue.id}`,
+      sourceType: 'inventory.cogs',
+      sourceRef: issue.id,
+      description: `Себестоимость продажи ${input.orderId}`,
+      occurredAt,
+      createdBy: input.actor,
+      lines: [
+        { accountCode: COGS_ACCOUNT, debit: totalCost, memo: 'Себестоимость проданного товара' },
+        { accountCode: INVENTORY_ASSET_ACCOUNT, credit: totalCost, memo: 'Выбытие товарного запаса' },
+      ],
+    })
+    : null;
   return { issue, entry };
 }
 
@@ -277,6 +292,7 @@ export async function consumeQuantityValuationOnTx(
       quantity,
       unitCost: layer.unitCost,
       actor: input.actor,
+      location: layer.location,
     });
     totalCost += issue.issue.totalCost;
     remaining -= quantity;
@@ -291,6 +307,7 @@ export async function reverseInventoryCostOnTx(
     issueId: string;
     quantity: number;
     returnId: string;
+    location: string;
     actor: string;
     occurredAt?: Date;
   },
@@ -307,19 +324,36 @@ export async function reverseInventoryCostOnTx(
   });
   if (updated.count !== 1) throw new ConflictError('valuation_return_race', `Себестоимость ${issue.id} изменена параллельно`);
   const total = input.quantity * issue.unitCost;
-  const entry = await postAccountingEntryOnTx(tx, {
-    idempotencyKey: `accounting:inventory.return:${sourceRef}`,
-    sourceType: 'inventory.return',
-    sourceRef,
-    description: `Восстановление себестоимости возврата ${input.returnId}`,
-    occurredAt: input.occurredAt ?? new Date(),
-    createdBy: input.actor,
-    lines: [
-      { accountCode: INVENTORY_ASSET_ACCOUNT, debit: total, memo: 'Возврат товара на склад' },
-      { accountCode: COGS_ACCOUNT, credit: total, memo: 'Сторно себестоимости продаж' },
-    ],
+  const occurredAt = input.occurredAt ?? new Date();
+  const reversal = await tx.inventoryValuationReversal.create({
+    data: {
+      issueId: issue.id,
+      productId: issue.productId,
+      returnId: input.returnId,
+      sourceType: 'inventory.return',
+      sourceRef,
+      location: input.location,
+      quantity: input.quantity,
+      unitCost: issue.unitCost,
+      totalCost: total,
+      createdAt: occurredAt,
+    },
   });
-  return { issue, quantity: input.quantity, unitCost: issue.unitCost, totalCost: total, entry };
+  const entry = total > 0
+    ? await postAccountingEntryOnTx(tx, {
+      idempotencyKey: `accounting:inventory.return:${sourceRef}`,
+      sourceType: 'inventory.return',
+      sourceRef,
+      description: `Восстановление себестоимости возврата ${input.returnId}`,
+      occurredAt,
+      createdBy: input.actor,
+      lines: [
+        { accountCode: INVENTORY_ASSET_ACCOUNT, debit: total, memo: 'Возврат товара на склад' },
+        { accountCode: COGS_ACCOUNT, credit: total, memo: 'Сторно себестоимости продаж' },
+      ],
+    })
+    : null;
+  return { issue, reversal, quantity: input.quantity, unitCost: issue.unitCost, totalCost: total, entry };
 }
 
 export async function reverseQuantityCostOnTx(
@@ -359,6 +393,7 @@ export async function reverseQuantityCostOnTx(
       quantity,
       returnId: input.returnId,
       actor: input.actor,
+      location,
     });
     await tx.inventoryValuationLayer.create({
       data: {
@@ -374,12 +409,14 @@ export async function reverseQuantityCostOnTx(
     });
     remaining -= quantity;
     totalCost += reversed.totalCost;
-    entries.push({
-      id: reversed.entry.id,
-      issueId: issue.id,
-      quantity,
-      totalCost: reversed.totalCost,
-    });
+    if (reversed.entry) {
+      entries.push({
+        id: reversed.entry.id,
+        issueId: issue.id,
+        quantity,
+        totalCost: reversed.totalCost,
+      });
+    }
   }
   // Orders created before immutable valuation was introduced have no issues.
   // Once an order has valuation provenance, an incomplete reversal is a hard

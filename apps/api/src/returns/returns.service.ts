@@ -496,21 +496,29 @@ export class ReturnsService {
           orderBy: { createdAt: 'desc' },
         });
         if (issue) {
-          const reversed = await reverseInventoryCostOnTx(tx, { issueId: issue.id, quantity: 1, returnId: ret.id, actor });
-          events.push({
-            type: EventType.AccountingEntryPosted,
+          const reversed = await reverseInventoryCostOnTx(tx, {
+            issueId: issue.id,
+            quantity: 1,
+            returnId: ret.id,
+            location,
             actor,
-            payload: {
-              accountingEntryId: reversed.entry.id,
-              sourceType: 'inventory.return',
-              returnId: ret.id,
-              orderId: order.id,
-              imei,
-              quantity: 1,
-              totalCost: reversed.totalCost,
-            },
-            refs: [reversed.entry.id, ret.id, order.id, imei],
           });
+          if (reversed.entry) {
+            events.push({
+              type: EventType.AccountingEntryPosted,
+              actor,
+              payload: {
+                accountingEntryId: reversed.entry.id,
+                sourceType: 'inventory.return',
+                returnId: ret.id,
+                orderId: order.id,
+                imei,
+                quantity: 1,
+                totalCost: reversed.totalCost,
+              },
+              refs: [reversed.entry.id, ret.id, order.id, imei],
+            });
+          }
         }
         const quarantine = await createQuarantineCaseOnTx(tx, {
           unitId: unit.id,

@@ -14,6 +14,7 @@
     "db:deploy": "node scripts/deploy-database.mjs",
     "db:seed": "ts-node prisma/seed.ts",
     "test:refund-migration-upgrade": "node scripts/test-refund-migration-upgrade.mjs",
+    "test:inventory-roll-forward-migration-upgrade": "node scripts/test-inventory-roll-forward-migration-upgrade.mjs",
     "db:studio": "prisma studio",
     "preflight": "ts-node scripts/print-production-preflight.ts",
     "readiness": "ts-node scripts/print-readiness.ts",
