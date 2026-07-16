@@ -250,7 +250,6 @@ export default function StaffPage() {
         grade: buybackForm.grade,
         price: Number(buybackForm.price),
         sellerPassport: buybackForm.passport.trim(),
-        actor: session.staffId,
       }, { accessToken: session.accessToken, staffIntake: true });
       setTradeIn(result);
       setBuyback(BUYBACK.map(() => true));

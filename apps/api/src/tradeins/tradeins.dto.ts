@@ -3,9 +3,13 @@ import { Grade } from '@prisma/client';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateTradeInDto {
-  @ApiProperty({ example: 'clx_customer_001' })
+  @ApiPropertyOptional({
+    description: 'Required for guest capability and staff intake. Ignored for customer JWT requests.',
+    example: 'clx_customer_001',
+  })
+  @IsOptional()
   @IsString()
-  customerId!: string;
+  customerId?: string;
 
   @ApiProperty({ example: 'iPhone 13 Pro 256GB' })
   @IsString()
@@ -32,10 +36,6 @@ export class CreateTradeInDto {
   @IsString()
   sellerPassport!: string;
 
-  @ApiPropertyOptional({ example: 'seller_azamat' })
-  @IsOptional()
-  @IsString()
-  actor?: string;
 }
 
 export class TradeInViewDto {

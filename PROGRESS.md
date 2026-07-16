@@ -2243,4 +2243,13 @@
 - Result: the Client now lists server-owned return requests, shows status/reason/refund amount, loads the authenticated order list for selection, and creates a full-order return through `POST /returns/mine` with a stable idempotency key. The UI explicitly explains that request creation is separate from refund execution and keeps loading/empty/error/retry states.
 - Checks run: Client simulator build passed; targeted Client XCUITest `4/4`; aggregate iOS UI gate passed for Client `4/4`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
 - Outcome: native iOS Client return request software is implemented and simulator-verified. Partial line selection, refund approval/execution UI, trade-in parity, physical-device checks and store release remain open. Native trade-in is intentionally blocked until the customer endpoint stops trusting `customerId` from request body and gains a retry-safe mutation contract.
-- Next step: close the trade-in API ownership/idempotency contract, then add the native customer flow on top of that corrected API.
+- Next step: add the API-backed SwiftUI Client trade-in route with stable retry state and signed-in owner display, then mirror the contract in Compose.
+
+## 2026-07-17
+
+- Task: close the customer trade-in ownership and idempotency contract before native implementation.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260717010000_tradein_idempotency/migration.sql`, `apps/api/src/tradeins/tradeins.controller.ts`, `apps/api/src/tradeins/tradeins.dto.ts`, `apps/api/src/tradeins/tradeins.service.ts`, `apps/api/test/tradeins.e2e-spec.ts`, `apps/api/test/tradein-rbac.e2e-spec.ts`, `apps/web/lib/api/tradeins.ts`, `apps/web/app/trade-in/page.tsx`, `apps/web/app/staff/page.tsx`.
+- Result: customer JWT requests now derive and enforce ownership without trusting `customerId` or `actor` from the body; guest requests remain bound to a `tradeins:create` capability; staff intake derives the actor from the staff JWT; every create path requires a unique `Idempotency-Key`; exact replay returns the original contract and changed payloads produce `idempotency_key_reused`; customers can list and read only their own trade-ins.
+- Checks run: local dev and isolated test databases received migration `20260717010000_tradein_idempotency`; targeted API suites passed `2/2`, `6/6`; API and web production builds passed; `git diff --check` passed.
+- Outcome: the trade-in API contract is implemented and regression-tested. Native iOS/Android trade-in screens, evidence retry semantics, physical-device checks, live providers and store release remain open.
+- Next step: add the API-backed SwiftUI Client trade-in route with stable retry state and signed-in owner display, then mirror the contract in Compose.

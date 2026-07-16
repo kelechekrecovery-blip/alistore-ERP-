@@ -54,13 +54,12 @@ export default function TradeInPage() {
       const guest = user ? null : await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
       const customerId = user?.customerId ?? guest!.id;
       const create = (accessToken?: string) => createTradeIn({
-        customerId,
+        ...(user ? {} : { customerId }),
         model: note.trim() ? `${model.trim()} (${note.trim()})` : model.trim(),
         imei: imei.trim() || undefined,
         grade,
         price,
         sellerPassport: passport.trim(),
-        actor: 'customer_app',
       }, { accessToken, guestCapability: guest?.guestCapability });
       const tradeIn = user ? await authed(create) : await create();
       const evidence = files.length

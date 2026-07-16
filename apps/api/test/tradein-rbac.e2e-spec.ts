@@ -1,5 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuditModule } from '../src/audit/audit.module';
@@ -9,6 +11,7 @@ import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { TradeInsModule } from '../src/tradeins/tradeins.module';
 import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
+import { JwtStrategy } from '../src/auth/jwt.strategy';
 
 describe('Trade-in self-service and staff intake RBAC', () => {
   let app: INestApplication;
@@ -17,6 +20,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
   let sellerToken: string;
   let sellerId: string;
   let warehouseToken: string;
+  let jwt: JwtService;
   const RUN = Math.floor(Math.random() * 1_000_000);
   let seq = 0;
 
@@ -24,11 +28,14 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
+        PassportModule,
+        JwtModule.register({ secret: process.env.JWT_SECRET ?? 'dev-insecure-change-me' }),
         PrismaModule,
         AuditModule,
         StaffAuthModule,
         TradeInsModule,
       ],
+      providers: [JwtStrategy],
     }).compile();
 
     app = moduleRef.createNestApplication();
@@ -36,6 +43,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
+    jwt = moduleRef.get(JwtService);
 
     const createSession = async (role: 'seller' | 'warehouse') => {
       const username = `${role}-tradein-${RUN}`;
@@ -92,8 +100,11 @@ describe('Trade-in self-service and staff intake RBAC', () => {
       grade: 'B',
       price: 42000,
       sellerPassport: 'ID1234567',
-      actor: 'spoof',
     };
+  }
+
+  function customerToken(customerId: string) {
+    return jwt.sign({ sub: customerId, typ: 'customer' });
   }
 
   it('keeps customer self-service public but guards staff intake/read and actors', async () => {
@@ -102,6 +113,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     const publicTradeIn = await request(app.getHttpServer())
       .post('/tradeins')
       .set('x-guest-capability', issueGuestCheckoutCapability(customer.id))
+      .set('Idempotency-Key', `guest-${RUN}-1`)
       .send(payload(customer.id))
       .expect(201);
 
@@ -109,6 +121,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     await request(app.getHttpServer())
       .post('/tradeins')
       .set('x-guest-capability', issueGuestCheckoutCapability(otherCustomer.id))
+      .set('Idempotency-Key', `guest-${RUN}-2`)
       .send(payload(customer.id))
       .expect(403);
 
@@ -138,6 +151,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     await request(app.getHttpServer())
       .post('/tradeins/intake')
       .set('Authorization', `Bearer ${warehouseToken}`)
+      .set('Idempotency-Key', `warehouse-${RUN}-1`)
       .send(payload(intakeCustomer.id))
       .expect(403);
 
@@ -145,6 +159,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     await request(app.getHttpServer())
       .post('/tradeins/intake')
       .set('Authorization', `Bearer ${sellerToken}`)
+      .set('Idempotency-Key', `seller-${RUN}-1`)
       .send(payload(intakeCustomer.id, intakeImei))
       .expect(201)
       .expect((res) => {
@@ -156,5 +171,31 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     expect(staffEvent?.refs).toContain(intakeImei);
     const saved = await prisma.tradeInDevice.findFirst({ where: { imei: intakeImei } });
     expect(saved?.customerId).toBe(intakeCustomer.id);
+  });
+
+  it('derives the owner from customer JWT and exposes only owned records', async () => {
+    const owner = await customerFixture();
+    const other = await customerFixture();
+    const response = await request(app.getHttpServer())
+      .post('/tradeins')
+      .set('Authorization', `Bearer ${customerToken(owner.id)}`)
+      .set('Idempotency-Key', `customer-${RUN}-1`)
+      .send(payload(other.id))
+      .expect(201);
+
+    expect(response.body.customerId).toBe(owner.id);
+    const event = await prisma.auditEvent.findFirst({ where: { type: 'tradein.assessed' } });
+    expect(event?.actor).toBe(owner.id);
+
+    await request(app.getHttpServer())
+      .get('/tradeins/mine')
+      .set('Authorization', `Bearer ${customerToken(owner.id)}`)
+      .expect(200)
+      .expect((res) => expect(res.body.map((item: { id: string }) => item.id)).toContain(response.body.id));
+
+    await request(app.getHttpServer())
+      .get(`/tradeins/mine/${response.body.id}`)
+      .set('Authorization', `Bearer ${customerToken(other.id)}`)
+      .expect(404);
   });
 });

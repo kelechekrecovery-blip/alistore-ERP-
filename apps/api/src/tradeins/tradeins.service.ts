@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
-import { TradeInDevice } from '@prisma/client';
+import { Prisma, TradeInDevice } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ValidationError } from '../common/errors';
+import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
+
+type TradeInCreateInput = Omit<CreateTradeInDto, 'customerId'> & { customerId: string };
 
 @Injectable()
 export class TradeInsService {
@@ -19,7 +21,30 @@ export class TradeInsService {
     return tradeIn ? this.view(tradeIn) : null;
   }
 
-  async create(dto: CreateTradeInDto, actor = dto.customerId): Promise<TradeInViewDto> {
+  async getOwned(id: string, customerId: string): Promise<TradeInViewDto | null> {
+    const tradeIn = await this.prisma.tradeInDevice.findFirst({ where: { id, customerId } });
+    return tradeIn ? this.view(tradeIn) : null;
+  }
+
+  async listByCustomer(customerId: string): Promise<TradeInViewDto[]> {
+    const tradeIns = await this.prisma.tradeInDevice.findMany({
+      where: { customerId },
+      orderBy: { id: 'desc' },
+      take: 100,
+    });
+    return tradeIns.map((tradeIn) => this.view(tradeIn));
+  }
+
+  async create(dto: TradeInCreateInput, actor: string, idempotencyKey: string): Promise<TradeInViewDto> {
+    const key = idempotencyKey.trim();
+    if (!key || key.length > 128) {
+      throw new ValidationError('invalid_idempotency_key', 'Idempotency key должен быть от 1 до 128 символов');
+    }
+    const model = dto.model.trim();
+    const sellerPassport = dto.sellerPassport.trim();
+    if (!model || !sellerPassport) {
+      throw new ValidationError('invalid_tradein_payload', 'Модель и паспорт продавца обязательны');
+    }
     const customer = await this.prisma.customer.findUnique({
       where: { id: dto.customerId },
       select: { id: true },
@@ -28,50 +53,81 @@ export class TradeInsService {
       throw new ValidationError('customer_not_found', `Клиент ${dto.customerId} не найден`);
     }
     const imei = this.cleanOptional(dto.imei);
+    const input = { customerId: dto.customerId, model, imei, grade: dto.grade, price: dto.price, sellerPassport };
+    const existing = await this.prisma.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
+    if (existing) return this.replay(existing, input);
 
-    return this.audit.transaction(async (tx) => {
-      const tradeIn = await tx.tradeInDevice.create({
-        data: {
-          customerId: dto.customerId,
-          model: dto.model,
-          imei,
-          grade: dto.grade,
-          price: dto.price,
-          sellerPassport: dto.sellerPassport,
-          contractId: this.contractId(),
-        },
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`tradein:${key}`}))::text AS locked`;
+        const replay = await tx.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
+        if (replay) return { result: this.replay(replay, input), events: [] };
+
+        const tradeIn = await tx.tradeInDevice.create({
+          data: {
+            customerId: input.customerId,
+            model: input.model,
+            imei: input.imei,
+            grade: input.grade,
+            price: input.price,
+            sellerPassport: input.sellerPassport,
+            contractId: this.contractId(),
+            idempotencyKey: key,
+          },
+        });
+
+        return {
+          result: this.view(tradeIn),
+          events: [
+            {
+              type: EventType.TradeInAssessed,
+              actor,
+              payload: {
+                tradeInId: tradeIn.id,
+                customerId: input.customerId,
+                model: input.model,
+                imei: input.imei,
+                grade: input.grade,
+                price: input.price,
+              },
+              refs: this.refs(tradeIn.id, input.customerId, input.imei),
+            },
+            {
+              type: EventType.TradeInContracted,
+              actor,
+              payload: {
+                tradeInId: tradeIn.id,
+                customerId: input.customerId,
+                contractId: tradeIn.contractId,
+                imei: input.imei,
+              },
+              refs: this.refs(tradeIn.id, input.customerId, input.imei),
+            },
+          ],
+        };
       });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        const raced = await this.prisma.tradeInDevice.findUniqueOrThrow({ where: { idempotencyKey: key } });
+        return this.replay(raced, input);
+      }
+      throw error;
+    }
+  }
 
-      return {
-        result: this.view(tradeIn),
-        events: [
-          {
-            type: EventType.TradeInAssessed,
-            actor,
-            payload: {
-              tradeInId: tradeIn.id,
-              customerId: dto.customerId,
-              model: dto.model,
-              imei,
-              grade: dto.grade,
-              price: dto.price,
-            },
-            refs: this.refs(tradeIn.id, dto.customerId, imei),
-          },
-          {
-            type: EventType.TradeInContracted,
-            actor,
-            payload: {
-              tradeInId: tradeIn.id,
-              customerId: dto.customerId,
-              contractId: tradeIn.contractId,
-              imei,
-            },
-            refs: this.refs(tradeIn.id, dto.customerId, imei),
-          },
-        ],
-      };
-    });
+  private replay(
+    tradeIn: TradeInDevice,
+    input: { customerId: string; model: string; imei: string | null; grade: TradeInDevice['grade']; price: number; sellerPassport: string },
+  ): TradeInViewDto {
+    const matches =
+      tradeIn.customerId === input.customerId &&
+      tradeIn.model === input.model &&
+      tradeIn.imei === input.imei &&
+      tradeIn.grade === input.grade &&
+      tradeIn.price === input.price &&
+      tradeIn.sellerPassport === input.sellerPassport;
+    if (!matches) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим trade-in');
+    return this.view(tradeIn);
   }
 
   private contractId(): string {
@@ -106,4 +162,8 @@ export class TradeInsService {
   private refs(...values: Array<string | null>): string[] {
     return values.filter((value): value is string => Boolean(value));
   }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }

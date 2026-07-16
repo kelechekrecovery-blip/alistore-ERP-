@@ -1,4 +1,15 @@
-import { Body, Controller, ForbiddenException, Get, Headers, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Headers,
+  NotFoundException,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -40,14 +51,39 @@ export class TradeInsController {
     @Body() dto: CreateTradeInDto,
     @CurrentUser() user?: AuthPrincipal,
     @Headers('x-guest-capability') capability?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     if (user?.typ === 'staff') throw new ForbiddenException('Используйте /tradeins/intake');
-    const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
-    if (user?.typ === 'customer' && dto.customerId !== customerId) {
-      throw new ForbiddenException('Нельзя создать trade-in от имени другого клиента');
+    const key = requireIdempotencyKey(idempotencyKey);
+    if (user?.typ === 'customer') {
+      return this.tradeIns.create({ ...dto, customerId: user.customerId }, user.customerId, key);
     }
+    const customerId = requiredCustomerId(dto.customerId);
     if (!user) requireGuestCapability(capability, 'tradeins:create', customerId);
-    return this.tradeIns.create({ ...dto, customerId }, customerId);
+    return this.tradeIns.create({ ...dto, customerId }, customerId, key);
+  }
+
+  @ApiOperation({ summary: 'List trade-ins of the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: TradeInViewDto, isArray: true })
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  mine(@CurrentUser() user: AuthPrincipal) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.tradeIns.listByCustomer(user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Get one trade-in of the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: TradeInViewDto })
+  @ApiNotFoundResponse({ description: 'Trade-in does not exist or is not owned by the customer.' })
+  @Get('mine/:id')
+  @UseGuards(JwtAuthGuard)
+  async mineOne(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    const tradeIn = await this.tradeIns.getOwned(id, user.customerId);
+    if (!tradeIn) throw new NotFoundException(`Скупка ${id} не найдена`);
+    return tradeIn;
   }
 
   @ApiOperation({
@@ -61,8 +97,14 @@ export class TradeInsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('tradeins', 'intake')
-  intake(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateTradeInDto) {
-    return this.tradeIns.create(dto, user.customerId);
+  intake(
+    @CurrentUser() user: AuthPrincipal,
+    @Body() dto: CreateTradeInDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const key = requireIdempotencyKey(idempotencyKey);
+    const customerId = requiredCustomerId(dto.customerId);
+    return this.tradeIns.create({ ...dto, customerId }, user.customerId, key);
   }
 
   @ApiOperation({ summary: 'Get a trade-in by id with protected fields masked' })
@@ -78,4 +120,17 @@ export class TradeInsController {
     if (!tradeIn) throw new NotFoundException(`Скупка ${id} не найдена`);
     return tradeIn;
   }
+}
+
+function requireIdempotencyKey(value: string | undefined): string {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
+}
+
+function requiredCustomerId(value: string | undefined): string {
+  const customerId = value?.trim();
+  if (!customerId) throw new BadRequestException('customerId обязателен для guest или staff intake');
+  return customerId;
 }
