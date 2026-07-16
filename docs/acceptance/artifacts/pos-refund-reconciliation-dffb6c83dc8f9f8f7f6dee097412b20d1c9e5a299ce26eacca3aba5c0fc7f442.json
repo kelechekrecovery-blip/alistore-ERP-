@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gate": "pos-refund-reconciliation",
+  "command": "npm run ecosystem:pos-refund:e2e",
+  "exitCode": 0,
+  "packageCommandSha256": "5a882260dbeb00f3fa505b62860636b13c090fa0e08c85c74bc400132fd3aaa7",
+  "sourceTreeSha256": "2d091fd48a72d02c395c87e92e4b1af474c81c25232d18407d305eda1da6c575",
+  "sourceCommit": "80f6506a5a21daf6910b51562a93c3cb0fc03c41",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "toolchain": "v25.9.0"
+  },
+  "executionEnvironmentSha256": "fe638b46bf31fa36e3d711c261a2f0e1746440eb275e0c226012c23c72f1809c",
+  "completedAt": "2026-07-16T09:56:08.705Z"
+}

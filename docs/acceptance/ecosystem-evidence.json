@@ -33,10 +33,16 @@
       ]
     },
     "pos-refund-reconciliation": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "ecosystem:pos-refund:e2e",
-      "command": null,
-      "artifacts": []
+      "command": "npm run ecosystem:pos-refund:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-dffb6c83dc8f9f8f7f6dee097412b20d1c9e5a299ce26eacca3aba5c0fc7f442.json",
+          "sha256": "dffb6c83dc8f9f8f7f6dee097412b20d1c9e5a299ce26eacca3aba5c0fc7f442"
+        }
+      ]
     },
     "reconciled-e2e": {
       "status": "partial",
