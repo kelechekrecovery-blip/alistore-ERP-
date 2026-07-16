@@ -151,6 +151,12 @@ describe('Evidence Vault (integration)', () => {
     expect(replay).toEqual(first);
     expect(await prisma.evidenceUpload.count({ where: { idempotencyKey: key } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'evidence.attached', refs: { has: mv.id } } })).toBe(1);
+    const read = await evidence.issueRead(key, 'customer:customer-1');
+    expect(read.asset.url).toBe(first.asset.url);
+    expect(await prisma.auditEvent.count({ where: { type: 'evidence.accessed', refs: { has: key } } })).toBe(1);
+    const secondRead = await evidence.issueRead(key, 'customer:customer-1');
+    expect(secondRead.asset.url).toBe(first.asset.url);
+    expect(await prisma.auditEvent.count({ where: { type: 'evidence.accessed', refs: { has: key } } })).toBe(2);
     await expect(evidence.attachImage(Buffer.from('different'), {
       entityType: 'inventory',
       entityId: mv.id,

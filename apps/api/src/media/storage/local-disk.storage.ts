@@ -36,4 +36,8 @@ export class LocalDiskStorage implements MediaStorage {
       if (error.code !== 'ENOENT') throw error;
     });
   }
+
+  async getReadUrl(key: string): Promise<string> {
+    return `${this.publicBase}/${key}`;
+  }
 }

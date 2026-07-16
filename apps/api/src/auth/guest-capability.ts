@@ -10,7 +10,8 @@ export type GuestCapabilityScope =
   | 'support:create'
   | 'warranty:create'
   | 'tradeins:create'
-  | 'evidence:write';
+  | 'evidence:write'
+  | 'evidence:read';
 
 interface GuestCapabilityClaims {
   sub: string;
@@ -42,6 +43,7 @@ export function issueGuestCheckoutCapability(customerId: string): string {
         'warranty:create',
         'tradeins:create',
         'evidence:write',
+        'evidence:read',
       ],
     } satisfies Omit<GuestCapabilityClaims, 'iat' | 'exp'>,
     secret(),

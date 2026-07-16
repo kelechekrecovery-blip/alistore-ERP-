@@ -87,11 +87,12 @@ export class EvidenceService {
               throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован для другого файла');
             }
             replayed = true;
+            const storedAsset = existing.asset as unknown as IngestedImage;
             return {
               result: {
                 entityType: existing.entityType as EvidenceEntityType,
                 entityId: existing.entityId,
-                asset: existing.asset as unknown as IngestedImage,
+                asset: { ...storedAsset, url: await this.media.getReadUrl(storedAsset.key) },
                 label: existing.label,
               },
               events: [],
@@ -144,11 +145,47 @@ export class EvidenceService {
         };
       });
       if (replayed) await this.mediaCleanup.deleteOrSchedule(asset.key);
-      return result;
+      return replayed
+        ? { ...result, asset: { ...result.asset, url: await this.media.getReadUrl(result.asset.key) } }
+        : result;
     } catch (error) {
       await this.mediaCleanup.deleteOrSchedule(asset.key);
       throw error;
     }
+  }
+
+  async findUpload(idempotencyKey: string) {
+    const upload = await this.prisma.evidenceUpload.findUnique({ where: { idempotencyKey } });
+    if (!upload) throw new ValidationError('evidence_not_found', 'Evidence-файл не найден');
+    return upload;
+  }
+
+  async assertStaffCanRead(role: string): Promise<void> {
+    if (!(await this.authz.can(role, 'evidence', 'read'))) {
+      throw new ForbiddenException('evidence_read_permission_denied');
+    }
+  }
+
+  async issueRead(idempotencyKey: string, actor: string) {
+    const upload = await this.findUpload(idempotencyKey);
+    const storedAsset = upload.asset as unknown as IngestedImage;
+    const asset = { ...storedAsset, url: await this.media.getReadUrl(storedAsset.key) };
+    return this.audit.transaction(async () => ({
+      result: {
+        entityType: upload.entityType as EvidenceEntityType,
+        entityId: upload.entityId,
+        asset,
+        label: upload.label,
+      },
+      events: [
+        {
+          type: EventType.EvidenceAccessed,
+          actor,
+          payload: { entityType: upload.entityType, entityId: upload.entityId, assetKey: storedAsset.key },
+          refs: [upload.entityId, storedAsset.key, upload.idempotencyKey],
+        },
+      ],
+    }));
   }
 
   async assertStaffCanAttachLoanerCustody(staffId: string, loanId: string): Promise<void> {

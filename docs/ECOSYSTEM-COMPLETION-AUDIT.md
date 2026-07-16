@@ -9,14 +9,16 @@ credentials, legal approval or physical hardware.
 ## Verified baseline
 
 - 53 NestJS modules including the application root, 39 generated Next routes and 100 Prisma migrations.
-- API/Web production builds, 142/142 Jest suites with 651/651 tests and the current Playwright acceptance baseline.
+- API/Web production builds, 143/143 Jest suites with 653/653 tests and the current Playwright acceptance baseline.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run android:ui` passed on 2026-07-17 with 31/31 connected Compose tests,
   including owned attendance open/reload. The full `ecosystem:verify:ui` baseline previously passed with 24/24 and is superseded by the current component gates plus the current `ecosystem:verify` run.
   Physical-device certification remains outside this software gate. The Evidence
   upload endpoint now requires a bounded idempotency key and stores the replayed
-  asset contract so a repeated upload emits one Ledger event.
+  asset contract so a repeated upload emits one Ledger event. The authorized
+  Evidence read endpoint refreshes short-lived storage URLs and appends an
+  `evidence.accessed` audit event; live bucket lifecycle and restore remain open.
 
 ## Handoff acceptance matrix
 
@@ -28,9 +30,9 @@ credentials, legal approval or physical hardware.
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
-| QA Test Scenarios | Partial | 580 current API tests, 46 current Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
+| QA Test Scenarios | Partial | 653 current API tests, 46 current Playwright flows, 31 XCTest contracts and 31 connected Compose tests | complete native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
 | Analytics | Partial | reports, margin/KPI, revenue and AI insights | cohorts, retention, funnels, stock aging, delivery/supplier dashboards and exports |
-| Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
+| Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, Evidence signed-read/access audit, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |
 | Client App 2.0 | Partial | SwiftUI/Compose shells and major customer API flows | screen-by-screen pixel matrix, XCUITest, app-level Compose E2E, biometric login, physical push/device gate |
 | Client services | Partial | support, returns, warranty, protection, trade-in APIs/web/native portions | unified native service journey, repair/loaner status, visual and offline acceptance |
@@ -61,14 +63,14 @@ credentials, legal approval or physical hardware.
 
 ## Test-system gaps
 
-1. `mvp:verify` proves web/API behavior but does not build or test final native apps.
-2. iOS has no XCUITest application targets; current `ios:test` exercises shared contracts.
-3. Android Compose instrumentation exists under `core`, but `android:test` runs JVM/Lint only.
+1. `mvp:verify` proves web/API behavior and mobile typecheck; native package and UI gates remain separate.
+2. iOS packaged XCUITest smoke exists, but it does not yet cover complete business journeys or physical devices.
+3. Android packaged Compose instrumentation exists, while `android:test` still runs JVM/Lint only.
 4. There is no single E2E that drives customer → payment → warehouse → courier/POS →
    refund and then reconciles Payment, stock and Event Ledger.
 5. Visual regression is assertion/screenshot based but lacks stored approved baselines for
    all 23 handoffs at desktop, phone, iOS and Android dimensions.
-6. Redis, Meilisearch and R2 outage tests do not yet prove every critical purchase path.
+6. Redis, Meilisearch and R2 outage tests do not yet prove every critical purchase path; Evidence lifecycle and restore are not locally certified.
 7. Load/soak, backup/restore, rollback, external pentest and physical hardware/device gates
    remain outside local software certification.
 8. The 23 tracked handoffs link to 74 design files, but 64 linked `.dc.html` files are
@@ -78,8 +80,9 @@ These gaps are now machine-reported by the committed-HEAD bootstrap in `docs/TRU
 completion gate, not a routine component gate. It derives the design corpus from Git and
 validates `docs/acceptance/ecosystem-evidence.json`; an accepted gate needs a real command
 plus committed artifacts whose SHA-256 values match the command and tested source-tree
-hash recorded by a successful result. It currently fails on the missing
-design corpus, visual goldens, iOS XCUITest, packaged Android UI and reconciled ecosystem E2E.
+hash recorded by a successful result. It currently fails on the missing design corpus,
+incomplete visual goldens, missing accepted artifacts for the latest source hash and the
+reconciled ecosystem E2E.
 
 ## Ordered remaining work
 
@@ -89,7 +92,7 @@ design corpus, visual goldens, iOS XCUITest, packaged Android UI and reconciled 
 4. Add iOS XCUITest and app-level Android connected journeys for all four apps.
 5. Add one cross-surface ecosystem E2E with database/Ledger reconciliation assertions.
 6. Add handoff visual baselines and accessibility/overflow checks for every screen/state.
-7. Finish BullMQ, search indexing, private Evidence signed reads, staging soak and DR drills.
+7. Finish BullMQ, search indexing, Evidence lifecycle/restore, staging soak and DR drills.
 8. Certify live payment/SMS/fiscal/push/channels and physical devices; release and pilot.
 
 No full-production or full-ecosystem claim is valid until every matrix row is either

@@ -339,6 +339,17 @@ p, admin, reports, read
 p, owner, reports, read
 p, admin, ai, read
 p, owner, ai, read
+p, cashier, evidence, read
+p, seller, evidence, read
+p, senior_seller, evidence, read
+p, franchise, evidence, read
+p, warehouse, evidence, read
+p, courier, evidence, read
+p, service, evidence, read
+p, technician, evidence, read
+p, marketer, evidence, read
+p, admin, evidence, read
+p, owner, evidence, read
 g, owner, admin
 g, admin, senior_seller
 `;

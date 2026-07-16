@@ -50,12 +50,21 @@ export class S3Storage implements MediaStorage {
       { abortSignal: signal },
     );
     const url = key.startsWith('evidence/')
-      ? await getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: this.evidenceUrlTtl })
+      ? await this.getReadUrl(key)
       : `${this.publicBase}/${key}`;
     return { key, url, bytes: body.byteLength };
   }
 
   async delete(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  async getReadUrl(key: string): Promise<string> {
+    if (!key.startsWith('evidence/')) return `${this.publicBase}/${key}`;
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      { expiresIn: this.evidenceUrlTtl },
+    );
   }
 }

@@ -5,7 +5,7 @@
 и не должны смешиваться с готовностью первого магазина к запуску.
 
 - **53 backend-модуля** (NestJS) · **39 веб-роутов** (Next.js) · **100 миграций**
-- Текущий полный worktree gate: **142/142 API suites / 651/651 тестов** на изолированной test-БД после применения всех 100 миграций.
+- Текущий полный worktree gate: **143/143 API suites / 653/653 теста** на изолированной test-БД после применения всех 100 миграций.
 - **46/46 Playwright flows подтверждены**, включая multi-tender refund, exchange, campaign → storefront → checkout, Marketing CMS, Finance и Service Center.
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS Client UI/XCTest passes on the iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Android four-APK build, unit tests and Lint pass, and **31/31** connected tests pass on API 36, including Client trade-in evidence and all packaged app smoke tests. Live push and physical camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
@@ -22,7 +22,7 @@
 | **2** Витрина | Каталог, карточка, корзина, checkout, поиск, избранное, сравнение, промо/бонусы; ERP-owned точки, scoped guest recovery и Marketing CMS подключены: блоки, подборки, approved-only отзывы, промокоды, согласованный campaign lifecycle, consent-safe Outbox, actual spend, first/last UTM, privacy-safe funnel и refund-adjusted net ROAS | 🟡 |
 | **3** Аккаунт+Auth | OTP-вход, Apple/Telegram social-auth backend, «Мои заказы», адреса, настройки, уведомления+consent, бонусы | ✅ |
 | **4** POS 2.0 | Тёмный терминал, продажа, service estimate payment, split tender, approval, offline replay, catalog delta-sync и print abstraction; packaged-app E2E и железо не сертифицированы | 🟡 |
-| **5** Склад | Fulfillment, серийный и количественный учёт, атомарный резерв/продажа/POS, движение статусов, **Evidence Vault (фото)** | ✅ |
+| **5** Склад | Fulfillment, серийный и количественный учёт, атомарный резерв/продажа/POS, движение статусов, **Evidence Vault (keyed upload + authorized signed read/access audit)** | ✅ |
 | **6** Approval+Возвраты+Обмены | Approval Inbox, refund/return/exchange, **UI обмена кассира** | ✅ |
 | **7** Опасные действия | Approval-матрица (цена/write-off/долг/скидка), **RBAC 9 ролей + 2FA + staff-сессии** | ✅ |
 | **8** ERP владельца | Дашборд, Risk, Ledger, KPI, Finance/HR/logistics/procurement/service verticals работают; все handoff-модули и состояния ещё не приняты | 🟡 |

@@ -2297,3 +2297,13 @@
 - Checks: API full Jest `142/142` suites and `651/651` tests; API/Web builds; isolated dev/test Prisma migration deploy; iOS Client UI test/build; Android compile/unit/androidTest/Lint; Android connected `31/31` across core, Client, Staff, Courier and POS; `git diff --check`.
 - Outcome: this Evidence idempotency vertical is implemented and simulator/emulator verified. Private signed reads, object lifecycle/restore, physical devices, live providers, staging certification and store publication remain open.
 - Next step: add authenticated private Evidence signed-read/access-audit coverage, then continue the next unblocked ERP/native parity vertical.
+
+## 2026-07-17
+
+- Task: add authorized private Evidence reads with refreshed signed URLs and access auditing.
+- Files changed: `apps/api/src/evidence/evidence.controller.ts`, `apps/api/src/evidence/evidence.controller.spec.ts`, `apps/api/src/evidence/evidence.service.ts`, `apps/api/src/evidence/evidence.service.spec.ts`, `apps/api/src/media/media-storage.ts`, `apps/api/src/media/media.service.ts`, `apps/api/src/media/storage/local-disk.storage.ts`, `apps/api/src/media/storage/s3.storage.ts`, `apps/api/src/auth/guest-capability.ts`, `apps/api/src/authz/authz.model.ts`, `apps/api/src/audit/event-types.ts`, `apps/api/test/evidence.e2e-spec.ts`, `BACKLOG.md`, `docs/ARCHITECTURE-GAP-MAP.md`, `docs/READINESS.md`, `docs/ECOSYSTEM-COMPLETION-AUDIT.md`.
+- Result: `GET /evidence/images/:idempotencyKey` now requires customer JWT ownership, a scoped guest capability or an active staff JWT with Evidence read permission. S3 Evidence reads use a fresh short-lived signed URL, local storage keeps the development contract, replay refreshes stale URLs, and every authorized read appends one `evidence.accessed` Event Ledger entry.
+- Checks: API build passed; focused Evidence/media/controller suites passed `3/3` suites and `9/9` tests; full API Jest passed `143/143` suites and `653/653` tests; `git diff --check` passed.
+- Commit: `7215135` (`feat(evidence): add authorized signed reads`).
+- Outcome: authorized signed-read/access-audit software is implemented. Live R2/MinIO private-bucket integration, lifecycle, backup/restore, staging certification, physical devices, live providers and store publication remain open.
+- Next step: commit this vertical, then continue with the next unblocked ERP/native parity item from `BACKLOG.md`.

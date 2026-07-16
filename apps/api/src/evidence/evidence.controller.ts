@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Headers, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -22,6 +22,33 @@ import { StaffAuthService } from '../staff-auth/staff-auth.service';
 @Controller('evidence')
 export class EvidenceController {
   constructor(private readonly evidence: EvidenceService, private readonly staffAuth: StaffAuthService) {}
+
+  @ApiOperation({ summary: 'Issue a short-lived authorized read URL for an Evidence Vault image' })
+  @Get('images/:idempotencyKey')
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async readImage(
+    @Param('idempotencyKey') idempotencyKey: string,
+    @CurrentUser() user?: AuthPrincipal,
+    @Headers('x-guest-capability') capability?: string,
+  ) {
+    const key = idempotencyKey.trim();
+    if (!key || key.length > 128) throw new BadRequestException('Некорректный Evidence idempotency key');
+    const upload = await this.evidence.findUpload(key);
+    let actor: string;
+    if (user?.typ === 'staff') {
+      await this.staffAuth.me(user.customerId);
+      await this.evidence.assertStaffCanRead(user.role ?? '');
+      actor = `staff:${user.customerId}`;
+    } else {
+      const customerId = user?.typ === 'customer'
+        ? user.customerId
+        : requireGuestCapability(capability, 'evidence:read').sub;
+      await this.evidence.assertCustomerOwnsEntity(customerId, upload.entityType as EvidenceImageDto['entityType'], upload.entityId);
+      actor = user?.customerId ? `customer:${user.customerId}` : `guest:${customerId}`;
+    }
+    return this.evidence.issueRead(key, actor);
+  }
 
   @ApiOperation({ summary: 'Attach an image evidence file to a domain entity' })
   @ApiConsumes('multipart/form-data')

@@ -30,6 +30,7 @@ describe('EvidenceService compensation', () => {
       registerIntent: jest.fn().mockResolvedValue(undefined),
       markRetainedOnTx: jest.fn().mockResolvedValue(undefined),
       deleteOrSchedule: jest.fn().mockResolvedValue(undefined),
+      getReadUrl: jest.fn().mockResolvedValue('/uploads/evidence/inventory/movement-1/photo.webp'),
     } as unknown as MediaCleanupService;
     const service = new EvidenceService(
       prisma,

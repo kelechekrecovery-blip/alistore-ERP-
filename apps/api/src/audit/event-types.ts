@@ -147,6 +147,7 @@ export const EventType = {
   TradeInAssessed: 'tradein.assessed',
   TradeInContracted: 'tradein.contracted',
   EvidenceAttached: 'evidence.attached',
+  EvidenceAccessed: 'evidence.accessed',
   ConsentChanged: 'customer.consent_changed',
   CustomerProfileUpdated: 'customer.profile_updated',
   CustomerPreferencesChanged: 'customer.preferences_changed',
