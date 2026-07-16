@@ -7,6 +7,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsISO8601,
   IsOptional,
   IsString,
   Matches,
@@ -79,6 +80,30 @@ export class ApplySupplierAdvanceDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsString() @MaxLength(64) invoiceId!: string;
   @IsInt() @Min(1) amount!: number;
+}
+
+export class SupplierStatementLineDto {
+  @IsString() @MinLength(1) @MaxLength(128) externalId!: string;
+  @IsISO8601({ strict: true }) occurredAt!: string;
+  @IsInt() amount!: number;
+  @IsOptional() @IsString() @MaxLength(500) reference?: string;
+}
+
+export class ImportSupplierStatementDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(128) statementNumber!: string;
+  @IsString() @MaxLength(64) supplierId!: string;
+  @IsISO8601({ strict: true }) periodStart!: string;
+  @IsISO8601({ strict: true }) periodEnd!: string;
+  @IsInt() openingBalance!: number;
+  @IsInt() closingBalance!: number;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10_000) @ValidateNested({ each: true }) @Type(() => SupplierStatementLineDto)
+  lines!: SupplierStatementLineDto[];
+}
+
+export class ReconcileSupplierStatementLineDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(1) @MaxLength(64) journalEntryId!: string;
 }
 
 export class CreateSupplierCreditNoteDto {

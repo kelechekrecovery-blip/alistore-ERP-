@@ -51,6 +51,8 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   async function cleanFixtures() {
     await prisma.auditEvent.deleteMany();
+    await prisma.supplierStatementLine.deleteMany();
+    await prisma.supplierStatement.deleteMany();
     await prisma.supplierInvoiceAdvanceAllocation.deleteMany();
     await prisma.supplierAdvance.deleteMany();
     await prisma.supplierInvoicePayment.deleteMany();
@@ -451,6 +453,86 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     expect(aging.body.totalAdvanceApplied).toBe(70000);
     expect(await prisma.auditEvent.count({ where: { type: 'supplier.advance.created', refs: { has: advance.body.id } } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'supplier.advance.applied', refs: { has: advance.body.id } } })).toBe(2);
+  });
+
+  it('reconciles a supplier statement line to the exact AP payment journal once', async () => {
+    const { supplier, product } = await fixture();
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `create-${RUN}-statement`, supplierId: supplier.id, location: 'BISHKEK-1', items: [{ productId: product.id, qty: 1, unitCost: 70000 }] })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/purchase-orders/${created.body.id}/send`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+    const receipt = await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ idempotencyKey: `receipt-${RUN}-statement`, lines: [{ itemId: created.body.items[0].id, imeis: [`PO-STATEMENT-${RUN}`] }] })
+      .expect(201);
+    const invoice = await request(app.getHttpServer())
+      .post('/procurement/supplier-invoices')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `invoice-${RUN}-statement`, invoiceNumber: `INV-${RUN}-STATEMENT`, supplierId: supplier.id, purchaseOrderId: created.body.id, amount: 70000 })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/supplier-invoices/${invoice.body.id}/approve`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+    const payment = await request(app.getHttpServer())
+      .post(`/procurement/supplier-invoices/${invoice.body.id}/payments`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `invoice-payment-${RUN}-statement`, paymentKey: `supplier-bank-${RUN}-statement`, amount: 30000, paymentAccountCode: '1010', paymentReference: 'STATEMENT-PAYMENT' })
+      .expect(201);
+    const paymentEntryId = payment.body.payment.accountingEntryId as string;
+    const receiptRow = await prisma.purchaseReceipt.findUniqueOrThrow({ where: { id: receipt.body.receiptId }, select: { accountingEntryId: true } });
+
+    const now = new Date();
+    const statementPayload = {
+      idempotencyKey: `supplier-statement-${RUN}`,
+      statementNumber: `SUPPLIER-STATEMENT-${RUN}`,
+      supplierId: supplier.id,
+      periodStart: new Date(now.getTime() - 86_400_000).toISOString(),
+      periodEnd: new Date(now.getTime() + 86_400_000).toISOString(),
+      openingBalance: 100_000,
+      closingBalance: 70_000,
+      lines: [{ externalId: `supplier-line-${RUN}`, occurredAt: now.toISOString(), amount: -30_000, reference: 'STATEMENT-PAYMENT' }],
+    };
+    await request(app.getHttpServer()).post('/procurement/supplier-statements').expect(401);
+    const imported = await request(app.getHttpServer())
+      .post('/procurement/supplier-statements')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(statementPayload)
+      .expect(201);
+    expect(imported.body).toMatchObject({ supplierId: supplier.id, statementNumber: statementPayload.statementNumber, status: 'imported', idempotent: false });
+    const importedReplay = await request(app.getHttpServer()).post('/procurement/supplier-statements').set('Authorization', `Bearer ${adminToken}`).send(statementPayload).expect(201);
+    expect(importedReplay.body).toMatchObject({ id: imported.body.id, idempotent: true });
+    const lineId = imported.body.lines[0].id as string;
+
+    await request(app.getHttpServer())
+      .post(`/procurement/supplier-statements/lines/${lineId}/reconcile`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `supplier-reconcile-${RUN}-wrong`, journalEntryId: receiptRow.accountingEntryId })
+      .expect(409);
+    const matched = await request(app.getHttpServer())
+      .post(`/procurement/supplier-statements/lines/${lineId}/reconcile`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `supplier-reconcile-${RUN}`, journalEntryId: paymentEntryId })
+      .expect(201);
+    expect(matched.body).toMatchObject({ status: 'matched', statement: { status: 'reconciled' }, matchedEntry: { id: paymentEntryId }, idempotent: false });
+    const replay = await request(app.getHttpServer())
+      .post(`/procurement/supplier-statements/lines/${lineId}/reconcile`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `supplier-reconcile-${RUN}`, journalEntryId: paymentEntryId })
+      .expect(201);
+    expect(replay.body).toMatchObject({ id: lineId, idempotent: true, matchedEntryId: paymentEntryId });
+    await request(app.getHttpServer())
+      .post(`/procurement/supplier-statements/lines/${lineId}/reconcile`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `supplier-reconcile-${RUN}`, journalEntryId: receiptRow.accountingEntryId })
+      .expect(409);
+
+    const listed = await request(app.getHttpServer())
+      .get(`/procurement/supplier-statements?supplierId=${supplier.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(listed.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: imported.body.id, status: 'reconciled', lines: expect.arrayContaining([expect.objectContaining({ id: lineId, matchedEntry: expect.objectContaining({ id: paymentEntryId }) })]) })]));
+    expect(await prisma.auditEvent.count({ where: { type: 'supplier.statement.line_reconciled', refs: { has: lineId } } })).toBe(1);
   });
 
   it('serializes concurrent receipts so ordered quantity cannot be exceeded', async () => {

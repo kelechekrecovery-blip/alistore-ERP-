@@ -306,6 +306,18 @@ enum SupplierAdvanceStatus {
   cancelled
 }
 
+enum SupplierStatementStatus {
+  imported
+  reconciled
+  disputed
+}
+
+enum SupplierStatementLineStatus {
+  unmatched
+  matched
+  disputed
+}
+
 enum BankStatementStatus {
   imported
   reconciled
@@ -1638,6 +1650,7 @@ model Supplier {
   invoices       SupplierInvoice[]
   creditNotes    SupplierCreditNote[]
   advances       SupplierAdvance[]
+  statements     SupplierStatement[]
   expenses       Expense[]
   createdAt      DateTime             @default(now())
 }
@@ -1742,6 +1755,7 @@ model AccountingJournalEntry {
   supplierInvoicePayment SupplierInvoicePayment?
   supplierAdvance          SupplierAdvance?
   supplierAdvanceAllocation SupplierInvoiceAdvanceAllocation?
+  supplierStatementLine    SupplierStatementLine?
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -2032,6 +2046,47 @@ model SupplierInvoiceAdvanceAllocation {
 
   @@index([advanceId, appliedAt])
   @@index([invoiceId, appliedAt])
+}
+
+model SupplierStatement {
+  id              String                  @id @default(cuid())
+  supplier        Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId      String
+  statementNumber String                  @unique
+  idempotencyKey  String                  @unique
+  periodStart     DateTime
+  periodEnd       DateTime
+  openingBalance  Int
+  closingBalance  Int
+  status          SupplierStatementStatus @default(imported)
+  createdBy       String
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  lines           SupplierStatementLine[]
+
+  @@index([supplierId, periodStart, periodEnd])
+  @@index([status, createdAt])
+}
+
+model SupplierStatementLine {
+  id                String                       @id @default(cuid())
+  statement         SupplierStatement            @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statementId       String
+  externalId        String
+  occurredAt        DateTime
+  amount            Int
+  reference         String?
+  status            SupplierStatementLineStatus  @default(unmatched)
+  reconciliationKey String?                      @unique
+  matchedEntryId    String?                      @unique
+  matchedEntry      AccountingJournalEntry?      @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
+  matchedBy         String?
+  matchedAt         DateTime?
+  createdAt         DateTime                     @default(now())
+
+  @@unique([statementId, externalId])
+  @@index([statementId, status])
+  @@index([occurredAt, amount])
 }
 
 model SupplierCreditNote {

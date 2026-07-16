@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
 import { ProcurementService } from './procurement.service';
 
 @ApiTags('procurement')
@@ -146,5 +146,31 @@ export class SupplierAdvanceController {
   @RequirePermission('procurement', 'receive')
   apply(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ApplySupplierAdvanceDto) {
     return this.procurement.applySupplierAdvance(id, dto, user.customerId);
+  }
+}
+
+@ApiTags('procurement')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@Controller('procurement/supplier-statements')
+export class SupplierStatementController {
+  constructor(private readonly procurement: ProcurementService) {}
+
+  @Get()
+  @RequirePermission('procurement', 'read')
+  list(@Query('supplierId') supplierId?: string) {
+    return this.procurement.listSupplierStatements(supplierId);
+  }
+
+  @Post()
+  @RequirePermission('procurement', 'create')
+  import(@CurrentUser() user: AuthPrincipal, @Body() dto: ImportSupplierStatementDto) {
+    return this.procurement.importSupplierStatement(dto, user.customerId);
+  }
+
+  @Post('lines/:id/reconcile')
+  @RequirePermission('procurement', 'receive')
+  reconcile(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReconcileSupplierStatementLineDto) {
+    return this.procurement.reconcileSupplierStatementLine(id, dto, user.customerId);
   }
 }

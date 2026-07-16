@@ -5,7 +5,7 @@ import { AuditService, AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
@@ -579,6 +579,121 @@ export class ProcurementService {
     }
   }
 
+  listSupplierStatements(supplierId?: string) {
+    return this.prisma.supplierStatement.findMany({
+      where: supplierId ? { supplierId } : undefined,
+      include: {
+        supplier: { select: { id: true, name: true } },
+        lines: {
+          include: { matchedEntry: { select: { id: true, sourceType: true, sourceRef: true, occurredAt: true } } },
+          orderBy: { occurredAt: 'asc' },
+        },
+      },
+      orderBy: { periodStart: 'desc' },
+      take: 120,
+    });
+  }
+
+  async importSupplierStatement(dto: ImportSupplierStatementDto, actor: string) {
+    const periodStart = new Date(dto.periodStart);
+    const periodEnd = new Date(dto.periodEnd);
+    if (Number.isNaN(periodStart.getTime()) || Number.isNaN(periodEnd.getTime()) || periodStart >= periodEnd) {
+      throw new ValidationError('invalid_supplier_statement_period', 'Период supplier-выписки некорректен');
+    }
+    const normalizedLines = dto.lines.map((line) => ({
+      externalId: line.externalId.trim(),
+      occurredAt: new Date(line.occurredAt),
+      amount: line.amount,
+      reference: line.reference?.trim() || null,
+    }));
+    if (normalizedLines.some((line) => !line.externalId || Number.isNaN(line.occurredAt.getTime()) || line.amount === 0) || new Set(normalizedLines.map((line) => line.externalId)).size !== normalizedLines.length) {
+      throw new ValidationError('invalid_supplier_statement_lines', 'Строки supplier-выписки должны иметь уникальный внешний ID, дату и ненулевую сумму');
+    }
+    if (dto.openingBalance + normalizedLines.reduce((sum, line) => sum + line.amount, 0) !== dto.closingBalance) {
+      throw new ConflictError('supplier_statement_balance_mismatch', 'Начальный баланс плюс движения не равен конечному балансу');
+    }
+    const existing = await this.prisma.supplierStatement.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { lines: true } });
+    if (existing) return replaySupplierStatement(existing, dto);
+
+    try {
+      return await this.audit.transaction(async (tx) => {
+        const supplier = await tx.supplier.findUnique({ where: { id: dto.supplierId }, select: { id: true } });
+        if (!supplier) throw new ValidationError('supplier_not_found', `Поставщик ${dto.supplierId} не найден`);
+        const statement = await tx.supplierStatement.create({
+          data: {
+            supplierId: supplier.id,
+            statementNumber: dto.statementNumber.trim(),
+            idempotencyKey: dto.idempotencyKey,
+            periodStart,
+            periodEnd,
+            openingBalance: dto.openingBalance,
+            closingBalance: dto.closingBalance,
+            createdBy: actor,
+            lines: { create: normalizedLines },
+          },
+          include: { supplier: { select: { id: true, name: true } }, lines: { orderBy: { occurredAt: 'asc' } } },
+        });
+        return {
+          result: { ...statement, idempotent: false },
+          events: [{ type: 'supplier.statement.imported', actor, payload: { statementId: statement.id, supplierId: supplier.id, statementNumber: statement.statementNumber, lineCount: statement.lines.length, closingBalance: statement.closingBalance }, refs: [statement.id, supplier.id] }],
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replay = await this.prisma.supplierStatement.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { lines: true } });
+        if (replay) return replaySupplierStatement(replay, dto);
+      }
+      throw error;
+    }
+  }
+
+  async reconcileSupplierStatementLine(id: string, dto: ReconcileSupplierStatementLineDto, actor: string) {
+    const existing = await this.prisma.supplierStatementLine.findUnique({
+      where: { reconciliationKey: dto.idempotencyKey },
+      include: { statement: true, matchedEntry: true },
+    });
+    if (existing) return replaySupplierStatementLine(existing, id, dto);
+
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "SupplierStatementLine" WHERE id = ${id} FOR UPDATE`;
+      const line = await tx.supplierStatementLine.findUnique({ where: { id }, include: { statement: true } });
+      if (!line) throw new ValidationError('supplier_statement_line_not_found', `Строка supplier-выписки ${id} не найдена`);
+      if (line.reconciliationKey === dto.idempotencyKey) return { result: { ...line, idempotent: true }, events: [] };
+      if (line.status === 'matched') throw new ConflictError('supplier_statement_line_matched', 'Строка уже сверена другим ключом');
+
+      const entry = await tx.accountingJournalEntry.findUnique({
+        where: { id: dto.journalEntryId },
+        include: {
+          lines: true,
+          purchaseReceipt: { select: { purchaseOrder: { select: { supplierId: true } } } },
+          supplierInvoicePayment: { select: { invoice: { select: { supplierId: true } } } },
+          supplierAdvanceAllocation: { select: { invoice: { select: { supplierId: true } } } },
+          supplierCreditNote: { select: { supplierId: true } },
+        },
+      });
+      if (!entry) throw new ValidationError('accounting_entry_not_found', `Проводка ${dto.journalEntryId} не найдена`);
+      if (entry.occurredAt < line.statement.periodStart || entry.occurredAt >= line.statement.periodEnd) throw new ConflictError('supplier_statement_entry_outside_period', 'Проводка находится вне периода supplier-выписки');
+      const movement = entry.lines.filter((current) => current.accountCode === '2000').reduce((sum, current) => sum + current.debit - current.credit, 0);
+      if (movement !== -line.amount) throw new ConflictError('supplier_statement_amount_mismatch', 'Движение по счету 2000 не совпадает со строкой supplier-выписки');
+      const entrySupplierId = entry.purchaseReceipt?.purchaseOrder.supplierId
+        ?? entry.supplierInvoicePayment?.invoice.supplierId
+        ?? entry.supplierAdvanceAllocation?.invoice.supplierId
+        ?? entry.supplierCreditNote?.supplierId;
+      if (!entrySupplierId) throw new ConflictError('supplier_statement_entry_supplier_unknown', 'Нельзя определить поставщика проводки');
+      if (entrySupplierId !== line.statement.supplierId) throw new ConflictError('supplier_statement_supplier_mismatch', 'Проводка принадлежит другому поставщику');
+      const duplicate = await tx.supplierStatementLine.findUnique({ where: { matchedEntryId: entry.id }, select: { id: true } });
+      if (duplicate && duplicate.id !== id) throw new ConflictError('accounting_entry_already_reconciled', 'Проводка уже связана с другой строкой supplier-выписки');
+
+      const matched = await tx.supplierStatementLine.update({ where: { id }, data: { status: 'matched', reconciliationKey: dto.idempotencyKey, matchedEntryId: entry.id, matchedBy: actor, matchedAt: new Date() } });
+      const remaining = await tx.supplierStatementLine.count({ where: { statementId: line.statementId, status: { not: 'matched' } } });
+      const statement = await tx.supplierStatement.update({ where: { id: line.statementId }, data: { status: remaining === 0 ? 'reconciled' : 'imported' } });
+      return {
+        result: { ...matched, statement, matchedEntry: { id: entry.id, sourceType: entry.sourceType, sourceRef: entry.sourceRef }, idempotent: false },
+        events: [{ type: 'supplier.statement.line_reconciled', actor, payload: { lineId: id, statementId: line.statementId, journalEntryId: entry.id, amount: line.amount, supplierId: line.statement.supplierId }, refs: [id, line.statementId, entry.id, line.statement.supplierId] }],
+      };
+    });
+  }
+
   listCreditNotes(supplierId?: string) {
     return this.prisma.supplierCreditNote.findMany({
       where: supplierId ? { supplierId } : undefined,
@@ -698,6 +813,24 @@ function replaySupplierAdvanceAllocation(
     throw new ConflictError('supplier_advance_allocation_idempotency_mismatch', 'Ключ зачёта уже использован с другими данными');
   }
   return { advance: allocation.advance, allocation, invoice: allocation.invoice, idempotent: true };
+}
+
+function replaySupplierStatement(statement: Prisma.SupplierStatementGetPayload<{}>, dto: ImportSupplierStatementDto) {
+  if (statement.supplierId !== dto.supplierId || statement.statementNumber !== dto.statementNumber.trim() || statement.periodStart.toISOString() !== new Date(dto.periodStart).toISOString() || statement.periodEnd.toISOString() !== new Date(dto.periodEnd).toISOString() || statement.openingBalance !== dto.openingBalance || statement.closingBalance !== dto.closingBalance) {
+    throw new ConflictError('supplier_statement_idempotency_conflict', 'Ключ supplier-выписки уже использован для других данных');
+  }
+  return { ...statement, idempotent: true };
+}
+
+function replaySupplierStatementLine(
+  line: Prisma.SupplierStatementLineGetPayload<{ include: { statement: true; matchedEntry: true } }>,
+  lineId: string,
+  dto: ReconcileSupplierStatementLineDto,
+) {
+  if (line.id !== lineId || line.matchedEntryId !== dto.journalEntryId) {
+    throw new ConflictError('supplier_statement_reconciliation_conflict', 'Ключ сверки уже использован для другой строки или проводки');
+  }
+  return { ...line, idempotent: true };
 }
 
 function purchaseOrderNumber(): string {
