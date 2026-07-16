@@ -102,12 +102,20 @@ const masterPrompt = fs.existsSync(path.join(root, 'CODEX_PROMPT.md'))
   : '';
 
 const isNoop = (command = '') => /^(?:true|:|echo(?:\s+.+)?|printf(?:\s+.+)?)$/u.test(command.trim());
+const acceptedGateScripts = new Map([
+  ['visual', 'e2e'],
+  ['ios-app-ui', 'ios:ui'],
+  ['android-app-ui', 'android:ui'],
+  ['reconciled-e2e', 'ecosystem:e2e'],
+]);
 const acceptedGate = (id, commandPattern) => {
   const gate = evidence.gates?.[id];
   const packageCommand = scripts[gate?.packageScript] ?? '';
   const declaredCommand = gate?.packageScript ? `npm run ${gate.packageScript}` : '';
   if (
     !gate ||
+    gate.packageScript !== acceptedGateScripts.get(id) ||
+    gate.packageScript.startsWith('-') ||
     gate.status !== 'accepted' ||
     gate.command !== declaredCommand ||
     isNoop(packageCommand) ||
@@ -149,14 +157,57 @@ const acceptedGate = (id, commandPattern) => {
       try {
         const result = JSON.parse(fs.readFileSync(absolute, 'utf8'));
         const completedAt = Date.parse(result.completedAt ?? '');
+        const environment = result.executionEnvironment;
+        const currentToolchain = (() => {
+          try {
+            if (id === 'ios-app-ui') {
+              return execFileSync('xcodebuild', ['-version'], {
+                encoding: 'utf8',
+                env: {
+                  ...process.env,
+                  DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+                },
+              }).trim();
+            }
+            if (id === 'android-app-ui') {
+              const adb = path.join(
+                process.env.ANDROID_HOME ?? `${process.env.HOME}/Library/Android/sdk`,
+                'platform-tools',
+                'adb',
+              );
+              return execFileSync(adb, ['version'], { encoding: 'utf8' }).trim();
+            }
+          } catch {
+            return null;
+          }
+          return null;
+        })();
+        const sourceCommitExists = /^[a-f0-9]{40}$/u.test(result.sourceCommit ?? '') && (() => {
+          try {
+            execFileSync('git', ['merge-base', '--is-ancestor', result.sourceCommit, 'HEAD'], {
+              cwd: root,
+              stdio: 'ignore',
+            });
+            return true;
+          } catch {
+            return false;
+          }
+        })();
         resultEvidenceFound =
           result.command === declaredCommand &&
           result.exitCode === 0 &&
           result.packageCommandSha256 === sha256(packageCommand) &&
           result.sourceTreeSha256 === sourceTreeSha256 &&
+          sourceCommitExists &&
+          environment?.platform === process.platform &&
+          environment?.architecture === process.arch &&
+          environment?.node === process.version &&
+          environment?.toolchain === currentToolchain &&
+          result.executionEnvironmentSha256 === sha256(JSON.stringify(environment)) &&
           Number.isFinite(completedAt) &&
           new Date(completedAt).toISOString() === result.completedAt &&
-          completedAt <= Date.now() + 60_000;
+          completedAt <= Date.now() + 60_000 &&
+          completedAt >= Date.now() - 30 * 24 * 60 * 60 * 1000;
       } catch {
         return false;
       }

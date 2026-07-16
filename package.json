@@ -35,6 +35,7 @@
     "ecosystem:component-verify": "node scripts/ecosystem-verify.mjs",
     "ecosystem:verify": "node scripts/ecosystem-verify.mjs",
     "ecosystem:verify:ui": "node scripts/ecosystem-verify.mjs --native-ui",
+    "ecosystem:evidence": "node scripts/record-ecosystem-evidence.mjs",
     "web": "npm run dev -w @alistore/web",
     "local:up": "bash scripts/local-up.sh",
     "local:down": "bash scripts/local-down.sh",

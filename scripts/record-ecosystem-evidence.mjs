@@ -1,0 +1,182 @@
+#!/usr/bin/env node
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const gateId = process.argv[2];
+const gateScripts = new Map([
+  ['ios-app-ui', 'ios:ui'],
+  ['android-app-ui', 'android:ui'],
+]);
+const evidencePath = path.join(root, 'docs', 'acceptance', 'ecosystem-evidence.json');
+const artifactDirectory = path.join(root, 'docs', 'acceptance', 'artifacts');
+const sourcePaths = [
+  'apps',
+  'e2e',
+  'scripts',
+  'design_handoff_alistore/screens',
+  'package.json',
+  'package-lock.json',
+  'playwright.config.ts',
+];
+
+if (!gateScripts.has(gateId)) {
+  console.error(`Usage: npm run ecosystem:evidence -- <${[...gateScripts.keys()].join('|')}>`);
+  process.exit(2);
+}
+
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+const sourceFiles = () =>
+  git(['ls-files', '-z', '--', ...sourcePaths]).split('\0').filter(Boolean).sort();
+const sourceTreeSha256 = () => {
+  const hash = crypto.createHash('sha256');
+  for (const file of sourceFiles()) {
+    hash.update(file).update('\0').update(fs.readFileSync(path.join(root, file))).update('\0');
+  }
+  return hash.digest('hex');
+};
+const dirtySource = () =>
+  git(['status', '--porcelain', '--untracked-files=all', '--', ...sourcePaths]).trim();
+const dirtyEvidence = () =>
+  git([
+    'status',
+    '--porcelain',
+    '--untracked-files=all',
+    '--',
+    'docs/acceptance/ecosystem-evidence.json',
+    'docs/acceptance/artifacts',
+  ]).trim();
+const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
+const writeJsonAtomic = (targetPath, value) => {
+  const temporaryPath = `${targetPath}.tmp-${process.pid}`;
+  fs.writeFileSync(temporaryPath, json(value));
+  fs.renameSync(temporaryPath, targetPath);
+};
+const assertSafeDirectory = (directoryPath) => {
+  const repositoryRoot = fs.realpathSync(root);
+  const relativeDirectory = path.relative(root, directoryPath);
+  let cursor = root;
+  for (const segment of relativeDirectory.split(path.sep)) {
+    cursor = path.join(cursor, segment);
+    if (fs.existsSync(cursor) && fs.lstatSync(cursor).isSymbolicLink()) {
+      throw new Error(`Refusing to write evidence through symlink: ${cursor}`);
+    }
+  }
+  fs.mkdirSync(directoryPath, { recursive: true });
+  const resolved = fs.realpathSync(directoryPath);
+  const expectedAcceptanceRoot = path.join(repositoryRoot, 'docs', 'acceptance');
+  if (!resolved.startsWith(`${expectedAcceptanceRoot}${path.sep}`)) {
+    throw new Error('Evidence artifact directory resolves outside docs/acceptance.');
+  }
+};
+const commandOutput = (command, args, env = process.env) => {
+  const output = execFileSync(command, args, { encoding: 'utf8', stderr: 'pipe', env }).trim();
+  if (!output) throw new Error(`Could not identify evidence toolchain: ${command}`);
+  return output;
+};
+const executionEnvironment = () => ({
+  platform: process.platform,
+  architecture: process.arch,
+  node: process.version,
+  toolchain:
+    gateId === 'ios-app-ui'
+      ? commandOutput('xcodebuild', ['-version'], {
+          ...process.env,
+          DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+        })
+      : commandOutput(path.join(process.env.ANDROID_HOME ?? `${process.env.HOME}/Library/Android/sdk`, 'platform-tools', 'adb'), ['version']),
+});
+
+if (process.env.ALISTORE_EVIDENCE_LOCK_HELD !== '1') {
+  const lockPath = path.resolve(root, git(['rev-parse', '--git-path', 'ecosystem-evidence.lock']).trim());
+  const lockedRun = spawnSync(
+    '/usr/bin/lockf',
+    ['-t', '0', lockPath, process.execPath, fileURLToPath(import.meta.url), ...process.argv.slice(2)],
+    {
+      cwd: root,
+      env: { ...process.env, ALISTORE_EVIDENCE_LOCK_HELD: '1' },
+      shell: false,
+      stdio: 'inherit',
+    },
+  );
+  process.exit(lockedRun.status ?? 1);
+}
+
+if (dirtySource()) {
+  console.error('Refusing to record evidence from a dirty source tree. Commit or remove source changes first.');
+  process.exit(1);
+}
+if (dirtyEvidence()) {
+  console.error('Refusing to overwrite uncommitted acceptance evidence. Commit or remove it first.');
+  process.exit(1);
+}
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+const gate = evidence.gates?.[gateId];
+const packageScript = gate?.packageScript;
+const packageCommand = packageJson.scripts?.[packageScript];
+const expectedPackageScript = gateScripts.get(gateId);
+if (
+  !packageScript ||
+  packageScript !== expectedPackageScript ||
+  packageScript.startsWith('-') ||
+  !packageCommand
+) {
+  console.error(`Gate ${gateId} does not reference an executable package script.`);
+  process.exit(1);
+}
+
+assertSafeDirectory(artifactDirectory);
+const beforeHash = sourceTreeSha256();
+const sourceCommit = git(['rev-parse', 'HEAD']).trim();
+const run = spawnSync('npm', ['run', '--', packageScript], {
+  cwd: root,
+  env: process.env,
+  shell: false,
+  stdio: 'inherit',
+});
+if (run.status !== 0) {
+  console.error(`Gate ${gateId} failed; no evidence was recorded.`);
+  process.exit(run.status ?? 1);
+}
+if (dirtySource() || sourceTreeSha256() !== beforeHash) {
+  console.error('Source tree changed while the gate was running; no evidence was recorded.');
+  process.exit(1);
+}
+
+assertSafeDirectory(artifactDirectory);
+const environment = executionEnvironment();
+const result = {
+  schemaVersion: 1,
+  gate: gateId,
+  command: `npm run ${packageScript}`,
+  exitCode: 0,
+  packageCommandSha256: sha256(packageCommand),
+  sourceTreeSha256: beforeHash,
+  sourceCommit,
+  executionEnvironment: environment,
+  executionEnvironmentSha256: sha256(JSON.stringify(environment)),
+  completedAt: new Date().toISOString(),
+};
+const resultBytes = json(result);
+const resultSha256 = sha256(resultBytes);
+const relativeArtifactPath = `docs/acceptance/artifacts/${gateId}-${resultSha256}.json`;
+const artifactPath = path.join(root, relativeArtifactPath);
+fs.writeFileSync(artifactPath, resultBytes, { flag: 'wx' });
+gate.status = 'accepted';
+gate.command = result.command;
+gate.artifacts = [
+  {
+    kind: 'result',
+    path: relativeArtifactPath,
+    sha256: resultSha256,
+  },
+];
+writeJsonAtomic(evidencePath, evidence);
+console.log(`Recorded ${gateId} result for source tree ${beforeHash}.`);
