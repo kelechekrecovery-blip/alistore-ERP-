@@ -31,6 +31,268 @@ private enum ClientTheme {
     static let coral = Color(red: 1, green: 0.357, blue: 0.18)
     static let lime = Color(red: 0.776, green: 1, blue: 0.239)
     static let muted = Color(red: 0.655, green: 0.612, blue: 0.573)
+
+    static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        .custom("Avenir Next", size: size).weight(weight)
+    }
+
+    static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Avenir Next", size: size).weight(weight)
+    }
+}
+
+private struct ClientProductImage: View {
+    let product: Product
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.white.opacity(0.045))
+            if let asset = assetName {
+                Image(asset)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(14)
+            } else {
+                Image(systemName: fallbackSymbol)
+                    .font(.system(size: 52, weight: .ultraLight))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+    }
+
+    private var assetName: String? {
+        let value = "\(product.name) \(product.category)".lowercased()
+        if value.contains("airpods") || value.contains("аудио") { return "client-product-airpods" }
+        if value.contains("macbook") || value.contains("ноут") { return "client-product-macbook" }
+        if value.contains("ipad") || value.contains("планшет") { return "client-product-ipad" }
+        if value.contains("watch") || value.contains("часы") { return "client-product-watch" }
+        if value.contains("samsung") { return "client-product-samsung" }
+        if value.contains("iphone") || value.contains("смартфон") { return "client-product-iphone" }
+        return nil
+    }
+
+    private var fallbackSymbol: String {
+        product.category.localizedCaseInsensitiveContains("ноут") ? "laptopcomputer" : "iphone.gen3"
+    }
+}
+
+private struct ClientStatusBar: View {
+    var body: some View {
+        HStack {
+            Text("9:41")
+            Spacer()
+            Text("AliStore").font(.system(size: 12, design: .monospaced))
+            Spacer()
+            Text("▪▪▪ 100%")
+        }
+        .font(ClientTheme.body(13, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 28)
+        .frame(height: 44)
+        .background(ClientTheme.background)
+    }
+}
+
+private struct ClientHeader: View {
+    let onCompare: () -> Void
+    let onNotifications: () -> Void
+    let onSearch: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Label("Бишкек", systemImage: "mappin.fill")
+                    .font(ClientTheme.body(12, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                Spacer()
+                Button(action: onCompare) { Image(systemName: "arrow.left.arrow.right") }
+                    .accessibilityLabel("Сравнение")
+                Button(action: onNotifications) { Image(systemName: "bell") }
+                    .accessibilityLabel("Уведомления")
+            }
+            .foregroundStyle(.white)
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass").foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                Text("Поиск техники, брендов…")
+                    .font(ClientTheme.body(14))
+                    .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onSearch)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Поиск техники и брендов")
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        .background(ClientTheme.background)
+    }
+}
+
+private struct ClientBottomNav: View {
+    let selected: ClientTab
+    let cartCount: Int
+    let onSelect: (ClientTab) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            navButton(.home, title: "Главная", symbol: "house")
+            navButton(.catalog, title: "Каталог", symbol: "square.grid.2x2")
+            navButton(.favorites, title: "Избранное", symbol: "heart")
+            navButton(.cart, title: "Корзина", symbol: "bag")
+            navButton(.account, title: "Кабинет", symbol: "person.crop.circle")
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 20)
+        .background(Color(red: 0.102, green: 0.086, blue: 0.067))
+        .overlay(alignment: .top) { Rectangle().fill(ClientTheme.line).frame(height: 1) }
+    }
+
+    private func navButton(_ tab: ClientTab, title: String, symbol: String) -> some View {
+        Button { onSelect(tab) } label: {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 3) {
+                    Image(systemName: selected == tab ? "\(symbol).fill" : symbol)
+                        .font(.system(size: 19, weight: .medium))
+                    Text(title).font(ClientTheme.body(10, weight: selected == tab ? .bold : .medium))
+                }
+                .foregroundStyle(selected == tab ? ClientTheme.lime : ClientTheme.muted)
+                .frame(maxWidth: .infinity)
+                if tab == .cart, cartCount > 0 {
+                    Text("\(cartCount)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(ClientTheme.coral, in: Capsule())
+                        .offset(x: -18, y: -2)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+}
+
+private struct ClientLoginView: View {
+    @Bindable var auth: CustomerAuthStore
+    let onGuest: () -> Void
+    @State private var phone = "+996 "
+    @State private var code = ""
+    @State private var requested = false
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("A")
+                        .font(ClientTheme.display(34, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 60, height: 60)
+                        .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 17))
+                        .padding(.bottom, 24)
+                    Text("Вход в AliStore")
+                        .font(ClientTheme.display(30, weight: .black))
+                        .foregroundStyle(.white)
+                    Text("Техника с гарантией и trade-in. Войдите по номеру — быстро и безопасно.")
+                        .font(ClientTheme.body(14))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineSpacing(4)
+                        .padding(.top, 10)
+                    TextField("+996 700 12 34 56", text: $phone)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                        .foregroundStyle(.white)
+                        .font(.system(size: 15, design: .monospaced))
+                        .padding(14)
+                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                        .padding(.top, 26)
+                        .accessibilityIdentifier("client-phone")
+                    if requested {
+                        TextField("6-значный код", text: $code)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                            .foregroundStyle(.white)
+                            .padding(14)
+                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                            .padding(.top, 10)
+                            .accessibilityIdentifier("client-otp")
+                        if let devCode = auth.devCode {
+                            Text("Код для тестового контура: \(devCode)")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 8)
+                        }
+                    }
+                    Button {
+                        Task {
+                            if requested {
+                                await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                            } else {
+                                requested = await auth.requestOTP(phone: normalizedPhone)
+                            }
+                        }
+                    } label: {
+                        HStack { Spacer(); if auth.isLoading { ProgressView().tint(.black) } else { Text(requested ? "Войти" : "Получить код по SMS") }; Spacer() }
+                            .font(ClientTheme.body(15, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (requested && code.filter(\.isNumber).count != 6))
+                    .padding(.top, 12)
+                    .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
+                    HStack(spacing: 10) {
+                        loginProvider("Apple", symbol: "applelogo")
+                        loginProvider("Telegram", symbol: "paperplane.fill")
+                    }
+                    .padding(.top, 12)
+                    Button("Продолжить как гость →", action: onGuest)
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 22)
+                    if let error = auth.errorMessage {
+                        Text(error).font(ClientTheme.body(12)).foregroundStyle(.red).padding(.top, 12)
+                    }
+                }
+                .padding(.horizontal, 26)
+                .frame(maxWidth: 402)
+                .frame(minHeight: 700)
+            }
+        }
+    }
+
+    private func loginProvider(_ title: String, symbol: String) -> some View {
+        Button {
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                Text(title)
+            }
+        }
+            .font(ClientTheme.body(14, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            .accessibilityLabel("Войти через \(title)")
+    }
+
+    private var normalizedPhone: String {
+        let digits = phone.filter(\.isNumber)
+        return "+\(digits)"
+    }
 }
 
 @main
@@ -53,6 +315,7 @@ private struct ClientRootView: View {
     @State private var cart: [String: Int] = [:]
     @State private var favorites: Set<String> = []
     @State private var selectedTab: ClientTab = .home
+    @State private var guestMode: Bool
     @State private var orderRefreshRevision = 0
     @State private var pushStatus = "Push не настроен"
     @Environment(\.modelContext) private var modelContext
@@ -60,6 +323,7 @@ private struct ClientRootView: View {
 
     init(environment: AppEnvironment) {
         self.environment = environment
+        _guestMode = State(initialValue: UITestBootstrap.startsAsGuest)
         _auth = State(initialValue: CustomerAuthStore(
             environment: environment,
             restoresStoredSession: !UITestBootstrap.disablesSessionRestore
@@ -67,29 +331,42 @@ private struct ClientRootView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            ClientHomeView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
-                .tabItem { Label("Главная", systemImage: "house") }
-                .tag(ClientTab.home)
-            CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
-                .tabItem { Label("Каталог", systemImage: "square.grid.2x2") }
-                .tag(ClientTab.catalog)
-            FavoritesView(products: products, cart: $cart, favorites: $favorites)
-                .tabItem { Label("Избранное", systemImage: "heart") }
-                .tag(ClientTab.favorites)
-            CartView(environment: environment, auth: auth, products: products, cart: $cart)
-                .tabItem { Label("Корзина", systemImage: "bag") }
-                .badge(cart.values.reduce(0, +))
-                .tag(ClientTab.cart)
-            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, onEnablePush: enablePush)
-                .tabItem { Label("Кабинет", systemImage: "person.crop.circle") }
-                .tag(ClientTab.account)
+        Group {
+            if auth.isRestoring {
+                ZStack { ClientTheme.background.ignoresSafeArea(); ProgressView("Открываем AliStore").tint(ClientTheme.lime) }
+            } else if auth.session == nil && !guestMode {
+                ClientLoginView(auth: auth, onGuest: { guestMode = true })
+            } else {
+                VStack(spacing: 0) {
+                    ClientStatusBar()
+                    ClientHeader(onCompare: { selectedTab = .catalog }, onNotifications: { selectedTab = .account }, onSearch: { selectedTab = .catalog })
+                    ZStack {
+                        switch selectedTab {
+                        case .home:
+                            ClientHomeView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
+                        case .catalog:
+                            CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
+                        case .favorites:
+                            FavoritesView(products: products, cart: $cart, favorites: $favorites)
+                        case .cart:
+                            CartView(environment: environment, auth: auth, products: products, cart: $cart)
+                        case .account:
+                            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, onEnablePush: enablePush, onLogout: { guestMode = false })
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .toolbar(.hidden, for: .navigationBar)
+                    ClientBottomNav(selected: selectedTab, cartCount: cart.values.reduce(0, +), onSelect: { selectedTab = $0 })
+                }
+                .background(ClientTheme.background)
+                .ignoresSafeArea(edges: [.top, .bottom])
+            }
         }
-        .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
+        .statusBarHidden(true)
         .overlay {
             if auth.requiresQuickUnlock, let session = auth.session {
-                QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout() } })
+                QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout(); guestMode = false } })
             }
         }
         .task {
@@ -459,6 +736,7 @@ private struct AccountView: View {
     let pushStatus: String
     let orderRefreshRevision: Int
     let onEnablePush: () -> Void
+    let onLogout: () -> Void
     @State private var phone = "+996"
     @State private var code = ""
     @State private var codeRequested = false
@@ -492,7 +770,12 @@ private struct AccountView: View {
                         }
                     }
                     Section {
-                        Button("Выйти", role: .destructive) { Task { await auth.logout() } }
+                        Button("Выйти", role: .destructive) {
+                            Task {
+                                await auth.logout()
+                                onLogout()
+                            }
+                        }
                     }
                 } else {
                     Section("Вход по SMS") {
@@ -917,7 +1200,7 @@ private struct CatalogView: View {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                             ForEach(visibleProducts) { product in
                                 NavigationLink {
-                                    ProductDetail(product: product, cart: $cart)
+                                    ProductDetail(product: product, cart: $cart, favorites: $favorites)
                                 } label: {
                                     NativeProductCard(product: product, cart: $cart, favorites: $favorites)
                                 }
@@ -973,7 +1256,14 @@ private struct ClientHomeView: View {
                     Button(action: openCatalog) {
                         ZStack(alignment: .bottomTrailing) {
                             LinearGradient(colors: [Color(red: 0.16, green: 0.16, blue: 0.18), ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            Image(systemName: "iphone.gen3").font(.system(size: 96, weight: .thin)).foregroundStyle(.white.opacity(0.12)).padding(16)
+                            Image("client-product-iphone")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 150, height: 150)
+                                .rotationEffect(.degrees(-8))
+                                .opacity(0.82)
+                                .padding(.trailing, 8)
+                                .padding(.bottom, 8)
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("НОВИНКА · В НАЛИЧИИ").font(.caption2.monospaced().weight(.bold)).foregroundStyle(ClientTheme.lime)
                                 Text("iPhone 17 Pro Max").font(.title2.weight(.heavy)).foregroundStyle(.white)
@@ -990,7 +1280,7 @@ private struct ClientHomeView: View {
                     }
                     .buttonStyle(.plain)
                     HStack {
-                        Text("Хиты продаж").font(.title3.weight(.bold))
+                    Text("🔥 Хиты продаж").font(ClientTheme.display(18, weight: .bold))
                         Spacer()
                         Button("Все", action: openCatalog).foregroundStyle(ClientTheme.lime)
                     }
@@ -1012,7 +1302,6 @@ private struct ClientHomeView: View {
             }
             .background(ClientTheme.background)
             .navigationTitle("AliStore")
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Image(systemName: "bell").foregroundStyle(.white) } }
         }
     }
 }
@@ -1046,13 +1335,14 @@ private struct NativeProductCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)).frame(height: 112)
-                Image(systemName: product.category.localizedCaseInsensitiveContains("ноут") ? "laptopcomputer" : "iphone.gen3").font(.system(size: 52, weight: .ultraLight)).foregroundStyle(.white.opacity(0.8)).frame(maxWidth: .infinity, maxHeight: 112)
+                ClientProductImage(product: product, cornerRadius: 12).frame(height: 120)
                 Button { if favorites.contains(product.id) { favorites.remove(product.id) } else { favorites.insert(product.id) } } label: { Image(systemName: favorites.contains(product.id) ? "heart.fill" : "heart").foregroundStyle(favorites.contains(product.id) ? ClientTheme.coral : .white).frame(width: 44, height: 44) }
             }
-            Text(product.name).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
-            Text(product.price.formatted(.currency(code: "KGS"))).font(.subheadline.monospacedDigit().weight(.bold)).foregroundStyle(.white)
-            Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Label("В корзину", systemImage: "bag.badge.plus").font(.caption.weight(.bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
+            Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
+            Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
+            Text(product.availableUnits > 0 ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии") : "Нет в наличии")
+                .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Color(red: 1, green: 0.541, blue: 0.478))
+            Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
         }
         .padding(10)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
@@ -1083,23 +1373,105 @@ private struct ServiceCard: View {
 private struct ProductDetail: View {
     let product: Product
     @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
 
     var body: some View {
-        List {
-            Section {
-                LabeledContent("SKU", value: product.sku)
-                LabeledContent("Категория", value: product.category)
-                LabeledContent("Цена", value: product.price, format: .currency(code: "KGS"))
-                LabeledContent("Доступно", value: "\(product.availableUnits)")
-            }
-            Section {
-                Button("Добавить в корзину", systemImage: "bag.badge.plus") {
-                    cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    ClientProductImage(product: product, cornerRadius: 0)
+                        .frame(height: 260)
+                    Button {
+                        if favorites.contains(product.id) { favorites.remove(product.id) } else { favorites.insert(product.id) }
+                    } label: {
+                        Image(systemName: favorites.contains(product.id) ? "heart.fill" : "heart")
+                            .foregroundStyle(favorites.contains(product.id) ? ClientTheme.coral : .white)
+                            .frame(width: 44, height: 44)
+                            .background(.black.opacity(0.5), in: Circle())
+                    }
+                    .padding(14)
                 }
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(product.availableUnits > 0 ? "В НАЛИЧИИ" : "НЕТ В НАЛИЧИИ")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+                    Text(product.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
+                    Text(product.price.formatted(.currency(code: "KGS")))
+                        .font(ClientTheme.display(26, weight: .black)).foregroundStyle(.white)
+                    Text("или \(Int(product.price / 12).formatted(.number.grouping(.never))) сом × 12 мес")
+                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)
+                    HStack(spacing: 8) {
+                        ForEach(["128 ГБ", "256 ГБ", "512 ГБ"], id: \.self) { value in
+                            Text(value)
+                                .font(ClientTheme.body(13, weight: .medium))
+                                .foregroundStyle(value == "128 ГБ" ? ClientTheme.lime : ClientTheme.muted)
+                                .padding(.horizontal, 14).padding(.vertical, 9)
+                                .background(value == "128 ГБ" ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(value == "128 ГБ" ? ClientTheme.lime : ClientTheme.line))
+                        }
+                    }
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ProductTrustCell(symbol: "shield.checkered", text: "Гарантия 12 мес")
+                        ProductTrustCell(symbol: "bolt.fill", text: "Доставка 1–2 ч")
+                        ProductTrustCell(symbol: "building.2.fill", text: "Самовывоз сегодня")
+                        ProductTrustCell(symbol: "arrow.uturn.left", text: "Возврат 14 дней")
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Наличие в магазинах").font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                        availabilityRow("AliStore Центр", value: product.availableUnits > 0 ? "● есть" : "● нет", color: product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+                        availabilityRow("AliStore Ош", value: product.availableUnits > 1 ? "● есть" : "● 1 шт", color: product.availableUnits > 1 ? ClientTheme.lime : Color(red: 0.898, green: 0.698, blue: 0.235))
+                    }
+                    .padding(14).background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                    Text("Характеристики").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
+                    detailRow("SKU", value: product.sku)
+                    detailRow("Категория", value: product.category)
+                    detailRow("Доступно", value: "\(product.availableUnits) шт")
+                    Text("Описание").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
+                    Text("Оригинальная техника с гарантией AliStore. Проверьте наличие и оформите доставку или самовывоз в удобной точке.")
+                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).lineSpacing(4)
+                    Button {
+                        cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+                    } label: {
+                        Text(product.availableUnits > 0 ? "Добавить в корзину" : "Нет в наличии")
+                            .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black)
+                            .frame(maxWidth: .infinity).frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
                     .disabled(product.availableUnits == 0)
+                    .padding(.top, 6)
+                }
+                .padding(16)
             }
         }
-        .navigationTitle(product.name)
+        .background(ClientTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func availabilityRow(_ title: String, value: String, color: Color) -> some View {
+        HStack { Text(title).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted); Spacer(); Text(value).font(ClientTheme.body(12, weight: .medium)).foregroundStyle(color) }
+    }
+
+    @ViewBuilder
+    private func detailRow(_ title: String, value: String) -> some View {
+        HStack { Text(title).font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted); Spacer(); Text(value).font(ClientTheme.body(13)).foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776)) }
+            .padding(.vertical, 8).overlay(alignment: .bottom) { Rectangle().fill(ClientTheme.surface).frame(height: 1) }
+    }
+}
+
+private struct ProductTrustCell: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).foregroundStyle(ClientTheme.lime)
+            Text(text).font(ClientTheme.body(12)).foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776)).lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(minHeight: 54)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
     }
 }

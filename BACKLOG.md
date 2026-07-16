@@ -242,3 +242,5 @@
 - Add provider-shaped payment intents and sandbox webhook reconciliation for card, MBank QR, O!Деньги QR, and installments.
 - Add real Evidence Vault image upload flows for trade-in, returns, warranty, support, and warehouse operations on top of the media service.
 - Complete customer app ecosystem routes: search, bonuses, addresses, notifications/preferences, support tickets, returns, and customer trade-in.
+- Finish native Client visual parity from `AliStore Клиент App 2.0`: custom SwiftUI shell, customer product assets, login/guest states, and simulator visual evidence.
+- Add signed native Client release preflight: production API validation, privacy manifest, App Store metadata, archive/export and App Store Connect submission verification.

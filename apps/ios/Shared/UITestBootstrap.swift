@@ -8,4 +8,12 @@ public enum UITestBootstrap {
         false
         #endif
     }
+
+    public static var startsAsGuest: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-guest")
+        #else
+        false
+        #endif
+    }
 }

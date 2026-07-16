@@ -2190,3 +2190,12 @@
 - Checks run: all `16/16` software-contract checks passed, including bounded visual acceptance, clean source/design evidence, Web/API and native gates, four bounded reconciliation rows and the broad four-vertical ecosystem matrix.
 - Outcome: the only strict audit blocker is `ECO-001`: `64` linked `.dc.html` handoffs are absent and have no owner-approved retirement. Local software evidence does not certify deep native journeys, physical devices, live providers or production infrastructure.
 - Next step: restore or explicitly retire the missing handoffs; meanwhile continue the independent software backlog with `EXCH-002`, remaining `AP-001` and `ACC-003` verticals.
+
+## 2026-07-17
+
+- Task: align the native SwiftUI Client shell with the available `AliStore Клиент App 2.0` prototype and repair its packaged UI gate.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Client/Assets.xcassets`, `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, generated `apps/ios/AliStoreNative.xcodeproj/project.pbxproj`.
+- Result: Client now starts with the prototype login screen when signed out, supports a guest shell with custom five-item navigation, uses the prototype's dark/coral/lime visual language, and bundles the real handoff product images in the Client app target. The old `TabView`-specific UI assertions were replaced with login and guest navigation assertions.
+- Checks run: `xcodebuild` Client simulator build passed; aggregate `AliStoreUITests` passed with Client `2/2`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check` passed; manual iPhone 17 Pro simulator screenshots verified login and guest/home rendering.
+- Outcome: this bounded native Client visual iteration is implemented and simulator-verified. Full 17-screen parity, live API data, Face ID on a physical device, release signing, TestFlight and App Store Connect submission remain open.
+- Next step: finish the Client hero/product visual pass, add privacy/release preflight metadata, and test a signed Release archive against a production HTTPS API URL.

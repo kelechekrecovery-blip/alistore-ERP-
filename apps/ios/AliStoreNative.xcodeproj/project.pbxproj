@@ -31,6 +31,7 @@
 		A562636391B66F2B1BED55CA /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		A6B3E652D932FE6D10C39B25 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */; };
 		A80FCD2AA45BA0E8B994C5C6 /* StaffScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDD9376D59012178E0570F2 /* StaffScannerView.swift */; };
+		AD8F4AD7E5412004A4DE7F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E3930B564A069DBB66A1EF6E /* Assets.xcassets */; };
 		B92D85D26242A0D8F65E1A52 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F23ACBE05CF3A0E1499E0B /* APIClient.swift */; };
 		CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */; };
@@ -209,6 +210,7 @@
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientUITests.swift; sourceTree = "<group>"; };
+		E3930B564A069DBB66A1EF6E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestBootstrap.swift; sourceTree = "<group>"; };
 		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -374,6 +376,7 @@
 			isa = PBXGroup;
 			children = (
 				41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */,
+				E3930B564A069DBB66A1EF6E /* Assets.xcassets */,
 				8C948B07F1B2BB3F577E75BC /* Client.entitlements */,
 				48457E88937519CA203EA7DE /* Info.plist */,
 			);
@@ -441,6 +444,7 @@
 			buildConfigurationList = ABBBAFA58E438391703AA7AC /* Build configuration list for PBXNativeTarget "AliStoreClient" */;
 			buildPhases = (
 				4D8486CDB47814615512A494 /* Sources */,
+				7BBF5A1180968AA4C9C937D7 /* Resources */,
 				E88CC460372D3C37D2E64CAB /* Frameworks */,
 				3D779579474E099128206EBF /* Embed Frameworks */,
 			);
@@ -671,6 +675,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7BBF5A1180968AA4C9C937D7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AD8F4AD7E5412004A4DE7F90 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1DE12775BCA27DE3EEE707C4 /* Sources */ = {
