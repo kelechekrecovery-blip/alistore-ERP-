@@ -223,7 +223,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
       <FinanceControlsPanel accessToken={accessToken} />
       <section aria-labelledby="trial-balance-title" className="border-b border-[#2E2822] pb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div><h2 id="trial-balance-title" className="font-display text-[15px] font-bold">Оборотно-сальдовая ведомость</h2><p className="mt-1 text-xs text-[#8A7F76]">{trialBalance?.coverage.note ?? 'Загружаем проводки операционных расходов'}</p></div>
+          <div><h2 id="trial-balance-title" className="font-display text-[15px] font-bold">Оборотно-сальдовая ведомость</h2><p className="mt-1 text-xs text-[#8A7F76]">{trialBalance?.coverage.note ?? 'Загружаем проводки расходов, продаж и возвратов'}</p></div>
           <span data-testid="trial-balance-status" className={`rounded-[5px] px-2.5 py-1 text-xs font-semibold ${accountingState === 'ready' && trialBalance?.balanced ? 'bg-[#26351B] text-[#C6FF3D]' : accountingState === 'error' || accountingState === 'ready' ? 'bg-[#593127] text-[#FFB5AA]' : 'bg-[#29231E] text-[#B9ADA2]'}`}>{accountingState === 'loading' ? 'Загрузка' : accountingState === 'error' ? 'Данные недоступны' : trialBalance?.balanced ? 'Дебет = кредит' : 'Баланс не сошёлся'}</span>
         </div>
         <div className="overflow-x-auto rounded-[7px] border border-[#2E2822] bg-[#16130F]">

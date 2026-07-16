@@ -22,6 +22,7 @@ describe('Cash shift reconciliation (integration)', () => {
   let payments: PaymentsService;
   let units: UnitsService;
   let seq = 0;
+  const run = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -179,7 +180,7 @@ describe('Cash shift reconciliation (integration)', () => {
 
   it('attributes a payment tagged with shiftId to the drawer end-to-end', async () => {
     seq += 1;
-    const suffix = seq.toString().padStart(3, '0');
+    const suffix = `${run}${seq.toString().padStart(3, '0')}`;
     const staffId = staff();
     const shift = await shifts.open(
       { staffId, point: 'BISHKEK-1', openCash: 0 },

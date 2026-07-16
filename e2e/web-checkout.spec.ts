@@ -133,8 +133,11 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   await resetDb();
   const { product } = await seedProduct('DELIVERY-E2E');
   const now = new Date();
-  const startsAt = new Date(now.getTime() + 60 * 60 * 1000);
-  const endsAt = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const localDay = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+  const startsAt = new Date(`${localDay}T10:00:00.000Z`);
+  const endsAt = new Date(`${localDay}T12:00:00.000Z`);
   const zone = await prisma.deliveryZone.create({
     data: {
       code: `web-center-${Date.now().toString(36)}`,

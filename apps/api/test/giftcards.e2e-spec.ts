@@ -6,6 +6,7 @@ import { OrdersService } from '../src/orders/orders.service';
 import { PaymentIntentsService } from '../src/payments/payment-intents.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { clearGiftCardTransactions } from './db-test-cleanup';
 import { UnitsService } from '../src/units/units.service';
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 
@@ -30,14 +31,16 @@ describe('Gift cards / store credit (integration)', () => {
   });
 
   afterAll(async () => {
+    await clearGiftCardTransactions(prisma);
     await prisma.$disconnect();
   });
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
-    await prisma.giftCard.deleteMany();
+    await clearGiftCardTransactions(prisma);
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.giftCard.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();

@@ -51,6 +51,7 @@ jobs:
       DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_test?schema=public
       TEST_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_test?schema=public
       E2E_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_test?schema=public
+      ALISTORE_TEST_DATABASE_CONFIRMED: '1'
       JWT_SECRET: ci-secret-alistore
       AUTH_OTP_DEV_ECHO: 'true'
 
@@ -63,7 +64,8 @@ jobs:
 
       - run: npm ci
       - run: npm run prisma:generate -w @alistore/api
-      - run: npm exec -w @alistore/api -- prisma migrate deploy
+      - run: npm run test:refund-migration-upgrade -w @alistore/api
+      - run: npm run db:deploy -w @alistore/api
       - run: npm run api:build
       - run: npm run build -w @alistore/web
       - run: npm run api:test

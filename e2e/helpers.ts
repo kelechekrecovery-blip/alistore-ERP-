@@ -30,6 +30,7 @@ export async function resetDb() {
   await prisma.businessBuyerProfile.deleteMany();
   await prisma.outboxMessage.deleteMany();
   await prisma.auditEvent.deleteMany();
+  await clearImmutableFinanceAggregates();
   await prisma.giftCard.deleteMany();
   await prisma.productReview.deleteMany();
   await prisma.campaignRefundAdjustment.deleteMany();
@@ -111,6 +112,18 @@ export async function resetDb() {
       idempotencyKey: 'e2e:store-point:bishkek-1',
     },
   });
+}
+
+async function clearImmutableFinanceAggregates() {
+  const [{ database }] = await prisma.$queryRaw<Array<{ database: string }>>`
+    SELECT current_database() AS database
+  `;
+  if (!database || !/(^|[_-])test($|[_-])/i.test(database)) {
+    throw new Error(`Refusing destructive E2E cleanup outside an explicit test database: ${database ?? 'unknown'}`);
+  }
+  await prisma.$executeRawUnsafe(
+    'TRUNCATE TABLE "GiftCardTransaction", "RefundLine", "RefundAllocation", "Refund"',
+  );
 }
 
 export async function seedProduct(prefix: string, price = 100000, cost = 80000) {

@@ -12,9 +12,9 @@ type ReturnWithItems = Prisma.ReturnGetPayload<{ include: { items: true } }>;
 
 /**
  * Return requests (Return state machine). Recording a return is separate from the
- * money: the actual refund is an approval-gated action on the payment
- * (PaymentsService.refund), so a return moving to `paid` reflects an approved,
- * executed refund — the ledger stays the single source of truth.
+ * money: the actual refund is an approval-gated Refund aggregate. A return
+ * moving to `paid` reflects fully executed allocations; the ledger stays the
+ * single source of truth.
  */
 @Injectable()
 export class ReturnsService {

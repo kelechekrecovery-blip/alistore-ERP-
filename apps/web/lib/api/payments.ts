@@ -23,6 +23,23 @@ export interface PaymentConfirmResult {
   idempotent: boolean;
 }
 
+export interface RefundAggregate {
+  id: string;
+  returnId: string;
+  orderId: string;
+  approvalId: string;
+  amount: number;
+  reason: string;
+  status: string;
+  approval: { id: string; status: string };
+  allocations: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    methodSnapshot: PaymentMethod;
+  }>;
+}
+
 export function createPaymentIntent(input: {
   orderId: string;
   method: OnlinePaymentMethod;
@@ -65,10 +82,16 @@ export function payOrder(input: {
   return postJson('/payments', input, { 'x-guest-capability': authorization.guestCapability ?? '' });
 }
 
-export function requestPaymentRefund(
-  paymentId: string,
-  input: { amount: number; reason: string; returnId?: string },
+export function requestReturnRefund(
+  returnId: string,
+  input: { reason: string; shiftId?: string },
   accessToken: string,
-): Promise<{ approvalId: string; status: 'requested' }> {
-  return postAuthJson(`/payments/${encodeURIComponent(paymentId)}/refund`, input, accessToken);
+  idempotencyKey: string,
+): Promise<RefundAggregate> {
+  return postAuthJson(
+    `/returns/${encodeURIComponent(returnId)}/refunds`,
+    input,
+    accessToken,
+    { 'idempotency-key': idempotencyKey },
+  );
 }

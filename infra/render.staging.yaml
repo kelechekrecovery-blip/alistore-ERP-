@@ -15,6 +15,8 @@ services:
         value: api
       - key: DATABASE_URL
         fromDatabase: { name: alistore-postgres-staging, property: connectionString }
+      - key: DIRECT_DATABASE_URL
+        fromDatabase: { name: alistore-postgres-staging, property: connectionString }
       - key: REDIS_URL
         fromService: { name: alistore-redis-staging, type: keyvalue, property: connectionString }
       - key: MEILI_API_KEY
@@ -58,6 +60,8 @@ services:
       - fromGroup: alistore-staging-common
       - key: PROCESS_ROLE
         value: worker
+      - key: REFUND_RELAY_ENABLED
+        value: "true"
       - key: DATABASE_URL
         fromDatabase: { name: alistore-postgres-staging, property: connectionString }
       - key: REDIS_URL
@@ -108,10 +112,12 @@ envVarGroups:
       - { key: PUBLIC_DEMO_MODE, value: "true" }
       - { key: AUTH_OTP_DEV_ECHO, value: "false" }
       - { key: PAYMENT_PROVIDER, value: sandbox }
+      - { key: PAYMENT_PROVIDER_CERTIFIED, value: "false" }
       - { key: JOB_BACKEND, value: bullmq }
       - { key: RESERVATION_SWEEP_ENABLED, value: "true" }
       - { key: SERVICE_SLA_SWEEP_ENABLED, value: "true" }
       - { key: OUTBOX_RELAY_ENABLED, value: "true" }
+      - { key: REFUND_RELAY_ENABLED, value: "false" }
       - { key: MEILI_HOST, value: "http://alistore-meilisearch-staging:7700" }
       - { key: MEDIA_STORAGE, value: s3 }
       - { key: S3_REGION, value: auto }

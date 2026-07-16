@@ -51,6 +51,7 @@ import { ServiceCenterModule } from './service-center/service-center.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.module';
+import { RefundsModule } from './refunds/refunds.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.mo
     StorefrontModule,
     PromotionsModule,
     StorefrontBlocksModule,
+    RefundsModule,
   ],
 })
 export class AppModule {}

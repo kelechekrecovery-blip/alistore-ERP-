@@ -136,6 +136,12 @@ p, cashier, payments, refund
 p, senior_seller, payments, refund
 p, admin, payments, refund
 p, owner, payments, refund
+p, admin, refunds, read
+p, owner, refunds, read
+p, admin, refunds, retry
+p, owner, refunds, retry
+p, admin, refunds, manage
+p, owner, refunds, manage
 p, cashier, payments, take_service
 p, admin, payments, take_service
 p, owner, payments, take_service

@@ -17,6 +17,7 @@ import { finalizeOrderInventorySaleOnTx } from '../inventory/order-inventory-sal
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
+const PROVIDER_TENDERS = new Set<PayDto['method']>(['card', 'qr_mbank', 'qr_odengi', 'bakai_pos', 'obank', 'installment']);
 
 interface PaymentTender {
   method: PayDto['method'];
@@ -43,6 +44,10 @@ export class PaymentsService {
     @Optional() private readonly campaignAttribution?: CampaignAttributionService,
   ) {}
 
+  get(id: string) {
+    return this.prisma.payment.findUnique({ where: { id } });
+  }
+
   /**
    * Request a refund — approval-gated (Approval Rules Matrix: refund любой →
    * Администратор). Enforces invariant #1: refund needs an existing positive
@@ -54,7 +59,11 @@ export class PaymentsService {
     reason: string,
     requester: string,
     returnId?: string,
-    settlement: { shiftId?: string; externalReference?: string } = {},
+    settlement: {
+      shiftId?: string;
+      externalReference?: string;
+      allocations?: Array<{ paymentId: string; amount: number; shiftId?: string; externalReference?: string }>;
+    } = {},
   ) {
     const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
     if (!payment) {
@@ -63,11 +72,61 @@ export class PaymentsService {
     if (payment.amount <= 0) {
       throw new ConflictError('not_refundable', 'Нельзя вернуть по возвратному платежу');
     }
-    if (amount <= 0 || amount > payment.amount) {
+    if (amount <= 0) {
+      throw new ValidationError(
+        'invalid_refund_amount',
+        'Сумма возврата должна быть больше 0',
+      );
+    }
+    if (!settlement.allocations?.length && amount > payment.amount) {
       throw new ValidationError(
         'invalid_refund_amount',
         `Сумма возврата должна быть 0 < amount ≤ ${payment.amount}`,
       );
+    }
+    const allocations = settlement.allocations?.length
+      ? settlement.allocations.map((allocation) => ({
+          paymentId: allocation.paymentId.trim(),
+          amount: allocation.amount,
+          shiftId: allocation.shiftId?.trim() || null,
+          externalReference: allocation.externalReference?.trim() || null,
+        }))
+      : [{
+          paymentId: payment.id,
+          amount,
+          shiftId: settlement.shiftId?.trim() || null,
+          externalReference: settlement.externalReference?.trim() || null,
+        }];
+    if (new Set(allocations.map((allocation) => allocation.paymentId)).size !== allocations.length) {
+      throw new ValidationError('duplicate_refund_tender', 'Исходный платёж нельзя указать в возврате дважды');
+    }
+    if (!allocations.some((allocation) => allocation.paymentId === payment.id)) {
+      throw new ValidationError('refund_anchor_missing', 'Аллокации должны включать платёж из URL');
+    }
+    if (allocations.some((allocation) => !allocation.paymentId || !Number.isInteger(allocation.amount) || allocation.amount <= 0)) {
+      throw new ValidationError('invalid_refund_allocation', 'Каждая аллокация возврата должна иметь платёж и положительную целую сумму');
+    }
+    if (allocations.reduce((sum, allocation) => sum + allocation.amount, 0) !== amount) {
+      throw new ValidationError('refund_allocation_total_mismatch', 'Сумма аллокаций не совпадает с общей суммой возврата');
+    }
+    const originals = await this.prisma.payment.findMany({ where: { id: { in: allocations.map((allocation) => allocation.paymentId) } } });
+    if (originals.length !== allocations.length || originals.some((original) => original.amount <= 0)) {
+      throw new ValidationError('refund_allocation_payment_invalid', 'Все аллокации должны ссылаться на существующие положительные платежи');
+    }
+    const target = `${payment.orderId ?? ''}:${payment.serviceWorkOrderId ?? ''}`;
+    if (originals.some((original) => `${original.orderId ?? ''}:${original.serviceWorkOrderId ?? ''}` !== target)) {
+      throw new ConflictError('refund_allocation_target_mismatch', 'Все платежи возврата должны относиться к одному документу');
+    }
+    const originalById = new Map(originals.map((original) => [original.id, original]));
+    for (const allocation of allocations) {
+      const original = originalById.get(allocation.paymentId)!;
+      const prior = await this.prisma.payment.aggregate({
+        where: { originalPaymentId: original.id },
+        _sum: { amount: true },
+      });
+      if (allocation.amount > original.amount + (prior._sum.amount ?? 0)) {
+        throw new ValidationError('refund_exceeds_tender', `Возврат превышает остаток платежа ${original.id}`);
+      }
     }
     if (returnId) {
       const ret = await this.prisma.return.findUnique({ where: { id: returnId } });
@@ -99,6 +158,7 @@ export class PaymentsService {
         shiftId: settlement.shiftId?.trim() || null,
         externalReference: settlement.externalReference?.trim() || null,
         cashierStaffId: requester,
+        allocations,
       },
     });
   }
@@ -184,6 +244,10 @@ export class PaymentsService {
     const missingIdempotency = tenders.find((payment) => !payment.idempotencyKey);
     if (missingIdempotency) {
       throw new ValidationError('payment_idempotency_required', 'Для каждого платежа нужен постоянный Idempotency-Key');
+    }
+    const missingProviderTxn = tenders.find((payment) => PROVIDER_TENDERS.has(payment.method) && !payment.txnId?.trim());
+    if (missingProviderTxn) {
+      throw new ValidationError('payment_provider_txn_required', 'Электронный платёж требует provider txnId для сверки и возврата');
     }
     const idempotencyKeys = tenders.map((payment) => payment.idempotencyKey as string);
     if (new Set(idempotencyKeys).size !== idempotencyKeys.length) {
@@ -278,11 +342,12 @@ export class PaymentsService {
       const taxMetadata = outputTaxMetadata(order.items);
       let processedAmount = alreadyReceived;
       for (const tender of tenders) {
+        let redeemedGiftCard = null;
         if (tender.method === 'gift_card') {
           if (!this.giftcards || !tender.giftCardCode) {
             throw new ValidationError('giftcard_unavailable', 'Gift-card сервис недоступен');
           }
-          await this.giftcards.redeemOnTx(
+          redeemedGiftCard = await this.giftcards.redeemOnTx(
             tx,
             tender.giftCardCode,
             order.id,
@@ -303,8 +368,22 @@ export class PaymentsService {
             idempotencyKey: tender.idempotencyKey,
             receivedBy: actor,
             point,
+            giftCardId: redeemedGiftCard?.id,
           },
         });
+        if (redeemedGiftCard) {
+          await tx.giftCardTransaction.create({
+            data: {
+              giftCardId: redeemedGiftCard.id,
+              paymentId: payment.id,
+              type: 'redemption',
+              amount: -tender.amount,
+              balanceAfter: redeemedGiftCard.balance,
+              sourceRef: `giftcard:payment:${payment.id}`,
+              actor,
+            },
+          });
+        }
         const accountingEntry = await postPaymentEntryOnTx(tx, {
           payment,
           idempotencyKey: tender.idempotencyKey as string,

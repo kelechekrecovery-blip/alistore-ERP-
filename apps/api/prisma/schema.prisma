@@ -72,6 +72,29 @@ enum PaymentStatus {
   refunded
 }
 
+enum RefundStatus {
+  requested
+  approved
+  processing
+  partially_succeeded
+  succeeded
+  failed
+  rejected
+}
+
+enum RefundAllocationStatus {
+  queued
+  processing
+  provider_pending
+  succeeded
+  failed
+}
+
+enum GiftCardTransactionType {
+  redemption
+  refund
+}
+
 enum FinanceSettlementStatus {
   balanced
   disputed
@@ -738,6 +761,7 @@ model Order {
   consignmentSales         ConsignmentItem[]               @relation("ConsignmentSaleOrder")
   quantityConsignmentSales QuantityConsignmentAllocation[] @relation("QuantityConsignmentSaleOrder")
   payments                 Payment[]
+  refunds                  Refund[]
   attribution              OrderAttribution?
   returns                  Return[]
   createdAt                DateTime                        @default(now())
@@ -1008,6 +1032,11 @@ model Payment {
   originalPayment    Payment?                @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
   originalPaymentId  String?
   refunds            Payment[]               @relation("PaymentRefunds")
+  refundAllocations   RefundAllocation[]      @relation("RefundOriginalPayment")
+  refundExecution     RefundAllocation?       @relation("RefundExecutionPayment")
+  giftCard            GiftCard?               @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
+  giftCardId          String?
+  giftCardTransaction GiftCardTransaction?
   amount             Int // отрицательное = возврат
   method             PaymentMethod
   status             PaymentStatus           @default(pending)
@@ -1026,6 +1055,7 @@ model Payment {
   @@index([orderId])
   @@index([serviceWorkOrderId])
   @@index([originalPaymentId])
+  @@index([giftCardId])
   @@index([shiftId])
   @@index([accountCode, createdAt])
   @@index([point, createdAt])
@@ -1061,6 +1091,8 @@ model GiftCard {
   expiresAt      DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+  payments       Payment[]
+  transactions   GiftCardTransaction[]
 
   @@index([customerId])
   @@index([status])
@@ -1079,6 +1111,7 @@ model CashShift {
   openedAt            DateTime  @default(now())
   closedAt            DateTime?
   payments            Payment[]
+  refundAllocations   RefundAllocation[]
   incassations        CashIncassation[]
 
   @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
@@ -1218,6 +1251,7 @@ model Return {
   restockedAt     DateTime?
   createdAt       DateTime     @default(now())
   items           ReturnItem[]
+  refund          Refund?
 
   @@index([orderId])
   @@index([status])
@@ -1232,9 +1266,106 @@ model ReturnItem {
   qty          Int
   refundAmount Int
   createdAt    DateTime  @default(now())
+  refundLines  RefundLine[]
 
   @@unique([returnId, orderItemId])
   @@index([orderItemId])
+}
+
+model Refund {
+  id             String             @id @default(cuid())
+  return         Return             @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId       String             @unique
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId        String
+  approval       Approval?          @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+  approvalId     String?            @unique
+  idempotencyKey String             @unique
+  requestHash    String
+  amount         Int
+  status         RefundStatus       @default(requested)
+  reason         String
+  requester      String
+  approver       String?
+  approvedAt     DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  allocations    RefundAllocation[]
+  lines          RefundLine[]
+
+  @@index([orderId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model RefundAllocation {
+  id                  String                  @id @default(cuid())
+  refund              Refund                  @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  refundId            String
+  originalPayment     Payment                 @relation("RefundOriginalPayment", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPaymentId   String
+  refundPayment       Payment?                @relation("RefundExecutionPayment", fields: [refundPaymentId], references: [id], onDelete: Restrict)
+  refundPaymentId     String?                 @unique
+  shift               CashShift?              @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId             String?
+  accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId   String?                 @unique
+  amount              Int
+  ordinal             Int
+  methodSnapshot      PaymentMethod
+  status              RefundAllocationStatus  @default(queued)
+  providerRefundId    String?                 @unique
+  attempts            Int                     @default(0)
+  lastError           String?
+  lockedAt            DateTime?
+  nextAttemptAt       DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  giftCardTransaction GiftCardTransaction?
+
+  @@unique([refundId, originalPaymentId])
+  @@unique([refundId, ordinal])
+  @@index([originalPaymentId])
+  @@index([shiftId])
+  @@index([status, nextAttemptAt])
+  @@index([status, lockedAt])
+}
+
+model RefundLine {
+  id            String     @id @default(cuid())
+  refund        Refund     @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  refundId      String
+  returnItem    ReturnItem @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
+  returnItemId  String
+  qty           Int
+  grossAmount   Int
+  taxBaseAmount Int
+  taxAmount     Int
+  revenueAmount Int
+  taxCode       String
+  taxRateBps    Int
+  createdAt     DateTime   @default(now())
+
+  @@unique([refundId, returnItemId])
+  @@index([returnItemId])
+}
+
+model GiftCardTransaction {
+  id                 String                  @id @default(cuid())
+  giftCard           GiftCard                @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
+  giftCardId         String
+  payment            Payment?                @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId          String?                 @unique
+  refundAllocation   RefundAllocation?       @relation(fields: [refundAllocationId], references: [id], onDelete: Restrict)
+  refundAllocationId String?                 @unique
+  type               GiftCardTransactionType
+  amount             Int
+  balanceAfter       Int
+  sourceRef          String                  @unique
+  actor              String
+  createdAt          DateTime                @default(now())
+
+  @@index([giftCardId, createdAt])
 }
 
 model WarrantyCase {
@@ -1495,6 +1626,7 @@ model AccountingJournalEntry {
   createdBy       String
   lines           AccountingJournalLine[]
   payment         Payment?
+  refundAllocation   RefundAllocation?
   purchaseReceipt PurchaseReceipt?
   supplierInvoice SupplierInvoice?
   supplierCreditNote SupplierCreditNote?
@@ -1888,6 +2020,7 @@ model Approval {
   reason    String
   evidence  Json? // обязательно для high-risk
   createdAt DateTime       @default(now())
+  refund    Refund?
 
   @@index([status])
   @@index([action])

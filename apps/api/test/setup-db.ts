@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { clearGiftCardTransactions } from './db-test-cleanup';
 
 const prisma = new PrismaClient();
+
+beforeEach(async () => {
+  await clearGiftCardTransactions(prisma);
+});
 
 beforeAll(async () => {
   await prisma.accountingAccount.createMany({

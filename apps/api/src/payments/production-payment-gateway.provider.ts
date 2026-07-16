@@ -3,6 +3,8 @@ import {
   GatewayCreateIntentInput,
   GatewayRefundInput,
   GatewayRefundResult,
+  GatewayRefundWebhookPayload,
+  GatewayRefundWebhookRequest,
   GatewayWebhookPayload,
   GatewayWebhookRequest,
   PaymentGatewayProvider,
@@ -31,6 +33,10 @@ export class ProductionPaymentGatewayProvider implements PaymentGatewayProvider 
   }
 
   verifyWebhook(_input: GatewayWebhookRequest): Promise<GatewayWebhookPayload> {
+    return this.unavailable();
+  }
+
+  verifyRefundWebhook(_input: GatewayRefundWebhookRequest): Promise<GatewayRefundWebhookPayload> {
     return this.unavailable();
   }
 

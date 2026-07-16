@@ -14,6 +14,7 @@ import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from './payment-gate
 import { selectPaymentGatewayProvider } from './payment-gateway-selector';
 import { SandboxPaymentsController } from './sandbox-payments.controller';
 import { CampaignsModule } from '../campaigns/campaigns.module';
+import { RefundsModule } from '../refunds/refunds.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { CampaignsModule } from '../campaigns/campaigns.module';
     RateLimitModule,
     GiftcardsModule,
     CampaignsModule,
+    RefundsModule,
   ],
   providers: [
     PaymentsService,

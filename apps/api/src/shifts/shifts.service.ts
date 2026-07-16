@@ -105,6 +105,22 @@ export class ShiftsService {
     return openCash + (agg._sum.amount ?? 0);
   }
 
+  private async assertNoPendingCashRefunds(tx: Prisma.TransactionClient, shiftId: string) {
+    const pending = await tx.refundAllocation.count({
+      where: {
+        shiftId,
+        status: { in: ['queued', 'processing', 'provider_pending', 'failed'] },
+        refund: { status: { in: ['requested', 'approved', 'processing', 'partially_succeeded', 'failed'] } },
+      },
+    });
+    if (pending > 0) {
+      throw new ConflictError(
+        'shift_has_pending_refunds',
+        'Смену нельзя закрыть или передать, пока наличный возврат не исполнен или не отклонён',
+      );
+    }
+  }
+
   /**
    * Close a shift with reconciliation. diff = closeCash − expected. A non-zero diff
    * without a reason is rejected (422); with a reason it is recorded and a
@@ -113,6 +129,7 @@ export class ShiftsService {
   async close(shiftId: string, dto: CloseShiftDto, actor: string, idempotencyKey?: string) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-close:' + shiftId}))::text AS locked`;
+      await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
       const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
       if (!shift) {
         throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
@@ -143,6 +160,7 @@ export class ShiftsService {
         }
       }
 
+      await this.assertNoPendingCashRefunds(tx, shiftId);
       const expected = await this.expectedCash(tx, shiftId, shift.openCash);
       const diff = dto.closeCash - expected;
 
@@ -203,9 +221,11 @@ export class ShiftsService {
       }
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-handover:' + shiftId}))::text AS locked`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-open:' + dto.toStaffId}))::text AS locked`;
+      await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
       const source = await tx.cashShift.findUnique({ where: { id: shiftId } });
       if (!source) throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
       if (source.closedAt) throw new ConflictError('shift_already_closed', 'Закрытую смену нельзя передать');
+      await this.assertNoPendingCashRefunds(tx, source.id);
       const manager = actorRole === Role.owner || actorRole === Role.admin;
       if (source.staffId !== actor && !manager) throw new ConflictError('shift_handover_owner_mismatch', 'Можно передать только свою кассовую смену');
       if (source.staffId === dto.toStaffId) throw new ValidationError('shift_handover_same_staff', 'Получатель должен отличаться от передающего');

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapStaff, customerToken, patchJson, postJson, prisma, resetDb } from './helpers';
+import { bootstrapStaff, customerToken, patchJson, prisma, resetDb } from './helpers';
 
 test('customer return request appears in ERP and leads to a bound refund approval', async ({ page, request }) => {
   await resetDb();
@@ -17,8 +17,11 @@ test('customer return request appears in ERP and leads to a bound refund approva
       items: { create: { sku: 'E2E-RETURN-PHONE', qty: 2, price: 50000 } },
     },
   });
-  const payment = await prisma.payment.create({
-    data: { orderId: order.id, amount: 100000, method: 'card', status: 'received' },
+  const cardPayment = await prisma.payment.create({
+    data: { orderId: order.id, amount: 40000, method: 'card', status: 'received', txnId: 'e2e-card-capture' },
+  });
+  const qrPayment = await prisma.payment.create({
+    data: { orderId: order.id, amount: 60000, method: 'qr_mbank', status: 'received', txnId: 'e2e-mbank-capture' },
   });
 
   await page.addInitScript((token) => {
@@ -52,17 +55,23 @@ test('customer return request appears in ERP and leads to a bound refund approva
   await expect(page.getByText(ret.id)).toBeVisible();
   await page.getByRole('button', { name: 'В refund' }).click();
   await expect(page.getByLabel('returnId')).toHaveValue(ret.id);
-  await expect(page.getByLabel('paymentId')).toHaveValue(payment.id);
   await expect(page.getByLabel('сумма возврата')).toHaveValue('50000');
+  await expect(page.getByText(/API сам распределит сумму/)).toBeVisible();
+  await page.getByRole('button', { name: 'Запросить refund' }).click();
+  await expect(page.getByText(/Refund approval #/)).toBeVisible();
 
-  const refund = await postJson<{ approvalId: string; status: string }>(
-    request,
-    `/payments/${payment.id}/refund`,
-    { amount: 50000, reason: 'e2e approved return', returnId: ret.id },
-    staffToken,
-  );
-  expect(refund.status).toBe('requested');
-  const approval = await prisma.approval.findUnique({ where: { id: refund.approvalId } });
+  const approval = await prisma.approval.findFirst({ where: { action: 'refund' }, orderBy: { createdAt: 'desc' } });
   expect(approval).toMatchObject({ action: 'refund', status: 'requested' });
-  expect(approval?.evidence).toMatchObject({ payload: { returnId: ret.id, paymentId: payment.id } });
+  const refund = await prisma.refund.findUniqueOrThrow({
+    where: { returnId: ret.id },
+    include: { allocations: { orderBy: { ordinal: 'asc' } }, lines: true },
+  });
+  expect(approval?.evidence).toMatchObject({ payload: { refundId: refund.id } });
+  expect(refund).toMatchObject({ amount: 50000, status: 'requested', approvalId: approval?.id });
+  expect(refund.allocations).toMatchObject([
+    { originalPaymentId: cardPayment.id, amount: 40000, methodSnapshot: 'card', status: 'queued' },
+    { originalPaymentId: qrPayment.id, amount: 10000, methodSnapshot: 'qr_mbank', status: 'queued' },
+  ]);
+  expect(refund.lines).toMatchObject([{ qty: 1, grossAmount: 50000 }]);
+  expect(await page.evaluate((returnId) => sessionStorage.getItem(`alistore.refund.idempotency.${returnId}`), ret.id)).toBeNull();
 });

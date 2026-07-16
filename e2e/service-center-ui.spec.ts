@@ -157,7 +157,7 @@ test('ERP accepts a third-party paid repair and the customer approves its estima
   await page.reload();
   await expect(page.getByTestId(`service-payment-status-${workOrder.id}`)).toContainText('Частичный возврат · осталось оплачено 5 500 с');
   const eventTypes = (await prisma.auditEvent.findMany({ where: { refs: { has: workOrder.id } }, orderBy: { ts: 'asc' } })).map((event) => event.type);
-  expect(eventTypes).toHaveLength(7);
+  expect(eventTypes).toHaveLength(9);
   expect(eventTypes).toEqual(expect.arrayContaining([
     'service.paid_repair_received',
     'service.work_order_created',
@@ -165,6 +165,8 @@ test('ERP accepts a third-party paid repair and the customer approves its estima
     'service.estimate_approved',
     'payment.received',
     'payment.received',
+    'accounting.entry_posted',
+    'accounting.entry_posted',
     'service.payment_completed',
   ]));
 });

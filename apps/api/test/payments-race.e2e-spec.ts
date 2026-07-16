@@ -53,10 +53,13 @@ describe('Payments — concurrency (accessory order)', () => {
     await prisma.order.update({ where: { id: order.id }, data: { fulfillmentLocation: 'BISHKEK-1' } });
     // Two full card payments fired together with distinct provider ids: only one may complete.
     const results = await Promise.allSettled([
-      payments.pay({ orderId: order.id, method: 'card', amount: 50000, txnId: 'race-payment-a' }, 'system'),
-      payments.pay({ orderId: order.id, method: 'card', amount: 50000, txnId: 'race-payment-b' }, 'system'),
+      payments.pay({ orderId: order.id, method: 'card', amount: 50000, txnId: `race-payment-a-${order.id}` }, 'system'),
+      payments.pay({ orderId: order.id, method: 'card', amount: 50000, txnId: `race-payment-b-${order.id}` }, 'system'),
     ]);
     const ok = results.filter((r) => r.status === 'fulfilled');
+    if (ok.length !== 1) {
+      throw new Error(`Expected one payment winner: ${results.map((result) => result.status === 'rejected' ? `${result.reason?.code ?? result.reason?.name}: ${result.reason?.message}` : 'fulfilled').join(' | ')}`);
+    }
     expect(ok).toHaveLength(1); // exactly one wins; the other hits payment_without_reservation
 
     const rows = await prisma.payment.findMany({ where: { orderId: order.id } });

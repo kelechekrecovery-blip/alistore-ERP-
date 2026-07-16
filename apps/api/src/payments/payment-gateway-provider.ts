@@ -56,10 +56,24 @@ export interface GatewayRefundResult {
   status: 'accepted' | 'succeeded';
 }
 
+export interface GatewayRefundWebhookPayload {
+  providerRefundId: string;
+  status: 'succeeded' | 'failed';
+  providerReference?: string;
+  failureCode?: string;
+}
+
+export interface GatewayRefundWebhookRequest {
+  payload: unknown;
+  rawBody?: Buffer;
+  headers: Readonly<Record<string, string | string[] | undefined>>;
+}
+
 export interface PaymentGatewayProvider {
   readonly name: 'sandbox' | 'production';
   assertOperational(): void;
   createIntent(input: GatewayCreateIntentInput): Promise<PaymentIntentView>;
   verifyWebhook(input: GatewayWebhookRequest): Promise<GatewayWebhookPayload>;
+  verifyRefundWebhook(input: GatewayRefundWebhookRequest): Promise<GatewayRefundWebhookPayload>;
   refund(input: GatewayRefundInput): Promise<GatewayRefundResult>;
 }

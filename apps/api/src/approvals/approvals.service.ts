@@ -99,7 +99,7 @@ export class ApprovalsService {
           `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
-      if (approval.action === 'campaign_budget' && approval.requester === input.approver) {
+      if ((approval.action === 'campaign_budget' || approval.action === 'refund') && approval.requester === input.approver) {
         throw new ForbiddenError(
           'four_eye_approval_required',
           'Автор кампании не может согласовать собственный бюджет',

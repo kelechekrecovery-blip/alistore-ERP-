@@ -76,8 +76,8 @@ DATABASE_URL="postgresql://alistore@localhost:5432/alistore_test?schema=public" 
   npm exec -w @alistore/api -- prisma db push --skip-generate
 
 npm run api:test                # serial integration gate against the shared test DB
-npm run mvp:verify              # полный release gate: schema, builds, Jest, E2E, readiness
-npm run mvp:verify -- --skip-e2e # быстрый gate без Playwright
+ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify              # полный destructive test-DB gate
+ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e # быстрый gate без Playwright
 npm run launch:preflight        # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness        # отчёт по apps/api/.env.production
 npm run launch:check            # strict preflight + strict external readiness
@@ -86,7 +86,9 @@ npm run ecosystem:audit        # readable ecosystem/design acceptance report
 npm run ecosystem:audit:json   # writes machine contract to .artifacts/ecosystem-audit.json
 ```
 
-`npm run mvp:verify` не падает из-за отсутствующих production-ключей/железа: внешний статус
+`mvp:verify` требует отдельную test-БД с сегментом `test` в имени и явное
+`ALISTORE_TEST_DATABASE_CONFIRMED=1`, потому что gate выполняет `prisma migrate reset --force`.
+Gate не падает из-за отсутствующих production-ключей/железа: внешний статус
 печатается отдельно. Для строгой production-проверки используйте `npm run mvp:verify -- --strict-external`.
 Финальная активация описана в [`docs/PRODUCTION-ACTIVATION.md`](docs/PRODUCTION-ACTIVATION.md).
 

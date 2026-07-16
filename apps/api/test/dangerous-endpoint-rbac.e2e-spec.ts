@@ -7,6 +7,7 @@ import { PaymentsModule } from '../src/payments/payments.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ProductsModule } from '../src/products/products.module';
+import { RefundsModule } from '../src/refunds/refunds.module';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 
@@ -32,6 +33,7 @@ describe('Dangerous product/refund endpoint RBAC', () => {
         StaffAuthModule,
         ProductsModule,
         PaymentsModule,
+        RefundsModule,
       ],
     }).compile();
 
@@ -71,7 +73,10 @@ describe('Dangerous product/refund endpoint RBAC', () => {
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
+    await prisma.returnItem.deleteMany();
+    await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.cashShift.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.inventoryMovement.deleteMany();
@@ -99,11 +104,23 @@ describe('Dangerous product/refund endpoint RBAC', () => {
       data: { phone: `+996702${RUN}`, name: 'Refund RBAC' },
     });
     const order = await prisma.order.create({
-      data: { customerId: customer.id, status: 'paid', channel: 'pos', total: amount },
+      data: {
+        customerId: customer.id, status: 'paid', channel: 'pos', total: amount,
+        items: { create: { sku: `REFUND-RBAC-${RUN}`, qty: 1, price: amount } },
+      },
+      include: { items: true },
     });
-    return prisma.payment.create({
-      data: { orderId: order.id, amount, method: 'cash', status: 'received' },
+    const payment = await prisma.payment.create({
+      data: { orderId: order.id, amount, method: 'cash', status: 'received', point: 'BISHKEK-1' },
     });
+    const shift = await prisma.cashShift.create({ data: { staffId: cashierId, point: 'BISHKEK-1', openCash: amount } });
+    const ret = await prisma.return.create({
+      data: {
+        orderId: order.id, reason: 'RBAC return', status: 'processing', refundAmount: 10000,
+        items: { create: { orderItemId: order.items[0].id, qty: 1, refundAmount: 10000 } },
+      },
+    });
+    return { payment, shift, ret };
   }
 
   it('guards product price changes and records actor from the staff JWT', async () => {
@@ -150,23 +167,24 @@ describe('Dangerous product/refund endpoint RBAC', () => {
   });
 
   it('guards refund requests while preserving public payment intent/webhook flow', async () => {
-    const payment = await paymentFixture();
+    const fixture = await paymentFixture();
 
     await request(app.getHttpServer())
-      .post(`/payments/${payment.id}/refund`)
+      .post(`/payments/${fixture.payment.id}/refund`)
       .send({ amount: 10000, reason: 'return', requester: 'spoof' })
       .expect(401);
 
     await request(app.getHttpServer())
-      .post(`/payments/${payment.id}/refund`)
+      .post(`/payments/${fixture.payment.id}/refund`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .send({ amount: 10000, reason: 'return', requester: 'spoof' })
       .expect(403);
 
     await request(app.getHttpServer())
-      .post(`/payments/${payment.id}/refund`)
+      .post(`/payments/${fixture.payment.id}/refund`)
       .set('Authorization', `Bearer ${cashierToken}`)
-      .send({ amount: 10000, reason: 'return', requester: 'spoof' })
+      .set('Idempotency-Key', `refund-rbac-${RUN}`)
+      .send({ amount: 10000, reason: 'return', requester: 'spoof', returnId: fixture.ret.id, shiftId: fixture.shift.id })
       .expect(202);
 
     const approval = await prisma.approval.findFirst({ where: { action: 'refund' } });
@@ -182,5 +200,44 @@ describe('Dangerous product/refund endpoint RBAC', () => {
         status: 'succeeded',
       })
       .expect(422);
+  });
+
+  it('allows authorized finance roles to read refund drilldown only', async () => {
+    const fixture = await paymentFixture();
+    const created = await request(app.getHttpServer())
+      .post(`/returns/${fixture.ret.id}/refunds`)
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .set('Idempotency-Key', `aggregate-rbac-${RUN}`)
+      .send({ reason: 'authorized aggregate read', shiftId: fixture.shift.id })
+      .expect(202);
+
+    await request(app.getHttpServer())
+      .get(`/refunds/${created.body.id}`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get(`/refunds/${created.body.id}`)
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get(`/refunds/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post(`/refunds/${created.body.id}/cancel`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .set('Idempotency-Key', `cancel-rbac-seller-${RUN}`)
+      .send({ reason: 'must be denied' })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/refunds/${created.body.id}/cancel`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Idempotency-Key', `cancel-rbac-admin-${RUN}`)
+      .send({ reason: 'allowed role reaches domain guard' })
+      .expect(409);
   });
 });

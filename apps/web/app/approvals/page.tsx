@@ -7,7 +7,7 @@ import {
   decideApproval,
   fetchStaffReturns,
   fetchApprovals,
-  requestPaymentRefund,
+  requestReturnRefund,
   staffLogin,
   staffTotpEnable,
   staffTotpSetup,
@@ -39,7 +39,7 @@ export default function ApprovalsPage() {
   const [login, setLogin] = useState({ username: '', password: '' });
   const [totpSetup, setTotpSetup] = useState<StaffTotpSetupResult | null>(null);
   const [totpToken, setTotpToken] = useState('');
-  const [refundForm, setRefundForm] = useState({ returnId: '', paymentId: '', amount: '', reason: '' });
+  const [refundForm, setRefundForm] = useState({ returnId: '', amount: '', reason: '', shiftId: '' });
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [restockLocation, setRestockLocation] = useState('RETURNS-BISHKEK');
 
@@ -119,9 +119,9 @@ export default function ApprovalsPage() {
   function prepareRefund(ret: ReturnRequest) {
     setRefundForm({
       returnId: ret.id,
-      paymentId: ret.order?.payments[0]?.id ?? '',
       amount: String(ret.refundAmount),
       reason: ret.reason,
+      shiftId: '',
     });
   }
 
@@ -140,7 +140,7 @@ export default function ApprovalsPage() {
     try {
       await decideApproval(a.id, status, session.accessToken, undefined, status === 'approved' ? code : undefined);
       if (status === 'approved') setTotpToken('');
-      flash(status === 'approved' ? 'Одобрено · действие выполнено' : 'Отклонено');
+      flash(status === 'approved' ? 'Одобрено · действие поставлено в обработку' : 'Отклонено');
       load(tab.status);
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка');
@@ -164,24 +164,28 @@ export default function ApprovalsPage() {
 
   async function requestRefund(e: FormEvent) {
     e.preventDefault();
-    if (!session || !refundForm.paymentId.trim()) return;
-    const amount = Number(refundForm.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      flash('Введите сумму возврата');
+    if (!session || !refundForm.returnId.trim()) return;
+    const returnId = refundForm.returnId.trim();
+    if (!refundForm.reason.trim()) {
+      flash('Введите причину возврата');
       return;
     }
     setBusy('refund-request');
     try {
-      const res = await requestPaymentRefund(
-        refundForm.paymentId.trim(),
+      const storageKey = `alistore.refund.idempotency.${returnId}`;
+      const idempotencyKey = window.sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+      window.sessionStorage.setItem(storageKey, idempotencyKey);
+      const res = await requestReturnRefund(
+        returnId,
         {
-          amount: Math.round(amount),
-          reason: refundForm.reason.trim() || 'refund request',
-          returnId: refundForm.returnId.trim() || undefined,
+          reason: refundForm.reason.trim(),
+          shiftId: refundForm.shiftId.trim() || undefined,
         },
         session.accessToken,
+        idempotencyKey,
       );
-      setRefundForm({ returnId: '', paymentId: '', amount: '', reason: '' });
+      window.sessionStorage.removeItem(storageKey);
+      setRefundForm({ returnId: '', amount: '', reason: '', shiftId: '' });
       setTab(TABS[0]);
       load('requested');
       flash(`Refund approval #${res.approvalId.slice(-8)}`);
@@ -357,27 +361,17 @@ export default function ApprovalsPage() {
                   <input
                     value={refundForm.returnId}
                     onChange={(e) => setRefundForm((v) => ({ ...v, returnId: e.target.value }))}
-                    placeholder="returnId (для складского возврата)"
+                    placeholder="returnId"
                     aria-label="returnId"
-                    className="min-h-11 min-w-0 rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40"
-                  />
-                  <input
-                    value={refundForm.paymentId}
-                    onChange={(e) => setRefundForm((v) => ({ ...v, paymentId: e.target.value }))}
-                    placeholder="paymentId"
-                    aria-label="paymentId"
                     required
                     className="min-h-11 min-w-0 rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40"
                   />
                   <input
                     value={refundForm.amount}
-                    onChange={(e) => setRefundForm((v) => ({ ...v, amount: e.target.value.replace(/\D/g, '') }))}
-                    placeholder="сумма"
+                    readOnly
+                    placeholder="Сумма определяется возвратом"
                     aria-label="сумма возврата"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    required
-                    className="min-h-11 min-w-0 rounded-btn border border-ink/15 px-4 py-2.5 text-sm outline-none focus:border-ink/40"
+                    className="min-h-11 min-w-0 rounded-btn border border-ink/10 bg-sand/50 px-4 py-2.5 text-sm text-ink/70"
                   />
                   <input
                     value={refundForm.reason}
@@ -387,7 +381,19 @@ export default function ApprovalsPage() {
                     required
                     className="min-h-11 min-w-0 rounded-btn border border-ink/15 px-4 py-2.5 text-sm outline-none focus:border-ink/40"
                   />
+                  <input
+                    value={refundForm.shiftId}
+                    onChange={(e) => setRefundForm((v) => ({ ...v, shiftId: e.target.value }))}
+                    placeholder="ID открытой смены, если возврат затронет наличные"
+                    aria-label="Смена наличного возврата"
+                    className="min-h-11 min-w-0 rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40"
+                  />
                 </div>
+                {refundForm.returnId && (
+                  <div className="mt-3 rounded-btn bg-sand/60 px-4 py-3 text-xs text-ink/60">
+                    API сам распределит сумму по исходным электронным платежам, подарочной карте и наличным и зафиксирует налоговые доли.
+                  </div>
+                )}
               </form>
               <div className="mb-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft">
                 <div className="flex flex-wrap items-center justify-between gap-3">

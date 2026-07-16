@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Headers,
@@ -9,6 +10,7 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  Optional,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -38,6 +40,7 @@ import { AuthPrincipal } from '../auth/jwt.strategy';
 import { requireGuestCapability } from '../auth/guest-capability';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
+import { RefundsService } from '../refunds/refunds.service';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -46,6 +49,7 @@ export class PaymentsController {
     private readonly payments: PaymentsService,
     private readonly intents: PaymentIntentsService,
     private readonly staffAuth: StaffAuthService,
+    @Optional() private readonly refunds?: RefundsService,
   ) {}
 
   @ApiOperation({ summary: 'List payments by order or cash shift' })
@@ -153,10 +157,30 @@ export class PaymentsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('payments', 'refund')
-  refund(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: RefundDto) {
-    return this.payments.refund(id, dto.amount, dto.reason, user.customerId, dto.returnId, {
-      shiftId: dto.shiftId,
-      externalReference: dto.externalReference,
-    });
+  async refund(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: RefundDto,
+  ) {
+    const actor = await requireActiveStaff(user, this.staffAuth);
+    if (!dto.returnId) {
+      const payment = await this.payments.get(id);
+      if (payment?.orderId) throw new BadRequestException('Товарный refund требует Return; используйте POST /returns/:returnId/refunds');
+      return this.payments.refund(id, dto.amount, dto.reason, actor, undefined, {
+        shiftId: dto.shiftId,
+        externalReference: dto.externalReference,
+        allocations: dto.allocations,
+      });
+    }
+    if (!this.refunds) throw new BadRequestException('Refund aggregate service unavailable');
+    return this.refunds.request(dto.returnId, { reason: dto.reason, shiftId: dto.shiftId }, actor, requireRefundIdempotencyKey(idempotencyKey));
   }
+}
+
+function requireRefundIdempotencyKey(value: string | undefined) {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

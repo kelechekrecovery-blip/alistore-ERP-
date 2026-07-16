@@ -114,4 +114,27 @@ describe('Approval decisions use staff JWT role, not body approverRole', () => {
     expect(res.body.status).toBe('approved');
     expect(res.body.approver).toBe(admin.staffId);
   });
+
+  it('rejects approve and reject decisions from stale or deactivated staff sessions', async () => {
+    const approveCandidate = await approval('refund');
+    const downgraded = await staffToken('admin');
+    await prisma.staffUser.update({ where: { id: downgraded.staffId }, data: { role: 'seller' } });
+    await request(app.getHttpServer())
+      .patch(`/approvals/${approveCandidate.id}/decide`)
+      .set('Authorization', `Bearer ${downgraded.accessToken}`)
+      .send({ status: 'approved', totpToken: downgraded.totpToken })
+      .expect(403);
+
+    const rejectCandidate = await approval('refund');
+    const deactivated = await staffToken('admin');
+    await prisma.staffUser.update({ where: { id: deactivated.staffId }, data: { active: false } });
+    await request(app.getHttpServer())
+      .patch(`/approvals/${rejectCandidate.id}/decide`)
+      .set('Authorization', `Bearer ${deactivated.accessToken}`)
+      .send({ status: 'rejected', reason: 'stale session must not decide' })
+      .expect(403);
+
+    expect((await prisma.approval.findUniqueOrThrow({ where: { id: approveCandidate.id } })).status).toBe('requested');
+    expect((await prisma.approval.findUniqueOrThrow({ where: { id: rejectCandidate.id } })).status).toBe('requested');
+  });
 });

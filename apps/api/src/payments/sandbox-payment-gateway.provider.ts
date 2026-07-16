@@ -2,6 +2,8 @@ import {
   GatewayCreateIntentInput,
   GatewayRefundInput,
   GatewayRefundResult,
+  GatewayRefundWebhookPayload,
+  GatewayRefundWebhookRequest,
   GatewayWebhookPayload,
   GatewayWebhookRequest,
   PaymentGatewayProvider,
@@ -52,6 +54,14 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
 
   async refund(input: GatewayRefundInput): Promise<GatewayRefundResult> {
     return { providerRefundId: `sandbox-refund-${input.idempotencyKey}`, status: 'succeeded' };
+  }
+
+  async verifyRefundWebhook(input: GatewayRefundWebhookRequest): Promise<GatewayRefundWebhookPayload> {
+    const payload = input.payload as Partial<GatewayRefundWebhookPayload>;
+    if (!payload.providerRefundId || !['succeeded', 'failed'].includes(payload.status ?? '')) {
+      throw new Error('invalid sandbox refund webhook');
+    }
+    return payload as GatewayRefundWebhookPayload;
   }
 
   private paymentUrl(provider: PaymentProviderName, intentId: string, returnUrl?: string): string {

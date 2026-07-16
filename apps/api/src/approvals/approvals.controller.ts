@@ -20,12 +20,14 @@ import {
 import { ApprovalsService } from './approvals.service';
 import { DecideApprovalDto } from './approvals.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { Role } from '../rbac/permissions';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 @ApiTags('approvals')
+@UseGuards(JwtAuthGuard, ActiveStaffGuard)
 @Controller('approvals')
 export class ApprovalsController {
   constructor(
@@ -37,7 +39,6 @@ export class ApprovalsController {
   @ApiBearerAuth()
   @ApiOkResponse({ description: 'Approvals, newest first.' })
   @Get()
-  @UseGuards(JwtAuthGuard)
   list(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
     this.assertStaff(user);
     return this.approvals.list(status ?? 'requested');
@@ -47,7 +48,6 @@ export class ApprovalsController {
   @ApiBearerAuth()
   @ApiNotFoundResponse({ description: 'Approval does not exist.' })
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
   async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     this.assertStaff(user);
     const approval = await this.approvals.get(id);
@@ -60,7 +60,6 @@ export class ApprovalsController {
   @ApiOkResponse({ description: 'Decision recorded; action executed on approve.' })
   @ApiConflictResponse({ description: 'Approval already decided.' })
   @Patch(':id/decide')
-  @UseGuards(JwtAuthGuard)
   async decide(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: DecideApprovalDto) {
     this.assertStaff(user);
     if (dto.status === 'approved') {

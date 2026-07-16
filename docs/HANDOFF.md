@@ -37,8 +37,8 @@ cd apps/web && npm run build && npx next start -p 3000
 
 ## Проверка
 ```bash
-npm run mvp:verify                     # schema + API/web build + Jest + Playwright + readiness
-npm run mvp:verify -- --skip-e2e       # быстрый gate без Playwright
+ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify                     # schema + API/web build + Jest + Playwright + readiness
+ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e       # быстрый gate без Playwright
 npm run launch:preflight               # core production env: DB/JWT/OTP/jobs
 npm run launch:readiness               # secret-safe отчёт по apps/api/.env.production
 npm run launch:check                   # strict preflight + strict external readiness

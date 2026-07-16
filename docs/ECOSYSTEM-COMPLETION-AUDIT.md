@@ -1,15 +1,15 @@
 # AliStore ecosystem completion audit
 
-Evidence snapshot: 2026-07-15, branch `codex/open-source-integrations`, including
-the verified first-store fulfillment, Finance settlement and net campaign-attribution iterations. This is a completion audit, not a marketing status page. `Implemented`
+Evidence snapshot: 2026-07-16, branch `codex/open-source-integrations`, including
+the verified first-store fulfillment, Finance settlement, authoritative refund aggregate and net campaign-attribution iterations. This is a completion audit, not a marketing status page. `Implemented`
 requires executable behavior and a relevant gate. `Partial` means a useful vertical
 exists but the handoff or role workflow is not complete. `External` requires owner
 credentials, legal approval or physical hardware.
 
 ## Verified baseline
 
-- 54 NestJS modules including the application root, 39 generated Next routes and 67 Prisma migrations.
-- API/Web production builds, 127/127 Jest suites with 499/499 tests and 43/43 Playwright flows.
+- 55 NestJS modules including the application root, 39 generated Next routes and 87 Prisma migrations.
+- API/Web production builds, 136/136 Jest suites with 582/582 tests and 46/46 Playwright flows.
 - Four SwiftUI app targets build; shared AliStoreCore XCTest has 31 contracts, including owned HR schedule/attendance and durable command retention.
 - Four Kotlin/Compose APKs build; JVM tests and Lint run through `android:test`.
 - `npm run android:ui` passed on 2026-07-14 with 25/25 connected Compose tests,
@@ -26,7 +26,7 @@ credentials, legal approval or physical hardware.
 | Order State Machine | Implemented for MVP | server transition table, invariant/concurrency suites | full provider/courier failure matrix and ecosystem-level replay scenario |
 | POS 2.0 | Partial | web POS plus native SwiftUI/Compose sale, shift, approval, receipt, return/exchange | XCUITest/Compose app-level E2E, physical scanner/printer/terminal certification |
 | Process Map 2.0 | Partial | domain services cover core purchase/operations spine | automated trace proving every documented cross-module process and compensation |
-| QA Test Scenarios | Partial | 499 committed API tests, 43 committed Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
+| QA Test Scenarios | Partial | 580 current API tests, 46 current Playwright flows, 31 XCTest contracts and 25 connected Compose tests | app-level native role E2E, accessibility/visual suite, outage/load/restore/security acceptance |
 | Analytics | Partial | reports, margin/KPI, revenue and AI insights | cohorts, retention, funnels, stock aging, delivery/supplier dashboards and exports |
 | Security | Partial | JWT ownership, staff RBAC, TOTP, capability scopes, rate limits, signed webhooks | external pentest, quarterly access workflow, PII encryption/retention certification |
 | Procurement | MVP implemented | PO create/send/cancel, partial receive, concurrency, ERP E2E | completeness, missort claim workflow, supplier calendar and quantity receiving |

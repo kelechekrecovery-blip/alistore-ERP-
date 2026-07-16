@@ -15,15 +15,17 @@ const testDatabaseEnv = testDatabaseOverride(env);
 const steps = [
   ['Prisma schema validate', 'npx', ['prisma', 'validate', '--schema', 'apps/api/prisma/schema.prisma']],
   ['Prisma client generate', 'npm', ['run', 'prisma:generate', '-w', '@alistore/api']],
+  ['Refund migration upgrade path', 'npm', ['run', 'test:refund-migration-upgrade', '-w', '@alistore/api'], testDatabaseEnv],
   ['API build', 'npm', ['run', 'api:build']],
   ['Web build', 'npm', ['run', 'build', '-w', '@alistore/web']],
   ['Mobile typecheck', 'npm', ['--prefix', 'apps/mobile', 'run', 'typecheck']],
   [
     'Test database reset',
     'npx',
-    ['prisma', 'db', 'push', '--schema', 'apps/api/prisma/schema.prisma', '--force-reset', '--accept-data-loss', '--skip-generate'],
+    ['prisma', 'migrate', 'reset', '--schema', 'apps/api/prisma/schema.prisma', '--force', '--skip-seed', '--skip-generate'],
     testDatabaseEnv,
   ],
+  ['Test database post-deploy indexes', 'node', ['apps/api/scripts/postdeploy-indexes.mjs'], testDatabaseEnv],
   // Integration suites share one test database and must not clean fixtures concurrently.
   ['API Jest', 'npm', ['run', 'test', '-w', '@alistore/api', '--', '--runInBand'], testDatabaseEnv],
 ];
@@ -100,13 +102,22 @@ function testDatabaseOverride(runtimeEnv) {
     throw new Error('TEST_DATABASE_URL is required for mvp:verify');
   }
   const parsed = new URL(testUrl);
-  if (!/test/i.test(parsed.pathname)) {
-    throw new Error('Refusing to reset a database whose name does not contain "test"');
+  const databaseName = parsed.pathname.replace(/^\/+/, '');
+  if (!/(^|[_-])test($|[_-])/i.test(databaseName)) {
+    throw new Error('Refusing to reset a database whose name does not contain a standalone "test" segment');
   }
   if (runtimeEnv.DATABASE_URL && normalizedDatabase(runtimeEnv.DATABASE_URL) === normalizedDatabase(testUrl)) {
     throw new Error('TEST_DATABASE_URL must differ from DATABASE_URL');
   }
-  return { DATABASE_URL: testUrl, TEST_DATABASE_URL: testUrl, E2E_DATABASE_URL: testUrl };
+  if (runtimeEnv.ALISTORE_TEST_DATABASE_CONFIRMED !== '1') {
+    throw new Error('Set ALISTORE_TEST_DATABASE_CONFIRMED=1 to confirm the destructive test database reset');
+  }
+  return {
+    DATABASE_URL: testUrl,
+    TEST_DATABASE_URL: testUrl,
+    E2E_DATABASE_URL: testUrl,
+    ALISTORE_TEST_DATABASE_CONFIRMED: runtimeEnv.ALISTORE_TEST_DATABASE_CONFIRMED,
+  };
 }
 
 function normalizedDatabase(value) {

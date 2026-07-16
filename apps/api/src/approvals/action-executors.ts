@@ -94,211 +94,297 @@ const reject_campaign_budget: ActionRejectionExecutor = async (
   });
 };
 
-/** refund — compensating negative Payment, order → refunded (invariant #1). */
-const refund: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+/** refund — one approved refund split back across its original tenders. */
+const legacy_refund: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const paymentId = String(payload['paymentId']);
   const amount = Number(payload['amount']);
   const returnId = payload['returnId'] ? String(payload['returnId']) : null;
-  const shiftId = payload['shiftId'] ? String(payload['shiftId']) : null;
-  const externalReference = payload['externalReference'] ? String(payload['externalReference']).trim() : null;
   const cashierStaffId = payload['cashierStaffId'] ? String(payload['cashierStaffId']) : null;
-  let refundTax = { taxCode: 'none', taxRateBps: 0, taxAmount: 0 };
-  const original = await tx.payment.findUnique({ where: { id: paymentId } });
-  if (!original) {
-    throw new ValidationError('payment_not_found', 'Платёж для возврата не найден');
+  const rawAllocations = Array.isArray(payload['allocations']) ? payload['allocations'] : null;
+  const allocations = rawAllocations?.map((value) => {
+    const allocation = value as Record<string, unknown>;
+    return {
+      paymentId: String(allocation['paymentId'] ?? ''),
+      amount: Number(allocation['amount']),
+      shiftId: allocation['shiftId'] ? String(allocation['shiftId']) : null,
+      externalReference: allocation['externalReference'] ? String(allocation['externalReference']).trim() : null,
+    };
+  }) ?? [{
+    paymentId,
+    amount,
+    shiftId: payload['shiftId'] ? String(payload['shiftId']) : null,
+    externalReference: payload['externalReference'] ? String(payload['externalReference']).trim() : null,
+  }];
+  if (
+    amount <= 0 || allocations.length === 0 ||
+    allocations.some((allocation) => !allocation.paymentId || !Number.isInteger(allocation.amount) || allocation.amount <= 0) ||
+    allocations.reduce((sum, allocation) => sum + allocation.amount, 0) !== amount ||
+    new Set(allocations.map((allocation) => allocation.paymentId)).size !== allocations.length ||
+    !allocations.some((allocation) => allocation.paymentId === paymentId)
+  ) {
+    throw new ValidationError('invalid_refund_allocation', 'Некорректные аллокации возврата');
   }
-  if (amount <= 0 || amount > original.amount) {
-    throw new ValidationError('invalid_refund_amount', 'Некорректная сумма возврата');
+
+  const paymentIds = allocations.map((allocation) => allocation.paymentId).sort();
+  await tx.$queryRaw`SELECT id FROM "Payment" WHERE id IN (${Prisma.join(paymentIds)}) ORDER BY id FOR UPDATE`;
+  const originals = await tx.payment.findMany({ where: { id: { in: paymentIds } } });
+  if (originals.length !== allocations.length || originals.some((original) => original.amount <= 0)) {
+    throw new ValidationError('payment_not_found', 'Один из исходных платежей возврата не найден');
   }
-  let payoutShiftId: string | null = null;
-  if (original.method === 'cash') {
-    if (!shiftId || !cashierStaffId) throw new ValidationError('cash_refund_shift_required', 'Для возврата наличными нужна смена инициатора');
-    await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
-    const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
-    if (!shift || shift.closedAt) throw new ConflictError('cash_refund_shift_closed', 'Смена возврата закрыта или не найдена');
-    if (shift.staffId !== cashierStaffId) throw new ConflictError('cash_refund_shift_foreign', 'Смена возврата принадлежит другому сотруднику');
-    if (original.point && shift.point !== original.point) throw new ConflictError('cash_refund_shift_wrong_point', 'Смена возврата открыта в другой точке');
-    payoutShiftId = shift.id;
-  } else if (original.method !== 'gift_card' && !externalReference) {
-    throw new ValidationError('refund_external_reference_required', 'Для безналичного возврата нужен референс провайдера или банка');
+  const originalById = new Map(originals.map((original) => [original.id, original]));
+  const anchor = originalById.get(paymentId)!;
+  const target = `${anchor.orderId ?? ''}:${anchor.serviceWorkOrderId ?? ''}`;
+  if (!anchor.orderId && !anchor.serviceWorkOrderId) {
+    throw new ConflictError('refund_target_missing', 'Исходный платёж не связан с заказом или ремонтом');
   }
-  await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${paymentId} FOR UPDATE`;
-  const tenderRefunds = await tx.payment.aggregate({
-    where: { originalPaymentId: paymentId },
-    _sum: { amount: true },
-  });
-  const tenderRemaining = original.amount + (tenderRefunds._sum.amount ?? 0);
-  if (amount > tenderRemaining) {
-    throw new ValidationError('refund_exceeds_tender', 'Сумма возвратов превышает остаток исходного платежа');
+  if (originals.some((original) => `${original.orderId ?? ''}:${original.serviceWorkOrderId ?? ''}` !== target)) {
+    throw new ConflictError('refund_allocation_target_mismatch', 'Все платежи возврата должны относиться к одному документу');
   }
+
+  const payoutShiftByPayment = new Map<string, string | null>();
+  for (const allocation of allocations) {
+    const original = originalById.get(allocation.paymentId)!;
+    const [tenderRefunds, reservedRefunds] = await Promise.all([
+      tx.payment.aggregate({
+        where: { originalPaymentId: original.id },
+        _sum: { amount: true },
+      }),
+      tx.refundAllocation.aggregate({
+        where: {
+          originalPaymentId: original.id,
+          status: { in: ['queued', 'processing', 'provider_pending', 'failed'] },
+          refund: { status: { in: ['requested', 'approved', 'processing', 'partially_succeeded', 'failed'] } },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+    const available = original.amount + (tenderRefunds._sum.amount ?? 0) - (reservedRefunds._sum.amount ?? 0);
+    if (allocation.amount > available) {
+      throw new ValidationError('refund_exceeds_tender', `Возврат превышает остаток платежа ${original.id}`);
+    }
+    if (original.method === 'gift_card' && !original.giftCardId) {
+      throw new ConflictError('giftcard_payment_unlinked', 'Исходный gift-card платёж не связан с картой');
+    }
+    if (original.method === 'cash') {
+      if (!allocation.shiftId || !cashierStaffId) {
+        throw new ValidationError('cash_refund_shift_required', 'Для каждой наличной аллокации нужна смена инициатора');
+      }
+      await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${allocation.shiftId} FOR UPDATE`;
+      const shift = await tx.cashShift.findUnique({ where: { id: allocation.shiftId } });
+      if (!shift || shift.closedAt) throw new ConflictError('cash_refund_shift_closed', 'Смена возврата закрыта или не найдена');
+      if (shift.staffId !== cashierStaffId) throw new ConflictError('cash_refund_shift_foreign', 'Смена возврата принадлежит другому сотруднику');
+      if (original.point && shift.point !== original.point) throw new ConflictError('cash_refund_shift_wrong_point', 'Смена возврата открыта в другой точке');
+      payoutShiftByPayment.set(original.id, shift.id);
+    } else {
+      payoutShiftByPayment.set(original.id, null);
+      if (original.method !== 'gift_card' && !allocation.externalReference) {
+        throw new ValidationError('refund_external_reference_required', `Для платежа ${original.id} нужен референс провайдера или банка`);
+      }
+    }
+  }
+  const references = allocations.map((allocation) => allocation.externalReference).filter((value): value is string => Boolean(value));
+  if (new Set(references).size !== references.length) {
+    throw new ValidationError('duplicate_refund_reference', 'Референсы аллокаций возврата должны быть уникальными');
+  }
+
   if (returnId) {
     await tx.$queryRaw`SELECT id FROM "Return" WHERE id = ${returnId} FOR UPDATE`;
     const ret = await tx.return.findUnique({ where: { id: returnId } });
     if (!ret) throw new ValidationError('return_not_found', 'Связанный возврат не найден');
-    if (!original.orderId || ret.orderId !== original.orderId) {
-      throw new ConflictError('refund_return_order_mismatch', 'Возврат и платёж относятся к разным заказам');
+    if (!anchor.orderId || ret.orderId !== anchor.orderId) {
+      throw new ConflictError('refund_return_order_mismatch', 'Возврат и платежи относятся к разным заказам');
     }
-    if (ret.status !== 'processing') {
-      throw new ConflictError('return_not_processing', `Возврат уже ${ret.status}`);
-    }
+    if (ret.status !== 'processing') throw new ConflictError('return_not_processing', `Возврат уже ${ret.status}`);
     if (amount !== ret.refundAmount) {
       throw new ValidationError('refund_return_amount_mismatch', `Сумма refund должна быть ${ret.refundAmount}`);
     }
   }
-  if (original.orderId) {
-    // Serialize concurrent refunds on this order (row lock), then cap total
-    // refunds at net paid (invariant #1: сумма возвратов ≤ оплаченной) — two
-    // 100k refunds against a 100k order can't both land.
-    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${original.orderId} FOR UPDATE`;
-    const agg = await tx.payment.aggregate({
-      where: { orderId: original.orderId },
-      _sum: { amount: true },
-    });
-    const netPaid = agg._sum.amount ?? 0;
-    if (amount > netPaid) {
-      throw new ValidationError(
-        'refund_exceeds_paid',
-        'Сумма возвратов превышает оплаченную по заказу',
-      );
-    }
-    const [taxDocument, priorRefunds] = await Promise.all([
-      tx.order.findUnique({ where: { id: original.orderId }, include: { items: true } }),
-      tx.payment.aggregate({
-        where: { orderId: original.orderId, amount: { lt: 0 } },
-        _sum: { amount: true },
-      }),
+
+  let taxCode = 'none';
+  let taxRateBps = 0;
+  let documentTax = 0;
+  let documentTotal = amount;
+  let refundedBefore = 0;
+  if (anchor.orderId) {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${anchor.orderId} FOR UPDATE`;
+    const [net, order, priorRefunds] = await Promise.all([
+      tx.payment.aggregate({ where: { orderId: anchor.orderId }, _sum: { amount: true } }),
+      tx.order.findUnique({ where: { id: anchor.orderId }, include: { items: true } }),
+      tx.payment.aggregate({ where: { orderId: anchor.orderId, amount: { lt: 0 } }, _sum: { amount: true } }),
     ]);
-    if (!taxDocument) throw new ValidationError('order_not_found', 'Заказ возврата не найден');
-    refundTax = {
-      ...outputTaxMetadata(taxDocument.items),
-      taxAmount: cumulativeTaxDelta(
-        taxDocument.taxAmount,
-        taxDocument.total,
-        Math.abs(priorRefunds._sum.amount ?? 0),
-        amount,
-      ),
-    };
-  } else if (original.serviceWorkOrderId) {
-    await tx.$queryRaw`SELECT id FROM "ServiceWorkOrder" WHERE id = ${original.serviceWorkOrderId} FOR UPDATE`;
-    const workOrder = await tx.serviceWorkOrder.findUnique({
-      where: { id: original.serviceWorkOrderId },
-      select: {
-        repairStartedAt: true,
-        estimateAmount: true,
-        taxCode: true,
-        taxRateBps: true,
-        taxAmount: true,
+    if (amount > (net._sum.amount ?? 0)) throw new ValidationError('refund_exceeds_paid', 'Сумма возвратов превышает оплату заказа');
+    if (!order) throw new ValidationError('order_not_found', 'Заказ возврата не найден');
+    const metadata = outputTaxMetadata(order.items);
+    taxCode = metadata.taxCode;
+    taxRateBps = metadata.taxRateBps;
+    documentTax = order.taxAmount;
+    documentTotal = order.total;
+    refundedBefore = Math.abs(priorRefunds._sum.amount ?? 0);
+  } else if (anchor.serviceWorkOrderId) {
+    await tx.$queryRaw`SELECT id FROM "ServiceWorkOrder" WHERE id = ${anchor.serviceWorkOrderId} FOR UPDATE`;
+    const [net, workOrder, priorRefunds] = await Promise.all([
+      tx.payment.aggregate({ where: { serviceWorkOrderId: anchor.serviceWorkOrderId }, _sum: { amount: true } }),
+      tx.serviceWorkOrder.findUnique({
+        where: { id: anchor.serviceWorkOrderId },
+        select: { repairStartedAt: true, estimateAmount: true, taxCode: true, taxRateBps: true, taxAmount: true },
+      }),
+      tx.payment.aggregate({ where: { serviceWorkOrderId: anchor.serviceWorkOrderId, amount: { lt: 0 } }, _sum: { amount: true } }),
+    ]);
+    if (workOrder?.repairStartedAt) {
+      throw new ConflictError('service_refund_after_start_forbidden', 'После начала ремонта возврат проводится только отдельной компенсацией с актом');
+    }
+    if (amount > (net._sum.amount ?? 0)) throw new ValidationError('refund_exceeds_paid', 'Сумма возвратов превышает оплату ремонта');
+    if (!workOrder?.estimateAmount) throw new ConflictError('service_estimate_missing', 'У ремонта отсутствует налоговый первичный документ');
+    const metadata = outputTaxMetadata([workOrder]);
+    taxCode = metadata.taxCode;
+    taxRateBps = metadata.taxRateBps;
+    documentTax = workOrder.taxAmount;
+    documentTotal = workOrder.estimateAmount;
+    refundedBefore = Math.abs(priorRefunds._sum.amount ?? 0);
+  }
+
+  const refunds = [];
+  let allocatedBefore = 0;
+  for (const [index, allocation] of allocations.entries()) {
+    const original = originalById.get(allocation.paymentId)!;
+    const key = allocations.length === 1 ? `refund:${approvalId}` : `refund:${approvalId}:${index + 1}`;
+    const compensating = await tx.payment.create({
+      data: {
+        orderId: original.orderId,
+        serviceWorkOrderId: original.serviceWorkOrderId,
+        originalPaymentId: original.id,
+        amount: -allocation.amount,
+        method: original.method,
+        status: 'refunded',
+        shiftId: payoutShiftByPayment.get(original.id) ?? null,
+        giftCardId: original.giftCardId,
+        accountCode: original.accountCode ?? paymentAccountCode(original.method),
+        idempotencyKey: key,
+        txnId: allocation.externalReference ? `refund:${original.method}:${allocation.externalReference}` : key,
+        receivedBy: cashierStaffId ?? approver,
+        point: original.point,
       },
     });
-    if (workOrder?.repairStartedAt) {
-      throw new ConflictError(
-        'service_refund_after_start_forbidden',
-        'После начала ремонта возврат проводится только отдельной компенсацией с актом',
-      );
-    }
-    const agg = await tx.payment.aggregate({
-      where: { serviceWorkOrderId: original.serviceWorkOrderId },
-      _sum: { amount: true },
-    });
-    if (amount > (agg._sum.amount ?? 0)) {
-      throw new ValidationError('refund_exceeds_paid', 'Сумма возвратов превышает оплату ремонта');
-    }
-    if (!workOrder?.estimateAmount) {
-      throw new ConflictError('service_estimate_missing', 'У ремонта отсутствует налоговый первичный документ');
-    }
-    const priorRefunds = await tx.payment.aggregate({
-      where: { serviceWorkOrderId: original.serviceWorkOrderId, amount: { lt: 0 } },
-      _sum: { amount: true },
-    });
-    refundTax = {
-      ...outputTaxMetadata([workOrder]),
-      taxAmount: cumulativeTaxDelta(
-        workOrder.taxAmount,
-        workOrder.estimateAmount,
-        Math.abs(priorRefunds._sum.amount ?? 0),
-        amount,
-      ),
-    };
-  }
-  const compensating = await tx.payment.create({
-    data: {
-      orderId: original.orderId,
-      serviceWorkOrderId: original.serviceWorkOrderId,
-      originalPaymentId: original.id,
-      amount: -Math.abs(amount),
-      method: original.method,
-      status: 'refunded',
-      shiftId: payoutShiftId,
-      accountCode: original.accountCode ?? paymentAccountCode(original.method),
-      idempotencyKey: `refund:${approvalId}`,
-      txnId: externalReference ? `refund:${original.method}:${externalReference}` : `refund:${approvalId}`,
-      receivedBy: cashierStaffId ?? approver,
+    const taxAmount = cumulativeTaxDelta(documentTax, documentTotal, refundedBefore + allocatedBefore, allocation.amount);
+    const accountingEntry = await postPaymentEntryOnTx(tx, {
+      payment: compensating,
+      idempotencyKey: key,
       point: original.point,
-    },
-  });
-  const accountingEntry = await postPaymentEntryOnTx(tx, {
-    payment: compensating,
-    idempotencyKey: `refund:${approvalId}`,
-    point: original.point,
-    actor: approver,
-    receivedBy: cashierStaffId,
-    tax: refundTax,
-  });
-  events.push({
-    type: EventType.PaymentRefunded,
-    actor: approver,
-    payload: { approvalId, originalPaymentId: paymentId, refundId: compensating.id, returnId, amount, taxAmount: accountingEntry.taxAmount },
-    refs: [original.orderId, original.serviceWorkOrderId, paymentId, compensating.id, returnId].filter((r): r is string => Boolean(r)),
-  });
-  events.push({
-    type: EventType.AccountingEntryPosted,
-    actor: approver,
-    payload: { accountingEntryId: accountingEntry.id, sourceType: 'payment.refund', sourceRef: compensating.id },
-    refs: [accountingEntry.id, compensating.id, paymentId],
-  });
-  if (original.orderId) {
+      actor: approver,
+      receivedBy: cashierStaffId,
+      tax: { taxCode, taxRateBps, taxAmount },
+    });
+    if (original.method === 'gift_card') {
+      const giftCardId = original.giftCardId!;
+      await tx.$queryRaw`SELECT id FROM "GiftCard" WHERE id = ${giftCardId} FOR UPDATE`;
+      const currentCard = await tx.giftCard.findUniqueOrThrow({ where: { id: giftCardId } });
+      const card = await tx.giftCard.update({
+        where: { id: giftCardId },
+        data: {
+          balance: { increment: allocation.amount },
+          status: currentCard.status === 'redeemed' ? 'active' : currentCard.status,
+        },
+      });
+      await tx.giftCardTransaction.create({
+        data: {
+          giftCardId,
+          paymentId: compensating.id,
+          type: 'refund',
+          amount: allocation.amount,
+          balanceAfter: card.balance,
+          sourceRef: key,
+          actor: approver,
+        },
+      });
+    }
+    allocatedBefore += allocation.amount;
+    refunds.push(compensating);
+    events.push({
+      type: EventType.PaymentRefunded,
+      actor: approver,
+      payload: { approvalId, originalPaymentId: original.id, refundId: compensating.id, returnId, amount: allocation.amount, taxAmount },
+      refs: [original.orderId, original.serviceWorkOrderId, original.id, compensating.id, returnId].filter((ref): ref is string => Boolean(ref)),
+    });
+    events.push({
+      type: EventType.AccountingEntryPosted,
+      actor: approver,
+      payload: { accountingEntryId: accountingEntry.id, sourceType: 'payment.refund', sourceRef: compensating.id },
+      refs: [accountingEntry.id, compensating.id, original.id],
+    });
+  }
+
+  const refundIds = refunds.map((payment) => payment.id);
+  const primaryRefundId = refundIds[0];
+  if (anchor.orderId) {
     await applyCampaignRefundOnTx(tx, {
-      orderId: original.orderId,
-      refundPaymentId: compensating.id,
+      orderId: anchor.orderId,
+      refundPaymentId: primaryRefundId,
       returnId,
       amount,
       actor: approver,
     }, events);
-    const order = await tx.order.findUnique({ where: { id: original.orderId } });
+    const order = await tx.order.findUnique({ where: { id: anchor.orderId } });
     if (order) {
-      await reconcileRefundLoyaltyOnTx(tx, {
-        order,
-        refundPaymentId: compensating.id,
-        actor: approver,
-      }, events);
+      await reconcileRefundLoyaltyOnTx(tx, { order, refundPaymentId: primaryRefundId, actor: approver }, events);
     }
-    const aggregate = await tx.payment.aggregate({
-      where: { orderId: original.orderId },
-      _sum: { amount: true },
-    });
-    const fullyRefunded = (aggregate._sum.amount ?? 0) <= 0;
-    if (order && fullyRefunded && canTransition(order.status, 'refunded')) {
+    const aggregate = await tx.payment.aggregate({ where: { orderId: anchor.orderId }, _sum: { amount: true } });
+    if (order && (aggregate._sum.amount ?? 0) <= 0 && canTransition(order.status, 'refunded')) {
       await tx.order.update({ where: { id: order.id }, data: { status: 'refunded' } });
-      events.push({
-        type: 'order.refunded',
-        actor: approver,
-        payload: { orderId: order.id, from: order.status },
-        refs: [order.id],
-      });
+      events.push({ type: 'order.refunded', actor: approver, payload: { orderId: order.id, from: order.status }, refs: [order.id] });
     }
     if (returnId) {
-      await tx.return.update({
-        where: { id: returnId },
-        data: { refundId: compensating.id, status: 'paid' },
-      });
+      await tx.return.update({ where: { id: returnId }, data: { refundId: primaryRefundId, status: 'paid' } });
       events.push({
         type: 'return.paid',
         actor: approver,
-        payload: { returnId, orderId: original.orderId, refundId: compensating.id, amount },
-        refs: [returnId, original.orderId, compensating.id],
+        payload: { returnId, orderId: anchor.orderId, refundId: primaryRefundId, refundIds, amount },
+        refs: [returnId, anchor.orderId, ...refundIds],
       });
     }
   }
+};
+
+/** FIN-003E refund aggregate: approval freezes the request; execution is a retryable saga. */
+const refund: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const refundId = String(payload['refundId'] ?? '');
+  if (!refundId) {
+    // Compatibility for approvals created before FIN-003E. New requests always
+    // create a Refund aggregate and never enter this path.
+    return legacy_refund(tx, payload, approver, approvalId, events);
+  }
+  await tx.$queryRaw`SELECT id FROM "Refund" WHERE id = ${refundId} FOR UPDATE`;
+  const aggregate = await tx.refund.findUnique({ where: { id: refundId } });
+  if (!aggregate) throw new ValidationError('refund_not_found', 'Refund не найден');
+  if (aggregate.approvalId !== approvalId || aggregate.status !== 'requested') {
+    throw new ConflictError('refund_approval_snapshot_changed', 'Refund больше не ожидает это согласование');
+  }
+  await tx.refund.update({
+    where: { id: refundId },
+    data: { status: 'approved', approver, approvedAt: new Date() },
+  });
+  events.push({
+    type: 'refund.approved',
+    actor: approver,
+    payload: { refundId, approvalId, amount: aggregate.amount, returnId: aggregate.returnId },
+    refs: [refundId, approvalId, aggregate.returnId, aggregate.orderId],
+  });
+};
+
+const reject_refund: ActionRejectionExecutor = async (tx, payload, approver, approvalId, reason, events) => {
+  const refundId = String(payload['refundId'] ?? '');
+  if (!refundId) return;
+  const aggregate = await tx.refund.findUnique({ where: { id: refundId } });
+  if (!aggregate || aggregate.approvalId !== approvalId || aggregate.status !== 'requested') {
+    throw new ConflictError('refund_approval_snapshot_changed', 'Refund больше не ожидает это согласование');
+  }
+  await tx.refund.update({ where: { id: refundId }, data: { status: 'rejected', approver } });
+  await tx.return.update({ where: { id: aggregate.returnId }, data: { status: 'rejected' } });
+  events.push({
+    type: 'refund.rejected',
+    actor: approver,
+    payload: { refundId, approvalId, reason },
+    refs: [refundId, approvalId, aggregate.returnId],
+  });
 };
 
 /** price — apply a price change beyond the ±15% threshold. */
@@ -446,4 +532,5 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
 
 export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {
   campaign_budget: reject_campaign_budget,
+  refund: reject_refund,
 };

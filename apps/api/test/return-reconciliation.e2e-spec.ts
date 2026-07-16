@@ -1,4 +1,5 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { clearGiftCardTransactions } from './db-test-cleanup';
 import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
@@ -6,12 +7,17 @@ import { PaymentsService } from '../src/payments/payments.service';
 import { ReturnsService } from '../src/returns/returns.service';
 import { postCogsOnTx } from '../src/inventory/inventory-valuation';
 import { EventType } from '../src/audit/event-types';
+import { RefundsService } from '../src/refunds/refunds.service';
+import { RefundProcessor } from '../src/refunds/refunds.processor';
+import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 
 describe('Refund-bound return reconciliation (integration)', () => {
   let prisma: PrismaService;
   let approvals: ApprovalsService;
   let payments: PaymentsService;
   let returns: ReturnsService;
+  let refunds: RefundsService;
+  let refundProcessor: RefundProcessor;
   let seq = 0;
 
   beforeAll(async () => {
@@ -21,6 +27,8 @@ describe('Refund-bound return reconciliation (integration)', () => {
     approvals = new ApprovalsService(prisma, audit);
     payments = new PaymentsService(prisma, audit, new UnitsService(prisma), approvals);
     returns = new ReturnsService(prisma, audit);
+    refunds = new RefundsService(prisma, audit);
+    refundProcessor = new RefundProcessor(prisma, audit, new SandboxPaymentGatewayProvider());
   });
 
   beforeEach(() => clean());
@@ -30,6 +38,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
   });
 
   async function clean() {
+    await clearGiftCardTransactions(prisma);
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.consignmentAdjustment.deleteMany();
@@ -211,13 +220,14 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await returns.transition(returnId, 'processing', 'staff:returns');
   }
 
-  async function refundReturn(returnId: string, paymentId: string, amount: number) {
-    const request = await payments.refund(paymentId, amount, 'accepted return', 'staff:returns', returnId, { externalReference: `return-provider-${returnId}` });
-    await approvals.decide(request.approvalId, {
+  async function refundReturn(returnId: string, _paymentId: string, _amount: number) {
+    const request = await refunds.request(returnId, { reason: 'accepted return' }, 'staff:returns', `return-refund-${returnId}`);
+    await approvals.decide(request!.approvalId!, {
       status: 'approved',
       approver: 'owner:refunds',
       approverRole: 'owner',
     });
+    await refundProcessor.processRefund(request!.id, 'system:test');
   }
 
   it('quotes and reconciles partial line returns without refunding delivery twice', async () => {
@@ -252,7 +262,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
         consumedAt: new Date(),
       },
     });
-    const payment = await prisma.payment.create({ data: { orderId: order.id, amount: 2900, method: 'card', status: 'received' } });
+    const payment = await prisma.payment.create({ data: { orderId: order.id, amount: 2900, method: 'card', status: 'received', txnId: `return-card-${suffix}` } });
 
     const first = await returns.request(
       order.id,
@@ -409,7 +419,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       },
     });
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: order.total, method: 'card', status: 'received' },
+      data: { orderId: order.id, amount: order.total, method: 'card', status: 'received', txnId: `return-card-${suffix}` },
     });
     const ret = await returns.request(order.id, 'full return', customer.id, customer.id, `return-${suffix}`);
     await moveToProcessing(ret.id);
@@ -483,7 +493,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       },
     });
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: 50000, method: 'card', status: 'received' },
+      data: { orderId: order.id, amount: 50000, method: 'card', status: 'received', txnId: `return-card-${suffix}` },
     });
     const ret = await returns.request(order.id, 'consignment return', customer.id, customer.id, `return-${suffix}`);
     await moveToProcessing(ret.id);
@@ -555,7 +565,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
       },
     })));
     const payment = await prisma.payment.create({
-      data: { orderId: order.id, amount: 100000, method: 'card', status: 'received' },
+      data: { orderId: order.id, amount: 100000, method: 'card', status: 'received', txnId: `return-card-${suffix}` },
     });
     const ret = await returns.request(order.id, 'two consignment items', customer.id, customer.id, `return-${suffix}`);
     await moveToProcessing(ret.id);

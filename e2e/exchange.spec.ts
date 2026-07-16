@@ -4,6 +4,10 @@ import { bootstrapStaff, postJson, prisma, resetDb } from './helpers';
 test('staff exchanges a sold IMEI into a higher-priced replacement', async ({ request }) => {
   await resetDb();
   const staffToken = await bootstrapStaff(request);
+  const staff = await prisma.staffUser.findFirstOrThrow({ where: { username: { startsWith: 'e2e-owner-' } } });
+  const shift = await prisma.cashShift.create({
+    data: { staffId: staff.id, point: 'BISHKEK-1', openCash: 50_000 },
+  });
   const customer = await prisma.customer.create({ data: { phone: '+996700900003', name: 'Exchange' } });
   const oldProduct = await prisma.product.create({
     data: { sku: 'E2E-OLD', name: 'Old Phone', price: 100000, cost: 80000, category: 'phones', attrs: {} },
@@ -30,7 +34,7 @@ test('staff exchanges a sold IMEI into a higher-priced replacement', async ({ re
   const result = await postJson<{ surcharge: number; exchangeOrderId: string }>(
     request,
     '/exchanges',
-    { originalOrderId: original.id, oldImei: 'E2E-OLD-IMEI', newProductId: newProduct.id, method: 'cash' },
+    { originalOrderId: original.id, oldImei: 'E2E-OLD-IMEI', newProductId: newProduct.id, method: 'cash', shiftId: shift.id },
     staffToken,
     { 'idempotency-key': 'e2e-exchange-1' },
   );

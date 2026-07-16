@@ -67,6 +67,13 @@ export const EventType = {
   ReturnRequested: 'return.requested',
   ReturnCompleted: 'return.completed',
   RefundRequested: 'refund.requested',
+  RefundApproved: 'refund.approved',
+  RefundProviderPending: 'refund.provider_pending',
+  RefundProviderSucceeded: 'refund.provider_succeeded',
+  RefundProviderFailed: 'refund.provider_failed',
+  RefundSucceeded: 'refund.succeeded',
+  RefundFailed: 'refund.failed',
+  RefundCancelled: 'refund.cancelled',
   // warranty
   WarrantyCreated: 'warranty.created',
   WarrantyClosed: 'warranty.closed',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createCourierRun, createDeliverySlot, createDeliveryZone, createStorePoint, fetchLogisticsOverview, updateStorePoint, type LogisticsOverview } from '@/lib/api';
 import { som } from '@/lib/format';
 
@@ -21,16 +21,31 @@ export function LogisticsView({ accessToken }: { accessToken: string }) {
   const [courierId, setCourierId] = useState(''); const [selected, setSelected] = useState<string[]>([]);
   const [pointCode, setPointCode] = useState(''); const [pointName, setPointName] = useState(''); const [pointAddress, setPointAddress] = useState('');
   const [pointLocation, setPointLocation] = useState(''); const [pointHours, setPointHours] = useState('Ежедневно 10:00–21:00');
-  const reload = useCallback(() => { setMessage(''); fetchLogisticsOverview(date, accessToken).then((result) => { setData(result); setZoneId((value) => value || result.zones[0]?.id || ''); setCourierId((value) => value || result.couriers[0]?.id || ''); }).catch((error) => { setData(null); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить логистику'); }); }, [accessToken, date]);
-  useEffect(() => reload(), [reload]);
+  const reloadSequence = useRef(0);
+  const reload = useCallback(async () => {
+    const sequence = ++reloadSequence.current;
+    setMessage('');
+    try {
+      const result = await fetchLogisticsOverview(date, accessToken);
+      if (sequence !== reloadSequence.current) return;
+      setData(result);
+      setZoneId((value) => value || result.zones[0]?.id || '');
+      setCourierId((value) => value || result.couriers[0]?.id || '');
+    } catch (error) {
+      if (sequence !== reloadSequence.current) return;
+      setData(null);
+      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить логистику');
+    }
+  }, [accessToken, date]);
+  useEffect(() => { void reload(); }, [reload]);
   const selectedOrders = useMemo(() => data?.pendingOrders.filter((order) => selected.includes(order.id)) ?? [], [data, selected]);
   const codTotal = selectedOrders.reduce((sum, order) => sum + Math.max(0, order.total - order.payments.filter((payment) => payment.amount > 0 && ['received', 'reconciled'].includes(payment.status)).reduce((paid, payment) => paid + payment.amount, 0)), 0);
 
-  async function addZone(event: FormEvent) { event.preventDefault(); setBusy('zone'); setMessage(''); try { await createDeliveryZone({ code: zoneCode.trim(), name: zoneName.trim(), fee: Math.round(Number(fee)), etaMinMinutes: 60, etaMaxMinutes: 180 }, accessToken); setZoneName(''); setZoneCode(''); reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Зона не создана'); } finally { setBusy(''); } }
-  async function addSlot(event: FormEvent) { event.preventDefault(); setBusy('slot'); setMessage(''); try { await createDeliverySlot({ zoneId, startsAt: localIso(date, start), endsAt: localIso(date, end), capacity: Math.round(Number(capacity)) }, accessToken); reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Слот не создан'); } finally { setBusy(''); } }
-  async function dispatch() { if (!courierId || !selected.length) return; setBusy('dispatch'); setMessage(''); try { await createCourierRun({ courierId, orderIds: selected, codTotal }, accessToken); setSelected([]); reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Рейс не создан'); } finally { setBusy(''); } }
-  async function addPoint(event: FormEvent) { event.preventDefault(); setBusy('point'); setMessage(''); try { await createStorePoint({ code: pointCode.trim(), name: pointName.trim(), address: pointAddress.trim(), inventoryLocation: pointLocation.trim(), hours: pointHours.trim() }, accessToken); setPointCode(''); setPointName(''); setPointAddress(''); setPointLocation(''); reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Точка не создана'); } finally { setBusy(''); } }
-  async function togglePoint(id: string, active: boolean) { setBusy(`point-${id}`); setMessage(''); try { await updateStorePoint(id, { active: !active }, accessToken); reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Статус точки не изменён'); } finally { setBusy(''); } }
+  async function addZone(event: FormEvent) { event.preventDefault(); setBusy('zone'); setMessage(''); try { await createDeliveryZone({ code: zoneCode.trim(), name: zoneName.trim(), fee: Math.round(Number(fee)), etaMinMinutes: 60, etaMaxMinutes: 180 }, accessToken); setZoneName(''); setZoneCode(''); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Зона не создана'); } finally { setBusy(''); } }
+  async function addSlot(event: FormEvent) { event.preventDefault(); setBusy('slot'); setMessage(''); try { await createDeliverySlot({ zoneId, startsAt: localIso(date, start), endsAt: localIso(date, end), capacity: Math.round(Number(capacity)) }, accessToken); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Слот не создан'); } finally { setBusy(''); } }
+  async function dispatch() { if (!courierId || !selected.length) return; setBusy('dispatch'); setMessage(''); try { await createCourierRun({ courierId, orderIds: selected, codTotal }, accessToken); setSelected([]); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Рейс не создан'); } finally { setBusy(''); } }
+  async function addPoint(event: FormEvent) { event.preventDefault(); setBusy('point'); setMessage(''); try { await createStorePoint({ code: pointCode.trim(), name: pointName.trim(), address: pointAddress.trim(), inventoryLocation: pointLocation.trim(), hours: pointHours.trim() }, accessToken); setPointCode(''); setPointName(''); setPointAddress(''); setPointLocation(''); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Точка не создана'); } finally { setBusy(''); } }
+  async function togglePoint(id: string, active: boolean) { setBusy(`point-${id}`); setMessage(''); try { await updateStorePoint(id, { active: !active }, accessToken); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Статус точки не изменён'); } finally { setBusy(''); } }
 
   return <div data-testid="logistics-view" className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2E2822] pb-4"><div className="flex gap-2" role="tablist">{TABS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`rounded-full border px-4 py-2 text-xs font-semibold ${tab === item.id ? 'border-[#FF5B2E] bg-[#FF5B2E] text-white' : 'border-[#2E2822] bg-[#16130F] text-[#A79C92]'}`}>{item.label}</button>)}</div><label className="text-[10px] text-[#8A7F76]">Дата<input aria-label="Дата логистики" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="ml-2 h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs text-white" /></label></div>

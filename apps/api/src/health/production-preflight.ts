@@ -137,6 +137,25 @@ const CHECKS: CheckDefinition[] = [
     evaluate: (env) => boolReady(env, 'OUTBOX_RELAY_ENABLED'),
   },
   {
+    id: 'refund_relay',
+    area: 'jobs',
+    title: 'Refund execution relay matches payment mode',
+    requiredEnv: ['PROCESS_ROLE', 'REFUND_RELAY_ENABLED', 'PUBLIC_DEMO_MODE', 'PAYMENT_PROVIDER', 'PAYMENT_PROVIDER_CERTIFIED'],
+    note: 'The API must keep the refund relay disabled; the worker runs it for sandbox/demo. Live execution stays blocked until the production refund adapter is implemented and certified.',
+    evaluate: (env) => {
+      const role = env('PROCESS_ROLE')?.trim().toLowerCase();
+      const relay = env('REFUND_RELAY_ENABLED')?.trim().toLowerCase();
+      const demo = env('PUBLIC_DEMO_MODE')?.trim().toLowerCase();
+      const provider = env('PAYMENT_PROVIDER')?.trim().toLowerCase();
+      const certified = env('PAYMENT_PROVIDER_CERTIFIED')?.trim().toLowerCase();
+      if (demo === 'true' && provider === 'sandbox' && certified === 'false') {
+        if (role === 'api') return relay === 'false' ? 'ready' : 'unsafe';
+        if (role === 'worker') return relay === 'true' ? 'ready' : 'unsafe';
+      }
+      return 'unsafe';
+    },
+  },
+  {
     id: 'bullmq_runtime',
     area: 'jobs',
     title: 'BullMQ Redis runtime configured',
