@@ -2141,3 +2141,10 @@
 - Checks run: matrix `4/4`; API `4/4` suites and `15/15` tests; Playwright `6/6`; result artifact SHA-256 `808aa4315d8a8cc85bb4bdcf5b94e007c981271d812c2468c7029a25f6a63076`.
 - Outcome: broad reconciliation evidence is current; bounded rows and native package evidence still need refresh on the same hash.
 - Next step: commit this result, then refresh the four bounded reconciliation rows.
+
+## 2026-07-16
+
+- Task: refresh `pos-refund-reconciliation` on the visual-contract source hash.
+- Checks run: Playwright `1/1`; artifact SHA-256 `03b6a426789ba979ba4e389cfe2baea8763cf72155c8ec2c3271a8a1933c03d6`; trusted recorder exited zero.
+- Outcome: POS/refund/quarantine evidence is current again.
+- Next step: commit and refresh courier/COD.
