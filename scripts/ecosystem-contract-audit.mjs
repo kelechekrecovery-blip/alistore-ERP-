@@ -103,6 +103,7 @@ const masterPrompt = fs.existsSync(path.join(root, 'CODEX_PROMPT.md'))
 
 const isNoop = (command = '') => /^(?:true|:|echo(?:\s+.+)?|printf(?:\s+.+)?)$/u.test(command.trim());
 const serviceLoanerCommand = 'npm --prefix apps/api test -- --runInBand test/service-center.e2e-spec.ts test/service-loaner.e2e-spec.ts test/warranty-rbac.e2e-spec.ts && playwright test e2e/service-center-ui.spec.ts';
+const procurementSaleCommand = 'npm --prefix apps/api test -- --runInBand test/procurement.e2e-spec.ts && playwright test e2e/ecosystem-procurement-sale.spec.ts';
 const acceptedGateScripts = new Map([
   ['visual', 'e2e'],
   ['ios-app-ui', 'ios:ui'],
@@ -110,6 +111,7 @@ const acceptedGateScripts = new Map([
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
   ['courier-cod-reconciliation', 'ecosystem:courier-cod:e2e'],
   ['service-loaner-reconciliation', 'ecosystem:service-loaner:e2e'],
+  ['procurement-sale-reconciliation', 'ecosystem:procurement-sale:e2e'],
   ['reconciled-e2e', 'ecosystem:e2e'],
 ]);
 const acceptedGate = (id, commandPattern) => {
@@ -313,6 +315,13 @@ const checks = [
       scripts['ecosystem:service-loaner:e2e'] === serviceLoanerCommand &&
       acceptedGate('service-loaner-reconciliation', /^npm --prefix apps\/api test -- --runInBand test\/service-center\.e2e-spec\.ts test\/service-loaner\.e2e-spec\.ts test\/warranty-rbac\.e2e-spec\.ts && playwright test e2e\/service-center-ui\.spec\.ts$/u),
     detail: 'Warranty repair, paid service collection and loaner custody have hash-verified money, inventory and Event Ledger evidence.',
+  },
+  {
+    id: 'procurement-sale-reconciliation-gate',
+    pass:
+      scripts['ecosystem:procurement-sale:e2e'] === procurementSaleCommand &&
+      acceptedGate('procurement-sale-reconciliation', /^npm --prefix apps\/api test -- --runInBand test\/procurement\.e2e-spec\.ts && playwright test e2e\/ecosystem-procurement-sale\.spec\.ts$/u),
+    detail: 'Partial procurement receiving, supplier liability, serialized stock and a subsequent POS sale have hash-verified exact reconciliation evidence.',
   },
   {
     id: 'reconciled-ecosystem-e2e',

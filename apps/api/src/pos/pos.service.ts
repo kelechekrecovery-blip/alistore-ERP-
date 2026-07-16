@@ -25,10 +25,13 @@ const WALKIN_PHONE = '+000000000000';
 const POS_AUTO_DEDUP_WINDOW_MS = 60_000;
 
 interface OrderLine {
+  productId: string;
   sku: string;
   qty: number;
   price: number;
   imei?: string;
+  unitCost: number;
+  costRef?: string;
 }
 
 interface NormalizedPosPayment {
@@ -106,9 +109,17 @@ export class PosService {
       if (existing?.orderId) {
         return this.completedFromExistingPayment(existing.orderId, existing.shiftId);
       }
+      const existingZeroOrder = await this.prisma.order.findUnique({
+        where: { idempotencyKey: txnId },
+        select: { id: true, status: true, total: true, posShiftId: true },
+      });
+      if (existingZeroOrder?.status === 'paid' && existingZeroOrder.total === 0) {
+        return this.completedFromExistingPayment(existingZeroOrder.id, existingZeroOrder.posShiftId);
+      }
     }
 
-    const margin = await this.evaluateMargin(dto, pct);
+    const items = await this.resolveOrderLines(dto, storePoint.inventoryLocation);
+    const margin = this.evaluateMargin(items, pct);
     const total = margin.total;
     const payments = this.normalizePayments(dto, total);
     const discountApprovalNeeded = pct > APPROVAL_THRESHOLDS.discountPct;
@@ -167,66 +178,57 @@ export class PosService {
       );
     }
 
-    // Serialized products require concrete units; quantity products reserve balances later.
-    const items: OrderLine[] = [];
-    for (const line of dto.lines) {
-      if (line.imei) {
-        if (line.qty !== 1) {
-          throw new ValidationError('serialized_quantity_invalid', 'Строка с IMEI должна иметь количество 1');
-        }
-        const selected = await this.units.getByImei(line.imei);
-        if (selected.productId !== line.productId || selected.sku !== line.sku) {
-          throw new ValidationError('imei_product_mismatch', `IMEI ${line.imei} не относится к ${line.sku}`);
-        }
-        if (selected.status !== 'in_stock') {
-          throw new ConflictError('unit_not_available', `IMEI ${line.imei} недоступен (статус: ${selected.status})`);
-        }
-        if (selected.location !== storePoint.inventoryLocation) {
-          throw new ConflictError('unit_wrong_location', `IMEI ${line.imei} находится в другой точке`);
-        }
-        items.push({ sku: line.sku, qty: 1, price: line.price, imei: line.imei });
-        continue;
-      }
-      const product = await this.prisma.product.findUnique({
-        where: { id: line.productId },
-        include: { _count: { select: { bundleComponents: true } } },
-      });
-      if (!product || product.sku !== line.sku) {
-        throw new ValidationError('product_not_found', `Товар ${line.sku} не найден`);
-      }
-      if (product.trackingMode === 'quantity' || product._count.bundleComponents > 0) {
-        items.push({ sku: line.sku, qty: line.qty, price: line.price });
-        continue;
-      }
-      const available = await this.prisma.deviceUnit.findMany({
-        where: { productId: line.productId, status: 'in_stock', location: storePoint.inventoryLocation },
-        take: line.qty,
-        orderBy: { id: 'asc' },
-      });
-      if (available.length >= line.qty) {
-        for (const unit of available.slice(0, line.qty)) {
-          items.push({ sku: line.sku, qty: 1, price: line.price, imei: unit.imei });
-        }
-      } else {
-        throw new ConflictError(
-          'insufficient_stock',
-          `Недостаточно единиц ${line.sku}: нужно ${line.qty}, в наличии ${available.length}`,
-        );
-      }
-    }
-
+    const orderItems = items.map(({ productId: _productId, unitCost: _unitCost, costRef: _costRef, ...item }) => item);
     const order = await this.orders.create(
-      { customerId: customer.id, channel: 'pos', fulfillmentType: 'store', storePointId: storePoint.id, total, items },
+      { customerId: customer.id, channel: 'pos', fulfillmentType: 'store', storePointId: storePoint.id, total, items: orderItems },
       actor,
-      undefined,
-      undefined,
+      txnId,
+      {
+        subtotal: total,
+        deliveryFee: 0,
+        promoCode: null,
+        promoDiscount: 0,
+        loyaltyPoints: 0,
+        unitCostsByLine: items.map((item) => item.unitCost),
+        posShiftId: shift.id,
+      },
       storePoint,
     );
     const containsBundle = await this.prisma.product.count({
       where: { sku: { in: items.map((item) => item.sku) }, bundleComponents: { some: {} } },
     });
-    if (containsBundle > 0) await this.orders.fulfill(order.id, actor);
-    else await this.orders.reserve(order.id, actor);
+    if (containsBundle > 0) {
+      try {
+        await this.orders.fulfill(order.id, actor);
+        const expectedBundleImeis = items.flatMap((item) => bundleImeis(item.costRef));
+        const allocations = await this.prisma.orderBundleAllocation.findMany({
+          where: { orderId: order.id },
+          select: { imei: true },
+          orderBy: { imei: 'asc' },
+        });
+        const actualBundleImeis = allocations.map((allocation) => allocation.imei).sort();
+        if (JSON.stringify(actualBundleImeis) !== JSON.stringify(expectedBundleImeis.sort())) {
+          throw new ConflictError('bundle_inventory_changed', 'Состав набора изменился; повторите продажу и одобрение');
+        }
+      } catch (error) {
+        const failedOrder = await this.prisma.order.findUnique({ where: { id: order.id }, select: { status: true } });
+        if (failedOrder?.status === 'created' || failedOrder?.status === 'reserved') {
+          await this.orders.transition(order.id, 'cancelled', actor);
+        }
+        throw error;
+      }
+    } else await this.orders.fulfill(order.id, actor);
+    if (total === 0) {
+      return {
+        pendingApproval: false as const,
+        orderId: order.id,
+        receiptNo: `POS-${order.id.slice(-6).toUpperCase()}`,
+        total,
+        status: 'paid',
+        shiftId: shift.id,
+        imeis: items.filter((item) => item.imei).map((item) => item.imei as string),
+      };
+    }
     const paid = await this.payments.payMany(
       {
         orderId: order.id,
@@ -298,57 +300,105 @@ export class PosService {
     return [{ method: dto.method, amount: total }];
   }
 
-  private async evaluateMargin(dto: PosSaleDto, pct: number): Promise<MarginControlResult> {
-    const productIds = [...new Set(dto.lines.map((line) => line.productId))];
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds } },
-      select: {
-        id: true,
-        sku: true,
-        price: true,
-        cost: true,
-        bundleComponents: {
-          select: { qty: true, componentProduct: { select: { cost: true } } },
-        },
-      },
-    });
-    const catalog = new Map(products.map((product) => [product.id, product]));
-    const missing = productIds.find((id) => !catalog.has(id));
-    if (missing) {
-      throw new ValidationError('product_not_found', `Товар ${missing} не найден`);
-    }
-    for (const line of dto.lines) {
-      const product = catalog.get(line.productId)!;
-      if (line.sku !== product.sku) {
-        throw new ValidationError('product_sku_mismatch', `SKU товара ${line.productId} изменился`);
-      }
-      if (line.price !== product.price) {
-        throw new ValidationError(
-          'product_price_mismatch',
-          `Цена ${line.sku} изменилась: актуальная цена ${product.price}`,
-        );
-      }
-    }
+  private evaluateMargin(items: OrderLine[], pct: number): MarginControlResult {
     return evaluateMarginControl(
-      dto.lines.map((line) => ({
-        productId: line.productId,
-        sku: line.sku,
-        qty: line.qty,
-        price: line.price,
-        cost: (() => {
-          const product = catalog.get(line.productId);
-          if (!product) return 0;
-          return product.bundleComponents.length > 0
-            ? product.bundleComponents.reduce(
-                (sum, component) => sum + component.qty * component.componentProduct.cost,
-                0,
-              )
-            : product.cost;
-        })(),
+      items.map((item) => ({
+        productId: item.productId,
+        sku: item.sku,
+        qty: item.qty,
+        price: item.price,
+        cost: item.unitCost,
+        costRef: item.costRef ?? item.imei,
       })),
       pct,
       APPROVAL_THRESHOLDS.minMarginSom,
     );
+  }
+
+  private async resolveOrderLines(dto: PosSaleDto, location: string): Promise<OrderLine[]> {
+    const items: OrderLine[] = [];
+    for (const line of dto.lines) {
+      if (line.imei) {
+        if (line.qty !== 1) throw new ValidationError('serialized_quantity_invalid', 'Строка с IMEI должна иметь количество 1');
+        const selected = await this.units.getForSaleByImei(line.imei);
+        if (selected.productId !== line.productId || selected.sku !== line.sku) {
+          throw new ValidationError('imei_product_mismatch', `IMEI ${line.imei} не относится к ${line.sku}`);
+        }
+        if (line.price !== selected.price) {
+          throw new ValidationError('product_price_mismatch', `Цена ${line.sku} изменилась: актуальная цена ${selected.price}`);
+        }
+        if (selected.status !== 'in_stock') throw new ConflictError('unit_not_available', `IMEI ${line.imei} недоступен (статус: ${selected.status})`);
+        if (selected.location !== location) throw new ConflictError('unit_wrong_location', `IMEI ${line.imei} находится в другой точке`);
+        items.push({ productId: line.productId, sku: line.sku, qty: 1, price: line.price, imei: line.imei, unitCost: selected.acquisitionCost ?? selected.productCost });
+        continue;
+      }
+      const product = await this.prisma.product.findUnique({
+        where: { id: line.productId },
+        include: {
+          _count: { select: { bundleComponents: true } },
+          bundleComponents: {
+            select: {
+              qty: true,
+              componentProductId: true,
+              componentProduct: { select: { sku: true, cost: true, trackingMode: true } },
+            },
+          },
+        },
+      });
+      if (!product || product.sku !== line.sku) throw new ValidationError('product_not_found', `Товар ${line.sku} не найден`);
+      if (line.price !== product.price) throw new ValidationError('product_price_mismatch', `Цена ${line.sku} изменилась: актуальная цена ${product.price}`);
+      if (product.trackingMode === 'quantity' || product._count.bundleComponents > 0) {
+        if (product.bundleComponents.length === 0) {
+          items.push({ productId: line.productId, sku: line.sku, qty: line.qty, price: line.price, unitCost: product.cost });
+          continue;
+        }
+        const bundleCopies = Array.from({ length: line.qty }, () => ({ unitCost: 0, imeis: [] as string[] }));
+        for (const component of product.bundleComponents) {
+          if (component.componentProduct.trackingMode === 'quantity') {
+            for (const copy of bundleCopies) copy.unitCost += component.qty * component.componentProduct.cost;
+            continue;
+          }
+          const required = component.qty * line.qty;
+          const units = await this.prisma.deviceUnit.findMany({
+            where: { productId: component.componentProductId, status: 'in_stock', location, consignmentItem: { is: null } },
+            take: required,
+            orderBy: { id: 'asc' },
+          });
+          if (units.length < required) {
+            throw new ConflictError('insufficient_bundle_stock', `Для набора ${line.sku} недостаточно ${component.componentProduct.sku}: нужно ${required}, в наличии ${units.length}`);
+          }
+          for (const [copyIndex, copy] of bundleCopies.entries()) {
+            for (const unit of units.slice(copyIndex * component.qty, (copyIndex + 1) * component.qty)) {
+              copy.unitCost += unit.acquisitionCost ?? component.componentProduct.cost;
+              copy.imeis.push(unit.imei);
+            }
+          }
+        }
+        for (const copy of bundleCopies) {
+          items.push({
+            productId: line.productId,
+            sku: line.sku,
+            qty: 1,
+            price: line.price,
+            unitCost: copy.unitCost,
+            costRef: copy.imeis.length > 0 ? `bundle:${copy.imeis.sort().join(',')}` : undefined,
+          });
+        }
+        continue;
+      }
+      const available = await this.prisma.deviceUnit.findMany({
+        where: { productId: line.productId, status: 'in_stock', location },
+        take: line.qty,
+        orderBy: { id: 'asc' },
+      });
+      if (available.length < line.qty) {
+        throw new ConflictError('insufficient_stock', `Недостаточно единиц ${line.sku}: нужно ${line.qty}, в наличии ${available.length}`);
+      }
+      for (const unit of available) {
+        items.push({ productId: line.productId, sku: line.sku, qty: 1, price: line.price, imei: unit.imei, unitCost: unit.acquisitionCost ?? product.cost });
+      }
+    }
+    return items;
   }
 
   /** Verify a discount approval is approved and matches sale percentage and margin fingerprint. */
@@ -412,4 +462,8 @@ export class PosService {
       idempotent: true,
     };
   }
+}
+
+function bundleImeis(costRef?: string): string[] {
+  return costRef?.startsWith('bundle:') ? costRef.slice('bundle:'.length).split(',').filter(Boolean) : [];
 }

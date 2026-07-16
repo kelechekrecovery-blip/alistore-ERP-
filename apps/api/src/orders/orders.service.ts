@@ -38,6 +38,8 @@ interface CanonicalPricing {
   loyaltyPoints: number;
   promotionLines?: PromotionLine[];
   unitCosts?: Record<string, number>;
+  unitCostsByLine?: number[];
+  posShiftId?: string;
   inventorySnapshots?: Record<string, OrderInventorySnapshot>;
 }
 
@@ -333,6 +335,7 @@ export class OrdersService {
             storePointCode: canonicalStorePoint.code,
             storePointName: canonicalStorePoint.name,
             storePointAddress: canonicalStorePoint.address,
+            posShiftId: canonical.posShiftId,
             pickupPoint: ['pickup', 'store'].includes(fulfillmentType) ? canonicalStorePoint.name : null,
             pickupAddress: ['pickup', 'store'].includes(fulfillmentType) ? canonicalStorePoint.address : null,
             fulfillmentLocation: canonicalStorePoint.inventoryLocation,
@@ -355,7 +358,7 @@ export class OrdersService {
                 sku: i.sku,
                 qty: i.qty,
                 price: i.price,
-                unitCost: canonical.unitCosts?.[i.sku] ?? 0,
+                unitCost: canonical.unitCostsByLine?.[index] ?? canonical.unitCosts?.[i.sku] ?? 0,
                 discountAmount: initialTax.lines[index].discountAmount,
                 taxCode: initialTax.lines[index].taxCode,
                 taxRateBps: initialTax.lines[index].taxRateBps,

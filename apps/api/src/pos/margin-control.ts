@@ -4,6 +4,7 @@ export interface MarginControlLine {
   qty: number;
   price: number;
   cost: number;
+  costRef?: string;
 }
 
 export interface MarginBreach {
@@ -74,10 +75,11 @@ function marginFingerprint(lines: MarginControlLine[], discountPct: number, minM
       qty: line.qty,
       price: line.price,
       cost: line.cost,
+      costRef: line.costRef ?? null,
     }))
     .sort((a, b) =>
-      `${a.productId}:${a.sku}:${a.price}:${a.qty}:${a.cost}`.localeCompare(
-        `${b.productId}:${b.sku}:${b.price}:${b.qty}:${b.cost}`,
+      `${a.productId}:${a.sku}:${a.price}:${a.qty}:${a.cost}:${a.costRef}`.localeCompare(
+        `${b.productId}:${b.sku}:${b.price}:${b.qty}:${b.cost}:${b.costRef}`,
       ),
     );
   return JSON.stringify({ discountPct, minMargin, lines: normalized });

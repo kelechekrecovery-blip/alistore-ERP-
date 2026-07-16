@@ -9,6 +9,8 @@ import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../src/common/errors';
 
+const RUN = `${process.pid}-${Date.now()}`;
+
 /**
  * POS counter sale: one call opens a shift, assigns IMEI units, and drives the
  * order created→reserved→paid, marking units sold and writing the ledger.
@@ -64,11 +66,11 @@ describe('POS sale (integration)', () => {
   async function seedProduct(units: number) {
     seq += 1;
     const product = await prisma.product.create({
-      data: { sku: `POS-${seq}`, name: 'iPhone', price: 100000, cost: 80000, category: 'phones', attrs: {} },
+      data: { sku: `POS-${RUN}-${seq}`, name: 'iPhone', price: 100000, cost: 80000, category: 'phones', attrs: {} },
     });
     for (let n = 0; n < units; n += 1) {
       await prisma.deviceUnit.create({
-        data: { imei: `IMEI-POS-${seq}-${n}`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+        data: { imei: `IMEI-POS-${RUN}-${seq}-${n}`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
       });
     }
     return product;
@@ -270,7 +272,7 @@ describe('POS sale (integration)', () => {
       staffId: 'staff_pos_offline',
       point: 'BISHKEK-1',
       method: 'cash' as const,
-      clientSaleId: 'offline-pos-1',
+      clientSaleId: `offline-pos-1-${RUN}`,
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
 
@@ -387,7 +389,7 @@ describe('POS sale (integration)', () => {
   });
 
   it('refuses to reuse an approved margin breach for a changed sale payload', async () => {
-    const product = await seedProduct(1);
+    const product = await seedProduct(2);
     await prisma.product.update({ where: { id: product.id }, data: { cost: 98000 } });
     const parked = await pos.sale({
       staffId: 'staff_pos_margin_tamper',
@@ -411,5 +413,24 @@ describe('POS sale (integration)', () => {
       .catch((e) => e);
     expect(err.code).toBe('margin_mismatch');
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(0);
+  });
+
+  it('uses the selected IMEI acquisition cost for margin approval', async () => {
+    const product = await seedProduct(1);
+    const unit = await prisma.deviceUnit.findFirstOrThrow({ where: { productId: product.id } });
+    await prisma.deviceUnit.update({ where: { imei: unit.imei }, data: { acquisitionCost: 105000 } });
+
+    const parked = await pos.sale({
+      staffId: 'staff_pos_actual_cost',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1, imei: unit.imei }],
+    });
+
+    expect(parked).toMatchObject({
+      pendingApproval: true,
+      reason: 'margin',
+      margin: { worstMargin: -5000, breaches: [{ cost: 105000, margin: -5000 }] },
+    });
   });
 });

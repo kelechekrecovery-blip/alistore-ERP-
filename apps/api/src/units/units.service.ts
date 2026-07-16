@@ -46,6 +46,27 @@ export class UnitsService {
     };
   }
 
+  /** Internal POS lookup; acquisition cost is deliberately not exposed by UnitsController. */
+  async getForSaleByImei(imei: string) {
+    const unit = await this.prisma.deviceUnit.findUnique({
+      where: { imei },
+      include: { product: { select: { name: true, sku: true, price: true, cost: true } } },
+    });
+    if (!unit) throw new ValidationError('unit_not_found', `IMEI ${imei} не найден`);
+    return {
+      imei: unit.imei,
+      productId: unit.productId,
+      status: unit.status,
+      location: unit.location,
+      orderId: unit.orderId,
+      product: unit.product.name,
+      sku: unit.product.sku,
+      price: unit.product.price,
+      acquisitionCost: unit.acquisitionCost,
+      productCost: unit.product.cost,
+    };
+  }
+
   /** Приёмка партии — register a new physical unit (status in_stock). */
   async receive(input: {
     imei: string;

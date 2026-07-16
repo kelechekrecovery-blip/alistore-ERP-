@@ -12,12 +12,15 @@ import { ReservationsService } from '../src/reservations/reservations.service';
 import { OutboxService } from '../src/outbox/outbox.service';
 import { LogNotificationTransport } from '../src/outbox/transports/log.transport';
 
+const RUN = `${process.pid}-${Date.now()}`;
+
 describe('Product bundles (integration)', () => {
   let prisma: PrismaService;
   let products: ProductsService;
   let orders: OrdersService;
   let pos: PosService;
   let payments: PaymentsService;
+  let approvals: ApprovalsService;
   let reservations: ReservationsService;
   let seq = 0;
 
@@ -25,7 +28,7 @@ describe('Product bundles (integration)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     const audit = new AuditService(prisma);
-    const approvals = new ApprovalsService(prisma, audit);
+    approvals = new ApprovalsService(prisma, audit);
     const units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
     reservations = new ReservationsService(
@@ -136,7 +139,7 @@ describe('Product bundles (integration)', () => {
       staffId: 'bundle-cashier',
       point: 'BISHKEK-1',
       method: 'cash' as const,
-      clientSaleId: `bundle-sale-replay-${seq}`,
+      clientSaleId: `bundle-sale-replay-${RUN}-${seq}`,
       lines: [{ productId: seeded.product.id, sku: seeded.product.sku, price: 70000, qty: 1 }],
     };
 
@@ -151,6 +154,79 @@ describe('Product bundles (integration)', () => {
     expect(await prisma.deviceUnit.count({ where: { status: 'sold', orderId: first.orderId } })).toBe(3);
     expect(await prisma.payment.count({ where: { orderId: first.orderId } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'unit.sold', refs: { has: first.orderId } } })).toBe(3);
+  });
+
+  it('uses concrete serialized component costs when approving bundle margin', async () => {
+    const seeded = await bundle(1, 2);
+    await prisma.deviceUnit.updateMany({
+      where: { productId: seeded.phone.id },
+      data: { acquisitionCost: 65000 },
+    });
+    await prisma.deviceUnit.updateMany({
+      where: { productId: seeded.accessory.id },
+      data: { acquisitionCost: 10000 },
+    });
+
+    const parked = await pos.sale({
+      staffId: 'bundle-margin-cashier',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      lines: [{ productId: seeded.product.id, sku: seeded.product.sku, price: 70000, qty: 1 }],
+    });
+
+    expect(parked).toMatchObject({
+      pendingApproval: true,
+      reason: 'margin',
+      margin: { worstMargin: -15000, breaches: [{ cost: 85000, margin: -15000 }] },
+    });
+    expect(await prisma.order.count()).toBe(0);
+  });
+
+  it('cancels the POS order when preselected bundle stock disappears before fulfillment', async () => {
+    const seeded = await bundle(1, 2);
+    const fulfill = orders.fulfill.bind(orders);
+    jest.spyOn(orders, 'fulfill').mockImplementationOnce(async (orderId, actor) => {
+      await prisma.deviceUnit.deleteMany({ where: { productId: seeded.phone.id } });
+      return fulfill(orderId, actor);
+    });
+
+    await expect(pos.sale({
+      staffId: 'bundle-race-cashier',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      clientSaleId: `bundle-race-${RUN}-${seq}`,
+      lines: [{ productId: seeded.product.id, sku: seeded.product.sku, price: 70000, qty: 1 }],
+    })).rejects.toMatchObject({ code: 'insufficient_bundle_stock' });
+
+    expect(await prisma.order.findFirstOrThrow({ where: { channel: 'pos' } })).toMatchObject({ status: 'cancelled' });
+    expect(await prisma.payment.count()).toBe(0);
+    expect(await prisma.reservation.count()).toBe(0);
+    expect(await prisma.orderBundleAllocation.count()).toBe(0);
+  });
+
+  it('completes and deduplicates an approved zero-total bundle without a synthetic payment', async () => {
+    const seeded = await bundle(1, 2);
+    const dto = {
+      staffId: 'bundle-free-cashier',
+      point: 'BISHKEK-1',
+      method: 'cash' as const,
+      discountPct: 100,
+      clientSaleId: `bundle-free-${RUN}-${seq}`,
+      lines: [{ productId: seeded.product.id, sku: seeded.product.sku, price: 70000, qty: 1 }],
+    };
+    const parked = await pos.sale(dto);
+    if (!parked.pendingApproval) throw new Error('zero-total bundle should require approval');
+    await approvals.decide(parked.approvalId, { status: 'approved', approver: 'bundle-owner', approverRole: 'owner' });
+
+    const first = await pos.sale({ ...dto, approvalId: parked.approvalId });
+    const replay = await pos.sale({ ...dto, approvalId: parked.approvalId });
+
+    expect(first).toMatchObject({ pendingApproval: false, total: 0, status: 'paid' });
+    expect(replay).toMatchObject({ pendingApproval: false, orderId: first.orderId, total: 0, status: 'paid', shiftId: first.shiftId, idempotent: true });
+    expect(await prisma.order.count()).toBe(1);
+    expect(await prisma.payment.count()).toBe(0);
+    expect(await prisma.deviceUnit.count({ where: { status: 'sold', orderId: first.orderId } })).toBe(3);
+    expect(await prisma.orderBundleAllocation.count({ where: { orderId: first.orderId, active: false, consumedAt: { not: null } } })).toBe(3);
   });
 
   it('allows only one concurrent fulfillment to claim the final component set', async () => {

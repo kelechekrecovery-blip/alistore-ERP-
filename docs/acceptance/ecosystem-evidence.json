@@ -68,6 +68,12 @@
         }
       ]
     },
+    "procurement-sale-reconciliation": {
+      "status": "partial",
+      "packageScript": "ecosystem:procurement-sale:e2e",
+      "command": null,
+      "artifacts": []
+    },
     "reconciled-e2e": {
       "status": "partial",
       "packageScript": "ecosystem:e2e",

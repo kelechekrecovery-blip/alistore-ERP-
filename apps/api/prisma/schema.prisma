@@ -788,6 +788,8 @@ model Order {
   storePointCode           String?
   storePointName           String?
   storePointAddress        String?
+  posShiftId               String?
+  posShift                 CashShift?                      @relation(fields: [posShiftId], references: [id], onDelete: Restrict)
   pickupPoint              String?
   pickupAddress            String?
   fulfillmentLocation      String?
@@ -831,6 +833,7 @@ model Order {
   @@index([status])
   @@index([fulfillmentType, status])
   @@index([storePointId, status])
+  @@index([posShiftId])
   @@index([pickupPoint, status])
   @@index([courierId, status])
   @@index([courierRunId])
@@ -1179,6 +1182,7 @@ model CashShift {
   refundAllocations   RefundAllocation[]
   incassations        CashIncassation[]
   exchangeRequests    ExchangeRequest[]
+  posOrders           Order[]
 
   @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
   @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy
