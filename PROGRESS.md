@@ -2176,3 +2176,10 @@
 - Checks run: four XCUITest bundles `4/4`, zero failures; artifact SHA-256 `8237873a2593486399a76dbc92287bc6c85eea4099afadb44b90a30f28dfe7cd`; trusted recorder exited zero.
 - Outcome: packaged iOS launch evidence is current again; deep journeys and physical-device certification remain open.
 - Next step: commit and refresh Android packaged UI evidence.
+
+## 2026-07-17
+
+- Task: refresh `android-app-ui` on the visual-contract source hash.
+- Checks run: shared Android core `26/26`; packaged connected tests for Client, Staff, Courier and POS `4/4`; artifact SHA-256 `886e4b74401ac9ce819c1fb8fd282e720dff8a604c23602fdd83086caf988778`; trusted recorder exited zero.
+- Outcome: packaged Android launch evidence is current for source-tree SHA-256 `00840f38304fb58a4f396709da313e9ace7107b31b836b080fd32e13eceb06d0`; deep business journeys and physical-device certification remain open.
+- Next step: commit the evidence and run the strict committed-HEAD ecosystem audit.
