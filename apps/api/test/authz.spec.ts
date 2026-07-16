@@ -23,4 +23,10 @@ describe('AuthzService (casbin — Role Permission Matrix)', () => {
     expect(await authz.can('seller', 'refund', 'approve')).toBe(false);
     expect(await authz.can('seller', 'writeoff', 'approve')).toBe(false);
   });
+
+  it('keeps inventory valuation and GL reconciliation financial', async () => {
+    expect(await authz.can('owner', 'finance', 'read')).toBe(true);
+    expect(await authz.can('admin', 'finance', 'read')).toBe(true);
+    expect(await authz.can('warehouse', 'finance', 'read')).toBe(false);
+  });
 });

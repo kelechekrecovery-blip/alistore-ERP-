@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { Card } from './Card';
 import { som } from '@/lib/format';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+import {
+  fetchInventoryValuationReconciliation,
+  type InventoryValuationReconciliation,
+} from '@/lib/api';
 import type { Dashboard } from '@/lib/reports';
 
 const LOW = 5;
@@ -29,14 +33,24 @@ function stockChip(units: number): { label: string; color: string } {
  * (Товар/Остаток/Цена/Статус, low-stock first) built from the public catalog, plus the
  * orders-by-status breakdown from the dashboard.
  */
-export function StockView({ d }: { d: Dashboard | null }) {
+export function StockView({ d, accessToken, role }: { d: Dashboard | null; accessToken: string; role: string }) {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [reconciliation, setReconciliation] = useState<InventoryValuationReconciliation | null>(null);
+  const [reconciliationError, setReconciliationError] = useState('');
+  const canReadFinance = role === 'admin' || role === 'owner';
 
   useEffect(() => {
     fetchCatalog({ limit: 200 })
       .then((response) => setProducts(response.items))
       .catch(() => setProducts([]));
   }, []);
+
+  useEffect(() => {
+    if (!canReadFinance) return;
+    fetchInventoryValuationReconciliation(accessToken)
+      .then(setReconciliation)
+      .catch((error) => setReconciliationError(error instanceof Error ? error.message : 'Сверка недоступна'));
+  }, [accessToken, canReadFinance]);
 
   const items = [...(products ?? [])].sort((a, b) => a.availableUnits - b.availableUnits);
   const totalValue = items.reduce((sum, p) => sum + p.price * p.availableUnits, 0);
@@ -106,6 +120,70 @@ export function StockView({ d }: { d: Dashboard | null }) {
         </div>
       </Card>
 
+      {canReadFinance && (
+        <Card>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="font-display text-[15px] font-bold text-white">Оценка запасов и GL 1200</div>
+              <div className="mt-0.5 text-xs text-[#8A7F76]">Собственный товар по себестоимости, без комиссии</div>
+            </div>
+            {reconciliation && (
+              <span className={`rounded-chip px-2 py-1 text-[11px] ${reconciliation.summary.consistent ? 'bg-lime/10 text-lime' : 'bg-[#FF8A7A]/10 text-[#FF8A7A]'}`}>
+                {reconciliation.summary.consistent ? 'Сходится' : 'Есть расхождения'}
+              </span>
+            )}
+          </div>
+          {reconciliationError && (
+            <div role="alert" className="rounded-[7px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/10 p-3 text-sm text-[#FF8A7A]">
+              {reconciliationError}
+            </div>
+          )}
+          {!reconciliation && !reconciliationError && (
+            <div className="py-8 text-center text-sm text-[#8A7F76]">Сверяем FIFO-слои и проводки…</div>
+          )}
+          {reconciliation && (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <ValuationMetric label="Количественный" value={som(reconciliation.summary.quantityValue)} />
+                <ValuationMetric label="Серийный" value={som(reconciliation.summary.serializedValue)} />
+                <ValuationMetric label="GL 1200" value={som(reconciliation.summary.glInventoryBalance)} />
+                <ValuationMetric
+                  label="Разница"
+                  value={som(reconciliation.summary.difference)}
+                  warning={reconciliation.summary.difference !== 0}
+                />
+              </div>
+              {!reconciliation.summary.complete && (
+                <div className="mt-3 rounded-[7px] border border-[#E5B23C]/30 bg-[#E5B23C]/10 p-3 text-xs text-[#E5B23C]">
+                  Неполная оценка: у {reconciliation.summary.missingSerializedCostUnits} серийных единиц не указана себестоимость.
+                </div>
+              )}
+              <div className="mt-4 overflow-x-auto">
+                <div className="min-w-[720px]">
+                  <div className="grid grid-cols-[1.8fr_1fr_repeat(5,0.75fr)] border-b border-[#2E2822] pb-2 text-xs text-[#8A7F76]">
+                    <span>Товар</span><span>Склад</span><span className="text-right">Свои ед.</span><span className="text-right">FIFO ед.</span><span className="text-right">Δ ед.</span><span className="text-right">Баланс</span><span className="text-right">Δ сумма</span>
+                  </div>
+                  {reconciliation.quantity.map((row) => (
+                    <div key={`${row.productId}:${row.location}`} className="grid grid-cols-[1.8fr_1fr_repeat(5,0.75fr)] items-center border-b border-[#221E19] py-2.5 text-xs last:border-0">
+                      <span className="truncate pr-2 text-white">{row.name}<span className="ml-1 text-[#6F665E]">{row.sku}</span></span>
+                      <span className="truncate text-[#A79C92]">{row.location}</span>
+                      <span className="text-right font-mono">{row.ownedPhysicalQty}</span>
+                      <span className="text-right font-mono">{row.layerQty}</span>
+                      <span className={`text-right font-mono ${row.quantityDifference === 0 ? 'text-lime' : 'text-[#FF8A7A]'}`}>{row.quantityDifference}</span>
+                      <span className="text-right font-mono">{som(row.inventoryValue)}</span>
+                      <span className={`text-right font-mono ${row.valueDifference === 0 ? 'text-lime' : 'text-[#FF8A7A]'}`}>{som(row.valueDifference)}</span>
+                    </div>
+                  ))}
+                  {reconciliation.quantity.length === 0 && (
+                    <div className="py-6 text-center text-xs text-[#8A7F76]">Количественных остатков нет</div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+
       {/* orders by status */}
       <Card>
         <div className="mb-3 font-display text-[15px] font-bold text-white">Заказы по статусам</div>
@@ -119,6 +197,15 @@ export function StockView({ d }: { d: Dashboard | null }) {
           </div>
         ))}
       </Card>
+    </div>
+  );
+}
+
+function ValuationMetric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+  return (
+    <div className="border-l border-[#3A342E] pl-3">
+      <div className="text-[11px] text-[#8A7F76]">{label}</div>
+      <div className={`mt-1 font-mono text-sm font-semibold ${warning ? 'text-[#FF8A7A]' : 'text-white'}`}>{value}</div>
     </div>
   );
 }

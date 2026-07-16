@@ -40,6 +40,130 @@ export class InventoryService {
     private readonly approvals: ApprovalsService,
   ) {}
 
+  /** Current owned-stock subledger versus immutable cost layers and GL inventory. */
+  async valuationReconciliation() {
+    const [balances, serializedUnits, glLines] = await Promise.all([
+      this.prisma.inventoryBalance.findMany({
+        where: { product: { trackingMode: 'quantity' } },
+        include: {
+          product: { select: { id: true, sku: true, name: true } },
+          valuationLayers: {
+            where: { quantityRemaining: { gt: 0 } },
+            select: { quantityRemaining: true, unitCost: true },
+          },
+          quantityConsignmentLots: {
+            select: { availableQty: true, reservedQty: true },
+          },
+        },
+        orderBy: [{ location: 'asc' }, { product: { sku: 'asc' } }],
+      }),
+      this.prisma.deviceUnit.findMany({
+        where: {
+          status: { notIn: ['sold', 'written_off'] },
+          consignmentItem: { is: null },
+          product: { trackingMode: 'serialized' },
+        },
+        select: {
+          productId: true,
+          location: true,
+          acquisitionCost: true,
+          product: { select: { sku: true, name: true } },
+        },
+        orderBy: [{ location: 'asc' }, { product: { sku: 'asc' } }],
+      }),
+      this.prisma.accountingJournalLine.findMany({
+        where: { accountCode: '1200' },
+        select: { debit: true, credit: true },
+      }),
+    ]);
+
+    const quantity = balances.map((balance) => {
+      const consignmentQty = balance.quantityConsignmentLots.reduce(
+        (sum, lot) => sum + lot.availableQty + lot.reservedQty,
+        0,
+      );
+      const ownedPhysicalQty = balance.onHand - consignmentQty;
+      const layerQty = balance.valuationLayers.reduce((sum, layer) => sum + layer.quantityRemaining, 0);
+      const layerValue = balance.valuationLayers.reduce(
+        (sum, layer) => sum + layer.quantityRemaining * layer.unitCost,
+        0,
+      );
+      const quantityDifference = layerQty - ownedPhysicalQty;
+      const valueDifference = layerValue - balance.inventoryValue;
+      const reservationDifference = Math.max(0, balance.reserved - balance.onHand);
+      return {
+        productId: balance.productId,
+        sku: balance.product.sku,
+        name: balance.product.name,
+        location: balance.location,
+        onHand: balance.onHand,
+        reserved: balance.reserved,
+        consignmentQty,
+        ownedPhysicalQty,
+        layerQty,
+        inventoryValue: balance.inventoryValue,
+        layerValue,
+        quantityDifference,
+        valueDifference,
+        reservationDifference,
+        consistent: quantityDifference === 0 && valueDifference === 0 && reservationDifference === 0
+          && ownedPhysicalQty >= 0,
+      };
+    });
+
+    const serializedByKey = new Map<string, {
+      productId: string;
+      sku: string;
+      name: string;
+      location: string;
+      units: number;
+      inventoryValue: number;
+      missingCostUnits: number;
+    }>();
+    for (const unit of serializedUnits) {
+      const key = `${unit.productId}\u0000${unit.location}`;
+      const row = serializedByKey.get(key) ?? {
+        productId: unit.productId,
+        sku: unit.product.sku,
+        name: unit.product.name,
+        location: unit.location,
+        units: 0,
+        inventoryValue: 0,
+        missingCostUnits: 0,
+      };
+      row.units += 1;
+      if (unit.acquisitionCost === null) row.missingCostUnits += 1;
+      else row.inventoryValue += unit.acquisitionCost;
+      serializedByKey.set(key, row);
+    }
+    const serialized = [...serializedByKey.values()];
+    const quantityValue = quantity.reduce((sum, row) => sum + row.inventoryValue, 0);
+    const serializedValue = serialized.reduce((sum, row) => sum + row.inventoryValue, 0);
+    const missingSerializedCostUnits = serialized.reduce((sum, row) => sum + row.missingCostUnits, 0);
+    const ownedInventoryValue = quantityValue + serializedValue;
+    const glInventoryBalance = glLines.reduce((sum, line) => sum + line.debit - line.credit, 0);
+    const difference = ownedInventoryValue - glInventoryBalance;
+    const inconsistentQuantityRows = quantity.filter((row) => !row.consistent).length;
+
+    return {
+      generatedAt: new Date().toISOString(),
+      scope: 'owned_inventory',
+      summary: {
+        quantityValue,
+        serializedValue,
+        ownedInventoryValue,
+        glInventoryBalance,
+        difference,
+        inconsistentQuantityRows,
+        missingSerializedCostUnits,
+        complete: missingSerializedCostUnits === 0,
+        consistent: difference === 0 && inconsistentQuantityRows === 0 && missingSerializedCostUnits === 0,
+      },
+      quantity,
+      serialized,
+    };
+  }
+
   async movement(dto: MovementDto, requester: string) {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product) {

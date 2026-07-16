@@ -276,7 +276,7 @@ export default function ErpPage() {
           {route === 'logistics' && <LogisticsView accessToken={session.accessToken} />}
           {route === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} role={session.role} />}
           {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
-          {route === 'stock' && <StockView d={d} />}
+          {route === 'stock' && <StockView d={d} accessToken={session.accessToken} role={session.role} />}
           {route === 'crm' && <CrmView />}
           {route === 'campaigns' && <CampaignsView />}
           {route === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}

@@ -25,6 +25,54 @@ export interface TransferQuantityResult {
   idempotent: boolean;
 }
 
+export interface InventoryValuationReconciliation {
+  generatedAt: string;
+  scope: 'owned_inventory';
+  summary: {
+    quantityValue: number;
+    serializedValue: number;
+    ownedInventoryValue: number;
+    glInventoryBalance: number;
+    difference: number;
+    inconsistentQuantityRows: number;
+    missingSerializedCostUnits: number;
+    complete: boolean;
+    consistent: boolean;
+  };
+  quantity: Array<{
+    productId: string;
+    sku: string;
+    name: string;
+    location: string;
+    onHand: number;
+    reserved: number;
+    consignmentQty: number;
+    ownedPhysicalQty: number;
+    layerQty: number;
+    inventoryValue: number;
+    layerValue: number;
+    quantityDifference: number;
+    valueDifference: number;
+    reservationDifference: number;
+    consistent: boolean;
+  }>;
+  serialized: Array<{
+    productId: string;
+    sku: string;
+    name: string;
+    location: string;
+    units: number;
+    inventoryValue: number;
+    missingCostUnits: number;
+  }>;
+}
+
+export function fetchInventoryValuationReconciliation(
+  accessToken: string,
+): Promise<InventoryValuationReconciliation> {
+  return getJson('/inventory/valuation/reconciliation', accessToken);
+}
+
 export function transferQuantityInventory(
   input: { idempotencyKey: string; productId: string; from: string; to: string; qty: number; reason?: string },
   accessToken: string,

@@ -159,4 +159,12 @@ export class InventoryController {
   async count(@CurrentUser() user: AuthPrincipal, @Body() dto: CountDto) {
     return this.inventory.count(dto, await requireActiveStaff(user, this.staffAuth));
   }
+
+  @ApiOperation({ summary: 'Reconcile owned inventory valuation layers with GL account 1200' })
+  @Get('valuation/reconciliation')
+  @RequirePermission('finance', 'read')
+  async valuationReconciliation(@CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.valuationReconciliation();
+  }
 }
