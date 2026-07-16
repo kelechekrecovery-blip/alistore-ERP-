@@ -18,6 +18,7 @@ test('staff intake creates a trade-in contract with IMEI risk reference', async 
       sellerPassport: 'ID1234567',
     },
     staffToken,
+    { 'idempotency-key': 'e2e-tradein-intake' },
   );
 
   expect(tradeIn.contractId).toMatch(/^TI-/);

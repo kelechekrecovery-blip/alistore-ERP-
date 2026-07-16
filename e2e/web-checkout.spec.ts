@@ -135,6 +135,12 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   const { product } = await seedProduct('DELIVERY-E2E');
   const startsAt = new Date(Date.now() + 60 * 60 * 1000);
   const endsAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  const deliveryDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(startsAt);
   const zone = await prisma.deliveryZone.create({
     data: {
       code: `web-center-${Date.now().toString(36)}`,
@@ -185,7 +191,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
     total: product.price + 350,
     deliveryAddress: 'Бишкек, ул. Токтогула 125/1, кв. 42',
   });
-  const availability = await page.request.get(`${API_BASE}/logistics/availability?date=${startsAt.toISOString().slice(0, 10)}`);
+  const availability = await page.request.get(`${API_BASE}/logistics/availability?date=${deliveryDate}`);
   expect(availability.ok()).toBeTruthy();
   const zones = await availability.json() as Array<{ slots: Array<{ id: string; remaining: number; available: boolean }> }>;
   expect(zones.flatMap((item) => item.slots).find((slot) => slot.id === zone.slots[0].id)).toMatchObject({ remaining: 0, available: false });

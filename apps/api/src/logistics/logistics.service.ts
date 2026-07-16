@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeliverySlotDto, CreateDeliveryZoneDto, CreateStorePointDto, UpdateStorePointDto } from './logistics.dto';
 
 const ACTIVE_SLOT_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'courier_assigned', 'out_for_delivery'] as const;
+const BUSINESS_TIME_ZONE = 'Asia/Bishkek';
+const BUSINESS_UTC_OFFSET = '+06:00';
 
 function key(raw?: string) {
   const value = raw?.trim();
@@ -15,7 +17,13 @@ function key(raw?: string) {
 }
 
 function dayBounds(date?: string) {
-  const start = date ? new Date(`${date.slice(0, 10)}T00:00:00.000Z`) : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+  const businessDate = date?.slice(0, 10) ?? new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const start = new Date(`${businessDate}T00:00:00.000${BUSINESS_UTC_OFFSET}`);
   if (Number.isNaN(start.getTime())) throw new ValidationError('invalid_logistics_date', 'Неверная дата');
   return { start, end: new Date(start.getTime() + 86_400_000) };
 }

@@ -65,8 +65,12 @@ test('staff exchanges a sold IMEI into a higher-priced replacement', async ({ re
   expect(await prisma.staffUser.findUniqueOrThrow({ where: { id: approver.staffId } }))
     .toMatchObject({ totpLastToken: null });
 
+  const foreignEvidenceKey = `e2e-exchange-foreign-evidence-${result.exchangeRequestId}`;
   const foreignEvidence = await request.post(`${API_BASE}/evidence/images`, {
-    headers: { authorization: `Bearer ${approver.accessToken}` },
+    headers: {
+      authorization: `Bearer ${approver.accessToken}`,
+      'idempotency-key': foreignEvidenceKey,
+    },
     multipart: {
       file: { name: 'foreign-exchange.png', mimeType: 'image/png', buffer: tinyPng },
       entityType: 'exchange',
@@ -75,8 +79,12 @@ test('staff exchanges a sold IMEI into a higher-priced replacement', async ({ re
     },
   });
   expect(foreignEvidence.status()).toBe(403);
+  const evidenceKey = `e2e-exchange-evidence-${result.exchangeRequestId}`;
   const evidence = await request.post(`${API_BASE}/evidence/images`, {
-    headers: { authorization: `Bearer ${requester.accessToken}` },
+    headers: {
+      authorization: `Bearer ${requester.accessToken}`,
+      'idempotency-key': evidenceKey,
+    },
     multipart: {
       file: { name: 'exchange.png', mimeType: 'image/png', buffer: tinyPng },
       entityType: 'exchange',

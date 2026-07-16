@@ -2317,3 +2317,12 @@
 - Implementation commit: `f113717` (`feat(native): harden biometric and pin quick unlock`).
 - Outcome: the native quick-unlock software gate is accepted. Physical Face ID/Touch ID/Android biometric, PIN, camera/push/hardware certification, signing, provider credentials and store release remain external gates.
 - Next step: proceed to the next unblocked finance/ERP or native parity item, with `NATIVE-QUICK-UNLOCK` retained only for physical-device certification.
+
+## 2026-07-17
+
+- Task: reconcile the autonomous lane E2E contract and close the delivery-date boundary regression.
+- Files changed: `e2e/exchange.spec.ts`, `e2e/tradein.spec.ts`, `e2e/web-checkout.spec.ts`, `apps/api/src/logistics/logistics.service.ts`, `apps/web/app/checkout/page.tsx`, `BACKLOG.md`.
+- Result: exchange Evidence requests and staff trade-in intake send stable idempotency keys; Evidence keys are aggregate-scoped so repeated database resets cannot reuse a stale key. Logistics availability now interprets checkout dates as `Asia/Bishkek` business days while preserving UTC timestamps, and the web checkout uses the same contract. This fixes slots created shortly after local midnight being hidden from customers.
+- Checks run: `npm run e2e` passed `56/56` with exit code `0`; isolated exchange, trade-in and delivery scenarios passed; `npm run api:build` passed; `npm run build -w @alistore/web` passed; `git diff --check` passed.
+- Outcome: `AUT-001` local Web/E2E gate is accepted. This does not certify live providers, staging, physical devices, signed mobile release or the 64 missing design references.
+- Next step: implement the next bounded finance/ERP item, prioritizing `INV-VAL-001I` or `AP-001` while retaining provider/device/staging blockers explicitly.
