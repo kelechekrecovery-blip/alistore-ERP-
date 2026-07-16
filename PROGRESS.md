@@ -2068,3 +2068,11 @@
 - Checks run: API `4/4` suites and `15/15` tests; Playwright `6/6`; matrix `4/4`; independent artifact SHA-256 `1fbcb4b544e25d8a75f08fe2b0a92c2551f25d9ae5678732de4e5c7b3db216b8` matches filename and manifest; recorder exited zero.
 - Outcome: `ECO-002G` is accepted at bounded local-software level. Deep native journeys, physical devices, live providers and 64 missing visual handoffs remain explicit gaps; production readiness remains RED.
 - Next step: commit this immutable evidence, run the clean committed-HEAD audit, then advance the highest-impact unblocked native/visual or AP/accounting gap.
+
+## 2026-07-16
+
+- Task: refresh bounded `pos-refund-reconciliation` evidence after the trusted-gate source commit.
+- Result: committed-HEAD recorder reran the exactly-once POS sale, return, approved multi-tender refund, quarantine and warehouse receipt flow against source commit `95860e7`.
+- Checks run: Playwright `1/1`; artifact SHA-256 `f4e6e85837d92df55abe02a75f81386d2e833c49cd22055e6c8a88a2d4c57f67`; recorder exited zero.
+- Outcome: the bounded POS/refund audit row is current again; courier/COD, service/loaner and procurement/sale bounded artifacts still require refresh on the same source commit.
+- Next step: commit this artifact, then refresh courier/COD evidence.
