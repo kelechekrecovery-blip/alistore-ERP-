@@ -45,4 +45,15 @@ final class AliStoreClientUITests: XCTestCase {
         search.tap()
         XCTAssertTrue(app.navigationBars["Поиск"].waitForExistence(timeout: 5))
     }
+
+    func testGuestAccountUsesClientShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        app.buttons["Кабинет"].tap()
+        XCTAssertTrue(app.navigationBars["Кабинет"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Войдите в кабинет"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Получить код"].exists)
+    }
 }

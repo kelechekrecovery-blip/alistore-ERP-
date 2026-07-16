@@ -953,77 +953,223 @@ private struct AccountView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                if auth.isRestoring {
-                    Section { ProgressView("Восстанавливаем сессию") }
-                } else if let session = auth.session {
-                    Section("Аккаунт") {
-                        LabeledContent("Телефон", value: session.phone)
-                        LabeledContent("ID", value: String(session.customerId.suffix(8)))
-                        NavigationLink("Мои заказы") {
-                            OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
-                        }
-                        NavigationLink("Мои устройства и гарантия") {
-                            DevicesView(environment: environment, auth: auth)
-                        }
-                        NavigationLink("Поддержка") {
-                            CustomerSupportView(environment: environment, auth: auth)
-                        }
-                    }
-                    Section("Уведомления") {
-                        LabeledContent("Статус", value: pushStatus)
-                        Button("Включить push", systemImage: "bell.badge") { onEnablePush() }
-                    }
-                    Section("Синхронизация") {
-                        NavigationLink("Офлайн-операции") {
-                            OfflineQueueView(environment: environment, auth: auth)
-                        }
-                    }
-                    Section {
-                        Button("Выйти", role: .destructive) {
-                            Task {
-                                await auth.logout()
-                                onLogout()
-                            }
-                        }
-                    }
-                } else {
-                    Section("Вход по SMS") {
-                        TextField("+996 555 000 000", text: $phone)
-                            .keyboardType(.phonePad)
-                        if codeRequested {
-                            TextField("6-значный код", text: $code)
-                                .keyboardType(.numberPad)
-                            if let devCode = auth.devCode {
-                                Text("Dev-код: \(devCode)").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    if let error = auth.errorMessage {
-                        Section { Text(error).foregroundStyle(.red) }
-                    }
-                    Section {
-                        if codeRequested {
-                            Button("Войти") {
-                                Task { await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber)) }
-                            }
-                            .disabled(auth.isLoading || code.filter(\.isNumber).count != 6)
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if auth.isRestoring {
+                            ProgressView("Восстанавливаем сессию")
+                                .tint(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 260)
+                        } else if let session = auth.session {
+                            signedInContent(session)
                         } else {
-                            Button("Получить код") {
-                                Task { codeRequested = await auth.requestOTP(phone: normalizedPhone) }
-                            }
-                            .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9)
+                            signInContent
                         }
                     }
+                    .padding(16)
                 }
             }
             .navigationTitle("Кабинет")
+            .navigationBarTitleDisplayMode(.inline)
         }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private func signedInContent(_ session: CustomerSession) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("МОЙ ALISTORE")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(ClientTheme.lime)
+            Text("Привет, покупатель")
+                .font(ClientTheme.display(25, weight: .black))
+                .foregroundStyle(.white)
+            Text(session.phone)
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Покупки и защита")
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            AccountMenuRow(title: "Мои заказы", detail: "Статусы, выдача и доставка", symbol: "shippingbox.fill") {
+                OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
+            }
+            AccountMenuRow(title: "Устройства и гарантия", detail: "IMEI, срок и обращение", symbol: "shield.checkered") {
+                DevicesView(environment: environment, auth: auth)
+            }
+            AccountMenuRow(title: "Поддержка", detail: "Обращения и ответы команды", symbol: "bubble.left.and.bubble.right.fill") {
+                CustomerSupportView(environment: environment, auth: auth)
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Сервисы")
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            AccountUnavailableRow(title: "Бонусы", detail: "Скоро появятся в кабинете", symbol: "gift.fill")
+            AccountUnavailableRow(title: "Адреса доставки", detail: "Управление адресами подключается", symbol: "mappin.and.ellipse")
+            AccountUnavailableRow(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3")
+        }
+
+        VStack(alignment: .leading, spacing: 10) {
+            AccountMenuRow(title: "Офлайн-операции", detail: pushStatus, symbol: "arrow.triangle.2.circlepath") {
+                OfflineQueueView(environment: environment, auth: auth)
+            }
+            Button {
+                onEnablePush()
+            } label: {
+                Label("Включить push", systemImage: "bell.badge")
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .buttonStyle(.plain)
+        }
+
+        Button {
+            Task {
+                await auth.logout()
+                onLogout()
+            }
+        } label: {
+            Text("Выйти из аккаунта")
+                .font(ClientTheme.body(14, weight: .semibold))
+                .foregroundStyle(ClientTheme.coral)
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var signInContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Войдите в кабинет")
+                .font(ClientTheme.display(25, weight: .black))
+                .foregroundStyle(.white)
+            Text("Заказы, гарантия и поддержка будут доступны после входа по SMS-коду.")
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .lineSpacing(3)
+            TextField("+996 555 000 000", text: $phone)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+                .foregroundStyle(.white)
+                .padding(14)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            if codeRequested {
+                TextField("6-значный код", text: $code)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .foregroundStyle(.white)
+                    .padding(14)
+                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                if let devCode = auth.devCode {
+                    Text("Код для тестового контура: \(devCode)")
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let error = auth.errorMessage {
+                Text(error).font(ClientTheme.body(12)).foregroundStyle(.red)
+            }
+            Button {
+                Task {
+                    if codeRequested {
+                        await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                    } else {
+                        codeRequested = await auth.requestOTP(phone: normalizedPhone)
+                    }
+                }
+            } label: {
+                HStack {
+                    Spacer()
+                    if auth.isLoading {
+                        ProgressView().tint(.black)
+                    } else {
+                        Text(codeRequested ? "Войти" : "Получить код")
+                    }
+                    Spacer()
+                }
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(height: 50)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .buttonStyle(.plain)
+            .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (codeRequested && code.filter(\.isNumber).count != 6))
+        }
+        .padding(18)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
     }
 
     private var normalizedPhone: String {
         let digits = phone.filter(\.isNumber)
         return "+\(digits)"
+    }
+}
+
+private struct AccountMenuRow<Destination: View>: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    @ViewBuilder let destination: () -> Destination
+
+    var body: some View {
+        NavigationLink(destination: destination) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .foregroundStyle(ClientTheme.lime)
+                    .frame(width: 38, height: 38)
+                    .background(ClientTheme.lime.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                    Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
+            }
+            .padding(12)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct AccountUnavailableRow: View {
+    let title: String
+    let detail: String
+    let symbol: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .foregroundStyle(ClientTheme.muted)
+                .frame(width: 38, height: 38)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+            }
+            Spacer()
+            Text("Скоро").font(ClientTheme.body(10, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+        }
+        .padding(12)
+        .background(ClientTheme.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 }
 

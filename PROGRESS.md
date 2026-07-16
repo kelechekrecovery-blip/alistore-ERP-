@@ -2217,3 +2217,12 @@
 - Checks run: targeted Client XCUITest `3/3`; aggregate iOS UI gate Client `3/3`, Staff `1/1`, Courier `1/1`, POS `1/1`; unsigned generic iOS Release archive succeeded; archive inspection confirmed HTTPS API URL and two privacy manifests; `git diff --check` passed.
 - Outcome: this bounded Client shell iteration is accepted on the simulator and release-build level. Notification data, account-backed compare sync, full 17-screen parity, physical-device biometrics/push and signed submission remain open.
 - Next step: implement the next API-backed Client account route, then refresh the native and release evidence after the route is covered by UI tests.
+
+## 2026-07-17
+
+- Task: bring the native Client account cabinet into the prototype visual system and cover the guest entry state.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: replaced the system `Form` cabinet with the dark Client shell, connected the existing orders, devices/warranty, support and offline queue routes, added visible push status/action, and represented not-yet-wired bonuses, addresses and settings as explicit non-interactive states rather than fake data.
+- Checks run: Client XCUITest `4/4`; Client simulator build passed; `git diff --check` passed.
+- Outcome: guest cabinet navigation and signed-in route composition are now visually consistent with the Client prototype. Bonuses, addresses, notification preferences and full API-backed account parity remain open.
+- Next step: run the aggregate iOS UI gate on this cabinet commit, then continue with the next API-backed account contract.
