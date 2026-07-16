@@ -30,8 +30,12 @@ describe('Warranty (integration)', () => {
     // a prior suite — jest suite order varies — never block the customer/product wipe.
     await prisma.auditEvent.deleteMany();
     await prisma.warrantyOpenCommand.deleteMany();
-    await prisma.warrantyCase.deleteMany();
+    await prisma.loanerLoan.deleteMany();
+    await prisma.servicePart.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.serviceWorkOrderCommand.deleteMany();
+    await prisma.serviceWorkOrder.deleteMany();
+    await prisma.warrantyCase.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.reservation.deleteMany();

@@ -31,7 +31,7 @@ export class EvidenceController {
       required: ['file', 'entityType', 'entityId'],
       properties: {
         file: { type: 'string', format: 'binary' },
-        entityType: { type: 'string', enum: ['tradein', 'return', 'warranty', 'inventory', 'order', 'support', 'shift'] },
+        entityType: { type: 'string', enum: ['tradein', 'return', 'warranty', 'inventory', 'order', 'support', 'shift', 'loaner', 'quarantine'] },
         entityId: { type: 'string' },
         label: { type: 'string' },
         actor: { type: 'string' },
@@ -54,6 +54,8 @@ export class EvidenceController {
       throw new ValidationError('no_file', 'Файл не приложен (поле "file")');
     }
     const custodyEvidence = dto.entityType === 'loaner' && ['loaner_issue', 'loaner_return'].includes(dto.label?.trim() ?? '');
+    const quarantineEvidence = dto.entityType === 'quarantine' && dto.label?.trim() === 'quarantine_diagnosis';
+    const trustedStaffEvidence = custodyEvidence || quarantineEvidence;
     let guestCustomerId: string | undefined;
     if (user?.typ === 'staff') {
       await this.staffAuth.me(user.customerId);
@@ -67,6 +69,6 @@ export class EvidenceController {
       await this.evidence.assertCustomerOwnsEntity(customerId, dto.entityType, dto.entityId);
     }
     const actor = user?.typ === 'staff' ? `staff:${user.customerId}` : user?.customerId ?? guestCustomerId!;
-    return this.evidence.attachImage(file.buffer, { ...dto, actor }, custodyEvidence && user?.typ === 'staff');
+    return this.evidence.attachImage(file.buffer, { ...dto, actor }, trustedStaffEvidence && user?.typ === 'staff');
   }
 }

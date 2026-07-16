@@ -45,6 +45,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await prisma.reservation.deleteMany();
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
@@ -127,6 +128,11 @@ describe('Refund-bound return reconciliation (integration)', () => {
     ]));
     expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'inventory.return', sourceRef: { startsWith: `${ret.id}:` } } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: EventType.AccountingEntryPosted, refs: { has: reversal.id } } })).toBe(1);
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei } })).toMatchObject({ status: 'returned', location: 'RETURNS' });
+    expect(await prisma.inventoryQuarantineCase.findFirstOrThrow({ where: { sourceType: 'return', returnId: ret.id } })).toMatchObject({
+      status: 'pending_diagnosis',
+      unitId: expect.any(String),
+    });
   });
 
   it('restores quantity FIFO value, movement value and COGS exactly once', async () => {
@@ -347,7 +353,8 @@ describe('Refund-bound return reconciliation (integration)', () => {
         },
       });
       await returns.transition(ret.id, 'reconciled', 'staff:warehouse', 'RETURNS');
-      expect(await prisma.deviceUnit.count({ where: { imei: { in: bundleImeis }, status: 'in_stock' } })).toBe(index + 1);
+      expect(await prisma.deviceUnit.count({ where: { imei: { in: bundleImeis }, status: 'returned' } })).toBe(index + 1);
+      expect(await prisma.inventoryQuarantineCase.count({ where: { sourceType: 'return', returnId: ret.id } })).toBe(1);
     }
     expect(await prisma.deviceUnit.count({ where: { imei: { in: bundleImeis }, orderId: null, location: 'RETURNS' } })).toBe(2);
   });
@@ -438,7 +445,8 @@ describe('Refund-bound return reconciliation (integration)', () => {
     })).toMatchObject({ onHand: 3, reserved: 0 });
     const units = await prisma.deviceUnit.findMany({ where: { imei: { in: [directImei, bundleImei] } } });
     expect(units).toHaveLength(2);
-    expect(units.every((unit) => unit.status === 'in_stock' && unit.location === 'RETURNS-BISHKEK' && !unit.orderId)).toBe(true);
+    expect(units.every((unit) => unit.status === 'returned' && unit.location === 'RETURNS-BISHKEK' && !unit.orderId)).toBe(true);
+    expect(await prisma.inventoryQuarantineCase.count({ where: { sourceType: 'return', returnId: ret.id } })).toBe(2);
     expect(await prisma.inventoryMovement.count({ where: { type: 'return_restock' } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'return.completed', refs: { has: ret.id } } })).toBe(1);
   });

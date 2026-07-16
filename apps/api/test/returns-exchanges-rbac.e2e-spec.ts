@@ -63,11 +63,13 @@ describe('Returns and exchanges RBAC split', () => {
   });
 
   afterAll(async () => {
+    await prisma.inventoryQuarantineCase.deleteMany();
     await app.close();
   });
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();

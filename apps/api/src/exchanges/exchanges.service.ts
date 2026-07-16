@@ -10,6 +10,7 @@ import { UnitsService } from '../units/units.service';
 import { paymentAccountCode, postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { outputTaxMetadata, salesTaxSnapshot } from '../finance/sales-tax';
 import { reverseInventoryCostOnTx } from '../inventory/inventory-valuation';
+import { createQuarantineCaseOnTx } from '../inventory/inventory-quarantine';
 
 const SURCHARGE_METHODS = new Set<PaymentMethod>([
   PaymentMethod.cash,
@@ -146,6 +147,24 @@ export class ExchangesService {
           items: { create: { orderItemId: oldItem.id, qty: 1, refundAmount: creditAmount } },
         },
       });
+      const oldIssue = await tx.inventoryValuationIssue.findFirst({
+        where: { orderId: order.id, imei: dto.oldImei, sourceType: 'sale', reversedQty: 0 },
+        orderBy: { createdAt: 'desc' },
+      });
+      const quarantine = await createQuarantineCaseOnTx(tx, {
+        unitId: oldUnit.id,
+        sourceType: 'exchange',
+        returnId: ret.id,
+        reason: 'обмен',
+        unitCost: oldIssue?.unitCost ?? oldUnit.acquisitionCost ?? 0,
+        actor,
+      });
+      events.push({
+        type: EventType.InventoryQuarantined,
+        actor,
+        payload: { quarantineId: quarantine.id, returnId: ret.id, orderId: order.id, imei: dto.oldImei, location: oldUnit.location },
+        refs: [quarantine.id, ret.id, order.id, dto.oldImei],
+      });
       events.push({
         type: EventType.ReturnCompleted,
         actor,
@@ -172,10 +191,6 @@ export class ExchangesService {
         ],
       });
       events.push(accountingEvent(actor, oldSaleReversal.id, 'exchange.return', ret.id, creditAmount, [ret.id, order.id]));
-      const oldIssue = await tx.inventoryValuationIssue.findFirst({
-        where: { orderId: order.id, imei: dto.oldImei, sourceType: 'sale', reversedQty: 0 },
-        orderBy: { createdAt: 'desc' },
-      });
       if (oldIssue) {
         const oldCost = await reverseInventoryCostOnTx(tx, { issueId: oldIssue.id, quantity: 1, returnId: ret.id, actor });
         events.push(accountingEvent(actor, oldCost.entry.id, 'inventory.return', oldIssue.id, oldCost.totalCost, [ret.id, order.id, dto.oldImei]));

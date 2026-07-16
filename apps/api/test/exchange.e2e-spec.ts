@@ -29,11 +29,13 @@ describe('Exchange (integration)', () => {
   });
 
   afterAll(async () => {
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.$disconnect();
   });
 
   beforeEach(async () => {
     await prisma.auditEvent.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
@@ -144,6 +146,9 @@ describe('Exchange (integration)', () => {
     const ret = await prisma.return.findUniqueOrThrow({ where: { id: res.returnId }, include: { items: true } });
     expect(ret).toMatchObject({ refundAmount: 100000, isFullOrder: true, status: 'reconciled' });
     expect(ret.items).toEqual([expect.objectContaining({ qty: 1, refundAmount: 100000 })]);
+    expect(await prisma.inventoryQuarantineCase.findFirstOrThrow({
+      where: { sourceType: 'exchange', returnId: res.returnId },
+    })).toMatchObject({ status: 'pending_diagnosis' });
 
     const accounting = await prisma.accountingJournalEntry.findMany({
       where: { sourceType: { in: ['exchange.return', 'exchange.sale', 'exchange.surcharge'] } },
@@ -186,7 +191,16 @@ describe('Exchange (integration)', () => {
 
     const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
     expect(types).toEqual(
-      expect.arrayContaining(['unit.returned', 'return.completed', 'order.created', 'unit.sold', 'order.paid', 'payment.received', 'order.exchanged']),
+      expect.arrayContaining([
+        'unit.returned',
+        EventType.InventoryQuarantined,
+        'return.completed',
+        'order.created',
+        'unit.sold',
+        'order.paid',
+        'payment.received',
+        'order.exchanged',
+      ]),
     );
   });
 

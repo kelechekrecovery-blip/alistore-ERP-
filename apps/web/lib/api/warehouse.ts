@@ -73,6 +73,56 @@ export function fetchInventoryValuationReconciliation(
   return getJson('/inventory/valuation/reconciliation', accessToken);
 }
 
+export type QuarantineDiagnosis = 'resellable' | 'repair' | 'write_off';
+export type QuarantineDisposition = 'restock' | 'repair' | 'write_off';
+
+export interface InventoryQuarantineCase {
+  id: string;
+  sourceType: 'return' | 'exchange';
+  returnId: string;
+  reason: string;
+  unitCost: number;
+  status: 'pending_diagnosis' | 'diagnosed' | 'disposed';
+  diagnosis?: QuarantineDiagnosis | null;
+  disposition?: QuarantineDisposition | null;
+  notes?: string | null;
+  createdBy: string;
+  diagnosedBy?: string | null;
+  disposedBy?: string | null;
+  diagnosedAt?: string | null;
+  disposedAt?: string | null;
+  dispositionApprovalId?: string | null;
+  repairWorkOrderId?: string | null;
+  createdAt: string;
+  unit: {
+    imei: string;
+    location: string;
+    status: string;
+    acquisitionCost?: number | null;
+    product: { id: string; sku: string; name: string };
+  };
+}
+
+export function fetchInventoryQuarantine(accessToken: string): Promise<InventoryQuarantineCase[]> {
+  return getJson('/inventory/quarantine', accessToken);
+}
+
+export function diagnoseInventoryQuarantine(
+  id: string,
+  input: { diagnosis: QuarantineDiagnosis; notes?: string },
+  accessToken: string,
+): Promise<InventoryQuarantineCase> {
+  return postAuthJson(`/inventory/quarantine/${id}/diagnose`, input, accessToken);
+}
+
+export function disposeInventoryQuarantine(
+  id: string,
+  disposition: QuarantineDisposition,
+  accessToken: string,
+): Promise<InventoryQuarantineCase | { approvalId: string; status: 'requested' }> {
+  return postAuthJson(`/inventory/quarantine/${id}/dispose`, { disposition }, accessToken);
+}
+
 export function transferQuantityInventory(
   input: { idempotencyKey: string; productId: string; from: string; to: string; qty: number; reason?: string },
   accessToken: string,

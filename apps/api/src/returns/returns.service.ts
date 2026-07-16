@@ -7,6 +7,7 @@ import { ConflictError, ForbiddenError, ValidationError } from '../common/errors
 import type { ReturnSelectionDto } from './returns.dto';
 import { reverseInventoryCostOnTx, reverseQuantityCostOnTx } from '../inventory/inventory-valuation';
 import { postConsignmentReturnAccountingOnTx } from '../inventory/consignment-accounting';
+import { createQuarantineCaseOnTx } from '../inventory/inventory-quarantine';
 
 type ReturnWithItems = Prisma.ReturnGetPayload<{ include: { items: true } }>;
 
@@ -474,9 +475,13 @@ export class ReturnsService {
     const consignmentImeis = new Set(consignments.map((item) => item.unit.imei));
     const regularImeis = imeis.filter((imei) => !consignmentImeis.has(imei));
     if (regularImeis.length > 0) {
+      const regularUnits = await tx.deviceUnit.findMany({
+        where: { imei: { in: regularImeis }, orderId: order.id, status: 'sold' },
+        select: { id: true, imei: true, acquisitionCost: true },
+      });
       const restored = await tx.deviceUnit.updateMany({
         where: { imei: { in: regularImeis }, orderId: order.id, status: 'sold' },
-        data: { status: 'in_stock', location, orderId: null },
+        data: { status: 'returned', location, orderId: null },
       });
       if (restored.count !== regularImeis.length) {
         throw new ConflictError(
@@ -484,7 +489,8 @@ export class ReturnsService {
           'Не все серийные товары заказа находятся в статусе sold',
         );
       }
-      for (const imei of regularImeis) {
+      for (const unit of regularUnits) {
+        const imei = unit.imei;
         const issue = await tx.inventoryValuationIssue.findFirst({
           where: { imei, sourceType: 'sale', orderId: order.id, reversedQty: 0 },
           orderBy: { createdAt: 'desc' },
@@ -506,6 +512,20 @@ export class ReturnsService {
             refs: [reversed.entry.id, ret.id, order.id, imei],
           });
         }
+        const quarantine = await createQuarantineCaseOnTx(tx, {
+          unitId: unit.id,
+          sourceType: 'return',
+          returnId: ret.id,
+          reason: ret.reason,
+          unitCost: issue?.unitCost ?? unit.acquisitionCost ?? 0,
+          actor,
+        });
+        events.push({
+          type: EventType.InventoryQuarantined,
+          actor,
+          payload: { quarantineId: quarantine.id, returnId: ret.id, orderId: order.id, imei, location },
+          refs: [quarantine.id, ret.id, order.id, imei],
+        });
         events.push({
           type: EventType.UnitReturned,
           actor,

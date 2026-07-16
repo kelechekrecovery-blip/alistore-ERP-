@@ -12,6 +12,8 @@ import { InventoryService } from './inventory.service';
 import {
   CountDto,
   CreateConsignmentPayoutDto,
+  DiagnoseQuarantineDto,
+  DisposeQuarantineDto,
   MovementDto,
   PayConsignmentPayoutDto,
   ReceiveConsignmentDto,
@@ -166,5 +168,35 @@ export class InventoryController {
   async valuationReconciliation(@CurrentUser() user: AuthPrincipal) {
     await requireActiveStaff(user, this.staffAuth);
     return this.inventory.valuationReconciliation();
+  }
+
+  @ApiOperation({ summary: 'List serialized units awaiting or completing quarantine disposition' })
+  @Get('quarantine')
+  @RequirePermission('inventory', 'count')
+  async listQuarantine(@CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    return this.inventory.listQuarantine();
+  }
+
+  @ApiOperation({ summary: 'Diagnose a quarantined IMEI after trusted staff photo evidence' })
+  @Post('quarantine/:id/diagnose')
+  @RequirePermission('inventory', 'count')
+  async diagnoseQuarantine(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Body() dto: DiagnoseQuarantineDto,
+  ) {
+    return this.inventory.diagnoseQuarantine(id, dto, await requireActiveStaff(user, this.staffAuth));
+  }
+
+  @ApiOperation({ summary: 'Apply a four-eyes quarantine disposition to the IMEI' })
+  @Post('quarantine/:id/dispose')
+  @RequirePermission('inventory', 'movement')
+  async disposeQuarantine(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Body() dto: DisposeQuarantineDto,
+  ) {
+    return this.inventory.disposeQuarantine(id, dto, await requireActiveStaff(user, this.staffAuth));
   }
 }

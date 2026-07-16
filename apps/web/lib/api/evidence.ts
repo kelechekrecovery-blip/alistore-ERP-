@@ -1,6 +1,6 @@
 import { API_BASE } from './http';
 
-export type EvidenceEntityType = 'tradein' | 'return' | 'warranty' | 'inventory' | 'order' | 'support' | 'shift' | 'loaner';
+export type EvidenceEntityType = 'tradein' | 'return' | 'warranty' | 'inventory' | 'order' | 'support' | 'shift' | 'loaner' | 'quarantine';
 
 export interface EvidenceAsset {
   key: string;

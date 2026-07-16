@@ -6,7 +6,7 @@ import { canTransition } from '../orders/order-state-machine';
 import { insertDebt } from '../debts/debt-insert';
 import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
 import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
-import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
+import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 
@@ -509,6 +509,126 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   }
 };
 
+/** quarantine_write_off — owner-approved disposal of one diagnosed returned IMEI. */
+const quarantine_write_off: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const quarantineId = String(payload['quarantineId']);
+  const unitId = String(payload['unitId']);
+  const unitCost = Number(payload['unitCost']);
+  await tx.$queryRaw`SELECT id FROM "InventoryQuarantineCase" WHERE id = ${quarantineId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM "DeviceUnit" WHERE id = ${unitId} FOR UPDATE`;
+  const quarantine = await tx.inventoryQuarantineCase.findUnique({
+    where: { id: quarantineId },
+    include: { unit: true },
+  });
+  if (!quarantine) throw new ValidationError('quarantine_not_found', 'Карантинная запись не найдена');
+  if (quarantine.dispositionApprovalId !== approvalId
+    || quarantine.unitId !== unitId
+    || quarantine.unitCost !== unitCost) {
+    throw new ConflictError('quarantine_approval_snapshot_changed', 'Снимок карантинного списания изменён');
+  }
+  if (quarantine.status !== 'diagnosed' || quarantine.diagnosis !== 'write_off') {
+    throw new ConflictError('quarantine_not_writeoff_ready', 'Карантин больше не ожидает списание');
+  }
+  if (quarantine.diagnosedBy === approver) {
+    throw new ConflictError('quarantine_four_eyes_required', 'Диагност не может согласовать списание');
+  }
+  const unitUpdate = await tx.deviceUnit.updateMany({
+    where: { id: unitId, status: 'returned' },
+    data: { status: 'written_off' },
+  });
+  if (unitUpdate.count !== 1) {
+    throw new ConflictError('quarantine_unit_state_mismatch', 'IMEI уже обработан другой операцией');
+  }
+  const movement = await tx.inventoryMovement.create({
+    data: {
+      productId: quarantine.unit.productId,
+      qty: -1,
+      type: 'write_off',
+      from: quarantine.unit.location,
+      reason: `quarantine:${quarantineId}`,
+      unitCost,
+      totalValue: unitCost,
+    },
+  });
+  await tx.inventoryValuationIssue.create({
+    data: {
+      productId: quarantine.unit.productId,
+      imei: quarantine.unit.imei,
+      sourceType: 'inventory.quarantine.write_off',
+      sourceRef: quarantineId,
+      quantity: 1,
+      unitCost,
+      totalCost: unitCost,
+    },
+  });
+  let accountingEntryId: string | null = null;
+  if (unitCost > 0) {
+    const entry = await postAccountingEntryOnTx(tx, {
+      idempotencyKey: `accounting:inventory:quarantine:${quarantineId}`,
+      sourceType: 'inventory.quarantine.write_off',
+      sourceRef: quarantineId,
+      description: `Списание IMEI ${quarantine.unit.imei} после карантина`,
+      point: quarantine.unit.location,
+      documentAmount: unitCost,
+      baseAmount: unitCost,
+      occurredAt: new Date(),
+      createdBy: approver,
+      lines: [
+        { accountCode: '6900', debit: unitCost },
+        { accountCode: '1200', credit: unitCost },
+      ],
+    });
+    accountingEntryId = entry.id;
+    events.push({
+      type: EventType.AccountingEntryPosted,
+      actor: approver,
+      payload: { accountingEntryId: entry.id, sourceType: 'inventory.quarantine.write_off', quarantineId, amount: unitCost },
+      refs: [entry.id, quarantineId, quarantine.unit.imei],
+    });
+  }
+  await tx.inventoryQuarantineCase.update({
+    where: { id: quarantineId },
+    data: { status: 'disposed', disposition: 'write_off', disposedBy: approver, disposedAt: new Date() },
+  });
+  events.push({
+    type: EventType.StockWrittenOff,
+    actor: approver,
+    payload: { approvalId, quarantineId, productId: quarantine.unit.productId, imei: quarantine.unit.imei, movementId: movement.id, totalValue: unitCost },
+    refs: [approvalId, quarantineId, quarantine.unit.imei, movement.id],
+  });
+  events.push({
+    type: EventType.InventoryDisposed,
+    actor: approver,
+    payload: { quarantineId, disposition: 'write_off', imei: quarantine.unit.imei, movementId: movement.id, accountingEntryId },
+    refs: [quarantineId, quarantine.unit.imei, movement.id],
+  });
+};
+
+const reject_quarantine_write_off: ActionRejectionExecutor = async (
+  tx,
+  payload,
+  approver,
+  approvalId,
+  reason,
+  events,
+) => {
+  const quarantineId = String(payload['quarantineId']);
+  await tx.$queryRaw`SELECT id FROM "InventoryQuarantineCase" WHERE id = ${quarantineId} FOR UPDATE`;
+  const cleared = await tx.inventoryQuarantineCase.updateMany({
+    where: { id: quarantineId, status: 'diagnosed', dispositionApprovalId: approvalId },
+    data: { dispositionApprovalId: null },
+  });
+  if (cleared.count !== 1) {
+    throw new ConflictError('quarantine_approval_snapshot_changed', 'Карантин больше не ожидает это согласование');
+  }
+  events.push({
+    type: EventType.InventoryDiagnosed,
+    actor: approver,
+    payload: { quarantineId, writeOffApprovalId: approvalId, rejected: true, reason },
+    refs: [quarantineId, approvalId],
+  });
+};
+
 async function lockQuantityBalance(tx: Prisma.TransactionClient, productId: string, location: string) {
   await tx.$queryRaw`SELECT id FROM "InventoryBalance" WHERE "productId" = ${productId} AND location = ${location} FOR UPDATE`;
   const balance = await tx.inventoryBalance.findUnique({ where: { productId_location: { productId, location } } });
@@ -572,6 +692,7 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   price,
   write_off,
   stock_adjust,
+  quarantine_write_off,
   delete: del,
   debt,
 };
@@ -579,4 +700,5 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
 export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {
   campaign_budget: reject_campaign_budget,
   refund: reject_refund,
+  quarantine_write_off: reject_quarantine_write_off,
 };

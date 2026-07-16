@@ -1,12 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Camera, Check, RefreshCw, ShieldCheck, Wrench } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card } from './Card';
 import { som } from '@/lib/format';
 import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 import {
+  diagnoseInventoryQuarantine,
+  disposeInventoryQuarantine,
+  fetchInventoryQuarantine,
   fetchInventoryValuationReconciliation,
+  uploadEvidenceImage,
+  type InventoryQuarantineCase,
   type InventoryValuationReconciliation,
+  type QuarantineDiagnosis,
+  type QuarantineDisposition,
 } from '@/lib/api';
 import type { Dashboard } from '@/lib/reports';
 
@@ -33,11 +41,26 @@ function stockChip(units: number): { label: string; color: string } {
  * (Товар/Остаток/Цена/Статус, low-stock first) built from the public catalog, plus the
  * orders-by-status breakdown from the dashboard.
  */
-export function StockView({ d, accessToken, role }: { d: Dashboard | null; accessToken: string; role: string }) {
+export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | null; accessToken: string; role: string; staffId: string }) {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [reconciliation, setReconciliation] = useState<InventoryValuationReconciliation | null>(null);
   const [reconciliationError, setReconciliationError] = useState('');
+  const [quarantine, setQuarantine] = useState<InventoryQuarantineCase[] | null>(null);
+  const [quarantineError, setQuarantineError] = useState('');
+  const [busyCase, setBusyCase] = useState('');
+  const [diagnosis, setDiagnosis] = useState<Record<string, QuarantineDiagnosis>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [evidence, setEvidence] = useState<Record<string, File | null>>({});
   const canReadFinance = role === 'admin' || role === 'owner';
+  const canManageQuarantine = role === 'admin' || role === 'owner' || role === 'warehouse';
+
+  const loadQuarantine = useCallback(() => {
+    if (!canManageQuarantine) return;
+    setQuarantineError('');
+    fetchInventoryQuarantine(accessToken)
+      .then(setQuarantine)
+      .catch((error) => setQuarantineError(error instanceof Error ? error.message : 'Карантин недоступен'));
+  }, [accessToken, canManageQuarantine]);
 
   useEffect(() => {
     fetchCatalog({ limit: 200 })
@@ -51,6 +74,59 @@ export function StockView({ d, accessToken, role }: { d: Dashboard | null; acces
       .then(setReconciliation)
       .catch((error) => setReconciliationError(error instanceof Error ? error.message : 'Сверка недоступна'));
   }, [accessToken, canReadFinance]);
+
+  useEffect(() => {
+    loadQuarantine();
+  }, [loadQuarantine]);
+
+  async function diagnoseCase(item: InventoryQuarantineCase) {
+    const file = evidence[item.id];
+    if (!file) {
+      setQuarantineError('Для диагноза приложите фото состояния устройства');
+      return;
+    }
+    setBusyCase(item.id);
+    setQuarantineError('');
+    try {
+      await uploadEvidenceImage({
+        file,
+        entityType: 'quarantine',
+        entityId: item.id,
+        label: 'quarantine_diagnosis',
+        accessToken,
+      });
+      await diagnoseInventoryQuarantine(item.id, {
+        diagnosis: diagnosis[item.id] ?? 'resellable',
+        notes: notes[item.id]?.trim() || undefined,
+      }, accessToken);
+      loadQuarantine();
+    } catch (error) {
+      setQuarantineError(error instanceof Error ? error.message : 'Не удалось зафиксировать диагноз');
+    } finally {
+      setBusyCase('');
+    }
+  }
+
+  async function disposeCase(item: InventoryQuarantineCase) {
+    if (!item.diagnosis) return;
+    setBusyCase(item.id);
+    setQuarantineError('');
+    try {
+      const result = await disposeInventoryQuarantine(item.id, dispositionFor(item.diagnosis), accessToken);
+      if ('approvalId' in result) {
+        setQuarantine((current) => current?.map((row) => row.id === item.id
+          ? { ...row, dispositionApprovalId: result.approvalId }
+          : row) ?? current);
+        setQuarantineError(`Запрос на списание ${result.approvalId} отправлен владельцу`);
+      } else {
+        loadQuarantine();
+      }
+    } catch (error) {
+      setQuarantineError(error instanceof Error ? error.message : 'Не удалось применить решение');
+    } finally {
+      setBusyCase('');
+    }
+  }
 
   const items = [...(products ?? [])].sort((a, b) => a.availableUnits - b.availableUnits);
   const totalValue = items.reduce((sum, p) => sum + p.price * p.availableUnits, 0);
@@ -119,6 +195,130 @@ export function StockView({ d, accessToken, role }: { d: Dashboard | null; acces
           )}
         </div>
       </Card>
+
+      {canManageQuarantine && (
+        <Card>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 font-display text-[15px] font-bold text-white">
+                <ShieldCheck size={17} className="text-[#E5B23C]" /> Карантин возвратных IMEI
+              </div>
+              <div className="mt-0.5 text-xs text-[#8A7F76]">Фото и диагноз фиксирует один сотрудник, решение применяет другой</div>
+            </div>
+            <button
+              type="button"
+              title="Обновить карантин"
+              aria-label="Обновить карантин"
+              onClick={loadQuarantine}
+              className="grid size-8 shrink-0 place-items-center rounded-[6px] border border-[#3A342E] text-[#A79C92] hover:border-[#5A5148] hover:text-white"
+            >
+              <RefreshCw size={15} />
+            </button>
+          </div>
+          {quarantineError && (
+            <div role="alert" className="mb-3 rounded-[7px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/10 p-3 text-sm text-[#FF8A7A]">
+              {quarantineError}
+            </div>
+          )}
+          {quarantine === null && !quarantineError && (
+            <div className="py-8 text-center text-sm text-[#8A7F76]">Загружаем очередь карантина…</div>
+          )}
+          {quarantine?.length === 0 && (
+            <div className="py-8 text-center text-sm text-[#8A7F76]">Устройств на карантине нет</div>
+          )}
+          <div className="divide-y divide-[#221E19]">
+            {quarantine?.map((item) => (
+              <div key={item.id} data-testid={`quarantine-${item.id}`} className="grid gap-3 py-4 first:pt-1 lg:grid-cols-[1.25fr_1fr_auto] lg:items-center">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-white">{item.unit.product.name}</div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-[#A79C92]">
+                    <span>{item.unit.imei}</span><span>{item.unit.location}</span><span>{som(item.unit.acquisitionCost ?? 0)}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-[#6F665E]">{item.sourceType === 'exchange' ? 'Обмен' : 'Возврат'} · {item.reason}</div>
+                </div>
+
+                {item.status === 'pending_diagnosis' && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select
+                      aria-label={`Диагноз ${item.unit.imei}`}
+                      value={diagnosis[item.id] ?? 'resellable'}
+                      onChange={(event) => setDiagnosis((current) => ({ ...current, [item.id]: event.target.value as QuarantineDiagnosis }))}
+                      className="h-9 rounded-[6px] border border-[#3A342E] bg-[#171411] px-2 text-xs text-white"
+                    >
+                      <option value="resellable">Можно вернуть в продажу</option>
+                      <option value="repair">Нужен ремонт</option>
+                      <option value="write_off">Списать</option>
+                    </select>
+                    <input
+                      aria-label={`Комментарий ${item.unit.imei}`}
+                      placeholder="Комментарий"
+                      value={notes[item.id] ?? ''}
+                      onChange={(event) => setNotes((current) => ({ ...current, [item.id]: event.target.value }))}
+                      className="h-9 min-w-0 rounded-[6px] border border-[#3A342E] bg-[#171411] px-2 text-xs text-white placeholder:text-[#6F665E]"
+                    />
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[6px] border border-dashed border-[#4A423A] px-2 text-xs text-[#A79C92] hover:border-[#6A6056] hover:text-white">
+                      <Camera size={14} />
+                      <span className="truncate">{evidence[item.id]?.name ?? 'Фото диагностики'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => setEvidence((current) => ({ ...current, [item.id]: event.target.files?.[0] ?? null }))}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={busyCase === item.id}
+                      onClick={() => diagnoseCase(item)}
+                      className="flex h-9 items-center justify-center gap-2 rounded-[6px] bg-[#E5B23C] px-3 text-xs font-semibold text-[#17120A] disabled:opacity-50"
+                    >
+                      <Check size={14} /> {busyCase === item.id ? 'Сохраняем…' : 'Зафиксировать'}
+                    </button>
+                  </div>
+                )}
+
+                {item.status === 'diagnosed' && (
+                  <div className="text-xs">
+                    <div className="font-semibold text-[#E5B23C]">{diagnosisLabel(item.diagnosis)}</div>
+                    <div className="mt-1 text-[#8A7F76]">Диагност: {item.diagnosedBy}</div>
+                    {item.notes && <div className="mt-1 text-[#D8CFC6]">{item.notes}</div>}
+                  </div>
+                )}
+
+                {item.status === 'disposed' && (
+                  <div className="text-xs">
+                    <div className="font-semibold text-lime">Решение выполнено: {dispositionLabel(item.disposition)}</div>
+                    <div className="mt-1 text-[#8A7F76]">Исполнитель: {item.disposedBy}</div>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  {item.status === 'diagnosed' ? (
+                    item.diagnosedBy === staffId ? (
+                      <span className="rounded-chip bg-[#E5B23C]/10 px-2 py-1 text-[11px] text-[#E5B23C]">
+                        Нужен второй сотрудник
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busyCase === item.id || Boolean(item.dispositionApprovalId)}
+                        onClick={() => disposeCase(item)}
+                        className="flex h-9 items-center gap-2 rounded-[6px] bg-lime px-3 text-xs font-semibold text-[#101408] disabled:opacity-50"
+                      >
+                        <Wrench size={14} /> {item.dispositionApprovalId ? 'Ждёт владельца' : busyCase === item.id ? 'Применяем…' : dispositionAction(item.diagnosis)}
+                      </button>
+                    )
+                  ) : (
+                    <span className={`rounded-chip px-2 py-1 text-[11px] ${item.status === 'disposed' ? 'bg-lime/10 text-lime' : 'bg-[#E5B23C]/10 text-[#E5B23C]'}`}>
+                      {item.status === 'disposed' ? 'Завершено' : 'Ждёт диагностики'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {canReadFinance && (
         <Card>
@@ -199,6 +399,30 @@ export function StockView({ d, accessToken, role }: { d: Dashboard | null; acces
       </Card>
     </div>
   );
+}
+
+function dispositionFor(diagnosis: QuarantineDiagnosis): QuarantineDisposition {
+  return diagnosis === 'resellable' ? 'restock' : diagnosis;
+}
+
+function diagnosisLabel(diagnosis?: QuarantineDiagnosis | null) {
+  if (diagnosis === 'resellable') return 'Можно вернуть в продажу';
+  if (diagnosis === 'repair') return 'Требуется ремонт';
+  if (diagnosis === 'write_off') return 'Требуется списание';
+  return 'Диагноз не указан';
+}
+
+function dispositionLabel(disposition?: QuarantineDisposition | null) {
+  if (disposition === 'restock') return 'возвращено в продажу';
+  if (disposition === 'repair') return 'передано в сервис';
+  if (disposition === 'write_off') return 'списано';
+  return 'не указано';
+}
+
+function dispositionAction(diagnosis?: QuarantineDiagnosis | null) {
+  if (diagnosis === 'resellable') return 'Вернуть в продажу';
+  if (diagnosis === 'repair') return 'Передать в сервис';
+  return 'Списать';
 }
 
 function ValuationMetric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -7,6 +8,8 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import {
   CountDto,
   CreateConsignmentPayoutDto,
+  DiagnoseQuarantineDto,
+  DisposeQuarantineDto,
   MovementDto,
   PayConsignmentPayoutDto,
   ReceiveConsignmentDto,
@@ -25,6 +28,16 @@ const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
   write_off: 'write_off',
   adjust: 'stock_adjust',
 };
+
+type QuarantineDispositionResult =
+  | { approvalId: string; status: 'requested' }
+  | Prisma.InventoryQuarantineCaseGetPayload<{
+    include: { unit: { include: { product: true } } };
+  }>;
+type QuarantineDisposedCase = Exclude<
+  QuarantineDispositionResult,
+  { approvalId: string; status: 'requested' }
+>;
 
 /**
  * Inventory movements. Write-off and stock adjustment are always approval-gated
@@ -162,6 +175,237 @@ export class InventoryService {
       quantity,
       serialized,
     };
+  }
+
+  async listQuarantine() {
+    const include = {
+      include: {
+        unit: {
+          select: {
+            imei: true,
+            location: true,
+            status: true,
+            acquisitionCost: true,
+            product: { select: { id: true, sku: true, name: true } },
+          },
+        },
+      },
+    } as const;
+    const [active, history] = await Promise.all([
+      this.prisma.inventoryQuarantineCase.findMany({
+        where: { status: { not: 'disposed' } },
+        ...include,
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.inventoryQuarantineCase.findMany({
+        where: { status: 'disposed' },
+        ...include,
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+    ]);
+    return [...active, ...history];
+  }
+
+  async diagnoseQuarantine(id: string, dto: DiagnoseQuarantineDto, actor: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "InventoryQuarantineCase" WHERE id = ${id} FOR UPDATE`;
+      const quarantine = await tx.inventoryQuarantineCase.findUnique({ where: { id } });
+      if (!quarantine) throw new ValidationError('quarantine_not_found', 'Карантинная запись не найдена');
+      const notes = dto.notes?.trim() || null;
+      if (quarantine.status === 'diagnosed'
+        && quarantine.diagnosis === dto.diagnosis
+        && quarantine.notes === notes) {
+        return { result: quarantine, events: [] };
+      }
+      if (quarantine.status !== 'pending_diagnosis') {
+        throw new ConflictError('quarantine_already_diagnosed', 'Диагноз уже зафиксирован и не редактируется');
+      }
+      const evidence = await tx.auditEvent.findMany({
+        where: { type: EventType.EvidenceAttached, actor: `staff:${actor}`, refs: { has: id } },
+        select: { actor: true, payload: true },
+        orderBy: { ts: 'desc' },
+      });
+      const hasTrustedDiagnosis = evidence.some((event) => {
+        const payload = event.payload as Record<string, unknown>;
+        return payload.entityType === 'quarantine'
+          && payload.entityId === id
+          && payload.label === 'quarantine_diagnosis'
+          && payload.trustedStaffEvidence === true
+          && event.actor === `staff:${actor}`;
+      });
+      if (!hasTrustedDiagnosis) {
+        throw new ConflictError('quarantine_evidence_required', 'До диагноза приложите фото quarantine_diagnosis');
+      }
+      const updated = await tx.inventoryQuarantineCase.update({
+        where: { id },
+        data: {
+          status: 'diagnosed',
+          diagnosis: dto.diagnosis,
+          notes,
+          diagnosedBy: actor,
+          diagnosedAt: new Date(),
+        },
+      });
+      return {
+        result: updated,
+        events: [{
+          type: EventType.InventoryDiagnosed,
+          actor,
+          payload: { quarantineId: id, diagnosis: dto.diagnosis, notes },
+          refs: [id, quarantine.unitId, quarantine.returnId],
+        }],
+      };
+    });
+  }
+
+  async disposeQuarantine(
+    id: string,
+    dto: DisposeQuarantineDto & { disposition: 'write_off' },
+    actor: string,
+  ): Promise<{ approvalId: string; status: 'requested' }>;
+  async disposeQuarantine(
+    id: string,
+    dto: DisposeQuarantineDto & { disposition: 'repair' },
+    actor: string,
+  ): Promise<QuarantineDisposedCase & { repairWorkOrderId: string }>;
+  async disposeQuarantine(
+    id: string,
+    dto: DisposeQuarantineDto & { disposition: 'restock' },
+    actor: string,
+  ): Promise<QuarantineDisposedCase>;
+  async disposeQuarantine(
+    id: string,
+    dto: DisposeQuarantineDto,
+    actor: string,
+  ): Promise<QuarantineDispositionResult>;
+  async disposeQuarantine(id: string, dto: DisposeQuarantineDto, actor: string) {
+    return this.audit.transaction<QuarantineDispositionResult>(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ unitId: string }>>`
+        SELECT "unitId" FROM "InventoryQuarantineCase" WHERE id = ${id} FOR UPDATE
+      `;
+      if (!locked[0]) throw new ValidationError('quarantine_not_found', 'Карантинная запись не найдена');
+      await tx.$queryRaw`SELECT id FROM "DeviceUnit" WHERE id = ${locked[0].unitId} FOR UPDATE`;
+      const quarantine = await tx.inventoryQuarantineCase.findUnique({
+        where: { id },
+        include: {
+          unit: { include: { product: true } },
+          return: { include: { order: true } },
+        },
+      });
+      if (!quarantine) throw new ValidationError('quarantine_not_found', 'Карантинная запись не найдена');
+      if (quarantine.status === 'disposed' && quarantine.disposition === dto.disposition) {
+        return { result: quarantine, events: [] };
+      }
+      if (quarantine.status !== 'diagnosed' || !quarantine.diagnosis || !quarantine.diagnosedBy) {
+        throw new ConflictError('quarantine_diagnosis_required', 'Сначала зафиксируйте диагноз');
+      }
+      if (quarantine.diagnosedBy === actor) {
+        throw new ConflictError('quarantine_four_eyes_required', 'Диагност не может сам применить disposition');
+      }
+      const expected = quarantine.diagnosis === 'resellable' ? 'restock' : quarantine.diagnosis;
+      if (dto.disposition !== expected) {
+        throw new ConflictError('quarantine_disposition_mismatch', `Для диагноза ${quarantine.diagnosis} допустимо только ${expected}`);
+      }
+      if (quarantine.unit.status !== 'returned') {
+        throw new ConflictError('quarantine_unit_state_mismatch', `IMEI уже находится в статусе ${quarantine.unit.status}`);
+      }
+
+      if (dto.disposition === 'write_off') {
+        if (quarantine.dispositionApprovalId) {
+          return {
+            result: { approvalId: quarantine.dispositionApprovalId, status: 'requested' as const },
+            events: [],
+          };
+        }
+        const approval = await tx.approval.create({
+          data: {
+            action: 'quarantine_write_off',
+            requester: actor,
+            reason: `Списание IMEI ${quarantine.unit.imei} после карантина`,
+            status: 'requested',
+            evidence: {
+              payload: {
+                quarantineId: id,
+                unitId: quarantine.unitId,
+                unitCost: quarantine.unitCost,
+              },
+            },
+          },
+        });
+        await tx.inventoryQuarantineCase.update({
+          where: { id },
+          data: { dispositionApprovalId: approval.id },
+        });
+        return {
+          result: { approvalId: approval.id, status: 'requested' as const },
+          events: [{
+            type: EventType.ApprovalRequested,
+            actor,
+            payload: { approvalId: approval.id, action: 'quarantine_write_off', quarantineId: id },
+            refs: [approval.id, id, quarantine.unit.imei],
+          }],
+        };
+      }
+
+      const nextUnitStatus = dto.disposition === 'restock'
+        ? 'in_stock'
+        : 'in_repair';
+      const events: Array<{ type: string; actor: string; payload: Record<string, unknown>; refs: string[] }> = [];
+      let repairWorkOrderId: string | null = null;
+      if (dto.disposition === 'repair') {
+        const warrantyCase = await tx.warrantyCase.create({
+          data: {
+            imei: quarantine.unit.imei,
+            customerId: quarantine.return.order.customerId,
+            problem: `Карантин: ${quarantine.notes ?? quarantine.reason}`,
+            status: 'received',
+            serviceType: 'warranty',
+            deviceName: quarantine.unit.product.name,
+            sla: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+          },
+        });
+        const workOrder = await tx.serviceWorkOrder.create({
+          data: {
+            warrantyCaseId: warrantyCase.id,
+            createdBy: actor,
+            point: quarantine.unit.location,
+          },
+        });
+        repairWorkOrderId = workOrder.id;
+        events.push({
+          type: EventType.ServiceWorkOrderCreated,
+          actor,
+          payload: { workOrderId: workOrder.id, warrantyId: warrantyCase.id, source: 'inventory_quarantine' },
+          refs: [workOrder.id, warrantyCase.id, id, quarantine.unit.imei],
+        });
+      }
+      const unitUpdate = await tx.deviceUnit.updateMany({
+        where: { id: quarantine.unitId, status: 'returned' },
+        data: { status: nextUnitStatus },
+      });
+      if (unitUpdate.count !== 1) {
+        throw new ConflictError('quarantine_unit_state_mismatch', 'IMEI уже обработан другой операцией');
+      }
+      const updated = await tx.inventoryQuarantineCase.update({
+        where: { id },
+        data: {
+          status: 'disposed',
+          disposition: dto.disposition,
+          disposedBy: actor,
+          disposedAt: new Date(),
+          repairWorkOrderId,
+        },
+        include: { unit: { include: { product: true } } },
+      });
+      events.push({
+        type: EventType.InventoryDisposed,
+        actor,
+        payload: { quarantineId: id, disposition: dto.disposition, imei: quarantine.unit.imei, repairWorkOrderId },
+        refs: [id, quarantine.unit.imei, ...(repairWorkOrderId ? [repairWorkOrderId] : [])],
+      });
+      return { result: updated, events };
+    });
   }
 
   async movement(dto: MovementDto, requester: string) {

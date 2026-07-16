@@ -9,7 +9,7 @@ import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
-  action: string; // refund | discount | write_off | price | debt | stock_adjust | delete | pii
+  action: string; // refund | discount | write_off | quarantine_write_off | price | debt | stock_adjust | delete | pii
   requester: string;
   reason: string;
   payload?: Record<string, unknown>;
@@ -99,7 +99,8 @@ export class ApprovalsService {
           `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
-      if ((approval.action === 'campaign_budget' || approval.action === 'refund') && approval.requester === input.approver) {
+      if (['campaign_budget', 'refund', 'quarantine_write_off'].includes(approval.action)
+        && approval.requester === input.approver) {
         throw new ForbiddenError(
           'four_eye_approval_required',
           'Автор кампании не может согласовать собственный бюджет',

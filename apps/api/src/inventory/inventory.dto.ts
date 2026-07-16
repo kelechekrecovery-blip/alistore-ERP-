@@ -92,6 +92,21 @@ export class ReceiveQuantityDto {
   @IsOptional() @IsString() reason?: string;
 }
 
+export class DiagnoseQuarantineDto {
+  @ApiProperty({ enum: ['resellable', 'repair', 'write_off'] })
+  @IsIn(['resellable', 'repair', 'write_off'])
+  diagnosis!: 'resellable' | 'repair' | 'write_off';
+
+  @ApiPropertyOptional({ example: 'Корпус и пломбы проверены' })
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
+export class DisposeQuarantineDto {
+  @ApiProperty({ enum: ['restock', 'repair', 'write_off'] })
+  @IsIn(['restock', 'repair', 'write_off'])
+  disposition!: 'restock' | 'repair' | 'write_off';
+}
+
 export class ReceiveConsignmentDto {
   @ApiProperty({ example: 'consignment-receive-01' })
   @IsString() @MaxLength(128) idempotencyKey!: string;

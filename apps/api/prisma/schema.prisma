@@ -131,6 +131,24 @@ enum UnitStatus {
   written_off
 }
 
+enum InventoryQuarantineStatus {
+  pending_diagnosis
+  diagnosed
+  disposed
+}
+
+enum InventoryQuarantineDiagnosis {
+  resellable
+  repair
+  write_off
+}
+
+enum InventoryQuarantineDisposition {
+  restock
+  repair
+  write_off
+}
+
 enum LoanerLoanStatus {
   prepared
   issued
@@ -611,12 +629,44 @@ model DeviceUnit {
   serviceReplacement ServiceWorkOrder? @relation("ServiceReplacementUnit")
   loanerProfile      LoanerDevice?
   valuationIssues    InventoryValuationIssue[]
+  quarantineCases    InventoryQuarantineCase[]
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
   @@index([status])
   @@index([orderId])
   @@index([updatedAt])
+}
+
+model InventoryQuarantineCase {
+  id                    String                          @id @default(cuid())
+  unit                  DeviceUnit                      @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unitId                String
+  return                Return                          @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId              String
+  sourceType            String
+  reason                String
+  unitCost              Int
+  status                InventoryQuarantineStatus       @default(pending_diagnosis)
+  diagnosis             InventoryQuarantineDiagnosis?
+  disposition           InventoryQuarantineDisposition?
+  notes                 String?
+  createdBy             String
+  diagnosedBy           String?
+  disposedBy            String?
+  diagnosedAt           DateTime?
+  disposedAt            DateTime?
+  dispositionApproval   Approval?                       @relation(fields: [dispositionApprovalId], references: [id], onDelete: Restrict)
+  dispositionApprovalId String?                         @unique
+  repairWorkOrder       ServiceWorkOrder?               @relation(fields: [repairWorkOrderId], references: [id], onDelete: Restrict)
+  repairWorkOrderId     String?                         @unique
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+
+  @@unique([sourceType, returnId, unitId])
+  @@index([status, createdAt])
+  @@index([unitId, status])
+  @@index([returnId])
 }
 
 model StorePoint {
@@ -1252,6 +1302,7 @@ model Return {
   createdAt       DateTime     @default(now())
   items           ReturnItem[]
   refund          Refund?
+  quarantineCases InventoryQuarantineCase[]
 
   @@index([orderId])
   @@index([status])
@@ -1415,6 +1466,7 @@ model ServiceWorkOrder {
   parts               ServicePart[]
   commands            ServiceWorkOrderCommand[]
   loanerLoans         LoanerLoan[]
+  quarantineCase      InventoryQuarantineCase?
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -2013,7 +2065,7 @@ model CourierCommand {
 
 model Approval {
   id        String         @id @default(cuid())
-  action    String // discount | refund | write_off | price | debt | delete | stock_adjust | pii
+  action    String // discount | refund | write_off | quarantine_write_off | price | debt | delete | stock_adjust | pii
   requester String
   approver  String?
   status    ApprovalStatus @default(requested)
@@ -2021,6 +2073,7 @@ model Approval {
   evidence  Json? // обязательно для high-risk
   createdAt DateTime       @default(now())
   refund    Refund?
+  quarantineDisposition InventoryQuarantineCase?
 
   @@index([status])
   @@index([action])

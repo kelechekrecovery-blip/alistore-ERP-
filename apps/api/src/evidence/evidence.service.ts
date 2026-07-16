@@ -92,6 +92,7 @@ export class EvidenceService {
       }
       case 'inventory':
       case 'shift':
+      case 'quarantine':
         throw new ForbiddenException('evidence_staff_only_entity');
     }
     if (!ownerId) throw new ValidationError('evidence_entity_not_found', `${type} ${id} не найден`);
@@ -123,6 +124,8 @@ export class EvidenceService {
         return this.prisma.cashShift.findUnique({ where: { id } });
       case 'loaner':
         return this.prisma.loanerLoan.findUnique({ where: { id } });
+      case 'quarantine':
+        return this.prisma.inventoryQuarantineCase.findUnique({ where: { id } });
     }
   }
 }

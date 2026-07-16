@@ -35,6 +35,9 @@ export const EventType = {
   StockAdjusted: 'stock.adjusted',
   StockWrittenOff: 'stock.written_off',
   InventoryCounted: 'inventory.counted',
+  InventoryQuarantined: 'inventory.quarantined',
+  InventoryDiagnosed: 'inventory.diagnosed',
+  InventoryDisposed: 'inventory.disposed',
   // reservations
   ReservationExpired: 'reservation.expired', // invariant #7: expired hold released by the sweep
   // units (IMEI/SN)
