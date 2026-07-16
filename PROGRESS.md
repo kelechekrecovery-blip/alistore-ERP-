@@ -2148,3 +2148,10 @@
 - Checks run: Playwright `1/1`; artifact SHA-256 `03b6a426789ba979ba4e389cfe2baea8763cf72155c8ec2c3271a8a1933c03d6`; trusted recorder exited zero.
 - Outcome: POS/refund/quarantine evidence is current again.
 - Next step: commit and refresh courier/COD.
+
+## 2026-07-16
+
+- Task: refresh `courier-cod-reconciliation` on the visual-contract source hash.
+- Checks run: Playwright `1/1`; artifact SHA-256 `249efacb75bd8f48fe257baeec950691963bd499413dca0e773fcf0dff7376ed`; trusted recorder exited zero.
+- Outcome: Web COD, warehouse, courier and handover evidence is current again.
+- Next step: commit and refresh service/loaner.
