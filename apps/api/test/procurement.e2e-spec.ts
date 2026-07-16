@@ -51,6 +51,8 @@ describe('Purchase order procurement (integration + RBAC)', () => {
 
   async function cleanFixtures() {
     await prisma.auditEvent.deleteMany();
+    await prisma.supplierInvoiceAdvanceAllocation.deleteMany();
+    await prisma.supplierAdvance.deleteMany();
     await prisma.supplierInvoicePayment.deleteMany();
     await prisma.supplierCreditNote.deleteMany();
     await prisma.supplierInvoice.deleteMany();
@@ -346,6 +348,109 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .expect(200);
     expect(aging.body.rows).toEqual(expect.arrayContaining([expect.objectContaining({ id: invoice.body.id, paidAmount: 70000, outstanding: 0 })]));
     expect(aging.body.totalOutstanding).toBe(0);
+  });
+
+  it('records supplier advances and applies them to an invoice exactly once', async () => {
+    const { supplier, product } = await fixture();
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `create-${RUN}-advance`, supplierId: supplier.id, location: 'BISHKEK-1', items: [{ productId: product.id, qty: 1, unitCost: 70000 }] })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/purchase-orders/${created.body.id}/send`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({ idempotencyKey: `receipt-${RUN}-advance`, lines: [{ itemId: created.body.items[0].id, imeis: [`PO-ADVANCE-${RUN}`] }] })
+      .expect(201);
+
+    const invoice = await request(app.getHttpServer())
+      .post('/procurement/supplier-invoices')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `invoice-${RUN}-advance`, invoiceNumber: `INV-${RUN}-ADVANCE`, supplierId: supplier.id, purchaseOrderId: created.body.id, amount: 70000 })
+      .expect(201);
+    await request(app.getHttpServer()).post(`/procurement/supplier-invoices/${invoice.body.id}/approve`).set('Authorization', `Bearer ${adminToken}`).expect(201);
+
+    const advancePayload = {
+      idempotencyKey: `advance-${RUN}`,
+      paymentKey: `supplier-advance-bank-${RUN}`,
+      supplierId: supplier.id,
+      amount: 70000,
+      paymentAccountCode: '1010',
+      paymentReference: 'ADVANCE-BANK-1',
+    };
+    const advance = await request(app.getHttpServer())
+      .post('/procurement/supplier-advances')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(advancePayload)
+      .expect(201);
+    expect(advance.body).toMatchObject({ supplierId: supplier.id, amount: 70000, appliedAmount: 0, status: 'open', idempotent: false });
+    const advanceEntry = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: advance.body.accountingEntryId }, include: { lines: true } });
+    expect(advanceEntry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1300', debit: 70000, credit: 0 }),
+      expect.objectContaining({ accountCode: '1010', debit: 0, credit: 70000 }),
+    ]));
+
+    const advanceReplay = await request(app.getHttpServer())
+      .post('/procurement/supplier-advances')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(advancePayload)
+      .expect(201);
+    expect(advanceReplay.body).toMatchObject({ id: advance.body.id, idempotent: true });
+    await request(app.getHttpServer())
+      .post('/procurement/supplier-advances')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...advancePayload, amount: 70001 })
+      .expect(409);
+
+    const firstApplyPayload = { idempotencyKey: `advance-apply-${RUN}-1`, invoiceId: invoice.body.id, amount: 30000 };
+    const firstApply = await request(app.getHttpServer())
+      .post(`/procurement/supplier-advances/${advance.body.id}/apply`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(firstApplyPayload)
+      .expect(201);
+    expect(firstApply.body).toMatchObject({ idempotent: false, advance: { status: 'partially_applied', appliedAmount: 30000 }, invoice: { status: 'partially_paid' }, allocation: { amount: 30000 } });
+
+    const firstApplyReplay = await request(app.getHttpServer())
+      .post(`/procurement/supplier-advances/${advance.body.id}/apply`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(firstApplyPayload)
+      .expect(201);
+    expect(firstApplyReplay.body).toMatchObject({ idempotent: true, allocation: { id: firstApply.body.allocation.id, amount: 30000 } });
+    await request(app.getHttpServer())
+      .post(`/procurement/supplier-advances/${advance.body.id}/apply`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ ...firstApplyPayload, amount: 31000 })
+      .expect(409);
+
+    const secondApply = await request(app.getHttpServer())
+      .post(`/procurement/supplier-advances/${advance.body.id}/apply`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ idempotencyKey: `advance-apply-${RUN}-2`, invoiceId: invoice.body.id, amount: 40000 })
+      .expect(201);
+    expect(secondApply.body).toMatchObject({ idempotent: false, advance: { status: 'applied', appliedAmount: 70000 }, invoice: { status: 'paid' }, allocation: { amount: 40000 } });
+    expect(await prisma.supplierInvoiceAdvanceAllocation.count({ where: { advanceId: advance.body.id } })).toBe(2);
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'supplier.advance.applied', sourceRef: { startsWith: advance.body.id } } })).toBe(2);
+    const applyEntry = await prisma.accountingJournalEntry.findUniqueOrThrow({ where: { id: secondApply.body.allocation.accountingEntryId }, include: { lines: true } });
+    expect(applyEntry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '2000', debit: 40000, credit: 0 }),
+      expect.objectContaining({ accountCode: '1300', debit: 0, credit: 40000 }),
+    ]));
+
+    const listed = await request(app.getHttpServer())
+      .get(`/procurement/supplier-advances?supplierId=${supplier.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(listed.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: advance.body.id, status: 'applied', appliedAmount: 70000, allocations: expect.arrayContaining([expect.objectContaining({ invoice: expect.objectContaining({ id: invoice.body.id }) })]) })]));
+
+    const aging = await request(app.getHttpServer())
+      .get('/finance/ap-aging')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(aging.body.rows).toEqual(expect.arrayContaining([expect.objectContaining({ id: invoice.body.id, paidAmount: 0, advanceApplied: 70000, outstanding: 0 })]));
+    expect(aging.body.totalAdvanceApplied).toBe(70000);
+    expect(await prisma.auditEvent.count({ where: { type: 'supplier.advance.created', refs: { has: advance.body.id } } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'supplier.advance.applied', refs: { has: advance.body.id } } })).toBe(2);
   });
 
   it('serializes concurrent receipts so ordered quantity cannot be exceeded', async () => {

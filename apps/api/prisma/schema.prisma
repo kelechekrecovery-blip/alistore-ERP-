@@ -299,6 +299,13 @@ enum SupplierCreditNoteStatus {
   cancelled
 }
 
+enum SupplierAdvanceStatus {
+  open
+  partially_applied
+  applied
+  cancelled
+}
+
 enum BankStatementStatus {
   imported
   reconciled
@@ -1630,6 +1637,7 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   invoices       SupplierInvoice[]
   creditNotes    SupplierCreditNote[]
+  advances       SupplierAdvance[]
   expenses       Expense[]
   createdAt      DateTime             @default(now())
 }
@@ -1732,6 +1740,8 @@ model AccountingJournalEntry {
   supplierInvoice    SupplierInvoice?
   supplierCreditNote SupplierCreditNote?
   supplierInvoicePayment SupplierInvoicePayment?
+  supplierAdvance          SupplierAdvance?
+  supplierAdvanceAllocation SupplierInvoiceAdvanceAllocation?
   bankStatementLine  BankStatementLine?
   cashIncassation    CashIncassation?
   taxSettlement      AccountingTaxSettlement?
@@ -1953,6 +1963,7 @@ model SupplierInvoice {
   accountingEntryId   String?                 @unique
   accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
   payments            SupplierInvoicePayment[]
+  advanceAllocations  SupplierInvoiceAdvanceAllocation[]
   creditNotes         SupplierCreditNote[]
   createdBy           String
   createdAt           DateTime                @default(now())
@@ -1981,6 +1992,46 @@ model SupplierInvoicePayment {
 
   @@index([invoiceId, paidAt])
   @@index([paymentAccountCode, paidAt])
+}
+
+model SupplierAdvance {
+  id                 String               @id @default(cuid())
+  supplier           Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId         String
+  idempotencyKey     String               @unique
+  paymentKey         String               @unique
+  amount             Int
+  appliedAmount      Int                  @default(0)
+  status             SupplierAdvanceStatus @default(open)
+  paymentAccountCode String
+  paymentReference   String
+  paidBy             String
+  paidAt             DateTime             @default(now())
+  accountingEntryId  String               @unique
+  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  allocations        SupplierInvoiceAdvanceAllocation[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([supplierId, status, createdAt])
+  @@index([status, paidAt])
+}
+
+model SupplierInvoiceAdvanceAllocation {
+  id                 String          @id @default(cuid())
+  advance            SupplierAdvance @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  invoice            SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceId          String
+  idempotencyKey     String          @unique
+  amount             Int
+  accountingEntryId  String          @unique
+  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  appliedBy          String
+  appliedAt          DateTime        @default(now())
+
+  @@index([advanceId, appliedAt])
+  @@index([invoiceId, appliedAt])
 }
 
 model SupplierCreditNote {

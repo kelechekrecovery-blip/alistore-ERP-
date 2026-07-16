@@ -407,22 +407,24 @@ export class FinanceService {
         accountingEntry: { select: { id: true, sourceType: true, sourceRef: true } },
         creditNotes: { where: { status: 'applied', appliedAt: { lte: asOf } }, select: { id: true, noteNumber: true, amount: true, accountingEntryId: true, appliedAt: true } },
         payments: { where: { paidAt: { lte: asOf } }, select: { id: true, amount: true, paymentAccountCode: true, paymentReference: true, paidAt: true, accountingEntryId: true } },
+        advanceAllocations: { where: { appliedAt: { lte: asOf } }, select: { id: true, amount: true, appliedAt: true, accountingEntryId: true, advance: { select: { id: true, paymentReference: true } } } },
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
     });
     const rows = invoices.map((invoice) => {
       const creditApplied = invoice.creditNotes.reduce((sum, note) => sum + note.amount, 0);
       const paidAmount = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
-      const outstanding = Math.max(0, invoice.amount - paidAmount - creditApplied);
-      const creditReceivable = Math.max(0, paidAmount + creditApplied - invoice.amount);
+      const advanceApplied = invoice.advanceAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+      const outstanding = Math.max(0, invoice.amount - paidAmount - creditApplied - advanceApplied);
+      const creditReceivable = Math.max(0, paidAmount + creditApplied + advanceApplied - invoice.amount);
       const dueDate = invoice.dueDate ?? invoice.createdAt;
       const ageDays = Math.max(0, Math.floor((asOf.getTime() - dueDate.getTime()) / 86_400_000));
       const bucket = outstanding === 0 ? 'paid' : ageDays === 0 ? 'current' : ageDays <= 30 ? '1_30' : ageDays <= 60 ? '31_60' : ageDays <= 90 ? '61_90' : '90_plus';
-      return { id: invoice.id, invoiceNumber: invoice.invoiceNumber, supplier: invoice.supplier, purchaseOrder: invoice.purchaseOrder, amount: invoice.amount, paidAmount, creditApplied, creditReceivable, outstanding, dueDate, ageDays, bucket, status: invoice.status, accountingEntry: invoice.accountingEntry, payments: invoice.payments, creditNotes: invoice.creditNotes };
+      return { id: invoice.id, invoiceNumber: invoice.invoiceNumber, supplier: invoice.supplier, purchaseOrder: invoice.purchaseOrder, amount: invoice.amount, paidAmount, creditApplied, advanceApplied, creditReceivable, outstanding, dueDate, ageDays, bucket, status: invoice.status, accountingEntry: invoice.accountingEntry, payments: invoice.payments, creditNotes: invoice.creditNotes, advanceAllocations: invoice.advanceAllocations };
     });
     const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
     const totals = Object.fromEntries(buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0)]));
-    return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), totalCreditReceivable: rows.reduce((sum, row) => sum + row.creditReceivable, 0), totalCreditApplied: rows.reduce((sum, row) => sum + row.creditApplied, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size };
+    return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), totalCreditReceivable: rows.reduce((sum, row) => sum + row.creditReceivable, 0), totalCreditApplied: rows.reduce((sum, row) => sum + row.creditApplied, 0), totalAdvanceApplied: rows.reduce((sum, row) => sum + row.advanceApplied, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size };
   }
 
   async reverseAccountingEntry(id: string, dto: ReverseAccountingEntryDto, actor: string) {

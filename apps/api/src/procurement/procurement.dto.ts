@@ -66,6 +66,21 @@ export class CreateSupplierInvoicePaymentDto {
   @IsString() @MinLength(1) @MaxLength(128) paymentReference!: string;
 }
 
+export class CreateSupplierAdvanceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MinLength(3) @MaxLength(128) paymentKey!: string;
+  @IsString() @MaxLength(64) supplierId!: string;
+  @IsInt() @Min(1) amount!: number;
+  @IsIn(['1000', '1010', '1020']) paymentAccountCode!: '1000' | '1010' | '1020';
+  @IsString() @MinLength(1) @MaxLength(128) paymentReference!: string;
+}
+
+export class ApplySupplierAdvanceDto {
+  @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
+  @IsString() @MaxLength(64) invoiceId!: string;
+  @IsInt() @Min(1) amount!: number;
+}
+
 export class CreateSupplierCreditNoteDto {
   @IsString() @MinLength(3) @MaxLength(128) idempotencyKey!: string;
   @IsString() @MinLength(1) @MaxLength(128) noteNumber!: string;

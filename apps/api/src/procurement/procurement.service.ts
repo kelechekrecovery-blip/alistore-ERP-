@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { Grade, Prisma, PurchaseOrderStatus, SupplierInvoiceStatus } from '@prisma/client';
+import { Grade, Prisma, PurchaseOrderStatus, SupplierAdvanceStatus, SupplierInvoiceStatus } from '@prisma/client';
 import { AuditService, AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePurchaseOrderDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
+import { ApplySupplierAdvanceDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 
@@ -265,13 +265,13 @@ export class ProcurementService {
   }
 
   listInvoices(status?: string) {
-    const allowed: SupplierInvoiceStatus[] = ['draft', 'approved', 'paid', 'cancelled'];
+    const allowed: SupplierInvoiceStatus[] = ['draft', 'approved', 'partially_paid', 'paid', 'cancelled'];
     if (status && !allowed.includes(status as SupplierInvoiceStatus)) {
       throw new ValidationError('invalid_supplier_invoice_status', `Неизвестный статус счета поставщика: ${status}`);
     }
     return this.prisma.supplierInvoice.findMany({
       where: status ? { status: status as SupplierInvoiceStatus } : undefined,
-      include: { supplier: true, purchaseOrder: { select: { id: true, number: true, status: true } }, accountingEntry: { include: { lines: true } }, payments: { orderBy: { paidAt: 'asc' } } },
+      include: { supplier: true, purchaseOrder: { select: { id: true, number: true, status: true } }, accountingEntry: { include: { lines: true } }, payments: { orderBy: { paidAt: 'asc' } }, advanceAllocations: { include: { advance: { select: { id: true, paymentReference: true } } }, orderBy: { appliedAt: 'asc' } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -370,13 +370,15 @@ export class ProcurementService {
       }
       const duplicate = await tx.supplierInvoicePayment.findUnique({ where: { paymentKey: dto.paymentKey } });
       if (duplicate) throw new ConflictError('supplier_invoice_payment_key_reused', 'Ключ оплаты уже использован');
-      const [payments, creditNotes] = await Promise.all([
+      const [payments, creditNotes, advanceAllocations] = await Promise.all([
         tx.supplierInvoicePayment.findMany({ where: { invoiceId: id }, orderBy: { paidAt: 'asc' } }),
         tx.supplierCreditNote.findMany({ where: { invoiceId: id, status: 'applied' }, select: { amount: true } }),
+        tx.supplierInvoiceAdvanceAllocation.findMany({ where: { invoiceId: id }, select: { amount: true } }),
       ]);
       const paidBefore = payments.reduce((sum, payment) => sum + payment.amount, 0);
       const creditApplied = creditNotes.reduce((sum, note) => sum + note.amount, 0);
-      const remaining = Math.max(0, invoice.amount - paidBefore - creditApplied);
+      const advanceApplied = advanceAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+      const remaining = Math.max(0, invoice.amount - paidBefore - creditApplied - advanceApplied);
       const amount = settleRemaining ? remaining : dto.amount;
       if (!amount || amount > remaining) {
         throw new ConflictError('supplier_invoice_payment_exceeds_balance', `Оплата превышает остаток счёта: ${remaining}`);
@@ -405,7 +407,7 @@ export class ProcurementService {
           accountingEntryId: accountingEntry.id,
         },
       });
-      const status: SupplierInvoiceStatus = paidBefore + creditApplied + amount >= invoice.amount ? 'paid' : 'partially_paid';
+      const status: SupplierInvoiceStatus = paidBefore + creditApplied + advanceApplied + amount >= invoice.amount ? 'paid' : 'partially_paid';
       const paid = await tx.supplierInvoice.update({
         where: { id },
         data: {
@@ -416,11 +418,165 @@ export class ProcurementService {
       return {
         result: { ...paid, payment, idempotent: false },
         events: [
-          { type: status === 'paid' ? 'supplier.invoice.paid' : 'supplier.invoice.partially_paid', actor, payload: { invoiceId: id, amount, outstanding: invoice.amount - paidBefore - creditApplied - amount, paymentKey: dto.paymentKey, accountingEntryId: accountingEntry.id }, refs: [id, invoice.supplierId, invoice.purchaseOrderId, payment.id] },
+          { type: status === 'paid' ? 'supplier.invoice.paid' : 'supplier.invoice.partially_paid', actor, payload: { invoiceId: id, amount, outstanding: invoice.amount - paidBefore - creditApplied - advanceApplied - amount, paymentKey: dto.paymentKey, accountingEntryId: accountingEntry.id }, refs: [id, invoice.supplierId, invoice.purchaseOrderId, payment.id] },
           { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'supplier.invoice.payment', sourceRef: `${id}:${dto.paymentKey}`, amount }, refs: [accountingEntry.id, id, payment.id] },
         ],
       };
     });
+  }
+
+  listSupplierAdvances(supplierId?: string) {
+    return this.prisma.supplierAdvance.findMany({
+      where: supplierId ? { supplierId } : undefined,
+      include: {
+        supplier: { select: { id: true, name: true } },
+        accountingEntry: { include: { lines: true } },
+        allocations: {
+          include: { invoice: { select: { id: true, invoiceNumber: true, status: true } } },
+          orderBy: { appliedAt: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  async createSupplierAdvance(dto: CreateSupplierAdvanceDto, actor: string) {
+    const existing = await this.prisma.supplierAdvance.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { accountingEntry: { include: { lines: true } }, allocations: true },
+    });
+    if (existing) return replaySupplierAdvance(existing, dto);
+
+    try {
+      return await this.audit.transaction(async (tx) => {
+        const supplier = await tx.supplier.findUnique({ where: { id: dto.supplierId }, select: { id: true } });
+        if (!supplier) throw new ValidationError('supplier_not_found', `Поставщик ${dto.supplierId} не найден`);
+        const paymentKey = await tx.supplierAdvance.findUnique({ where: { paymentKey: dto.paymentKey }, select: { id: true } });
+        if (paymentKey) throw new ConflictError('supplier_advance_payment_key_reused', 'Ключ аванса уже использован');
+
+        const accountingEntry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:supplier-advance:${dto.idempotencyKey}`,
+          sourceType: 'supplier.advance.created',
+          sourceRef: dto.paymentKey,
+          description: `Аванс поставщику ${dto.paymentReference}`,
+          occurredAt: new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: '1300', debit: dto.amount, memo: 'Аванс поставщику' },
+            { accountCode: dto.paymentAccountCode, credit: dto.amount, memo: `Перечисление аванса: ${dto.paymentReference}` },
+          ],
+        });
+        const advance = await tx.supplierAdvance.create({
+          data: {
+            supplierId: supplier.id,
+            idempotencyKey: dto.idempotencyKey,
+            paymentKey: dto.paymentKey,
+            amount: dto.amount,
+            paymentAccountCode: dto.paymentAccountCode,
+            paymentReference: dto.paymentReference.trim(),
+            paidBy: actor,
+            accountingEntryId: accountingEntry.id,
+          },
+          include: { supplier: { select: { id: true, name: true } }, accountingEntry: { include: { lines: true } }, allocations: true },
+        });
+        return {
+          result: { ...advance, idempotent: false },
+          events: [
+            { type: 'supplier.advance.created', actor, payload: { advanceId: advance.id, supplierId: supplier.id, amount: advance.amount, paymentKey: advance.paymentKey, accountingEntryId: accountingEntry.id }, refs: [advance.id, supplier.id, accountingEntry.id] },
+            { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'supplier.advance.created', sourceRef: dto.paymentKey, amount: dto.amount }, refs: [accountingEntry.id, advance.id, supplier.id] },
+          ],
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replay = await this.prisma.supplierAdvance.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+          include: { accountingEntry: { include: { lines: true } }, allocations: true },
+        });
+        if (replay) return replaySupplierAdvance(replay, dto);
+      }
+      throw error;
+    }
+  }
+
+  async applySupplierAdvance(id: string, dto: ApplySupplierAdvanceDto, actor: string) {
+    const existing = await this.prisma.supplierInvoiceAdvanceAllocation.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { advance: true, invoice: true, accountingEntry: { include: { lines: true } } },
+    });
+    if (existing) return replaySupplierAdvanceAllocation(existing, id, dto);
+
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "SupplierAdvance" WHERE id = ${id} FOR UPDATE`;
+        const advance = await tx.supplierAdvance.findUnique({ where: { id }, include: { allocations: true } });
+        if (!advance) throw new ValidationError('supplier_advance_not_found', `Аванс ${id} не найден`);
+        if (advance.status === 'cancelled') throw new ConflictError('supplier_advance_cancelled', 'Отменённый аванс нельзя применить');
+
+        const duplicate = await tx.supplierInvoiceAdvanceAllocation.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+        if (duplicate) throw new ConflictError('supplier_advance_allocation_idempotency_reused', 'Ключ зачёта уже использован');
+
+        await tx.$queryRaw`SELECT id FROM "SupplierInvoice" WHERE id = ${dto.invoiceId} FOR UPDATE`;
+        const invoice = await tx.supplierInvoice.findUnique({ where: { id: dto.invoiceId } });
+        if (!invoice) throw new ValidationError('supplier_invoice_not_found', `Счёт ${dto.invoiceId} не найден`);
+        if (invoice.supplierId !== advance.supplierId) throw new ConflictError('supplier_advance_supplier_mismatch', 'Аванс и счёт принадлежат разным поставщикам');
+        if (invoice.status !== 'approved' && invoice.status !== 'partially_paid') throw new ConflictError('supplier_invoice_not_payable', 'Применить аванс можно только к утверждённому счёту');
+
+        const [advanceAllocations, payments, creditNotes, invoiceAllocations] = await Promise.all([
+          tx.supplierInvoiceAdvanceAllocation.findMany({ where: { advanceId: id }, select: { amount: true } }),
+          tx.supplierInvoicePayment.findMany({ where: { invoiceId: dto.invoiceId }, select: { amount: true } }),
+          tx.supplierCreditNote.findMany({ where: { invoiceId: dto.invoiceId, status: 'applied' }, select: { amount: true } }),
+          tx.supplierInvoiceAdvanceAllocation.findMany({ where: { invoiceId: dto.invoiceId }, select: { amount: true } }),
+        ]);
+        const appliedBefore = advanceAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+        const invoicePaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+        const creditApplied = creditNotes.reduce((sum, note) => sum + note.amount, 0);
+        const invoiceAdvanceApplied = invoiceAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+        const advanceRemaining = advance.amount - appliedBefore;
+        const invoiceRemaining = invoice.amount - invoicePaid - creditApplied - invoiceAdvanceApplied;
+        if (dto.amount > advanceRemaining) throw new ConflictError('supplier_advance_exceeds_balance', `Сумма превышает остаток аванса: ${advanceRemaining}`);
+        if (dto.amount > invoiceRemaining) throw new ConflictError('supplier_advance_exceeds_invoice', `Сумма превышает остаток счёта: ${invoiceRemaining}`);
+
+        const accountingEntry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:supplier-advance.apply:${id}:${dto.idempotencyKey}`,
+          sourceType: 'supplier.advance.applied',
+          sourceRef: `${id}:${dto.invoiceId}:${dto.idempotencyKey}`,
+          description: `Зачёт аванса по счёту ${dto.invoiceId}`,
+          occurredAt: new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: '2000', debit: dto.amount, memo: 'Зачёт аванса в погашение обязательства' },
+            { accountCode: '1300', credit: dto.amount, memo: 'Уменьшение аванса поставщику' },
+          ],
+        });
+        const allocation = await tx.supplierInvoiceAdvanceAllocation.create({
+          data: { advanceId: id, invoiceId: dto.invoiceId, idempotencyKey: dto.idempotencyKey, amount: dto.amount, accountingEntryId: accountingEntry.id, appliedBy: actor },
+          include: { advance: true, invoice: true, accountingEntry: { include: { lines: true } } },
+        });
+        const appliedAmount = appliedBefore + dto.amount;
+        const nextAdvanceStatus: SupplierAdvanceStatus = appliedAmount >= advance.amount ? 'applied' : 'partially_applied';
+        const updatedAdvance = await tx.supplierAdvance.update({ where: { id }, data: { appliedAmount, status: nextAdvanceStatus } });
+        const nextInvoiceStatus: SupplierInvoiceStatus = invoicePaid + creditApplied + invoiceAdvanceApplied + dto.amount >= invoice.amount ? 'paid' : 'partially_paid';
+        const updatedInvoice = await tx.supplierInvoice.update({ where: { id: dto.invoiceId }, data: { status: nextInvoiceStatus } });
+        return {
+          result: { advance: updatedAdvance, allocation, invoice: updatedInvoice, idempotent: false },
+          events: [
+            { type: 'supplier.advance.applied', actor, payload: { advanceId: id, allocationId: allocation.id, invoiceId: dto.invoiceId, amount: dto.amount, accountingEntryId: accountingEntry.id, outstanding: Math.max(0, invoiceRemaining - dto.amount) }, refs: [id, allocation.id, dto.invoiceId, accountingEntry.id] },
+            { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'supplier.advance.applied', sourceRef: `${id}:${dto.invoiceId}:${dto.idempotencyKey}`, amount: dto.amount }, refs: [accountingEntry.id, id, dto.invoiceId, allocation.id] },
+          ],
+        };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replay = await this.prisma.supplierInvoiceAdvanceAllocation.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+          include: { advance: true, invoice: true, accountingEntry: { include: { lines: true } } },
+        });
+        if (replay) return replaySupplierAdvanceAllocation(replay, id, dto);
+      }
+      throw error;
+    }
   }
 
   listCreditNotes(supplierId?: string) {
@@ -524,6 +680,24 @@ function replaySupplierInvoicePayment(
     throw new ConflictError('supplier_invoice_payment_idempotency_mismatch', 'Ключ платежа уже использован с другими данными');
   }
   return { ...payment.invoice, payment, idempotent: true };
+}
+
+function replaySupplierAdvance(advance: Prisma.SupplierAdvanceGetPayload<{}>, dto: CreateSupplierAdvanceDto) {
+  if (advance.supplierId !== dto.supplierId || advance.paymentKey !== dto.paymentKey || advance.amount !== dto.amount || advance.paymentAccountCode !== dto.paymentAccountCode || advance.paymentReference !== dto.paymentReference.trim()) {
+    throw new ConflictError('supplier_advance_idempotency_mismatch', 'Ключ аванса уже использован с другими данными');
+  }
+  return { ...advance, idempotent: true };
+}
+
+function replaySupplierAdvanceAllocation(
+  allocation: Prisma.SupplierInvoiceAdvanceAllocationGetPayload<{ include: { advance: true; invoice: true; accountingEntry: { include: { lines: true } } } }>,
+  advanceId: string,
+  dto: ApplySupplierAdvanceDto,
+) {
+  if (allocation.advanceId !== advanceId || allocation.invoiceId !== dto.invoiceId || allocation.amount !== dto.amount) {
+    throw new ConflictError('supplier_advance_allocation_idempotency_mismatch', 'Ключ зачёта уже использован с другими данными');
+  }
+  return { advance: allocation.advance, allocation, invoice: allocation.invoice, idempotent: true };
 }
 
 function purchaseOrderNumber(): string {
