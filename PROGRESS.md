@@ -2084,3 +2084,11 @@
 - Checks run: Playwright `1/1`; artifact SHA-256 `a3e1f174bf3b057a137affad8a5c38c5c705f659016c44b9f84d5addaac46263`; recorder exited zero.
 - Outcome: the bounded courier/COD audit row is current again; service/loaner and procurement/sale bounded artifacts still require refresh.
 - Next step: commit this artifact, then refresh service/loaner evidence.
+
+## 2026-07-16
+
+- Task: refresh bounded `service-loaner-reconciliation` evidence after the trusted-gate source commit.
+- Result: committed-HEAD recorder reran warranty and paid-repair diagnosis, customer estimate approval, loaner issue/return and custody visibility against source commit `95860e7`.
+- Checks run: API `3/3` suites and `9/9` tests; Playwright `3/3`; artifact SHA-256 `e96cd1f192afb26f66ac5f22b333c7797365f05ac9c32183bc9514deee0247ad`; recorder exited zero.
+- Outcome: the bounded service/loaner audit row is current again; procurement/sale is the final bounded artifact requiring refresh.
+- Next step: commit this artifact, then refresh procurement/sale evidence.
