@@ -10,6 +10,7 @@ android {
   compileSdk = 36
   defaultConfig {
     applicationId = "kg.alistore.courier"; minSdk = 26; targetSdk = 36; versionCode = 1; versionName = "0.1.0"
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     manifestPlaceholders["usesCleartextTraffic"] = "true"
     buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api\"")
     buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
@@ -20,12 +21,19 @@ android {
 }
 kotlin { jvmToolchain(17) }
 dependencies {
+  val composeBom = platform(libs.androidx.compose.bom)
   implementation(project(":core"))
-  implementation(platform(libs.androidx.compose.bom))
+  implementation(composeBom)
+  androidTestImplementation(composeBom)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.biometric)
   implementation(libs.androidx.core.ktx)
   implementation(libs.kotlinx.coroutines.android)
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.messaging)
+  debugImplementation(libs.androidx.compose.ui.test.manifest)
+  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+  androidTestImplementation(libs.androidx.test.ext.junit)
+  androidTestImplementation(libs.androidx.test.runner)
+  androidTestImplementation(libs.androidx.test.rules)
 }

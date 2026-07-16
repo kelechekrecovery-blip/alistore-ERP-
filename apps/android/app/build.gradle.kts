@@ -16,6 +16,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartextTraffic"] = "true"
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api\"")
     }
@@ -67,5 +68,9 @@ dependencies {
   implementation(libs.androidx.compose.material3)
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation(libs.androidx.compose.ui.test.manifest)
+  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+  androidTestImplementation(libs.androidx.test.ext.junit)
+  androidTestImplementation(libs.androidx.test.runner)
   implementation(project(":core"))
 }
