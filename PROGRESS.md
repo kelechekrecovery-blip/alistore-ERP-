@@ -2307,3 +2307,13 @@
 - Implementation commit: `5b99cfc` (`feat(evidence): add authorized signed reads`).
 - Outcome: authorized signed-read/access-audit software is implemented. Live R2/MinIO private-bucket integration, lifecycle, backup/restore, staging certification, physical devices, live providers and store publication remain open.
 - Next step: continue with the next unblocked ERP/native parity item from `BACKLOG.md`.
+
+## 2026-07-17
+
+- Task: harden native biometric and PIN quick unlock for Client, Staff, Courier and POS.
+- Files changed: `apps/ios/Shared/QuickUnlock.swift`, `apps/ios/Shared/CustomerAuthStore.swift`, `apps/ios/Shared/StaffAuthStore.swift`, `apps/android/core/src/main/java/kg/alistore/core/QuickUnlock.kt`, `apps/android/core/src/main/java/kg/alistore/core/AliStoreApp.kt`, `apps/android/core/src/main/java/kg/alistore/core/StaffOperationsScreens.kt`, `apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt`, `apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt`, `apps/android/core/src/test/java/kg/alistore/core/PinAttemptLimiterTest.kt`.
+- Result: iOS stores a versioned salted PIN in Keychain and Android stores a salted HMAC in Android Keystore; both check biometric availability, enforce a five-failure/30-second lockout, keep server session validation authoritative and clear local quick-unlock material on explicit logout or invalid-session cleanup. Android uses a pure tested limiter so lockout behavior is deterministic.
+- Checks: `npm run ios:build` passed for all targets; `npm run ios:ui` passed Client `4/4`, Staff `1/1`, Courier `1/1`, POS `1/1`; Android `:core:compileDebugKotlin :core:testDebugUnitTest :core:lintDebug` passed; `npm run android:ui` passed `27/27` core connected tests plus `1/1` packaged smoke for each of Client, Staff, Courier and POS; `git diff --check` passed.
+- Implementation commit: `f113717` (`feat(native): harden biometric and pin quick unlock`).
+- Outcome: the native quick-unlock software gate is accepted. Physical Face ID/Touch ID/Android biometric, PIN, camera/push/hardware certification, signing, provider credentials and store release remain external gates.
+- Next step: proceed to the next unblocked finance/ERP or native parity item, with `NATIVE-QUICK-UNLOCK` retained only for physical-device certification.
