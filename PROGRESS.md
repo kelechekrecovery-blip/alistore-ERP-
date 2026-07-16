@@ -2252,4 +2252,13 @@
 - Result: customer JWT requests now derive and enforce ownership without trusting `customerId` or `actor` from the body; guest requests remain bound to a `tradeins:create` capability; staff intake derives the actor from the staff JWT; every create path requires a unique `Idempotency-Key`; exact replay returns the original contract and changed payloads produce `idempotency_key_reused`; customers can list and read only their own trade-ins.
 - Checks run: local dev and isolated test databases received migration `20260717010000_tradein_idempotency`; targeted API suites passed `2/2`, `6/6`; API and web production builds passed; `git diff --check` passed.
 - Outcome: the trade-in API contract is implemented and regression-tested. Native iOS/Android trade-in screens, evidence retry semantics, physical-device checks, live providers and store release remain open.
-- Next step: add the API-backed SwiftUI Client trade-in route with stable retry state and signed-in owner display, then mirror the contract in Compose.
+- Next step: mirror the API-backed trade-in contract in Android Compose, then add evidence capture/retry and native signed-in journey coverage.
+
+## 2026-07-17
+
+- Task: add the API-backed iOS Client trade-in route with owner-scoped history and retry-safe submission.
+- Files changed: `apps/ios/Shared/Models.swift`, `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: signed-in Client users can list their own trade-in contracts, open a dark prototype-aligned assessment form, submit without a customerId body field, and retry a transient failure with the same persisted-in-form idempotency key. Editing the draft rotates the key to prevent accidental `idempotency_key_reused`; the UI exposes loading, empty, error/retry and success refresh states.
+- Checks run: Client simulator build passed; targeted Client XCUITest passed `4/4`; aggregate iOS UI gate completed successfully with the existing Client/Staff/Courier/POS bundles; non-fatal existing POS actor-isolation and LLDB debugger-store warnings remain.
+- Outcome: native iOS Client trade-in software is implemented and simulator-verified. Android Compose parity, evidence camera upload/retry, physical-device checks, live providers and store release remain open.
+- Next step: implement the same customer-owned trade-in flow in Android Compose using Keystore-backed session and stable WorkManager/idempotency semantics.

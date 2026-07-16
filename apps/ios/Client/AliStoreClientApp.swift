@@ -1147,6 +1147,290 @@ private struct CustomerReturnRequestView: View {
     }
 }
 
+private struct CustomerTradeInsView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var tradeIns: [CustomerTradeIn] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showingForm = false
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем trade-in").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Trade-in")
+                            .font(ClientTheme.display(26, weight: .black))
+                            .foregroundStyle(.white)
+                        Text("Оценка старого устройства и защищённый договор в одном кабинете. Сумма остаётся предварительной до диагностики сотрудником.")
+                            .font(ClientTheme.body(12))
+                            .foregroundStyle(ClientTheme.muted)
+                            .lineSpacing(3)
+
+                        if tradeIns.isEmpty {
+                            EmptyStateView(
+                                title: "Заявок пока нет",
+                                detail: "Оформите trade-in, чтобы сохранить оценку и номер договора.",
+                                symbol: "arrow.triangle.2.circlepath"
+                            )
+                        } else {
+                            ForEach(tradeIns) { tradeIn in
+                                CustomerTradeInCard(tradeIn: tradeIn)
+                            }
+                        }
+
+                        Button { showingForm = true } label: {
+                            Label("Оценить устройство", systemImage: "plus")
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Trade-in")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+        .sheet(isPresented: $showingForm) {
+            NavigationStack {
+                CustomerTradeInFormView(environment: environment, auth: auth) {
+                    showingForm = false
+                    Task { await load() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            tradeIns = try await APIClient(baseURL: environment.apiBaseURL).get("tradeins/mine", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CustomerTradeInCard: View {
+    let tradeIn: CustomerTradeIn
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(ClientTheme.lime)
+                    .frame(width: 38, height: 38)
+                    .background(ClientTheme.lime.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tradeIn.model)
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    Text(tradeIn.contractId ?? "Договор формируется")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+                Text(tradeIn.price.formatted(.currency(code: "KGS")))
+                    .font(ClientTheme.body(14, weight: .bold))
+                    .foregroundStyle(ClientTheme.lime)
+            }
+            HStack {
+                Text("Состояние: (tradeIn.grade)")
+                Spacer()
+                Text("Паспорт (tradeIn.sellerPassportMasked)")
+            }
+            .font(ClientTheme.body(11))
+            .foregroundStyle(ClientTheme.muted)
+            if let imei = tradeIn.imei, !imei.isEmpty {
+                Text("IMEI (imei)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(ClientTheme.muted)
+            }
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+}
+
+private struct CustomerTradeInFormView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let onCreated: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var model = ""
+    @State private var imei = ""
+    @State private var grade = "B"
+    @State private var price = ""
+    @State private var sellerPassport = ""
+    @State private var idempotencyKey = UUID().uuidString
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    private let grades = [("A", "Отличное"), ("B", "Хорошее"), ("C", "Нужна диагностика")]
+
+    private var parsedPrice: Int? {
+        let digits = price.filter(\.isNumber)
+        guard let value = Int(digits), value > 0 else { return nil }
+        return value
+    }
+
+    private var canSubmit: Bool {
+        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !sellerPassport.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        parsedPrice != nil && !isSubmitting
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Новая оценка")
+                        .font(ClientTheme.display(25, weight: .black))
+                        .foregroundStyle(.white)
+                    Text("Владелец заявки определяется вашим customer JWT. Если сеть прервётся, повторная отправка использует тот же ключ и не создаст второй договор.")
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineSpacing(3)
+
+                    tradeInField("Модель", placeholder: "iPhone 13 Pro 256GB", text: $model)
+                    tradeInField("IMEI / серийный номер", placeholder: "Можно оставить пустым", text: $imei)
+                    tradeInField("Паспорт / ID продавца", placeholder: "Для защищённого договора", text: $sellerPassport)
+                    tradeInField("Предварительная цена", placeholder: "42000", text: $price, keyboard: .numberPad)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Состояние")
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        ForEach(grades, id: \.0) { option in
+                            Button {
+                                grade = option.0
+                                rotateKey()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: grade == option.0 ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(grade == option.0 ? ClientTheme.lime : ClientTheme.muted)
+                                    Text(option.0).font(ClientTheme.body(13, weight: .bold)).foregroundStyle(.white)
+                                    Text(option.1).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                                    Spacer()
+                                }
+                                .padding(12)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(grade == option.0 ? ClientTheme.lime : ClientTheme.line))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(ClientTheme.body(12))
+                            .foregroundStyle(ClientTheme.coral)
+                    }
+
+                    Button { Task { await submit() } } label: {
+                        HStack {
+                            Spacer()
+                            if isSubmitting { ProgressView().tint(.black) }
+                            else { Text("Создать оценку") }
+                            Spacer()
+                        }
+                        .font(ClientTheme.body(15, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(height: 50)
+                        .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSubmit)
+                    .opacity(canSubmit ? 1 : 0.45)
+                }
+                .padding(18)
+            }
+        }
+        .navigationTitle("Trade-in")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Отмена") { dismiss() } } }
+        .tint(ClientTheme.lime)
+        .onChange(of: model) { _, _ in rotateKey() }
+        .onChange(of: imei) { _, _ in rotateKey() }
+        .onChange(of: price) { _, _ in rotateKey() }
+        .onChange(of: sellerPassport) { _, _ in rotateKey() }
+    }
+
+    @ViewBuilder
+    private func tradeInField(
+        _ title: String,
+        placeholder: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            TextField(placeholder, text: text)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.sentences)
+                .foregroundStyle(.white)
+                .padding(13)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        }
+    }
+
+    private func rotateKey() {
+        idempotencyKey = UUID().uuidString
+    }
+
+    @MainActor
+    private func submit() async {
+        guard let token = auth.session?.accessToken, let parsedPrice else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            let _: CustomerTradeIn = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "tradeins",
+                body: CreateCustomerTradeInRequest(
+                    model: model.trimmingCharacters(in: .whitespacesAndNewlines),
+                    imei: imei.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : imei.trimmingCharacters(in: .whitespacesAndNewlines),
+                    grade: grade,
+                    price: parsedPrice,
+                    sellerPassport: sellerPassport.trimmingCharacters(in: .whitespacesAndNewlines)
+                ),
+                token: token,
+                idempotencyKey: idempotencyKey
+            )
+            onCreated()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 private struct AccountView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
@@ -1229,6 +1513,9 @@ private struct AccountView: View {
             }
             AccountMenuRow(title: "Адреса доставки", detail: "Сохранённые адреса и адрес по умолчанию", symbol: "mappin.and.ellipse") {
                 CustomerAddressesView(environment: environment, auth: auth)
+            }
+            AccountMenuRow(title: "Trade-in", detail: "Оценка устройства и договор", symbol: "arrow.triangle.2.circlepath") {
+                CustomerTradeInsView(environment: environment, auth: auth)
             }
             AccountMenuRow(title: "Настройки", detail: "Профиль, уведомления и согласия", symbol: "slider.horizontal.3") {
                 CustomerSettingsView(environment: environment, auth: auth)

@@ -315,6 +315,33 @@ public struct CreateCustomerReturnRequest: Encodable, Sendable {
     }
 }
 
+public struct CustomerTradeIn: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let customerId: String
+    public let model: String
+    public let imei: String?
+    public let grade: String
+    public let price: Int
+    public let contractId: String?
+    public let sellerPassportMasked: String
+}
+
+public struct CreateCustomerTradeInRequest: Encodable, Sendable {
+    public let model: String
+    public let imei: String?
+    public let grade: String
+    public let price: Int
+    public let sellerPassport: String
+
+    public init(model: String, imei: String?, grade: String, price: Int, sellerPassport: String) {
+        self.model = model
+        self.imei = imei
+        self.grade = grade
+        self.price = price
+        self.sellerPassport = sellerPassport
+    }
+}
+
 public struct RefreshRequest: Encodable, Sendable {
     public let refreshToken: String
 
