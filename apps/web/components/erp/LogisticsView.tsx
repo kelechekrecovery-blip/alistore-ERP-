@@ -22,6 +22,7 @@ export function LogisticsView({ accessToken }: { accessToken: string }) {
   const [pointCode, setPointCode] = useState(''); const [pointName, setPointName] = useState(''); const [pointAddress, setPointAddress] = useState('');
   const [pointLocation, setPointLocation] = useState(''); const [pointHours, setPointHours] = useState('Ежедневно 10:00–21:00');
   const reloadSequence = useRef(0);
+  const dispatchCommand = useRef<{ fingerprint: string; key: string } | null>(null);
   const reload = useCallback(async () => {
     const sequence = ++reloadSequence.current;
     setMessage('');
@@ -43,7 +44,7 @@ export function LogisticsView({ accessToken }: { accessToken: string }) {
 
   async function addZone(event: FormEvent) { event.preventDefault(); setBusy('zone'); setMessage(''); try { await createDeliveryZone({ code: zoneCode.trim(), name: zoneName.trim(), fee: Math.round(Number(fee)), etaMinMinutes: 60, etaMaxMinutes: 180 }, accessToken); setZoneName(''); setZoneCode(''); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Зона не создана'); } finally { setBusy(''); } }
   async function addSlot(event: FormEvent) { event.preventDefault(); setBusy('slot'); setMessage(''); try { await createDeliverySlot({ zoneId, startsAt: localIso(date, start), endsAt: localIso(date, end), capacity: Math.round(Number(capacity)) }, accessToken); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Слот не создан'); } finally { setBusy(''); } }
-  async function dispatch() { if (!courierId || !selected.length) return; setBusy('dispatch'); setMessage(''); try { await createCourierRun({ courierId, orderIds: selected, codTotal }, accessToken); setSelected([]); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Рейс не создан'); } finally { setBusy(''); } }
+  async function dispatch() { if (!courierId || !selected.length) return; const input = { courierId, orderIds: [...selected].sort(), codTotal }; const fingerprint = JSON.stringify(input); if (dispatchCommand.current?.fingerprint !== fingerprint) dispatchCommand.current = { fingerprint, key: crypto.randomUUID() }; setBusy('dispatch'); setMessage(''); try { await createCourierRun(input, accessToken, dispatchCommand.current.key); dispatchCommand.current = null; setSelected([]); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Рейс не создан'); } finally { setBusy(''); } }
   async function addPoint(event: FormEvent) { event.preventDefault(); setBusy('point'); setMessage(''); try { await createStorePoint({ code: pointCode.trim(), name: pointName.trim(), address: pointAddress.trim(), inventoryLocation: pointLocation.trim(), hours: pointHours.trim() }, accessToken); setPointCode(''); setPointName(''); setPointAddress(''); setPointLocation(''); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Точка не создана'); } finally { setBusy(''); } }
   async function togglePoint(id: string, active: boolean) { setBusy(`point-${id}`); setMessage(''); try { await updateStorePoint(id, { active: !active }, accessToken); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Статус точки не изменён'); } finally { setBusy(''); } }
 

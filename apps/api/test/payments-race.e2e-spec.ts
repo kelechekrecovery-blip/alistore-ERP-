@@ -31,8 +31,61 @@ describe('Payments — concurrency (accessory order)', () => {
     await prisma.reservation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.deviceUnit.deleteMany({ where: { imei: { startsWith: 'EXPIRED-PAYMENT' } } });
+    await prisma.product.deleteMany({ where: { sku: { in: ['EXPIRED-PAYMENT', 'UNRESERVED-PAYMENT'] } } });
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
+  });
+
+  it('does not accept final payment after the reservation was released', async () => {
+    const customer = await prisma.customer.create({ data: { phone: '+996701999999', name: 'Expired' } });
+    const product = await prisma.product.create({
+      data: { sku: 'EXPIRED-PAYMENT', name: 'Expired phone', price: 50000, cost: 40000, category: 'phones', attrs: {} },
+    });
+    const imei = 'EXPIRED-PAYMENT-IMEI';
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        total: 50000,
+        status: 'reserved',
+        items: { create: { sku: product.sku, qty: 1, price: 50000, imei } },
+      },
+    });
+    await prisma.deviceUnit.create({ data: { imei, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
+    await prisma.reservation.create({
+      data: { orderId: order.id, imei, active: false, expiresAt: new Date(Date.now() - 1000) },
+    });
+    await expect(payments.pay(
+      { orderId: order.id, method: 'card', amount: 50000, txnId: `expired-${order.id}` },
+      'system',
+    )).rejects.toMatchObject({ code: 'order_reservation_incomplete' });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: 'reserved' });
+  });
+
+  it('does not accept final payment for a known serialized product with no reservation history', async () => {
+    const customer = await prisma.customer.create({ data: { phone: '+996701999998', name: 'Unreserved' } });
+    const product = await prisma.product.create({
+      data: { sku: 'UNRESERVED-PAYMENT', name: 'Unreserved phone', price: 60000, cost: 45000, category: 'phones', attrs: {} },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        total: 60000,
+        status: 'reserved',
+        fulfillmentLocation: 'BISHKEK-1',
+        items: { create: { sku: product.sku, qty: 1, price: 60000 } },
+      },
+    });
+
+    await expect(payments.pay(
+      { orderId: order.id, method: 'card', amount: 60000, txnId: `unreserved-${order.id}` },
+      'system',
+    )).rejects.toMatchObject({ code: 'order_reservation_incomplete' });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: 'reserved' });
   });
 
   /** A reserved, accessory-only order (no serialized unit) ready to pay. */

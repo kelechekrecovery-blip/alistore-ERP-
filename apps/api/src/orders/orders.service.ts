@@ -1,7 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrderStatus, Prisma, StorePoint } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -13,16 +13,20 @@ import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { earnLoyaltyOnTx, redeemLoyaltyOnTx } from '../customers/loyalty-ledger';
 import {
-  accrueConsignmentSalesOnTx,
-  accrueQuantityConsignmentSalesOnTx,
   releaseQuantityConsignmentOnTx,
   reserveQuantityConsignmentOnTx,
 } from '../inventory/consignment-accounting';
 import { LogisticsService } from '../logistics/logistics.service';
 import { PromotionLine, PromotionsService } from '../promotions/promotions.service';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
-import { consumeQuantityValuationOnTx } from '../inventory/inventory-valuation';
 import { salesTaxSnapshot } from '../finance/sales-tax';
+import {
+  assertOrderReservationCoverageOnTx,
+  finalizeOrderInventorySaleOnTx,
+  lockInventoryBalancesOnTx,
+  resolveOrderInventorySnapshot,
+  type OrderInventorySnapshot,
+} from '../inventory/order-inventory-sale';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -34,6 +38,7 @@ interface CanonicalPricing {
   loyaltyPoints: number;
   promotionLines?: PromotionLine[];
   unitCosts?: Record<string, number>;
+  inventorySnapshots?: Record<string, OrderInventorySnapshot>;
 }
 
 function defaultFulfillment(channel: string): NonNullable<CreateOrderDto['fulfillmentType']> {
@@ -106,15 +111,14 @@ export class OrdersService {
 
   /** Create an order (status `created`) and write order.created to the ledger. */
   async createFromCatalog(dto: CreateOrderDto, actor: string, idempotencyKey?: string, allowLoyalty = false) {
+    const requestHash = orderRequestHash(dto, false);
     if (idempotencyKey) {
       const existing = await this.prisma.order.findUnique({
         where: { idempotencyKey },
         include: { items: true },
       });
       if (existing) {
-        if (existing.customerId !== dto.customerId) {
-          throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
-        }
+        assertOrderReplayCompatible(existing, dto, false, requestHash);
         return existing;
       }
     }
@@ -129,6 +133,10 @@ export class OrdersService {
       throw new ValidationError('delivery_selection_forbidden', 'Зона и слот доступны только для курьерской доставки');
     }
     const fulfillmentType: NonNullable<CreateOrderDto['fulfillmentType']> = dto.fulfillmentType ?? defaultFulfillment(dto.channel);
+    const paymentMode = dto.paymentMode ?? 'prepaid';
+    if (paymentMode === 'cod' && fulfillmentType !== 'courier') {
+      throw new ValidationError('cod_courier_required', 'Оплата при получении доступна только для курьерской доставки');
+    }
     const requiresPointSelection = fulfillmentType === 'pickup';
     const storePoint = this.logistics
       ? await this.logistics.resolveStorePoint(
@@ -204,11 +212,22 @@ export class OrdersService {
         qty: item.qty,
       })),
       unitCosts: Object.fromEntries(products.map((product) => [product.sku, product.cost])),
+      inventorySnapshots: Object.fromEntries(products.map((product) => [product.sku, {
+        productId: product.id,
+        trackingMode: product.trackingMode,
+        components: product.bundleComponents.map((component) => ({
+          productId: component.componentProductId,
+          sku: component.componentProduct.sku,
+          trackingMode: component.componentProduct.trackingMode,
+          qty: component.qty,
+        })),
+      }])),
     };
     return this.create(
       {
         ...dto,
         fulfillmentType,
+        paymentMode,
         storePointId: storePoint.id,
         pickupPoint: undefined,
         deliveryAddress,
@@ -219,6 +238,7 @@ export class OrdersService {
       idempotencyKey,
       pricing,
       storePoint,
+      requestHash,
     );
   }
 
@@ -228,6 +248,7 @@ export class OrdersService {
     idempotencyKey?: string,
     pricing?: CanonicalPricing,
     storePoint?: StorePoint,
+    requestHash = orderRequestHash(dto, true),
   ) {
     const isDemo = this.config?.get<string>('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
     const fulfillmentType = dto.fulfillmentType ?? defaultFulfillment(dto.channel);
@@ -242,9 +263,7 @@ export class OrdersService {
             include: { items: true },
           });
           if (existing) {
-            if (existing.customerId !== dto.customerId) {
-              throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
-            }
+            assertOrderReplayCompatible(existing, dto, true, requestHash);
             return { result: existing, events: [] };
           }
         }
@@ -303,10 +322,13 @@ export class OrdersService {
         const initialOrder = await tx.order.create({
           data: {
             idempotencyKey,
+            idempotencyRequestHash: idempotencyKey ? requestHash : null,
             isDemo,
             customerId: dto.customerId,
             channel: dto.channel,
             fulfillmentType,
+            paymentMode: dto.paymentMode ?? 'prepaid',
+            paymentModeExplicit: true,
             storePointId: canonicalStorePoint.id,
             storePointCode: canonicalStorePoint.code,
             storePointName: canonicalStorePoint.name,
@@ -340,6 +362,9 @@ export class OrdersService {
                 taxBaseAmount: initialTax.lines[index].taxBaseAmount,
                 taxAmount: initialTax.lines[index].taxAmount,
                 imei: i.imei,
+                ...(canonical.inventorySnapshots?.[i.sku]
+                  ? { inventorySnapshot: canonical.inventorySnapshots[i.sku] as unknown as Prisma.InputJsonValue }
+                  : {}),
               })),
             },
             ...(preparedAttribution ? { attribution: { create: preparedAttribution.data } } : {}),
@@ -411,6 +436,7 @@ export class OrdersService {
               orderId: order.id,
               channel: order.channel,
               fulfillmentType: order.fulfillmentType,
+              paymentMode: order.paymentMode,
               storePointId: order.storePointId,
               pickupPoint: order.pickupPoint,
               pickupAddress: order.pickupAddress,
@@ -455,9 +481,7 @@ export class OrdersService {
           include: { items: true },
         });
         if (existing) {
-          if (existing.customerId !== dto.customerId) {
-            throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
-          }
+          assertOrderReplayCompatible(existing, dto, true, requestHash);
           return existing;
         }
       }
@@ -486,6 +510,7 @@ export class OrdersService {
    */
   async reserve(orderId: string, actor: string) {
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { items: true },
@@ -496,12 +521,56 @@ export class OrdersService {
       this.assertNotDemo(order);
       assertTransition(order.status, 'reserved');
 
+      const currentProducts = await tx.product.findMany({
+        where: { sku: { in: [...new Set(order.items.map((item) => item.sku))] } },
+        include: { bundleComponents: { include: { componentProduct: true } } },
+      });
+      const currentProductsBySku = new Map(currentProducts.map((product) => [product.sku, product]));
+      const inventorySpecs = new Map<string, OrderInventorySnapshot>();
+      for (const item of order.items) {
+        const product = currentProductsBySku.get(item.sku);
+        const snapshot = resolveOrderInventorySnapshot(item.inventorySnapshot, product ? {
+          productId: product.id,
+          trackingMode: product.trackingMode,
+          components: product.bundleComponents.map((component) => ({
+            productId: component.componentProductId,
+            sku: component.componentProduct.sku,
+            trackingMode: component.componentProduct.trackingMode,
+            qty: component.qty,
+          })),
+        } : null);
+        if (snapshot) inventorySpecs.set(item.id, snapshot);
+      }
+      const quantityProductIds = [...new Set([...inventorySpecs.values()].flatMap((snapshot) => {
+        if (snapshot.components.length > 0) {
+          return snapshot.components
+            .filter((component) => component.trackingMode === 'quantity')
+            .map((component) => component.productId);
+        }
+        return snapshot.trackingMode === 'quantity' ? [snapshot.productId] : [];
+      }))];
+      if (quantityProductIds.length > 0) {
+        const balances = await tx.inventoryBalance.findMany({
+          where: {
+            productId: { in: quantityProductIds },
+            ...(order.fulfillmentLocation ? { location: order.fulfillmentLocation } : {}),
+          },
+          select: { id: true },
+          orderBy: { id: 'asc' },
+        });
+        await lockInventoryBalancesOnTx(tx, balances.map((balance) => balance.id));
+      }
+
       const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
       const events: AuditInput[] = [];
       for (const item of order.items) {
+        const inventorySpec = inventorySpecs.get(item.id);
         if (item.imei) {
           const unit = await tx.deviceUnit.findUnique({ where: { imei: item.imei } });
-          if (!unit || (order.fulfillmentLocation && unit.location !== order.fulfillmentLocation)) {
+          if (!unit || !inventorySpec || unit.productId !== inventorySpec.productId) {
+            throw new ConflictError('unit_product_mismatch', `Единица ${item.imei} не соответствует товару ${item.sku}`);
+          }
+          if (order.fulfillmentLocation && unit.location !== order.fulfillmentLocation) {
             throw new ConflictError('unit_wrong_store_point', `Единица ${item.imei} недоступна в выбранной точке`);
           }
           await this.units.reserveOnTx(tx, item.imei, orderId);
@@ -516,11 +585,15 @@ export class OrdersService {
           });
           continue;
         }
-        const product = await tx.product.findUnique({ where: { sku: item.sku } });
-        if (product?.trackingMode === 'quantity') {
+        if (inventorySpec?.trackingMode === 'quantity' && inventorySpec.components.length === 0) {
           await this.reserveQuantityOnTx(
-            tx, orderId, item.id, product.id, product.sku, item.qty,
+            tx, orderId, item.id, inventorySpec.productId, item.sku, item.qty,
             order.fulfillmentLocation, expiresAt, actor, events,
+          );
+        } else if (inventorySpec) {
+          throw new ConflictError(
+            'serialized_unit_required',
+            `Для серийного товара ${item.sku} нужно назначить IMEI через складское исполнение`,
           );
         }
       }
@@ -542,11 +615,13 @@ export class OrdersService {
   /** Generic guarded status transition (writes an order.* ledger event). */
   async transition(orderId: string, to: OrderStatus, actor: string) {
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: {
           payments: { where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } }, orderBy: { createdAt: 'asc' } },
           courierRun: true,
+          items: { select: { id: true } },
         },
       });
       if (!order) {
@@ -554,6 +629,16 @@ export class OrdersService {
       }
       this.assertNotDemo(order);
       assertTransition(order.status, to);
+      if (order.status === 'reserved' && to === 'picking' && order.paymentMode !== 'cod') {
+        throw new ValidationError('cod_picking_required', 'Неоплаченный заказ можно собирать только в режиме COD');
+      }
+      if (order.status === 'reserved' && to === 'picking' && order.items.length > 0) {
+        await assertOrderReservationCoverageOnTx(tx, orderId);
+      }
+      if (to === 'paid') {
+        assertOrderTenderSettled(order);
+        throw new ConflictError('order_paid_transition_forbidden', 'Статус paid устанавливает только сервис оплаты или COD');
+      }
       if (to === 'completed') assertOrderMoneyReconciled(order);
       const releaseEvents: AuditInput[] = [];
       if (to === 'cancelled') {
@@ -561,6 +646,17 @@ export class OrdersService {
           where: { orderId, active: true },
           include: { quantityAllocation: true },
         });
+        reservations.sort((left, right) => {
+          const leftKey = left.quantityAllocation?.balanceId ?? left.imei ?? left.id;
+          const rightKey = right.quantityAllocation?.balanceId ?? right.imei ?? right.id;
+          return leftKey.localeCompare(rightKey) || left.id.localeCompare(right.id);
+        });
+        await lockInventoryBalancesOnTx(
+          tx,
+          reservations.flatMap((reservation) => (
+            reservation.quantityAllocation?.balanceId ? [reservation.quantityAllocation.balanceId] : []
+          )),
+        );
         for (const reservation of reservations) {
           if (reservation.imei) {
             const released = await this.units.releaseOnTx(tx, reservation.imei, orderId);
@@ -597,6 +693,10 @@ export class OrdersService {
         await tx.reservation.updateMany({
           where: { orderId, active: true },
           data: { active: false },
+        });
+        await tx.orderBundleAllocation.updateMany({
+          where: { orderId, active: true },
+          data: { active: false, releasedAt: new Date() },
         });
       }
       let updated = await tx.order.update({
@@ -655,6 +755,7 @@ export class OrdersService {
    */
   async fulfill(orderId: string, actor: string) {
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { items: true },
@@ -665,18 +766,80 @@ export class OrdersService {
       this.assertNotDemo(order);
       assertTransition(order.status, 'reserved');
 
+      const currentProducts = await tx.product.findMany({
+        where: { sku: { in: [...new Set(order.items.map((item) => item.sku))] } },
+        include: { bundleComponents: { include: { componentProduct: true } } },
+      });
+      const currentProductsBySku = new Map(currentProducts.map((product) => [product.sku, product]));
+      const inventorySpecs = new Map<string, OrderInventorySnapshot>();
+      for (const item of order.items) {
+        const product = currentProductsBySku.get(item.sku);
+        const snapshot = resolveOrderInventorySnapshot(item.inventorySnapshot, product ? {
+          productId: product.id,
+          trackingMode: product.trackingMode,
+          components: product.bundleComponents.map((component) => ({
+            productId: component.componentProductId,
+            sku: component.componentProduct.sku,
+            trackingMode: component.componentProduct.trackingMode,
+            qty: component.qty,
+          })),
+        } : null);
+        if (snapshot) inventorySpecs.set(item.id, snapshot);
+      }
+      const quantityProductIds = [...new Set([...inventorySpecs.values()].flatMap((snapshot) => {
+        if (snapshot.components.length > 0) {
+          return snapshot.components
+            .filter((component) => component.trackingMode === 'quantity')
+            .map((component) => component.productId);
+        }
+        return snapshot.trackingMode === 'quantity' ? [snapshot.productId] : [];
+      }))];
+      if (quantityProductIds.length > 0) {
+        const balances = await tx.inventoryBalance.findMany({
+          where: {
+            productId: { in: quantityProductIds },
+            ...(order.fulfillmentLocation ? { location: order.fulfillmentLocation } : {}),
+          },
+          select: { id: true },
+          orderBy: { id: 'asc' },
+        });
+        await lockInventoryBalancesOnTx(tx, balances.map((balance) => balance.id));
+      }
+
       const expiresAt = new Date(Date.now() + RESERVATION_TTL_MS);
       const events: AuditInput[] = [];
       const assigned: string[] = [];
       let nextLineNumber = Math.max(0, ...order.items.map((item) => item.lineNumber)) + 1;
+      const serializedProductIds = [...new Set([...inventorySpecs.values()].flatMap((snapshot) => {
+        if (snapshot.components.length > 0) {
+          return snapshot.components
+            .filter((component) => component.trackingMode === 'serialized')
+            .map((component) => component.productId);
+        }
+        return snapshot.trackingMode === 'serialized' ? [snapshot.productId] : [];
+      }))];
+      const serializedProducts = serializedProductIds.length > 0
+        ? await tx.product.findMany({ where: { id: { in: serializedProductIds } }, select: { id: true, cost: true } })
+        : [];
+      const serializedCosts = new Map(serializedProducts.map((product) => [product.id, product.cost]));
 
-      const reserveUnit = async (imei: string, sku: string) => {
+      const reserveUnit = async (imei: string, sku: string, expectedProductId: string) => {
         // Conditional claim — a findUnique→update would let two concurrent fulfills both
         // pass the in-stock check and double-reserve one device to two orders. Gate the
         // write on status:'in_stock' (mirror units.reserveOnTx); 0 rows → unit already taken.
+        const candidate = await tx.deviceUnit.findUnique({
+          where: { imei },
+          select: { acquisitionCost: true, consignmentItem: { select: { id: true } } },
+        });
+        const acquisitionCost = candidate?.consignmentItem
+          ? candidate.acquisitionCost
+          : candidate?.acquisitionCost ?? serializedCosts.get(expectedProductId);
+        if (!candidate?.consignmentItem && acquisitionCost === undefined) {
+          throw new ConflictError('unit_acquisition_cost_missing', `Для единицы ${imei} не определена себестоимость`);
+        }
         const claimed = await tx.deviceUnit.updateMany({
-          where: { imei, status: 'in_stock' },
-          data: { status: 'reserved', orderId },
+          where: { imei, productId: expectedProductId, status: 'in_stock' },
+          data: { status: 'reserved', orderId, acquisitionCost },
         });
         if (claimed.count === 0) {
           throw new ConflictError('unit_already_taken', `Единица ${imei} уже занята — повторите`);
@@ -692,36 +855,40 @@ export class OrdersService {
       };
 
       for (const item of order.items) {
+        const inventorySpec = inventorySpecs.get(item.id);
         if (item.imei) {
           // already serialized (e.g. POS) — reserve if still in stock
           const unit = await tx.deviceUnit.findUnique({ where: { imei: item.imei } });
+          if (!unit || !inventorySpec || unit.productId !== inventorySpec.productId) {
+            throw new ConflictError('unit_product_mismatch', `Единица ${item.imei} не соответствует товару ${item.sku}`);
+          }
           if (unit && order.fulfillmentLocation && unit.location !== order.fulfillmentLocation) {
             throw new ConflictError('unit_wrong_store_point', `Единица ${item.imei} недоступна в выбранной точке`);
           }
-          if (unit?.status === 'in_stock') await reserveUnit(item.imei, item.sku);
+          if (unit.status !== 'in_stock') {
+            throw new ConflictError('unit_already_taken', `Единица ${item.imei} уже занята — повторите`);
+          }
+          await reserveUnit(item.imei, item.sku, inventorySpec.productId);
           continue;
         }
-        const product = await tx.product.findUnique({
-          where: { sku: item.sku },
-          include: { bundleComponents: { include: { componentProduct: true } } },
-        });
-        if (!product) continue; // non-serialized line (accessory) — nothing to assign
+        if (!inventorySpec) continue; // historical non-stock/service line
 
-        if (product.bundleComponents.length > 0) {
-          for (const component of product.bundleComponents) {
+        if (inventorySpec.components.length > 0) {
+          for (const component of inventorySpec.components) {
             const required = component.qty * item.qty;
-            if (component.componentProduct.trackingMode === 'quantity') {
+            if (component.trackingMode === 'quantity') {
               await this.reserveQuantityOnTx(
-                tx, orderId, item.id, component.componentProductId,
-                component.componentProduct.sku, required, order.fulfillmentLocation,
-                expiresAt, actor, events,
+                tx, orderId, item.id, component.productId,
+                component.sku, required, order.fulfillmentLocation,
+                expiresAt, actor, events, false,
               );
               continue;
             }
             const units = await tx.deviceUnit.findMany({
               where: {
-                productId: component.componentProductId,
+                productId: component.productId,
                 status: 'in_stock',
+                consignmentItem: { is: null },
                 ...(order.fulfillmentLocation ? { location: order.fulfillmentLocation } : {}),
               },
               take: required,
@@ -730,18 +897,18 @@ export class OrdersService {
             if (units.length < required) {
               throw new ConflictError(
                 'insufficient_bundle_stock',
-                `Для набора ${item.sku} недостаточно ${component.componentProduct.sku}: нужно ${required}, в наличии ${units.length}`,
+                `Для набора ${item.sku} недостаточно ${component.sku}: нужно ${required}, в наличии ${units.length}`,
               );
             }
             for (const unit of units) {
-              await reserveUnit(unit.imei, component.componentProduct.sku);
+              await reserveUnit(unit.imei, component.sku, component.productId);
               await tx.orderBundleAllocation.create({
                 data: {
                   orderId,
                   orderItemId: item.id,
                   bundleSku: item.sku,
-                  componentProductId: component.componentProductId,
-                  componentSku: component.componentProduct.sku,
+                  componentProductId: component.productId,
+                  componentSku: component.sku,
                   location: unit.location,
                   imei: unit.imei,
                 },
@@ -751,9 +918,9 @@ export class OrdersService {
           continue;
         }
 
-        if (product.trackingMode === 'quantity') {
+        if (inventorySpec.trackingMode === 'quantity') {
           await this.reserveQuantityOnTx(
-            tx, orderId, item.id, product.id, product.sku, item.qty,
+            tx, orderId, item.id, inventorySpec.productId, item.sku, item.qty,
             order.fulfillmentLocation, expiresAt, actor, events,
           );
           continue;
@@ -761,7 +928,7 @@ export class OrdersService {
 
         const units = await tx.deviceUnit.findMany({
           where: {
-            productId: product.id,
+            productId: inventorySpec.productId,
             status: 'in_stock',
             ...(order.fulfillmentLocation ? { location: order.fulfillmentLocation } : {}),
           },
@@ -791,7 +958,7 @@ export class OrdersService {
           where: { id: item.id },
           data: { qty: 1, imei: units[0].imei, ...splitSnapshot(0) },
         });
-        await reserveUnit(units[0].imei, item.sku);
+        await reserveUnit(units[0].imei, item.sku, inventorySpec.productId);
         for (const [offset, unit] of units.slice(1).entries()) {
           await tx.orderItem.create({
             data: {
@@ -805,9 +972,12 @@ export class OrdersService {
               taxRateBps: item.taxRateBps,
               ...splitSnapshot(offset + 1),
               imei: unit.imei,
+              ...(item.inventorySnapshot
+                ? { inventorySnapshot: item.inventorySnapshot as Prisma.InputJsonValue }
+                : {}),
             },
           });
-          await reserveUnit(unit.imei, item.sku);
+          await reserveUnit(unit.imei, item.sku, inventorySpec.productId);
         }
       }
 
@@ -823,33 +993,11 @@ export class OrdersService {
       // Fulfillment is therefore the authoritative point where its reserved units become
       // sold and the order becomes paid. No synthetic Payment row is created.
       if (order.total === 0) {
-        for (const imei of assigned) {
-          const valuation = await this.units.sellOnTx(tx, imei, order.id, actor);
-          if (valuation?.entry) {
-            events.push({
-              type: EventType.AccountingEntryPosted,
-              actor,
-              payload: {
-                accountingEntryId: valuation.entry.id,
-                sourceType: 'inventory.cogs',
-                sourceRef: valuation.issue.id,
-                amount: valuation.issue.totalCost,
-              },
-              refs: [valuation.entry.id, valuation.issue.id, order.id, imei],
-            });
-          }
-          events.push({
-            type: EventType.UnitSold,
-            actor,
-            payload: { orderId, imei, method: 'loyalty' },
-            refs: [orderId, imei],
-          });
-        }
-        await accrueConsignmentSalesOnTx(tx, { orderId: order.id, imeis: assigned, actor, events });
-        await this.consumeQuantityOnTx(tx, order.id, actor, events);
-        await tx.reservation.updateMany({
-          where: { orderId, active: true },
-          data: { active: false },
+        await finalizeOrderInventorySaleOnTx(tx, {
+          orderId: order.id,
+          actor,
+          units: this.units,
+          events,
         });
         nextStatus = 'paid';
         events.push({
@@ -888,6 +1036,7 @@ export class OrdersService {
     expiresAt: Date,
     actor: string,
     events: AuditInput[],
+    allowConsignment = true,
   ): Promise<void> {
     const balances = await tx.inventoryBalance.findMany({
       where: { productId, ...(preferredLocation ? { location: preferredLocation } : {}) },
@@ -896,7 +1045,16 @@ export class OrdersService {
     let remaining = quantity;
     for (const balance of balances) {
       if (remaining === 0) break;
-      const desired = Math.min(remaining, Math.max(0, balance.onHand - balance.reserved));
+      const consignmentAvailable = allowConsignment
+        ? 0
+        : (await tx.quantityConsignmentLot.aggregate({
+          where: { balanceId: balance.id },
+          _sum: { availableQty: true },
+        }))._sum.availableQty ?? 0;
+      const desired = Math.min(
+        remaining,
+        Math.max(0, balance.onHand - balance.reserved - consignmentAvailable),
+      );
       if (desired === 0) continue;
       const claimed = await tx.$executeRaw`
         UPDATE "InventoryBalance"
@@ -907,11 +1065,13 @@ export class OrdersService {
       const allocation = await tx.orderQuantityAllocation.create({
         data: { orderId, orderItemId, productId, balanceId: balance.id, sku, location: balance.location, qty: desired },
       });
-      await reserveQuantityConsignmentOnTx(tx, {
-        orderQuantityAllocationId: allocation.id,
-        balanceId: balance.id,
-        qty: desired,
-      });
+      if (allowConsignment) {
+        await reserveQuantityConsignmentOnTx(tx, {
+          orderQuantityAllocationId: allocation.id,
+          balanceId: balance.id,
+          qty: desired,
+        });
+      }
       await tx.reservation.create({
         data: { orderId, quantityAllocationId: allocation.id, expiresAt, active: true },
       });
@@ -949,47 +1109,6 @@ export class OrdersService {
     return point;
   }
 
-  private async consumeQuantityOnTx(
-    tx: Prisma.TransactionClient,
-    orderId: string,
-    actor: string,
-    events: AuditInput[],
-  ): Promise<void> {
-    const allocations = await tx.orderQuantityAllocation.findMany({ where: { orderId, active: true } });
-    for (const allocation of allocations) {
-      const totalCost = await consumeQuantityValuationOnTx(tx, {
-        orderId,
-        allocationId: allocation.id,
-        productId: allocation.productId,
-        balanceId: allocation.balanceId,
-        quantity: allocation.qty,
-        actor,
-      });
-      const consumed = await tx.inventoryBalance.updateMany({
-        where: { id: allocation.balanceId, onHand: { gte: allocation.qty }, reserved: { gte: allocation.qty }, inventoryValue: { gte: totalCost } },
-        data: { onHand: { decrement: allocation.qty }, reserved: { decrement: allocation.qty }, inventoryValue: { decrement: totalCost } },
-      });
-      if (consumed.count !== 1) {
-        throw new ConflictError('quantity_allocation_invalid', `Резерв ${allocation.id} больше недоступен`);
-      }
-      await tx.orderQuantityAllocation.update({
-        where: { id: allocation.id },
-        data: { active: false, consumedAt: new Date() },
-      });
-      events.push({
-        type: EventType.StockSold,
-        actor,
-        payload: { orderId, sku: allocation.sku, qty: allocation.qty, allocationId: allocation.id },
-        refs: [orderId, allocation.productId, allocation.id],
-      });
-    }
-    await accrueQuantityConsignmentSalesOnTx(tx, {
-      orderId,
-      orderQuantityAllocationIds: allocations.map((allocation) => allocation.id),
-      actor,
-      events,
-    });
-  }
 }
 
 function directAvailability(product: {
@@ -1051,4 +1170,118 @@ function assertOrderMoneyReconciled(order: {
   if (received + handedOverCod < order.total) {
     throw new ConflictError('order_money_unreconciled', `Заказ ${order.id} нельзя завершить до сверки оплаты/COD`);
   }
+}
+
+function assertOrderTenderSettled(order: { id: string; total: number; payments: { amount: number }[] }): void {
+  if (order.total <= 0) return;
+  const received = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
+  if (received < order.total) {
+    throw new ConflictError('order_payment_unsettled', `Заказ ${order.id} нельзя отметить оплаченным без полученной оплаты`);
+  }
+}
+
+function assertOrderReplayCompatible(
+  existing: {
+    customerId: string;
+    channel: string;
+    fulfillmentType: string;
+    paymentMode: string;
+    total: number;
+    storePointId: string | null;
+    pickupPoint: string | null;
+    deliveryAddress: string | null;
+    deliverySlot: string | null;
+    deliveryZoneId: string | null;
+    deliverySlotId: string | null;
+    promoCode: string | null;
+    loyaltyRedeemed: number;
+    idempotencyRequestHash: string | null;
+    items: Array<{ sku: string; qty: number; price: number; imei: string | null }>;
+  },
+  dto: CreateOrderDto,
+  compareImei = true,
+  requestHash = orderRequestHash(dto, compareImei),
+): void {
+  if (existing.customerId !== dto.customerId) {
+    throw new ConflictError('order_idempotency_owner_mismatch', 'Ключ заказа уже использован');
+  }
+  if (existing.idempotencyRequestHash) {
+    if (existing.idempotencyRequestHash !== requestHash) {
+      throw new ConflictError('order_idempotency_mismatch', 'Idempotency-Key уже использован для другого заказа');
+    }
+    return;
+  }
+  const requestedFulfillment = dto.fulfillmentType ?? defaultFulfillment(dto.channel);
+  const materialMismatch = existing.channel !== dto.channel
+    || existing.fulfillmentType !== requestedFulfillment
+    || existing.paymentMode !== (dto.paymentMode ?? 'prepaid')
+    || (compareImei && existing.total !== dto.total)
+    || (dto.storePointId !== undefined && existing.storePointId !== dto.storePointId)
+    || (compareImei && existing.pickupPoint !== (dto.pickupPoint?.trim() || null))
+    || existing.deliveryAddress !== (dto.deliveryAddress?.trim() || null)
+    || existing.deliverySlot !== (dto.deliverySlot?.trim() || null)
+    || existing.deliveryZoneId !== (dto.deliveryZoneId ?? null)
+    || existing.deliverySlotId !== (dto.deliverySlotId ?? null)
+    || existing.promoCode !== normalizePromo(dto.promoCode)
+    || existing.loyaltyRedeemed !== (dto.loyaltyPoints ?? 0)
+    || normalizedReplayItems(existing.items, compareImei) !== normalizedReplayItems(dto.items, compareImei)
+    || (compareImei && normalizedReplayPrices(existing.items) !== normalizedReplayPrices(dto.items));
+  if (materialMismatch) {
+    throw new ConflictError('order_idempotency_mismatch', 'Idempotency-Key уже использован для другого заказа');
+  }
+}
+
+function normalizedReplayPrices(items: Array<{ sku: string; qty: number; price: number; imei?: string | null }>): string {
+  return [...items]
+    .map((item) => ({ sku: item.sku, qty: item.qty, price: item.price, imei: item.imei ?? null }))
+    .sort((left, right) => stableJson(left).localeCompare(stableJson(right)))
+    .map(stableJson)
+    .join('\u0001');
+}
+
+function orderRequestHash(dto: CreateOrderDto, compareImei: boolean): string {
+  const material = {
+    customerId: dto.customerId,
+    channel: dto.channel,
+    fulfillmentType: dto.fulfillmentType ?? defaultFulfillment(dto.channel),
+    paymentMode: dto.paymentMode ?? 'prepaid',
+    storePointId: dto.storePointId ?? null,
+    pickupPoint: dto.pickupPoint?.trim() || null,
+    deliveryAddress: dto.deliveryAddress?.trim() || null,
+    deliverySlot: dto.deliverySlot?.trim() || null,
+    deliveryZoneId: dto.deliveryZoneId ?? null,
+    deliverySlotId: dto.deliverySlotId ?? null,
+    promoCode: normalizePromo(dto.promoCode),
+    loyaltyPoints: dto.loyaltyPoints ?? 0,
+    attribution: dto.attribution ?? null,
+    clientTotal: compareImei ? dto.total : null,
+    items: normalizedReplayItems(dto.items, compareImei),
+    clientPrices: compareImei
+      ? [...dto.items]
+        .map((item) => ({ sku: item.sku, qty: item.qty, imei: item.imei ?? null, price: item.price }))
+        .sort((left, right) => stableJson(left).localeCompare(stableJson(right)))
+      : null,
+  };
+  return createHash('sha256').update(stableJson(material)).digest('hex');
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function normalizedReplayItems(items: Array<{ sku: string; qty: number; imei?: string | null }>, compareImei: boolean): string {
+  const quantities = new Map<string, number>();
+  for (const item of items) {
+    const key = compareImei ? `${item.sku}\u0000${item.imei ?? ''}` : item.sku;
+    quantities.set(key, (quantities.get(key) ?? 0) + item.qty);
+  }
+  return [...quantities.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, qty]) => `${key}\u0000${qty}`)
+    .join('\u0001');
 }

@@ -195,12 +195,16 @@ test('marketer launches a promotion in ERP and checkout redeems the same server 
   await page.getByPlaceholder('+996 700 12 34 56').fill(`+996700${Date.now().toString().slice(-6)}`);
   await page.getByPlaceholder('Имя').fill('Promo Buyer');
   await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
   await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
+  await expect(page.getByText('Ожидаем оплату')).toBeVisible();
+  await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
   await expect(page.getByText('Заказ оформлен!')).toBeVisible();
 
   const order = await prisma.order.findFirstOrThrow({ where: { promoCode: code }, orderBy: { createdAt: 'desc' } });
-  expect(order).toMatchObject({ subtotal: 100_000, promoDiscount: 3000, total: 97_000 });
+  expect(order).toMatchObject({ subtotal: 100_000, promoDiscount: 3000, total: 97_000, status: 'paid' });
+  expect(await prisma.payment.count({ where: { orderId: order.id, status: 'received' } })).toBe(1);
   expect(await prisma.promotionRedemption.count({ where: { orderId: order.id } })).toBe(1);
   expect(await prisma.auditEvent.count({ where: { type: 'promotion.redeemed', refs: { has: order.id } } })).toBe(1);
 });

@@ -53,6 +53,11 @@ export class UnitsService {
     location: string;
     grade?: 'A' | 'B' | 'C';
   }) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: input.productId },
+      select: { cost: true },
+    });
+    if (!product) throw new ValidationError('product_not_found', `Товар ${input.productId} не найден`);
     return this.prisma.deviceUnit.create({
       data: {
         imei: input.imei,
@@ -60,6 +65,7 @@ export class UnitsService {
         location: input.location,
         grade: input.grade,
         status: 'in_stock',
+        acquisitionCost: product.cost,
       },
     });
   }
@@ -77,9 +83,20 @@ export class UnitsService {
     // status on the locked row, so two concurrent reservations of the same IMEI
     // cannot both flip in_stock→reserved (invariant #2). A findUnique→update would
     // let both pass the check and double-reserve (one device → two customers).
+    const candidate = await tx.deviceUnit.findUnique({
+      where: { imei },
+      select: {
+        acquisitionCost: true,
+        product: { select: { cost: true } },
+        consignmentItem: { select: { id: true } },
+      },
+    });
+    const acquisitionCost = candidate?.consignmentItem
+      ? candidate.acquisitionCost
+      : candidate?.acquisitionCost ?? candidate?.product.cost;
     const { count } = await tx.deviceUnit.updateMany({
       where: { imei, status: 'in_stock' },
-      data: { status: 'reserved', orderId },
+      data: { status: 'reserved', orderId, acquisitionCost },
     });
     if (count === 0) {
       const unit = await tx.deviceUnit.findUnique({ where: { imei } });
@@ -124,15 +141,13 @@ export class UnitsService {
     const sold = await tx.deviceUnit.findUniqueOrThrow({
       where: { imei },
       include: {
-        product: { select: { cost: true } },
         consignmentItem: { select: { id: true } },
       },
     });
     if (sold.consignmentItem) return null;
-    const unitCost = sold.acquisitionCost ?? sold.product.cost;
-    // Consignment/trade-in units can have no owned acquisition cost. They create
-    // owner liability through consignment accounting, but must not create a
-    // zero-value journal entry (the ledger rejects zero debit/credit lines).
+    if (sold.acquisitionCost === null) {
+      throw new ConflictError('unit_acquisition_cost_missing', `Для IMEI ${imei} не зафиксирована себестоимость`);
+    }
     return postCogsOnTx(tx, {
       productId: sold.productId,
       orderId,
@@ -140,7 +155,7 @@ export class UnitsService {
       imei,
       location: sold.location,
       quantity: 1,
-      unitCost,
+      unitCost: sold.acquisitionCost,
       actor,
     });
   }

@@ -89,7 +89,7 @@ describe('Gift cards / store credit (integration)', () => {
 
   async function reservedOrder(total = 100000) {
     const seeded = await webOrder(total);
-    await orders.reserve(seeded.order.id, 'seller');
+    await orders.fulfill(seeded.order.id, 'seller');
     return seeded;
   }
 

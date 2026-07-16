@@ -44,6 +44,12 @@
         }
       ]
     },
+    "courier-cod-reconciliation": {
+      "status": "partial",
+      "packageScript": "ecosystem:courier-cod:e2e",
+      "command": null,
+      "artifacts": []
+    },
     "reconciled-e2e": {
       "status": "partial",
       "packageScript": "ecosystem:e2e",

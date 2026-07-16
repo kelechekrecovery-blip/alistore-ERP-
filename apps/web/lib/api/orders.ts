@@ -50,6 +50,7 @@ export async function createOrder(input: {
   customerId: string;
   channel: string;
   fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
+  paymentMode?: 'prepaid' | 'cod';
   storePointId?: string;
   deliveryAddress?: string;
   deliverySlot?: string;
@@ -77,6 +78,7 @@ export async function createOrder(input: {
 export async function createMyOrder(input: {
   channel: 'web' | 'mobile';
   fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
+  paymentMode?: 'prepaid' | 'cod';
   storePointId?: string;
   deliveryAddress?: string;
   deliverySlot?: string;

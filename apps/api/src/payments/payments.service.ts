@@ -13,7 +13,11 @@ import { PayDto } from './payments.dto';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
-import { finalizeOrderInventorySaleOnTx } from '../inventory/order-inventory-sale';
+import {
+  assertOrderReservationCoverageOnTx,
+  finalizeOrderInventorySaleOnTx,
+  orderHasTrackedInventoryOnTx,
+} from '../inventory/order-inventory-sale';
 
 /** Order statuses from which a payment may complete (must hold a live reservation). */
 const PAYABLE_STATUSES = new Set(['reserved', 'awaiting_payment']);
@@ -424,6 +428,9 @@ export class PaymentsService {
         return { result: { order, payment: payments[0], payments, idempotent: false }, events };
       }
 
+      if (await orderHasTrackedInventoryOnTx(tx, order.id)) {
+        await assertOrderReservationCoverageOnTx(tx, order.id);
+      }
       await finalizeOrderInventorySaleOnTx(tx, {
         orderId: order.id,
         actor,

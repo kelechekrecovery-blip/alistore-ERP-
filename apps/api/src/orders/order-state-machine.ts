@@ -18,7 +18,7 @@ export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   created: ['awaiting_confirmation', 'confirmed', 'reserved', 'cancelled'],
   awaiting_confirmation: ['confirmed', 'cancelled'],
   confirmed: ['reserved', 'cancelled'],
-  reserved: ['awaiting_payment', 'paid', 'cancelled'],
+  reserved: ['awaiting_payment', 'paid', 'picking', 'cancelled'],
   awaiting_payment: ['paid', 'cancelled'],
   paid: ['picking', 'ready_for_pickup', 'courier_assigned', 'return_requested', 'refunded', 'exchanged'],
   picking: ['packed', 'cancelled'],

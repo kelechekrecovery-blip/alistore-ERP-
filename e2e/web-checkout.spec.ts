@@ -96,6 +96,7 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900001');
   await page.getByPlaceholder('Имя').fill('E2E Buyer');
   await page.getByRole('button', { name: 'Далее' }).last().click();
+  await expect(page.getByRole('button', { name: /Наличными при получении/ })).toHaveCount(0);
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
   await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
@@ -132,12 +133,8 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
 test('web checkout uses ERP delivery zone fee and reserves an available slot', async ({ page }) => {
   await resetDb();
   const { product } = await seedProduct('DELIVERY-E2E');
-  const now = new Date();
-  const localDay = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bishkek', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(now);
-  const startsAt = new Date(`${localDay}T10:00:00.000Z`);
-  const endsAt = new Date(`${localDay}T12:00:00.000Z`);
+  const startsAt = new Date(Date.now() + 60 * 60 * 1000);
+  const endsAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
   const zone = await prisma.deliveryZone.create({
     data: {
       code: `web-center-${Date.now().toString(36)}`,
@@ -173,6 +170,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900351');
   await page.getByPlaceholder('Имя').fill('Delivery Buyer');
   await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: /Наличными при получении/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
   await expect(page.getByText('Центр Бишкек')).toBeVisible();
   await page.getByRole('button', { name: 'Подтвердить заказ' }).click();

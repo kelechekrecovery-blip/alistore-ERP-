@@ -16,6 +16,7 @@ import { OrderAttributionDto } from '../campaigns/attribution.dto';
 
 const CHANNELS = ['web', 'app', 'mobile', 'staff_mobile', 'pos', 'telegram'] as const;
 const FULFILLMENT_TYPES = ['pickup', 'courier', 'express', 'store'] as const;
+const PAYMENT_MODES = ['prepaid', 'cod'] as const;
 
 export class OrderItemDto {
   @ApiProperty({ example: 'IPHONE-15-128-BLK' })
@@ -46,6 +47,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsIn(FULFILLMENT_TYPES)
   fulfillmentType?: (typeof FULFILLMENT_TYPES)[number];
+
+  @ApiPropertyOptional({ enum: PAYMENT_MODES, default: 'prepaid' })
+  @IsOptional()
+  @IsIn(PAYMENT_MODES)
+  paymentMode?: (typeof PAYMENT_MODES)[number];
 
   @ApiPropertyOptional({ description: 'Server-managed active store/pickup point id.' })
   @IsOptional()

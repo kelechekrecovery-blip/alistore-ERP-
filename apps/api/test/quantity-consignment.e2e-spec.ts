@@ -35,6 +35,23 @@ describe('Quantity consignment inventory (integration)', () => {
   });
 
   async function clean() {
+    const fixtureProducts = await prisma.product.findMany({ where: { sku: { startsWith: 'QCONS-' } }, select: { id: true } });
+    const productIds = fixtureProducts.map((product) => product.id);
+    const issues = await prisma.inventoryValuationIssue.findMany({ where: { productId: { in: productIds } }, select: { id: true } });
+    const issueIds = issues.map((issue) => issue.id);
+    const consignmentAllocations = await prisma.quantityConsignmentAllocation.findMany({
+      where: { lot: { productId: { in: productIds } } },
+      select: { id: true },
+    });
+    const consignmentRefs = consignmentAllocations.map((allocation) => allocation.id);
+    const accountingWhere = { OR: [
+      { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } },
+      { sourceType: 'quantity-consignment.sale', sourceRef: { in: consignmentRefs } },
+    ] };
+    await prisma.$transaction([
+      prisma.accountingJournalLine.deleteMany({ where: { entry: accountingWhere } }),
+      prisma.accountingJournalEntry.deleteMany({ where: accountingWhere }),
+    ]);
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.reservation.deleteMany();
@@ -42,12 +59,16 @@ describe('Quantity consignment inventory (integration)', () => {
     await prisma.quantityConsignmentAllocation.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany();
     await prisma.quantityConsignmentLot.deleteMany();
+    await prisma.inventoryValuationReversal.deleteMany({ where: { issueId: { in: issueIds } } });
+    await prisma.inventoryValuationIssue.deleteMany({ where: { id: { in: issueIds } } });
+    await prisma.inventoryValuationLayer.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.consignmentAdjustment.deleteMany();
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.loyaltyEntry.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.inventoryMovement.deleteMany();
@@ -160,6 +181,109 @@ describe('Quantity consignment inventory (integration)', () => {
     ]));
     expect(await prisma.quantityConsignmentLot.count({ where: { productId: product.id } })).toBe(2);
     expect(await prisma.auditEvent.count({ where: { type: 'consignment.returned', refs: { has: allocation.id } } })).toBe(1);
+  });
+
+  it('splits mixed owned and consignment quantity stock into COGS and owner liability', async () => {
+    const { product, customer } = await setup(5);
+    const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
+    });
+    await prisma.inventoryBalance.update({
+      where: { id: balance.id },
+      data: { onHand: { increment: 2 }, inventoryValue: { increment: 1_000 } },
+    });
+    await prisma.inventoryValuationLayer.create({
+      data: {
+        productId: product.id,
+        balanceId: balance.id,
+        location: 'BISHKEK-1',
+        sourceType: 'test-receipt',
+        sourceRef: `mixed-owned-${seq}`,
+        unitCost: 500,
+        quantityReceived: 2,
+        quantityRemaining: 2,
+      },
+    });
+    const order = await reserve(product, customer.id, 7);
+    await payments.pay({ orderId: order.id, amount: 7_000, method: 'card', txnId: `qcons-mixed-${seq}` }, 'cashier:qcons');
+
+    const ownerAllocation = await prisma.quantityConsignmentAllocation.findFirstOrThrow({ where: { saleOrderId: order.id } });
+    expect(ownerAllocation).toMatchObject({ qty: 5, ownerAmount: 4_500, status: 'sold' });
+    const valuation = await prisma.inventoryValuationIssue.findMany({ where: { orderId: order.id } });
+    expect(valuation.reduce((sum, issue) => sum + issue.quantity, 0)).toBe(2);
+    expect(valuation.reduce((sum, issue) => sum + issue.totalCost, 0)).toBe(1_000);
+    expect(await prisma.accountingJournalEntry.count({
+      where: { sourceType: 'inventory.cogs', sourceRef: { in: valuation.map((issue) => issue.id) } },
+    })).toBe(1);
+    expect(await prisma.accountingJournalEntry.count({
+      where: { sourceType: 'quantity-consignment.sale', sourceRef: ownerAllocation.id },
+    })).toBe(1);
+    expect(await prisma.inventoryBalance.findUniqueOrThrow({ where: { id: balance.id } })).toMatchObject({
+      onHand: 0,
+      reserved: 0,
+      inventoryValue: 0,
+    });
+  });
+
+  it('splits mixed stock for a fully loyalty-funded order without a synthetic payment', async () => {
+    const { product, customer } = await setup(5);
+    const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
+    });
+    await prisma.inventoryBalance.update({
+      where: { id: balance.id },
+      data: { onHand: { increment: 2 }, inventoryValue: { increment: 1_000 } },
+    });
+    await prisma.inventoryValuationLayer.create({
+      data: {
+        productId: product.id,
+        balanceId: balance.id,
+        location: 'BISHKEK-1',
+        sourceType: 'test-receipt',
+        sourceRef: `mixed-loyalty-owned-${seq}`,
+        unitCost: 500,
+        quantityReceived: 2,
+        quantityRemaining: 2,
+      },
+    });
+    await prisma.loyaltyEntry.create({
+      data: {
+        customerId: customer.id,
+        label: 'Полная оплата бонусами',
+        amount: 7_000,
+        sourceRef: `mixed-loyalty-seed-${seq}`,
+      },
+    });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      total: 1,
+      loyaltyPoints: 7_000,
+      items: [{ sku: product.sku, qty: 7, price: 1 }],
+    }, customer.id, `qcons-mixed-loyalty-${seq}`, true);
+
+    expect(order.total).toBe(0);
+    expect((await orders.fulfill(order.id, 'warehouse:qcons')).order.status).toBe('paid');
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+    const ownerAllocation = await prisma.quantityConsignmentAllocation.findFirstOrThrow({
+      where: { saleOrderId: order.id },
+    });
+    expect(ownerAllocation).toMatchObject({ qty: 5, ownerAmount: 4_500, status: 'sold' });
+    const valuation = await prisma.inventoryValuationIssue.findMany({ where: { orderId: order.id } });
+    expect(valuation.reduce((sum, issue) => sum + issue.quantity, 0)).toBe(2);
+    expect(valuation.reduce((sum, issue) => sum + issue.totalCost, 0)).toBe(1_000);
+    expect(await prisma.accountingJournalEntry.count({
+      where: { sourceType: 'inventory.cogs', sourceRef: { in: valuation.map((issue) => issue.id) } },
+    })).toBe(1);
+    expect(await prisma.accountingJournalEntry.count({
+      where: { sourceType: 'quantity-consignment.sale', sourceRef: ownerAllocation.id },
+    })).toBe(1);
+    expect(await prisma.inventoryBalance.findUniqueOrThrow({ where: { id: balance.id } })).toMatchObject({
+      onHand: 0,
+      reserved: 0,
+      inventoryValue: 0,
+    });
   });
 
   it('keeps the unreturned quantity payable after a partial return is reconciled', async () => {

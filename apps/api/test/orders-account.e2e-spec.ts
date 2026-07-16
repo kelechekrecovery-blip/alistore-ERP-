@@ -41,12 +41,15 @@ describe('Orders by customer (account)', () => {
     await prisma.loyaltyEntry.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.reservation.deleteMany();
+    await prisma.quantityConsignmentAllocation.deleteMany();
+    await prisma.orderQuantityAllocation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.promotionRedemption.deleteMany();
     await prisma.promotionCode.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.inventoryMovement.deleteMany();
+    await prisma.inventoryBalance.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
@@ -98,6 +101,52 @@ describe('Orders by customer (account)', () => {
     expect(replay.id).toBe(first.id);
     expect(await prisma.order.count({ where: { idempotencyKey: 'native-order-retry-1' } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'order.created', refs: { has: first.id } } })).toBe(1);
+    await expect(orders.create(
+      { ...input, total: 101, items: [{ sku: 'OFFLINE-1', qty: 1, price: 101 }] },
+      owner.id,
+      'native-order-retry-1',
+    )).rejects.toMatchObject({ code: 'order_idempotency_mismatch' });
+  });
+
+  it('serializes concurrent quantity fulfillment without duplicate allocations', async () => {
+    const owner = await customer();
+    const product = await prisma.product.create({
+      data: { sku: `QTY-FULFILL-${seq}`, name: 'Quantity item', price: 1000, cost: 700, category: 'accessories', attrs: {}, trackingMode: 'quantity' },
+    });
+    await prisma.inventoryBalance.create({
+      data: { productId: product.id, location: 'BISHKEK-1', onHand: 2, reserved: 0, inventoryValue: 1400 },
+    });
+    const order = await orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      total: 1,
+      items: [{ sku: product.sku, qty: 2, price: 1 }],
+    }, owner.id, `qty-fulfill-${seq}`);
+    const results = await Promise.allSettled([
+      orders.fulfill(order.id, 'warehouse:a'),
+      orders.fulfill(order.id, 'warehouse:b'),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(await prisma.orderQuantityAllocation.aggregate({
+      where: { orderId: order.id, active: true },
+      _sum: { qty: true },
+    })).toMatchObject({ _sum: { qty: 2 } });
+    expect(await prisma.inventoryBalance.findFirstOrThrow({ where: { productId: product.id } })).toMatchObject({ reserved: 2 });
+  });
+
+  it('rejects a concurrent payload mismatch on the same order key', async () => {
+    const owner = await customer();
+    const key = `native-order-race-${seq}`;
+    const base = { customerId: owner.id, channel: 'mobile' as const, total: 100 };
+    const results = await Promise.allSettled([
+      orders.create({ ...base, items: [{ sku: 'RACE-A', qty: 1, price: 100 }] }, owner.id, key),
+      orders.create({ ...base, items: [{ sku: 'RACE-B', qty: 1, price: 100 }] }, owner.id, key),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    expect(rejected?.reason).toMatchObject({ code: 'order_idempotency_mismatch' });
+    expect(await prisma.order.count({ where: { idempotencyKey: key } })).toBe(1);
   });
 
   it('creates authenticated native orders from server prices and current stock', async () => {
@@ -127,10 +176,97 @@ describe('Orders by customer (account)', () => {
     const replay = await orders.createFromCatalog({
       customerId: owner.id,
       channel: 'mobile',
-      total: 1,
-      items: [{ sku: product.sku, qty: 1, price: 1 }],
+      fulfillmentType: 'pickup',
+      pickupPoint: 'BISHKEK-1',
+      total: 2,
+      items: [{ sku: product.sku, qty: 2, price: 1, imei: 'CLIENT-CANNOT-ASSIGN' }],
     }, owner.id, 'native-server-quote-1');
     expect(replay.id).toBe(order.id);
+  });
+
+  it('keeps courier COD unpaid through picking and rejects fake paid transitions', async () => {
+    const owner = await customer();
+    const product = await prisma.product.create({
+      data: { sku: `COD-CONTRACT-${seq}`, name: 'COD phone', price: 10000, cost: 7000, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei: `COD-CONTRACT-${seq}-IMEI`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1', acquisitionCost: 7000 },
+    });
+
+    await expect(orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      paymentMode: 'cod',
+      total: 1,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, `cod-pickup-${seq}`)).rejects.toMatchObject({ code: 'cod_courier_required' });
+
+    const order = await orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      fulfillmentType: 'courier',
+      paymentMode: 'cod',
+      deliveryAddress: 'Бишкек, ул. Киевская 95',
+      total: 1,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, `cod-order-${seq}`);
+    expect(order).toMatchObject({ status: 'created', paymentMode: 'cod', total: 10200 });
+    await expect(orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      fulfillmentType: 'courier',
+      paymentMode: 'prepaid',
+      deliveryAddress: 'Бишкек, ул. Киевская 95',
+      total: 1,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, `cod-order-${seq}`)).rejects.toMatchObject({ code: 'order_idempotency_mismatch' });
+
+    await orders.fulfill(order.id, 'warehouse:test');
+    await expect(orders.transition(order.id, 'paid', 'warehouse:test')).rejects.toMatchObject({
+      code: 'order_payment_unsettled',
+    });
+    await expect(prisma.order.update({
+      where: { id: order.id },
+      data: { fulfillmentType: 'pickup' },
+    })).rejects.toThrow('Order_cod_courier_check');
+    expect(await orders.transition(order.id, 'picking', 'warehouse:test')).toMatchObject({ status: 'picking' });
+    expect(await orders.transition(order.id, 'packed', 'warehouse:test')).toMatchObject({ status: 'packed' });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+  });
+
+  it('rejects a generic paid transition even when a tender already exists', async () => {
+    const owner = await customer();
+    const product = await prisma.product.create({
+      data: {
+        sku: `PAID-DOMAIN-${seq}`,
+        name: 'Paid domain item',
+        price: 5000,
+        cost: 3000,
+        category: 'accessories',
+        attrs: {},
+        trackingMode: 'quantity',
+      },
+    });
+    await prisma.inventoryBalance.create({
+      data: { productId: product.id, location: 'BISHKEK-1', onHand: 1, reserved: 0, inventoryValue: 3000 },
+    });
+    const order = await orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      total: 1,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, `paid-domain-${seq}`);
+    await orders.fulfill(order.id, 'warehouse:test');
+    await prisma.payment.create({
+      data: { orderId: order.id, amount: order.total, method: 'cash', status: 'received', txnId: `paid-domain-${seq}` },
+    });
+
+    await expect(orders.transition(order.id, 'paid', 'warehouse:test')).rejects.toMatchObject({
+      code: 'order_paid_transition_forbidden',
+    });
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: 'reserved' });
+    expect(await prisma.orderQuantityAllocation.count({ where: { orderId: order.id, active: true } })).toBe(1);
   });
 
   it('prices checkout on the server and redeems loyalty exactly once on replay', async () => {
@@ -184,6 +320,33 @@ describe('Orders by customer (account)', () => {
     const balance = await prisma.loyaltyEntry.aggregate({ where: { customerId: owner.id }, _sum: { amount: true } });
     expect(balance._sum.amount).toBe(300);
     expect(await prisma.auditEvent.count({ where: { type: 'loyalty.redeemed', refs: { has: first.id } } })).toBe(1);
+  });
+
+  it('binds an idempotent order to the exact original loyalty request', async () => {
+    const owner = await customer();
+    await prisma.loyaltyEntry.create({
+      data: { customerId: owner.id, label: 'Баланс выше цены', amount: 1000, sourceRef: `loyalty-cap-${seq}` },
+    });
+    const product = await prisma.product.create({
+      data: { sku: `LOYALTY-CAP-${seq}`, name: 'Capped loyalty phone', price: 500, cost: 400, category: 'phones', attrs: {} },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei: `LOYALTY-CAP-${seq}-IMEI`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+    });
+    const input = {
+      customerId: owner.id,
+      channel: 'web' as const,
+      total: 1,
+      loyaltyPoints: 500,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    };
+    const first = await orders.createFromCatalog(input, owner.id, `loyalty-cap-order-${seq}`, true);
+    const replay = await orders.createFromCatalog(input, owner.id, `loyalty-cap-order-${seq}`, true);
+    expect(first.loyaltyRedeemed).toBe(500);
+    expect(replay.id).toBe(first.id);
+    await expect(orders.createFromCatalog(
+      { ...input, loyaltyPoints: 499 }, owner.id, `loyalty-cap-order-${seq}`, true,
+    )).rejects.toMatchObject({ code: 'order_idempotency_mismatch' });
   });
 
   it('serializes concurrent loyalty redemption for one customer', async () => {

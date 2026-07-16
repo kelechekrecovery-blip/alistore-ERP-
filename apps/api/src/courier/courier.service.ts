@@ -9,7 +9,12 @@ import { OutboxService } from '../outbox/outbox.service';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
 import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/accounting-journal';
 import { UnitsService } from '../units/units.service';
-import { finalizeOrderInventorySaleOnTx } from '../inventory/order-inventory-sale';
+import {
+  assertOrderInventoryFinalizedOnTx,
+  assertOrderReservationCoverageOnTx,
+  finalizeOrderInventorySaleOnTx,
+  orderHasTrackedInventoryOnTx,
+} from '../inventory/order-inventory-sale';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
@@ -44,15 +49,35 @@ export class CourierService {
     return run;
   }
 
-  async createRun(dto: CreateRunDto, actor: string) {
+  async createRun(dto: CreateRunDto, actor: string, idempotencyKey: string) {
+    const key = requireIdempotencyKey(idempotencyKey);
     return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'courier-run-key:' + key}))`;
+      const existing = await tx.courierRun.findUnique({
+        where: { assignmentIdempotencyKey: key },
+        include: { orders: { select: { id: true } } },
+      });
+      if (existing) return { result: replayRunAssignment(existing, dto), events: [] };
       const courier = await tx.staffUser.findUnique({ where: { id: dto.courierId } });
       if (!courier || !courier.active || courier.role !== 'courier') {
         throw new ValidationError('courier_not_available', 'Нужен активный сотрудник с ролью courier');
       }
-      const orderIds = [...new Set(dto.orderIds ?? [])];
+      const orderIds = [...new Set(dto.orderIds ?? [])].sort();
+      if (orderIds.length > 0) {
+        await tx.$queryRaw(Prisma.sql`
+          SELECT id
+          FROM "Order"
+          WHERE id IN (${Prisma.join(orderIds)})
+          ORDER BY id
+          FOR UPDATE
+        `);
+      }
       const orders = orderIds.length > 0
-        ? await tx.order.findMany({ where: { id: { in: orderIds } }, include: { payments: true } })
+        ? await tx.order.findMany({
+          where: { id: { in: orderIds } },
+          include: { payments: true },
+          orderBy: { id: 'asc' },
+        })
         : [];
       if (orders.length !== orderIds.length) {
         throw new ValidationError('order_not_found', 'Один или несколько заказов доставки не найдены');
@@ -65,6 +90,9 @@ export class CourierService {
         if (!(ASSIGNABLE_STATUSES as readonly string[]).includes(order.status)) {
           throw new ConflictError('order_not_assignable', `Заказ ${order.id} нельзя назначить из статуса ${order.status}`);
         }
+        if (order.paymentMode !== 'cod' && outstandingAmount(order) > 0) {
+          throw new ConflictError('order_payment_unsettled', `Предоплаченный заказ ${order.id} нельзя назначить до полной оплаты`);
+        }
       }
       const serverCod = orders.reduce((sum, order) => sum + outstandingAmount(order), 0);
       if (orders.length > 0 && dto.codTotal !== serverCod) {
@@ -72,6 +100,7 @@ export class CourierService {
       }
       const run = await tx.courierRun.create({
         data: {
+          assignmentIdempotencyKey: key,
           courierId: dto.courierId,
           codTotal: orders.length > 0 ? serverCod : dto.codTotal,
           collectedTotal: orders.length > 0 ? 0 : dto.codTotal,
@@ -150,12 +179,21 @@ export class CourierService {
       }
       const receivedBefore = settledAmount(order);
       const inventoryEvents: AuditInput[] = [];
-      await finalizeOrderInventorySaleOnTx(tx, {
-        orderId,
-        actor: courierId,
-        units: this.units,
-        events: inventoryEvents,
-      });
+      if (receivedBefore < order.total) {
+        if (await orderHasTrackedInventoryOnTx(tx, orderId)) {
+          await assertOrderReservationCoverageOnTx(tx, orderId, new Date(), { enforceExpiry: false });
+          await finalizeOrderInventorySaleOnTx(tx, {
+            orderId,
+            actor: courierId,
+            units: this.units,
+            events: inventoryEvents,
+          });
+        }
+      } else {
+        if (await orderHasTrackedInventoryOnTx(tx, orderId)) {
+          await assertOrderInventoryFinalizedOnTx(tx, orderId);
+        }
+      }
       const receivableEntry = dto.codAmount > 0
         ? await postOrderReceivableOnTx(tx, {
           idempotencyKey: `accounting:cod.receivable:${order.id}`,
@@ -378,6 +416,30 @@ function settledAmount(order: { payments: Array<{ amount: number; status: string
   return order.payments
     .filter((payment) => payment.amount > 0 && SETTLED_PAYMENT_STATUSES.has(payment.status))
     .reduce((sum, payment) => sum + payment.amount, 0);
+}
+
+function requireIdempotencyKey(value: string): string {
+  const key = value.trim();
+  if (!key || key.length > 128) throw new ValidationError('invalid_idempotency_key', 'Нужен Idempotency-Key до 128 символов');
+  return key;
+}
+
+function replayRunAssignment(
+  existing: Prisma.CourierRunGetPayload<{ include: { orders: { select: { id: true } } } }>,
+  dto: CreateRunDto,
+) {
+  const expectedOrderIds = [...new Set(dto.orderIds ?? [])].sort();
+  const actualOrderIds = existing.orders.map((order) => order.id).sort();
+  if (
+    existing.courierId !== dto.courierId
+    || existing.codTotal !== dto.codTotal
+    || expectedOrderIds.length !== actualOrderIds.length
+    || expectedOrderIds.some((id, index) => id !== actualOrderIds[index])
+  ) {
+    throw new ConflictError('courier_run_idempotency_mismatch', 'Idempotency-Key уже использован для другого рейса');
+  }
+  const { orders: _, ...run } = existing;
+  return { ...run, orderIds: actualOrderIds };
 }
 
 function replayCommand<T>(

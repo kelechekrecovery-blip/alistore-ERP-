@@ -82,9 +82,23 @@ export class ExchangesService {
           expiresAt: new Date(Date.now() + EXCHANGE_REQUEST_TTL_MS),
         },
       });
+      const replacementUnit = await tx.deviceUnit.findUnique({
+        where: { id: request.newUnitId },
+        select: { acquisitionCost: true },
+      });
+      const replacementProduct = await tx.product.findUnique({
+        where: { id: request.newProductId },
+        select: { cost: true },
+      });
+      if (!replacementUnit || !replacementProduct) {
+        throw new ConflictError('exchange_replacement_missing', 'Товар-замена больше не доступен');
+      }
       const held = await tx.deviceUnit.updateMany({
         where: { id: request.newUnitId, status: 'in_stock', orderId: null },
-        data: { status: 'reserved' },
+        data: {
+          status: 'reserved',
+          acquisitionCost: replacementUnit.acquisitionCost ?? replacementProduct.cost,
+        },
       });
       if (held.count !== 1) {
         throw new ConflictError('exchange_replacement_race', 'Выбранный IMEI уже занят другой операцией');

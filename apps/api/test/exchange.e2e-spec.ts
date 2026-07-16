@@ -205,6 +205,10 @@ describe('Exchange (integration)', () => {
 
   it('swaps devices, collects surcharge, marks original exchanged', async () => {
     const { customer, order, oldImei, newProduct, shift, actor, oldTax } = await setup(100000, 130000);
+    await prisma.deviceUnit.updateMany({
+      where: { productId: newProduct.id, status: 'in_stock' },
+      data: { acquisitionCost: null },
+    });
 
     const res = await executeApproved(
       { originalOrderId: order.id, oldImei, newProductId: newProduct.id, method: 'cash', shiftId: shift.id },

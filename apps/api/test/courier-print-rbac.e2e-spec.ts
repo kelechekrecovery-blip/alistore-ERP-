@@ -100,6 +100,7 @@ describe('Courier and print/export RBAC', () => {
     const run = await request(app.getHttpServer())
       .post('/courier/runs')
       .set('Authorization', `Bearer ${warehouseToken}`)
+      .set('Idempotency-Key', `assign-${RUN}`)
       .send({ courierId, codTotal: 1000 })
       .expect(201);
 

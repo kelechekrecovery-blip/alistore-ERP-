@@ -77,7 +77,26 @@ describe('Campaign attribution → paid conversion (integration)', () => {
       data: {
         sku: `MKT005-${run}`, name: 'Attributed accessory', price: 10000, cost: 4000,
         category: 'accessories', trackingMode: 'quantity', attrs: {},
-        balances: { create: { location: point.inventoryLocation, onHand: 2 } },
+      },
+    });
+    const balance = await prisma.inventoryBalance.create({
+      data: {
+        productId: product.id,
+        location: point.inventoryLocation,
+        onHand: 2,
+        inventoryValue: 8000,
+      },
+    });
+    await prisma.inventoryValuationLayer.create({
+      data: {
+        productId: product.id,
+        balanceId: balance.id,
+        location: point.inventoryLocation,
+        sourceType: 'test.opening_balance',
+        sourceRef: `mkt005-${run}-opening`,
+        unitCost: 4000,
+        quantityReceived: 2,
+        quantityRemaining: 2,
       },
     });
     const customer = await prisma.customer.create({

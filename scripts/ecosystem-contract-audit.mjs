@@ -107,6 +107,7 @@ const acceptedGateScripts = new Map([
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
+  ['courier-cod-reconciliation', 'ecosystem:courier-cod:e2e'],
   ['reconciled-e2e', 'ecosystem:e2e'],
 ]);
 const acceptedGate = (id, commandPattern) => {
@@ -296,6 +297,13 @@ const checks = [
       /playwright/u.test(scripts['ecosystem:pos-refund:e2e'] ?? '') &&
       acceptedGate('pos-refund-reconciliation', /playwright/u),
     detail: 'POS sale, customer return, approved refund and warehouse quarantine have hash-verified exact reconciliation evidence.',
+  },
+  {
+    id: 'courier-cod-reconciliation-gate',
+    pass:
+      /playwright/u.test(scripts['ecosystem:courier-cod:e2e'] ?? '') &&
+      acceptedGate('courier-cod-reconciliation', /playwright/u),
+    detail: 'Web COD checkout, warehouse picking, courier delivery, cash handover and exact accounting/inventory reconciliation have hash-verified evidence.',
   },
   {
     id: 'reconciled-ecosystem-e2e',

@@ -12,6 +12,7 @@ const gateScripts = new Map([
   ['ios-app-ui', 'ios:ui'],
   ['android-app-ui', 'android:ui'],
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
+  ['courier-cod-reconciliation', 'ecosystem:courier-cod:e2e'],
 ]);
 const evidencePath = path.join(root, 'docs', 'acceptance', 'ecosystem-evidence.json');
 const artifactDirectory = path.join(root, 'docs', 'acceptance', 'artifacts');

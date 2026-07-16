@@ -80,6 +80,7 @@ test('owner creates delivery capacity and dispatches a packed order', async ({ p
   const customer = await prisma.customer.create({ data: { phone: `+996700${Date.now().toString().slice(-6)}`, name: 'Айжан' } });
   const order = await prisma.order.create({ data: {
     customerId: customer.id, channel: 'web', fulfillmentType: 'courier', status: 'packed', subtotal: 100000,
+    paymentMode: 'cod',
     deliveryFee: zone.fee, total: 100300, deliveryAddress: 'ул. Киевская 95', deliverySlot: '10:00–12:00',
     deliveryZoneId: zone.id, deliverySlotId: slot.id, items: { create: { sku: `UI-LOG-${suffix}`, qty: 1, price: 100000 } },
   } });

@@ -11,6 +11,10 @@ describe('order state machine (pure)', () => {
     expect(canTransition('reserved', 'paid')).toBe(true);
   });
 
+  it('exposes reserved → picking only for the contextual COD guard', () => {
+    expect(canTransition('reserved', 'picking')).toBe(true);
+  });
+
   it('forbids skipping reservation: created → paid', () => {
     expect(canTransition('created', 'paid')).toBe(false);
   });

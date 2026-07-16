@@ -63,7 +63,7 @@ export default function CheckoutPage() {
   const [delivery, setDelivery] = useState('pickup');
   const [pickupPoints, setPickupPoints] = useState<StorePoint[]>([]);
   const [pickupPoint, setPickupPoint] = useState('');
-  const [payment, setPayment] = useState<PaymentChoice>('cash');
+  const [payment, setPayment] = useState<PaymentChoice>('card');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -81,6 +81,9 @@ export default function CheckoutPage() {
   const [done, setDone] = useState<DoneState | null>(null);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
+  useEffect(() => {
+    if (delivery !== 'courier' && payment === 'cash') setPayment('card');
+  }, [delivery, payment]);
   useEffect(() => {
     if (!authHydrated) return;
     if (!user) {
@@ -153,6 +156,7 @@ export default function CheckoutPage() {
       const orderInput = {
         channel: 'web',
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
+        paymentMode: payment === 'cash' && delivery === 'courier' ? 'cod' as const : 'prepaid' as const,
         storePointId: delivery === 'pickup' ? pickupPoint : undefined,
         deliveryAddress: delivery !== 'pickup' ? deliveryAddress.trim() : undefined,
         deliverySlot: delivery === 'pickup'
@@ -296,7 +300,7 @@ export default function CheckoutPage() {
           <>
             <div className="mb-3 font-display text-base font-bold">Способ получения</div>
             {DELIVERY.map((d) => (
-              <button key={d.id} type="button" onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={d.id} type="button" aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-[#2E2822]'}`}>
                 <span className="text-2xl">{d.icon}</span>
                 <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-[#A79C92]">{d.meta}</div></div>
                 <span className="text-[13px] text-[#D8CFC6]">{d.price}</span>
@@ -394,8 +398,8 @@ export default function CheckoutPage() {
         {step === 2 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
-            {PAYMENT.map((p) => (
-              <button key={p.id} type="button" onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+            {PAYMENT.filter((p) => p.id !== 'cash' || delivery === 'courier').map((p) => (
+              <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-[#2E2822]'}`}>
                 <span className="text-xl">{p.icon}</span>
                 <span className="flex-1 text-sm">{p.name}</span>
                 <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-[#3A342E]'}`} style={{ height: 18, width: 18 }} />

@@ -266,10 +266,6 @@ export async function consumeQuantityValuationOnTx(
   tx: Prisma.TransactionClient,
   input: { orderId: string; allocationId: string; productId: string; balanceId: string; quantity: number; actor: string },
 ) {
-  const balance = await tx.inventoryBalance.findUnique({ where: { id: input.balanceId }, select: { inventoryValue: true } });
-  // Consignment quantities are physically tracked in InventoryBalance but have
-  // no owned asset value; their owner liability is posted separately.
-  if (balance?.inventoryValue === 0) return 0;
   const layers = await tx.inventoryValuationLayer.findMany({
     where: { balanceId: input.balanceId, quantityRemaining: { gt: 0 } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],

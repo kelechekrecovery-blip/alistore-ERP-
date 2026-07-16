@@ -780,6 +780,9 @@ model Order {
   status                   OrderStatus                     @default(draft)
   channel                  String // web | app | mobile | pos | telegram
   fulfillmentType          String                          @default("pickup") // pickup | courier | express | store
+  paymentMode              String                          @default("prepaid") // prepaid | cod
+  paymentModeExplicit      Boolean                         @default(false)
+  idempotencyRequestHash   String?
   storePointId             String?
   storePoint               StorePoint?                     @relation(fields: [storePointId], references: [id], onDelete: Restrict)
   storePointCode           String?
@@ -1050,12 +1053,17 @@ model OrderBundleAllocation {
   componentProductId String
   componentSku       String
   location           String
-  imei               String   @unique
+  imei               String
+  active             Boolean  @default(true)
+  releasedAt         DateTime?
+  consumedAt         DateTime?
   createdAt          DateTime @default(now())
 
   @@index([orderId])
+  @@index([orderId, active])
   @@index([orderItemId])
   @@index([componentProductId])
+  @@index([imei])
 }
 
 model OrderItem {
@@ -1073,6 +1081,7 @@ model OrderItem {
   taxBaseAmount  Int          @default(0)
   taxAmount      Int          @default(0)
   imei           String?
+  inventorySnapshot Json?
   returnItems    ReturnItem[]
 
   @@index([orderId])
@@ -2073,6 +2082,7 @@ model CourierRun {
   codTotal               Int // COD не сдан >24ч → Risk
   handedOver             Boolean   @default(false)
   collectedTotal         Int       @default(0)
+  assignmentIdempotencyKey String? @unique
   handoverIdempotencyKey String?   @unique
   handoverAmount         Int?
   handoverReason         String?

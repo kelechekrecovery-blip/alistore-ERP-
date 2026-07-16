@@ -8,12 +8,17 @@ import { PaymentsService } from '../src/payments/payments.service';
 import { CustomersService } from '../src/customers/customers.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
 import { PosService } from '../src/pos/pos.service';
+import { ReservationsService } from '../src/reservations/reservations.service';
+import { OutboxService } from '../src/outbox/outbox.service';
+import { LogNotificationTransport } from '../src/outbox/transports/log.transport';
 
 describe('Product bundles (integration)', () => {
   let prisma: PrismaService;
   let products: ProductsService;
   let orders: OrdersService;
   let pos: PosService;
+  let payments: PaymentsService;
+  let reservations: ReservationsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -23,14 +28,21 @@ describe('Product bundles (integration)', () => {
     const approvals = new ApprovalsService(prisma, audit);
     const units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
+    reservations = new ReservationsService(
+      prisma,
+      audit,
+      units,
+      new OutboxService(prisma, new LogNotificationTransport()),
+    );
     products = new ProductsService(prisma, audit, approvals);
+    payments = new PaymentsService(prisma, audit, units, approvals);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit),
       new ShiftsService(prisma, audit),
       units,
       orders,
-      new PaymentsService(prisma, audit, units, approvals),
+      payments,
       approvals,
     );
   });
@@ -51,6 +63,7 @@ describe('Product bundles (integration)', () => {
     await prisma.order.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.productBundleComponent.deleteMany();
+    await prisma.consignmentItem.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.inventoryMovement.deleteMany();
     await prisma.product.deleteMany();
@@ -123,7 +136,7 @@ describe('Product bundles (integration)', () => {
       staffId: 'bundle-cashier',
       point: 'BISHKEK-1',
       method: 'cash' as const,
-      clientSaleId: 'bundle-sale-replay-1',
+      clientSaleId: `bundle-sale-replay-${seq}`,
       lines: [{ productId: seeded.product.id, sku: seeded.product.sku, price: 70000, qty: 1 }],
     };
 
@@ -161,6 +174,177 @@ describe('Product bundles (integration)', () => {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(await prisma.orderBundleAllocation.count()).toBe(3);
     expect(await prisma.deviceUnit.count({ where: { status: 'reserved' } })).toBe(3);
+  });
+
+  it('does not assign serialized consignment stock to a bundle without component pricing', async () => {
+    const seeded = await bundle(1, 2);
+    const phoneUnit = await prisma.deviceUnit.findFirstOrThrow({ where: { productId: seeded.phone.id } });
+    await prisma.consignmentItem.create({
+      data: {
+        idempotencyKey: `bundle-consignment-${seq}`,
+        unitId: phoneUnit.id,
+        productId: seeded.phone.id,
+        ownerName: 'Bundle owner',
+        commissionBps: 1000,
+        createdBy: 'warehouse',
+      },
+    });
+    const customer = await prisma.customer.create({ data: { phone: '+996700801008', name: 'Bundle consignment' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: seeded.product.price,
+      items: [{ sku: seeded.product.sku, qty: 1, price: seeded.product.price }],
+    }, customer.id);
+
+    await expect(orders.fulfill(order.id, 'warehouse-consignment-bundle')).rejects.toMatchObject({
+      code: 'insufficient_bundle_stock',
+    });
+    expect(await prisma.orderBundleAllocation.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { id: phoneUnit.id } })).toMatchObject({ status: 'in_stock' });
+  });
+
+  it('blocks bundle composition changes while an order is in flight', async () => {
+    const seeded = await bundle(1, 2);
+    const customer = await prisma.customer.create({ data: { phone: '+996700801003', name: 'Bundle C' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: 1,
+      items: [{ sku: seeded.product.sku, qty: 1, price: 1 }],
+    }, customer.id);
+    await orders.fulfill(order.id, 'warehouse-c');
+
+    await expect(products.update(seeded.product.id, {
+      bundleComponents: [{ sku: seeded.phone.sku, qty: 1 }],
+    }, 'owner-bundle-test')).rejects.toMatchObject({ code: 'bundle_composition_in_flight' });
+  });
+
+  it('fulfills the immutable bundle snapshot when catalog composition changes concurrently', async () => {
+    const seeded = await bundle(1, 2);
+    const customer = await prisma.customer.create({ data: { phone: '+996700801004', name: 'Bundle snapshot' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: 1,
+      items: [{ sku: seeded.product.sku, qty: 1, price: 1 }],
+    }, customer.id);
+
+    // Simulate a catalog transaction that committed after pricing but before
+    // fulfillment. The order remains bound to the composition it purchased.
+    await prisma.productBundleComponent.deleteMany({ where: { bundleProductId: seeded.product.id } });
+    await prisma.productBundleComponent.create({
+      data: { bundleProductId: seeded.product.id, componentProductId: seeded.phone.id, qty: 1 },
+    });
+
+    await orders.fulfill(order.id, 'warehouse-snapshot');
+    const allocations = await prisma.orderBundleAllocation.findMany({
+      where: { orderId: order.id, active: true },
+      orderBy: { componentSku: 'asc' },
+    });
+    expect(allocations).toHaveLength(3);
+    expect(allocations.filter((allocation) => allocation.componentProductId === seeded.phone.id)).toHaveLength(1);
+    expect(allocations.filter((allocation) => allocation.componentProductId === seeded.accessory.id)).toHaveLength(2);
+  });
+
+  it('fails closed when a stored inventory snapshot is malformed', async () => {
+    const seeded = await bundle(1, 2);
+    const customer = await prisma.customer.create({ data: { phone: '+996700801006', name: 'Bundle corrupt' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: 1,
+      items: [{ sku: seeded.product.sku, qty: 1, price: 1 }],
+    }, customer.id);
+    await prisma.orderItem.updateMany({
+      where: { orderId: order.id },
+      data: { inventorySnapshot: { corrupt: true } },
+    });
+
+    await expect(orders.fulfill(order.id, 'warehouse-corrupt')).rejects.toMatchObject({
+      code: 'order_inventory_snapshot_invalid',
+    });
+    expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
+  });
+
+  it('rejects a preassigned IMEI from a different snapshot product', async () => {
+    const expected = await component('SERIAL-EXPECTED', 1, 40000);
+    const wrong = await component('SERIAL-WRONG', 1, 41000);
+    const wrongUnit = await prisma.deviceUnit.findFirstOrThrow({ where: { productId: wrong.id } });
+    const customer = await prisma.customer.create({ data: { phone: '+996700801007', name: 'IMEI mismatch' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: expected.price,
+      items: [{ sku: expected.sku, qty: 1, price: expected.price }],
+    }, customer.id);
+    await prisma.orderItem.updateMany({
+      where: { orderId: order.id },
+      data: { imei: wrongUnit.imei },
+    });
+
+    await expect(orders.fulfill(order.id, 'warehouse-imei-mismatch')).rejects.toMatchObject({
+      code: 'unit_product_mismatch',
+    });
+    expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: wrongUnit.imei } })).toMatchObject({
+      productId: wrong.id,
+      status: 'in_stock',
+      orderId: null,
+    });
+  });
+
+  it('rejects a bundle allocation whose physical unit belongs to another component', async () => {
+    const seeded = await bundle(1, 2);
+    const customer = await prisma.customer.create({ data: { phone: '+996700801008', name: 'Bundle IMEI mismatch' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: seeded.product.price,
+      items: [{ sku: seeded.product.sku, qty: 1, price: seeded.product.price }],
+    }, customer.id);
+    await orders.fulfill(order.id, 'warehouse-bundle-imei-mismatch');
+    const phoneAllocation = await prisma.orderBundleAllocation.findFirstOrThrow({
+      where: { orderId: order.id, componentProductId: seeded.phone.id },
+    });
+    await prisma.deviceUnit.update({
+      where: { imei: phoneAllocation.imei },
+      data: { productId: seeded.accessory.id },
+    });
+
+    await expect(payments.pay({
+      orderId: order.id,
+      amount: seeded.product.price,
+      method: 'card',
+      txnId: `bundle-mismatch-${seq}`,
+    }, 'cashier-bundle-mismatch')).rejects.toMatchObject({ code: 'order_reservation_incomplete' });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+  });
+
+  it('preserves released bundle allocation history and safely reserves the same units again', async () => {
+    const seeded = await bundle(1, 2);
+    const customer = await prisma.customer.create({ data: { phone: '+996700801005', name: 'Bundle retry' } });
+    const order = await orders.createFromCatalog({
+      customerId: customer.id,
+      channel: 'web',
+      total: 1,
+      items: [{ sku: seeded.product.sku, qty: 1, price: 1 }],
+    }, customer.id);
+    await orders.fulfill(order.id, 'warehouse-expiry');
+    await prisma.reservation.updateMany({
+      where: { orderId: order.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    expect((await reservations.releaseExpired()).released).toBe(3);
+    expect(await prisma.orderBundleAllocation.count({
+      where: { orderId: order.id, active: false, releasedAt: { not: null } },
+    })).toBe(3);
+
+    await orders.fulfill(order.id, 'warehouse-expiry-retry');
+    expect(await prisma.orderBundleAllocation.count({ where: { orderId: order.id } })).toBe(6);
+    expect(await prisma.orderBundleAllocation.count({ where: { orderId: order.id, active: true } })).toBe(3);
   });
 
   it('rejects virtual bundles that would create direct or nested stock', async () => {

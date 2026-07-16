@@ -19,6 +19,19 @@ import {
 
 /** Price change beyond ±15% needs approval (Approval Rules Matrix). */
 const PRICE_APPROVAL_THRESHOLD_PCT = 15;
+const IN_FLIGHT_ORDER_STATUSES = [
+  'created',
+  'awaiting_confirmation',
+  'confirmed',
+  'reserved',
+  'awaiting_payment',
+  'paid',
+  'picking',
+  'packed',
+  'ready_for_pickup',
+  'courier_assigned',
+  'out_for_delivery',
+] as const;
 
 type ProductWithStockCount = Prisma.ProductGetPayload<{
   include: {
@@ -232,6 +245,18 @@ export class ProductsService {
 
     return this.audit.transaction(async (tx) => {
       if (dto.bundleComponents !== undefined) {
+        const inFlightOrderLines = await tx.orderItem.count({
+          where: {
+            sku: product.sku,
+            order: { status: { in: [...IN_FLIGHT_ORDER_STATUSES] } },
+          },
+        });
+        if (inFlightOrderLines > 0) {
+          throw new ConflictError(
+            'bundle_composition_in_flight',
+            'Состав набора нельзя менять, пока по нему исполняются заказы',
+          );
+        }
         const components = await this.resolveBundleComponents(tx, product.sku, dto.bundleComponents);
         if (components.length > 0) {
           const [directStock, componentUse] = await Promise.all([

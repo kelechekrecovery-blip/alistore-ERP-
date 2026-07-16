@@ -52,8 +52,12 @@ export class CourierController {
   @ApiCreatedResponse({ description: 'Run created.' })
   @Post('runs')
   @RequirePermission('courier', 'assign')
-  createRun(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateRunDto) {
-    return this.courier.createRun(dto, user.customerId);
+  createRun(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CreateRunDto,
+  ) {
+    return this.courier.createRun(dto, user.customerId, requireIdempotencyKey(key));
   }
 
   @ApiOperation({ summary: 'Assigned deliveries for the active courier JWT' })
