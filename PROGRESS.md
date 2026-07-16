@@ -2059,3 +2059,12 @@
 - Checks run: `npm run ecosystem:evidence -- procurement-sale-reconciliation`; procurement API `1/1` suite and `6/6` tests; Playwright `1/1`; independent SHA-256 verification matched artifact filename and manifest.
 - Outcome: durable exact procurement, AP, inventory, POS money and Ledger evidence is recorded for this bounded vertical. The broad reconciled ecosystem, complete visual corpus, deeper native journeys and external provider/hardware certification remain open.
 - Next step: commit the immutable evidence, verify the clean-tree procurement audit gate becomes PASS, then implement the next bounded gap in the broad ecosystem matrix.
+
+## 2026-07-16
+
+- Task: record durable `reconciled-e2e` evidence on clean source commit `95860e7` and close `ECO-002G`.
+- Files changed: ecosystem evidence manifest, immutable content-addressed reconciled result artifact, backlog and progress records.
+- Result: the committed-HEAD bootstrap reran all four accepted software verticals sequentially and fail-fast: POS/refund/quarantine, Web COD/warehouse/courier/handover, warranty/paid service/loaner, and procurement/partial receiving/POS sale. The result is bound to source-tree SHA-256 `1c57e27dfef0c1f9aedfc6ecd269f925c1f41a0f6f25c2ebc8c8c344b3377f5e`, source commit `95860e7d34d5c6b5a9ab53cc25f6e584e6557df0`, the exact direct runner command, fixed local acceptance database and complete locked Git/Node/npm/Chrome/Jest/Playwright environment.
+- Checks run: API `4/4` suites and `15/15` tests; Playwright `6/6`; matrix `4/4`; independent artifact SHA-256 `1fbcb4b544e25d8a75f08fe2b0a92c2551f25d9ae5678732de4e5c7b3db216b8` matches filename and manifest; recorder exited zero.
+- Outcome: `ECO-002G` is accepted at bounded local-software level. Deep native journeys, physical devices, live providers and 64 missing visual handoffs remain explicit gaps; production readiness remains RED.
+- Next step: commit this immutable evidence, run the clean committed-HEAD audit, then advance the highest-impact unblocked native/visual or AP/accounting gap.

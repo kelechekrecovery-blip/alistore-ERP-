@@ -81,10 +81,16 @@
       ]
     },
     "reconciled-e2e": {
-      "status": "partial",
+      "status": "accepted",
       "packageScript": "ecosystem:e2e",
-      "command": null,
-      "artifacts": []
+      "command": "npm run ecosystem:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/reconciled-e2e-1fbcb4b544e25d8a75f08fe2b0a92c2551f25d9ae5678732de4e5c7b3db216b8.json",
+          "sha256": "1fbcb4b544e25d8a75f08fe2b0a92c2551f25d9ae5678732de4e5c7b3db216b8"
+        }
+      ]
     }
   }
 }
