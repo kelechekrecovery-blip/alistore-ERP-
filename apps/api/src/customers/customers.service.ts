@@ -242,7 +242,7 @@ export class CustomersService {
       });
 
       const events: AuditInput[] = [
-        { type: CUSTOMER_ACCOUNT_DELETED_EVENT, actor: customerId, payload: { customerId }, refs: [customerId] },
+        { type: EventType.CustomerDeleted, actor: customerId, payload: { customerId }, refs: [customerId] },
       ];
       if (customer.consent) {
         events.push({ type: EventType.ConsentChanged, actor: customerId, payload: { customerId, from: true, to: false }, refs: [customerId] });
@@ -320,12 +320,6 @@ function requiredText(value: string, label: string): string {
   if (!normalized) throw new ValidationError('required_text', `${label} не может быть пустым`);
   return normalized;
 }
-
-/**
- * Ledger type for self-service account deletion. The canonical catalogue lives in
- * audit/event-types.ts — add it there when that surface is editable again.
- */
-const CUSTOMER_ACCOUNT_DELETED_EVENT = 'customer.deleted';
 
 const DELETED_CUSTOMER_NAME = 'Удалённый пользователь';
 const DELETED_PHONE_PREFIX = 'deleted:';

@@ -1,5 +1,25 @@
 # PROGRESS
 
+## 2026-07-18
+
+- Iteration ID: `LOGIC-011-004-PAYMENT-019`.
+- Task: reconcile unpaid-order cancellation compensation and late payment callbacks.
+- Files changed: `OrdersService`, `PaymentIntentsService`, `PaymentParked` event type, and `cancel-compensation.e2e-spec.ts`.
+- Result: paid orders can only enter the return/refund contour; cancellation releases stock, restores redeemed loyalty and gift-card tenders atomically, adjusts an open courier COD run, and records compensating Ledger events. Repeated payment intents replay the persisted response; a successful provider callback after cancellation is parked as a pending payment and remains refundable without marking the order paid.
+- Checks run: isolated API `test/cancel-compensation.e2e-spec.ts` passed `5/5` with `--no-cache`; API TypeScript no-emit, Prisma validation with disposable `DATABASE_URL`, web production build, and `git diff --check` passed.
+- Outcome: LOGIC-011/LOGIC-004 cancellation and late-callback slice is accepted in tested API code. Live provider reconciliation and staging certification remain open.
+- Next step: commit the validated Wave 1 documentation/customer/e2e boundary, then refresh clean-SHA evidence and strict audit.
+
+# 2026-07-17 — GAP-WAVE1-001
+
+- Iteration ID: `GAP-WAVE1-001`.
+- Task: Wave 1 of the gap-closure program from `docs/GAP-ANALYSIS-2026-07-17.md` — SEO foundation, legal skeleton with checkout PII consent, self-service account deletion/export, Expo deprecation, docs-sync tooling and payment/staff-auth regression pinning.
+- Files changed: `apps/web/app/sitemap.ts`, `apps/web/app/robots.ts`, `apps/web/lib/site.ts`, `apps/web/app/product/[id]/ProductClient.tsx`, `apps/web/app/privacy/page.tsx`, `apps/web/app/oferta/page.tsx`, `apps/web/components/SiteFooter.tsx`, `apps/web/app/checkout/page.tsx`, `apps/web/app/account/settings/page.tsx`, `apps/web/lib/api/orders.ts`, `apps/api/src/orders/orders.dto.ts`, `apps/api/src/orders/orders.service.ts`, `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260717140000_order_pii_consent/migration.sql` (created, not applied), `apps/api/src/customers/customers.controller.ts`, `apps/api/src/customers/customers.service.ts`, `apps/api/src/customers/customer-deletion.e2e-spec.ts`, `apps/api/src/audit/event-types.ts`, `apps/api/src/payments/payments-auth-regression.spec.ts`, `apps/ios/Shared/APIClient.swift`, `apps/ios/Client/AliStoreClientApp.swift`, `apps/android/core/.../ClientAccountDataScreens.kt`, `apps/android/core/.../ApiClient.kt`, `apps/android/core/.../ClientAuthScreen.kt`, `apps/mobile/README.md`, `apps/mobile/package.json`, `scripts/docs-sync.mjs`, root `package.json`, `e2e/checkout-consent.spec.ts`, `e2e/web-checkout.spec.ts`, `e2e/ecosystem-courier-cod.spec.ts`, `e2e/storefront-cms-ui.spec.ts`, `BACKLOG.md`, `PROGRESS.md`.
+- Result: all four Wave 1 workstreams landed. Storefront emits sitemap/robots/JSON-LD; `/privacy` + `/oferta` skeletons (draft-marked) are footer-linked and checkout requires personal-data consent persisted to `Order.piiConsentAt`; `DELETE /customers/me` anonymizes PII, revokes sessions and keeps orders/Ledger intact, with `GET /customers/me/export` and web/iOS/Android entry points; Expo app is marked DEPRECATED; `npm run docs:sync` reports real counts (54 modules / 40 routes / 113 migrations); payment-auth and staff-throttle contracts are pinned by regression tests.
+- Checks run: `npx tsc --noEmit` (api) ✓; Jest `payments-auth-regression` 5/5 + `customer-deletion` 4/4 ✓; `npx next build` (web) ✓ incl. live /sitemap.xml + /robots.txt smoke; `npx prisma validate` ✓; iOS swiftc -parse ✓. NOT run: Android compile (no JDK on this machine), new/updated e2e specs (need running api+web servers and the consent migration applied).
+- Acceptance: accepted as local software evidence only; commits pending user confirmation, one coherent commit per workstream. Lawyer texts, App Store metadata wiring and Android compile verification remain open.
+- Next step: commit Wave 1 after owner approval, then Wave 2 — provider-neutral fiscal skeleton (`GAP-FISCAL-001`, «информационный чек» state, NO fake QR) and observability base (`GAP-OBSERVE-001`).
+
 # 2026-07-17 — ECOSYSTEM-AUDIT-STRICT-004
 
 - Iteration ID: `ECOSYSTEM-AUDIT-STRICT-004`.

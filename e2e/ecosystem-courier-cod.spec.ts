@@ -62,6 +62,7 @@ test('web COD checkout, warehouse, courier and cash handover reconcile exactly o
   await cashOnDelivery.click();
   await expect(cashOnDelivery).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByLabel(/Согласен с условиями/).check();
   await page.getByRole('button', { name: 'Подтвердить заказ' }).click();
   await expect(page.getByText('Заказ оформлен!')).toBeVisible();
 

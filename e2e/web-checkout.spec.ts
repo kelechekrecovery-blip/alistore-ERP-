@@ -35,6 +35,7 @@ test('campaign UTM survives navigation, converts on payment once, and appears as
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByLabel(/Согласен с условиями/).check();
   await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
   await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
   await expect(page.getByText('Заказ оформлен!')).toBeVisible();
@@ -99,6 +100,7 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Наличными при получении/ })).toHaveCount(0);
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByLabel(/Согласен с условиями/).check();
   await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
   await expect(page.getByText('Ожидаем оплату')).toBeVisible();
   await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
@@ -179,6 +181,7 @@ test('web checkout uses ERP delivery zone fee and reserves an available slot', a
   await page.getByRole('button', { name: /Наличными при получении/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
   await expect(page.getByText('Центр Бишкек')).toBeVisible();
+  await page.getByLabel(/Согласен с условиями/).check();
   await page.getByRole('button', { name: 'Подтвердить заказ' }).click();
   await expect(page.getByText('Заказ оформлен!')).toBeVisible();
 
@@ -305,6 +308,7 @@ test('authenticated checkout redeems server loyalty and canonical promo exactly 
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByLabel(/Согласен с условиями/).check();
   await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
   await expect(page.getByText('Ожидаем оплату')).toBeVisible();
   await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();

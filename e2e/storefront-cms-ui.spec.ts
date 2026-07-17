@@ -197,6 +197,7 @@ test('marketer launches a promotion in ERP and checkout redeems the same server 
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await page.getByLabel(/Согласен с условиями/).check();
   await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
   await expect(page.getByText('Ожидаем оплату')).toBeVisible();
   await page.getByRole('button', { name: /Подтвердить sandbox/ }).click();
