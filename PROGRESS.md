@@ -2533,3 +2533,13 @@
 - Checks run: `npx prisma validate`; `npx prisma migrate deploy` applied the migration to `alistore_dev`; direct SQL application of the migration to isolated `alistore_test`; API build; targeted procurement `10/10`; paired finance/procurement `22/22`; full API Jest `143/143` suites and `657/657` tests; `git diff --check`.
 - Outcome: `AP-001H` is accepted at local software level. The isolated test database still requires direct SQL migration application because Prisma schema-engine commands return a blank error in this environment; test execution itself passed. Staging-shaped accounting/valuation performance, live providers, physical devices, missing design references and first-store accounting validation remain open. Production readiness remains RED.
 - Next step: continue with `ACC-003` opening balances and remaining store accounting lifecycle, while retaining the external launch and design-corpus gates.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-004`.
+- Task: harden native iOS Release API and APNs configuration for the Client, Staff and Courier targets.
+- Files changed: `apps/ios/project.yml`, generated `apps/ios/AliStoreNative.xcodeproj/project.pbxproj`, `apps/ios/Client/Client.entitlements`, `apps/ios/Staff/Staff.entitlements`, `apps/ios/Courier/Courier.entitlements`, and `apps/ios/scripts/store-preflight.sh`.
+- Result: Debug keeps the local API and development APNs environment; Release resolves the API only from `ALISTORE_API_BASE_URL` and resolves APNs to `production`. The strict preflight now verifies both values without printing secrets. This removes the static development APNs entitlement risk from signed Release candidates for the three push-enabled targets.
+- Checks run: `npm run ios:generate`; unsigned arm64 iPhoneOS Release compile for all 10 iOS targets; positive preflight with temporary dummy credentials; expected-negative preflight without a team id; `git diff --check`.
+- Outcome: Release configuration software checks are accepted locally. No signing, provisioning profile, App Store Connect upload, physical-device push check or TestFlight review was claimed because the required owner credentials and profiles are not configured.
+- Next step: continue Client screen-by-screen visual parity and collect simulator visual evidence, then run the signed archive gate when the owner supplies protected Apple/App Store Connect credentials.

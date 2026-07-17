@@ -45,9 +45,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Client/Client.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
       configs:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
   AliStoreStaff:
     type: application
     platform: iOS
@@ -75,9 +77,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Staff/Staff.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
       configs:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
   AliStoreCourier:
     type: application
     platform: iOS
@@ -105,9 +109,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Courier/Courier.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
       configs:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
   AliStorePOS:
     type: application
     platform: iOS

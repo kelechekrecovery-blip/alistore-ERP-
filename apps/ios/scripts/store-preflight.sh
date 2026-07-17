@@ -36,7 +36,10 @@ settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Dev
 
 resolved_api="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /API_BASE_URL$/ {print $2; exit}')"
 [[ "$resolved_api" == "$api_base" ]] || fail 'Release API_BASE_URL did not resolve to ALISTORE_API_BASE_URL'
+resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /APS_ENVIRONMENT$/ {print $2; exit}')"
+[[ "$resolved_aps" == "production" ]] || fail 'Release APS_ENVIRONMENT must resolve to production'
 
 printf 'store-preflight: Release API URL resolved to HTTPS\n'
+printf 'store-preflight: Release APNs environment resolved to production\n'
 printf 'store-preflight: Apple team and App Store Connect credentials are present\n'
 printf 'store-preflight: native Client configuration passed\n'
