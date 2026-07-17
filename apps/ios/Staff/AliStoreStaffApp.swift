@@ -66,7 +66,7 @@ struct AliStoreStaffApp: App {
 private struct StaffRootView: View {
     let session: StaffSession
     let logout: () -> Void
-    @State private var selectedTab = StaffTab.work
+    @State private var selectedTab = StaffTab.home
     @State private var workMode = StaffWorkMode.orders
     @State private var routedTaskId: String?
     @State private var pushStatus = "Push не настроен"
@@ -75,20 +75,37 @@ private struct StaffRootView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
+                StaffHomeView(
+                    session: session,
+                    openOrders: {
+                        selectedTab = .orders
+                        workMode = .orders
+                    },
+                    openTasks: {
+                        selectedTab = .kpi
+                        workMode = .tasks
+                    },
+                    openScanner: { selectedTab = .buyback },
+                    openShift: { selectedTab = .shift }
+                )
+            }
+            .tabItem { Label("Главная", systemImage: "house.fill") }
+            .tag(StaffTab.home)
+            NavigationStack {
                 StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
             }
-            .tabItem { Label("Задачи", systemImage: "checklist") }
-            .tag(StaffTab.work)
+            .tabItem { Label("Заказы", systemImage: "shippingbox.fill") }
+            .tag(StaffTab.orders)
+            NavigationStack {
+                StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
+            }
+            .tabItem { Label("KPI", systemImage: "chart.bar.fill") }
+            .tag(StaffTab.kpi)
             NavigationStack {
                 StaffScannerView(session: session)
             }
-            .tabItem { Label("Сканер", systemImage: "barcode.viewfinder") }
-            .tag(StaffTab.scanner)
-            NavigationStack {
-                Customer360View(session: session)
-            }
-            .tabItem { Label("Клиенты", systemImage: "person.2") }
-            .tag(StaffTab.customers)
+            .tabItem { Label("Скупка", systemImage: "barcode.viewfinder") }
+            .tag(StaffTab.buyback)
             NavigationStack {
                 StaffShiftView(session: session, pushStatus: pushStatus, enablePush: enablePush, logout: logout)
             }
@@ -107,16 +124,26 @@ private struct StaffRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .staffAPNsFailure)) { notification in
             pushStatus = notification.object as? String ?? "APNs registration failed"
         }
+        .onChange(of: selectedTab) { _, tab in
+            switch tab {
+            case .orders:
+                workMode = .orders
+            case .kpi:
+                workMode = .tasks
+            default:
+                break
+            }
+        }
     }
 
     private func route(_ url: URL) {
         guard url.scheme == "alistore-staff" else { return }
         if url.host == "tasks" {
-            selectedTab = .work
+            selectedTab = .kpi
             workMode = .tasks
             routedTaskId = url.pathComponents.dropFirst().first
         } else if url.host == "support" {
-            selectedTab = .work
+            selectedTab = .orders
             workMode = .support
         } else if url.host == "shift" || url.host == "attendance" || url.host == "account" {
             selectedTab = .shift
@@ -158,7 +185,194 @@ private struct StaffRootView: View {
     }
 }
 
-private enum StaffTab: Hashable { case work, scanner, customers, shift }
+private enum StaffTab: Hashable { case home, orders, kpi, buyback, shift }
+
+private struct StaffHomeView: View {
+    let session: StaffSession
+    let openOrders: () -> Void
+    let openTasks: () -> Void
+    let openScanner: () -> Void
+    let openShift: () -> Void
+
+    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
+    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    private let surfaceSoft = Color(red: 0.165, green: 0.145, blue: 0.122)
+    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
+    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
+    private let coral = Color(red: 1, green: 0.357, blue: 0.18)
+    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                shiftCard
+                quickActions
+                aiTaskCard
+                customerTools
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 28)
+        }
+        .background(background.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .preferredColorScheme(.dark)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(coral)
+                Text("Аз")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Азизбек")
+                    .font(.title3.weight(.black))
+                    .foregroundStyle(primaryText)
+                Text("Продавец · AliStore Центр")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(secondaryText)
+            }
+            Spacer()
+            Text("○ вне смены")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(primaryText)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(surfaceSoft, in: Capsule())
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var shiftCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Смена не открыта")
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text("Откройте смену с фото точки, чтобы принимать заказы и фиксировать KPI.")
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text("12")
+                        .font(.title2.weight(.black))
+                        .foregroundStyle(lime)
+                    Text("продаж вчера")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(secondaryText)
+                }
+            }
+            Button(action: openShift) {
+                Label("Открыть смену", systemImage: "camera.fill")
+                    .font(.headline.weight(.bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(coral, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var quickActions: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("Быстрые действия")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                actionTile("Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders", action: openOrders)
+                actionTile("Добавить товар", subtitle: "сканер", icon: "plus.app.fill", tint: lime, identifier: "staff-home-add-product", action: openScanner)
+                actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Color(red: 0.58, green: 0.72, blue: 1), identifier: "staff-home-buyback", action: openScanner)
+                actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Color(red: 1, green: 0.77, blue: 0.35), identifier: "staff-home-kpi", action: openTasks)
+            }
+        }
+    }
+
+    private var aiTaskCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ЗАДАЧА ОТ AI")
+                .font(.caption.weight(.black))
+                .foregroundStyle(lime)
+            Text("Мало продаж аксессуаров сегодня")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            Text("Предложите защитное стекло и чехол к каждому iPhone. Цель до конца смены: +18 аксессуаров.")
+                .font(.subheadline)
+                .foregroundStyle(secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: openTasks) {
+                Label("К задачам", systemImage: "arrow.right.circle.fill")
+                    .font(.subheadline.weight(.bold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(coral)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var customerTools: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Рабочие инструменты")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            HStack(spacing: 10) {
+                toolPill("Customer 360", icon: "person.text.rectangle", action: openOrders)
+                toolPill("Evidence", icon: "photo.stack", action: openScanner)
+            }
+        }
+    }
+
+    private func actionTile(_ title: String, subtitle: String, icon: String, tint: Color, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 32, height: 32)
+                    .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(primaryText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+                Text(subtitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+            }
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+            .padding(13)
+            .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func toolPill(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
 
 private struct Customer360View: View {
     let session: StaffSession

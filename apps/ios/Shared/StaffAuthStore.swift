@@ -18,6 +18,14 @@ public final class StaffAuthStore {
         self.api = APIClient(baseURL: environment.apiBaseURL)
         self.tokens = SecureTokenStore(service: keychainService)
         self.quickUnlockService = keychainService
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            session = StaffSession(accessToken: "ui-test-staff-token", staffId: "staff-ui-test", username: "azizbek", role: "sales")
+            requiresQuickUnlock = false
+            isRestoring = false
+            return
+        }
+        #endif
         if restoresStoredSession {
             Task { await self.restore() }
         } else {

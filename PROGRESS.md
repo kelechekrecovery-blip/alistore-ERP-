@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-STAFF-VISUAL-001
+
+- Iteration ID: `IOS-STAFF-VISUAL-001`.
+- Task: improve the native Staff app shell against `AliStore Сотрудник App 2.0` and prove the signed-in Staff landing state.
+- Files changed: `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Shared/StaffAuthStore.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, and `BACKLOG.md`.
+- Result: Staff now opens to a prototype-style dark home after sign-in with Azizbek identity, store/role subtitle, shift status, camera shift CTA, quick actions, AI task card and bottom navigation for `Главная`, `Заказы`, `KPI` and `Скупка`. A Debug-only signed-in Staff fixture makes UI acceptance deterministic, while the existing shared `QuickUnlockView`/Keychain PIN/biometric mechanism remains the production quick-access path after real login.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; targeted Staff XCUITest passed `2/2`; `npm run ios:ui` passed Client `17/17`, Staff `2/2`, Courier `1/1`, POS `1/1`.
+- Acceptance: accepted for the local Staff home-shell visual/packaged simulator gate. This does not certify physical-device Face ID/APNs/scanner/camera behavior, release signing, production API URL, TestFlight/App Store review, or complete Staff inner-screen pixel parity.
+- Next step: continue Staff inner flows and POS/Courier visual parity, then physical-device quick-unlock/push/scanner smoke when devices and production credentials are available.
+
 # 2026-07-17 — ANDROID-CLIENT-NOTIFICATIONS-001
 
 - Iteration ID: `ANDROID-CLIENT-NOTIFICATIONS-001`.

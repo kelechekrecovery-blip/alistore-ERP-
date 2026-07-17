@@ -55,6 +55,13 @@ public struct StaffSession: Codable, Sendable {
     public let staffId: String
     public let username: String
     public let role: String
+
+    public init(accessToken: String, staffId: String, username: String, role: String) {
+        self.accessToken = accessToken
+        self.staffId = staffId
+        self.username = username
+        self.role = role
+    }
 }
 
 public struct StaffPrincipal: Decodable, Sendable {
