@@ -2663,3 +2663,13 @@
 - Checks run: `npm run ios:build` passed all 10 iOS targets; `npm run ios:ui` passed Client `15/15`, Staff `1/1`, Courier `1/1` and POS `1/1`; `npm run ios:test` `34/34`; `git diff --check`.
 - Outcome: payment-result presentation and local navigation are accepted at simulator software level. Payment provider failure/retry certification, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: continue remaining Client payment failure/retry and full 17-screen visual evidence, then run signed archive/store preflight when Apple credentials, profiles and production API URL are supplied.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-017`.
+- Task: implement server-driven native Client payment failure recovery and support routing.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: payment result now distinguishes success, pending and failed provider states from `PaymentIntent.status`/`orderStatus`; failed payments show the prototype recovery actions, retry through the existing server endpoint with a fresh idempotency key, and open the authenticated support surface. The Debug-only failure fixture only selects existing local typed order data and is compiled out of Release.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; targeted failure UI test passed `1/1`; `npm run ios:ui` passed Client `16/16`, Staff `1/1`, Courier `1/1` and POS `1/1`; `npm run ios:test` `34/34`; `git diff --check`.
+- Outcome: payment-result recovery is accepted at local simulator software level. Live provider failure/retry, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: finish screen-by-screen visual evidence for the remaining Client App 2.0 states, then run signed archive/store preflight when Apple credentials, profiles and production API URL are supplied.

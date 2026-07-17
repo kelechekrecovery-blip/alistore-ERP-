@@ -222,6 +222,21 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Каталог"].exists)
     }
 
+    func testPaymentResultShowsFailureRecoveryActions() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-failure"]
+        app.launch()
+
+        app.buttons["Корзина"].tap()
+        XCTAssertTrue(app.staticTexts["payment-result-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Оплата не прошла"].exists)
+        XCTAssertTrue(app.buttons["payment-retry-button"].exists)
+        XCTAssertTrue(app.buttons["payment-support-button"].exists)
+
+        app.buttons["payment-support-button"].tap()
+        XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
+    }
+
     private func launchSignedInAccount() -> XCUIApplication {
         launchSignedInAccount(arguments: [])
     }

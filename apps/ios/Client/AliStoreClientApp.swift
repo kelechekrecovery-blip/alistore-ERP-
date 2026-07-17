@@ -26,7 +26,7 @@ private enum ClientTab: Hashable {
 }
 
 private enum ClientOverlay: String, Identifiable, Hashable {
-    case search, compare, notifications
+    case search, compare, notifications, support
 
     var id: String { rawValue }
 }
@@ -342,6 +342,8 @@ private struct ClientOverlayView: View {
                     compareContent
                 case .notifications:
                     notificationContent
+                case .support:
+                    CustomerSupportView(environment: environment, auth: auth)
                 }
             }
             .navigationTitle(title)
@@ -366,6 +368,7 @@ private struct ClientOverlayView: View {
         case .search: "Поиск"
         case .compare: "Сравнение"
         case .notifications: "Уведомления"
+        case .support: "Поддержка"
         }
     }
 
@@ -804,7 +807,14 @@ private struct ClientRootView: View {
                         case .favorites:
                             FavoritesView(products: products, cart: $cart, favorites: $favorites)
                         case .cart:
-                            CartView(environment: environment, auth: auth, products: products, cart: $cart, onOpenCatalog: { selectedTab = .catalog })
+                            CartView(
+                                environment: environment,
+                                auth: auth,
+                                products: products,
+                                cart: $cart,
+                                onOpenCatalog: { selectedTab = .catalog },
+                                onOpenSupport: { overlay = .support }
+                            )
                         case .account:
                             AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, onEnablePush: enablePush, onLogout: { guestMode = false })
                         }
@@ -1145,11 +1155,14 @@ private struct CartView: View {
     @State private var errorMessage: String?
     @State private var completedOrder: CustomerOrder?
     @State private var paymentIntent: PaymentIntent?
+    @State private var isRetryingPayment = false
+    @State private var retryErrorMessage: String?
     @State private var queuedOffline = false
     @State private var checkoutStep: ClientCheckoutStep = .delivery
     @State private var showingOrderStatus = false
     @State private var showingCheckout = UITestBootstrap.startsAtCheckout
     let onOpenCatalog: () -> Void
+    let onOpenSupport: () -> Void
 
     private var lines: [(Product, Int)] {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
@@ -1169,7 +1182,12 @@ private struct CartView: View {
                             order: order,
                             paymentIntent: paymentIntent,
                             paymentURL: paymentIntent.flatMap(paymentURL),
+                            forceFailure: UITestBootstrap.startsAtPaymentFailure,
+                            isRetrying: isRetryingPayment,
+                            retryErrorMessage: retryErrorMessage,
                             onTrack: { showingOrderStatus = true },
+                            onRetry: { Task { await retryPayment() } },
+                            onSupport: onOpenSupport,
                             onReset: {
                                 resetCheckout()
                                 onOpenCatalog()
@@ -1198,7 +1216,7 @@ private struct CartView: View {
         }
         .task {
             #if DEBUG
-            if UITestBootstrap.startsAtPaymentResult {
+            if UITestBootstrap.startsAtPaymentResult || UITestBootstrap.startsAtPaymentFailure {
                 completedOrder = ClientUIFixture.orders[0]
             }
             #endif
@@ -1459,6 +1477,8 @@ private struct CartView: View {
     private func resetCheckout() {
         completedOrder = nil
         paymentIntent = nil
+        isRetryingPayment = false
+        retryErrorMessage = nil
         queuedOffline = false
         checkoutStep = .delivery
         showingCheckout = false
@@ -1527,6 +1547,34 @@ private struct CartView: View {
     }
 
     @MainActor
+    private func retryPayment() async {
+        guard let session = auth.session, let order = completedOrder else { return }
+        guard let method = OnlinePaymentMethod(rawValue: paymentIntent?.method ?? paymentMethod) else {
+            retryErrorMessage = "Для этого заказа повторная онлайн-оплата недоступна. Обратитесь в поддержку."
+            return
+        }
+        isRetryingPayment = true
+        retryErrorMessage = nil
+        defer { isRetryingPayment = false }
+        do {
+            paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "payments/intents/mine",
+                body: CreatePaymentIntentRequest(
+                    orderId: order.id,
+                    method: method,
+                    amount: order.total,
+                    returnUrl: "alistore://payment-return?orderId=\(order.id)"
+                ),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+        } catch is CancellationError {
+        } catch {
+            retryErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     private func loadStorePoints() async {
         do {
             let options: CheckoutOptions = try await APIClient(baseURL: environment.apiBaseURL).get("logistics/checkout-options")
@@ -1551,17 +1599,55 @@ private struct ClientPaymentResultView: View {
     let order: CustomerOrder
     let paymentIntent: PaymentIntent?
     let paymentURL: URL?
+    let forceFailure: Bool
+    let isRetrying: Bool
+    let retryErrorMessage: String?
     let onTrack: () -> Void
+    let onRetry: () -> Void
+    let onSupport: () -> Void
     let onReset: () -> Void
+
+    private enum ResultState: Equatable {
+        case success, pending, failed
+    }
+
+    private var resultState: ResultState {
+        if forceFailure { return .failed }
+        guard let paymentIntent else { return .success }
+        let status = paymentIntent.status.lowercased()
+        if ["failed", "declined", "expired", "cancelled", "canceled", "rejected"].contains(status) {
+            return .failed
+        }
+        if ["succeeded", "success", "paid", "captured", "completed"].contains(status) || paymentIntent.orderStatus.lowercased() == "paid" {
+            return .success
+        }
+        return .pending
+    }
+
+    private var title: String {
+        switch resultState {
+        case .success: "Заказ оформлен"
+        case .pending: "Ожидает оплаты"
+        case .failed: "Оплата не прошла"
+        }
+    }
+
+    private var detail: String {
+        switch resultState {
+        case .success: "Мы передали заказ в обработку. Актуальный статус будет обновляться в Кабинете."
+        case .pending: "Завершите оплату на защищённой странице провайдера. Статус подтвердит только серверный webhook."
+        case .failed: "Платёж не подтверждён провайдером. Повторите попытку или обратитесь в поддержку. Деньги не считаются списанными без серверного подтверждения."
+        }
+    }
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: paymentIntent == nil ? "checkmark" : "creditcard")
+            Image(systemName: resultState == .success ? "checkmark" : resultState == .failed ? "xmark" : "creditcard")
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.black)
                 .frame(width: 80, height: 80)
-                .background(paymentIntent == nil ? ClientTheme.lime : Color(red: 0.898, green: 0.698, blue: 0.235), in: Circle())
-            Text(paymentIntent == nil ? "Заказ оформлен" : "Ожидает оплаты")
+                .background(resultState == .success ? ClientTheme.lime : resultState == .failed ? ClientTheme.coral : Color(red: 0.898, green: 0.698, blue: 0.235), in: Circle())
+            Text(title)
                 .font(ClientTheme.display(24, weight: .black))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
@@ -1569,13 +1655,13 @@ private struct ClientPaymentResultView: View {
             Text("Заказ #\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
                 .font(ClientTheme.body(14))
                 .foregroundStyle(ClientTheme.muted)
-            Text(paymentIntent == nil ? "Мы передали заказ в обработку. Актуальный статус будет обновляться в Кабинете." : "Завершите оплату на защищённой странице провайдера. Статус подтвердит только серверный webhook.")
+            Text(detail)
                 .font(ClientTheme.body(13))
                 .foregroundStyle(ClientTheme.muted)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .padding(.horizontal, 10)
-            if let paymentURL {
+            if resultState == .pending, let paymentURL {
                 Link("Перейти к оплате", destination: paymentURL)
                     .font(ClientTheme.body(15, weight: .bold))
                     .foregroundStyle(.black)
@@ -1583,18 +1669,46 @@ private struct ClientPaymentResultView: View {
                     .frame(height: 50)
                     .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
             }
-            Button("Отследить заказ", action: onTrack)
-                .font(ClientTheme.body(15, weight: .bold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
-                .accessibilityIdentifier("payment-track-button")
-            Button("Вернуться в каталог", action: onReset)
-                .font(ClientTheme.body(13, weight: .medium))
-                .foregroundStyle(ClientTheme.muted)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("payment-catalog-button")
+            switch resultState {
+            case .success, .pending:
+                Button("Отследить заказ", action: onTrack)
+                    .font(ClientTheme.body(15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    .accessibilityIdentifier("payment-track-button")
+                Button("Вернуться в каталог", action: onReset)
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("payment-catalog-button")
+            case .failed:
+                if let retryErrorMessage {
+                    Text(retryErrorMessage)
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.coral)
+                        .multilineTextAlignment(.center)
+                }
+                Button(action: onRetry) {
+                    HStack {
+                        Spacer()
+                        if isRetrying { ProgressView().tint(.black) } else { Text("Повторить оплату") }
+                        Spacer()
+                    }
+                    .font(ClientTheme.body(15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(height: 50)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                }
+                .disabled(isRetrying)
+                .accessibilityIdentifier("payment-retry-button")
+                Button("Связаться с поддержкой", action: onSupport)
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("payment-support-button")
+            }
         }
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, minHeight: 440)
