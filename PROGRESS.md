@@ -2,6 +2,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-013-COURIER-EVIDENCE-028`.
+- Task: close the courier COD reconciliation evidence after server-authoritative partial collection and rebind native evidence to the final toolchain HEAD.
+- Result: trusted Playwright courier flow passed `1/1` for web COD checkout, warehouse picking, courier delivery, cash handover and exact reconciliation. Native trusted evidence was re-recorded on the same source tree: iOS `34/34`, Android `30/30`.
+- Commits: `b8b8cbd` (courier reconciliation), `d847fb2` (iOS rebind), `7cce461` (Android rebind).
+- Toolchain note: regenerated Prisma Client after `npm ci` exposed a stale generated-client mismatch in the Playwright webServer; the dependency-tree lock was updated in `1227802`, then the gate passed.
+- Strict audit: courier COD, iOS UI and Android UI are PASS. Remaining blockers are durable visual acceptance, POS/refund, service/loaner, procurement/sale, composite ecosystem evidence and 64 missing linked handoffs.
+- Next step: take the next reconciliation vertical, prioritizing POS/refund because it is the financial return path.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-013-NATIVE-EVIDENCE-027`.
 - Task: refresh trusted native UI evidence after the partial-COD contract and dependency-tree lock changes.
 - Result: iOS app UI evidence passed `34/34`; Android packaged UI evidence passed `30/30` across core, Client, Staff, Courier and POS on the API 36 emulator. Evidence artifacts are hash-bound to the current source tree and committed separately.
