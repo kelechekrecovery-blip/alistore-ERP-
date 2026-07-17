@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-POS-REPLAY-013`.
+- Task: close the POS replay identity gap before refreshing ecosystem evidence.
+- Files changed: `apps/api/src/pos/pos.service.ts` and this progress entry.
+- Result: replay now validates the stored sale composition (shift owner plus sorted SKU/quantity/price) before returning a prior receipt. Reusing a client sale key for another cashier or cart is rejected, while distinct client keys preserve identical carts; fingerprint dedup is explicitly labeled.
+- Checks run: isolated `test/pos-sale-replay.e2e-spec.ts` passed `5/5`; `git diff --check`.
+- Outcome: the POS idempotency invariant is accepted as a code/API increment. Full POS refund, warehouse quarantine and financial reconciliation evidence remain a separate gate.
+- Next step: refresh trusted POS/reconciliation evidence on the clean SHA, then rerun strict audit.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-MOBILE-REFERENCE-012`.
 - Task: make the final native-app boundary explicit for the legacy Expo package.
 - Files changed: `apps/mobile/README.md`, `apps/mobile/package.json`, and this progress entry.

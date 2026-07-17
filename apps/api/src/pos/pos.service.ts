@@ -21,7 +21,10 @@ const WALKIN_PHONE = '+000000000000';
  * `clientSaleId`, which is the precise idempotency key. If one is missing, we derive a
  * deterministic key from the cart fingerprint bucketed into this window, so an accidental
  * network re-submit within the window collapses to one sale while a deliberate identical
- * re-ring in a later window is still processed as a new sale.
+ * re-ring in a later window is still processed as a new sale. Any replay is verified
+ * against the stored sale composition (`saleRequestHash`); a fingerprint-keyed dedup is
+ * flagged with `dedupedBy: 'fingerprint'` instead of silently substituting the sale, so
+ * two genuinely different sales with the same cart must each carry their own clientSaleId.
  */
 const POS_AUTO_DEDUP_WINDOW_MS = 60_000;
 
