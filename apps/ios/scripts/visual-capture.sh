@@ -23,8 +23,8 @@ DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
     --output-path "$attachments_dir" >/dev/null
 
 attachment_count="$(find "$attachments_dir" -type f -name '*.png' -print | wc -l | tr -d ' ')"
-[[ "$attachment_count" -eq 6 ]] || {
-  printf 'ios visual capture: expected 6 PNG attachments, got %s\n' "$attachment_count" >&2
+[[ "$attachment_count" -eq 7 ]] || {
+  printf 'ios visual capture: expected 7 PNG attachments, got %s\n' "$attachment_count" >&2
   exit 1
 }
 

@@ -4539,6 +4539,7 @@ private struct CatalogView: View {
                                         NativeProductCard(product: product, cart: $cart, favorites: $favorites)
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityIdentifier("client-product-\(product.id)")
                                 }
                             }
                         }
@@ -4864,6 +4865,18 @@ private struct ProductDetail: View {
     private func loadDetail() async {
         detailLoading = true
         defer { detailLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsAtVisualEvidence {
+            let related = ClientUIFixture.products.filter { $0.id != product.id }.prefix(2)
+            detail = CatalogProductDetail(
+                product: product,
+                variants: Array(ClientUIFixture.products.prefix(2)),
+                related: Array(related)
+            )
+            detailError = nil
+            return
+        }
+#endif
         do {
             detail = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products/\(product.id)")
             detailError = nil

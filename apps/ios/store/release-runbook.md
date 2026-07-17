@@ -45,8 +45,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 ```
 
 `ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
-Simulator and exports six retained PNG attachments (home, catalog, cart,
-account, payment success and payment failure). These are review evidence only;
+Simulator and exports seven retained PNG attachments (home, catalog, product
+detail, cart, account, payment success and payment failure). These are review evidence only;
 they do not replace pixel comparison against the handoff or physical-device
 release smoke.
 

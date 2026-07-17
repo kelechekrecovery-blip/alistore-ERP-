@@ -9,6 +9,12 @@ public struct CatalogProductDetail: Decodable, Sendable {
     public let product: Product
     public let variants: [Product]
     public let related: [Product]
+
+    public init(product: Product, variants: [Product], related: [Product]) {
+        self.product = product
+        self.variants = variants
+        self.related = related
+    }
 }
 
 public struct Product: Decodable, Identifiable, Sendable {
