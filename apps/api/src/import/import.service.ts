@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditInput, AuditService } from '../audit/audit.service';
+import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { ImportResult, ImportRowError, ParsedProductRow } from './import.types';
 
@@ -10,10 +12,17 @@ const REQUIRED = ['sku', 'name', 'price', 'cost', 'category'] as const;
  * Launch-time data migration — import products from an Excel file (Roadmap:
  * «Импорт данных из Excel/тетради»). Header row maps columns by name in any
  * order; rows upsert by SKU so re-imports are safe. Prices are whole сом (Int).
+ * Every row mutation commits through the append-only Event Ledger
+ * (product.created / product.updated / price.changed) in one transaction.
  */
 @Injectable()
 export class ImportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Optional only so direct unit construction (no Nest DI) keeps working;
+    // the global AuditModule always injects it in the app.
+    @Optional() private readonly audit?: AuditService,
+  ) {}
 
   /** Parse a product Excel into structured rows (no writes). */
   async parseProducts(
@@ -65,52 +74,97 @@ export class ImportService {
   }
 
   /** Import products from Excel: upsert by SKU. Returns created/updated counts. */
-  async importProducts(buffer: Buffer): Promise<ImportResult> {
+  async importProducts(buffer: Buffer, actor = 'import'): Promise<ImportResult> {
     const { rows, errors } = await this.parseProducts(buffer);
+    const audit = this.audit ?? new AuditService(this.prisma);
     let created = 0;
     let updated = 0;
     let unchanged = 0;
+    // Each row commits in its own transaction (as before): one bad row aborts
+    // the import without rolling back the rows already applied.
     for (const p of rows) {
-      const existing = await this.prisma.product.findUnique({
-        where: { sku: p.sku },
-      });
+      const outcome = await audit.transaction(async (tx) => {
+        const existing = await tx.product.findUnique({
+          where: { sku: p.sku },
+        });
 
-      if (!existing) {
-        await this.prisma.product.create({
+        if (!existing) {
+          const product = await tx.product.create({
+            data: {
+              sku: p.sku,
+              name: p.name,
+              price: p.price,
+              cost: p.cost,
+              category: p.category,
+              attrs: {},
+            },
+          });
+          return {
+            result: 'created' as const,
+            events: [
+              {
+                type: EventType.ProductCreated,
+                actor,
+                payload: {
+                  productId: product.id,
+                  sku: p.sku,
+                  name: p.name,
+                  price: p.price,
+                  cost: p.cost,
+                  category: p.category,
+                },
+                refs: [product.id, p.sku],
+              },
+            ],
+          };
+        }
+
+        if (
+          existing.name === p.name &&
+          existing.price === p.price &&
+          existing.cost === p.cost &&
+          existing.category === p.category
+        ) {
+          return { result: 'unchanged' as const, events: [] };
+        }
+
+        const product = await tx.product.update({
+          where: { sku: p.sku },
           data: {
             sku: p.sku,
             name: p.name,
             price: p.price,
             cost: p.cost,
             category: p.category,
-            attrs: {},
           },
         });
-        created += 1;
-        continue;
-      }
-
-      if (
-        existing.name === p.name &&
-        existing.price === p.price &&
-        existing.cost === p.cost &&
-        existing.category === p.category
-      ) {
-        unchanged += 1;
-        continue;
-      }
-
-      await this.prisma.product.update({
-        where: { sku: p.sku },
-        data: {
-          sku: p.sku,
-          name: p.name,
-          price: p.price,
-          cost: p.cost,
-          category: p.category,
-        },
+        const events: AuditInput[] = [
+          {
+            type: EventType.ProductUpdated,
+            actor,
+            payload: {
+              productId: product.id,
+              sku: p.sku,
+              changes: (['name', 'price', 'cost', 'category'] as const).filter(
+                (field) => existing[field] !== p[field],
+              ),
+            },
+            refs: [product.id, p.sku],
+          },
+        ];
+        if (existing.price !== p.price) {
+          events.push({
+            type: EventType.PriceChanged,
+            actor,
+            payload: { productId: product.id, from: existing.price, to: p.price },
+            refs: [product.id, p.sku],
+          });
+        }
+        return { result: 'updated' as const, events };
       });
-      updated += 1;
+      if (outcome === 'created') created += 1;
+      else if (outcome === 'updated') updated += 1;
+      else unchanged += 1;
     }
     return { created, updated, unchanged, errors };
   }

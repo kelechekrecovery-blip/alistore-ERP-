@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `SEC-LOGIC-010-014`.
+- Task: harden bulk product import against customer JWT access and preserve an Event Ledger trail for price-affecting imports.
+- Files changed: `apps/api/src/import/import.controller.ts`, `apps/api/src/import/import.module.ts`, `apps/api/src/import/import.service.ts`, `apps/api/test/import-guard.e2e-spec.ts`, and this progress entry.
+- Result: `/import/products` now requires an active staff session plus `products:create`; customer and cashier requests are rejected before writes. Created, updated and price-changed rows append audit events in the same transaction with the acting staff identity.
+- Checks run: isolated `test/import-guard.e2e-spec.ts` passed `3/3`; `git diff --check`.
+- Outcome: the LOGIC-010 P0 import authorization gap is closed in tested API code. Production readiness still requires the broader strict security audit and deployment credentials.
+- Next step: validate the native POS return and Android account-data slices, then commit them separately.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-POS-REPLAY-013`.
 - Task: close the POS replay identity gap before refreshing ecosystem evidence.
 - Files changed: `apps/api/src/pos/pos.service.ts` and this progress entry.
