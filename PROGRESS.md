@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — VISUAL-EVIDENCE-003
+
+- Iteration ID: `VISUAL-EVIDENCE-003`.
+- Task: refresh trusted durable Web/ERP visual acceptance evidence after restoring the ecosystem audit npm aliases.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/visual-b7464628cbcef430a74513a99759081dcd2264e87b0f50b55a68010c21d850e4.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run visual:e2e` with `exitCode: 0` for source tree `6b3989bc1c2c52f0ebdb72a888c21fa117852874941252c25c3b9752e46bc790`. The visual runner passed `3/3` exact screenshot tests for ERP desktop, storefront desktop and storefront mobile.
+- Checks run: `sh scripts/run-trusted-ecosystem-node.sh scripts/record-ecosystem-evidence.mjs visual`; `git diff --check`.
+- Acceptance: accepted for the current committed Web/ERP visual baseline. Remaining strict-audit blockers are native/reconciliation evidence refresh under the new source hash plus the 64 missing or unretired linked handoff files.
+- Next step: refresh `ios-app-ui`, `android-app-ui`, POS/refund, courier COD, service/loaner, procurement/sale and reconciled E2E evidence in separate commits, then rerun `npm run ecosystem:audit:strict`.
+
 # 2026-07-17 — ECO-AUDIT-COMMAND-001
 
 - Iteration ID: `ECO-AUDIT-COMMAND-001`.
