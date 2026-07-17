@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MOB-018-ANDROID-PREVIEW-019`.
+- Task: make Android Client account actions safe when the API base URL is unavailable in previews/tests.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt` and this progress entry.
+- Result: export/delete actions now render a controlled “Нет адреса API” state instead of constructing an invalid client; normal authenticated flows remain unchanged.
+- Checks run: `:core:test` and `:core:lintDebug` passed; `git diff --check`.
+- Outcome: preview/test resilience is accepted; it does not represent connected emulator or production mobile readiness.
+- Next step: validate the courier run deadlock scenario and then run the clean-tree evidence gate.
+
+## 2026-07-18
+
 - Iteration ID: `SEC-010-STAFF-ADMIN-018`.
 - Task: close staff access and account-administration gaps across approvals, Customer 360, TOTP recovery and deactivation.
 - Files changed: approval/customer authorization wiring, `authz.model.ts`, staff auth admin routes/service/module, audit event types, `access-staff-batch.e2e-spec.ts`, and this progress entry.

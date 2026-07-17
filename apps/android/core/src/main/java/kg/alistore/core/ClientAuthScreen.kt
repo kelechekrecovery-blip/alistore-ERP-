@@ -191,7 +191,8 @@ private fun SignedInAccount(
   }
   val scope = rememberCoroutineScope()
   val context = LocalContext.current
-  val accountGateway = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
+  // Null when the base URL is missing (e.g. previews/tests) — data actions then just report.
+  val accountGateway = remember(apiBaseUrl) { runCatching { ApiClient(apiBaseUrl) }.getOrNull() }
   var busy by remember { mutableStateOf(false) }
   var dataBusy by remember { mutableStateOf(false) }
   var dataMessage by remember { mutableStateOf<String?>(null) }
@@ -251,9 +252,12 @@ private fun SignedInAccount(
       Text("Мои данные", color = AuthMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
       Button(
         onClick = {
-          scope.launch {
+          val gateway = accountGateway
+          if (gateway == null) {
+            dataMessage = "Нет адреса API"
+          } else scope.launch {
             dataBusy = true; dataMessage = null
-            runCatching { withFreshToken { token -> accountGateway.exportData(token) } }
+            runCatching { withFreshToken { token -> gateway.exportData(token) } }
               .onSuccess { pendingExport = it; exportLauncher.launch("alistore-my-data.json") }
               .onFailure { dataMessage = it.message ?: "Не удалось выгрузить данные" }
             dataBusy = false
@@ -294,9 +298,12 @@ private fun SignedInAccount(
         TextButton(
           enabled = !dataBusy,
           onClick = {
-            scope.launch {
+            val gateway = accountGateway
+            if (gateway == null) {
+              showDeleteConfirm = false; dataMessage = "Нет адреса API"
+            } else scope.launch {
               dataBusy = true
-              runCatching { withFreshToken { token -> accountGateway.deleteAccount(token) } }
+              runCatching { withFreshToken { token -> gateway.deleteAccount(token) } }
                 .onSuccess { showDeleteConfirm = false; dataBusy = false; onState(manager.logout(state)) }
                 .onFailure { dataBusy = false; showDeleteConfirm = false; dataMessage = it.message ?: "Не удалось удалить аккаунт" }
             }
