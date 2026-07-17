@@ -40,6 +40,7 @@ describe('Courier run deadlock (LOGIC-002)', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.courierRun.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'courier-deadlock-' } } });
   };
