@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-CLIENT-PUSH-001
+
+- Iteration ID: `ANDROID-CLIENT-PUSH-001`.
+- Task: add the Android Client push registration and notification deep-link contour using the same server token endpoint as the other native apps.
+- Files changed: client Gradle/manifest/activity, optional Firebase messaging service and registrar, shared client push route contract, Android parser regression, backlog/progress documentation.
+- Result: Client registers an FCM token only after a signed-in customer session and only when app-owned Firebase configuration exists; token refresh uses the customer session from Keystore. Notification payloads accept only `alistore-client://orders/:id`, `alistore-client://warranty/:id` and `alistore-client://account/:route`, while arbitrary schemes/hosts are dropped. Client Release now fails closed without `google-services.json`; Debug has no credential dependency.
+- Checks run: `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 30 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `npm run android:build` passed all four debug APKs; `git diff --check`.
+- Acceptance: accepted for the local Android Client push/routing software vertical. FCM provider delivery, Android 13 notification permission, physical-device push/deep-link smoke, release signing and production credentials remain external.
+- Next step: continue the next locally unblocked Android Staff/Courier/POS or ERP vertical while keeping provider, device and design-corpus gates explicit.
+
 # 2026-07-17 — ANDROID-CLIENT-STATE-001
 
 - Iteration ID: `ANDROID-CLIENT-STATE-001`.

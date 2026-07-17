@@ -7,3 +7,7 @@ interface PushRegistrationGateway {
 fun interface StaffPushRegistrar {
   suspend fun register(session: StaffSession)
 }
+
+fun interface ClientPushRegistrar {
+  suspend fun register(session: AuthState.SignedIn)
+}

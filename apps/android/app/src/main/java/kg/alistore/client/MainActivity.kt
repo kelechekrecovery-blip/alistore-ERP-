@@ -12,13 +12,15 @@ import androidx.compose.runtime.setValue
 import kg.alistore.core.AliStoreApp
 import kg.alistore.core.AppRole
 
+private fun routeFrom(intent: Intent?): String? = intent?.dataString ?: intent?.getStringExtra("deepLink")
+
 class MainActivity : FragmentActivity() {
   private var deepLinkUrl by mutableStateOf<String?>(null)
   private var deepLinkRevision by mutableLongStateOf(0)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    deepLinkUrl = intent?.dataString
+    deepLinkUrl = routeFrom(intent)
     enableEdgeToEdge()
     setContent {
       AliStoreApp(
@@ -26,6 +28,7 @@ class MainActivity : FragmentActivity() {
         apiBaseUrl = BuildConfig.API_BASE_URL,
         deepLinkUrl = deepLinkUrl,
         deepLinkRevision = deepLinkRevision,
+        clientPushRegistrar = if (BuildConfig.FCM_CONFIGURED) FirebaseClientPushRegistrar(applicationContext, BuildConfig.API_BASE_URL) else null,
       )
     }
   }
@@ -33,7 +36,7 @@ class MainActivity : FragmentActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    deepLinkUrl = intent.dataString
+    deepLinkUrl = routeFrom(intent)
     deepLinkRevision += 1
   }
 }

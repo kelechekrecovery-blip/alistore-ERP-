@@ -69,9 +69,10 @@ fun AliStoreApp(
   deepLinkUrl: String? = null,
   deepLinkRevision: Long = 0,
   staffPushRegistrar: StaffPushRegistrar? = null,
+  clientPushRegistrar: ClientPushRegistrar? = null,
 ) {
   if (role == AppRole.CLIENT) {
-    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision)
+    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, clientPushRegistrar)
     return
   }
   if (role == AppRole.STAFF) {
@@ -90,7 +91,12 @@ fun AliStoreApp(
 }
 
 @Composable
-private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision: Long) {
+private fun ClientApp(
+  apiBaseUrl: String,
+  deepLinkUrl: String?,
+  deepLinkRevision: Long,
+  clientPushRegistrar: ClientPushRegistrar?,
+) {
   val context = LocalContext.current.applicationContext
   val localStateStore = remember { ClientLocalStateStore(context, "client") }
   val restoredLocalState = remember(localStateStore) { localStateStore.read() }
@@ -138,12 +144,28 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
     loading = false
   }
   LaunchedEffect(authManager) { authState = authManager.restore() }
+  LaunchedEffect(authState, clientPushRegistrar) {
+    val signedIn = authState as? AuthState.SignedIn
+    if (signedIn != null && clientPushRegistrar != null) {
+      runCatching { clientPushRegistrar.register(signedIn) }
+    }
+  }
   LaunchedEffect(deepLinkUrl, deepLinkRevision) {
     parsePaymentReturnRoute(deepLinkUrl)?.let { route ->
       paymentReturn = route
       selected = 4
       accountRoute = "orders"
       orderRefreshRevision += 1
+    }
+    parseClientPushRoute(deepLinkUrl)?.let { route ->
+      paymentReturn = null
+      selected = 4
+      accountRoute = when (route.destination) {
+        ClientPushDestination.ORDERS -> "orders"
+        ClientPushDestination.WARRANTY -> "devices"
+        ClientPushDestination.ACCOUNT -> route.entityId ?: "settings"
+      }
+      if (route.destination == ClientPushDestination.ORDERS) orderRefreshRevision += 1
     }
   }
 

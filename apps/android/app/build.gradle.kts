@@ -5,7 +5,10 @@ plugins {
 
 val releaseApiBaseUrl = providers.gradleProperty("ALISTORE_API_BASE_URL").orElse("").get()
 val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) || it == "build" }
+val firebaseConfigured = file("google-services.json").isFile
+if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
 require(!releaseRequested || releaseApiBaseUrl.startsWith("https://")) { "Release requires -PALISTORE_API_BASE_URL=https://..." }
+require(!releaseRequested || firebaseConfigured) { "Client Release requires apps/android/app/google-services.json" }
 
 android {
     namespace = "kg.alistore.client"
@@ -19,6 +22,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartextTraffic"] = "true"
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api\"")
+        buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
     }
 
     buildTypes {
@@ -61,6 +65,8 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.biometric)
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.messaging)
 
   // Compose
   implementation(libs.androidx.compose.ui)

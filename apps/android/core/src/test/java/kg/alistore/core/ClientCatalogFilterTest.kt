@@ -64,4 +64,22 @@ class ClientCatalogFilterTest {
     assertEquals(OnlinePaymentMethod.CARD, route?.method)
     assertTrue(route?.isFailed() == true)
   }
+
+  @Test
+  fun clientPushRouteScopesDestinationsAndRejectsUntrustedLinks() {
+    assertEquals(null, parseClientPushRoute("https://example.com/orders/order-1"))
+    assertEquals(
+      ClientPushRoute(ClientPushDestination.ORDERS, "order-1"),
+      parseClientPushRoute("alistore-client://orders/order-1"),
+    )
+    assertEquals(
+      ClientPushRoute(ClientPushDestination.WARRANTY, "IMEI 123"),
+      parseClientPushRoute("alistore-client://warranty/IMEI%20123"),
+    )
+    assertEquals(
+      ClientPushRoute(ClientPushDestination.ACCOUNT, "settings"),
+      parseClientPushRoute("alistore-client://account/settings"),
+    )
+    assertEquals(null, parseClientPushRoute("alistore-client://orders"))
+  }
 }
