@@ -2635,6 +2635,14 @@
 
 ## 2026-07-17
 
+- Iteration ID: `MVP-VERIFY-003`.
+- Task: run the complete MVP verification after accepting the AR fixture cleanup and ERP/CMS browser slice.
+- Checks run: `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` passed Prisma validation/generation, four migration upgrade paths, API build, Web build, mobile typecheck, clean reset and post-deploy indexes, API `149/149` suites with `673/673` tests, and Playwright `58/58` tests in `2.8m`.
+- Result: the local MVP software gate is accepted on the current commit. External readiness remains a report-only blocker with 10 missing provider/configuration items and one manual POS hardware gate; no production certification is claimed.
+- Next step: refresh trusted acceptance artifacts affected by the test-source commit, then implement the next ERP/storefront server-price-to-checkout assertion without weakening the fail-closed audit.
+
+## 2026-07-17
+
 - Iteration ID: `ERP-STOREFRONT-CONTRACT-001`.
 - Task: verify the ERP-to-storefront contract across product administration, CMS blocks, reviews, promotions and checkout.
 - Checks run: `npx playwright test e2e/admin-products.spec.ts e2e/storefront-cms-ui.spec.ts` passed `7/7` tests in `36.8s`.
