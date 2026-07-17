@@ -87,6 +87,10 @@ export const EventType = {
   RefundProviderPending: 'refund.provider_pending',
   RefundProviderSucceeded: 'refund.provider_succeeded',
   RefundProviderFailed: 'refund.provider_failed',
+  /** sweep parked a provider_pending allocation whose callback never arrived. */
+  RefundProviderStale: 'refund.provider_stale',
+  /** owner/admin resolved a stuck refund without a provider callback (confirm or cancel). */
+  RefundResolved: 'refund.resolved',
   RefundSucceeded: 'refund.succeeded',
   RefundFailed: 'refund.failed',
   RefundCancelled: 'refund.cancelled',

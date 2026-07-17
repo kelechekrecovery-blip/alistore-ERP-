@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PaymentMethod, Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
@@ -14,9 +15,32 @@ import {
   PaymentGatewayProvider,
 } from '../payments/payment-gateway-provider';
 import { PrismaService } from '../prisma/prisma.service';
-import { MAX_REFUND_ATTEMPTS, nextRefundAttempt } from './refunds.constants';
+import { ResolveRefundDto } from './refunds.dto';
+import {
+  DEFAULT_PROVIDER_PENDING_STALE_MS,
+  MAX_REFUND_ATTEMPTS,
+  PROVIDER_PENDING_STALE_PREFIX,
+  PROVIDER_TERMINAL_FAILURE_PREFIX,
+  isStaleProviderPendingFailure,
+  nextRefundAttempt,
+} from './refunds.constants';
 
 const PROVIDER_METHODS = new Set<PaymentMethod>(['card', 'qr_mbank', 'qr_odengi', 'bakai_pos', 'obank', 'installment']);
+
+/** Retry selection skips allocations parked for operator reconciliation. */
+const RETRYABLE_LAST_ERROR: Prisma.RefundAllocationWhereInput = {
+  OR: [
+    { lastError: null },
+    {
+      NOT: {
+        OR: [
+          { lastError: { startsWith: PROVIDER_TERMINAL_FAILURE_PREFIX } },
+          { lastError: { startsWith: PROVIDER_PENDING_STALE_PREFIX } },
+        ],
+      },
+    },
+  ],
+};
 
 @Injectable()
 export class RefundProcessor {
@@ -82,7 +106,7 @@ export class RefundProcessor {
             status: { in: ['queued', 'failed'] },
             attempts: { lt: MAX_REFUND_ATTEMPTS },
             AND: [
-              { OR: [{ lastError: null }, { NOT: { lastError: { startsWith: 'provider_terminal_failure:' } } }] },
+              RETRYABLE_LAST_ERROR,
               { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
             ],
           },
@@ -91,7 +115,8 @@ export class RefundProcessor {
             OR: [
               { attempts: { gte: MAX_REFUND_ATTEMPTS } },
               { nextAttemptAt: { gt: new Date() } },
-              { lastError: { startsWith: 'provider_terminal_failure:' } },
+              { lastError: { startsWith: PROVIDER_TERMINAL_FAILURE_PREFIX } },
+              { lastError: { startsWith: PROVIDER_PENDING_STALE_PREFIX } },
             ],
           },
         },
@@ -128,7 +153,7 @@ export class RefundProcessor {
         status: { in: ['queued', 'failed'] },
         attempts: { lt: MAX_REFUND_ATTEMPTS },
         AND: [
-          { OR: [{ lastError: null }, { NOT: { lastError: { startsWith: 'provider_terminal_failure:' } } }] },
+          RETRYABLE_LAST_ERROR,
           { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
         ],
       },
@@ -168,6 +193,72 @@ export class RefundProcessor {
     }
   }
 
+  /**
+   * LOGIC-007 stale sweep: a provider refund accepted but never confirmed by a
+   * webhook (lost callback, provider outage) is parked once it is older than
+   * `staleMs`. Parking moves the allocation out of the ambiguous
+   * `provider_pending` limbo into a `failed` state with a
+   * `provider_pending_stale:` marker that the retry selection skips — only a
+   * late provider webhook or an operator resolve can move it further, because
+   * blindly re-calling the provider could double-refund. The state change and
+   * its `refund.provider_stale` ledger event commit atomically per allocation.
+   */
+  async sweepStaleProviderPending(staleMs = DEFAULT_PROVIDER_PENDING_STALE_MS, limit = 25, actor = 'system:refund-stale-sweep') {
+    const staleBefore = new Date(Date.now() - staleMs);
+    const stale = await this.prisma.refundAllocation.findMany({
+      where: { status: 'provider_pending', updatedAt: { lt: staleBefore } },
+      orderBy: { updatedAt: 'asc' },
+      take: limit,
+      select: { id: true, refundId: true, providerRefundId: true },
+    });
+    let swept = 0;
+    for (const allocation of stale) {
+      try {
+        if (await this.markProviderPendingStale(allocation.id, allocation.refundId, allocation.providerRefundId, staleMs, actor)) {
+          swept += 1;
+        }
+      } catch (error) {
+        this.logger.warn(`Stale sweep skipped refund allocation ${allocation.id}: ${error instanceof Error ? error.message : error}`);
+      }
+    }
+    return swept;
+  }
+
+  private async markProviderPendingStale(
+    allocationId: string,
+    refundId: string,
+    providerRefundId: string | null,
+    staleMs: number,
+    actor: string,
+  ) {
+    return this.audit.transaction(async (tx) => {
+      const changed = await tx.refundAllocation.updateMany({
+        where: { id: allocationId, status: 'provider_pending' },
+        data: {
+          status: 'failed',
+          lastError: `${PROVIDER_PENDING_STALE_PREFIX}${staleMs}`,
+          lockedAt: null,
+          nextAttemptAt: null,
+        },
+      });
+      if (changed.count === 0) return { result: false, events: [] };
+      const succeeded = await tx.refundAllocation.count({ where: { refundId, status: 'succeeded' } });
+      await tx.refund.update({
+        where: { id: refundId },
+        data: { status: succeeded > 0 ? 'partially_succeeded' : 'failed' },
+      });
+      return {
+        result: true,
+        events: [{
+          type: EventType.RefundProviderStale,
+          actor,
+          payload: { refundId, allocationId, providerRefundId, staleMs },
+          refs: [refundId, allocationId, providerRefundId].filter((ref): ref is string => Boolean(ref)),
+        }],
+      };
+    });
+  }
+
   async reconcileProviderRefund(payload: GatewayRefundWebhookPayload, actor: string) {
     const allocation = await this.prisma.refundAllocation.findUnique({
       where: { providerRefundId: payload.providerRefundId },
@@ -175,6 +266,20 @@ export class RefundProcessor {
     });
     if (!allocation) throw new ValidationError('provider_refund_not_found', 'Provider refund не найден');
     if (allocation.status === 'succeeded') return;
+    if (allocation.status === 'failed' && isStaleProviderPendingFailure(allocation.lastError)) {
+      // A stale-parked allocation is not a verified failure: the provider
+      // callback stays authoritative. Restore provider_pending so the normal
+      // reconciliation path finalizes or terminal-fails it exactly once.
+      const restored = await this.prisma.refundAllocation.updateMany({
+        where: {
+          id: allocation.id,
+          status: 'failed',
+          lastError: { startsWith: PROVIDER_PENDING_STALE_PREFIX },
+        },
+        data: { status: 'provider_pending', lastError: null },
+      });
+      if (restored.count > 0) allocation.status = 'provider_pending';
+    }
     if (allocation.status === 'failed') {
       const verifiedFailure = await this.prisma.auditEvent.findFirst({
         where: { type: EventType.RefundProviderFailed, refs: { has: allocation.id } },
@@ -235,6 +340,159 @@ export class RefundProcessor {
     await this.processRefund(allocation.refundId, actor);
   }
 
+  /**
+   * LOGIC-007 operator resolve for a refund stuck without a provider callback
+   * (stale `provider_pending`, stale-parked or bare-500 `failed` allocations):
+   * - `confirm` attests the provider executed the refund and finalizes the
+   *   pending allocations locally — compensating payment, accounting entry,
+   *   gift-card restore and completion cascade, exactly as a success webhook
+   *   would, plus a `refund.resolved` ledger event naming the operator.
+   * - `cancel` attests the provider did NOT execute it and rejects the refund,
+   *   releasing the reserved tender capacity without any webhook event.
+   * Idempotent per Idempotency-Key via the replayed `refund.resolved` event.
+   */
+  async resolveRefund(refundId: string, dto: ResolveRefundDto, actor: string, idempotencyKey: string) {
+    if (dto.action !== 'confirm' && dto.action !== 'cancel') {
+      throw new ValidationError('refund_resolve_action_invalid', 'Действие resolve должно быть confirm или cancel');
+    }
+    const reason = dto.reason.trim();
+    const providerReference = dto.providerReference?.trim() || null;
+    const requestHash = createHash('sha256')
+      .update(JSON.stringify({ id: refundId, action: dto.action, reason, providerReference }))
+      .digest('hex');
+    const idempotencyRef = `idempotency:${idempotencyKey}`;
+    const replay = await this.prisma.auditEvent.findFirst({
+      where: { type: EventType.RefundResolved, refs: { has: idempotencyRef } },
+    });
+    if (replay) {
+      if (!replay.refs.includes(refundId)) throw new ConflictError('idempotency_key_reused', 'Ключ уже использован для другого возврата');
+      if ((replay.payload as Record<string, unknown>).requestHash !== requestHash) {
+        throw new ConflictError('idempotency_key_reused', 'Ключ уже использован с другим запросом');
+      }
+      return this.prisma.refund.findUniqueOrThrow({ where: { id: refundId } });
+    }
+    if (dto.action === 'cancel') {
+      return this.resolveCancel(refundId, reason, actor, requestHash, idempotencyRef);
+    }
+    return this.resolveConfirm(refundId, reason, providerReference, actor, requestHash, idempotencyRef);
+  }
+
+  private async resolveConfirm(
+    refundId: string,
+    reason: string,
+    providerReference: string | null,
+    actor: string,
+    requestHash: string,
+    idempotencyRef: string,
+  ) {
+    const refund = await this.prisma.refund.findUnique({
+      where: { id: refundId },
+      include: { allocations: { orderBy: { ordinal: 'asc' } } },
+    });
+    if (!refund) throw new ValidationError('refund_not_found', 'Refund не найден');
+    if (!['processing', 'partially_succeeded', 'failed'].includes(refund.status)) {
+      throw new ConflictError('refund_not_resolvable', `Подтверждение без callback возможно только для зависшего исполнения, текущий статус ${refund.status}`);
+    }
+    const resolvable = refund.allocations.filter((allocation) =>
+      allocation.status === 'provider_pending'
+      || (allocation.status === 'failed' && isStaleProviderPendingFailure(allocation.lastError)));
+    if (resolvable.length === 0) {
+      throw new ConflictError('refund_not_resolvable', 'Нет аллокаций, ожидающих provider callback');
+    }
+    if (resolvable.some((allocation) => !allocation.providerRefundId)) {
+      throw new ConflictError('provider_refund_missing', 'Аллокация не имеет provider refund для подтверждения');
+    }
+    let first = true;
+    for (const allocation of resolvable) {
+      await this.finalize(
+        allocation.id,
+        refundId,
+        actor,
+        allocation.providerRefundId!,
+        allocation.attempts,
+        first ? providerReference : null,
+        'provider_pending',
+        {
+          restoreStaleFailure: true,
+          extraEvents: first ? [{
+            type: EventType.RefundResolved,
+            actor,
+            payload: {
+              refundId,
+              action: 'confirmed',
+              reason,
+              requestHash,
+              allocationIds: resolvable.map((item) => item.id),
+              providerReference,
+              withoutProviderCallback: true,
+            },
+            refs: [refundId, refund.returnId, refund.orderId, idempotencyRef, ...resolvable.map((item) => item.id)],
+          }] : undefined,
+        },
+      );
+      first = false;
+    }
+    await this.processRefund(refundId, actor);
+    return this.prisma.refund.findUniqueOrThrow({ where: { id: refundId } });
+  }
+
+  private async resolveCancel(
+    refundId: string,
+    reason: string,
+    actor: string,
+    requestHash: string,
+    idempotencyRef: string,
+  ) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'refund-resolve:' + idempotencyRef}))::text AS locked`;
+      const replay = await tx.auditEvent.findFirst({
+        where: { type: EventType.RefundResolved, refs: { has: idempotencyRef } },
+      });
+      if (replay) {
+        if (!replay.refs.includes(refundId) || (replay.payload as Record<string, unknown>).requestHash !== requestHash) {
+          throw new ConflictError('idempotency_key_reused', 'Ключ уже использован с другим запросом');
+        }
+        return { result: await tx.refund.findUniqueOrThrow({ where: { id: refundId } }), events: [] };
+      }
+      await tx.$queryRaw`SELECT id FROM "Refund" WHERE id = ${refundId} FOR UPDATE`;
+      const refund = await tx.refund.findUnique({ where: { id: refundId }, include: { allocations: true } });
+      if (!refund) throw new ValidationError('refund_not_found', 'Refund не найден');
+      if (!['processing', 'failed'].includes(refund.status)) {
+        throw new ConflictError('refund_not_resolvable', `Отмена без callback возможна только для зависшего исполнения, текущий статус ${refund.status}`);
+      }
+      if (refund.allocations.some((allocation) => ['processing', 'succeeded'].includes(allocation.status))) {
+        throw new ConflictError('refund_reconciliation_required', 'Есть исполняемая или подтверждённая аллокация; нужна финансовая сверка');
+      }
+      const cancellable = refund.allocations.filter((allocation) =>
+        ['queued', 'provider_pending', 'failed'].includes(allocation.status));
+      if (cancellable.length === 0) {
+        throw new ConflictError('refund_not_resolvable', 'Нет аллокаций для отмены');
+      }
+      await tx.refundAllocation.updateMany({
+        where: { refundId, status: { in: ['queued', 'provider_pending', 'failed'] } },
+        data: { status: 'failed', lastError: `operator_cancelled:${reason}`, lockedAt: null, nextAttemptAt: null },
+      });
+      const result = await tx.refund.update({ where: { id: refundId }, data: { status: 'rejected' } });
+      await tx.return.update({ where: { id: refund.returnId }, data: { status: 'rejected' } });
+      return {
+        result,
+        events: [{
+          type: EventType.RefundResolved,
+          actor,
+          payload: {
+            refundId,
+            action: 'cancelled',
+            reason,
+            requestHash,
+            allocationIds: cancellable.map((allocation) => allocation.id),
+            withoutProviderCallback: true,
+          },
+          refs: [refundId, refund.returnId, refund.orderId, idempotencyRef, ...cancellable.map((allocation) => allocation.id)],
+        }],
+      };
+    });
+  }
+
   private async assertTenderCapacity(allocationId: string, originalPaymentId: string, amount: number) {
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${originalPaymentId} FOR UPDATE`;
@@ -269,6 +527,7 @@ export class RefundProcessor {
     claimAttempt: number,
     providerReference: string | null = null,
     expectedStatus: 'processing' | 'provider_pending' = 'processing',
+    options: { restoreStaleFailure?: boolean; extraEvents?: AuditInput[] } = {},
   ) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Refund" WHERE id = ${refundId} FOR UPDATE`;
@@ -283,6 +542,16 @@ export class RefundProcessor {
       if (!allocation) throw new ValidationError('refund_allocation_not_found', 'Аллокация возврата не найдена');
       if (allocation.status === 'succeeded') return { result: allocation, events: [] };
       if (allocation.attempts !== claimAttempt) return { result: allocation, events: [] };
+      if (options.restoreStaleFailure && allocation.status === 'failed' && isStaleProviderPendingFailure(allocation.lastError)) {
+        // Operator confirm of a stale-parked allocation: restore the expected
+        // state inside this locked transaction, then finalize as usual.
+        await tx.refundAllocation.update({
+          where: { id: allocationId },
+          data: { status: 'provider_pending', lastError: null },
+        });
+        allocation.status = 'provider_pending';
+        allocation.lastError = null;
+      }
       if (allocation.status !== expectedStatus) {
         throw new ConflictError('refund_allocation_not_claimed', 'Аллокация не находится в ожидаемом состоянии исполнения');
       }
@@ -368,6 +637,7 @@ export class RefundProcessor {
           refs: [allocation.refundId, allocation.id, providerRefundId],
         });
       }
+      if (options.extraEvents) events.push(...options.extraEvents);
       const remaining = await tx.refundAllocation.count({ where: { refundId: allocation.refundId, status: { not: 'succeeded' } } });
       if (remaining === 0) await this.completeRefundOnTx(tx, allocation.refund, payment.id, actor, events);
       else await tx.refund.update({ where: { id: allocation.refundId }, data: { status: 'processing' } });

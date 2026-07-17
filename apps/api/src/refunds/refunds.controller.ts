@@ -8,7 +8,7 @@ import { requireActiveStaff } from '../auth/staff-principal';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
-import { CancelRefundDto, CreateRefundDto } from './refunds.dto';
+import { CancelRefundDto, CreateRefundDto, ResolveRefundDto } from './refunds.dto';
 import { RefundProcessor } from './refunds.processor';
 import { RefundsService } from './refunds.service';
 
@@ -63,6 +63,20 @@ export class RefundsController {
   ) {
     const actor = await requireActiveStaff(user, this.staffAuth);
     return this.refunds.cancel(id, dto, actor, requireIdempotencyKey(idempotencyKey));
+  }
+
+  @Post('refunds/:id/resolve')
+  @RequirePermission('refunds', 'manage')
+  @ApiOperation({ summary: 'Resolve a refund stuck without a provider callback: confirm or cancel (owner/admin)' })
+  async resolve(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: ResolveRefundDto,
+  ) {
+    const actor = await requireActiveStaff(user, this.staffAuth);
+    await this.processor.resolveRefund(id, dto, actor, requireIdempotencyKey(idempotencyKey));
+    return this.refunds.get(id);
   }
 }
 
