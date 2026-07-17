@@ -6,7 +6,14 @@ import { som } from '@/lib/format';
 
 type Tab = 'zones' | 'pickup' | 'routes';
 const TABS: { id: Tab; label: string }[] = [{ id: 'zones', label: 'Зоны и слоты' }, { id: 'pickup', label: 'Точки выдачи' }, { id: 'routes', label: 'Маршруты' }];
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
 function localIso(date: string, clock: string) { return new Date(`${date}T${clock}:00+06:00`).toISOString(); }
 function clock(value: string) { return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bishkek' }); }
 
