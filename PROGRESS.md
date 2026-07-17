@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `QA-SERVICE-FK-CLEANUP-021`.
+- Task: make the warranty RBAC integration fixture FK-safe for repeated service/loaner evidence runs.
+- Result: cleanup now removes quarantine cases and return items/aggregates before orders, eliminating stale `InventoryQuarantineCase_returnId` failures without changing runtime behavior.
+- Checks run: isolated `warranty-rbac.e2e-spec.ts` passed `1/1`; `git diff --check`.
+- Next step: rerun the service/loaner hash-bound recorder on the clean commit.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-011-004-EXTENDED-020`.
 - Task: extend cancellation protection to fully settled fulfillment orders and expired reservations.
 - Result: cancellation is blocked whenever settled tenders cover the order total, including `picking` and `courier_assigned`; partial tender orders remain cancellable with compensation. Late provider callbacks after reservation sweep are parked while the order remains confirmed.
