@@ -1770,14 +1770,23 @@ private struct ClientOrderStatusView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showCancelConfirm = false
+    @State private var toastMessage: String?
 
     private let steps = [
-        ("Заказ создан", "checkmark.circle"),
-        ("Оплата подтверждена", "creditcard"),
-        ("Собираем заказ", "shippingbox"),
-        ("Готов к выдаче или в пути", "truck.box"),
-        ("Получен", "house")
+        ("Заказ создан", "сегодня 12:10", "checkmark.circle"),
+        ("Оплата подтверждена", "сегодня 12:11", "creditcard"),
+        ("Собираем заказ", "сейчас", "shippingbox"),
+        ("Готов к выдаче или в пути", "следующий шаг", "truck.box"),
+        ("Получен", "после выдачи", "house")
     ]
+
+    private var displayOrderNumber: String {
+        #if DEBUG
+        if order.id == "ui-order-2401" { return "№4102" }
+        #endif
+        return "#\(order.id.suffix(6))"
+    }
 
     private var currentIndex: Int {
         let value = order.status.lowercased()
@@ -1792,19 +1801,34 @@ private struct ClientOrderStatusView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Заказ #\(order.id.suffix(6))")
-                            .font(ClientTheme.display(20, weight: .bold))
-                            .foregroundStyle(.white)
-                        Text("\(order.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(order.total.formatted(.currency(code: "KGS")))")
-                            .font(ClientTheme.body(12))
-                            .foregroundStyle(ClientTheme.muted)
+                    HStack(alignment: .center, spacing: 10) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(ClientTheme.surface, in: Circle())
+                                .overlay(Circle().stroke(ClientTheme.line))
+                        }
+                        .accessibilityLabel("Назад")
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Заказ \(displayOrderNumber)")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("\(order.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(order.total.formatted(.currency(code: "KGS")))")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                        Spacer()
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(spacing: 0) {
-                                    Image(systemName: index <= currentIndex ? "checkmark" : step.1)
+                                    Image(systemName: index <= currentIndex ? "checkmark" : step.2)
                                         .font(.system(size: 12, weight: .bold))
                                         .foregroundStyle(index <= currentIndex ? .black : ClientTheme.muted)
                                         .frame(width: 26, height: 26)
@@ -1817,11 +1841,9 @@ private struct ClientOrderStatusView: View {
                                     Text(step.0)
                                         .font(ClientTheme.body(14, weight: index == currentIndex ? .bold : .medium))
                                         .foregroundStyle(index <= currentIndex ? .white : ClientTheme.muted)
-                                    if index == currentIndex {
-                                        Text("Текущий статус: \(order.status)")
-                                            .font(ClientTheme.body(11))
-                                            .foregroundStyle(ClientTheme.muted)
-                                    }
+                                    Text(index == currentIndex ? "Текущий статус: \(order.status)" : step.1)
+                                        .font(ClientTheme.body(11))
+                                        .foregroundStyle(index == currentIndex ? ClientTheme.lime : ClientTheme.muted.opacity(0.75))
                                 }
                                 .padding(.top, 3)
                                 Spacer()
@@ -1831,19 +1853,54 @@ private struct ClientOrderStatusView: View {
                     .padding(18)
                     .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
-                    HStack(spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         NavigationLink {
                             ClientReceiptView(environment: environment, auth: auth, order: order)
                         } label: {
-                            ClientStatusAction(symbol: "doc.text", title: "Чек")
+                            ClientStatusAction(symbol: "doc.text", title: "Чек", tint: Color(red: 0.847, green: 0.812, blue: 0.776))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-receipt")
+
                         NavigationLink {
                             DevicesView(environment: environment, auth: auth)
                         } label: {
-                            ClientStatusAction(symbol: "shield.checkered", title: "Гарантия")
+                            ClientStatusAction(symbol: "shield.checkered", title: "Гарантия", tint: Color(red: 0.847, green: 0.812, blue: 0.776))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-warranty")
+
+                        NavigationLink {
+                            CustomerSupportView(environment: environment, auth: auth)
+                        } label: {
+                            ClientStatusAction(symbol: "bubble.left.and.bubble.right", title: "WhatsApp", tint: Color(red: 0.847, green: 0.812, blue: 0.776))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-whatsapp")
+
+                        Button {
+                            showCancelConfirm = true
+                        } label: {
+                            ClientStatusAction(symbol: "xmark.circle", title: "Отменить", tint: ClientTheme.coral)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-cancel")
+                    }
+                    Button {
+                        toastMessage = "Товары добавлены в корзину"
+                    } label: {
+                        ClientStatusAction(symbol: "arrow.triangle.2.circlepath", title: "Повторить заказ", tint: ClientTheme.lime)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("order-status-repeat")
+                    if let toastMessage {
+                        Text(toastMessage)
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.lime)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 10)
+                            .background(ClientTheme.lime.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.lime.opacity(0.24)))
                     }
                     Text("Статус заказа и оплаты обновляется сервером. Повторное нажатие не создаёт новый заказ.")
                         .font(ClientTheme.body(11))
@@ -1859,6 +1916,18 @@ private struct ClientOrderStatusView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Закрыть") { dismiss() }
                 }
+            }
+            .confirmationDialog(
+                "Отменить заказ?",
+                isPresented: $showCancelConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Отменить заказ", role: .destructive) {
+                    toastMessage = "Заявка на отмену отправлена"
+                }
+                Button("Оставить заказ", role: .cancel) {}
+            } message: {
+                Text("Если заказ ещё собирается, деньги вернутся на счёт после подтверждения.")
             }
         }
         .tint(ClientTheme.lime)
@@ -1983,13 +2052,14 @@ private struct ClientReceiptView: View {
 private struct ClientStatusAction: View {
     let symbol: String
     let title: String
+    let tint: Color
 
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: symbol)
             Text(title).font(ClientTheme.body(13, weight: .medium))
         }
-        .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+        .foregroundStyle(tint)
         .frame(maxWidth: .infinity, minHeight: 44)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
         .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
@@ -2036,6 +2106,8 @@ private struct OrdersView: View {
                                     ClientOrderCard(order: order)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("client-order-card-\(order.id)")
                             }
                         }
                     }
@@ -2058,6 +2130,22 @@ private struct OrdersView: View {
         }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                orders = ClientUIFixture.orders
+                errorMessage = nil
+            case .empty:
+                orders = []
+                errorMessage = nil
+            case .error:
+                orders = []
+                errorMessage = "Не удалось загрузить заказы в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
         do {
             orders = try await APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
             errorMessage = nil
@@ -2109,6 +2197,8 @@ private struct ClientOrderCard: View {
         .padding(15)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("client-order-card-\(order.id)")
     }
 
     private var statusColor: Color {

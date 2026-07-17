@@ -2855,6 +2855,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-013`.
+- Task: align native Client order status/details with the `AliStore Клиент App 2.0` handoff.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the signed-in order detail flow now renders the prototype `Заказ №4102` shell with back affordance, date/total subtitle, timed progress timeline, receipt/warranty/WhatsApp/cancel/reorder action grid and repeat-order confirmation state. Debug-only signed-in order fixtures were added to `OrdersView` so the simulator acceptance path is deterministic while live mode keeps `GET /orders/mine`.
+- Checks run: targeted `AliStoreClientUITests/testSignedInOrderStatusUsesPrototypeActions` passed; `npm run ios:visual` passed with 16 PNG attachments including `client-order-status`; full `npm run ios:ui` passed Client `21/21`, Staff `8/8`, Courier `1/1`, POS `1/1`.
+- Outcome: Client order status visual parity is accepted at local simulator software level. App Store readiness remains blocked by owner pixel sign-off, production signing/provisioning, TestFlight/App Store Connect submission, and physical-device Face ID/APNs/camera/offline smoke.
+- Next step: continue native release blockers or move to Android Client parity / ERP-CMS integration while external device and store credentials remain outside this repo.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-004`.
 - Task: align native Client notifications with the `AliStore Клиент App 2.0` handoff while preserving the customer-owned notification API contract.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.

@@ -102,6 +102,28 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Офлайн"].exists)
     }
 
+    func testSignedInOrderStatusUsesPrototypeActions() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Мои заказы"].tap()
+        XCTAssertTrue(app.navigationBars["Мои заказы"].waitForExistence(timeout: 5))
+        let orderCard = app.descendants(matching: .any)["client-order-card-ui-order-2401"]
+        XCTAssertTrue(orderCard.waitForExistence(timeout: 5))
+
+        orderCard.tap()
+        XCTAssertTrue(app.staticTexts["Заказ №4102"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Заказ создан"].exists)
+        XCTAssertTrue(app.staticTexts["Оплата подтверждена"].exists)
+        XCTAssertTrue(app.staticTexts["Собираем заказ"].exists)
+        XCTAssertTrue(app.buttons["order-status-receipt"].exists)
+        XCTAssertTrue(app.buttons["order-status-warranty"].exists)
+        XCTAssertTrue(app.buttons["order-status-whatsapp"].exists)
+        XCTAssertTrue(app.buttons["order-status-cancel"].exists)
+        XCTAssertTrue(app.buttons["order-status-repeat"].exists)
+
+        app.buttons["order-status-repeat"].tap()
+        XCTAssertTrue(app.staticTexts["Товары добавлены в корзину"].waitForExistence(timeout: 5))
+    }
+
     func testSignedInAccountFixturesRenderLoyaltyAndReturns() {
         let loyaltyApp = launchSignedInAccount()
         loyaltyApp.buttons["account-loyalty-card"].tap()
@@ -332,6 +354,16 @@ final class AliStoreClientUITests: XCTestCase {
 
         let account = launchSignedInAccount()
         capture(account, named: "client-account")
+
+        let orderStatus = launchSignedInAccount()
+        orderStatus.staticTexts["Мои заказы"].tap()
+        XCTAssertTrue(orderStatus.navigationBars["Мои заказы"].waitForExistence(timeout: 5))
+        let orderCard = orderStatus.descendants(matching: .any)["client-order-card-ui-order-2401"]
+        XCTAssertTrue(orderCard.waitForExistence(timeout: 5))
+        orderCard.tap()
+        XCTAssertTrue(orderStatus.staticTexts["Заказ №4102"].waitForExistence(timeout: 5))
+        XCTAssertTrue(orderStatus.buttons["order-status-repeat"].waitForExistence(timeout: 5))
+        capture(orderStatus, named: "client-order-status")
 
         let notifications = launchSignedInAccount()
         notifications.buttons["Уведомления"].tap()
