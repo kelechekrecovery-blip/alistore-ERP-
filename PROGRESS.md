@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-004-RACE-PARK-023`.
+- Task: park provider callbacks that race a cancellation or reservation sweep.
+- Result: the webhook path now catches the locked payment guard, parks only non-demo orders that are no longer payable, and preserves the existing refund path; demo orders remain blocked from payment creation.
+- Checks run: isolated `cancel-compensation.e2e-spec.ts` passed `6/6`; `git diff --check`.
+- Next step: commit the race-safe callback slice and retry service/loaner evidence.
+
+## 2026-07-18
+
 - Iteration ID: `QA-SERVICE-FK-CLEANUP-022`.
 - Task: remove the remaining valuation-reversal FK dependency from the warranty/service fixture reset.
 - Checks run: isolated `warranty-rbac.e2e-spec.ts` passed `1/1`; `git diff --check`.

@@ -187,13 +187,25 @@ export class PaymentIntentsService {
     }
     const order = await this.prisma.order.findUnique({ where: { id: verified.orderId } });
     if (!order) throw new ValidationError('order_not_found', `Заказ ${verified.orderId} не найден`);
-    if (!['reserved', 'awaiting_payment'].includes(order.status)) {
+    // Money for an order that can no longer take it (cancelled, or swept back to an
+    // unreserved state) is parked with a refund path instead of looping a bare 409.
+    // Demo orders never create payments — they keep hitting the pay() guard below.
+    if (!order.isDemo && !['reserved', 'awaiting_payment'].includes(order.status)) {
       return this.parkCancelledOrderPayment(order.id, verified, verified.actor ?? `provider:${verified.method}`);
     }
-    return this.payments.pay(
-      { orderId: verified.orderId, method: verified.method, amount: verified.amount, txnId: verified.txnId },
-      verified.actor ?? `provider:${verified.method}`,
-    );
+    try {
+      return await this.payments.pay(
+        { orderId: verified.orderId, method: verified.method, amount: verified.amount, txnId: verified.txnId },
+        verified.actor ?? `provider:${verified.method}`,
+      );
+    } catch (error) {
+      // The order left a payable state between the pre-check and the locked pay()
+      // (cancel or reservation sweep) — park the money instead of a bare 409.
+      if (!order.isDemo && error instanceof ConflictError && error.code === 'payment_without_reservation') {
+        return this.parkCancelledOrderPayment(order.id, verified, verified.actor ?? `provider:${verified.method}`);
+      }
+      throw error;
+    }
   }
 
   private async parkCancelledOrderPayment(
