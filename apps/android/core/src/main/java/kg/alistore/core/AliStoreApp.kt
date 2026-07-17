@@ -92,12 +92,14 @@ fun AliStoreApp(
 @Composable
 private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision: Long) {
   val context = LocalContext.current.applicationContext
+  val localStateStore = remember { ClientLocalStateStore(context, "client") }
+  val restoredLocalState = remember(localStateStore) { localStateStore.read() }
   var selected by remember { mutableStateOf(0) }
   var products by remember { mutableStateOf<List<Product>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
-  var favorites by remember { mutableStateOf(setOf<String>()) }
-  var cart by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+  var favorites by remember { mutableStateOf(restoredLocalState.favorites) }
+  var cart by remember { mutableStateOf(restoredLocalState.cart) }
   var authState by remember { mutableStateOf<AuthState>(AuthState.Restoring) }
   var accountRoute by remember { mutableStateOf<String?>(null) }
   var productRoute by remember { mutableStateOf<String?>(null) }
@@ -108,10 +110,17 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
   }
   val quickUnlock = remember { QuickUnlockStore(context, "client") }
   val logout: () -> Unit = { quickUnlock.clear(); authState = authManager.forceLogout() }
+  fun persistLocalState(nextFavorites: Set<String> = favorites, nextCart: Map<String, Int> = cart) {
+    localStateStore.write(ClientLocalState(nextFavorites, nextCart))
+  }
   val addToCart: (String) -> Unit = { id ->
     products.firstOrNull { it.id == id }?.let { product ->
       val current = cart[id] ?: 0
-      if (product.availableUnits > current) cart = cart + (id to current + 1)
+      if (product.availableUnits > current) {
+        val nextCart = cart + (id to current + 1)
+        cart = nextCart
+        persistLocalState(nextCart = nextCart)
+      }
     }
   }
   val tabs = listOf(
@@ -170,16 +179,35 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
           onOpenProduct = { productRoute = it },
           modifier = Modifier.padding(padding),
         )
-        selected == 0 -> ClientHome(apiBaseUrl, products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
-        selected == 1 -> ClientCatalogScreen(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding), apiBaseUrl)
-        selected == 2 -> ProductGrid(apiBaseUrl, "Избранное", products.filter { it.id in favorites }, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
+        selected == 0 -> ClientHome(apiBaseUrl, products, favorites, cart.keys, { id ->
+          val nextFavorites = favorites.toggle(id)
+          favorites = nextFavorites
+          persistLocalState(nextFavorites = nextFavorites)
+        }, addToCart, { productRoute = it }, Modifier.padding(padding))
+        selected == 1 -> ClientCatalogScreen(products, favorites, cart.keys, { id ->
+          val nextFavorites = favorites.toggle(id)
+          favorites = nextFavorites
+          persistLocalState(nextFavorites = nextFavorites)
+        }, addToCart, { productRoute = it }, Modifier.padding(padding), apiBaseUrl)
+        selected == 2 -> ProductGrid(apiBaseUrl, "Избранное", products.filter { it.id in favorites }, favorites, cart.keys, { id ->
+          val nextFavorites = favorites.toggle(id)
+          favorites = nextFavorites
+          persistLocalState(nextFavorites = nextFavorites)
+        }, addToCart, { productRoute = it }, Modifier.padding(padding))
         selected == 3 -> ClientCheckout(
           apiBaseUrl = apiBaseUrl,
           products = products,
           cart = cart,
           authState = authState,
-          onQuantity = { id, quantity -> cart = if (quantity <= 0) cart - id else cart + (id to quantity) },
-          onClear = { cart = emptyMap() },
+          onQuantity = { id, quantity ->
+            val nextCart = if (quantity <= 0) cart - id else cart + (id to quantity)
+            cart = nextCart
+            persistLocalState(nextCart = nextCart)
+          },
+          onClear = {
+            cart = emptyMap()
+            persistLocalState(nextCart = emptyMap())
+          },
           onLogin = { selected = 4 },
           modifier = Modifier.padding(padding),
           authManager = authManager,

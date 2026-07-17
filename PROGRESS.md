@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-CLIENT-STATE-001
+
+- Iteration ID: `ANDROID-CLIENT-STATE-001`.
+- Task: preserve Android Client favorites and cart quantities across process recreation without making local data authoritative for money or stock.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/ClientLocalState.kt`, `AliStoreApp.kt`, `apps/android/core/src/androidTest/java/kg/alistore/core/ClientLocalStateTest.kt`, `BACKLOG.md`.
+- Result: Client state is restored from an application-scoped JSON-backed local store, writes are deterministic, invalid/non-positive quantities are discarded, and catalog/cart mutations persist immediately. Checkout still caps against server-derived availability and server-owned prices; logout and payment flows do not treat local state as proof of authorization or payment.
+- Checks run: `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 30 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `npm run android:build` passed all four debug APKs; `git diff --check`.
+- Acceptance: accepted for the local Android Client persistence software vertical. The emulator test recreates the store and verifies deterministic favorites/cart recovery and invalid-quantity filtering; physical process-restart/device smoke, storage corruption recovery and complete 17-screen parity remain open.
+- Next step: continue the next locally unblocked Android Staff/Courier/POS or ERP vertical while keeping physical, provider and design-corpus gates explicit.
+
 # 2026-07-17 — ANDROID-CLIENT-PAYMENT-RETURN-001
 
 - Iteration ID: `ANDROID-CLIENT-PAYMENT-RETURN-001`.
