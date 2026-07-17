@@ -348,6 +348,7 @@ export class OrdersService {
             deliveryFee: canonical.deliveryFee,
             promoCode: appliedPromotion?.code ?? canonical.promoCode,
             promoDiscount,
+            piiConsentAt: dto.piiConsent ? new Date() : null,
             taxBaseAmount: initialTax.taxBaseAmount,
             taxAmount: initialTax.taxAmount,
             total: baseTotal,

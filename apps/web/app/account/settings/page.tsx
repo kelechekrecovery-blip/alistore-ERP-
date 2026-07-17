@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { fetchMySettings, updateMySettings, type CustomerSettings } from '@/lib/api';
+import { deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
 
 export default function SettingsPage() {
   const { user, authed, logout } = useAuth();
@@ -15,6 +15,9 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const reload = useCallback(() => {
     if (!user) return Promise.resolve();
@@ -36,6 +39,37 @@ export default function SettingsPage() {
       setError(value instanceof Error ? value.message : 'Не удалось сохранить настройки');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function downloadMyData() {
+    setExporting(true); setError('');
+    try {
+      const data = await authed((token) => getJson<unknown>('/customers/me/export', token));
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `alistore-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Не удалось выгрузить данные');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function deleteAccount() {
+    setDeleting(true); setError('');
+    try {
+      await authed((token) => deleteAuthJson<{ id: string; deleted: boolean }>('/customers/me', {}, token));
+      await logout();
+      router.push('/');
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Не удалось удалить аккаунт');
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   }
 
@@ -77,6 +111,53 @@ export default function SettingsPage() {
           <span>Сессия</span>
           <span>обновляется автоматически</span>
         </div>
+      </div>
+
+      <div className="mt-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <div className="text-sm font-semibold">Мои данные</div>
+        <div className="mt-1 text-[12px] text-[#8A7F76]">Выгрузка и удаление персональных данных.</div>
+        <button
+          type="button"
+          disabled={exporting || !user}
+          onClick={downloadMyData}
+          className="mt-3 w-full rounded-[8px] border border-[#2E2822] bg-[#16130F] py-3 text-sm font-semibold disabled:text-[#6E645C]"
+        >
+          {exporting ? 'Готовим файл…' : 'Скачать мои данные'}
+        </button>
+        {!confirmingDelete ? (
+          <button
+            type="button"
+            disabled={!user}
+            onClick={() => setConfirmingDelete(true)}
+            className="mt-2 w-full rounded-[8px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 py-3 text-sm font-semibold text-[#FF8A7A] disabled:opacity-50"
+          >
+            Удалить аккаунт
+          </button>
+        ) : (
+          <div className="mt-2 rounded-[8px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-3">
+            <div className="text-[13px] text-[#FF8A7A]">
+              Профиль, адреса и сессии будут удалены без восстановления. Заказы и история покупок останутся у магазина — они нужны для бухгалтерии.
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmingDelete(false)}
+                className="rounded-[8px] border border-[#2E2822] bg-[#16130F] py-2.5 text-[13px] font-semibold"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={deleteAccount}
+                className="rounded-[8px] bg-[#FF8A7A] py-2.5 text-[13px] font-bold text-[#221E19] disabled:opacity-50"
+              >
+                {deleting ? 'Удаляем…' : 'Удалить навсегда'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <button

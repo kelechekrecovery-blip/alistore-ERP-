@@ -101,7 +101,7 @@ export class ShiftsController {
     @Body() dto: CloseShiftDto,
   ) {
     const staffId = await requireActiveStaff(user, this.staffAuth);
-    return this.shifts.close(id, dto, staffId, idempotencyKey);
+    return this.shifts.close(id, dto, staffId, idempotencyKey, user.role);
   }
 
   @Post(':id/handover')

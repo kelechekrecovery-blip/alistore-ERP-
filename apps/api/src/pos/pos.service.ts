@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Payment } from '@prisma/client';
 import { createHash } from 'crypto';
 import { CustomersService } from '../customers/customers.service';
 import { ShiftsService } from '../shifts/shifts.service';
@@ -10,7 +11,7 @@ import { APPROVAL_THRESHOLDS } from '../rbac/permissions';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PosSaleDto } from './pos.dto';
-import { evaluateMarginControl, MarginControlResult } from './margin-control';
+import { evaluateMarginControl, MarginControlResult, saleTotal } from './margin-control';
 
 /** Walk-in retail customer — POS sales without a named buyer attach here. */
 const WALKIN_PHONE = '+000000000000';
@@ -107,14 +108,18 @@ export class PosService {
     if (txnId) {
       const existing = await this.payments.findByTxnId(txnId);
       if (existing?.orderId) {
-        return this.completedFromExistingPayment(existing.orderId, existing.shiftId);
+        await this.assertReplayCompatible(existing.orderId, dto);
+        const replay = await this.completedFromExistingPayment(existing.orderId, existing.shiftId);
+        return dto.clientSaleId ? replay : { ...replay, dedupedBy: 'fingerprint' as const };
       }
       const existingZeroOrder = await this.prisma.order.findUnique({
         where: { idempotencyKey: txnId },
         select: { id: true, status: true, total: true, posShiftId: true },
       });
       if (existingZeroOrder?.status === 'paid' && existingZeroOrder.total === 0) {
-        return this.completedFromExistingPayment(existingZeroOrder.id, existingZeroOrder.posShiftId);
+        await this.assertReplayCompatible(existingZeroOrder.id, dto);
+        const replay = await this.completedFromExistingPayment(existingZeroOrder.id, existingZeroOrder.posShiftId);
+        return dto.clientSaleId ? replay : { ...replay, dedupedBy: 'fingerprint' as const };
       }
     }
 
@@ -461,6 +466,32 @@ export class PosService {
       imeis: order.items.filter((i) => i.imei).map((i) => i.imei as string),
       idempotent: true,
     };
+  }
+
+  /** Never return a receipt for a different cart or another cashier's key. */
+  private async assertReplayCompatible(orderId: string, dto: PosSaleDto) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        items: { select: { sku: true, qty: true, price: true }, orderBy: { lineNumber: 'asc' } },
+        posShift: { select: { staffId: true } },
+      },
+    });
+    if (!order) throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+    if (order.posShift?.staffId && order.posShift.staffId !== dto.staffId) {
+      throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже принадлежит другому кассиру');
+    }
+    const requested = dto.lines
+      .map((line) => `${line.sku}:${line.qty}:${line.price}`)
+      .sort()
+      .join('|');
+    const existing = order.items
+      .map((line) => `${line.sku}:${line.qty}:${line.price}`)
+      .sort()
+      .join('|');
+    if (requested !== existing) {
+      throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже связан с другим составом корзины');
+    }
   }
 }
 

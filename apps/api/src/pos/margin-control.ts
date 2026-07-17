@@ -28,13 +28,19 @@ export interface MarginControlResult {
   fingerprint: string;
 }
 
+/** Sale total after the percentage discount; pure, so the POS replay check reuses it. */
+export function saleTotal(lines: Array<{ price: number; qty: number }>, discountPct: number): number {
+  const gross = lines.reduce((sum, line) => sum + line.price * line.qty, 0);
+  return Math.round(gross * (1 - discountPct / 100));
+}
+
 export function evaluateMarginControl(
   lines: MarginControlLine[],
   discountPct: number,
   minMargin: number,
 ): MarginControlResult {
   const gross = lines.reduce((sum, line) => sum + line.price * line.qty, 0);
-  const total = Math.round(gross * (1 - discountPct / 100));
+  const total = saleTotal(lines, discountPct);
   const discountAmount = gross - total;
   const margins = lines.map((line) => Math.round(line.price * (1 - discountPct / 100)) - line.cost);
   const worstMargin = margins.length ? Math.min(...margins) : 0;

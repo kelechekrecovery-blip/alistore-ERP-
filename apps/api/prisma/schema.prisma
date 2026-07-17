@@ -956,6 +956,7 @@ model Order {
   taxBaseAmount            Int                             @default(0)
   taxAmount                Int                             @default(0)
   total                    Int
+  piiConsentAt             DateTime? // согласие с офертой и обработкой ПДн на витрине
   items                    OrderItem[]
   bundleAllocations        OrderBundleAllocation[]
   quantityAllocations      OrderQuantityAllocation[]

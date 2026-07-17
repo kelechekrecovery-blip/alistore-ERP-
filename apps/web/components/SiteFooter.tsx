@@ -9,7 +9,7 @@ export function SiteFooter() {
   const point = storefront?.stores[0];
   return (
     <footer className="mt-24 border-t border-[#2E2822] bg-[#16130F]">
-      <div className="mx-auto grid w-[min(1200px,92vw)] gap-10 py-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid w-[min(1200px,92vw)] gap-10 py-12 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
         <div>
           <Link href="/" className="flex items-center gap-3">
             <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-coral font-display font-bold text-white">A</span>
@@ -19,6 +19,7 @@ export function SiteFooter() {
         </div>
         <FooterColumn title="Покупателям" links={[["Каталог", "/catalog"], ["Trade-in", "/trade-in"], ["Гарантия", "/warranty"], ["Поддержка", "/support"]]} />
         <FooterColumn title="Аккаунт" links={[["Кабинет", "/account"], ["Заказы", "/account"], ["Избранное", "/favorites"], ["Бонусы", "/account/bonuses"]]} />
+        <FooterColumn title="Документы" links={[["Политика конфиденциальности", "/privacy"], ["Публичная оферта", "/oferta"]]} />
         <div>
           <h3 className="text-sm font-semibold text-white">Контакты</h3>
           {point && <><p className="mt-4 text-sm text-[#D8CFC6]">{point.address}</p><p className="mt-2 text-sm text-[#D8CFC6]">{point.hours}</p></>}

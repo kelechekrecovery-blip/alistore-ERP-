@@ -77,9 +77,10 @@ export function payOrder(input: {
   amount: number;
   txnId?: string;
   giftCardCode?: string;
-}, authorization: { accessToken?: string; guestCapability?: string }): Promise<PaymentConfirmResult> {
-  if (authorization.accessToken) return postAuthJson('/payments', input, authorization.accessToken);
-  return postJson('/payments', input, { 'x-guest-capability': authorization.guestCapability ?? '' });
+}, authorization: { accessToken?: string; guestCapability?: string }, idempotencyKey?: string): Promise<PaymentConfirmResult> {
+  const headers = idempotencyKey ? { 'idempotency-key': idempotencyKey } : undefined;
+  if (authorization.accessToken) return postAuthJson('/payments', input, authorization.accessToken, headers);
+  return postJson('/payments', input, { 'x-guest-capability': authorization.guestCapability ?? '', ...(headers ?? {}) });
 }
 
 export function requestReturnRefund(

@@ -122,17 +122,31 @@ export class ShiftsService {
   }
 
   /**
+   * Owner-or-manager guard shared by close() and handover(): only the shift owner
+   * or an owner/admin role may run the mutation (LOGIC-005).
+   */
+  private assertOwnerOrManager(shiftStaffId: string, actor: string, actorRole: string | undefined) {
+    const manager = actorRole === Role.owner || actorRole === Role.admin;
+    if (shiftStaffId !== actor && !manager) throw new ConflictError('shift_handover_owner_mismatch', 'Можно передать только свою кассовую смену');
+  }
+
+  /**
    * Close a shift with reconciliation. diff = closeCash − expected. A non-zero diff
    * without a reason is rejected (422); with a reason it is recorded and a
    * cash.shortage event is appended.
    */
-  async close(shiftId: string, dto: CloseShiftDto, actor: string, idempotencyKey?: string) {
+  async close(shiftId: string, dto: CloseShiftDto, actor: string, idempotencyKey?: string, actorRole?: string) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-close:' + shiftId}))::text AS locked`;
       await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
       const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
       if (!shift) {
         throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
+      }
+      // The controller always passes the staff role; legacy service-level callers
+      // without role context keep the previous owner-blind behavior.
+      if (actorRole !== undefined) {
+        this.assertOwnerOrManager(shift.staffId, actor, actorRole);
       }
       if (shift.closedAt) {
         if (idempotencyKey && shift.closeIdempotencyKey === idempotencyKey) {
@@ -226,8 +240,7 @@ export class ShiftsService {
       if (!source) throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
       if (source.closedAt) throw new ConflictError('shift_already_closed', 'Закрытую смену нельзя передать');
       await this.assertNoPendingCashRefunds(tx, source.id);
-      const manager = actorRole === Role.owner || actorRole === Role.admin;
-      if (source.staffId !== actor && !manager) throw new ConflictError('shift_handover_owner_mismatch', 'Можно передать только свою кассовую смену');
+      this.assertOwnerOrManager(source.staffId, actor, actorRole);
       if (source.staffId === dto.toStaffId) throw new ValidationError('shift_handover_same_staff', 'Получатель должен отличаться от передающего');
       const target = await tx.staffUser.findUnique({ where: { id: dto.toStaffId } });
       if (!target?.active || !['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'].includes(target.role)) throw new ValidationError('shift_handover_target_invalid', 'Получатель неактивен или не может работать с кассой');

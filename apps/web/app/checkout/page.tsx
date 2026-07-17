@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCart } from '@/lib/cart';
+import { checkoutOrderKey, paymentIntentKey, type CheckoutSnapshot } from '@/lib/checkout-idempotency';
 import { useAuth } from '@/lib/auth';
 import { som } from '@/lib/format';
 import {
@@ -94,7 +95,26 @@ export default function CheckoutPage() {
   const [giftCard, setGiftCard] = useState<GiftCardView | null>(null);
   const [giftError, setGiftError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [piiConsent, setPiiConsent] = useState(false);
   const [done, setDone] = useState<DoneState | null>(null);
+  const checkoutAttempt = useRef<number | null>(null);
+
+  function currentCheckoutAttempt() {
+    if (checkoutAttempt.current !== null) return checkoutAttempt.current;
+    try {
+      const stored = Number.parseInt(localStorage.getItem('alistore.checkout.attempt.v1') ?? '0', 10);
+      checkoutAttempt.current = Number.isFinite(stored) && stored >= 0 ? stored : 0;
+    } catch {
+      checkoutAttempt.current = 0;
+    }
+    return checkoutAttempt.current;
+  }
+
+  function rotateCheckoutAttempt() {
+    const next = currentCheckoutAttempt() + 1;
+    checkoutAttempt.current = next;
+    try { localStorage.setItem('alistore.checkout.attempt.v1', String(next)); } catch { /* storage is optional */ }
+  }
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
   useEffect(() => {
@@ -184,6 +204,7 @@ export default function CheckoutPage() {
   }
 
   async function place() {
+    if (!piiConsent) return;
     setBusy(true); setError(null);
     try {
       const orderInput = {
@@ -201,9 +222,21 @@ export default function CheckoutPage() {
         promoCode: promoCode ?? undefined,
         attribution: loadAttribution() ?? undefined,
         loyaltyPoints: user ? bonusDiscount : undefined,
+        piiConsent,
         items: items.map((i) => ({ sku: i.sku, qty: i.qty, price: i.price })),
       } as const;
-      const orderKey = crypto.randomUUID();
+      const snapshot: CheckoutSnapshot = {
+        customer: user?.customerId ?? phone.trim(),
+        fulfillmentType: delivery,
+        storePointId: pickupPoint,
+        deliveryAddress: deliveryAddress.trim(),
+        deliveryZoneId: deliveryZoneId,
+        deliverySlotId: deliverySlotId,
+        payableTotal: payable,
+        attempt: currentCheckoutAttempt(),
+        items: items.map((item) => ({ sku: item.sku, qty: item.qty, price: item.price })),
+      };
+      const orderKey = await checkoutOrderKey(snapshot);
       let guestCapability: string | null = null;
       let order: CreatedOrder;
       if (user) {
@@ -226,18 +259,20 @@ export default function CheckoutPage() {
           giftCardCode: giftCard.code,
         } as const;
         const paid = user
-          ? await authed((token) => payOrder(giftPayment, { accessToken: token }))
-          : await payOrder(giftPayment, { guestCapability: guestCapability! });
+          ? await authed((token) => payOrder(giftPayment, { accessToken: token }, paymentIntentKey(order.id, 'gift_card', serverGiftAmount)))
+          : await payOrder(giftPayment, { guestCapability: guestCapability! }, paymentIntentKey(order.id, 'gift_card', serverGiftAmount));
         currentOrder = { ...order, status: paid.order?.status ?? order.status };
       }
       if (serverDue === 0) {
         setDone({ order: currentOrder, paid: currentOrder.status === 'paid' });
         clear();
+        rotateCheckoutAttempt();
         return;
       }
       if (payment === 'cash') {
         setDone({ order: currentOrder });
         clear();
+        rotateCheckoutAttempt();
         return;
       }
       const intentInput = {
@@ -245,7 +280,7 @@ export default function CheckoutPage() {
         method: payment,
         amount: serverDue,
       } as const;
-      const intentKey = crypto.randomUUID();
+      const intentKey = paymentIntentKey(order.id, payment, serverDue);
       const intent = user
         ? await authed((token) => createMyPaymentIntent(intentInput, token, intentKey))
         : await createPaymentIntent({ ...intentInput, actor: 'web_checkout' }, guestCapability!, intentKey);
@@ -267,6 +302,7 @@ export default function CheckoutPage() {
       });
       setDone({ ...done, order: { ...done.order, status: res.order?.status ?? 'paid' }, paid: true });
       clear();
+      rotateCheckoutAttempt();
     } catch {
       setError('Платёж не подтверждён. Попробуйте ещё раз.');
     } finally {
@@ -471,8 +507,22 @@ export default function CheckoutPage() {
               {giftAmount > 0 && <Row k={`Подарочная ${giftCard?.code ?? ''}`} v={`−${som(giftAmount)}`} />}
               <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span></div>
             </div>
+            <label className="checkout-surface mt-3 flex cursor-pointer items-start gap-3 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <input
+                type="checkbox"
+                checked={piiConsent}
+                onChange={(event) => setPiiConsent(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
+              />
+              <span className="text-[13px] leading-5 text-[#D8CFC6]">
+                Согласен с условиями{' '}
+                <Link href="/oferta" target="_blank" rel="noreferrer" className="text-lime underline">публичной оферты</Link>
+                {' '}и{' '}
+                <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
+              </span>
+            </label>
             {error && <p className="mt-3 text-sm text-[#FF8A7A]">{error}</p>}
-            <button type="button" disabled={busy} onClick={place} className="checkout-primary mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
+            <button type="button" disabled={busy || !piiConsent} onClick={place} className="checkout-primary mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
           </>
         )}
       </div>

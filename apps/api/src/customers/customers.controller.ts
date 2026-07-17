@@ -97,6 +97,27 @@ export class CustomersController {
     return this.customers.updateSettings(user.customerId, dto);
   }
 
+  @ApiOperation({ summary: 'Export all personal data as one JSON document (self-service)' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Profile, addresses, orders, loyalty, coupons and notification preferences.' })
+  @Get('me/export')
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  exportData(@CurrentUser() user: AuthPrincipal) {
+    this.assertCustomer(user);
+    return this.customers.exportData(user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Delete the account: anonymize PII and revoke sessions; orders stay for accounting' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Account anonymized; all sessions revoked.' })
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  deleteAccount(@CurrentUser() user: AuthPrincipal) {
+    this.assertCustomer(user);
+    return this.customers.deleteAccount(user.customerId);
+  }
+
   @ApiOperation({ summary: 'Devices the authenticated customer bought (IMEI + warranty)' })
   @ApiBearerAuth()
   @ApiOkResponse({ description: "The current customer's devices." })

@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -102,6 +103,14 @@ export class CreateOrderDto {
   @IsInt()
   @Min(0)
   loyaltyPoints?: number;
+
+  @ApiPropertyOptional({
+    description: 'Storefront consent to the public offer and personal-data processing; when true the service stamps piiConsentAt.',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  piiConsent?: boolean;
 
   @ApiProperty({ type: () => [OrderItemDto] })
   @IsArray()

@@ -60,6 +60,7 @@ export async function createOrder(input: {
   promoCode?: string;
   attribution?: Pick<StoredAttribution, 'first' | 'last'>;
   loyaltyPoints?: number;
+  piiConsent?: boolean;
   items: OrderLine[];
 }, guestCapability: string, idempotencyKey: string): Promise<CreatedOrder> {
   const res = await fetch(`${API_BASE}/orders`, {
@@ -88,6 +89,7 @@ export async function createMyOrder(input: {
   promoCode?: string;
   attribution?: Pick<StoredAttribution, 'first' | 'last'>;
   loyaltyPoints?: number;
+  piiConsent?: boolean;
   items: OrderLine[];
 }, accessToken: string, idempotencyKey: string): Promise<CreatedOrder> {
   return postAuthJson('/orders/mine', input, accessToken, { 'idempotency-key': idempotencyKey });

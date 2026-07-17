@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import type { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { ConflictError } from '../common/errors';
-import type { CustomerAddress } from '@prisma/client';
+import type { Customer, CustomerAddress } from '@prisma/client';
 import { CreateCustomerAddressDto, UpdateCustomerAddressDto, UpdateCustomerSettingsDto, UpsertCustomerDto } from './customers.dto';
 import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 import { warrantyCoverage } from './warranty-coverage';
@@ -177,6 +178,80 @@ export class CustomersService {
   }
 
   /**
+   * Self-service data export (KG personal-data law / store review requirement).
+   * One JSON document with everything tied to the account: profile, addresses,
+   * orders (ids/status/totals/dates), loyalty entries, coupons and notification
+   * consents/preferences. Read-only — no ledger event.
+   */
+  async exportData(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
+    const [addresses, orders, loyaltyEntries, coupons, preferences] = await Promise.all([
+      this.prisma.customerAddress.findMany({ where: { customerId }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] }),
+      this.prisma.order.findMany({
+        where: { customerId },
+        select: { id: true, status: true, channel: true, total: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.loyaltyEntry.findMany({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.customerCoupon.findMany({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.customerPreferences.findUnique({ where: { customerId } }),
+    ]);
+    return {
+      exportedAt: new Date().toISOString(),
+      profile: { id: customer.id, phone: customer.phone, name: customer.name, consent: customer.consent, createdAt: customer.createdAt },
+      addresses,
+      orders,
+      loyaltyEntries,
+      coupons,
+      notifications: { consent: customer.consent, ...preferenceValues(preferences) },
+    };
+  }
+
+  /**
+   * Self-service account deletion. The customer row stays (orders, payments,
+   * loyalty and the append-only ledger reference it for accounting) but is
+   * anonymized in place: name/phone become non-reversible placeholders and the
+   * unique phone is freed, so the same number can OTP-register again as a fresh
+   * customer. Addresses, social identities, push tokens and the notification
+   * inbox are erased; every refresh session is revoked. One transaction with the
+   * customer.deleted ledger event (and consent_changed when consent flips off).
+   */
+  async deleteAccount(customerId: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-delete:' + customerId}))::text AS locked`;
+      const customer = await tx.customer.findUnique({ where: { id: customerId } });
+      if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
+      if (isAnonymized(customer)) return { result: { id: customer.id, deleted: true }, events: [] };
+
+      await tx.customer.update({
+        where: { id: customerId },
+        data: { name: DELETED_CUSTOMER_NAME, phone: deletedPhone(customerId), consent: false },
+      });
+      await tx.customerAddress.deleteMany({ where: { customerId } });
+      await tx.customerIdentity.deleteMany({ where: { customerId } });
+      await tx.pushToken.deleteMany({ where: { customerId } });
+      await tx.customerNotification.deleteMany({ where: { customerId } });
+      await tx.customerPreferences.updateMany({
+        where: { customerId },
+        data: { push: false, whatsapp: false, service: false, promos: false },
+      });
+      await tx.refreshToken.updateMany({
+        where: { customerId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      const events: AuditInput[] = [
+        { type: CUSTOMER_ACCOUNT_DELETED_EVENT, actor: customerId, payload: { customerId }, refs: [customerId] },
+      ];
+      if (customer.consent) {
+        events.push({ type: EventType.ConsentChanged, actor: customerId, payload: { customerId, from: true, to: false }, refs: [customerId] });
+      }
+      return { result: { id: customer.id, deleted: true }, events };
+    });
+  }
+
+  /**
    * Devices the customer bought — the serialized units (IMEI) sold on their orders,
    * with the product name and any open warranty case. Powers «Мои устройства».
    */
@@ -244,6 +319,24 @@ function requiredText(value: string, label: string): string {
   const normalized = value.trim();
   if (!normalized) throw new ValidationError('required_text', `${label} не может быть пустым`);
   return normalized;
+}
+
+/**
+ * Ledger type for self-service account deletion. The canonical catalogue lives in
+ * audit/event-types.ts — add it there when that surface is editable again.
+ */
+const CUSTOMER_ACCOUNT_DELETED_EVENT = 'customer.deleted';
+
+const DELETED_CUSTOMER_NAME = 'Удалённый пользователь';
+const DELETED_PHONE_PREFIX = 'deleted:';
+
+/** Unique non-reversible phone placeholder; frees the real phone for re-registration. */
+function deletedPhone(customerId: string): string {
+  return `${DELETED_PHONE_PREFIX}${customerId}`;
+}
+
+function isAnonymized(customer: Customer): boolean {
+  return customer.phone.startsWith(DELETED_PHONE_PREFIX);
 }
 
 function normalizeAddress(dto: CreateCustomerAddressDto) {
