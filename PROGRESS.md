@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-APP-UI-EVIDENCE-003
+
+- Iteration ID: `IOS-APP-UI-EVIDENCE-003`.
+- Task: refresh trusted all-iOS-app UI evidence after restoring ecosystem audit npm aliases.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-app-ui-18dad8dfd3a6c4304423e385f1c21da5ac69a879c86e0732f6f472bb5e5e654d.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ios:ui` with `exitCode: 0` for source tree `6b3989bc1c2c52f0ebdb72a888c21fa117852874941252c25c3b9752e46bc790`. XCUITest passed Client `21/21`, Staff `9/9`, Courier `2/2`, and POS `2/2` on the iPhone 17 Pro simulator.
+- Checks run: `sh scripts/run-trusted-ecosystem-node.sh scripts/record-ecosystem-evidence.mjs ios-app-ui`; `git diff --check`.
+- Acceptance: accepted for simulator UI evidence across all four iOS apps. Physical-device Face ID/APNs/camera/maps/scanner/printer/payment-terminal smoke, production API values, signing/provisioning and TestFlight/App Store review remain external release gates.
+- Next step: refresh Android packaged-app UI evidence and the four reconciliation/E2E evidence gates under the same current source hash.
+
 # 2026-07-17 — VISUAL-EVIDENCE-003
 
 - Iteration ID: `VISUAL-EVIDENCE-003`.
