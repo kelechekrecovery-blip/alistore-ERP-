@@ -2,7 +2,7 @@
   "name": "@alistore/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "AliStore native customer, staff, and POS app built with Expo React Native",
+  "description": "DEPRECATED (legacy reference): AliStore native customer, staff, and POS app built with Expo React Native",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

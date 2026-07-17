@@ -1,4 +1,11 @@
-# AliStore Native
+# AliStore Mobile (Expo) — DEPRECATED
+
+> **DEPRECATED / legacy behavior reference** — the final store artifacts are the
+> native apps in `apps/ios` and `apps/android`. **Do not run `eas build` /
+> `eas submit` from this package.** The Expo app below is kept in the repo only
+> as a behavior reference for the native reimplementations.
+
+---
 
 Expo React Native app for the AliStore ecosystem. This is not a PWA, not a
 Capacitor shell, and not a WebView wrapper.

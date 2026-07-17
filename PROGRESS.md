@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-MOBILE-REFERENCE-012`.
+- Task: make the final native-app boundary explicit for the legacy Expo package.
+- Files changed: `apps/mobile/README.md`, `apps/mobile/package.json`, and this progress entry.
+- Result: the Expo package is now clearly marked deprecated and behavior-reference-only; native SwiftUI and Kotlin Compose packages remain the release targets, and the package warns against EAS build/submit.
+- Checks run: `git diff --check`; package metadata remains valid JSON.
+- Outcome: this prevents an accidental PWA/Expo release path. It does not add native feature parity or store certification.
+- Next step: preserve the unrelated POS change, refresh clean-SHA evidence after its owner commits, and rerun strict audit.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-IOS-ACCOUNT-011`.
 - Task: validate the parallel iOS Client account-data slice and establish a clean commit boundary.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/APIClient.swift`, and this progress entry.
