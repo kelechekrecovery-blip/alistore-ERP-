@@ -8,6 +8,7 @@ import {
   fetchStaffReturns,
   fetchApprovals,
   requestReturnRefund,
+  resolveRefund,
   staffLogin,
   staffTotpEnable,
   staffTotpSetup,
@@ -42,6 +43,7 @@ export default function ApprovalsPage() {
   const [refundForm, setRefundForm] = useState({ returnId: '', amount: '', reason: '', shiftId: '' });
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [restockLocation, setRestockLocation] = useState('RETURNS-BISHKEK');
+  const [resolveForm, setResolveForm] = useState({ refundId: '', action: 'confirm' as 'confirm' | 'cancel', reason: '', providerReference: '' });
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -123,6 +125,43 @@ export default function ApprovalsPage() {
       reason: ret.reason,
       shiftId: '',
     });
+  }
+
+  function prepareResolve(refundId: string, action: 'confirm' | 'cancel') {
+    setResolveForm({ refundId, action, reason: '', providerReference: '' });
+  }
+
+  async function submitResolve(event: FormEvent) {
+    event.preventDefault();
+    if (!session || !resolveForm.refundId || !resolveForm.reason.trim()) return;
+    if (resolveForm.action === 'confirm' && !resolveForm.providerReference.trim()) {
+      flash('Укажите подтверждение провайдера');
+      return;
+    }
+    setBusy(`resolve-refund-${resolveForm.refundId}`);
+    try {
+      const key = `alistore.refund.resolve.${resolveForm.refundId}.${resolveForm.action}`;
+      const idempotencyKey = window.sessionStorage.getItem(key) ?? crypto.randomUUID();
+      window.sessionStorage.setItem(key, idempotencyKey);
+      await resolveRefund(
+        resolveForm.refundId,
+        {
+          action: resolveForm.action,
+          reason: resolveForm.reason.trim(),
+          providerReference: resolveForm.providerReference.trim() || undefined,
+        },
+        session.accessToken,
+        idempotencyKey,
+      );
+      window.sessionStorage.removeItem(key);
+      setResolveForm({ refundId: '', action: 'confirm', reason: '', providerReference: '' });
+      await loadReturns(session.accessToken);
+      flash(resolveForm.action === 'confirm' ? 'Refund подтверждён по выписке провайдера' : 'Refund отменён оператором');
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка разрешения refund');
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function decide(a: Approval, status: 'approved' | 'rejected') {
@@ -339,11 +378,50 @@ export default function ApprovalsPage() {
                             Отклонить
                           </button>
                         )}
+                        {ret.refund && ['processing', 'partially_succeeded', 'failed'].includes(ret.refund.status) && (
+                          <div className="basis-full rounded-btn border border-danger/20 bg-danger/5 px-3 py-3">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="font-semibold text-danger">Требует сверки refund</span>
+                              <span className="font-mono text-ink/45">{ret.refund.id}</span>
+                              <span className="text-ink/55">{ret.refund.status}</span>
+                              <span className="text-ink/45">
+                                {ret.refund.allocations.filter((allocation) => ['provider_pending', 'failed'].includes(allocation.status)).length} аллокац.
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button type="button" onClick={() => prepareResolve(ret.refund!.id, 'confirm')} className="rounded-btn bg-success px-3 py-2 text-xs font-semibold text-white">
+                                Провайдер подтвердил
+                              </button>
+                              <button type="button" onClick={() => prepareResolve(ret.refund!.id, 'cancel')} className="rounded-btn border border-danger/30 px-3 py-2 text-xs font-semibold text-danger">
+                                Провайдер не исполнял
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </section>
+              {resolveForm.refundId && (
+                <form onSubmit={submitResolve} className="mb-4 rounded-card border border-danger/20 bg-white p-4 shadow-soft">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="font-display text-base font-bold text-ink">Сверка зависшего refund</div>
+                      <div className="mt-1 font-mono text-xs text-ink/50">{resolveForm.refundId}</div>
+                    </div>
+                    <span className="rounded-chip bg-sand px-3 py-1 text-xs font-semibold text-ink/65">{resolveForm.action === 'confirm' ? 'подтвердить исполнение' : 'отменить исполнение'}</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input value={resolveForm.reason} onChange={(e) => setResolveForm((v) => ({ ...v, reason: e.target.value }))} placeholder="Основание сверки" aria-label="Основание сверки refund" required className="min-h-11 rounded-btn border border-ink/15 px-4 py-2.5 text-sm outline-none focus:border-ink/40" />
+                    {resolveForm.action === 'confirm' && <input value={resolveForm.providerReference} onChange={(e) => setResolveForm((v) => ({ ...v, providerReference: e.target.value }))} placeholder="ID операции / ссылка на выписку" aria-label="Подтверждение провайдера" required className="min-h-11 rounded-btn border border-ink/15 px-4 py-2.5 font-mono text-sm outline-none focus:border-ink/40" />}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="submit" disabled={busy === `resolve-refund-${resolveForm.refundId}`} className="rounded-btn bg-ink px-4 py-2.5 text-sm font-semibold text-sand disabled:opacity-50">{busy === `resolve-refund-${resolveForm.refundId}` ? 'Сохраняем…' : 'Зафиксировать решение'}</button>
+                    <button type="button" onClick={() => setResolveForm({ refundId: '', action: 'confirm', reason: '', providerReference: '' })} className="rounded-btn border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink/70">Отмена</button>
+                  </div>
+                </form>
+              )}
               <form onSubmit={requestRefund} className="mb-4 rounded-card border border-ink/10 bg-white p-4 shadow-soft">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

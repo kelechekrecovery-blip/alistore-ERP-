@@ -33,6 +33,24 @@ export class ReturnsService {
       where: status ? { status: status as ReturnStatus } : undefined,
       include: {
         items: true,
+        refund: {
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            allocations: {
+              select: {
+                id: true,
+                amount: true,
+                status: true,
+                methodSnapshot: true,
+                providerRefundId: true,
+                lastError: true,
+              },
+              orderBy: { ordinal: 'asc' },
+            },
+          },
+        },
         order: {
           select: {
             id: true,

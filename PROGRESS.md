@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-007-ERP-RESOLVE-023`.
+- Task: connect the stale provider-pending refund resolver to the ERP Return Desk.
+- Result: staff return listing now includes a compact refund/allocation snapshot; ERP operators with `refunds,manage` can choose provider-confirmed or provider-not-executed, enter an auditable reason/reference, and submit a stable session idempotency key to `POST /refunds/:id/resolve`. The browser flow covers cancellation and verifies both Refund and Return become `rejected`.
+- Checks run: `npm run api:build`; `npm run build -w @alistore/web`; targeted `e2e/return-refund.spec.ts` passed `1/1`; full Playwright passed `62/62`; `git diff --check`.
+- Next step: continue the next native/ERP parity slice; physical-device certification and owner-controlled design-corpus decisions remain external gates.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-2-NATIVE-PACKAGED-GATES-022`.
 - Task: refresh packaged iOS and Android UI evidence against the current source tree.
 - Result: iOS packaged UI passed `34/34` (Client 21, Staff 9, Courier 2, POS 2); Android packaged connected UI passed `30/30` across Core/Client/Staff/Courier/POS on AVD `savio_api36_arm64` (API 36). Both hash-bound evidence artifacts are committed.

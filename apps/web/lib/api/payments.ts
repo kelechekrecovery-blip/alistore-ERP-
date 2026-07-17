@@ -37,7 +37,23 @@ export interface RefundAggregate {
     amount: number;
     status: string;
     methodSnapshot: PaymentMethod;
+    providerRefundId?: string | null;
+    lastError?: string | null;
   }>;
+}
+
+export function resolveRefund(
+  refundId: string,
+  input: { action: 'confirm' | 'cancel'; reason: string; providerReference?: string },
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<RefundAggregate> {
+  return postAuthJson(
+    `/refunds/${encodeURIComponent(refundId)}/resolve`,
+    input,
+    accessToken,
+    { 'idempotency-key': idempotencyKey },
+  );
 }
 
 export function createPaymentIntent(input: {

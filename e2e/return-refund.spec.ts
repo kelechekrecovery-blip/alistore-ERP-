@@ -74,4 +74,20 @@ test('customer return request appears in ERP and leads to a bound refund approva
   ]);
   expect(refund.lines).toMatchObject([{ qty: 1, grossAmount: 50000 }]);
   expect(await page.evaluate((returnId) => sessionStorage.getItem(`alistore.refund.idempotency.${returnId}`), ret.id)).toBeNull();
+
+  // Simulate a provider-pending allocation parked by the stale sweep. The ERP
+  // operator must be able to cancel it without inventing a provider callback.
+  await prisma.refund.update({ where: { id: refund.id }, data: { status: 'failed' } });
+  await prisma.refundAllocation.updateMany({
+    where: { refundId: refund.id },
+    data: { status: 'failed', lastError: 'provider_pending_stale:300000' },
+  });
+  await page.reload();
+  await expect(page.getByText('Требует сверки refund')).toBeVisible();
+  await page.getByRole('button', { name: 'Провайдер не исполнял' }).click();
+  await page.getByLabel('Основание сверки refund').fill('Проверено по выписке: операция не исполнена');
+  await page.getByRole('button', { name: 'Зафиксировать решение' }).click();
+  await expect(page.getByText('Refund отменён оператором')).toBeVisible();
+  await expect(prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).resolves.toMatchObject({ status: 'rejected' });
+  await expect(prisma.return.findUniqueOrThrow({ where: { id: ret.id } })).resolves.toMatchObject({ status: 'rejected' });
 });

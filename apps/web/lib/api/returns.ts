@@ -17,6 +17,19 @@ export interface ReturnRequest {
   };
   restockLocation?: string | null;
   restockedAt?: string | null;
+  refund?: {
+    id: string;
+    status: string;
+    amount: number;
+    allocations: Array<{
+      id: string;
+      amount: number;
+      status: string;
+      methodSnapshot: string;
+      providerRefundId?: string | null;
+      lastError?: string | null;
+    }>;
+  } | null;
   createdAt: string;
 }
 
