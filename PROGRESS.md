@@ -3358,3 +3358,13 @@
 - Checks run: production Web build passed; ERP/CMS Playwright `7/7`; checkout Playwright `7/7`; targeted stale-price test passed; `git diff --check`.
 - Outcome: Phase 1 price/tax authority slice is accepted locally. The API already recalculates server prices and remains authoritative at order creation. Trusted evidence needs rebinding after this source change.
 - Next step: verify ERP store-point, stock and delivery-slot changes reach checkout and fail safely when availability changes.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-LOGISTICS-003`.
+- Task: prove that an ERP-managed pickup point is exposed by customer checkout while active and removed immediately when disabled.
+- Files changed: `e2e/erp-logistics-storefront.spec.ts` and `PROGRESS.md`.
+- Result: the new browser contract seeds a real catalog item, creates a pickup point through the ERP Logistics UI, verifies its persisted inventory location and active state, confirms the point/address in checkout, disables it in ERP, and confirms checkout no longer offers it. The scenario respects the existing slug and uppercase inventory-location validation rules.
+- Checks run: targeted Playwright `1/1`; `git diff --check`.
+- Outcome: the pickup-point lifecycle is accepted locally as part of the Phase 1 logistics slice. Delivery-zone/slot creation and capacity behavior remain the next bounded assertion; physical dispatch, maps, courier devices and live provider gates remain open.
+- Next step: add the ERP-created delivery zone/slot -> courier checkout availability assertion.
