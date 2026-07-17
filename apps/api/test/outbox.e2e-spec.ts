@@ -64,7 +64,15 @@ describe('Outbox (transactional, integration)', () => {
       template: 'order_paid',
     });
 
-    for (let i = 0; i < 5; i += 1) await outbox.relayPending();
+    for (let i = 0; i < 5; i += 1) {
+      await outbox.relayPending();
+      if (i < 4) {
+        // Advance the persisted schedule instead of sleeping through backoff.
+        await prisma.outboxMessage.updateMany({
+          data: { nextAttemptAt: new Date(0) },
+        });
+      }
+    }
 
     const row = await prisma.outboxMessage.findFirst();
     expect(row?.status).toBe('failed');
