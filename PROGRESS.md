@@ -3625,3 +3625,12 @@
 - Checks run: `npx tsc --noEmit -p apps/api/tsconfig.json` (exit 0); isolated database `alistore_logic012_test` (CREATE → `prisma db push --skip-generate` → jest → DROP): `test/pos-sale-resume.e2e-spec.ts` 5/5, regression sweep `pos-sale|product-bundles|quantity-inventory` 50/50 (NODE_PATH=./node_modules npx jest --runInBand, exit 0); `git diff --check` (exit 0).
 - Outcome: LOGIC-012 accepted in tested API code with no client changes required. Remaining gaps: a concurrent first-attempt/retry pair still fails the loser closed (409) and converges on the next tap; Android offline queue can hold duplicate rows for one key — server replay makes them converge, client-side dedup is a nicety; packaged-app offline replay remains a native gate.
 - Next step: `LOGIC-007` refund stale-provider recovery.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-P1-LOGIC-012-020`.
+- Task: make interrupted POS sales resumable with the same idempotency key and align ERP delivery-slot dates with the Bishkek business calendar.
+- Files changed: `apps/api/src/pos/pos.service.ts`, `apps/web/components/erp/LogisticsView.tsx`, and refund recovery files in the following P1 slice.
+- Result: an existing POS order in `created`/`reserved` resumes fulfillment and payment without recreating the order; replay composition remains staff/cart/amount-bound. ERP slot creation now uses `Asia/Bishkek`, matching checkout/API availability and preventing midnight date drift.
+- Checks run: API build; `pos-sale-replay.e2e-spec.ts` `5/5`; targeted logistics Playwright `1/1`; full Playwright rerun after the fix had the logistics case passing, with the prior visual baseline still differing.
+- Outcome: POS recovery commit `3ba76b5`; ERP date fix commit `08dcb14`. Refund stale-provider recovery commit `9df8777` adds sweep and operator resolve; existing refund suites pass `27/27`, but dedicated stale-resolve E2E remains open.
+- Next step: add dedicated stale-resolve tests and refresh visual evidence on a committed clean SHA, then rerun `mvp:verify` and strict audit.
