@@ -337,10 +337,43 @@ describe('Exchange (integration)', () => {
       oldImei: fixture.oldImei,
       newProductId: fixture.newProduct.id,
       method: 'card',
-    }, fixture.actor, 'missing-provider-reference')).rejects.toMatchObject({ code: 'exchange_non_cash_provider_pending' });
+    }, fixture.actor, 'missing-provider-reference')).rejects.toMatchObject({ code: 'exchange_provider_reference_required' });
     expect(await prisma.return.count({ where: { orderId: fixture.order.id, reason: 'обмен' } })).toBe(0);
     expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: fixture.oldImei } })).toMatchObject({ status: 'sold', orderId: fixture.order.id });
     expect(await prisma.order.count({ where: { channel: 'exchange' } })).toBe(0);
+  });
+
+  it('executes a non-cash surcharge with a unique provider reference', async () => {
+    const fixture = await setup(100000, 130000);
+    const dto = {
+      originalOrderId: fixture.order.id,
+      oldImei: fixture.oldImei,
+      newProductId: fixture.newProduct.id,
+      method: 'card' as const,
+      externalReference: `exchange-card-provider-${seq}`,
+    };
+
+    const created = await executeApproved(dto, fixture.actor, 'card-provider-exchange');
+    const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: created.exchangeOrderId } });
+    expect(payment).toMatchObject({
+      amount: 30000,
+      method: 'card',
+      shiftId: null,
+      txnId: dto.externalReference,
+      accountCode: '1020',
+      receivedBy: fixture.actor,
+    });
+    const replay = await exchanges.request(dto, fixture.actor, 'card-provider-exchange');
+    expect(replay).toMatchObject({ status: 'executed', idempotent: true, surchargeAmount: 30000 });
+
+    const other = await setup(100000, 130000);
+    await expect(exchanges.request({
+      originalOrderId: other.order.id,
+      oldImei: other.oldImei,
+      newProductId: other.newProduct.id,
+      method: 'card',
+      externalReference: dto.externalReference,
+    }, other.actor, 'duplicate-provider-reference')).rejects.toMatchObject({ code: 'exchange_provider_reference_used' });
   });
 
   it('replays an equal-price exchange without creating a synthetic payment', async () => {

@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — EXCH-002A
+
+- Iteration ID: `EXCH-002A`.
+- Task: unblock local non-cash exchange surcharge execution without pretending live provider certification is complete.
+- Files changed: `apps/api/src/exchanges/exchanges.service.ts`, `apps/api/test/exchange.e2e-spec.ts`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: exchanges with card/QR/POS surcharges now require a confirmed provider/terminal `externalReference` before any stock or money mutation. The service serializes the reference, rejects duplicate references already used by a payment or active exchange request, stores the accepted reference as `Payment.txnId`, posts the normal `exchange.surcharge` accounting entry and preserves idempotent replay. Missing references fail closed with `exchange_provider_reference_required`.
+- Checks run: `npm install` repaired a local invalid `otplib` install without package file changes; `npm run api:test -- --runInBand test/exchange.e2e-spec.ts` passed `13/13`; `npm run api:test -- --runInBand test/returns-exchanges-rbac.e2e-spec.ts` passed `2/2`; `npm run api:build` passed.
+- Acceptance: accepted for the local provider-reference software contour. Live provider intent/callback/retry, daily statement reconciliation, production credentials and certification flags remain open under `EXCH-002B`.
+- Next step: continue `EXCH-002B` only after provider contract/credentials are available, otherwise keep moving on locally unblockable ERP/native/E2E gaps.
+
 # 2026-07-17 — IOS-STAFF-VISUAL-001
 
 - Iteration ID: `IOS-STAFF-VISUAL-001`.

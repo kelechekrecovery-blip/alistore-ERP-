@@ -381,12 +381,7 @@ export class ExchangesService {
       const cashShift = exactSurcharge > 0 && dto.method === PaymentMethod.cash
         ? await this.resolveCashShiftOnTx(tx, dto.shiftId, actor, point)
         : null;
-      if (exactSurcharge > 0 && dto.method !== PaymentMethod.cash) {
-        throw new ValidationError(
-          'exchange_non_cash_provider_pending',
-          'Безналичная доплата станет доступна после provider-backed capture',
-        );
-      }
+      await this.validateProviderSurchargeReferenceOnTx(tx, exactSurcharge, dto.method, externalReference, exchangeRequestId);
       if (expectedAmounts && (
         expectedAmounts.creditAmount !== creditAmount
         || expectedAmounts.surchargeAmount !== exactSurcharge
@@ -669,12 +664,7 @@ export class ExchangesService {
     const shift = surchargeAmount > 0 && dto.method === PaymentMethod.cash
       ? await this.resolveCashShiftOnTx(tx, dto.shiftId, actor, point)
       : null;
-    if (surchargeAmount > 0 && dto.method !== PaymentMethod.cash) {
-      throw new ValidationError(
-        'exchange_non_cash_provider_pending',
-        'Безналичная доплата станет доступна после provider-backed capture',
-      );
-    }
+    await this.validateProviderSurchargeReferenceOnTx(tx, surchargeAmount, dto.method, externalReference);
     return {
       originalOrderId: order.id,
       oldImei: dto.oldImei,
@@ -759,6 +749,38 @@ export class ExchangesService {
       newImei: exchangeOrder.items[0]?.imei ?? String(payload.newImei ?? ''),
       idempotent: true,
     };
+  }
+
+  private async validateProviderSurchargeReferenceOnTx(
+    tx: Prisma.TransactionClient,
+    surchargeAmount: number,
+    method: PaymentMethod,
+    externalReference: string | null,
+    exchangeRequestId?: string,
+  ) {
+    if (surchargeAmount <= 0 || method === PaymentMethod.cash) return;
+    if (!externalReference) {
+      throw new ValidationError(
+        'exchange_provider_reference_required',
+        'Безналичная доплата требует подтверждённый provider/terminal reference',
+      );
+    }
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`exchange-provider-reference:${externalReference}`}))::text AS locked`;
+    const existingPayment = await tx.payment.findUnique({ where: { txnId: externalReference } });
+    if (existingPayment) {
+      throw new ConflictError('exchange_provider_reference_used', 'Provider reference уже использован в платеже');
+    }
+    const existingExchange = await tx.exchangeRequest.findFirst({
+      where: {
+        externalReference,
+        status: { in: ['requested', 'executed'] },
+        ...(exchangeRequestId ? { id: { not: exchangeRequestId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existingExchange) {
+      throw new ConflictError('exchange_provider_reference_used', 'Provider reference уже закреплён за другим обменом');
+    }
   }
 
   private async resolveCashShiftOnTx(
