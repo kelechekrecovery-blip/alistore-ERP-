@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `FIN-003E-GATE-035`.
+- Task: revalidate Phase 1 refund aggregate after the consolidated MVP/evidence gates.
+- Result: `apps/api/test/refund-aggregate.e2e-spec.ts` passed `18/18` in-band. Coverage confirms multi-tender allocation, four-eyes approval, gift-card journal restoration, provider-pending saga/retry, stale reconciliation, immutable tax snapshots, database invariants and replay-safe execution.
+- Acceptance: FIN-003E is complete at local software level. Live payment-provider execution, signed callbacks, accountant/tax validation and first-store reconciliation remain external release gates; production readiness is not claimed.
+- Next step: advance to the next unblocked financial slice (`INV-VAL-001I`/`EXCH-002B`) while owner-controlled design references and staging credentials remain open blockers.
+
+## 2026-07-18
+
 - Iteration ID: `MVP-VERIFY-EVIDENCE-034`.
 - Task: rebind every hash-bound acceptance artifact after the outbox test correction.
 - Result: visual `3/3`, POS/refund `1/1`, courier/COD `1/1`, service/loaner API `9/9` plus UI `3/3`, procurement API `10/10` plus UI `1/1`, composite ecosystem `4/4`, iOS UI `34/34`, and Android UI `30/30` all pass on source tree `705b3bf...`.
