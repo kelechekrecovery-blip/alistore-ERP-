@@ -2825,6 +2825,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-012`.
+- Task: accept expanded trusted native Client visual evidence after the 15-state simulator gate source commit.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-08be0f06f581c09f151d782a676dd91908fc0dc9c4872dbcabdfaf554d4ec317.json`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the trusted recorder reran `npm run ios:visual` from clean source commit `73adecb565ae5e9786fcb7139acb6342099bbb3a`, confirmed 15 PNG attachments, and updated `ios-client-visual` acceptance to artifact `08be0f06f581c09f151d782a676dd91908fc0dc9c4872dbcabdfaf554d4ec317` with source tree `174337819c594e1c0984eaa50c87dfe36b76768145760bf9decc56fff6fd9c03`.
+- Checks run: trusted `scripts/record-ecosystem-evidence.mjs ios-client-visual` passed; `git diff --check` passed.
+- Outcome: trusted software evidence now covers the expanded Client App 2.0 visual route set. Owner pixel sign-off, physical-device Face ID/APNs/camera/offline smoke, production signing, TestFlight and App Store Connect submission remain open release gates.
+- Next step: continue the highest-value unresolved track: Staff/Courier/POS native parity, Android parity, ERP/CMS integration, or production provider certification depending on available external access.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-011`.
 - Task: expand native Client visual evidence beyond the seven-state purchase path toward the Client App 2.0 self-service prototype.
 - Files changed: `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `BACKLOG.md`, and `PROGRESS.md`.

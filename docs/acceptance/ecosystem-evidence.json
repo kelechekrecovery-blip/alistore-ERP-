@@ -33,8 +33,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/ios-client-visual-b192564522ec3568b75718782955225f2042e24a961abdabd0c1f0eeafb74080.json",
-          "sha256": "b192564522ec3568b75718782955225f2042e24a961abdabd0c1f0eeafb74080"
+          "path": "docs/acceptance/artifacts/ios-client-visual-08be0f06f581c09f151d782a676dd91908fc0dc9c4872dbcabdfaf554d4ec317.json",
+          "sha256": "08be0f06f581c09f151d782a676dd91908fc0dc9c4872dbcabdfaf554d4ec317"
         }
       ]
     },
