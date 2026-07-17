@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `GAP-FISCAL-001` Provider-neutral fiscal boundary is now present locally: receipts explicitly expose `informational` status with null fiscal number/QR/provider reference and never claim KKM/OFD execution. Remaining gate is owner-selected Kyrgyz fiscal provider, legal tax mapping, signed integration contract and offline KKM certification; no fake fiscal data is generated.
 - `LOGIC-013-NATIVE-COD-026` Native Courier now exposes server-authoritative collected COD and requires a reason for partial collection on iOS/Android; unit/build coverage is green. Hash-bound iOS (`34/34`) and Android (`30/30`) UI evidence plus web courier/COD reconciliation (`1/1`) are accepted on current HEAD. Remaining gates: physical push/maps/camera/network and live provider certification.
 - `LOGIC-007-ERP-RESOLVE` Accepted in this iteration: ERP Return Desk now exposes stale provider refund allocations from the staff return list and supports audited confirm/cancel resolution with stable idempotency; browser coverage is included in `e2e/return-refund.spec.ts`. Physical provider reconciliation remains a production gate.
 - `PHASE-1-POS-REFUND-EVIDENCE` POS sale → customer return → approved refund → warehouse quarantine is now hash-bound and accepted (`1/1` trusted Playwright). Remaining reconciliation verticals are service/loaner and procurement/sale.

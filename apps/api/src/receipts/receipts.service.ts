@@ -4,6 +4,7 @@ import { transform } from 'receiptline';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptData } from './receipts.dto';
 import { ValidationError } from '../common/errors';
+import { INFORMATIONAL_FISCAL_PROVIDER, FiscalReceiptResult } from '../fiscal/fiscal-provider';
 
 export interface RenderedReceipt {
   /** receiptline markup — the human-readable source of the receipt. */
@@ -12,6 +13,8 @@ export interface RenderedReceipt {
   svg: string;
   /** ESC/POS command bytes for a thermal printer, base64-encoded. */
   escposBase64: string;
+  /** Explicitly non-fiscal until a certified OFD/KKM adapter is configured. */
+  fiscal: FiscalReceiptResult;
 }
 
 const CPL = 42; // characters per line (58mm roll)
@@ -83,6 +86,7 @@ export class ReceiptsService {
     if (data.store.phone) lines.push(data.store.phone);
     lines.push(`Чек ${data.orderId}`, this.formatDate(data.issuedAt));
     if (data.cashier) lines.push(`Кассир: ${data.cashier}`);
+    lines.push('Информационный чек — фискализация не выполнена');
     lines.push('---');
     for (const item of data.items) {
       const lineTotal = item.qty * item.price;
@@ -112,6 +116,12 @@ export class ReceiptsService {
       markup,
       svg,
       escposBase64: Buffer.from(escpos, 'binary').toString('base64'),
+      fiscal: {
+        status: 'informational',
+        fiscalNumber: null,
+        qrPayload: null,
+        providerReference: null,
+      },
     };
   }
 

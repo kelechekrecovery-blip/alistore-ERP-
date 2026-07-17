@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-FISCAL-001-SOFTWARE-036`.
+- Task: add a provider-neutral fiscal receipt boundary without pretending to implement Kyrgyz KKM/OFD.
+- Result: receipts now expose an explicit `informational` fiscal state with null fiscal number, QR payload and provider reference. The default provider is uncertified and fails closed; receipt output is visibly marked `Информационный чек — фискализация не выполнена`.
+- Checks: fiscal provider, receipt renderer and real-order receipt integration passed `8/8`; API build and `git diff --check` passed.
+- Acceptance: local software slice accepted. Live fiscal provider selection, tax/legal mapping, signed callbacks, offline KKM policy and certification remain owner/provider gates.
+- Next step: refresh trusted hash-bound visual/native/reconciliation artifacts, then continue the next unblocked financial or staging-software slice.
+
+## 2026-07-18
+
 - Iteration ID: `FIN-003E-GATE-035`.
 - Task: revalidate Phase 1 refund aggregate after the consolidated MVP/evidence gates.
 - Result: `apps/api/test/refund-aggregate.e2e-spec.ts` passed `18/18` in-band. Coverage confirms multi-tender allocation, four-eyes approval, gift-card journal restoration, provider-pending saga/retry, stale reconciliation, immutable tax snapshots, database invariants and replay-safe execution.

@@ -57,5 +57,11 @@ describe('ReceiptsService (receiptline)', () => {
     const escpos = Buffer.from(out.escposBase64, 'base64');
     expect(escpos.length).toBeGreaterThan(0);
     expect(escpos.subarray(0, 2).toString('hex')).toBe('1b40'); // ESC @ (printer init)
+    expect(out.fiscal).toEqual({
+      status: 'informational',
+      fiscalNumber: null,
+      qrPayload: null,
+      providerReference: null,
+    });
   });
 });
