@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
@@ -52,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,11 +94,11 @@ class CourierCommandManager(
     online = { gateway.startDelivery(orderId, token, key) },
   )
 
-  suspend fun deliver(orderId: String, codAmount: Int, token: String, key: String): CourierCommandResult = submit(
+  suspend fun deliver(orderId: String, codAmount: Int, reason: String?, token: String, key: String): CourierCommandResult = submit(
     endpoint = "courier/orders/$orderId/deliver",
-    body = JSONObject().put("codAmount", codAmount),
+    body = JSONObject().put("codAmount", codAmount).putOpt("reason", reason),
     key = key,
-    online = { gateway.completeDelivery(orderId, codAmount, token, key) },
+    online = { gateway.completeDelivery(orderId, codAmount, reason, token, key) },
   )
 
   suspend fun fail(orderId: String, reason: String, token: String, key: String): CourierCommandResult = submit(
@@ -271,8 +273,13 @@ private fun CourierRoute(
     if (deliveries.isEmpty()) item { Text("Назначенных доставок пока нет", color = CourierMuted, modifier = Modifier.padding(top = 48.dp)) }
     items(orderedDeliveries, key = CourierDelivery::id) { delivery ->
       var failureReason by rememberSaveable(delivery.id) { mutableStateOf("") }
+      var collectedCodText by rememberSaveable(delivery.id) { mutableStateOf(delivery.outstandingCod.toString()) }
+      var partialCodReason by rememberSaveable(delivery.id) { mutableStateOf("") }
       var busy by remember(delivery.id) { mutableStateOf(false) }
       var statusMessage by remember(delivery.id) { mutableStateOf<String?>(null) }
+      val collectedCod = collectedCodText.toIntOrNull()
+      val validCollectedCod = collectedCod != null && collectedCod in 0..delivery.outstandingCod
+      val partialReasonRequired = collectedCod != null && collectedCod < delivery.outstandingCod
       Card(colors = CardDefaults.cardColors(containerColor = CourierSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
         Column(Modifier.padding(16.dp)) {
           Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -298,10 +305,26 @@ private fun CourierRoute(
           }
           if (delivery.status == "out_for_delivery") {
             CourierEvidencePicker(delivery.id, session, evidenceGateway, Modifier.fillMaxWidth().padding(top = 8.dp))
-            CourierActionButton("Доставлено · ${delivery.outstandingCod} сом", busy) {
+            OutlinedTextField(
+              collectedCodText,
+              { collectedCodText = it.filter(Char::isDigit) },
+              label = { Text("Получено COD") },
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              singleLine = true,
+              modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("courier-cod-amount"),
+            )
+            if (partialReasonRequired) {
+              OutlinedTextField(
+                partialCodReason,
+                { partialCodReason = it },
+                label = { Text("Причина частичной оплаты") },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("courier-cod-reason"),
+              )
+            }
+            CourierActionButton("Доставлено · ${collectedCod ?: delivery.outstandingCod} сом", busy || !validCollectedCod || (partialReasonRequired && partialCodReason.isBlank())) {
               busy = true
               scope.launch {
-                runCatching { commands.deliver(delivery.id, delivery.outstandingCod, session.accessToken, UUID.randomUUID().toString()) }
+                runCatching { commands.deliver(delivery.id, collectedCod ?: 0, partialCodReason.trim().ifEmpty { null }, session.accessToken, UUID.randomUUID().toString()) }
                   .onSuccess { statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Доставка завершена"; scheduleCourierSync(context.applicationContext, apiBaseUrl); onRefresh() }
                   .onFailure { statusMessage = it.message }
                 busy = false

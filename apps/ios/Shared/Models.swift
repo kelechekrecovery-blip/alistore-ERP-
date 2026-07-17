@@ -1038,7 +1038,11 @@ public struct CourierDelivery: Decodable, Identifiable, Sendable {
 
 public struct CompleteCourierDeliveryRequest: Codable, Sendable {
     public let codAmount: Int
-    public init(codAmount: Int) { self.codAmount = codAmount }
+    public let reason: String?
+    public init(codAmount: Int, reason: String? = nil) {
+        self.codAmount = codAmount
+        self.reason = reason
+    }
 }
 
 public struct FailCourierDeliveryRequest: Codable, Sendable {

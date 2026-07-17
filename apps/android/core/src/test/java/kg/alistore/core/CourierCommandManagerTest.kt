@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class CourierCommandManagerTest {
   @Test
@@ -12,12 +13,25 @@ class CourierCommandManagerTest {
     val queue = RecordingQueue()
     val manager = CourierCommandManager(FakeCourierGateway(IOException("offline")), queue)
 
-    val result = manager.deliver("order-1", 2500, "staff-token", "delivery-key")
+    val result = manager.deliver("order-1", 2500, null, "staff-token", "delivery-key")
 
     assertTrue(result is CourierCommandResult.Queued)
     assertEquals("courier/orders/order-1/deliver", queue.endpoint)
     assertEquals("delivery-key", queue.key)
     assertEquals("{\"codAmount\":2500}", queue.body)
+  }
+
+  @Test
+  fun `partial COD queues the reason with the command`() = runTest {
+    val queue = RecordingQueue()
+    val manager = CourierCommandManager(FakeCourierGateway(IOException("offline")), queue)
+
+    manager.deliver("order-1", 500, "customer paid the remainder later", "staff-token", "partial-key")
+
+    val body = JSONObject(requireNotNull(queue.body))
+    assertEquals(500, body.getInt("codAmount"))
+    assertEquals("customer paid the remainder later", body.getString("reason"))
+    assertEquals("partial-key", queue.key)
   }
 
   @Test
@@ -48,7 +62,7 @@ private class RecordingQueue : MutationQueue {
 private class FakeCourierGateway(private val failure: Exception) : CourierGateway {
   override suspend fun courierDeliveries(token: String) = emptyList<CourierDelivery>()
   override suspend fun startDelivery(orderId: String, token: String, idempotencyKey: String): CourierDelivery = throw failure
-  override suspend fun completeDelivery(orderId: String, codAmount: Int, token: String, idempotencyKey: String): CourierDelivery = throw failure
+  override suspend fun completeDelivery(orderId: String, codAmount: Int, reason: String?, token: String, idempotencyKey: String): CourierDelivery = throw failure
   override suspend fun failDelivery(orderId: String, reason: String, token: String, idempotencyKey: String) = throw failure
   override suspend fun handoverCourierRun(runId: String, amount: Int, token: String, idempotencyKey: String): CourierRunSummary = throw failure
 }

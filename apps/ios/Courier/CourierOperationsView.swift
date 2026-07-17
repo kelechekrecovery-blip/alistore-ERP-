@@ -299,6 +299,8 @@ private struct CourierDeliveryCard: View {
 
     @Environment(\.openURL) private var openURL
     @State private var failureReason = ""
+    @State private var collectedCOD = ""
+    @State private var partialCODReason = ""
     @State private var isBusy = false
     @State private var statusMessage: String?
 
@@ -327,10 +329,25 @@ private struct CourierDeliveryCard: View {
                 }
             } else if delivery.status == "out_for_delivery" {
                 CourierEvidenceView(orderId: delivery.id, session: session)
-                primaryButton("Доставлено · \(delivery.outstandingCOD) сом") {
+                TextField("Получено COD", text: $collectedCOD)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                    .onAppear {
+                        if collectedCOD.isEmpty { collectedCOD = String(delivery.outstandingCOD) }
+                    }
+                if collectedCODValue < delivery.outstandingCOD {
+                    TextField("Причина частичной оплаты", text: $partialCODReason, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                }
+                primaryButton("Доставлено · \(collectedCODValue) сом", disabled: !canCompleteCOD) {
                     await execute(
                         endpoint: "courier/orders/\(delivery.id)/deliver",
-                        body: CompleteCourierDeliveryRequest(codAmount: delivery.outstandingCOD)
+                        body: CompleteCourierDeliveryRequest(
+                            codAmount: collectedCODValue,
+                            reason: partialCODReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? nil
+                                : partialCODReason.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
                     )
                 }
                 TextField("Причина неудачной доставки", text: $failureReason, axis: .vertical)
@@ -362,13 +379,22 @@ private struct CourierDeliveryCard: View {
     }
 
     @ViewBuilder
-    private func primaryButton(_ title: String, action: @escaping () async -> Void) -> some View {
+    private func primaryButton(_ title: String, disabled: Bool = false, action: @escaping () async -> Void) -> some View {
         Button(title) { Task { await action() } }
             .buttonStyle(.borderedProminent)
             .tint(courierLime)
             .foregroundStyle(courierInk)
             .frame(maxWidth: .infinity)
-            .disabled(isBusy)
+            .disabled(isBusy || disabled)
+    }
+
+    private var collectedCODValue: Int {
+        min(max(Int(collectedCOD) ?? 0, 0), delivery.outstandingCOD)
+    }
+
+    private var canCompleteCOD: Bool {
+        guard let amount = Int(collectedCOD), amount >= 0, amount <= delivery.outstandingCOD else { return false }
+        return amount == delivery.outstandingCOD || !partialCODReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     @MainActor

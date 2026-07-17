@@ -524,6 +524,9 @@ final class APIClientTests: XCTestCase {
         let encoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 59900))
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         XCTAssertEqual(payload["codAmount"] as? Int, 59900)
+        let partialEncoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 500, reason: "Клиент доплатит позже"))
+        let partialPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: partialEncoded) as? [String: Any])
+        XCTAssertEqual(partialPayload["reason"] as? String, "Клиент доплатит позже")
     }
 
     @MainActor

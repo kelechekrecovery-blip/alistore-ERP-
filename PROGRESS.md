@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-013-NATIVE-COD-026`.
+- Task: align native Courier delivery completion with the server-authoritative partial COD contract.
+- Result: iOS and Android Courier now let the operator enter the collected COD amount, require a partial-payment reason when the amount is below outstanding COD, and preserve the reason in the offline command payload. Full-payment payload compatibility is retained; Android command tests parse payload semantics instead of relying on JSON key order, and iOS API tests cover the partial reason field.
+- Checks run: `npm run ios:build` passed; `npm run android:test` passed (42 tests, lint); `npm run android:build` passed (Client/Staff/Courier/POS APKs); `git diff --check`.
+- Acceptance: native software slice accepted locally. Hash-bound UI evidence must be refreshed after this source change; physical-device biometrics/push/maps/camera/network and live provider reconciliation remain open.
+- Next step: refresh iOS/Android packaged UI evidence and rerun the trusted ecosystem audit.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-013-OUTBOX-024`.
 - Task: start the courier reliability slice from the master execution plan.
 - Result: `OutboxMessage.nextAttemptAt` and a compound due-work index now enforce server-side retry timing; relay retries use exponential backoff and park the fifth failure in `failed`, while successful delivery clears the schedule. Expo and FCM transports now fail visibly when a recipient has no active device token, preventing false `sent` state.

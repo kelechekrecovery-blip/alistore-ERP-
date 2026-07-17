@@ -273,12 +273,13 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun completeDelivery(
     orderId: String,
     codAmount: Int,
+    reason: String?,
     token: String,
     idempotencyKey: String,
   ): CourierDelivery = request(
     "courier/orders/$orderId/deliver",
     "POST",
-    JSONObject().put("codAmount", codAmount),
+    JSONObject().put("codAmount", codAmount).putOpt("reason", reason),
     token,
     idempotencyKey = idempotencyKey,
   ).courierDelivery()
