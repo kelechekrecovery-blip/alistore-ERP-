@@ -2583,3 +2583,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets; full `npm run ios:ui` passed Client `6/6`, Staff `1/1`, Courier `1/1` and POS `1/1`; targeted signed-in Client UI test passed `1/1` after scrolling the lazy grid; `git diff --check` passed.
 - Outcome: `IOS-CLIENT-008` is accepted at local simulator software level. Full authenticated data-state fixtures, complete 17-screen visual evidence, physical-device camera/push/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
 - Next step: add authenticated loaded/empty/error fixtures for returns, loyalty, addresses, settings and warranty without weakening customer ownership.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-009`.
+- Task: add deterministic authenticated loaded-state fixtures for the Client account child screens.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/Models.swift`, and `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: Debug-only fixtures now render customer-owned loyalty, returns/orders, addresses, settings, devices and warranty data for UI verification without real credentials, network mutation or Keychain writes. Production continues through the existing API/JWT ownership paths. Public typed initializers in `AliStoreCore` make these fixtures explicit and reusable for previews/contract tests without changing decoding or business behavior.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; targeted Client UI suite passed `9/9`; full `npm run ios:ui` passed Client `9/9`, Staff `1/1`, Courier `1/1` and POS `1/1`; `git diff --check` passed after the final patch.
+- Outcome: authenticated loaded-state coverage is accepted at local simulator software level. Full 17-screen visual evidence, explicit empty/error fixtures, physical-device Face ID/APNs/camera/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: add Debug-only empty/error fixtures for account routes and continue exact visual parity, then run the signed archive gate when the owner supplies Apple Developer/App Store Connect credentials and profiles.

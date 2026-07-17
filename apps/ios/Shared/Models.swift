@@ -193,6 +193,15 @@ public struct CustomerLoyalty: Decodable, Sendable {
     public let nextLevelSpend: Int
     public let coupons: [CustomerCoupon]
     public let history: [LoyaltyHistoryEntry]
+
+    public init(balance: Int, conversion: Int, level: String, nextLevelSpend: Int, coupons: [CustomerCoupon], history: [LoyaltyHistoryEntry]) {
+        self.balance = balance
+        self.conversion = conversion
+        self.level = level
+        self.nextLevelSpend = nextLevelSpend
+        self.coupons = coupons
+        self.history = history
+    }
 }
 
 public struct CustomerCoupon: Decodable, Identifiable, Sendable {
@@ -202,6 +211,15 @@ public struct CustomerCoupon: Decodable, Identifiable, Sendable {
     public let valueLabel: String
     public let expiresAt: Date?
     public let active: Bool
+
+    public init(id: String, title: String, code: String, valueLabel: String, expiresAt: Date?, active: Bool) {
+        self.id = id
+        self.title = title
+        self.code = code
+        self.valueLabel = valueLabel
+        self.expiresAt = expiresAt
+        self.active = active
+    }
 }
 
 public struct LoyaltyHistoryEntry: Decodable, Identifiable, Sendable {
@@ -211,6 +229,15 @@ public struct LoyaltyHistoryEntry: Decodable, Identifiable, Sendable {
     public let amount: Int
     public let expiresAt: Date?
     public let createdAt: Date
+
+    public init(id: String, kind: String, label: String, amount: Int, expiresAt: Date?, createdAt: Date) {
+        self.id = id
+        self.kind = kind
+        self.label = label
+        self.amount = amount
+        self.expiresAt = expiresAt
+        self.createdAt = createdAt
+    }
 }
 
 public struct CustomerAddress: Decodable, Identifiable, Sendable {
@@ -221,6 +248,16 @@ public struct CustomerAddress: Decodable, Identifiable, Sendable {
     public let isPrimary: Bool
     public let createdAt: Date
     public let updatedAt: Date
+
+    public init(id: String, title: String, text: String, comment: String?, isPrimary: Bool, createdAt: Date, updatedAt: Date) {
+        self.id = id
+        self.title = title
+        self.text = text
+        self.comment = comment
+        self.isPrimary = isPrimary
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 public struct CreateCustomerAddressRequest: Encodable, Sendable {
@@ -260,6 +297,17 @@ public struct CustomerSettings: Decodable, Sendable {
     public let whatsapp: Bool
     public let service: Bool
     public let promos: Bool
+
+    public init(id: String, phone: String, name: String, consent: Bool, push: Bool, whatsapp: Bool, service: Bool, promos: Bool) {
+        self.id = id
+        self.phone = phone
+        self.name = name
+        self.consent = consent
+        self.push = push
+        self.whatsapp = whatsapp
+        self.service = service
+        self.promos = promos
+    }
 }
 
 public struct UpdateCustomerSettingsRequest: Encodable, Sendable {
@@ -291,6 +339,19 @@ public struct CustomerReturn: Decodable, Identifiable, Sendable {
     public let createdAt: Date
     public let items: [CustomerReturnItem]
     public let order: CustomerReturnOrder?
+
+    public init(id: String, orderId: String, reason: String, status: String, refundId: String?, refundAmount: Int, isFullOrder: Bool, createdAt: Date, items: [CustomerReturnItem], order: CustomerReturnOrder?) {
+        self.id = id
+        self.orderId = orderId
+        self.reason = reason
+        self.status = status
+        self.refundId = refundId
+        self.refundAmount = refundAmount
+        self.isFullOrder = isFullOrder
+        self.createdAt = createdAt
+        self.items = items
+        self.order = order
+    }
 }
 
 public struct CustomerReturnItem: Decodable, Identifiable, Sendable {
@@ -298,6 +359,13 @@ public struct CustomerReturnItem: Decodable, Identifiable, Sendable {
     public let orderItemId: String
     public let qty: Int
     public let refundAmount: Int
+
+    public init(id: String, orderItemId: String, qty: Int, refundAmount: Int) {
+        self.id = id
+        self.orderItemId = orderItemId
+        self.qty = qty
+        self.refundAmount = refundAmount
+    }
 }
 
 public struct CustomerReturnOrder: Decodable, Sendable {
@@ -305,6 +373,13 @@ public struct CustomerReturnOrder: Decodable, Sendable {
     public let total: Int
     public let createdAt: Date
     public let items: [CustomerReturnOrderItem]
+
+    public init(id: String, total: Int, createdAt: Date, items: [CustomerReturnOrderItem]) {
+        self.id = id
+        self.total = total
+        self.createdAt = createdAt
+        self.items = items
+    }
 }
 
 public struct CustomerReturnOrderItem: Decodable, Identifiable, Sendable {
@@ -312,6 +387,13 @@ public struct CustomerReturnOrderItem: Decodable, Identifiable, Sendable {
     public let sku: String
     public let qty: Int
     public let price: Int
+
+    public init(id: String, sku: String, qty: Int, price: Int) {
+        self.id = id
+        self.sku = sku
+        self.qty = qty
+        self.price = price
+    }
 }
 
 public struct CreateCustomerReturnRequest: Encodable, Sendable {
@@ -362,6 +444,13 @@ public struct CustomerOrderItem: Decodable, Sendable {
     public let qty: Int
     public let price: Int
     public let imei: String?
+
+    public init(sku: String, qty: Int, price: Int, imei: String?) {
+        self.sku = sku
+        self.qty = qty
+        self.price = price
+        self.imei = imei
+    }
 }
 
 public struct CustomerOrder: Decodable, Identifiable, Sendable {
@@ -376,6 +465,20 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
     public let total: Int
     public let createdAt: Date
     public let items: [CustomerOrderItem]
+
+    public init(id: String, channel: String, fulfillmentType: String?, pickupPoint: String?, deliveryAddress: String?, deliverySlot: String?, pickupCode: String?, status: String, total: Int, createdAt: Date, items: [CustomerOrderItem]) {
+        self.id = id
+        self.channel = channel
+        self.fulfillmentType = fulfillmentType
+        self.pickupPoint = pickupPoint
+        self.deliveryAddress = deliveryAddress
+        self.deliverySlot = deliverySlot
+        self.pickupCode = pickupCode
+        self.status = status
+        self.total = total
+        self.createdAt = createdAt
+        self.items = items
+    }
 }
 
 public struct CustomerOrderReceipt: Decodable, Sendable {
@@ -573,6 +676,12 @@ public struct DeviceWarrantySummary: Decodable, Sendable {
     public let id: String
     public let status: String
     public let sla: Date
+
+    public init(id: String, status: String, sla: Date) {
+        self.id = id
+        self.status = status
+        self.sla = sla
+    }
 }
 
 public struct CustomerDevice: Decodable, Identifiable, Sendable {
@@ -583,6 +692,15 @@ public struct CustomerDevice: Decodable, Identifiable, Sendable {
     public let warrantyUntil: String?
     public let daysLeft: Int?
     public let warranty: DeviceWarrantySummary?
+
+    public init(imei: String, product: String, status: String, warrantyUntil: String?, daysLeft: Int?, warranty: DeviceWarrantySummary?) {
+        self.imei = imei
+        self.product = product
+        self.status = status
+        self.warrantyUntil = warrantyUntil
+        self.daysLeft = daysLeft
+        self.warranty = warranty
+    }
 }
 
 public struct OpenWarrantyRequest: Encodable, Sendable {

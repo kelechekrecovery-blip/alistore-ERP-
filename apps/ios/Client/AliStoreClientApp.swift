@@ -1571,6 +1571,90 @@ private struct ClientOrderCard: View {
     }
 }
 
+#if DEBUG
+private enum ClientUIFixture {
+    private static let referenceDate = Date(timeIntervalSince1970: 1_750_000_000)
+    private static let warrantyDate = Date(timeIntervalSince1970: 1_767_280_000)
+
+    static let orders: [CustomerOrder] = [
+        CustomerOrder(
+            id: "ui-order-2401",
+            channel: "web",
+            fulfillmentType: "pickup",
+            pickupPoint: "ЦУМ, Бишкек",
+            deliveryAddress: nil,
+            deliverySlot: nil,
+            pickupCode: "AL-2401",
+            status: "ready_for_pickup",
+            total: 89900,
+            createdAt: referenceDate,
+            items: [CustomerOrderItem(sku: "IPHONE-15-128-BLK", qty: 1, price: 89900, imei: "352099999999001")]
+        )
+    ]
+
+    static let returns: [CustomerReturn] = [
+        CustomerReturn(
+            id: "ui-return-2401",
+            orderId: "ui-order-2401",
+            reason: "Не подошёл цвет устройства",
+            status: "under_review",
+            refundId: nil,
+            refundAmount: 89900,
+            isFullOrder: true,
+            createdAt: referenceDate,
+            items: [CustomerReturnItem(id: "ui-return-item-2401", orderItemId: "ui-order-item-2401", qty: 1, refundAmount: 89900)],
+            order: CustomerReturnOrder(
+                id: "ui-order-2401",
+                total: 89900,
+                createdAt: referenceDate,
+                items: [CustomerReturnOrderItem(id: "ui-order-item-2401", sku: "IPHONE-15-128-BLK", qty: 1, price: 89900)]
+            )
+        )
+    ]
+
+    static let loyalty = CustomerLoyalty(
+        balance: 1240,
+        conversion: 1,
+        level: "Gold",
+        nextLevelSpend: 18500,
+        coupons: [
+            CustomerCoupon(id: "ui-coupon-1", title: "Скидка на аксессуары", code: "ALI-GOLD", valueLabel: "−10%", expiresAt: warrantyDate, active: true)
+        ],
+        history: [
+            LoyaltyHistoryEntry(id: "ui-loyalty-1", kind: "earned", label: "Покупка iPhone 15", amount: 899, expiresAt: nil, createdAt: referenceDate),
+            LoyaltyHistoryEntry(id: "ui-loyalty-2", kind: "spent", label: "Скидка в заказе", amount: -120, expiresAt: nil, createdAt: referenceDate)
+        ]
+    )
+
+    static let addresses = [
+        CustomerAddress(id: "ui-address-1", title: "Дом", text: "Бишкек, ул. Киевская, 125, кв. 42", comment: "Домофон 42", isPrimary: true, createdAt: referenceDate, updatedAt: referenceDate),
+        CustomerAddress(id: "ui-address-2", title: "Работа", text: "Бишкек, пр. Манаса, 40", comment: nil, isPrimary: false, createdAt: referenceDate, updatedAt: referenceDate)
+    ]
+
+    static let settings = CustomerSettings(
+        id: "ui-settings-1",
+        phone: "+996 700 00 12 34",
+        name: "Айбек",
+        consent: true,
+        push: true,
+        whatsapp: true,
+        service: true,
+        promos: false
+    )
+
+    static let devices = [
+        CustomerDevice(
+            imei: "352099999999001",
+            product: "iPhone 15 128 GB Black",
+            status: "sold",
+            warrantyUntil: "2026-01-15",
+            daysLeft: 182,
+            warranty: DeviceWarrantySummary(id: "ui-warranty-1", status: "active", sla: warrantyDate)
+        )
+    ]
+}
+#endif
+
 private struct CustomerReturnsView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
@@ -1662,6 +1746,14 @@ private struct CustomerReturnsView: View {
         guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            returns = ClientUIFixture.returns
+            orders = ClientUIFixture.orders
+            errorMessage = nil
+            return
+        }
+#endif
         do {
             async let loadedReturns: [CustomerReturn] = APIClient(baseURL: environment.apiBaseURL).get("returns/mine", token: token)
             async let loadedOrders: [CustomerOrder] = APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
@@ -2503,6 +2595,13 @@ private struct CustomerLoyaltyView: View {
         guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            loyalty = ClientUIFixture.loyalty
+            errorMessage = nil
+            return
+        }
+#endif
         do {
             loyalty = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/loyalty", token: token)
             errorMessage = nil
@@ -2602,6 +2701,13 @@ private struct CustomerAddressesView: View {
         guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            addresses = ClientUIFixture.addresses
+            errorMessage = nil
+            return
+        }
+#endif
         do {
             addresses = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/addresses", token: token)
             errorMessage = nil
@@ -2826,6 +2932,20 @@ private struct CustomerSettingsView: View {
         guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            let loaded = ClientUIFixture.settings
+            settings = loaded
+            name = loaded.name
+            consent = loaded.consent
+            push = loaded.push
+            whatsapp = loaded.whatsapp
+            service = loaded.service
+            promos = loaded.promos
+            errorMessage = nil
+            return
+        }
+#endif
         do {
             let loaded: CustomerSettings = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/settings", token: token)
             settings = loaded
@@ -3279,6 +3399,13 @@ private struct DevicesView: View {
         guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            devices = ClientUIFixture.devices
+            errorMessage = nil
+            return
+        }
+#endif
         do {
             devices = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/devices", token: token)
             errorMessage = nil
