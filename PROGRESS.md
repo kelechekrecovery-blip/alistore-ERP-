@@ -2812,3 +2812,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `19/19`, Staff `2/2`, Courier `1/1`, POS `1/1`.
 - Outcome: Client Trade-in visual parity is accepted at local simulator software level. Real diagnostic pricing, production provider credentials, physical camera/Face ID/APNs smoke, trusted visual recorder drift and TestFlight/App Store signing remain open release gates.
 - Next step: continue remaining Client App 2.0 visual subflows, especially return request/status and warranty/service details, then rerun trusted visual/store preflight after external credentials and physical devices are ready.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-007`.
+- Task: align native Client return status and request screens with the `AliStore Клиент App 2.0` handoff while preserving the customer-owned returns API contract.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the returns route now renders the prototype `Возврат товара` shell with a dark product card, status pill, three-step progress, reason panel and photo evidence placeholder. The request sheet now matches the handoff with selected product, reason choices, free-text details, dashed photo placeholder and lime submit CTA while keeping JWT-owned `returns/mine` reads and idempotent server submission.
+- Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `20/20`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
+- Outcome: Client returns visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
+- Next step: continue unresolved Client App 2.0 subflows, especially warranty/service visual details and trusted visual recorder recovery, or switch to Android/ERP while external release blockers remain.

@@ -116,8 +116,31 @@ final class AliStoreClientUITests: XCTestCase {
         let returnsApp = launchSignedInAccount()
         returnsApp.staticTexts["Возвраты"].tap()
         XCTAssertTrue(returnsApp.navigationBars["Возвраты"].waitForExistence(timeout: 5))
+        XCTAssertTrue(returnsApp.staticTexts["Возврат товара"].waitForExistence(timeout: 5))
+        XCTAssertTrue(returnsApp.staticTexts["iPhone 15 128 GB Black"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Заявка принята"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Проверка товара"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Возврат денег"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Причина возврата"].exists)
         XCTAssertTrue(returnsApp.staticTexts["Не подошёл цвет устройства"].exists)
         XCTAssertTrue(returnsApp.staticTexts["На проверке"].exists)
+    }
+
+    func testSignedInReturnRequestUsesPrototypeForm() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Возвраты"].tap()
+        XCTAssertTrue(app.navigationBars["Возвраты"].waitForExistence(timeout: 5))
+        app.buttons["Оформить возврат"].tap()
+
+        XCTAssertTrue(app.navigationBars["Оформить возврат"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Возврат товара"].exists)
+        XCTAssertTrue(app.staticTexts["Выберите товар из заказа №4102"].exists)
+        XCTAssertTrue(app.staticTexts["AirPods Pro 2"].exists)
+        XCTAssertTrue(app.staticTexts["24 900 сом"].exists)
+        XCTAssertTrue(app.staticTexts["Причина возврата"].exists)
+        XCTAssertTrue(app.buttons["return-reason-Не подошёл цвет"].exists)
+        XCTAssertTrue(app.staticTexts["return-photo-placeholder"].exists)
+        XCTAssertTrue(app.buttons["return-submit"].exists)
     }
 
     func testSignedInAccountFixturesRenderAddressesAndSettings() {

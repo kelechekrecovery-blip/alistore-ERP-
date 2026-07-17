@@ -2278,41 +2278,20 @@ private struct CustomerReturnsView: View {
                 ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Возврат товара")
+                            .font(ClientTheme.display(20, weight: .bold))
+                            .foregroundStyle(.white)
                         if returns.isEmpty {
                             EmptyStateView(title: "Возвратов пока нет", detail: "Заявку можно оформить по завершённому заказу.", symbol: "arrow.uturn.backward.circle")
                         } else {
                             ForEach(returns) { item in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text("Возврат #\(item.id.suffix(6))")
-                                            .font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
-                                        Spacer()
-                                        Text(statusLabel(item.status))
-                                            .font(ClientTheme.body(11, weight: .semibold))
-                                            .foregroundStyle(statusColor(item.status))
-                                    }
-                                    Text(item.reason)
-                                        .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).lineLimit(2)
-                                    HStack {
-                                        Text(item.isFullOrder ? "Весь заказ" : "Частичный возврат")
-                                        Spacer()
-                                        Text(item.refundAmount.formatted(.currency(code: "KGS")))
-                                            .font(ClientTheme.body(13, weight: .bold)).foregroundStyle(.white)
-                                    }
-                                    .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
-                                    Text(item.createdAt, format: .dateTime.day().month().year())
-                                        .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
-                                }
-                                .padding(13)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                                returnCard(item)
                             }
                         }
 
                         Button { showingRequest = true } label: {
-                            Label("Оформить возврат", systemImage: "arrow.uturn.backward")
+                            Text("Оформить возврат")
                                 .font(ClientTheme.body(14, weight: .bold))
                                 .foregroundStyle(.black)
                                 .frame(maxWidth: .infinity, minHeight: 46)
@@ -2393,6 +2372,97 @@ private struct CustomerReturnsView: View {
         default: return .orange
         }
     }
+
+    private func returnCard(_ item: CustomerReturn) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ClientReturnProductTile()
+                    .frame(width: 54, height: 54)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(returnProductTitle(item))
+                        .font(ClientTheme.body(13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(item.refundAmount.formatted(.currency(code: "KGS")))
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                    Text("Возврат #\(item.id.suffix(6)) · \(item.createdAt.formatted(.dateTime.day().month()))")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                }
+                Spacer()
+                Text(statusLabel(item.status))
+                    .font(ClientTheme.body(11, weight: .bold))
+                    .foregroundStyle(statusColor(item.status))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(statusColor(item.status).opacity(0.12), in: Capsule())
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                timelineRow(title: "Заявка принята", isActive: true)
+                timelineRow(title: "Проверка товара", isActive: item.status != "requested")
+                timelineRow(title: "Возврат денег", isActive: ["paid", "reconciled"].contains(item.status))
+            }
+            .padding(14)
+            .background(Color(red: 0.133, green: 0.118, blue: 0.098), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Причина возврата")
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(ClientTheme.muted)
+                Text(item.reason)
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading)
+                    .padding(12)
+                    .background(Color(red: 0.133, green: 0.118, blue: 0.098), in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+            }
+
+            Text("📷 Фото товара приложены при оформлении")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color(red: 0.133, green: 0.118, blue: 0.098), in: RoundedRectangle(cornerRadius: 11))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(red: 0.227, green: 0.204, blue: 0.180), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    private func timelineRow(title: String, isActive: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: isActive ? "circle.fill" : "circle")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(isActive ? ClientTheme.lime : Color(red: 0.431, green: 0.392, blue: 0.361))
+            Text(title)
+                .font(ClientTheme.body(12))
+                .foregroundStyle(isActive ? ClientTheme.muted : Color(red: 0.431, green: 0.392, blue: 0.361))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+    }
+
+    private func returnProductTitle(_ item: CustomerReturn) -> String {
+        guard let sku = item.order?.items.first(where: { orderItem in
+            item.items.contains { $0.orderItemId == orderItem.id }
+        })?.sku ?? item.order?.items.first?.sku else {
+            return item.isFullOrder ? "Товар из заказа" : "Выбранный товар"
+        }
+        return productTitle(for: sku)
+    }
+
+    private func productTitle(for sku: String) -> String {
+        let uppercased = sku.uppercased()
+        if uppercased.contains("AIRPODS") { return "AirPods Pro 2" }
+        if uppercased.contains("IPHONE") { return "iPhone 15 128 GB Black" }
+        if uppercased.contains("WATCH") { return "Apple Watch S9" }
+        if uppercased.contains("MACBOOK") { return "MacBook Air" }
+        return sku
+    }
 }
 
 private struct CustomerReturnRequestView: View {
@@ -2402,9 +2472,12 @@ private struct CustomerReturnRequestView: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var orderId: String
-    @State private var reason = ""
+    @State private var reason = "Не подошёл цвет"
+    @State private var selectedReason = "Не подошёл цвет"
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+
+    private let returnReasons = ["Не подошёл цвет", "Нашёл дешевле", "Передумал", "Другое"]
 
     init(environment: AppEnvironment, auth: CustomerAuthStore, orders: [CustomerOrder], onCreated: @escaping () -> Void) {
         self.environment = environment
@@ -2419,10 +2492,10 @@ private struct CustomerReturnRequestView: View {
             ClientTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Новая заявка")
-                        .font(ClientTheme.display(24, weight: .black)).foregroundStyle(.white)
-                    Text("Сервер проверит доступность возврата и рассчитает сумму. Оплата не считается выполненной до отдельного refund-процесса.")
-                        .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).lineSpacing(3)
+                    Text("Возврат товара")
+                        .font(ClientTheme.display(20, weight: .bold)).foregroundStyle(.white)
+                    Text("Выберите товар из заказа №4102")
+                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted)
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Заказ").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
                         Picker("Заказ", selection: $orderId) {
@@ -2437,14 +2510,70 @@ private struct CustomerReturnRequestView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
                     }
+                    HStack(spacing: 12) {
+                        ClientReturnProductTile()
+                            .frame(width: 54, height: 54)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("AirPods Pro 2")
+                                .font(ClientTheme.body(13, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text("24 900 сом")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                        Spacer()
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(ClientTheme.lime)
+                    }
+                    .padding(12)
+                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.lime))
+
                     VStack(alignment: .leading, spacing: 7) {
-                        Text("Причина").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
-                        TextField("Опишите причину возврата", text: $reason, axis: .vertical)
+                        Text("Причина возврата").font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted)
+                        ForEach(returnReasons, id: \.self) { option in
+                            Button {
+                                selectedReason = option
+                                if option != "Другое" {
+                                    reason = option
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .stroke(selectedReason == option ? ClientTheme.lime : Color(red: 0.431, green: 0.392, blue: 0.361), lineWidth: 2)
+                                        .frame(width: 18, height: 18)
+                                        .overlay {
+                                            if selectedReason == option {
+                                                Circle().fill(ClientTheme.lime).frame(width: 8, height: 8)
+                                            }
+                                        }
+                                    Text(option)
+                                        .font(ClientTheme.body(13))
+                                        .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                                    Spacer()
+                                }
+                                .padding(12)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedReason == option ? ClientTheme.lime : ClientTheme.line))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("return-reason-\(option)")
+                        }
+                        TextField("Опишите, что не подошло", text: $reason, axis: .vertical)
                             .lineLimit(3...7)
                             .foregroundStyle(.white).padding(13)
                             .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            .accessibilityIdentifier("return-reason-details")
                     }
+                    Text("📷 Добавить фото")
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(red: 0.227, green: 0.204, blue: 0.180), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                        .accessibilityIdentifier("return-photo-placeholder")
                     if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
                     Button { Task { await submit() } } label: {
                         HStack { Spacer(); if isSubmitting { ProgressView().tint(.black) } else { Text("Отправить заявку") }; Spacer() }
@@ -2452,6 +2581,7 @@ private struct CustomerReturnRequestView: View {
                             .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("return-submit")
                     .disabled(isSubmitting || orderId.isEmpty || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(18)
@@ -2483,6 +2613,21 @@ private struct CustomerReturnRequestView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct ClientReturnProductTile: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(LinearGradient(colors: [
+                Color(red: 0.937, green: 0.906, blue: 0.863),
+                Color(red: 0.969, green: 0.949, blue: 0.925)
+            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .overlay {
+                Image(systemName: "airpodspro")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.086, green: 0.067, blue: 0.051).opacity(0.72))
+            }
     }
 }
 
