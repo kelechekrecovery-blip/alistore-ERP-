@@ -2,6 +2,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-013-OUTBOX-024`.
+- Task: start the courier reliability slice from the master execution plan.
+- Result: `OutboxMessage.nextAttemptAt` and a compound due-work index now enforce server-side retry timing; relay retries use exponential backoff and park the fifth failure in `failed`, while successful delivery clears the schedule. Expo and FCM transports now fail visibly when a recipient has no active device token, preventing false `sent` state.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260718100000_outbox_retry_backoff/migration.sql`, `apps/api/src/outbox/outbox.service.ts`, `apps/api/src/outbox/transports/expo-push.transport.ts`, `apps/api/src/outbox/transports/fcm-push.transport.ts`, and focused tests.
+- Checks run: Prisma validate/generate; `npm run api:build`; focused Jest `7/7`; `git diff --check`.
+- Acceptance: first LOGIC-013 sub-slice accepted locally. Partial COD-at-door semantics and physical courier device certification remain open.
+- Next step: define and implement an atomic partial COD collection aggregate with remaining customer debt, handover reconciliation and replay/concurrency tests.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-007-ERP-RESOLVE-023`.
 - Task: connect the stale provider-pending refund resolver to the ERP Return Desk.
 - Result: staff return listing now includes a compact refund/allocation snapshot; ERP operators with `refunds,manage` can choose provider-confirmed or provider-not-executed, enter an auditable reason/reference, and submit a stable session idempotency key to `POST /refunds/:id/resolve`. The browser flow covers cancellation and verifies both Refund and Return become `rejected`.

@@ -8,6 +8,8 @@ import {
 } from './outbox.types';
 
 const MAX_ATTEMPTS = 5;
+const RETRY_BASE_MS = 5_000;
+const RETRY_MAX_MS = 60 * 60 * 1_000;
 
 /**
  * Transactional outbox. Producers enqueue a message in the SAME transaction as
@@ -46,7 +48,7 @@ export class OutboxService {
    */
   async relayPending(limit = 50): Promise<{ sent: number; failed: number }> {
     const pending = await this.prisma.outboxMessage.findMany({
-      where: { status: 'pending', attempts: { lt: MAX_ATTEMPTS } },
+      where: { status: 'pending', attempts: { lt: MAX_ATTEMPTS }, nextAttemptAt: { lte: new Date() } },
       orderBy: { createdAt: 'asc' },
       take: limit,
     });
@@ -63,18 +65,20 @@ export class OutboxService {
         });
         await this.prisma.outboxMessage.update({
           where: { id: message.id },
-          data: { status: 'sent', sentAt: new Date() },
+          data: { status: 'sent', sentAt: new Date(), nextAttemptAt: null },
         });
         sent += 1;
       } catch (err) {
         const attempts = message.attempts + 1;
         const capped = attempts >= MAX_ATTEMPTS;
+        const delayMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1));
         await this.prisma.outboxMessage.update({
           where: { id: message.id },
           data: {
             attempts,
             lastError: err instanceof Error ? err.message : 'unknown error',
             status: capped ? 'failed' : 'pending',
+            nextAttemptAt: capped ? null : new Date(Date.now() + delayMs),
           },
         });
         if (capped) failed += 1;

@@ -49,7 +49,9 @@ export class FcmPushTransport implements NotificationTransport {
 
   async deliver(message: DeliverableMessage): Promise<void> {
     const tokens = await this.resolveTokens(message.recipient);
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) {
+      throw new Error(`push_recipient_unavailable: no active FCM tokens for ${message.recipient}`);
+    }
 
     const payload = jsonObject(message.payload);
     const results = await Promise.all(tokens.map(async (token) => ({

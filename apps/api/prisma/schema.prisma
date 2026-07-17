@@ -2975,10 +2975,12 @@ model OutboxMessage {
   status     OutboxStatus @default(pending)
   attempts   Int          @default(0)
   lastError  String?
+  nextAttemptAt DateTime?  @default(now())
   createdAt  DateTime     @default(now())
   sentAt     DateTime?
 
   @@index([status])
+  @@index([status, nextAttemptAt])
   @@index([campaignId, status])
 }
 

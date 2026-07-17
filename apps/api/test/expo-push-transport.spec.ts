@@ -140,6 +140,17 @@ describe('ExpoPushTransport', () => {
       }),
     ).rejects.toThrow(/Expo push send failed: 429/);
   });
+
+  it('fails visibly when a bound recipient has no active device tokens', async () => {
+    await expect(
+      transport.deliver({
+        channel: 'push',
+        recipient: 'missing-recipient',
+        template: 'task_assigned',
+        payload: { message: 'Нужен retry' },
+      }),
+    ).rejects.toThrow(/push_recipient_unavailable/);
+  });
 });
 
 function okResponse(body: unknown) {

@@ -32,7 +32,9 @@ export class ExpoPushTransport implements NotificationTransport {
 
   async deliver(message: DeliverableMessage): Promise<void> {
     const tokens = await this.resolveTokens(message.recipient);
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) {
+      throw new Error(`push_recipient_unavailable: no active Expo tokens for ${message.recipient}`);
+    }
 
     const payload = jsonObject(message.payload);
     const response = await fetch(this.apiUrl, {
