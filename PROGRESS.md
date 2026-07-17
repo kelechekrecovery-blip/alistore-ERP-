@@ -3418,3 +3418,13 @@
 - Checks run: `npm run ecosystem:audit:strict`; POS trusted recorder passed; failed/terminated courier refresh was not recorded as evidence because its local dev-server run hung under concurrent processes.
 - Outcome: acceptance remains fail-closed and no production-readiness claim is made. The Phase 1 functional ERP/storefront work remains locally accepted; the global release gate is still open.
 - Next step: obtain an uncontended test window for the remaining reconciliation recorders and full `mvp:verify`, then address native UI evidence and the owner-controlled design corpus blocker.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-ISOLATED-009`.
+- Task: verify service/loaner and procurement/sale reconciliation in isolation from the shared local test database.
+- Files changed: `PROGRESS.md` only; no concurrent source changes were staged or overwritten.
+- Result: service/loaner passed API `9/9` and UI `3/3`. Procurement API passed `10/10`; its shared-browser run hit PostgreSQL deadlock `40P01` during destructive cleanup, then the same browser scenario passed `1/1` on isolated database `alistore_phase1_codex_test` with dedicated ports after all `112` migrations were deployed.
+- Checks run: `npm run ecosystem:service-loaner:e2e`; `npm run ecosystem:procurement-sale:e2e` (API green, shared UI blocked by contention); isolated `npx playwright test e2e/ecosystem-procurement-sale.spec.ts` green; isolated migration deploy green.
+- Outcome: the functional scenarios are green, but trusted hash-bound evidence was not recorded because the source tree currently contains concurrent uncommitted changes. The strict release audit therefore remains fail-closed.
+- Next step: wait for the concurrent source lane to produce a committed clean SHA, then rerun trusted service/loaner, procurement/sale and full `mvp:verify` evidence against that exact SHA.
