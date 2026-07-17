@@ -55,6 +55,14 @@ public enum UITestBootstrap {
         #endif
     }
 
+    public static var startsAtVisualEvidence: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-visual-evidence")
+        #else
+        false
+        #endif
+    }
+
     public static var startsSignedIn: Bool {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments

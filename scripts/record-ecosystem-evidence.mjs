@@ -13,6 +13,7 @@ const gateId = process.argv[2];
 const gateScripts = new Map([
   ['visual', 'visual:e2e'],
   ['ios-app-ui', 'ios:ui'],
+  ['ios-client-visual', 'ios:visual'],
   ['android-app-ui', 'android:ui'],
   ['pos-refund-reconciliation', 'ecosystem:pos-refund:e2e'],
   ['courier-cod-reconciliation', 'ecosystem:courier-cod:e2e'],

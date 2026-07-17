@@ -28,6 +28,8 @@ chmod 700 apps/ios/scripts/store-preflight.sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   apps/ios/scripts/store-preflight.sh
 
+npm run ios:visual
+
 cd apps/ios
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodegen generate
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
@@ -41,6 +43,12 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -allowProvisioningUpdate \
   archive
 ```
+
+`ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
+Simulator and exports six retained PNG attachments (home, catalog, cart,
+account, payment success and payment failure). These are review evidence only;
+they do not replace pixel comparison against the handoff or physical-device
+release smoke.
 
 The archive must be signed with an Apple Distribution identity and a
 provisioning profile for `kg.alistore.client`. If the archive fails because no

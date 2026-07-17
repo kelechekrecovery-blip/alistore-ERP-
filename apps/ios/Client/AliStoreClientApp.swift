@@ -899,6 +899,16 @@ private struct ClientRootView: View {
     private func loadCatalog() async {
         catalogLoading = true
         defer { catalogLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsAtVisualEvidence {
+            products = ClientUIFixture.products
+            if (UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart), let product = products.first {
+                cart[product.id] = 1
+            }
+            catalogError = nil
+            return
+        }
+#endif
         do {
             let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
             products = response.items
@@ -2073,6 +2083,15 @@ private struct ClientOrderCard: View {
 private enum ClientUIFixture {
     private static let referenceDate = Date(timeIntervalSince1970: 1_750_000_000)
     private static let warrantyDate = Date(timeIntervalSince1970: 1_767_280_000)
+
+    static let products = [
+        Product(id: "ui-product-iphone", sku: "UI-IPHONE-17", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3),
+        Product(id: "ui-product-samsung", sku: "UI-SAMSUNG-S25", name: "Samsung Galaxy S25", price: 89_900, category: "Смартфоны", availableUnits: 5),
+        Product(id: "ui-product-macbook", sku: "UI-MACBOOK-AIR", name: "MacBook Air M4", price: 124_900, category: "Ноутбуки", availableUnits: 2),
+        Product(id: "ui-product-airpods", sku: "UI-AIRPODS-PRO", name: "AirPods Pro 3", price: 24_900, category: "Аудио", availableUnits: 8),
+        Product(id: "ui-product-watch", sku: "UI-WATCH-S10", name: "Apple Watch Series 10", price: 39_900, category: "Часы", availableUnits: 4),
+        Product(id: "ui-product-ipad", sku: "UI-IPAD-AIR", name: "iPad Air M3", price: 69_900, category: "Планшеты", availableUnits: 1)
+    ]
 
     static let orders: [CustomerOrder] = [
         CustomerOrder(

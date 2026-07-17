@@ -26,6 +26,10 @@
         }
       ]
     },
+    "ios-client-visual": {
+      "status": "pending",
+      "packageScript": "ios:visual"
+    },
     "android-app-ui": {
       "status": "accepted",
       "packageScript": "android:ui",

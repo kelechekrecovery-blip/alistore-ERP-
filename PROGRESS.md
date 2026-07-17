@@ -2673,3 +2673,13 @@
 - Checks run: `npm run ios:build` passed all 10 iOS targets; targeted failure UI test passed `1/1`; `npm run ios:ui` passed Client `16/16`, Staff `1/1`, Courier `1/1` and POS `1/1`; `npm run ios:test` `34/34`; `git diff --check`.
 - Outcome: payment-result recovery is accepted at local simulator software level. Live provider failure/retry, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: finish screen-by-screen visual evidence for the remaining Client App 2.0 states, then run signed archive/store preflight when Apple credentials, profiles and production API URL are supplied.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-001`.
+- Task: add deterministic native Client visual-evidence capture for the key prototype states.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `package.json`, `scripts/record-ecosystem-evidence.mjs`, `docs/TRUSTED-ECOSYSTEM-GATE.md`, `docs/acceptance/ecosystem-evidence.json`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`.
+- Result: the dedicated `ios:visual` command runs one isolated XCUITest and exports exactly six PNG attachments for Client home, catalog, cart, signed-in account, payment success and payment failure. A Debug-only local product fixture keeps the screenshots deterministic and shows real product imagery without a local API or credentials; Release behavior remains unchanged.
+- Checks run: `bash -n apps/ios/scripts/visual-capture.sh`; package/evidence JSON parse; `npm run ios:visual` passed 1/1 with 6/6 PNG attachments; `npm run ios:ui` passed Client `17/17`, Staff `1/1`, Courier `1/1`, POS `1/1`; `npm run ios:test` passed `34/34`; `npm run ios:build` passed all 10 targets; `git diff --check`.
+- Outcome: native Client visual evidence is reproducible and the full local iOS simulator software gate is green. This is not pixel-perfect acceptance for all 17 screens and does not certify physical-device Face ID/APNs/camera/offline behavior, signing, TestFlight, App Store Connect or production providers.
+- Next step: record the clean-HEAD visual artifact, then execute App Store release preflight and report the external credential blocker.

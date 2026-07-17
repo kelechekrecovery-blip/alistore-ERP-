@@ -28,6 +28,7 @@ Append `--strict` for the release audit. To record an accepted gate, replace the
 ```text
 scripts/record-ecosystem-evidence.mjs visual
 scripts/record-ecosystem-evidence.mjs ios-app-ui
+scripts/record-ecosystem-evidence.mjs ios-client-visual
 scripts/record-ecosystem-evidence.mjs android-app-ui
 scripts/record-ecosystem-evidence.mjs reconciled-e2e
 ```

@@ -237,6 +237,39 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
     }
 
+    func testClientPrototypeVisualEvidence() {
+        let home = launchGuest()
+        capture(home, named: "client-home")
+
+        home.buttons["Каталог"].tap()
+        XCTAssertTrue(home.staticTexts["Каталог"].waitForExistence(timeout: 5))
+        capture(home, named: "client-catalog")
+
+        let cart = XCUIApplication()
+        cart.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-cart", "--ui-testing-visual-evidence"]
+        cart.launch()
+        cart.buttons["Корзина"].tap()
+        XCTAssertTrue(cart.staticTexts["Корзина"].waitForExistence(timeout: 10))
+        capture(cart, named: "client-cart")
+
+        let account = launchSignedInAccount()
+        capture(account, named: "client-account")
+
+        let payment = XCUIApplication()
+        payment.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-result", "--ui-testing-visual-evidence"]
+        payment.launch()
+        payment.buttons["Корзина"].tap()
+        XCTAssertTrue(payment.staticTexts["payment-result-title"].waitForExistence(timeout: 10))
+        capture(payment, named: "client-payment-success")
+
+        let failure = XCUIApplication()
+        failure.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-failure", "--ui-testing-visual-evidence"]
+        failure.launch()
+        failure.buttons["Корзина"].tap()
+        XCTAssertTrue(failure.staticTexts["Оплата не прошла"].waitForExistence(timeout: 10))
+        capture(failure, named: "client-payment-failure")
+    }
+
     private func launchSignedInAccount() -> XCUIApplication {
         launchSignedInAccount(arguments: [])
     }
@@ -247,5 +280,20 @@ final class AliStoreClientUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["Покупатель"].waitForExistence(timeout: 10))
         return app
+    }
+
+    private func launchGuest() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-visual-evidence"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Главная"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }
