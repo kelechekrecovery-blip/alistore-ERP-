@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-APP-UI-EVIDENCE-002
+
+- Iteration ID: `ANDROID-APP-UI-EVIDENCE-002`.
+- Task: refresh trusted Android packaged-app UI evidence on the connected API 36 emulator.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/android-app-ui-79a135d16eece8aae399b1b2f3c6d92c98b0398770121a420787a8d559551063.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run android:ui` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`. The run covered core connected tests `30/30` plus packaged Client, Staff, Courier and POS connected smoke tests on `savio_api36_arm64(AVD)`.
+- Checks run: trusted ecosystem recorder for `android-app-ui`; `git diff --check`.
+- Acceptance: accepted for committed Android emulator packaged-app UI evidence. Physical-device biometric/push/camera/maps/scanner/printer/payment-terminal smoke, release signing, Play Internal/App Store credentials and live providers remain open.
+- Next step: rerun strict ecosystem audit and continue the remaining reconciliation/visual/design-corpus gaps.
+
 # 2026-07-17 — IOS-STORE-PREFLIGHT-STATUS-001
 
 - Iteration ID: `IOS-STORE-PREFLIGHT-STATUS-001`.
