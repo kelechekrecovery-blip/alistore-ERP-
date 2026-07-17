@@ -2553,3 +2553,13 @@
 - Checks run: `npm run api:build`; targeted authenticated receipt E2E `1/1`; full API Jest `148/148` suites and `670/670` tests; `npm run ios:build` all 10 targets; `npm run ios:test` `33/33`; `npm run ios:ui` Client `5/5`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: `IOS-CLIENT-005` is accepted at local software level. Full 17-screen visual parity, physical-device push/camera/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
 - Next step: continue the remaining Client App 2.0 screen-by-screen visual pass, prioritizing Devices/Warranty and then support/returns/trade-in, while retaining the external device, credentials and missing-reference gates.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-006`.
+- Task: align the native Client Devices and Warranty screens with the `AliStore Клиент App 2.0` handoff.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: replaced system `List`/`Form` presentation with the dark prototype shell: device cards show product, IMEI, warranty badge, coverage facts and actions; the warranty screen now contains a certificate card, status/SLA card, problem input, coverage explanation and server-backed service/trade-in routes. Existing customer-owned API reads and stable warranty idempotency remain unchanged.
+- Checks run: `npm run ios:build` all 10 targets; `npm run ios:ui` Client `5/5`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: `IOS-CLIENT-006` is accepted at local simulator software level. Full 17-screen visual evidence, physical-device camera/push/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: continue Client support/returns/trade-in screen parity and add authenticated UI fixtures for device/warranty states before physical-device certification.

@@ -3074,35 +3074,37 @@ private struct DevicesView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Group {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
             if isLoading {
                 ProgressView("Загружаем устройства")
+                    .tint(ClientTheme.lime)
+                    .foregroundStyle(ClientTheme.muted)
             } else if let errorMessage {
-                ContentUnavailableView("Устройства недоступны", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
+                ClientStateCard(
+                    title: "Устройства недоступны",
+                    detail: errorMessage,
+                    symbol: "wifi.exclamationmark"
+                )
             } else if devices.isEmpty {
-                EmptyStateView(title: "Устройств пока нет", detail: "Купленные устройства появятся после оплаты заказа.", symbol: "iphone")
+                ClientStateCard(
+                    title: "Устройств пока нет",
+                    detail: "Купленные устройства появятся после оплаты заказа.",
+                    symbol: "iphone"
+                )
             } else {
-                List(devices) { device in
-                    NavigationLink {
-                        WarrantyRequestView(environment: environment, auth: auth, device: device)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(device.product).font(.headline)
-                                Spacer()
-                                Text(device.warranty?.status ?? "Гарантия")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(device.daysLeft.map { $0 > 0 } == true ? .green : .secondary)
-                            }
-                            Text("IMEI \(device.imei)").font(.caption.monospaced()).foregroundStyle(.secondary)
-                            if let days = device.daysLeft {
-                                Text(days > 0 ? "Осталось \(days) дн." : "Гарантия завершена").font(.caption)
-                            }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Все покупки с гарантией AliStore")
+                            .font(ClientTheme.body(13))
+                            .foregroundStyle(ClientTheme.muted)
+                        ForEach(devices) { device in
+                            ClientDeviceCard(environment: environment, auth: auth, device: device)
                         }
-                        .padding(.vertical, 4)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .listStyle(.plain)
             }
         }
         .navigationTitle("Мои устройства")
@@ -3124,6 +3126,141 @@ private struct DevicesView: View {
     }
 }
 
+private struct ClientDeviceCard: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let device: CustomerDevice
+
+    private var isCovered: Bool { device.daysLeft.map { $0 > 0 } ?? false }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(ClientTheme.coral.opacity(0.16))
+                    Image(systemName: device.product.localizedCaseInsensitiveContains("mac") ? "laptopcomputer" : "iphone.gen3")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(ClientTheme.coral)
+                }
+                .frame(width: 54, height: 54)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(device.product)
+                        .font(ClientTheme.body(15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("IMEI \(device.imei)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(ClientTheme.muted)
+                    Text("Статус: \(device.status)")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer(minLength: 6)
+                Text(isCovered ? "Активна" : "Завершена")
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(isCovered ? ClientTheme.lime : ClientTheme.muted)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background((isCovered ? ClientTheme.lime : ClientTheme.muted).opacity(0.14), in: Capsule())
+            }
+
+            HStack(spacing: 0) {
+                ClientDeviceFact(title: "Гарантия до", value: formattedDate(device.warrantyUntil) ?? "Не указана")
+                Spacer()
+                ClientDeviceFact(
+                    title: "Осталось",
+                    value: device.daysLeft.map { $0 > 0 ? "\($0) дн." : "0 дн." } ?? "Не указано",
+                    accent: isCovered
+                )
+            }
+            .padding(.top, 2)
+
+            HStack(spacing: 8) {
+                NavigationLink {
+                    WarrantyRequestView(environment: environment, auth: auth, device: device)
+                } label: {
+                    Label("Гарантия", systemImage: "shield.checkered")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 9))
+                }
+                .accessibilityLabel("Открыть гарантию для \(device.product)")
+                NavigationLink {
+                    CustomerSupportView(environment: environment, auth: auth)
+                } label: {
+                    Label("Сервис", systemImage: "wrench.and.screwdriver")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ClientTheme.line.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+                }
+                .accessibilityLabel("Открыть обращение в сервис")
+                NavigationLink {
+                    CustomerTradeInsView(environment: environment, auth: auth)
+                } label: {
+                    Label("Trade-in", systemImage: "arrow.triangle.2.circlepath")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ClientTheme.line.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+                }
+                .accessibilityLabel("Открыть Trade-in")
+            }
+        }
+        .padding(16)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+    }
+}
+
+private struct ClientDeviceFact: View {
+    let title: String
+    let value: String
+    var accent = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            Text(value)
+                .font(ClientTheme.body(13, weight: .semibold))
+                .foregroundStyle(accent ? ClientTheme.lime : .white)
+        }
+    }
+}
+
+private struct ClientStateCard: View {
+    let title: String
+    let detail: String
+    let symbol: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(ClientTheme.lime)
+            Text(title)
+                .font(ClientTheme.body(17, weight: .bold))
+                .foregroundStyle(.white)
+            Text(detail)
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: 360)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+        .padding(16)
+    }
+}
+
 private struct WarrantyRequestView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
@@ -3134,36 +3271,63 @@ private struct WarrantyRequestView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Form {
-            Section("Устройство") {
-                LabeledContent("Модель", value: device.product)
-                LabeledContent("IMEI", value: device.imei)
-                if let days = device.daysLeft { LabeledContent("Гарантия", value: "\(days) дн.") }
-            }
-            if let warranty = device.warranty {
-                Section("Обращение") {
-                    LabeledContent("Статус", value: warranty.status)
-                    LabeledContent("SLA", value: warranty.sla, format: .dateTime.day().month().year())
-                }
-            } else if let created {
-                Section("Обращение") {
-                    LabeledContent("Статус", value: created.status)
-                    LabeledContent("SLA", value: created.sla, format: .dateTime.day().month().year())
-                }
-            } else {
-                Section("Проблема") {
-                    TextField("Опишите неисправность", text: $problem, axis: .vertical)
-                        .lineLimit(3...7)
-                    if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
-                    Button {
-                        Task { await submit() }
-                    } label: {
-                        if isSubmitting { ProgressView() } else { Text("Открыть гарантийное обращение") }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ClientWarrantyCertificate(device: device)
+                if let warranty = device.warranty {
+                    ClientWarrantyStatusCard(warranty: warranty)
+                } else if let created {
+                    ClientWarrantyStatusCard(warranty: created)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Опишите неисправность")
+                            .font(ClientTheme.body(14, weight: .bold))
+                            .foregroundStyle(.white)
+                        TextEditor(text: $problem)
+                            .scrollContentBackground(.hidden)
+                            .foregroundStyle(.white)
+                            .font(ClientTheme.body(14))
+                            .frame(minHeight: 116)
+                            .padding(10)
+                            .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                            .accessibilityIdentifier("client-warranty-problem")
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(Color(red: 1, green: 0.54, blue: 0.48))
+                        }
+                        Button {
+                            Task { await submit() }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if isSubmitting {
+                                    ProgressView().tint(.black)
+                                } else {
+                                    Text("Открыть гарантийное обращение")
+                                }
+                                Spacer()
+                            }
+                            .font(ClientTheme.body(14, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(minHeight: 48)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+                        }
+                        .disabled(isSubmitting || problem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("client-open-warranty")
                     }
-                    .disabled(isSubmitting || problem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(16)
+                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
                 }
+                ClientWarrantyCoverageCard()
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
+        .scrollIndicators(.hidden)
+        .background(ClientTheme.background.ignoresSafeArea())
         .navigationTitle("Гарантия")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -3184,6 +3348,137 @@ private struct WarrantyRequestView: View {
             errorMessage = error.localizedDescription
         }
     }
+}
+
+private struct ClientWarrantyCertificate: View {
+    let device: CustomerDevice
+    private var isCovered: Bool { device.daysLeft.map { $0 > 0 } ?? false }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label {
+                    Text("Гарантийный талон")
+                        .font(ClientTheme.body(14, weight: .bold))
+                } icon: {
+                    Text("A")
+                        .font(ClientTheme.body(13, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 7))
+                }
+                .foregroundStyle(.white)
+                Spacer()
+                Text(isCovered ? "Активна" : "Завершена")
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(isCovered ? ClientTheme.lime : ClientTheme.muted)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background((isCovered ? ClientTheme.lime : ClientTheme.muted).opacity(0.14), in: Capsule())
+            }
+            Text(device.product)
+                .font(ClientTheme.display(20, weight: .bold))
+                .foregroundStyle(.white)
+            Text("IMEI \(device.imei)")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(ClientTheme.muted)
+            HStack(spacing: 0) {
+                ClientDeviceFact(title: "Гарантия до", value: formattedDate(device.warrantyUntil) ?? "Не указана")
+                Spacer()
+                ClientDeviceFact(
+                    title: "Осталось",
+                    value: device.daysLeft.map { $0 > 0 ? "\($0) дней" : "0 дней" } ?? "Не указано",
+                    accent: isCovered
+                )
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.165, green: 0.165, blue: 0.18), ClientTheme.surface],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+    }
+}
+
+private struct ClientWarrantyStatusCard: View {
+    let warranty: DeviceWarrantySummaryOrCase
+
+    init(warranty: DeviceWarrantySummary) {
+        self.warranty = DeviceWarrantySummaryOrCase(status: warranty.status, sla: warranty.sla, problem: nil)
+    }
+
+    init(warranty: WarrantyCase) {
+        self.warranty = DeviceWarrantySummaryOrCase(status: warranty.status, sla: warranty.sla, problem: warranty.problem)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Обращение в сервис")
+                .font(ClientTheme.body(14, weight: .bold))
+                .foregroundStyle(.white)
+            HStack {
+                Text("Статус")
+                    .foregroundStyle(ClientTheme.muted)
+                Spacer()
+                Text(warranty.status)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(ClientTheme.lime)
+            }
+            HStack {
+                Text("Рассмотрим до")
+                    .foregroundStyle(ClientTheme.muted)
+                Spacer()
+                Text(warranty.sla.formatted(.dateTime.day().month().year()))
+                    .foregroundStyle(.white)
+            }
+            if let problem = warranty.problem, !problem.isEmpty {
+                Text(problem)
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(.white)
+                    .padding(.top, 4)
+            }
+        }
+        .font(ClientTheme.body(13))
+        .padding(16)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+}
+
+private struct DeviceWarrantySummaryOrCase {
+    let status: String
+    let sla: Date
+    let problem: String?
+}
+
+private struct ClientWarrantyCoverageCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Что покрывается")
+                .font(ClientTheme.body(14, weight: .bold))
+                .foregroundStyle(.white)
+            Text("✓ Заводской брак\n✓ Неисправности экрана и батареи\n✗ Механические повреждения и влага")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(ClientTheme.muted)
+                .lineSpacing(5)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+}
+
+private func formattedDate(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let formatter = ISO8601DateFormatter()
+    guard let date = formatter.date(from: value) else { return value }
+    return date.formatted(.dateTime.day().month().year())
 }
 
 private struct CatalogView: View {
