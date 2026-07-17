@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-CLIENT-VISUAL-018-EVIDENCE
+
+- Iteration ID: `IOS-CLIENT-VISUAL-018-EVIDENCE`.
+- Task: refresh trusted `ios-client-visual` acceptance evidence from the committed handoff-aligned iOS Client screenshot gate.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-9feb5194dbcfef85dba5592aa649575418d051d176f40533d013f8cbdd69408a.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ios:visual` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`.
+- Checks run: trusted ecosystem recorder for `ios-client-visual` executed the XCUITest screenshot gate and recorded accepted evidence; JSON parse check passed; `git diff --check` passed. The outer zsh wrapper reported `read-only variable: status` after evidence was already written, so the recorded artifact is the authoritative gate result.
+- Acceptance: accepted for committed simulator visual evidence only. Physical-device smoke, owner pixel sign-off, production API, signing/provisioning, TestFlight upload and App Store review remain open.
+- Next step: continue the remaining release gaps, starting with native physical-device/release blockers or the next ERP/finance/core backlog item depending on available credentials.
+
 # 2026-07-17 — IOS-CLIENT-VISUAL-018
 
 - Iteration ID: `IOS-CLIENT-VISUAL-018`.
