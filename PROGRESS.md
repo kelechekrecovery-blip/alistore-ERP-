@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-STORE-PREFLIGHT-STATUS-001
+
+- Iteration ID: `IOS-STORE-PREFLIGHT-STATUS-001`.
+- Task: inspect the current native iOS Client App Store preflight/signing blockers after refreshing all-iOS-app simulator UI evidence.
+- Files changed: `BACKLOG.md` and `PROGRESS.md`.
+- Result: local Apple Distribution signing identity for team `ZYU3F8W56P` and the protected App Store Connect key file `AuthKey_47XTPVKBDS.p8` are present. `apps/ios/.env.production` is intentionally absent and ignored by Git, so the default store preflight fails closed before release checks with `ALISTORE_API_BASE_URL is required`. A temporary production-shaped env passes the non-strict native Client store preflight, proving metadata, privacy manifest, HTTPS API injection, bundle id, AppIcon and production APNs resolution. Strict signing fails closed without a local App Store provisioning profile for `kg.alistore.client`; with `IOS_ALLOW_PROVISIONING_UPDATE=true`, the same strict signing gate verifies the Apple Distribution identity and reaches a pass. Strict App Store Connect remains blocked until the real `ASC_ISSUER_ID`/account authorization is supplied.
+- Checks run: `npm run ios:store-preflight` failed closed as expected without `apps/ios/.env.production`; temporary-env `npm run ios:store-preflight -- --env-file <tmp>` passed; temporary-env `--strict-signing` failed closed without a provisioning profile; temporary-env `--strict-signing` with explicit Xcode auto-provisioning allowance passed; `git diff --check` passed.
+- Acceptance: accepted as release-blocker evidence only. It does not certify App Store readiness because real production API configuration, verified App Store Connect issuer, provisioning/profile or authenticated Xcode account, physical iPhone smoke, TestFlight upload and App Store review remain open.
+- Next step: fill the ignored `apps/ios/.env.production` with real protected values and run `npm run ios:store-preflight -- --env-file apps/ios/.env.production --strict-asc --strict-signing`, or continue the next software-only ecosystem gap while owner-controlled Apple/provider/device gates remain external.
+
 # 2026-07-17 — IOS-APP-UI-EVIDENCE-002
 
 - Iteration ID: `IOS-APP-UI-EVIDENCE-002`.
