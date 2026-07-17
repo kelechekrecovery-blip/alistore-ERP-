@@ -554,6 +554,14 @@ public struct Customer360: Decodable, Sendable {
     public let debts: Customer360Debts
     public let warranties: Customer360Warranties
     public let tickets: Customer360Tickets
+
+    public init(customer: Customer360Profile, orders: Customer360Orders, debts: Customer360Debts, warranties: Customer360Warranties, tickets: Customer360Tickets) {
+        self.customer = customer
+        self.orders = orders
+        self.debts = debts
+        self.warranties = warranties
+        self.tickets = tickets
+    }
 }
 
 public struct Customer360Profile: Decodable, Sendable {
@@ -564,6 +572,16 @@ public struct Customer360Profile: Decodable, Sendable {
     public let segments: [String]
     public let ltv: Int
     public let createdAt: Date
+
+    public init(id: String, name: String, phone: String, consent: Bool, segments: [String], ltv: Int, createdAt: Date) {
+        self.id = id
+        self.name = name
+        self.phone = phone
+        self.consent = consent
+        self.segments = segments
+        self.ltv = ltv
+        self.createdAt = createdAt
+    }
 }
 
 public struct Customer360Order: Decodable, Identifiable, Sendable {
@@ -571,12 +589,25 @@ public struct Customer360Order: Decodable, Identifiable, Sendable {
     public let status: String
     public let total: Int
     public let createdAt: Date
+
+    public init(id: String, status: String, total: Int, createdAt: Date) {
+        self.id = id
+        self.status = status
+        self.total = total
+        self.createdAt = createdAt
+    }
 }
 
 public struct Customer360Orders: Decodable, Sendable {
     public let total: Int
     public let spent: Int
     public let recent: [Customer360Order]
+
+    public init(total: Int, spent: Int, recent: [Customer360Order]) {
+        self.total = total
+        self.spent = spent
+        self.recent = recent
+    }
 }
 
 public struct Customer360Debt: Decodable, Identifiable, Sendable {
@@ -584,12 +615,25 @@ public struct Customer360Debt: Decodable, Identifiable, Sendable {
     public let balance: Int
     public let status: String
     public let dueDate: Date
+
+    public init(id: String, balance: Int, status: String, dueDate: Date) {
+        self.id = id
+        self.balance = balance
+        self.status = status
+        self.dueDate = dueDate
+    }
 }
 
 public struct Customer360Debts: Decodable, Sendable {
     public let count: Int
     public let openBalance: Int
     public let items: [Customer360Debt]
+
+    public init(count: Int, openBalance: Int, items: [Customer360Debt]) {
+        self.count = count
+        self.openBalance = openBalance
+        self.items = items
+    }
 }
 
 public struct Customer360Warranty: Decodable, Identifiable, Sendable {
@@ -597,11 +641,23 @@ public struct Customer360Warranty: Decodable, Identifiable, Sendable {
     public let imei: String
     public let status: String
     public let sla: Date
+
+    public init(id: String, imei: String, status: String, sla: Date) {
+        self.id = id
+        self.imei = imei
+        self.status = status
+        self.sla = sla
+    }
 }
 
 public struct Customer360Warranties: Decodable, Sendable {
     public let open: Int
     public let items: [Customer360Warranty]
+
+    public init(open: Int, items: [Customer360Warranty]) {
+        self.open = open
+        self.items = items
+    }
 }
 
 public struct Customer360Ticket: Decodable, Identifiable, Sendable {
@@ -610,11 +666,24 @@ public struct Customer360Ticket: Decodable, Identifiable, Sendable {
     public let status: String
     public let priority: String
     public let sla: Date
+
+    public init(id: String, subject: String, status: String, priority: String, sla: Date) {
+        self.id = id
+        self.subject = subject
+        self.status = status
+        self.priority = priority
+        self.sla = sla
+    }
 }
 
 public struct Customer360Tickets: Decodable, Sendable {
     public let open: Int
     public let items: [Customer360Ticket]
+
+    public init(open: Int, items: [Customer360Ticket]) {
+        self.open = open
+        self.items = items
+    }
 }
 
 public struct WarrantyStatusRequest: Encodable, Sendable {

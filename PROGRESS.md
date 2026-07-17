@@ -2805,6 +2805,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-STAFF-VISUAL-006`.
+- Task: connect and visually align native Staff Customer 360 / warranty tools after the Staff app shell pass.
+- Files changed: `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: Customer 360 now opens from the Staff home work tools into a dedicated dark Staff tab instead of routing to Orders. The screen renders the prototype-style customer profile, consent and segments, LTV/orders/debt/service metrics, recent purchases, warranty/service action and support context while live mode still uses staff JWT `GET customers/:id/overview` and `PATCH warranty/:id`.
+- Checks run: `npm run ios:build` passed all 10 targets; targeted `AliStoreStaffUITests` passed 8/8; full `npm run ios:ui` passed Client 20/20, Staff 8/8, Courier 1/1 and POS 1/1; `git diff --check` passed.
+- Outcome: Staff Customer 360/warranty visual slice is accepted at local simulator software level. Physical Face ID/APNs/scanner/camera/customer communication smoke, exact pixel sign-off and complete Staff operational journey remain open.
+- Next step: continue remaining Staff/Courier/POS native parity or Android parity while external physical-device gates remain blocked.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-009`.
 - Task: unblock trusted Client visual evidence recording after the local toolchain drifted from `scripts/ecosystem-toolchain-lock.json`.
 - Files changed: `scripts/ecosystem-toolchain-lock.json`, `BACKLOG.md`, and `PROGRESS.md`.

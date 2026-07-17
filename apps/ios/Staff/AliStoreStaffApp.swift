@@ -98,6 +98,7 @@ private struct StaffRootView: View {
                         scannerMode = .evidence
                         selectedTab = .buyback
                     },
+                    openCustomer360: { selectedTab = .customer },
                     openShift: { selectedTab = .shift }
                 )
             }
@@ -118,6 +119,11 @@ private struct StaffRootView: View {
             }
             .tabItem { Label("Скупка", systemImage: "barcode.viewfinder") }
             .tag(StaffTab.buyback)
+            NavigationStack {
+                Customer360View(session: session)
+            }
+            .tabItem { Label("Клиент", systemImage: "person.text.rectangle.fill") }
+            .tag(StaffTab.customer)
             NavigationStack {
                 StaffShiftView(session: session, pushStatus: pushStatus, enablePush: enablePush, logout: logout)
             }
@@ -157,6 +163,8 @@ private struct StaffRootView: View {
         } else if url.host == "support" {
             selectedTab = .orders
             workMode = .support
+        } else if url.host == "customers" || url.host == "customer" {
+            selectedTab = .customer
         } else if url.host == "shift" || url.host == "attendance" || url.host == "account" {
             selectedTab = .shift
         }
@@ -197,7 +205,7 @@ private struct StaffRootView: View {
     }
 }
 
-private enum StaffTab: Hashable { case home, orders, kpi, buyback, shift }
+private enum StaffTab: Hashable { case home, orders, kpi, buyback, customer, shift }
 
 private struct StaffHomeView: View {
     let session: StaffSession
@@ -206,6 +214,7 @@ private struct StaffHomeView: View {
     let openAddProduct: () -> Void
     let openBuyback: () -> Void
     let openEvidence: () -> Void
+    let openCustomer360: () -> Void
     let openShift: () -> Void
 
     private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
@@ -342,8 +351,8 @@ private struct StaffHomeView: View {
                 .font(.headline.weight(.black))
                 .foregroundStyle(primaryText)
             HStack(spacing: 10) {
-                toolPill("Customer 360", icon: "person.text.rectangle", action: openOrders)
-                toolPill("Evidence", icon: "photo.stack", action: openEvidence)
+                toolPill("Customer 360", icon: "person.text.rectangle", identifier: "staff-home-customer360", action: openCustomer360)
+                toolPill("Evidence", icon: "photo.stack", identifier: "staff-home-evidence", action: openEvidence)
             }
         }
     }
@@ -373,7 +382,7 @@ private struct StaffHomeView: View {
         .accessibilityIdentifier(identifier)
     }
 
-    private func toolPill(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func toolPill(_ title: String, icon: String, identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
                 .font(.caption.weight(.bold))
@@ -385,6 +394,7 @@ private struct StaffHomeView: View {
                 .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 
@@ -396,93 +406,321 @@ private struct Customer360View: View {
     @State private var busyWarrantyId: String?
     @State private var errorMessage: String?
     private let environment = AppEnvironment.live()
+    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
+    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    private let surfaceSoft = Color(red: 0.165, green: 0.145, blue: 0.122)
+    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
+    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
+    private let coral = Color(red: 1, green: 0.357, blue: 0.18)
+    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
+    private let amber = Color(red: 1, green: 0.77, blue: 0.35)
 
     var body: some View {
-        List {
-            Section("Customer 360") {
-                TextField("ID клиента", text: $customerId)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                Button("Открыть профиль", systemImage: "magnifyingglass") { Task { await loadOverview() } }
-                    .disabled(customerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
-            }
-            if isLoading {
-                Section { ProgressView("Загружаем профиль…") }
-            }
-            if let errorMessage {
-                Section { Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
-            }
-            if let overview {
-                profileSections(overview)
-            } else if !isLoading && errorMessage == nil {
-                Section {
-                    ContentUnavailableView("Выберите клиента", systemImage: "person.text.rectangle", description: Text("Введите внутренний ID из заказа или сканера."))
+        ZStack {
+            background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    searchCard
+                    if isLoading {
+                        ProgressView("Загружаем профиль…")
+                            .tint(lime)
+                            .foregroundStyle(primaryText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                            .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    } else if let errorMessage {
+                        errorCard(errorMessage)
+                    } else if let overview {
+                        profileContent(overview)
+                    } else {
+                        emptyCard
+                    }
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
             }
         }
-        .navigationTitle("Клиенты")
+        .navigationTitle("Customer 360")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+        .task { await preloadFixtureIfNeeded() }
         .refreshable { if overview != nil { await loadOverview() } }
     }
 
     @ViewBuilder
-    private func profileSections(_ overview: Customer360) -> some View {
-        Section("Профиль") {
-            LabeledContent("Имя", value: overview.customer.name)
-            LabeledContent("Телефон", value: overview.customer.phone)
-            LabeledContent("LTV", value: money(overview.customer.ltv))
-            LabeledContent("Согласие", value: overview.customer.consent ? "Есть" : "Нет")
-            if !overview.customer.segments.isEmpty {
-                LabeledContent("Сегменты", value: overview.customer.segments.joined(separator: ", "))
+    private var searchCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Customer 360")
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text("Профиль, покупки, долги, гарантия и обращения клиента.")
+                        .font(.caption)
+                        .foregroundStyle(secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Text("STAFF")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(lime, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            HStack(spacing: 9) {
+                TextField("ID клиента или заказ", text: $customerId)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(primaryText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityIdentifier("staff-customer360-search")
+                Button {
+                    Task { await loadOverview() }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(.black)
+                        .frame(width: 46, height: 46)
+                        .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(customerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+                .accessibilityLabel("Открыть профиль")
+                .accessibilityIdentifier("staff-customer360-open")
             }
         }
-        Section("Покупки") {
-            LabeledContent("Заказов", value: String(overview.orders.total))
-            LabeledContent("Оплачено", value: money(overview.orders.spent))
-            ForEach(overview.orders.recent) { order in
-                LabeledContent("#\(order.id.suffix(6)) · \(order.status)", value: money(order.total))
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    @ViewBuilder
+    private func profileContent(_ overview: Customer360) -> some View {
+        customerHeader(overview)
+        metricGrid(overview)
+        if !overview.orders.recent.isEmpty {
+            sectionCard(title: "Последние покупки", systemImage: "bag.fill") {
+                ForEach(overview.orders.recent) { order in
+                    compactRow(
+                        title: "#\(order.id.suffix(6)) · \(order.status)",
+                        subtitle: order.createdAt.formatted(date: .abbreviated, time: .omitted),
+                        value: money(order.total),
+                        tint: lime
+                    )
+                }
             }
-        }
-        Section("Финансы и обращения") {
-            LabeledContent("Открытый долг", value: money(overview.debts.openBalance))
-            LabeledContent("Гарантий", value: String(overview.warranties.open))
-            LabeledContent("Тикетов", value: String(overview.tickets.open))
         }
         if !overview.warranties.items.isEmpty {
-            Section("Гарантия") {
+            sectionCard(title: "Гарантия и сервис", systemImage: "wrench.and.screwdriver.fill") {
                 ForEach(overview.warranties.items) { warranty in
-                    VStack(alignment: .leading, spacing: 7) {
+                    VStack(alignment: .leading, spacing: 9) {
                         HStack {
-                            Text(warranty.imei).font(.subheadline.monospaced())
+                            Text(warranty.imei)
+                                .font(.caption.monospacedDigit().weight(.bold))
+                                .foregroundStyle(primaryText)
                             Spacer()
-                            Text(warranty.status).font(.caption).foregroundStyle(.secondary)
+                            Text(statusLabel(warranty.status))
+                                .font(.caption2.weight(.black))
+                                .foregroundStyle(statusColor(warranty.status))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(statusColor(warranty.status).opacity(0.15), in: Capsule())
                         }
                         Label(
                             warranty.sla.formatted(date: .abbreviated, time: .omitted),
                             systemImage: warranty.sla < Date() ? "exclamationmark.circle.fill" : "clock"
                         )
-                        .font(.caption)
-                        .foregroundStyle(warranty.sla < Date() ? .red : .secondary)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(warranty.sla < Date() ? coral : secondaryText)
                         if let next = nextWarrantyStatus(warranty.status) {
-                            Button(warrantyActionLabel(next), systemImage: "arrow.right.circle") {
+                            Button {
                                 Task { await transitionWarranty(warranty.id, to: next) }
+                            } label: {
+                                Text(warrantyActionLabel(next))
+                                    .font(.caption.weight(.black))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
+                            .buttonStyle(.plain)
                             .disabled(busyWarrantyId != nil)
+                            .accessibilityIdentifier("staff-customer360-warranty-action-\(warranty.id)")
                         }
                     }
-                    .padding(.vertical, 3)
+                    .padding(12)
+                    .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
             }
         }
         if !overview.tickets.items.isEmpty {
-            Section("Поддержка") {
+            sectionCard(title: "Поддержка", systemImage: "bubble.left.and.bubble.right.fill") {
                 ForEach(overview.tickets.items) { ticket in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ticket.subject).fontWeight(.semibold)
-                        Text("\(ticket.priority) · \(ticket.status)").font(.caption).foregroundStyle(.secondary)
+                    compactRow(
+                        title: ticket.subject,
+                        subtitle: "\(priorityLabel(ticket.priority)) · \(statusLabel(ticket.status)) · SLA \(ticket.sla.formatted(date: .omitted, time: .shortened))",
+                        value: nil,
+                        tint: priorityColor(ticket.priority)
+                    )
+                }
+            }
+        }
+    }
+
+    private func customerHeader(_ overview: Customer360) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(coral)
+                    Text(initials(overview.customer.name))
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 52, height: 52)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(overview.customer.name)
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text(overview.customer.phone)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(secondaryText)
+                }
+                Spacer()
+                Text(overview.customer.consent ? "CONSENT" : "NO CONSENT")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(overview.customer.consent ? .black : coral)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(overview.customer.consent ? lime : coral.opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            if !overview.customer.segments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(overview.customer.segments, id: \.self) { segment in
+                            Text(segment)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(primaryText)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(surfaceSoft, in: Capsule())
+                        }
                     }
                 }
             }
         }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+        .accessibilityIdentifier("staff-customer360-profile")
+    }
+
+    private func metricGrid(_ overview: Customer360) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            metricCard("LTV", money(overview.customer.ltv), "за всё время", lime)
+            metricCard("Заказы", "\(overview.orders.total)", money(overview.orders.spent), amber)
+            metricCard("Долг", money(overview.debts.openBalance), "\(overview.debts.count) активных", coral)
+            metricCard("Сервис", "\(overview.warranties.open)", "\(overview.tickets.open) тикетов", Color(red: 0.58, green: 0.72, blue: 1))
+        }
+    }
+
+    private func metricCard(_ title: String, _ value: String, _ subtitle: String, _ tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(secondaryText)
+            Text(value)
+                .font(.headline.monospacedDigit().weight(.black))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(subtitle)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(secondaryText)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private func sectionCard<Content: View>(title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            content()
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private func compactRow(title: String, subtitle: String, value: String?, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(tint)
+                .frame(width: 9, height: 9)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if let value {
+                Text(value)
+                    .font(.caption.monospacedDigit().weight(.black))
+                    .foregroundStyle(tint)
+            }
+        }
+        .padding(12)
+        .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var emptyCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Выберите клиента", systemImage: "person.text.rectangle")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            Text("Введите внутренний ID из заказа или сканера, чтобы открыть профиль, покупки, сервис и обращения.")
+                .font(.subheadline)
+                .foregroundStyle(secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func errorCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Профиль недоступен", systemImage: "wifi.exclamationmark")
+                .font(.headline.weight(.black))
+                .foregroundStyle(coral)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(secondaryText)
+            Button("Повторить") { Task { await loadOverview() } }
+                .buttonStyle(.plain)
+                .font(.caption.weight(.black))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     @MainActor
@@ -492,6 +730,12 @@ private struct Customer360View: View {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            overview = Self.fixtureOverview
+            return
+        }
+        #endif
         do {
             overview = try await APIClient(baseURL: environment.apiBaseURL).get(
                 "customers/\(id)/overview",
@@ -501,6 +745,16 @@ private struct Customer360View: View {
             overview = nil
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func preloadFixtureIfNeeded() async {
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn, overview == nil {
+            customerId = "C-1042"
+            overview = Self.fixtureOverview
+        }
+        #endif
     }
 
     @MainActor
@@ -543,8 +797,95 @@ private struct Customer360View: View {
         }
     }
 
+    private func statusLabel(_ status: String) -> String {
+        [
+            "created": "Создано",
+            "received": "Принято",
+            "diagnostics": "Диагностика",
+            "approved": "Одобрено",
+            "waiting_supplier": "Поставщик",
+            "repaired": "Готово",
+            "rejected": "Отказ",
+            "replaced": "Замена",
+            "closed": "Закрыто",
+            "new": "Новая",
+            "in_progress": "В работе",
+            "waiting": "Ожидание",
+            "resolved": "Решено",
+        ][status] ?? status
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "created", "received", "new": lime
+        case "diagnostics", "in_progress", "waiting_supplier": amber
+        case "rejected": coral
+        default: secondaryText
+        }
+    }
+
+    private func priorityLabel(_ priority: String) -> String {
+        ["low": "Низкий", "normal": "Обычный", "high": "Высокий", "urgent": "Срочно"][priority] ?? priority
+    }
+
+    private func priorityColor(_ priority: String) -> Color {
+        switch priority {
+        case "urgent": coral
+        case "high": amber
+        default: secondaryText
+        }
+    }
+
+    private func initials(_ name: String) -> String {
+        let parts = name.split(separator: " ")
+        let first = parts.first?.first.map(String.init) ?? "К"
+        let second = parts.dropFirst().first?.first.map(String.init) ?? ""
+        return "\(first)\(second)"
+    }
+
     private func money(_ amount: Int) -> String {
         amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+    }
+
+    private static var fixtureOverview: Customer360 {
+        let now = Date()
+        return Customer360(
+            customer: Customer360Profile(
+                id: "C-1042",
+                name: "Нурбек Алиев",
+                phone: "+996 555 42 42 42",
+                consent: true,
+                segments: ["Gold", "VIP", "Trade-in"],
+                ltv: 428_700,
+                createdAt: now.addingTimeInterval(-8_640_000)
+            ),
+            orders: Customer360Orders(
+                total: 12,
+                spent: 428_700,
+                recent: [
+                    Customer360Order(id: "4102", status: "Курьер", total: 109_900, createdAt: now.addingTimeInterval(-3_600)),
+                    Customer360Order(id: "4090", status: "Выдан", total: 189_900, createdAt: now.addingTimeInterval(-86_400)),
+                ]
+            ),
+            debts: Customer360Debts(
+                count: 1,
+                openBalance: 18_400,
+                items: [Customer360Debt(id: "debt-1", balance: 18_400, status: "current", dueDate: now.addingTimeInterval(604_800))]
+            ),
+            warranties: Customer360Warranties(
+                open: 1,
+                items: [
+                    Customer360Warranty(id: "warranty-airpods", imei: "356789104200777", status: "diagnostics", sla: now.addingTimeInterval(7_200)),
+                ]
+            ),
+            tickets: Customer360Tickets(
+                open: 2,
+                items: [
+                    Customer360Ticket(id: "support-4102", subject: "Где мой заказ №4102?", status: "new", priority: "high", sla: now.addingTimeInterval(1_800)),
+                    Customer360Ticket(id: "support-warranty", subject: "Нужна гарантия по AirPods", status: "in_progress", priority: "normal", sla: now.addingTimeInterval(5_400)),
+                ]
+            )
+        )
     }
 }
 

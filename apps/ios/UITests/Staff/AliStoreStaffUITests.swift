@@ -148,4 +148,29 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Срочно"].exists)
         XCTAssertFalse(app.buttons["Эскалировать"].exists)
     }
+
+    func testSignedInStaffCustomer360MatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-customer360"].tap()
+
+        XCTAssertTrue(app.staticTexts["Customer 360"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["staff-customer360-search"].exists)
+        XCTAssertTrue(app.staticTexts["Нурбек Алиев"].exists)
+        XCTAssertTrue(app.staticTexts["+996 555 42 42 42"].exists)
+        XCTAssertTrue(app.staticTexts["CONSENT"].exists)
+        XCTAssertTrue(app.staticTexts["Gold"].exists)
+        XCTAssertTrue(app.staticTexts["LTV"].exists)
+        XCTAssertTrue(app.staticTexts["за всё время"].exists)
+        XCTAssertTrue(app.staticTexts["Гарантия и сервис"].exists)
+        XCTAssertTrue(app.staticTexts["356789104200777"].exists)
+        XCTAssertTrue(app.staticTexts["Диагностика"].exists)
+        XCTAssertTrue(app.buttons["Согласовать ремонт"].exists)
+        XCTAssertTrue(app.staticTexts["Поддержка"].exists)
+        XCTAssertTrue(app.staticTexts["Где мой заказ №4102?"].exists)
+        XCTAssertTrue(app.staticTexts["Нужна гарантия по AirPods"].exists)
+    }
 }
