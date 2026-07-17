@@ -187,7 +187,7 @@ export class PaymentIntentsService {
     }
     const order = await this.prisma.order.findUnique({ where: { id: verified.orderId } });
     if (!order) throw new ValidationError('order_not_found', `Заказ ${verified.orderId} не найден`);
-    if (order.status === 'cancelled') {
+    if (!['reserved', 'awaiting_payment'].includes(order.status)) {
       return this.parkCancelledOrderPayment(order.id, verified, verified.actor ?? `provider:${verified.method}`);
     }
     return this.payments.pay(

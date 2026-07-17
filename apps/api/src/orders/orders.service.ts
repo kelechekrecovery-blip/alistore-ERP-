@@ -632,7 +632,10 @@ export class OrdersService {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
       this.assertNotDemo(order);
-      if (order.status === 'paid' && to === 'cancelled') {
+      const settledAmount = order.payments
+        .filter((payment) => payment.amount > 0 && ['received', 'reconciled'].includes(payment.status))
+        .reduce((sum, payment) => sum + payment.amount, 0);
+      if (to === 'cancelled' && settledAmount >= order.total) {
         throw new ConflictError('paid_order_cancel_requires_return', 'Оплаченный заказ отменяется через возврат и refund');
       }
       assertTransition(order.status, to);

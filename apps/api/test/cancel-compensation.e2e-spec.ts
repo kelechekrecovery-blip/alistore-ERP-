@@ -9,6 +9,7 @@ import { PaymentIntentsService } from '../src/payments/payment-intents.service';
 import { GiftcardsService } from '../src/giftcards/giftcards.service';
 import { CourierService } from '../src/courier/courier.service';
 import { OutboxService } from '../src/outbox/outbox.service';
+import { ReservationsService } from '../src/reservations/reservations.service';
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 
 /**
@@ -31,6 +32,7 @@ describe('Cancel compensation (integration)', () => {
   let giftcards: GiftcardsService;
   let intents: PaymentIntentsService;
   let courier: CourierService;
+  let outbox: OutboxService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -43,7 +45,8 @@ describe('Cancel compensation (integration)', () => {
     giftcards = new GiftcardsService(prisma, audit);
     payments = new PaymentsService(prisma, audit, units, approvals, giftcards, orders);
     intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider());
-    courier = new CourierService(prisma, audit, new OutboxService(prisma, { deliver: async () => undefined }), units);
+    outbox = new OutboxService(prisma, { deliver: async () => undefined });
+    courier = new CourierService(prisma, audit, outbox, units);
   });
 
   afterAll(async () => {
@@ -139,14 +142,33 @@ describe('Cancel compensation (integration)', () => {
       code: 'paid_order_cancel_requires_return',
     });
 
-    const kept = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: { payments: true } });
-    expect(kept.status).toBe('paid');
-    expect(kept.payments).toHaveLength(1);
-    expect(await prisma.deviceUnit.count({ where: { orderId: order.id, status: 'sold' } })).toBe(1);
-
     // The sanctioned path for a paid order stays available.
     const returned = await orders.transition(order.id, 'return_requested', 'support');
     expect(returned.status).toBe('return_requested');
+
+    // The defect path: a settled order that already moved into fulfillment —
+    // its units are sold and its money is received, so a plain cancel would strand both.
+    const inFlight = await paidOrder();
+    await orders.transition(inFlight.order.id, 'picking', 'warehouse');
+    await expect(orders.transition(inFlight.order.id, 'cancelled', 'support')).rejects.toMatchObject({
+      code: 'paid_order_cancel_requires_return',
+    });
+    const kept = await prisma.order.findUniqueOrThrow({ where: { id: inFlight.order.id }, include: { payments: true } });
+    expect(kept.status).toBe('picking');
+    expect(kept.payments).toHaveLength(1);
+    expect(await prisma.deviceUnit.count({ where: { orderId: inFlight.order.id, status: 'sold' } })).toBe(1);
+
+    // …and the same guard once the settled order is dispatched with a courier.
+    await orders.transition(inFlight.order.id, 'packed', 'warehouse');
+    const staff = await prisma.staffUser.create({
+      data: { username: `cancel-comp-courier-${++seq}`, passwordHash: 'test-only', role: 'courier' },
+    });
+    await prisma.order.update({ where: { id: inFlight.order.id }, data: { fulfillmentType: 'courier' } });
+    await courier.createRun({ courierId: staff.id, codTotal: 0, orderIds: [inFlight.order.id] }, 'dispatcher', `assign-prepaid-${seq}`);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: inFlight.order.id } })).status).toBe('courier_assigned');
+    await expect(orders.transition(inFlight.order.id, 'cancelled', 'support')).rejects.toMatchObject({
+      code: 'paid_order_cancel_requires_return',
+    });
 
     // Unpaid orders keep cancelling as before.
     const unpaid = await webOrder();
@@ -241,6 +263,27 @@ describe('Cancel compensation (integration)', () => {
     // Parked money has a way back: the standard refund contour accepts the row.
     const approval = await payments.refund(parked.payment.id, 100000, 'webhook after cancel', 'admin');
     expect(approval.approvalId).toEqual(expect.any(String));
+  });
+
+  it('parks a webhook payment that arrives after the reservation was swept', async () => {
+    const { order } = await webOrder();
+    const intent = await intents.create({ orderId: order.id, method: 'qr_mbank', amount: 100000, actor: 'web_checkout' });
+
+    // The reservation sweeper releases the expired hold and returns the order to confirmed.
+    await prisma.reservation.updateMany({ where: { orderId: order.id }, data: { expiresAt: new Date(Date.now() - 60_000) } });
+    const sweeper = new ReservationsService(prisma, new AuditService(prisma), new UnitsService(prisma), outbox);
+    const swept = await sweeper.releaseExpired(new Date());
+    expect(swept.released).toBeGreaterThan(0);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('confirmed');
+
+    const parked = (await intents.webhook({
+      orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank',
+    })) as unknown as { parked: boolean; idempotent: boolean; payment: { id: string; status: string } };
+    expect(parked.parked).toBe(true);
+    expect(parked.payment).toMatchObject({ status: 'pending' });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('confirmed');
+    expect(await prisma.payment.count({ where: { txnId: intent.txnId } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'payment.parked', refs: { has: order.id } } })).toBe(1);
   });
 
   it('subtracts the cancelled COD order from its courier run codTotal', async () => {

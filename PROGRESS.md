@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-011-004-EXTENDED-020`.
+- Task: extend cancellation protection to fully settled fulfillment orders and expired reservations.
+- Result: cancellation is blocked whenever settled tenders cover the order total, including `picking` and `courier_assigned`; partial tender orders remain cancellable with compensation. Late provider callbacks after reservation sweep are parked while the order remains confirmed.
+- Checks run: isolated `cancel-compensation.e2e-spec.ts` passed `6/6`; `git diff --check`.
+- Outcome: the cancellation/payment replay slice now covers paid fulfillment, partial gift-card tender, cancelled orders and swept reservations. Live provider and staging evidence remain separate gates.
+- Next step: commit the extension and rerun the hash-bound reconciliation recorders.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-011-004-PAYMENT-019`.
 - Task: reconcile unpaid-order cancellation compensation and late payment callbacks.
 - Files changed: `OrdersService`, `PaymentIntentsService`, `PaymentParked` event type, and `cancel-compensation.e2e-spec.ts`.
