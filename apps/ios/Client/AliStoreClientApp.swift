@@ -413,8 +413,13 @@ private struct ClientOverlayView: View {
                 if comparedProducts.isEmpty {
                     EmptyStateView(title: "Нет товаров для сравнения", detail: "Откройте поиск и добавьте технику к сравнению.", symbol: "arrow.left.arrow.right")
                 } else {
-                    ForEach(comparedProducts) { product in
-                        compareRow(product, selected: true)
+                    let lowestPrice = comparedProducts.map(\.price).min()
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 10) {
+                            ForEach(comparedProducts) { product in
+                                compareCard(product, isBestPrice: product.price == lowestPrice)
+                            }
+                        }
                     }
                 }
                 if !products.isEmpty {
@@ -587,6 +592,61 @@ private struct ClientOverlayView: View {
         .padding(10)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    private func compareCard(_ product: Product, isBestPrice: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ClientProductImage(product: product, cornerRadius: 10)
+                .frame(width: 138, height: 92)
+            if isBestPrice {
+                Text("ЛУЧШАЯ ЦЕНА")
+                    .font(ClientTheme.body(9, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(ClientTheme.lime, in: Capsule())
+            }
+            Text(product.name)
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .frame(minHeight: 32, alignment: .top)
+            Text(product.price.formatted(.currency(code: "KGS")))
+                .font(ClientTheme.display(15, weight: .black))
+                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(product.category)
+                Text("🛡 Гарантия 12 мес")
+                Text(product.availableUnits > 0 ? "● В наличии" : "● Нет в наличии")
+                    .foregroundStyle(product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+            }
+            .font(ClientTheme.body(10))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 4)
+            Button {
+                cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+            } label: {
+                Text(product.availableUnits > 0 ? "В корзину" : "Нет в наличии")
+                    .font(ClientTheme.body(11, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .disabled(product.availableUnits == 0)
+            Button {
+                compared.remove(product.id)
+            } label: {
+                Text("Убрать")
+                    .font(ClientTheme.body(10))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity, minHeight: 24)
+            }
+            .accessibilityLabel("Убрать \(product.name) из сравнения")
+        }
+        .padding(10)
+        .frame(width: 160, alignment: .topLeading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(isBestPrice ? ClientTheme.lime : ClientTheme.line))
     }
 
     private func compareRow(_ product: Product, selected: Bool) -> some View {
@@ -4474,12 +4534,16 @@ private struct ProductDetail: View {
                         .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)
                     HStack(spacing: 8) {
                         ForEach(displayVariants) { variant in
-                            Text(variant.name == displayProduct.name ? "Текущий" : variant.name)
-                                .font(ClientTheme.body(13, weight: .medium))
-                                .foregroundStyle(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.muted)
-                                .padding(.horizontal, 14).padding(.vertical, 9)
-                                .background(variant.id == displayProduct.id ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.line))
+                            if variant.id == displayProduct.id {
+                                variantChip(variant, title: "Текущий")
+                            } else {
+                                NavigationLink {
+                                    ProductDetail(environment: environment, product: variant, cart: $cart, favorites: $favorites)
+                                } label: {
+                                    variantChip(variant, title: variant.name)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                     if detailLoading {
@@ -4556,6 +4620,16 @@ private struct ProductDetail: View {
         } catch {
             detailError = error.localizedDescription
         }
+    }
+
+    private func variantChip(_ variant: Product, title: String) -> some View {
+        Text(title)
+            .font(ClientTheme.body(13, weight: .medium))
+            .foregroundStyle(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.muted)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(variant.id == displayProduct.id ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.line))
     }
 
     @ViewBuilder

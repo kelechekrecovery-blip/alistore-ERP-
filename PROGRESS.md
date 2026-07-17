@@ -2633,3 +2633,13 @@
 - Checks run: `npm run ios:build` all 10 targets; `npm run ios:ui` Client `13/13`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: catalog filter/search vertical is accepted at local simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: continue native Client compare/cart visual evidence and then run the signed archive/store preflight when Apple credentials and profiles are available.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-014`.
+- Task: align native Client comparison cards and product variant selection with the Client App 2.0 handoff.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: comparison now uses horizontal prototype-style cards with best-price highlighting, product image, warranty, stock, add-to-cart and remove actions. Product variants are interactive navigation chips that open the selected server product detail; current selection remains visually distinct.
+- Checks run: `npm run ios:build` all 10 targets; the first ad-hoc UI command was rejected because the project has no `AliStoreClientUITests` scheme; the corrected `npm run ios:ui` passed Client `13/13`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: compare/variant presentation is accepted at local simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: continue the remaining Client App 2.0 visual evidence for cart and payment-result states, then run signed archive/store preflight with owner credentials.
