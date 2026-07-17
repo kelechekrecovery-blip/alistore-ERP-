@@ -204,7 +204,10 @@ describe('Refund provider_pending stale sweep and manual resolve (LOGIC-007)', (
       'cashier-1',
       `blocked-${f.ret.id}`,
     )).rejects.toMatchObject({ code: 'refund_exceeds_paid' });
-    await expect(shifts.close(f.shift.id, { closeCash: f.shift.openCash }, 'cashier-1'))
+    await expect(shifts.close(f.shift.id, {
+      closeCash: f.shift.openCash,
+      reason: 'часть возврата возвращена на электронный tender',
+    }, 'cashier-1'))
       .rejects.toMatchObject({ code: 'shift_has_pending_refunds' });
 
     await processor.resolveRefund(
