@@ -70,6 +70,26 @@ public actor APIClient {
         try await request(path, method: "GET", token: token, body: nil, as: type)
     }
 
+    /// Authenticated GET returning the raw body — for document downloads (data export)
+    /// where the bytes must reach the user unchanged instead of a decoded model.
+    public func getData(_ path: String, token: String? = nil) async throws -> Data {
+        let cleanPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        guard let url = URL(string: cleanPath, relativeTo: baseURL.appendingPathComponent("/")) else {
+            throw APIError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data)
+            throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
+        }
+        return data
+    }
+
     public func post<Body: Encodable & Sendable, Response: Decodable & Sendable>(
         _ path: String,
         body: Body,

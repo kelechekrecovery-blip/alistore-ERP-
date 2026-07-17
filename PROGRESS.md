@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-IOS-ACCOUNT-011`.
+- Task: validate the parallel iOS Client account-data slice and establish a clean commit boundary.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/APIClient.swift`, and this progress entry.
+- Result: the Client account screen now exposes authenticated data export and destructive account deletion with explicit confirmation, server-owned retention messaging, loading/error states, logout on success, and a system share sheet for the exported JSON. The shared API client supports authenticated raw-data downloads without weakening typed API calls.
+- Checks run: `npm run ios:build` (all targets, simulator) passed; `npm run ios:test` passed with 34/34 XCTest cases; `git diff --check`.
+- Outcome: the iOS Client account-data slice is accepted as a simulator-tested code increment. Physical-device biometrics/push/camera, XCUITest, signing and store certification remain open and are not claimed here.
+- Next step: refresh hash-bound evidence on the clean SHA, then continue the next Phase 1 storefront/ERP acceptance slice and close remaining native/reconciliation blockers.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-ISOLATED-010`.
 - Task: complete the procurement/sale verification on the current parallel source lane without sharing its database with other agents.
 - Files changed: `PROGRESS.md` only; no source or concurrent worktree files were staged.

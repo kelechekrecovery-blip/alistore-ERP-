@@ -3262,6 +3262,11 @@ private struct AccountView: View {
     @State private var phone = "+996"
     @State private var code = ""
     @State private var codeRequested = false
+    @State private var isExportingData = false
+    @State private var isDeletingAccount = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var accountDataError: String?
+    @State private var exportShareFile: ExportShareFile?
 
     var body: some View {
         NavigationStack {
@@ -3404,6 +3409,59 @@ private struct AccountView: View {
             .buttonStyle(.plain)
         }
 
+        Text("Мои данные")
+            .font(ClientTheme.body(12, weight: .semibold))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 2)
+
+        VStack(spacing: 10) {
+            Button {
+                Task { await exportMyData() }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .foregroundStyle(ClientTheme.lime)
+                    Text("Скачать мои данные")
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    if isExportingData { ProgressView().tint(ClientTheme.lime) }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(isExportingData || isDeletingAccount)
+
+            Button {
+                showDeleteAccountConfirm = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash.fill")
+                        .foregroundStyle(ClientTheme.coral)
+                    Text("Удалить аккаунт")
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(ClientTheme.coral)
+                    Spacer()
+                    if isDeletingAccount { ProgressView().tint(ClientTheme.coral) }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(isExportingData || isDeletingAccount)
+
+            if let accountDataError {
+                Text(accountDataError)
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(.red)
+            }
+        }
+
         Button {
             Task {
                 await auth.logout()
@@ -3418,6 +3476,53 @@ private struct AccountView: View {
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
         }
         .buttonStyle(.plain)
+        .alert("Удалить аккаунт?", isPresented: $showDeleteAccountConfirm) {
+            Button("Удалить навсегда", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Профиль, адреса и сессии будут удалены без восстановления. Заказы и история покупок останутся у магазина — они нужны для бухгалтерии.")
+        }
+        .sheet(item: $exportShareFile) { file in
+            ActivityShareSheet(items: [file.url])
+        }
+    }
+
+    @MainActor
+    private func exportMyData() async {
+        guard let token = auth.session?.accessToken else { return }
+        isExportingData = true
+        accountDataError = nil
+        defer { isExportingData = false }
+        do {
+            let data = try await APIClient(baseURL: environment.apiBaseURL).getData("customers/me/export", token: token)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("alistore-my-data-\(formatter.string(from: Date())).json")
+            try data.write(to: fileURL, options: .atomic)
+            exportShareFile = ExportShareFile(url: fileURL)
+        } catch is CancellationError {
+        } catch {
+            accountDataError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func deleteAccount() async {
+        guard let token = auth.session?.accessToken else { return }
+        isDeletingAccount = true
+        accountDataError = nil
+        do {
+            let _: DeleteAccountResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me", token: token)
+            await auth.logout()
+            onLogout()
+        } catch is CancellationError {
+            isDeletingAccount = false
+        } catch {
+            accountDataError = error.localizedDescription
+            isDeletingAccount = false
+        }
     }
 
     private var signInContent: some View {
@@ -4002,6 +4107,27 @@ private struct CustomerAddressEditorView: View {
 
 private struct DeleteCustomerAddressResponse: Decodable, Sendable {
     let id: String
+}
+
+private struct DeleteAccountResponse: Decodable, Sendable {
+    let id: String
+    let deleted: Bool
+}
+
+/// Wraps the exported JSON file so `.sheet(item:)` can present the system share sheet.
+private struct ExportShareFile: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 private struct CustomerSettingsView: View {
