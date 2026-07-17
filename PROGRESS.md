@@ -2,6 +2,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-013-NATIVE-EVIDENCE-027`.
+- Task: refresh trusted native UI evidence after the partial-COD contract and dependency-tree lock changes.
+- Result: iOS app UI evidence passed `34/34`; Android packaged UI evidence passed `30/30` across core, Client, Staff, Courier and POS on the API 36 emulator. Evidence artifacts are hash-bound to the current source tree and committed separately.
+- Commits: `dec7b78` (iOS evidence), `3fb71dd` (Android evidence).
+- Checks run: `npm run ios:ui`; `npm run android:ui`; `git diff --check`; `npm run ecosystem:audit:strict` accepts both native gates.
+- Audit result: strict audit still reports five reconciliation gaps and 64 missing linked design references. No claim of full ecosystem readiness is made.
+- Next step: close one remaining server reconciliation vertical, then refresh its trusted evidence; physical-device/provider certification and missing design references remain external or owner-blocked gates.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-013-NATIVE-COD-026`.
 - Task: align native Courier delivery completion with the server-authoritative partial COD contract.
 - Result: iOS and Android Courier now let the operator enter the collected COD amount, require a partial-payment reason when the amount is below outstanding COD, and preserve the reason in the offline command payload. Full-payment payload compatibility is retained; Android command tests parse payload semantics instead of relying on JSON key order, and iOS API tests cover the partial reason field.
