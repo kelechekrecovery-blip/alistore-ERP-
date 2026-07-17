@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ECO-AUDIT-COMMAND-001
+
+- Iteration ID: `ECO-AUDIT-COMMAND-001`.
+- Task: restore the executable npm aliases used by the master plan and progress log for strict ecosystem contract audits.
+- Files changed: `package.json` and `PROGRESS.md`.
+- Result: added `ecosystem:audit`, `ecosystem:audit:strict`, and `ecosystem:audit:json` aliases through the trusted ecosystem bootstrap using `sh scripts/run-trusted-ecosystem-node.sh`, matching the current non-executable script mode. The strict audit now runs from npm instead of failing with a missing script.
+- Checks run: `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`; `npm run ecosystem:audit:strict` now executes and fails with the current release blockers instead of a package-script error; `npm run ecosystem:audit:json` writes `.artifacts/ecosystem-audit.json`.
+- Current blockers from the restored strict audit: 64 linked design handoffs are still absent or not retired; the source tree was dirty during this iteration; and the hash-bound visual/native/reconciliation evidence must be refreshed again after the audit-command commit because `package.json` is part of the audited source set.
+- Next step: commit this command restoration, rerun `npm run ecosystem:audit:strict` on a clean tree, then refresh the evidence gates whose source-tree hash is invalidated by the package-script change.
+
 # 2026-07-17 — IOS-STORE-PREFLIGHT-006
 
 - Iteration ID: `IOS-STORE-PREFLIGHT-006`.
