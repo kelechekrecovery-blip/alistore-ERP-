@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `QA-SERVICE-FK-CLEANUP-022`.
+- Task: remove the remaining valuation-reversal FK dependency from the warranty/service fixture reset.
+- Checks run: isolated `warranty-rbac.e2e-spec.ts` passed `1/1`; `git diff --check`.
+- Next step: rerun the full service/loaner evidence recorder.
+
+## 2026-07-18
+
 - Iteration ID: `QA-SERVICE-FK-CLEANUP-021`.
 - Task: make the warranty RBAC integration fixture FK-safe for repeated service/loaner evidence runs.
 - Result: cleanup now removes quarantine cases and return items/aggregates before orders, eliminating stale `InventoryQuarantineCase_returnId` failures without changing runtime behavior.
