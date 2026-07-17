@@ -2965,6 +2965,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-RELEASE-006`.
+- Task: package native iOS Client App Store screenshots from the accepted 17-state visual evidence instead of relying on UUID-named Xcode attachments.
+- Files changed: `scripts/prepare-ios-store-screenshots.mjs`, `package.json`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: added `npm run ios:store-screenshots`, which reads `apps/ios/store/client-metadata.json`, verifies the Xcode attachment manifest contains every required Client state, checks each PNG header/dimensions/SHA-256 and writes deterministic App Store Connect files such as `01-client-home.png` under `apps/ios/build/AppStoreScreenshots/ru-KG/iphone-17-pro`.
+- Checks run: `node --check scripts/prepare-ios-store-screenshots.mjs`; `npm run ios:store-screenshots`; `node scripts/validate-ios-store-metadata.mjs apps/ios/store/client-metadata.json`; `git diff --check`.
+- Outcome: App Store screenshot packaging is now repeatable and validated from the local visual evidence bundle. Actual App Store readiness remains blocked by owner pixel sign-off, physical-device Face ID/APNs/camera/offline smoke, production `.env`, signing/provisioning, verified App Store Connect credentials, TestFlight upload and review submission.
+- Next step: continue the next locally unblocked lane: POS/Staff/Courier native operational UI coverage, Android parity, ERP/CMS integration, or strict store preflight once protected Apple values are present.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-008`.
 - Task: align native Client warranty/service details with the `AliStore Клиент App 2.0` handoff while preserving warranty ownership and support routing.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.

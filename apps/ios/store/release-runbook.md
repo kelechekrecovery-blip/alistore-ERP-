@@ -75,6 +75,18 @@ warranty, addresses, settings, payment success and payment failure. These are
 review evidence only; they do not replace owner pixel approval or physical-device
 release smoke.
 
+After `ios:visual`, package the retained Xcode attachments into deterministic
+App Store Connect filenames:
+
+```bash
+npm run ios:store-screenshots
+```
+
+The command reads `apps/ios/store/client-metadata.json`, verifies all 17 required
+states in the Xcode attachment manifest, checks PNG dimensions and SHA-256
+hashes, and writes `apps/ios/build/AppStoreScreenshots/ru-KG/iphone-17-pro/`.
+Upload those generated files to App Store Connect in numeric order.
+
 The archive must be signed with an Apple Distribution identity and a
 provisioning profile for `kg.alistore.client`. If the archive fails because no
 profile is available, create/download the profile in the Apple Developer

@@ -21,6 +21,7 @@
     "ios:test": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project AliStoreNative.xcodeproj -scheme AliStoreClient -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO",
     "ios:ui": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project AliStoreNative.xcodeproj -scheme AliStoreUITests -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO",
     "ios:visual": "bash apps/ios/scripts/visual-capture.sh",
+    "ios:store-screenshots": "node scripts/prepare-ios-store-screenshots.mjs",
     "ios:store-preflight": "bash apps/ios/scripts/store-preflight.sh",
     "android:build": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleDebug :staff:assembleDebug :courier:assembleDebug :pos:assembleDebug",
     "android:test": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew test lintDebug",
