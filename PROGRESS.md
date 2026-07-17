@@ -2825,6 +2825,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-011`.
+- Task: expand native Client visual evidence beyond the seven-state purchase path toward the Client App 2.0 self-service prototype.
+- Files changed: `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: `testClientPrototypeVisualEvidence` now captures 15 retained simulator screenshots: home, catalog, product detail, cart, account, notifications, loyalty, returns, support, Trade-in estimate, warranty certificate, addresses, settings, payment success and payment failure. The visual capture script fails closed unless all 15 PNG attachments export.
+- Checks run: `npm run ios:visual` passed with 15 PNG attachments; `git diff --check` passed.
+- Outcome: local simulator visual evidence coverage is broader. Trusted accepted evidence, owner pixel approval, physical-device Face ID/APNs/camera/offline smoke, signing, TestFlight and App Store Connect submission remain open.
+- Next step: commit this expanded source gate, then run trusted `ios-client-visual` recorder again on clean HEAD so the accepted artifact points at the 15-state source commit.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-004`.
 - Task: align native Client notifications with the `AliStore Клиент App 2.0` handoff while preserving the customer-owned notification API contract.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
