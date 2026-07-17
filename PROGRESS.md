@@ -3032,3 +3032,13 @@
 - Checks run: trusted ecosystem bootstrap for `scripts/record-ecosystem-evidence.mjs ios-client-visual` executed `npm run ios:visual` and the XCUITest passed with 17 PNG attachments; artifact SHA-256 was verified with `shasum -a 256`; `jq` parsed the new evidence; `git diff --check` passed.
 - Outcome: the accepted iOS Client visual evidence is no longer stale relative to the current native Client source tree. This remains simulator visual evidence only; owner pixel sign-off, physical-device Face ID/APNs/camera/offline smoke, production HTTPS API, TestFlight/App Store Connect, provisioning and release signing remain external release gates.
 - Next step: continue the next locally unblocked lane: Staff/Courier/POS native polish, Android Client/Staff parity, ERP/CMS integration, or staging/provider certification once external access is available.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-COURIER-UI-001`.
+- Task: add signed-in simulator coverage for the native iOS Courier route/COD shell instead of only proving the login screen.
+- Files changed: `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/Shared/StaffAuthStore.swift`, `apps/ios/Courier/CourierOperationsView.swift`, `apps/ios/UITests/Courier/AliStoreCourierUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: Debug UI tests can pass `--ui-testing-role=courier` to restore a courier session without weakening release auth. In UI-test signed-in mode, Courier loads deterministic assigned and out-for-delivery jobs locally, showing route count, customer/address/slot/COD cards, Evidence block, delivery CTA and COD handover screen without depending on a live API fixture.
+- Checks run: targeted Courier signed-in XCUITest passed `1/1`; full `AliStoreCourierUITests` passed `2/2`; `npm run ios:build` passed all 10 iOS targets; `git diff --check` passed.
+- Outcome: iOS Courier now has simulator coverage for its main route/COD surface, not just cold login. Physical APNs, maps, camera/network behavior, real-device COD handover, production signing and first-store delivery UAT remain external release gates.
+- Next step: continue POS native operational UI coverage or Android/ERP parity while keeping physical hardware/provider gates explicit.

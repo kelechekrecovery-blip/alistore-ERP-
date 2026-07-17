@@ -20,7 +20,7 @@ public final class StaffAuthStore {
         self.quickUnlockService = keychainService
         #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            session = StaffSession(accessToken: "ui-test-staff-token", staffId: "staff-ui-test", username: "azizbek", role: "sales")
+            session = StaffSession(accessToken: "ui-test-staff-token", staffId: "staff-ui-test", username: "azizbek", role: UITestBootstrap.staffRole)
             requiresQuickUnlock = UITestBootstrap.requiresQuickUnlock
             isRestoring = false
             return

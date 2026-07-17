@@ -80,6 +80,18 @@ public enum UITestBootstrap {
         #endif
     }
 
+    public static var staffRole: String {
+        #if DEBUG
+        let prefix = "--ui-testing-role="
+        if let value = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) {
+            return String(value.dropFirst(prefix.count))
+        }
+        return "sales"
+        #else
+        return "sales"
+        #endif
+    }
+
     public static var accountFixtureMode: AccountFixtureMode {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments

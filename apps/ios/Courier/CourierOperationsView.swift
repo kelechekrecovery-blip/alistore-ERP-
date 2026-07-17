@@ -98,6 +98,14 @@ struct CourierRootView: View {
     @MainActor
     private func load() async {
         isLoading = deliveries.isEmpty
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            deliveries = Self.fixtureDeliveries
+            message = nil
+            isLoading = false
+            return
+        }
+        #endif
         do {
             deliveries = try await api.get("courier/me/deliveries", token: session.accessToken)
             message = nil
@@ -202,6 +210,42 @@ struct CourierRootView: View {
             return status >= 500
         }
     }
+
+    #if DEBUG
+    private static var fixtureDeliveries: [CourierDelivery] {
+        let json = """
+        [
+          {
+            "id": "4102",
+            "status": "courier_assigned",
+            "total": 119900,
+            "deliveryAddress": "Бишкек, ул. Киевская, 125",
+            "deliverySlot": "Сегодня 15:00-17:00",
+            "customer": { "name": "Айбек Маматов", "phone": "+996555010203" },
+            "items": [
+              { "sku": "iPhone 15 128 GB Black", "qty": 1, "price": 119900, "imei": "356789101234567" }
+            ],
+            "payments": [],
+            "courierRun": { "id": "run-4102", "codTotal": 119900, "collectedTotal": 0, "handedOver": false }
+          },
+          {
+            "id": "4098",
+            "status": "out_for_delivery",
+            "total": 45900,
+            "deliveryAddress": "пр. Чуй 132, офис 4",
+            "deliverySlot": "Сегодня 17:00-19:00",
+            "customer": { "name": "Элина Осмонова", "phone": "+996700111222" },
+            "items": [
+              { "sku": "AirPods Pro 2", "qty": 1, "price": 45900, "imei": null }
+            ],
+            "payments": [],
+            "courierRun": { "id": "run-4098", "codTotal": 45900, "collectedTotal": 45900, "handedOver": false }
+          }
+        ]
+        """
+        return (try? JSONDecoder().decode([CourierDelivery].self, from: Data(json.utf8))) ?? []
+    }
+    #endif
 }
 
 private struct CourierRouteView: View {
