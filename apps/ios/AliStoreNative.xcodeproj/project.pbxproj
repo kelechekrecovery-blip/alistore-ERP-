@@ -16,6 +16,7 @@
 		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */; };
+		563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */; };
 		615203EBFF70A2140FAB6A11 /* AliStoreStaffUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */; };
 		652FDF2063F51338694979A9 /* StaffWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7596CAED282254008F7309B8 /* StaffWorkView.swift */; };
 		72577A15EB13D14CB354087E /* CustomerAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */; };
@@ -23,6 +24,7 @@
 		73F2797F50FCEB22F130961A /* AliStoreClientUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */; };
 		77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */; };
 		7F516A224125BB6E327DCD90 /* POSSaleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C7F7335AA46910CF656B72 /* POSSaleView.swift */; };
+		801111550678A8B136CA7459 /* POSReturnFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD7187EA0C9EF4F8DA4016FE /* POSReturnFlow.swift */; };
 		8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */; };
 		8C5A4F7C9419670E633A9668 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EBC4D5C06A5630E3B7D69D /* Models.swift */; };
 		8DD0417F646F1BEC0FF7830A /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
@@ -177,6 +179,7 @@
 		13A9A1766E34065A9DE2EE32 /* Courier.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Courier.entitlements; sourceTree = "<group>"; };
 		1835E8741DBB19503E6334A1 /* QuickUnlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlock.swift; sourceTree = "<group>"; };
 		1897622CBA172469A7099983 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSReturnFlowTests.swift; sourceTree = "<group>"; };
 		2A617D85C85DD435B687E350 /* StaffLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffLoginView.swift; sourceTree = "<group>"; };
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierOperationsView.swift; sourceTree = "<group>"; };
@@ -214,6 +217,7 @@
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientUITests.swift; sourceTree = "<group>"; };
+		CD7187EA0C9EF4F8DA4016FE /* POSReturnFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSReturnFlow.swift; sourceTree = "<group>"; };
 		E3930B564A069DBB66A1EF6E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestBootstrap.swift; sourceTree = "<group>"; };
 		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
@@ -272,6 +276,7 @@
 				A9EBC4D5C06A5630E3B7D69D /* Models.swift */,
 				04AAB6220384C05861A21153 /* NativeShell.swift */,
 				8A5A549F226050ACB113FF4E /* OfflineQueue.swift */,
+				CD7187EA0C9EF4F8DA4016FE /* POSReturnFlow.swift */,
 				3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */,
 				1835E8741DBB19503E6334A1 /* QuickUnlock.swift */,
 				3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */,
@@ -402,6 +407,7 @@
 			isa = PBXGroup;
 			children = (
 				42436819B18857A22AC06504 /* APIClientTests.swift */,
+				23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -754,6 +760,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */,
+				563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -767,6 +774,7 @@
 				8C5A4F7C9419670E633A9668 /* Models.swift in Sources */,
 				95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */,
 				03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */,
+				801111550678A8B136CA7459 /* POSReturnFlow.swift in Sources */,
 				EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */,
 				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,
 				77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */,

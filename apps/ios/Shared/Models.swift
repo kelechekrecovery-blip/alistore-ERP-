@@ -1198,7 +1198,12 @@ public struct POSReturn: Decodable, Identifiable, Sendable {
 
 public struct POSReturnTransitionRequest: Encodable, Sendable {
     public let status: String
-    public init(status: String) { self.status = status }
+    public let location: String?
+
+    public init(status: String, location: String? = nil) {
+        self.status = status
+        self.location = location
+    }
 }
 
 public struct POSRefundRequest: Encodable, Sendable {

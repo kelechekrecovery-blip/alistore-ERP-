@@ -176,6 +176,7 @@ struct POSOperationsView: View {
     @State private var isBusy = false
     @State private var message: String?
     @State private var errorMessage: String?
+    @State private var restockLocation = "RETURNS-BISHKEK"
     private let api = APIClient(baseURL: AppEnvironment.live().apiBaseURL)
 
     var body: some View {
@@ -207,12 +208,16 @@ struct POSOperationsView: View {
                 }
                 Section("Возвраты") {
                     if returns.isEmpty { Text("Нет заявок").foregroundStyle(POSPalette.muted) }
+                    if returns.contains(where: { $0.status == "paid" }) {
+                        TextField("Склад возврата", text: $restockLocation).textInputAutocapitalization(.characters)
+                    }
                     ForEach(returns) { item in
                         VStack(alignment: .leading) {
                             Text("#\(item.id.suffix(8)) · \(item.status)").font(.subheadline.weight(.semibold))
                             Text(item.reason).font(.caption).foregroundStyle(POSPalette.muted)
-                            if item.status == "requested" {
-                                Button("Принять", systemImage: "checkmark.circle") { Task { await transition(item, to: "received") } }
+                            ForEach(POSReturnFlow.nextStatuses(for: item.status), id: \.self) { next in
+                                Button(POSReturnFlow.actionLabel(for: next)) { Task { await transition(item, to: next) } }
+                                    .disabled(isBusy)
                             }
                         }
                     }
@@ -280,9 +285,12 @@ struct POSOperationsView: View {
     }
 
     @MainActor private func transition(_ item: POSReturn, to status: String) async {
+        isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
         do {
             let updated: POSReturn = try await api.patch(
-                "returns/\(item.id)", body: POSReturnTransitionRequest(status: status), token: session.accessToken
+                "returns/\(item.id)",
+                body: POSReturnTransitionRequest(status: status, location: status == "reconciled" ? restockLocation : nil),
+                token: session.accessToken
             )
             returns = returns.map { $0.id == updated.id ? updated : $0 }
             message = "Возврат #\(updated.id.suffix(8)): \(updated.status)"

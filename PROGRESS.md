@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MOB-013-IOS-POS-015`.
+- Task: align the iOS POS return UI and request contract with the server return state machine.
+- Files changed: `apps/ios/POS/POSOperationsView.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Shared/POSReturnFlow.swift`, `apps/ios/Tests/POSReturnFlowTests.swift`, `apps/ios/AliStoreNative.xcodeproj/project.pbxproj`, and this progress entry.
+- Result: the POS no longer attempts the invalid `requested → received` transition. It exposes the valid review/approval/processing/reconciliation actions and sends a restock location for reconciliation; server rejection remains visible to the operator.
+- Checks run: `npm run ios:test` passed `39/39` XCTest cases; `npm run ios:build` all targets passed; `git diff --check`.
+- Outcome: the iOS POS return state-machine slice is simulator-accepted. Real printer/terminal, physical-device and full refund/warehouse reconciliation remain open.
+- Next step: validate and commit Android Client account data and auth changes, then refresh native evidence on a clean SHA.
+
+## 2026-07-18
+
 - Iteration ID: `SEC-LOGIC-010-014`.
 - Task: harden bulk product import against customer JWT access and preserve an Event Ledger trail for price-affecting imports.
 - Files changed: `apps/api/src/import/import.controller.ts`, `apps/api/src/import/import.module.ts`, `apps/api/src/import/import.service.ts`, `apps/api/test/import-guard.e2e-spec.ts`, and this progress entry.
