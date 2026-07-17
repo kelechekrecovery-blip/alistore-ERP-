@@ -207,8 +207,13 @@ final class AliStoreClientUITests: XCTestCase {
         app.buttons["Открыть гарантию для iPhone 15 128 GB Black"].tap()
         XCTAssertTrue(app.navigationBars["Гарантия"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Гарантийный талон"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 15 · 128 ГБ"].exists)
         XCTAssertTrue(app.staticTexts["Активна"].exists)
         XCTAssertTrue(app.staticTexts["Обращение в сервис"].exists)
+        XCTAssertTrue(app.buttons["warranty-open-service"].exists)
+        XCTAssertTrue(app.buttons["warranty-receipt"].exists)
+        XCTAssertTrue(app.staticTexts["Что покрывается"].exists)
+        XCTAssertTrue(app.staticTexts["✓ Заводской брак\n✓ Неисправности экрана, батареи\n✗ Механические повреждения, влага"].exists)
     }
 
     func testSignedInAccountFixturesRenderEmptyStates() {

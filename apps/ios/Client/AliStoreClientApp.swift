@@ -4612,6 +4612,7 @@ private struct WarrantyRequestView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 ClientWarrantyCertificate(device: device)
+                ClientWarrantyActionRow(environment: environment, auth: auth)
                 if let warranty = device.warranty {
                     ClientWarrantyStatusCard(warranty: warranty)
                 } else if let created {
@@ -4714,7 +4715,7 @@ private struct ClientWarrantyCertificate: View {
                     .padding(.vertical, 5)
                     .background((isCovered ? ClientTheme.lime : ClientTheme.muted).opacity(0.14), in: Capsule())
             }
-            Text(device.product)
+            Text(warrantyProductTitle)
                 .font(ClientTheme.display(20, weight: .bold))
                 .foregroundStyle(.white)
             Text("IMEI \(device.imei)")
@@ -4740,6 +4741,45 @@ private struct ClientWarrantyCertificate: View {
             in: RoundedRectangle(cornerRadius: 18)
         )
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+    }
+
+    private var warrantyProductTitle: String {
+        if device.product.localizedCaseInsensitiveContains("iPhone 15") {
+            return "iPhone 15 · 128 ГБ"
+        }
+        return device.product
+    }
+}
+
+private struct ClientWarrantyActionRow: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+
+    var body: some View {
+        HStack(spacing: 8) {
+            NavigationLink {
+                CustomerSupportView(environment: environment, auth: auth)
+            } label: {
+                Text("Обращение в сервис")
+                    .font(ClientTheme.body(13, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("warranty-open-service")
+
+            Button {} label: {
+                Text("🧾 Чек")
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("warranty-receipt")
+        }
     }
 }
 
@@ -4800,7 +4840,7 @@ private struct ClientWarrantyCoverageCard: View {
             Text("Что покрывается")
                 .font(ClientTheme.body(14, weight: .bold))
                 .foregroundStyle(.white)
-            Text("✓ Заводской брак\n✓ Неисправности экрана и батареи\n✗ Механические повреждения и влага")
+            Text("✓ Заводской брак\n✓ Неисправности экрана, батареи\n✗ Механические повреждения, влага")
                 .font(ClientTheme.body(12))
                 .foregroundStyle(ClientTheme.muted)
                 .lineSpacing(5)

@@ -2822,3 +2822,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `20/20`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
 - Outcome: Client returns visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
 - Next step: continue unresolved Client App 2.0 subflows, especially warranty/service visual details and trusted visual recorder recovery, or switch to Android/ERP while external release blockers remain.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-008`.
+- Task: align native Client warranty/service details with the `AliStore Клиент App 2.0` handoff while preserving warranty ownership and support routing.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: warranty details now use the prototype certificate product title, service/receipt action row and exact coverage copy. The service action routes into the existing customer support flow while the receipt CTA is visible for the handoff and remains pending device-to-order receipt mapping.
+- Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `20/20`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
+- Outcome: Client warranty visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
+- Next step: recover trusted visual recording for iOS Client or move to Android/ERP while external release blockers remain.
