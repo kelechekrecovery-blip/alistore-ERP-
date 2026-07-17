@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+import { API_BASE, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
 test('ERP embeds website catalog administration and publishes product changes to the storefront', async ({ page }) => {
   await resetDb();
@@ -23,8 +23,20 @@ test('ERP embeds website catalog administration and publishes product changes to
   await page.getByRole('button', { name: 'Сохранить изменения' }).click();
   await expect(page.getByText(`Сохранено: ${product.sku}`)).toBeVisible();
 
+  // The ERP price action is the source event; storefront and checkout must read
+  // the resulting server price instead of trusting the cart snapshot.
+  const priceDraft = page.locator('aside').locator('input').nth(0);
+  await priceDraft.fill('86000');
+  await page.locator('aside').locator('input').nth(1).fill('phase 1 price contract');
+  await page.getByRole('button', { name: 'Запросить изменение цены' }).click();
+  await expect(page.getByText(/Цена применена:|Approval создан:/)).toBeVisible();
+
   await page.goto(`/product/${product.id}`);
   await expect(page.getByRole('heading', { name: 'ERP Published Product' })).toBeVisible();
+  await expect(page.getByRole('main').getByText(/86\s?000\s?с/).first()).toBeVisible();
+  const catalogResponse = await page.request.get(`${API_BASE}/catalog/products/${product.id}`);
+  await expect(catalogResponse).toBeOK();
+  await expect(catalogResponse.json()).resolves.toMatchObject({ product: { id: product.id, price: 86000 } });
 });
 
 test('admin manages products with AI enrichment and approval-gated danger actions', async ({ page }) => {

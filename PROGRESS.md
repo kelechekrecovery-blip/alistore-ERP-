@@ -3340,3 +3340,12 @@
 - Checks run: `git diff --check`; trusted `visual` evidence recorder passed `3/3` exact screenshot tests; `ecosystem:audit:strict` remains expected to fail on missing design references plus evidence refreshes for other source-bound profiles.
 - Outcome: planning gate is complete; implementation starts with the server-price -> catalog -> checkout assertion.
 - Next step: inspect existing price/quote tests and add only the missing authoritative-price assertion, then rerun targeted API/Playwright/evidence gates.
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-PRICE-CONTRACT-001`.
+- Task: prove the ERP price change reaches the customer storefront through the server catalog contract.
+- Files changed: `e2e/admin-products.spec.ts`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the browser journey now changes a product price from ERP, verifies the product detail displays `86 000 с`, and verifies `GET /catalog/products/:id` returns the same server price. The test keeps the price action approval path and does not treat the client cart price as authority.
+- Checks run: targeted Playwright `1/1`; full `e2e/admin-products.spec.ts` `2/2`; `git diff --check`.
+- Outcome: the first Phase 1 vertical contract slice is locally accepted. Hash-bound ecosystem evidence must be refreshed after this source change; design corpus and live-provider blockers remain unchanged.
+- Next step: add the stale-price checkout negative assertion at the API/browser boundary, then proceed to stock and fulfillment availability.
