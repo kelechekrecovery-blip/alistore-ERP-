@@ -57,7 +57,19 @@ describe('Finance AR aging and primary-document drilldown', () => {
       await prisma.$transaction(async (tx) => {
         await tx.debtPlan.updateMany({ where: { id: { in: debtIds } }, data: { accountingEntryId: null } });
         await tx.accountingJournalLine.deleteMany({ where: { entry: { sourceType: { startsWith: 'debt.' } } } });
-        await tx.accountingJournalEntry.deleteMany({ where: { sourceType: { startsWith: 'debt.' } } });
+        const debtEntries = await tx.accountingJournalEntry.findMany({
+          where: { sourceType: { startsWith: 'debt.' } },
+          select: { id: true },
+        });
+        if (debtEntries.length > 0) {
+          // Debt receipts retain a Restrict FK from Payment to the journal entry.
+          // Detach those source payments before removing the isolated fixture ledger.
+          await tx.payment.updateMany({
+            where: { accountingEntryId: { in: debtEntries.map((entry) => entry.id) } },
+            data: { accountingEntryId: null },
+          });
+          await tx.accountingJournalEntry.deleteMany({ where: { id: { in: debtEntries.map((entry) => entry.id) } } });
+        }
         await tx.debtPlan.deleteMany({ where: { id: { in: debtIds } } });
         await tx.auditEvent.deleteMany({ where: { refs: { hasSome: debtIds } } });
       });
