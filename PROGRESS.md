@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — PROCUREMENT-SALE-EVIDENCE-003
+
+- Iteration ID: `PROCUREMENT-SALE-EVIDENCE-003`.
+- Task: refresh trusted partial procurement receiving, supplier liability, serialized stock and subsequent POS sale reconciliation evidence after restoring ecosystem audit npm aliases.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/procurement-sale-reconciliation-db0763f3ab310017538083a2e6e7aa5b908fbc56e059082438c63313c011120e.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ecosystem:procurement-sale:e2e` with `exitCode: 0` for source tree `6b3989bc1c2c52f0ebdb72a888c21fa117852874941252c25c3b9752e46bc790`. Procurement API Jest passed `10/10`, and Playwright passed the procurement-to-sale reconciliation scenario `1/1`.
+- Checks run: `sh scripts/run-trusted-ecosystem-node.sh scripts/record-ecosystem-evidence.mjs procurement-sale-reconciliation`; `git diff --check`.
+- Acceptance: accepted for committed local procurement/sale software reconciliation evidence. Staging-shaped supplier accounting validation, live providers and first-store receiving/sale UAT remain open.
+- Next step: refresh composite reconciled E2E evidence and rerun `npm run ecosystem:audit:strict`.
+
 # 2026-07-17 — SERVICE-LOANER-EVIDENCE-003
 
 - Iteration ID: `SERVICE-LOANER-EVIDENCE-003`.
