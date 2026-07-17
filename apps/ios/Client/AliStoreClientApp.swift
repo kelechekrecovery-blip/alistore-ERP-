@@ -2493,6 +2493,14 @@ private struct CustomerTradeInsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingForm = false
+    @State private var selectedCondition = 1
+    @State private var showingEstimate = false
+
+    private let conditions = [
+        ("Как новый", "Без царапин, полный комплект"),
+        ("Хорошее", "Есть мелкие следы использования"),
+        ("Нужен ремонт", "Экран, батарея или корпус требуют проверки")
+    ]
 
     var body: some View {
         ZStack {
@@ -2504,34 +2512,150 @@ private struct CustomerTradeInsView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Trade-in")
-                            .font(ClientTheme.display(26, weight: .black))
-                            .foregroundStyle(.white)
-                        Text("Оценка старого устройства и защищённый договор в одном кабинете. Сумма остаётся предварительной до диагностики сотрудником.")
-                            .font(ClientTheme.body(12))
-                            .foregroundStyle(ClientTheme.muted)
-                            .lineSpacing(3)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Trade-in оценка")
+                                .font(ClientTheme.display(20, weight: .black))
+                                .foregroundStyle(.white)
+                            Text("Оцените старое устройство за 30 секунд")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.leading, 30)
+                        }
 
-                        if tradeIns.isEmpty {
-                            EmptyStateView(
-                                title: "Заявок пока нет",
-                                detail: "Оформите trade-in, чтобы сохранить оценку и номер договора.",
-                                symbol: "arrow.triangle.2.circlepath"
+                        if showingEstimate {
+                            VStack(spacing: 8) {
+                                Text("Предварительная оценка")
+                                    .font(ClientTheme.body(13))
+                                    .foregroundStyle(ClientTheme.muted)
+                                Text("28 000–32 000")
+                                    .font(ClientTheme.display(34, weight: .black))
+                                    .foregroundStyle(ClientTheme.lime)
+                                Text("Точная цена — после диагностики в магазине. Можно зачесть в счёт нового устройства.")
+                                    .font(ClientTheme.body(12))
+                                    .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
+                                    .multilineTextAlignment(.center)
+                                    .lineSpacing(3)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(22)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0.165, green: 0.165, blue: 0.18), ClientTheme.surface],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                in: RoundedRectangle(cornerRadius: 18)
                             )
+                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+                            .accessibilityIdentifier("tradein-estimate-card")
+
+                            Button {
+                                showingForm = true
+                            } label: {
+                                Text("Выбрать новое устройство")
+                                    .font(ClientTheme.body(15, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, minHeight: 50)
+                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("tradein-open-request")
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    showingEstimate = false
+                                }
+                            } label: {
+                                Text("Оценить другое")
+                                    .font(ClientTheme.body(13))
+                                    .foregroundStyle(ClientTheme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                            }
+                            .buttonStyle(.plain)
                         } else {
+                            Text("Модель")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                            Text("iPhone 13 · 128 ГБ")
+                                .font(ClientTheme.body(14))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(13)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+
+                            Text("Состояние")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 2)
+                            ForEach(Array(conditions.enumerated()), id: \.offset) { index, condition in
+                                Button {
+                                    selectedCondition = index
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Circle()
+                                            .stroke(selectedCondition == index ? ClientTheme.lime : Color(red: 0.227, green: 0.204, blue: 0.18), lineWidth: 2)
+                                            .frame(width: 18, height: 18)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(condition.0)
+                                                .font(ClientTheme.body(13))
+                                                .foregroundStyle(.white)
+                                            Text(condition.1)
+                                                .font(ClientTheme.body(11))
+                                                .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(12)
+                                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedCondition == index ? ClientTheme.lime : ClientTheme.line))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("tradein-condition-\(index)")
+                            }
+
+                            Text("📷 Фото устройства (4 ракурса)")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                                .frame(maxWidth: .infinity, minHeight: 54)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(red: 0.227, green: 0.204, blue: 0.18), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                                .accessibilityIdentifier("tradein-photo-placeholder")
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    showingEstimate = true
+                                }
+                            } label: {
+                                Text("Узнать цену")
+                                    .font(ClientTheme.body(15, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, minHeight: 50)
+                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("tradein-evaluate")
+                        }
+
+                        if !tradeIns.isEmpty {
+                            Text("Мои заявки")
+                                .font(ClientTheme.body(12, weight: .semibold))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 6)
                             ForEach(tradeIns) { tradeIn in
                                 CustomerTradeInCard(tradeIn: tradeIn, environment: environment, auth: auth)
                             }
                         }
 
                         Button { showingForm = true } label: {
-                            Label("Оценить устройство", systemImage: "plus")
+                            Label("Сохранить заявку", systemImage: "doc.badge.plus")
                                 .font(ClientTheme.body(14, weight: .bold))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(ClientTheme.lime)
                                 .frame(maxWidth: .infinity, minHeight: 48)
-                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                                .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 13))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("tradein-save-request")
                     }
                     .padding(16)
                 }
@@ -2555,9 +2679,16 @@ private struct CustomerTradeInsView: View {
 
     @MainActor
     private func load() async {
-        guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            tradeIns = []
+            errorMessage = nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else { return }
         do {
             tradeIns = try await APIClient(baseURL: environment.apiBaseURL).get("tradeins/mine", token: token)
             errorMessage = nil

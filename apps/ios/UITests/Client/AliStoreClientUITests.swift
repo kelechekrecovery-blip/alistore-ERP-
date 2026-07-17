@@ -156,6 +156,24 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["support-submit"].exists)
     }
 
+    func testSignedInTradeInUsesPrototypeEstimator() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Trade-in"].tap()
+        XCTAssertTrue(app.navigationBars["Trade-in"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Trade-in оценка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Оцените старое устройство за 30 секунд"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 13 · 128 ГБ"].exists)
+        XCTAssertTrue(app.buttons["tradein-condition-1"].exists)
+        XCTAssertTrue(app.staticTexts["tradein-photo-placeholder"].exists)
+        XCTAssertTrue(app.buttons["tradein-evaluate"].exists)
+
+        app.buttons["tradein-evaluate"].tap()
+        XCTAssertTrue(app.staticTexts["Предварительная оценка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["28 000–32 000"].exists)
+        XCTAssertTrue(app.buttons["tradein-open-request"].exists)
+        XCTAssertTrue(app.buttons["tradein-save-request"].exists)
+    }
+
     func testSignedInAccountFixturesRenderDeviceAndWarranty() {
         let app = launchSignedInAccount()
         app.staticTexts["Устройства"].tap()

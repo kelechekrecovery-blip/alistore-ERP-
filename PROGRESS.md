@@ -2802,3 +2802,13 @@
 - Checks run: `npm run ios:ui` passed Client `18/18`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed; `npm run ios:build` passed all 10 targets.
 - Outcome: Client support visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
 - Next step: continue remaining Client App 2.0 visual subflows or switch to ERP/Android parity while external release credentials and physical-device certification remain blocked.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-006`.
+- Task: align native Client Trade-in estimator with the `AliStore Клиент App 2.0` handoff while preserving the existing trade-in request/evidence flow.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: the Trade-in route now opens on the prototype estimator instead of a plain request list: title/subtitle, fixed model row, three condition choices, dashed photo placeholder, lime `Узнать цену` CTA, estimate card `28 000–32 000`, and actions for choosing a new device or saving a server-backed request. Existing customer-owned trade-in requests and Evidence photo upload cards remain available below returned server data, and Debug-only signed-in mode avoids a credentialless loading hang.
+- Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `19/19`, Staff `2/2`, Courier `1/1`, POS `1/1`.
+- Outcome: Client Trade-in visual parity is accepted at local simulator software level. Real diagnostic pricing, production provider credentials, physical camera/Face ID/APNs smoke, trusted visual recorder drift and TestFlight/App Store signing remain open release gates.
+- Next step: continue remaining Client App 2.0 visual subflows, especially return request/status and warranty/service details, then rerun trusted visual/store preflight after external credentials and physical devices are ready.
