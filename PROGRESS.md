@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MVP-VERIFY-033`.
+- Task: repair the full MVP verification regression and rerun the complete local gate.
+- Result: outbox integration test now advances `nextAttemptAt` explicitly between retry attempts; production backoff remains intact. Full `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` completed migrations, API/Web builds, mobile typecheck, API suite and 62 Playwright scenarios. External provider/hardware readiness is reported separately and remains blocked without credentials.
+- Commit: `f2c32db`.
+- Follow-up: because the source tree changed, refresh all hash-bound evidence before accepting strict audit again.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-2-STAGING-READINESS-033`.
 - Task: start staging/provider readiness without exposing or inventing credentials.
 - Result: verified `infra/render.staging.yaml`, Docker deployment files and `apps/api/.env.production.example`. `npm run launch:preflight:strict` and `npm run launch:readiness:strict` both stop safely because `.env.production` is absent; no secrets were created or committed.
