@@ -3605,3 +3605,12 @@
 - Checks run: isolated API `test/courier-run-deadlock.e2e-spec.ts` passed `5/5` with `--no-cache`; `git diff --check`.
 - Outcome: LOGIC-002 is accepted in tested API code. Physical courier device, maps/camera/push, provider and staging certification remain open.
 - Next step: commit this isolated courier slice, then refresh hash-bound evidence on a clean source SHA and rerun the strict audit.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-ERP-EVIDENCE-019`.
+- Task: finish trusted Phase 1 reconciliation evidence for the ERP/site operational contour.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, four hash-bound artifacts under `docs/acceptance/artifacts/`, trusted toolchain lock, and security/backlog records.
+- Result: POS sale → return → approved refund → warehouse receipt, COD checkout → warehouse → courier → cash handover, service/loaner, and procurement → partial receiving → sale all passed on one clean source-tree hash. Composite reconciled matrix passed `4/4`.
+- Checks run: POS browser `1/1`; courier browser `1/1`; service API `9/9` + browser `3/3`; procurement API `10/10` + browser `1/1`; composite `4/4`; strict ecosystem audit rerun.
+- Outcome: all four server/web reconciliation gates are PASS and hash-bound. Strict audit remains RED only for durable visual acceptance, native UI evidence, and the 64 missing linked design references.
+- Next step: run the clean `mvp:verify` gate, then address the next P1 with highest launch value: refund stale-provider recovery or native UI evidence, depending on available local device/emulator gates.
