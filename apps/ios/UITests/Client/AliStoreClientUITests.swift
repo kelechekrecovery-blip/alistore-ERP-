@@ -86,10 +86,12 @@ final class AliStoreClientUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Покупатель"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["БОНУСЫ И УРОВЕНЬ"].exists)
+        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["GOLD"].exists)
+        XCTAssertTrue(app.staticTexts["Уровень Gold"].exists)
+        XCTAssertTrue(app.staticTexts["4 820 бонусов"].exists)
         XCTAssertTrue(app.buttons["account-loyalty-card"].exists)
-        XCTAssertTrue(app.staticTexts["Быстрый доступ"].exists)
+        XCTAssertTrue(app.staticTexts["Меню"].exists)
         XCTAssertTrue(app.staticTexts["Мои заказы"].exists)
         XCTAssertTrue(app.staticTexts["Устройства"].exists)
         XCTAssertTrue(app.staticTexts["Trade-in"].exists)
@@ -284,7 +286,7 @@ final class AliStoreClientUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"] + arguments
         app.launch()
-        XCTAssertTrue(app.staticTexts["Покупатель"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 10))
         return app
     }
 

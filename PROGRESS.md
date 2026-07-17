@@ -2676,6 +2676,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-ACCOUNT-002`.
+- Task: align the signed-in native Client account/profile shell with `AliStore Клиент App 2.0` after the prototype re-check.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: the signed-in account screen now renders the prototype customer identity (`Нурбек`), `GOLD` badge, masked Kyrgyz phone, Gold bonus card with progress, `Меню` section and tile badges for active orders and Trade-in. The account visual-evidence and all signed-in account fixture tests now wait for the new canonical profile instead of the old generic placeholder.
+- Checks run: `npm run ios:ui` passed Client `17/17`, Staff `1/1`, Courier `1/1`, POS `1/1`; `npm run ios:build` passed all 10 iOS targets; `git diff --check` passed; `apps/ios/scripts/store-preflight.sh` failed closed as expected with `ALISTORE_API_BASE_URL is required`.
+- Outcome: the local simulator software gate for this iOS Client account/profile gap is accepted. App Store/TestFlight remains blocked by missing production HTTPS API URL, verified App Store Connect issuer/team setup, provisioning profile and physical-device Face ID/APNs/offline smoke.
+- Next step: continue the remaining native Client visual parity and release-preflight tasks, then rerun store preflight after production URL and Apple signing/profile inputs are provided.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-012`.
 - Task: hydrate the native Client product detail screen from the server catalog detail contract.
 - Files changed: `apps/ios/Shared/Models.swift`, `apps/ios/Client/AliStoreClientApp.swift`, and `apps/ios/Tests/APIClientTests.swift`.

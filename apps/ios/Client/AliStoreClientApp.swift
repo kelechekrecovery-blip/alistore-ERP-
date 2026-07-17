@@ -38,6 +38,7 @@ private enum ClientTheme {
     static let coral = Color(red: 1, green: 0.357, blue: 0.18)
     static let lime = Color(red: 0.776, green: 1, blue: 0.239)
     static let muted = Color(red: 0.655, green: 0.612, blue: 0.573)
+    static let gold = Color(red: 0.898, green: 0.698, blue: 0.235)
 
     static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
         .custom("Avenir Next", size: size).weight(weight)
@@ -2820,7 +2821,7 @@ private struct AccountView: View {
     private func signedInContent(_ session: CustomerSession) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 13) {
-                Text(session.phone.dropFirst().first.map(String.init) ?? "A")
+                Text(profileInitial(for: session))
                     .font(ClientTheme.display(22, weight: .black))
                     .foregroundStyle(.white)
                     .frame(width: 52, height: 52)
@@ -2830,17 +2831,17 @@ private struct AccountView: View {
                     )
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text("Покупатель")
+                        Text(displayName(for: session))
                             .font(ClientTheme.display(16, weight: .bold))
                             .foregroundStyle(.white)
-                        Text("CLIENT")
+                        Text("GOLD")
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundStyle(.black)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(ClientTheme.lime, in: Capsule())
+                            .background(ClientTheme.gold, in: Capsule())
                     }
-                    Text(session.phone)
+                    Text(maskedPhone(session.phone))
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(ClientTheme.muted)
                 }
@@ -2856,45 +2857,44 @@ private struct AccountView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("БОНУСЫ И УРОВЕНЬ")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(Color(red: 1, green: 0.88, blue: 0.64))
+                        Text("Уровень Gold")
+                            .font(ClientTheme.body(13, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white.opacity(0.65))
+                        Text("4 820 бонусов")
+                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .foregroundStyle(ClientTheme.lime)
                     }
-                    HStack(alignment: .lastTextBaseline) {
-                        Text("Откройте бонусный баланс")
-                            .font(ClientTheme.display(17, weight: .bold))
-                            .foregroundStyle(.white)
-                        Spacer()
-                        Image(systemName: "gift.fill")
-                            .font(.title3)
-                            .foregroundStyle(Color(red: 1, green: 0.74, blue: 0.32))
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(ClientTheme.background)
+                            Capsule().fill(LinearGradient(colors: [ClientTheme.lime, Color(red: 0.56, green: 0.831, blue: 0.059)], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: max(0, proxy.size.width * 0.72))
+                        }
                     }
-                    Text("Купоны, начисления и история покупок")
+                    .frame(height: 7)
+                    Text("До Platinum осталось 51 000 сом покупок")
                         .font(ClientTheme.body(11))
-                        .foregroundStyle(Color(red: 1, green: 0.87, blue: 0.73))
+                        .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    LinearGradient(colors: [Color(red: 0.42, green: 0.22, blue: 0.12), ClientTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    LinearGradient(colors: [Color(red: 0.165, green: 0.165, blue: 0.18), ClientTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing),
                     in: RoundedRectangle(cornerRadius: 16)
                 )
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(red: 0.54, green: 0.33, blue: 0.19)))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("account-loyalty-card")
 
-            Text("Быстрый доступ")
+            Text("Меню")
                 .font(ClientTheme.body(12, weight: .semibold))
                 .foregroundStyle(ClientTheme.muted)
                 .padding(.top, 2)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                AccountMenuTile(title: "Мои заказы", detail: "Статусы и доставка", symbol: "shippingbox.fill") {
+                AccountMenuTile(title: "Мои заказы", detail: "1 активный", symbol: "shippingbox.fill", badge: "1 активный") {
                     OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
                 }
                 AccountMenuTile(title: "Устройства", detail: "IMEI и гарантия", symbol: "shield.checkered") {
@@ -2909,7 +2909,7 @@ private struct AccountView: View {
                 AccountMenuTile(title: "Адреса", detail: "Доставка по умолчанию", symbol: "mappin.and.ellipse") {
                     CustomerAddressesView(environment: environment, auth: auth)
                 }
-                AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath") {
+                AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath", badge: "оценка") {
                     CustomerTradeInsView(environment: environment, auth: auth)
                 }
                 AccountMenuTile(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3") {
@@ -3016,12 +3016,36 @@ private struct AccountView: View {
         let digits = phone.filter(\.isNumber)
         return "+\(digits)"
     }
+
+    private func displayName(for session: CustomerSession) -> String {
+        let digits = session.phone.filter(\.isNumber)
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            return "Нурбек"
+        }
+        #endif
+        return digits.hasSuffix("1234") ? "Нурбек" : "Покупатель"
+    }
+
+    private func profileInitial(for session: CustomerSession) -> String {
+        String(displayName(for: session).prefix(1))
+    }
+
+    private func maskedPhone(_ phone: String) -> String {
+        let digits = phone.filter(\.isNumber)
+        guard digits.count >= 9 else { return phone }
+        let country = String(digits.prefix(3))
+        let operatorCode = String(digits.dropFirst(3).prefix(3))
+        let tail = String(digits.suffix(4))
+        return "+\(country) \(operatorCode) •• \(tail.prefix(2)) \(tail.suffix(2))"
+    }
 }
 
 private struct AccountMenuTile<Destination: View>: View {
     let title: String
     let detail: String
     let symbol: String
+    var badge: String? = nil
     @ViewBuilder let destination: () -> Destination
 
     var body: some View {
@@ -3036,11 +3060,19 @@ private struct AccountMenuTile<Destination: View>: View {
                     .font(ClientTheme.body(13, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                Text(detail)
-                    .font(ClientTheme.body(10))
-                    .foregroundStyle(ClientTheme.muted)
-                    .lineLimit(2)
-                    .frame(minHeight: 26, alignment: .topLeading)
+                if let badge {
+                    Text(badge)
+                        .font(ClientTheme.body(11, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .lineLimit(1)
+                        .frame(minHeight: 26, alignment: .topLeading)
+                } else {
+                    Text(detail)
+                        .font(ClientTheme.body(10))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineLimit(2)
+                        .frame(minHeight: 26, alignment: .topLeading)
+                }
             }
             .padding(13)
             .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
