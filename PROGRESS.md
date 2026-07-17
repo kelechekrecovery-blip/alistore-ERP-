@@ -2563,3 +2563,13 @@
 - Checks run: `npm run ios:build` all 10 targets; `npm run ios:ui` Client `5/5`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: `IOS-CLIENT-006` is accepted at local simulator software level. Full 17-screen visual evidence, physical-device camera/push/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
 - Next step: continue Client support/returns/trade-in screen parity and add authenticated UI fixtures for device/warranty states before physical-device certification.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-007`.
+- Task: align the native Client Support screen with the `AliStore Клиент App 2.0` handoff.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: replaced the system support `List` with a dark prototype shell containing contact channels, FAQ rows, customer support form, priority chips, loading/error/empty states and server-backed ticket cards. Existing customer JWT ownership, stable submission idempotency and retry behavior remain unchanged.
+- Checks run: `npm run ios:build` all 10 targets; `npm run ios:ui` Client `5/5`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: `IOS-CLIENT-007` is accepted at local simulator software level. Full 17-screen visual evidence, authenticated native UI fixtures, physical-device camera/push/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: finish the remaining Client account shell visual pass (returns, Trade-in, bonuses, addresses, settings and notifications), then collect authenticated simulator evidence before physical-device certification.

@@ -2855,86 +2855,124 @@ private struct CustomerSupportView: View {
     }
 
     var body: some View {
-        List {
-            Section("Связаться с нами") {
-                Label("Ответим в приложении", systemImage: "message.fill")
-                Text("Опишите вопрос — обращение получит SLA и появится в очереди поддержки.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Новое обращение") {
-                TextField("Тема", text: $subject)
-                    .accessibilityIdentifier("support-subject")
-                TextField("Подробности", text: $details, axis: .vertical)
-                    .lineLimit(3...7)
-                    .accessibilityIdentifier("support-details")
-                Picker("Срочность", selection: $priority) {
-                    Text("Обычная").tag("normal")
-                    Text("Высокая").tag("high")
-                    Text("Срочная").tag("urgent")
-                }
-                if let submissionError {
-                    Text(submissionError).font(.caption).foregroundStyle(.red)
-                }
-                Button {
-                    Task { await submit() }
-                } label: {
-                    if isSubmitting {
-                        ProgressView()
-                    } else {
-                        Label("Создать обращение", systemImage: "paperplane.fill")
-                    }
-                }
-                .disabled(isSubmitting || normalizedSubject.isEmpty)
-                .accessibilityIdentifier("support-submit")
-            }
-
-            Section("Мои обращения") {
-                if isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView("Загружаем")
-                        Spacer()
-                    }
-                } else if let loadError {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(loadError).font(.caption).foregroundStyle(.red)
-                        Button("Повторить", systemImage: "arrow.clockwise") {
-                            Task { await load() }
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем поддержку")
+                    .tint(ClientTheme.lime)
+                    .foregroundStyle(ClientTheme.muted)
+            } else if let loadError {
+                ClientDataErrorView(message: loadError, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 8) {
+                            ClientSupportChannel(symbol: "message.fill", title: "В приложении", detail: "Ответим по SLA", tint: ClientTheme.lime)
+                            ClientSupportChannel(symbol: "paperplane.fill", title: "Telegram", detail: "Быстрый вопрос", tint: Color(red: 0.5, green: 0.7, blue: 0.95))
+                            ClientSupportChannel(symbol: "phone.fill", title: "Звонок", detail: "Каждый день", tint: .white)
                         }
-                    }
-                } else if tickets.isEmpty {
-                    ContentUnavailableView("Обращений пока нет", systemImage: "bubble.left.and.bubble.right")
-                } else {
-                    ForEach(tickets) { ticket in
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(ticket.subject).font(.headline)
-                                Spacer()
-                                Text(statusLabel(ticket.status))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ticket.status == "resolved" || ticket.status == "closed" ? .secondary : ClientTheme.lime)
-                            }
-                            if let body = ticket.body, !body.isEmpty {
-                                Text(body).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-                            }
+
+                        Text("Частые вопросы")
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        ForEach(["Как работает гарантия?", "Где мой заказ?", "Как оформить возврат?", "Что нужно для Trade-in?"], id: \.self) { question in
                             HStack {
-                                Text(priorityLabel(ticket.priority))
+                                Text(question)
+                                    .font(ClientTheme.body(13))
+                                    .foregroundStyle(.white)
                                 Spacer()
-                                Text(ticket.createdAt, format: .dateTime.day().month().year())
+                                Image(systemName: "chevron.down")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ClientTheme.muted)
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .padding(13)
+                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
                         }
-                        .padding(.vertical, 4)
-                        .accessibilityIdentifier("support-ticket-\(ticket.id)")
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Создать обращение")
+                                .font(ClientTheme.body(15, weight: .bold))
+                                .foregroundStyle(.white)
+                            TextField("Тема обращения", text: $subject)
+                                .font(ClientTheme.body(14))
+                                .foregroundStyle(.white)
+                                .padding(13)
+                                .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                .accessibilityIdentifier("support-subject")
+                            TextEditor(text: $details)
+                                .scrollContentBackground(.hidden)
+                                .font(ClientTheme.body(14))
+                                .foregroundStyle(.white)
+                                .frame(minHeight: 92)
+                                .padding(9)
+                                .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                .accessibilityIdentifier("support-details")
+                            HStack(spacing: 8) {
+                                Text("Срочность")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(ClientTheme.muted)
+                                Spacer()
+                                ForEach([("normal", "Обычная"), ("high", "Высокая"), ("urgent", "Срочная")], id: \.0) { option in
+                                    Button(option.1) { priority = option.0 }
+                                        .font(ClientTheme.body(10, weight: .semibold))
+                                        .foregroundStyle(priority == option.0 ? .black : ClientTheme.muted)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 6)
+                                        .background(priority == option.0 ? ClientTheme.lime : ClientTheme.line, in: Capsule())
+                                }
+                            }
+                            if let submissionError {
+                                Text(submissionError)
+                                    .font(ClientTheme.body(12))
+                                    .foregroundStyle(ClientTheme.coral)
+                            }
+                            Button {
+                                Task { await submit() }
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if isSubmitting {
+                                        ProgressView().tint(.black)
+                                    } else {
+                                        Label("Отправить обращение", systemImage: "paperplane.fill")
+                                    }
+                                    Spacer()
+                                }
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(minHeight: 48)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+                            }
+                            .disabled(isSubmitting || normalizedSubject.isEmpty)
+                            .accessibilityIdentifier("support-submit")
+                        }
+                        .padding(16)
+                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+
+                        Text("Мои обращения")
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        if tickets.isEmpty {
+                            ClientStateCard(title: "Обращений пока нет", detail: "Создайте обращение, и команда ответит в приложении.", symbol: "bubble.left.and.bubble.right")
+                        } else {
+                            ForEach(tickets) { ticket in
+                                ClientSupportTicketCard(ticket: ticket, statusLabel: statusLabel(ticket.status), priorityLabel: priorityLabel(ticket.priority))
+                                    .accessibilityIdentifier("support-ticket-\(ticket.id)")
+                            }
+                        }
                     }
+                    .padding(16)
                 }
             }
         }
         .navigationTitle("Поддержка")
         .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
         .task { await load() }
         .refreshable { await load() }
         .onChange(of: subject) { _, _ in renewSubmissionKey() }
@@ -3005,6 +3043,73 @@ private struct CustomerSupportView: View {
 
     private func priorityLabel(_ priority: String) -> String {
         ["normal": "Обычная", "high": "Высокая", "urgent": "Срочная"][priority] ?? priority
+    }
+}
+
+private struct ClientSupportChannel: View {
+    let symbol: String
+    let title: String
+    let detail: String
+    let tint: Color
+
+    var body: some View {
+        VStack(spacing: 7) {
+            Image(systemName: symbol)
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(tint)
+            Text(title)
+                .font(ClientTheme.body(11, weight: .semibold))
+                .foregroundStyle(tint)
+            Text(detail)
+                .font(ClientTheme.body(9))
+                .foregroundStyle(ClientTheme.muted)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 78)
+        .padding(.horizontal, 3)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+}
+
+private struct ClientSupportTicketCard: View {
+    let ticket: CustomerSupportTicket
+    let statusLabel: String
+    let priorityLabel: String
+
+    private var statusColor: Color {
+        ["resolved", "closed"].contains(ticket.status) ? ClientTheme.muted : ClientTheme.lime
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(ticket.subject)
+                    .font(ClientTheme.body(14, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(statusLabel)
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(statusColor)
+            }
+            if let body = ticket.body, !body.isEmpty {
+                Text(body)
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineLimit(2)
+            }
+            HStack {
+                Text(priorityLabel)
+                Spacer()
+                Text(ticket.createdAt, format: .dateTime.day().month().year())
+            }
+            .font(ClientTheme.body(11))
+            .foregroundStyle(ClientTheme.muted)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 }
 
