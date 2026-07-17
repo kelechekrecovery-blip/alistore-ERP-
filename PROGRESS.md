@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ECOSYSTEM-AUDIT-STRICT-004
+
+- Iteration ID: `ECOSYSTEM-AUDIT-STRICT-004`.
+- Task: rerun strict ecosystem audit after refreshing visual, native UI and reconciliation evidence under the restored audit npm aliases.
+- Files changed: `PROGRESS.md`.
+- Result: `npm run ecosystem:audit:strict` now passes every software/evidence gate: durable visual, clean source/design evidence, iOS app UI, Android app UI, POS/refund reconciliation, courier COD reconciliation, service/loaner reconciliation, procurement/sale reconciliation and composite reconciled E2E. The strict audit exits `1` with exactly one remaining blocker: the design corpus still has 23 tracked handoffs, 74 linked handoffs, 10 present linked files and 64 missing linked `.dc.html` files.
+- Checks run: `npm run ecosystem:audit:strict`; `git status --short`; `git diff --check`.
+- Acceptance: accepted as current state evidence. Local software gates are green in strict audit; full ecosystem acceptance remains blocked until the 64 missing design references are restored or explicitly retired with owner approval.
+- Next step: resolve `ECO-001` by restoring the missing `.dc.html` files from the design source or recording owner-approved retirements, then rerun strict audit.
+
 # 2026-07-17 — RECONCILED-E2E-EVIDENCE-003
 
 - Iteration ID: `RECONCILED-E2E-EVIDENCE-003`.
