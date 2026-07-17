@@ -2955,6 +2955,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-RELEASE-005`.
+- Task: add a strict signing/provisioning gate before native iOS Client archive and TestFlight upload.
+- Files changed: `apps/ios/scripts/store-preflight.sh`, `apps/ios/.env.production.example`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: `store-preflight.sh` now supports `--strict-signing`. It verifies an Apple Distribution signing identity for the configured team and requires a matching local App Store provisioning profile for `kg.alistore.client`, unless `IOS_ALLOW_PROVISIONING_UPDATE=true` is explicitly set for a protected machine with an authenticated Xcode account.
+- Checks run: `bash -n apps/ios/scripts/store-preflight.sh`; `apps/ios/scripts/store-preflight.sh --help`; `node scripts/validate-ios-store-metadata.mjs apps/ios/store/client-metadata.json`; negative `npm run ios:store-preflight -- --env-file <temporary fake env> --strict-signing` failed closed with no provisioning profile; positive `npm run ios:store-preflight -- --env-file <temporary fake env with IOS_ALLOW_PROVISIONING_UPDATE=true> --strict-signing` passed without printing secrets.
+- Outcome: the release preflight now proves the next App Store signing blocker before archive. Actual App Store publication remains open because `apps/ios/.env.production`, verified `ASC_ISSUER_ID`, provisioning/auto-signing access, TestFlight upload and physical iPhone smoke are not completed in this session.
+- Next step: when protected Apple values are available, run `npm run ios:store-preflight -- --env-file apps/ios/.env.production --strict-asc --strict-signing`, then create a signed archive and continue TestFlight/device smoke.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-015`.
 - Task: close the missing native iOS Client Search visual state from `AliStore Клиент App 2.0`.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `apps/ios/store/client-metadata.json`, `apps/ios/store/release-runbook.md`, `scripts/validate-ios-store-metadata.mjs`, `BACKLOG.md`, and `PROGRESS.md`.

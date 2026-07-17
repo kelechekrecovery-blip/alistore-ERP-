@@ -11,6 +11,7 @@ ios_root="$repo_root/apps/ios"
 env_file=""
 metadata_file="$ios_root/store/client-metadata.json"
 strict_asc="0"
+strict_signing="0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -23,13 +24,18 @@ while [[ $# -gt 0 ]]; do
       strict_asc="1"
       shift
       ;;
+    --strict-signing)
+      strict_signing="1"
+      shift
+      ;;
     --help|-h)
       cat <<'USAGE'
-Usage: apps/ios/scripts/store-preflight.sh [--env-file path] [--strict-asc]
+Usage: apps/ios/scripts/store-preflight.sh [--env-file path] [--strict-asc] [--strict-signing]
 
 Validates the native iOS Client release configuration without printing secrets.
 If --env-file is omitted and apps/ios/.env.production exists, that file is loaded.
 Use --strict-asc to verify the App Store Connect API key against Apple's API.
+Use --strict-signing to verify Apple Distribution signing material is available.
 USAGE
       exit 0
       ;;
@@ -109,6 +115,35 @@ if [[ "$strict_asc" == "1" ]]; then
     || fail 'App Store Connect API verification failed'
 fi
 
+if [[ "$strict_signing" == "1" ]]; then
+  signing_identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  if ! printf '%s\n' "$signing_identities" | grep -Eq "Apple Distribution: .+\\($team_id\\)"; then
+    fail "Apple Distribution signing identity for team $team_id is required"
+  fi
+
+  profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+  profile_match="0"
+  if [[ -d "$profile_dir" ]]; then
+    while IFS= read -r profile; do
+      profile_plist="$(security cms -D -i "$profile" 2>/dev/null || true)"
+      [[ -n "$profile_plist" ]] || continue
+      application_id="$(printf '%s' "$profile_plist" | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
+      profile_team="$(printf '%s' "$profile_plist" | plutil -extract TeamIdentifier.0 raw -o - - 2>/dev/null || true)"
+      [[ "$profile_team" == "$team_id" ]] || continue
+      case "$application_id" in
+        "$team_id.kg.alistore.client"|"$team_id.*")
+          profile_match="1"
+          break
+          ;;
+      esac
+    done < <(find "$profile_dir" -maxdepth 1 -type f -name '*.mobileprovision' -print)
+  fi
+
+  if [[ "$profile_match" != "1" && "${IOS_ALLOW_PROVISIONING_UPDATE:-}" != "true" ]]; then
+    fail 'App Store provisioning profile for kg.alistore.client is required, or set IOS_ALLOW_PROVISIONING_UPDATE=true for an authenticated Xcode account'
+  fi
+fi
+
 settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
   xcodebuild -project "$ios_root/AliStoreNative.xcodeproj" \
   -scheme AliStoreClient -configuration Release -showBuildSettings \
@@ -131,5 +166,8 @@ printf 'store-preflight: Release APNs environment resolved to production\n'
 printf 'store-preflight: Apple team and App Store Connect credentials are present\n'
 if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'
+fi
+if [[ "$strict_signing" == "1" ]]; then
+  printf 'store-preflight: Apple Distribution signing material verified\n'
 fi
 printf 'store-preflight: native Client configuration passed\n'
