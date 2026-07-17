@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — COURIER-COD-EVIDENCE-002
+
+- Iteration ID: `COURIER-COD-EVIDENCE-002`.
+- Task: refresh trusted Web COD checkout, warehouse picking, courier delivery and cash handover reconciliation evidence.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/courier-cod-reconciliation-cffef7d5e1df7cbef5f232753bf5c7c9d37d21e4f036a6aa34a1725e260f82c6.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ecosystem:courier-cod:e2e` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`. The Playwright COD reconciliation scenario passed `1/1`.
+- Checks run: trusted ecosystem recorder for `courier-cod-reconciliation`; `git diff --check`.
+- Acceptance: accepted for committed local software reconciliation evidence. Live courier/device GPS, physical cash-handover UAT and first-store financial close remain open.
+- Next step: refresh service/loaner, procurement/sale and composite reconciled ecosystem evidence.
+
 # 2026-07-17 — POS-REFUND-EVIDENCE-002
 
 - Iteration ID: `POS-REFUND-EVIDENCE-002`.

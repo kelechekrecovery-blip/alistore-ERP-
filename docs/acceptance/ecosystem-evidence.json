@@ -69,8 +69,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-249efacb75bd8f48fe257baeec950691963bd499413dca0e773fcf0dff7376ed.json",
-          "sha256": "249efacb75bd8f48fe257baeec950691963bd499413dca0e773fcf0dff7376ed"
+          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-cffef7d5e1df7cbef5f232753bf5c7c9d37d21e4f036a6aa34a1725e260f82c6.json",
+          "sha256": "cffef7d5e1df7cbef5f232753bf5c7c9d37d21e4f036a6aa34a1725e260f82c6"
         }
       ]
     },
