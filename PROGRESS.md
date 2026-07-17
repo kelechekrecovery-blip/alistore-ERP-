@@ -2653,3 +2653,13 @@
 - Checks run: `npm run ios:build` passed all 10 iOS targets; `npm run ios:ui` passed Client `14/14`, Staff `1/1`, Courier `1/1` and POS `1/1`; `git diff --check` passed.
 - Outcome: cart presentation and cart-to-checkout navigation are accepted at local simulator software level. Full 17-screen visual evidence, promo/bonus checkout integration, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: continue remaining Client payment-result/checkout visual evidence and then run signed archive/store preflight when Apple credentials, profiles and production API URL are supplied.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-016`.
+- Task: harden native Client payment-result actions and return-to-catalog navigation.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: the payment-result screen now exposes stable accessibility targets for its prototype actions, and `Вернуться в каталог` resets local checkout presentation and routes to the real catalog tab. A Debug-only fixture renders a completed local UI state from existing typed fixture data without creating a payment/order or entering Release builds.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; `npm run ios:ui` passed Client `15/15`, Staff `1/1`, Courier `1/1` and POS `1/1`; `npm run ios:test` `34/34`; `git diff --check`.
+- Outcome: payment-result presentation and local navigation are accepted at simulator software level. Payment provider failure/retry certification, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: continue remaining Client payment failure/retry and full 17-screen visual evidence, then run signed archive/store preflight when Apple credentials, profiles and production API URL are supplied.

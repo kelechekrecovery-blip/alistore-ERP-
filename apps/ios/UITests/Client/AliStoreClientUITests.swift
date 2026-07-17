@@ -207,6 +207,21 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Способ получения"].exists)
     }
 
+    func testPaymentResultUsesPrototypeActionsAndReturnsToCatalog() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-result"]
+        app.launch()
+
+        app.buttons["Корзина"].tap()
+        XCTAssertTrue(app.staticTexts["payment-result-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Заказ оформлен"].exists)
+        XCTAssertTrue(app.buttons["payment-track-button"].exists)
+
+        app.buttons["payment-catalog-button"].tap()
+        XCTAssertTrue(app.buttons["Каталог"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Каталог"].exists)
+    }
+
     private func launchSignedInAccount() -> XCUIApplication {
         launchSignedInAccount(arguments: [])
     }

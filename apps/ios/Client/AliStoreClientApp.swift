@@ -804,7 +804,7 @@ private struct ClientRootView: View {
                         case .favorites:
                             FavoritesView(products: products, cart: $cart, favorites: $favorites)
                         case .cart:
-                            CartView(environment: environment, auth: auth, products: products, cart: $cart)
+                            CartView(environment: environment, auth: auth, products: products, cart: $cart, onOpenCatalog: { selectedTab = .catalog })
                         case .account:
                             AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, onEnablePush: enablePush, onLogout: { guestMode = false })
                         }
@@ -1149,6 +1149,7 @@ private struct CartView: View {
     @State private var checkoutStep: ClientCheckoutStep = .delivery
     @State private var showingOrderStatus = false
     @State private var showingCheckout = UITestBootstrap.startsAtCheckout
+    let onOpenCatalog: () -> Void
 
     private var lines: [(Product, Int)] {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
@@ -1164,7 +1165,16 @@ private struct CartView: View {
                     if queuedOffline {
                         offlineState
                     } else if let order = completedOrder {
-                        ClientPaymentResultView(order: order, paymentIntent: paymentIntent, paymentURL: paymentIntent.flatMap(paymentURL), onTrack: { showingOrderStatus = true }, onReset: resetCheckout)
+                        ClientPaymentResultView(
+                            order: order,
+                            paymentIntent: paymentIntent,
+                            paymentURL: paymentIntent.flatMap(paymentURL),
+                            onTrack: { showingOrderStatus = true },
+                            onReset: {
+                                resetCheckout()
+                                onOpenCatalog()
+                            }
+                        )
                     } else if lines.isEmpty {
                         EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
                     } else {
@@ -1186,7 +1196,14 @@ private struct CartView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .task { await loadStorePoints() }
+        .task {
+            #if DEBUG
+            if UITestBootstrap.startsAtPaymentResult {
+                completedOrder = ClientUIFixture.orders[0]
+            }
+            #endif
+            await loadStorePoints()
+        }
         .sheet(isPresented: $showingOrderStatus) {
             if let order = completedOrder {
                 ClientOrderStatusView(order: order, environment: environment, auth: auth)
@@ -1548,6 +1565,7 @@ private struct ClientPaymentResultView: View {
                 .font(ClientTheme.display(24, weight: .black))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
+                .accessibilityIdentifier("payment-result-title")
             Text("Заказ #\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
                 .font(ClientTheme.body(14))
                 .foregroundStyle(ClientTheme.muted)
@@ -1571,10 +1589,12 @@ private struct ClientPaymentResultView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
                 .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                .accessibilityIdentifier("payment-track-button")
             Button("Вернуться в каталог", action: onReset)
                 .font(ClientTheme.body(13, weight: .medium))
                 .foregroundStyle(ClientTheme.muted)
                 .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("payment-catalog-button")
         }
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, minHeight: 440)
