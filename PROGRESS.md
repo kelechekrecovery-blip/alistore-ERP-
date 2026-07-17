@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `SEC-011-POS-REPLAY-017`.
+- Task: close push-token rebinding and sandbox payment confirmation bypasses, while preserving exact POS replay validation after a price change.
+- Files changed: notification ownership guard/service, sandbox confirmation guard/controller, POS replay service, `push-sandbox-guard.e2e-spec.ts`, and this progress entry.
+- Result: push registration requires JWT ownership and rejects cross-customer/cross-staff rebinding; sandbox confirmation is disabled by default and rate-limited when explicitly enabled; POS replays compare persisted sale composition without re-reading current catalog prices.
+- Checks run: isolated `test/push-sandbox-guard.e2e-spec.ts` passed `7/7`; API production TypeScript build passed; `git diff --check`.
+- Outcome: SEC-011 is accepted in API code and the POS replay path retains its idempotency invariant. Physical push delivery, live providers and full ecosystem reconciliation remain open.
+- Next step: validate approval/authz changes now visible in the tree, then restore a clean SHA for evidence recording.
+
+## 2026-07-18
+
 - Iteration ID: `MOB-018-ANDROID-ACCOUNT-POS-016`.
 - Task: complete the Android Client account-data entry points and align Android POS return requests with the server contract.
 - Files changed: Android core account/auth/API/ POS gateway and screen sources, `ClientAuthScreenTest.kt`, `PosSaleManagerTest.kt`, and this progress entry.

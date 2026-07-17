@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 import type { RegisterPushTokenDto } from './push-token.dto';
 
@@ -10,6 +10,8 @@ export class NotificationsService {
 
   async registerPushToken(dto: RegisterPushTokenDto, user?: AuthPrincipal) {
     const binding = await this.resolveBinding(user);
+    const existing = await this.prisma.pushToken.findUnique({ where: { token: dto.token } });
+    if (existing) this.assertTokenOwnership(existing, binding);
     const token = await this.prisma.pushToken.upsert({
       where: { token: dto.token },
       update: {
@@ -69,7 +71,7 @@ export class NotificationsService {
 
   private async resolveBinding(user: AuthPrincipal | undefined) {
     if (!user) {
-      return { scope: 'anonymous', customerId: null, staffId: null };
+      throw new UnauthorizedException('Для регистрации push-токена требуется авторизация');
     }
 
     if (user.typ === 'customer') {
@@ -94,6 +96,22 @@ export class NotificationsService {
       return { scope: 'staff', customerId: null, staffId: staff.id };
     }
 
-    return { scope: 'anonymous', customerId: null, staffId: null };
+    throw new UnauthorizedException('Для регистрации push-токена требуется авторизация');
+  }
+
+  /**
+   * A token already bound to a different customer/staff principal must not be
+   * re-bound (push hijack guard); the owner may refresh it, and an unbound
+   * legacy token may be claimed by any authenticated principal.
+   */
+  private assertTokenOwnership(
+    existing: { customerId: string | null; staffId: string | null },
+    binding: { scope: string; customerId: string | null; staffId: string | null },
+  ) {
+    const ownedByOtherCustomer = existing.customerId !== null && existing.customerId !== binding.customerId;
+    const ownedByOtherStaff = existing.staffId !== null && existing.staffId !== binding.staffId;
+    if (ownedByOtherCustomer || ownedByOtherStaff) {
+      throw new ConflictError('push_token_already_bound', 'Push-токен уже привязан к другому аккаунту');
+    }
   }
 }

@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { PaymentIntentsService } from './payment-intents.service';
+import { SandboxConfirmGuard } from './sandbox-confirm.guard';
 
 @ApiExcludeController()
 @Controller('sandbox/payments')
@@ -25,6 +27,8 @@ export class SandboxPaymentsController {
   }
 
   @Post(':provider/:intentId/confirm')
+  @UseGuards(SandboxConfirmGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async confirm(
     @Param('intentId') intentId: string,
     @Body() body: { returnUrl?: string },

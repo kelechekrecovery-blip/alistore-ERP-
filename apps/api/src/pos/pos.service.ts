@@ -111,9 +111,11 @@ export class PosService {
     if (txnId) {
       const existing = await this.payments.findByTxnId(txnId);
       if (existing?.orderId) {
-        await this.assertReplayCompatible(existing.orderId, dto);
-        const replay = await this.completedFromExistingPayment(existing.orderId, existing.shiftId);
-        return dto.clientSaleId ? replay : { ...replay, dedupedBy: 'fingerprint' as const };
+        // The replay check hashes the client-sent composition only (no catalog reads),
+        // so a legitimate retry still replays after a later price change (LOGIC-006).
+        const expectedTotal = saleTotal(dto.lines, pct);
+        const expectedPayments = this.normalizePayments(dto, expectedTotal);
+        return this.replaySale(existing, dto, storePoint.inventoryLocation, expectedTotal, expectedPayments);
       }
       const existingZeroOrder = await this.prisma.order.findUnique({
         where: { idempotencyKey: txnId },
@@ -288,6 +290,78 @@ export class PosService {
       .join('|');
     const material = [dto.staffId, dto.point, dto.discountPct ?? 0, lines, tenders, bucket].join('#');
     return createHash('sha256').update(material).digest('hex').slice(0, 32);
+  }
+
+  /**
+   * Verify a replayed idempotency key against the stored sale (LOGIC-006). The canonical
+   * composition is already persisted as order items + payments, so — like the courier
+   * command payload comparison — the stored sale is hashed the same way as the incoming
+   * request; a mismatch means the key was reused for a different sale and conflicts
+   * instead of returning someone else's receipt.
+   */
+  private async replaySale(
+    existing: Payment,
+    dto: PosSaleDto,
+    point: string,
+    total: number,
+    payments: NormalizedPosPayment[],
+  ) {
+    const order = await this.orders.get(existing.orderId as string);
+    if (!order) {
+      throw new ValidationError('order_not_found', `Заказ ${existing.orderId} не найден`);
+    }
+    const storedHash = this.saleRequestHash({
+      staffId: existing.receivedBy ?? '',
+      point: existing.point ?? '',
+      total: order.total,
+      lines: order.items,
+      tenders: order.payments.filter((payment) => payment.amount > 0),
+    });
+    const requestHash = this.saleRequestHash({
+      staffId: dto.staffId ?? '',
+      point,
+      total,
+      lines: dto.lines,
+      tenders: payments,
+    });
+    if (storedHash !== requestHash) {
+      throw new ConflictError('idempotency_key_reused', 'Ключ уже использован с другим запросом');
+    }
+    const completed = await this.completedFromExistingPayment(order.id, existing.shiftId);
+    // The fingerprint fallback is a last resort (M-5): an auto-keyed hit cannot be told
+    // apart from a deliberate identical re-ring, so the dedup is flagged instead of
+    // silently substituting the sale. A distinct same-cart sale needs its own clientSaleId.
+    return dto.clientSaleId ? completed : { ...completed, dedupedBy: 'fingerprint' as const };
+  }
+
+  /**
+   * SHA-256 over the canonical sale composition, mirroring the refunds requestHash
+   * pattern. Lines are aggregated per sku+price (auto-assigned IMEI units are split into
+   * per-unit rows server-side) and lines/tenders are sorted, so field order and unit
+   * assignment never change the hash.
+   */
+  private saleRequestHash(composition: {
+    staffId: string;
+    point: string;
+    total: number;
+    lines: Array<{ sku: string; qty: number; price: number }>;
+    tenders: Array<{ method: string; amount: number }>;
+  }): string {
+    const aggregated = new Map<string, { sku: string; qty: number; price: number }>();
+    for (const line of composition.lines) {
+      const key = `${line.sku}:${line.price}`;
+      const existing = aggregated.get(key);
+      if (existing) existing.qty += line.qty;
+      else aggregated.set(key, { sku: line.sku, qty: line.qty, price: line.price });
+    }
+    const canonical = {
+      staffId: composition.staffId,
+      point: composition.point,
+      total: composition.total,
+      lines: [...aggregated.values()].map((line) => `${line.sku}:${line.qty}:${line.price}`).sort(),
+      tenders: composition.tenders.map((tender) => `${tender.method}:${tender.amount}`).sort(),
+    };
+    return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
   }
 
   private normalizePayments(dto: PosSaleDto, total: number): NormalizedPosPayment[] {

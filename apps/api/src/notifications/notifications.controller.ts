@@ -2,7 +2,6 @@ import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, U
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 import { NotificationsService } from './notifications.service';
@@ -19,11 +18,11 @@ export class NotificationsController {
   @ApiBearerAuth()
   @ApiCreatedResponse({ description: 'Push token registered or refreshed.' })
   @Post('push-tokens')
-  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   registerPushToken(
     @Body() dto: RegisterPushTokenDto,
-    @CurrentUser() user?: AuthPrincipal,
+    @CurrentUser() user: AuthPrincipal,
   ) {
     return this.notifications.registerPushToken(dto, user);
   }
