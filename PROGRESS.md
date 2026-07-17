@@ -2633,6 +2633,15 @@
 - Outcome: the complete serial API gate is green. The expected provider/outbox fallback warnings are test scenarios, not failures. Web E2E and native/strict ecosystem gates remain separate acceptance requirements.
 - Next step: run the ERP/storefront browser gate on the clean commit and refresh only the evidence artifacts affected by the source-tree change.
 
+## 2026-07-17
+
+- Iteration ID: `ERP-STOREFRONT-CONTRACT-001`.
+- Task: verify the ERP-to-storefront contract across product administration, CMS blocks, reviews, promotions and checkout.
+- Checks run: `npx playwright test e2e/admin-products.spec.ts e2e/storefront-cms-ui.spec.ts` passed `7/7` tests in `36.8s`.
+- Result: ERP product edits are visible on the public product route; CMS product collections and device-targeted blocks publish in server order; draft edits persist; reviews remain private until marketer approval; and an ERP promotion is redeemed by the same server quote during checkout.
+- Outcome: the available ERP/CMS integration slice is accepted locally. This does not close missing handoff references, full ERP module parity, production provider certification or native physical-device gates.
+- Next step: extend the ERP/storefront contract with an explicit server-price update → catalog → checkout assertion, then refresh trusted evidence after the source-tree change.
+
 - Task: refresh `ios-app-ui` on the visual-contract source hash.
 - Checks run: four XCUITest bundles `4/4`, zero failures; artifact SHA-256 `8237873a2593486399a76dbc92287bc6c85eea4099afadb44b90a30f28dfe7cd`; trusted recorder exited zero.
 - Outcome: packaged iOS launch evidence is current again; deep journeys and physical-device certification remain open.
