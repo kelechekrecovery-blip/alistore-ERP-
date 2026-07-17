@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `QA-TOOLCHAIN-REPIN-025`.
+- Task: re-pin the trusted ecosystem toolchain after restoring dependencies with `npm ci --ignore-scripts`.
+- Result: tracked node_modules tree hash now matches the clean reproducible install; package-lock, Node runtime, npm CLI and Playwright/Jest versions remain unchanged.
+- Checks run: `npm ci --ignore-scripts` completed with 0 vulnerabilities; independent hash comparison confirmed package-lock/runtime matches; `git diff --check`.
+- Next step: rerun service/loaner evidence with the repinned trusted toolchain.
+
+## 2026-07-18
+
 - Iteration ID: `QA-SERVICE-FK-CLEANUP-024`.
 - Task: make valuation-reversal cleanup respect deferred append-only coverage triggers.
 - Result: the warranty fixture resets `reversedQty` and reversal rows in one transaction, so repeated evidence runs preserve the database invariant instead of using trigger-disabling shortcuts.
