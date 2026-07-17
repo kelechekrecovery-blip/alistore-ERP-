@@ -875,14 +875,14 @@ private struct ClientRootView: View {
     }
 
     private func restoreLocalState() {
-        guard !UITestBootstrap.startsAtCheckout else { return }
+        guard !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart else { return }
         cart = ClientLocalState.cart()
         favorites = ClientLocalState.favorites()
         compared = ClientLocalState.compared()
     }
 
     private func saveLocalState() {
-        guard !UITestBootstrap.startsAtCheckout else { return }
+        guard !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart else { return }
         ClientLocalState.save(cart: cart, favorites: favorites, compared: compared)
     }
 
@@ -892,12 +892,12 @@ private struct ClientRootView: View {
         do {
             let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
             products = response.items
-            if UITestBootstrap.startsAtCheckout, let product = response.items.first {
+            if (UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart), let product = response.items.first {
                 cart[product.id] = 1
             }
             catalogError = nil
         } catch {
-            if UITestBootstrap.startsAtCheckout {
+            if UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart {
                 let fixture = Product(id: "ui-product", sku: "UI-IPHONE", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3)
                 products = [fixture]
                 cart[fixture.id] = 1
@@ -1148,6 +1148,7 @@ private struct CartView: View {
     @State private var queuedOffline = false
     @State private var checkoutStep: ClientCheckoutStep = .delivery
     @State private var showingOrderStatus = false
+    @State private var showingCheckout = UITestBootstrap.startsAtCheckout
 
     private var lines: [(Product, Int)] {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
@@ -1167,12 +1168,17 @@ private struct CartView: View {
                     } else if lines.isEmpty {
                         EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
                     } else {
-                        if checkoutStep == .review {
-                            reviewStep
+                        if showingCheckout {
+                            if checkoutStep == .review {
+                                reviewStep
+                            } else {
+                                stepContent
+                            }
+                            footer
                         } else {
-                            stepContent
+                            cartContents
+                            cartFooter
                         }
-                        footer
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1191,17 +1197,17 @@ private struct CartView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(completedOrder == nil ? "Оформление" : "Готово")
+                Text(completedOrder == nil ? (showingCheckout ? "Оформление" : "Корзина") : "Готово")
                     .font(ClientTheme.display(20, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
                 if completedOrder == nil && !lines.isEmpty {
-                    Text("\(lines.count) поз.")
+                    Text("\(cart.values.reduce(0, +)) шт.")
                         .font(ClientTheme.body(12, weight: .medium))
                         .foregroundStyle(ClientTheme.muted)
                 }
             }
-            if completedOrder == nil && !lines.isEmpty {
+            if completedOrder == nil && showingCheckout && !lines.isEmpty {
                 ClientCheckoutSteps(current: checkoutStep)
                 HStack {
                     ForEach(ClientCheckoutStep.allCases) { step in
@@ -1212,6 +1218,95 @@ private struct CartView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var cartContents: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(lines, id: \.0.id) { product, quantity in
+                HStack(alignment: .top, spacing: 12) {
+                    ClientProductImage(product: product, cornerRadius: 10)
+                        .frame(width: 76, height: 76)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(product.name)
+                            .font(ClientTheme.body(13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        Text(product.price.formatted(.currency(code: "KGS")))
+                            .font(ClientTheme.display(15, weight: .black))
+                            .foregroundStyle(.white)
+                        HStack(spacing: 8) {
+                            HStack(spacing: 10) {
+                                Button {
+                                    quantityBinding(product.id).wrappedValue = quantity - 1
+                                } label: {
+                                    Image(systemName: "minus")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .frame(width: 28, height: 28)
+                                }
+                                .accessibilityLabel("Уменьшить количество \(product.name)")
+                                Text("\(quantity)")
+                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 20)
+                                Button {
+                                    quantityBinding(product.id).wrappedValue = quantity + 1
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .frame(width: 28, height: 28)
+                                }
+                                .accessibilityLabel("Увеличить количество \(product.name)")
+                            }
+                            .foregroundStyle(.white)
+                            .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 8))
+                            Button("Удалить") {
+                                quantityBinding(product.id).wrappedValue = 0
+                            }
+                            .font(ClientTheme.body(11, weight: .medium))
+                            .foregroundStyle(ClientTheme.muted)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Text((product.price * quantity).formatted(.currency(code: "KGS")))
+                        .font(ClientTheme.display(14, weight: .bold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .multilineTextAlignment(.trailing)
+                }
+                .padding(12)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                .accessibilityElement(children: .contain)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +)) шт.", emphasized: false)
+                ClientSummaryRow(title: "Сумма товаров", value: total.formatted(.currency(code: "KGS")), emphasized: false)
+                ClientSummaryRow(title: "Итого", value: total.formatted(.currency(code: "KGS")), emphasized: true)
+            }
+            .padding(16)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        }
+    }
+
+    private var cartFooter: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                showingCheckout = true
+                checkoutStep = .delivery
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Оформить заказ")
+                    Spacer()
+                }
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(height: 50)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .accessibilityIdentifier("cart-checkout-button")
         }
     }
 
@@ -1349,13 +1444,16 @@ private struct CartView: View {
         paymentIntent = nil
         queuedOffline = false
         checkoutStep = .delivery
+        showingCheckout = false
     }
 
     private func quantityBinding(_ id: String) -> Binding<Int> {
         Binding(
             get: { cart[id] ?? 0 },
             set: { value in
-                if value == 0 { cart.removeValue(forKey: id) } else { cart[id] = value }
+                let stockCap = products.first(where: { $0.id == id })?.availableUnits ?? value
+                let capped = min(max(value, 0), stockCap)
+                if capped == 0 { cart.removeValue(forKey: id) } else { cart[id] = capped }
             }
         )
     }

@@ -2643,3 +2643,13 @@
 - Checks run: `npm run ios:build` all 10 targets; the first ad-hoc UI command was rejected because the project has no `AliStoreClientUITests` scheme; the corrected `npm run ios:ui` passed Client `13/13`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: compare/variant presentation is accepted at local simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: continue the remaining Client App 2.0 visual evidence for cart and payment-result states, then run signed archive/store preflight with owner credentials.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-015`.
+- Task: align the native Client cart screen with the `AliStore Клиент App 2.0` handoff and separate cart presentation from checkout entry.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: the Client now renders a dark cart shell with product imagery, line totals, quantity decrement/increment controls capped by server-provided stock, removal, item count and total summary. `Оформить заказ` transitions into the existing four-step checkout; the checkout continues to use server-authoritative prices/statuses and stable idempotency. A Debug-only cart fixture covers the new route without creating a real order or persisting test state.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; `npm run ios:ui` passed Client `14/14`, Staff `1/1`, Courier `1/1` and POS `1/1`; `git diff --check` passed.
+- Outcome: cart presentation and cart-to-checkout navigation are accepted at local simulator software level. Full 17-screen visual evidence, promo/bonus checkout integration, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: continue remaining Client payment-result/checkout visual evidence and then run signed archive/store preflight when Apple credentials, profiles and production API URL are supplied.
