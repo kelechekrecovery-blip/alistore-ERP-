@@ -379,13 +379,35 @@ private struct ClientOverlayView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(ClientTheme.muted)
-                    TextField("Техника, бренды, SKU", text: $query)
+                    TextField("iphone", text: $query)
                         .textInputAutocapitalization(.never)
                         .foregroundStyle(.white)
                 }
                 .padding(14)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
-                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.lime))
+                Text("Популярные запросы")
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(ClientTheme.muted)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(["iPhone", "AirPods", "Samsung", "Apple Watch", "Trade-in"], id: \.self) { value in
+                        Button {
+                            query = value.lowercased()
+                        } label: {
+                            Text(value)
+                                .font(ClientTheme.body(12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Text("Результаты")
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(ClientTheme.muted)
                 if products.isEmpty {
                     EmptyStateView(title: "Каталог недоступен", detail: "Проверьте соединение и повторите поиск.", symbol: "wifi.exclamationmark")
                 } else if matchingProducts.isEmpty {
@@ -404,6 +426,11 @@ private struct ClientOverlayView: View {
                 }
             }
             .padding(16)
+        }
+        .onAppear {
+            if UITestBootstrap.startsAtVisualEvidence && query.isEmpty {
+                query = "iphone"
+            }
         }
     }
 

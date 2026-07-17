@@ -59,8 +59,8 @@ With `--strict-asc`, it also signs a short-lived App Store Connect JWT and calls
 Apple's API to prove the issuer/key pair works. It never prints secret values.
 
 `ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
-Simulator and exports 16 retained PNG attachments: home, catalog, product detail,
-cart, account, order status, notifications, loyalty, returns, support, Trade-in,
+Simulator and exports 17 retained PNG attachments: home, catalog, product detail,
+search, cart, account, order status, notifications, loyalty, returns, support, Trade-in,
 warranty, addresses, settings, payment success and payment failure. These are
 review evidence only; they do not replace owner pixel approval or physical-device
 release smoke.

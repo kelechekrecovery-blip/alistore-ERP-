@@ -2955,6 +2955,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-015`.
+- Task: close the missing native iOS Client Search visual state from `AliStore Клиент App 2.0`.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `apps/ios/store/client-metadata.json`, `apps/ios/store/release-runbook.md`, `scripts/validate-ios-store-metadata.mjs`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the Client search overlay now opens with the prototype-style lime outlined search field, popular-query chips and results heading. The visual evidence test captures the missing `client-search` screen, and store metadata plus the visual capture script now enforce 17 required PNG states.
+- Checks run: `node --check scripts/validate-ios-store-metadata.mjs`; `node scripts/validate-ios-store-metadata.mjs apps/ios/store/client-metadata.json`; `bash -n apps/ios/scripts/visual-capture.sh`; `git diff --check`; `npm run ios:visual` passed and exported 17 PNG attachments; `npm run ios:store-preflight -- --env-file <temporary fake env>` passed in non-strict mode without printing secrets.
+- Outcome: the local simulator visual evidence gate now covers all 17 tracked Client App 2.0 review states. This does not claim App Store readiness; production API configuration, TestFlight/App Store Connect credentials, owner pixel sign-off and physical-device Face ID/APNs/camera/offline smoke remain open.
+- Next step: continue the remaining ecosystem gaps: ERP/CMS integration and visual parity, Android/iOS Staff/Courier/POS device certification, live provider certification and first-store staging UAT.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-STAFF-VISUAL-002`.
 - Task: align native Staff Tasks/KPI with the `AliStore Сотрудник App 2.0` handoff.
 - Files changed: `apps/ios/Staff/StaffWorkView.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.

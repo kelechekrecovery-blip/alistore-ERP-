@@ -75,10 +75,10 @@ if (/password|парол|token|secret|sk-|cfat_/iu.test(metadata.review.notes)) 
 if (metadata.screenshots?.requiredSimulator !== 'iPhone 17 Pro') {
   fail('screenshots.requiredSimulator must be iPhone 17 Pro');
 }
-if (metadata.screenshots?.requiredPngCount !== 16) fail('screenshots.requiredPngCount must be 16');
+if (metadata.screenshots?.requiredPngCount !== 17) fail('screenshots.requiredPngCount must be 17');
 const requiredStates = metadata.screenshots?.requiredStates;
-if (!Array.isArray(requiredStates) || requiredStates.length !== 16) {
-  fail('screenshots.requiredStates must contain exactly 16 states');
+if (!Array.isArray(requiredStates) || requiredStates.length !== 17) {
+  fail('screenshots.requiredStates must contain exactly 17 states');
 }
 if (new Set(requiredStates).size !== requiredStates.length) {
   fail('screenshots.requiredStates must not contain duplicates');

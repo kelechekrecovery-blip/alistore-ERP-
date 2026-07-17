@@ -36,11 +36,12 @@
   "screenshots": {
     "source": "apps/ios/build/AliStoreClientVisual-attachments",
     "requiredSimulator": "iPhone 17 Pro",
-    "requiredPngCount": 16,
+    "requiredPngCount": 17,
     "requiredStates": [
       "client-home",
       "client-catalog",
       "client-product-detail",
+      "client-search",
       "client-cart",
       "client-account",
       "client-order-status",

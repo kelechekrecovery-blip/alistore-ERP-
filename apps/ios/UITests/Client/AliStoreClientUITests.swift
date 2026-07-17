@@ -345,6 +345,14 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(home.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
         capture(home, named: "client-product-detail")
 
+        let search = launchGuest()
+        let searchButton = search.buttons["Поиск техники и брендов"]
+        XCTAssertTrue(searchButton.waitForExistence(timeout: 5))
+        searchButton.tap()
+        XCTAssertTrue(search.navigationBars["Поиск"].waitForExistence(timeout: 5))
+        XCTAssertTrue(search.staticTexts["Популярные запросы"].waitForExistence(timeout: 5))
+        capture(search, named: "client-search")
+
         let cart = XCUIApplication()
         cart.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-cart", "--ui-testing-visual-evidence"]
         cart.launch()
