@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-CLIENT-NOTIFICATIONS-001
+
+- Iteration ID: `ANDROID-CLIENT-NOTIFICATIONS-001`.
+- Task: request the Android 13+ notification permission in the packaged Client app and make its connected smoke permission-aware.
+- Files changed: Client `MainActivity`, packaged Client UI test, backlog/progress documentation.
+- Result: Client requests `POST_NOTIFICATIONS` only on Android 13+ when it is not already granted; older Android versions keep the existing path. The smoke test grants the permission before launch, matching the existing Staff test contract.
+- Checks run: `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 30 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `npm run android:build` passed all four debug APKs; `git diff --check`.
+- Acceptance: accepted for the local Android Client notification-permission software vertical. Denied-permission UX, FCM provider delivery, physical-device push and production credentials remain external.
+- Next step: continue the next locally unblocked Android Staff/Courier/POS or ERP vertical while keeping provider, device and design-corpus gates explicit.
+
 # 2026-07-17 — ANDROID-CLIENT-PUSH-001
 
 - Iteration ID: `ANDROID-CLIENT-PUSH-001`.
