@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-POS-UI-001
+
+- Iteration ID: `IOS-POS-UI-001`.
+- Task: add signed-in simulator coverage for the native iOS POS sale/split/receipt shell instead of only proving the login screen.
+- Files changed: `apps/ios/Shared/Models.swift`, `apps/ios/POS/POSSaleView.swift`, `apps/ios/UITests/POS/AliStorePOSUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: DEBUG UI-test mode now loads deterministic POS catalog/open shift for cashier role and returns a deterministic receipt after split cash/card tender; production path remains API-backed with idempotency. POS UI test covers catalog sync, cart add, split amount, paid Event Ledger message, receipt markup and hardware-certification warning.
+- Checks run: targeted POS sale/split XCUITest passed; full `AliStorePOSUITests` passed `2/2`; `npm run ios:build` passed all 10 targets; `git diff --check` passed. Note: one concurrent Xcode run failed from a simulator bundle race while `ios:build` was running in parallel; rerun alone passed.
+- Acceptance: accepted for the local POS sale/split/receipt simulator gate. Physical scanner/printer/bank terminal certification, live provider capture/reconciliation, production signing and first-store POS UAT remain open.
+- Next step: continue Android parity, Staff/Courier/POS physical gates, ERP/CMS handoff completion, staging/provider certification and strict ecosystem E2E.
+
 # 2026-07-17 — EXCH-002A
 
 - Iteration ID: `EXCH-002A`.

@@ -107,6 +107,30 @@ public struct CashShift: Decodable, Identifiable, Sendable {
             .filter { $0.method == "cash" && $0.status == "received" }
             .reduce(0) { $0 + $1.amount }
     }
+
+    public init(
+        id: String,
+        staffId: String,
+        point: String,
+        openCash: Int,
+        closeCash: Int? = nil,
+        diff: Int? = nil,
+        openedAt: Date,
+        closedAt: Date? = nil,
+        payments: [ShiftPayment]? = nil,
+        expected: Int? = nil
+    ) {
+        self.id = id
+        self.staffId = staffId
+        self.point = point
+        self.openCash = openCash
+        self.closeCash = closeCash
+        self.diff = diff
+        self.openedAt = openedAt
+        self.closedAt = closedAt
+        self.payments = payments
+        self.expected = expected
+    }
 }
 
 public struct OpenShiftRequest: Encodable, Sendable {
@@ -1148,6 +1172,12 @@ public struct POSReceipt: Decodable, Sendable {
     public let markup: String
     public let svg: String
     public let escposBase64: String
+
+    public init(markup: String, svg: String, escposBase64: String) {
+        self.markup = markup
+        self.svg = svg
+        self.escposBase64 = escposBase64
+    }
 }
 
 public struct POSPayment: Decodable, Identifiable, Sendable {

@@ -104,9 +104,11 @@ struct POSSaleView: View {
                     HStack {
                         Button { change(product, by: -1) } label: { Image(systemName: "minus") }
                             .disabled((cart[product.id] ?? 0) == 0)
+                            .accessibilityIdentifier("pos-qty-minus-\(product.id)")
                         Text("\(cart[product.id] ?? 0)").frame(minWidth: 24)
                         Button { change(product, by: 1) } label: { Image(systemName: "plus") }
                             .disabled((cart[product.id] ?? 0) >= product.availableUnits)
+                            .accessibilityIdentifier("pos-qty-plus-\(product.id)")
                     }
                     .buttonStyle(.bordered)
                 }
@@ -166,10 +168,12 @@ struct POSSaleView: View {
             }
             .buttonStyle(.borderedProminent).tint(POSPalette.lime).foregroundStyle(POSPalette.ink)
             .disabled(isBusy || shift == nil || cart.isEmpty || total <= 0)
+            .accessibilityIdentifier("pos-sale-submit")
             if let receipt {
                 Divider()
                 Text("Чек с сервера").font(.subheadline.weight(.bold))
                 Text(receipt.markup).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                    .accessibilityIdentifier("pos-receipt-markup")
                 Button("Печать", systemImage: "printer.fill") { POSReceiptPrinter.print(receipt.markup) }
                     .buttonStyle(.bordered)
                 Text("ESC/POS сформирован; устройство требует отдельной сертификации")
@@ -181,6 +185,14 @@ struct POSSaleView: View {
 
     @MainActor private func refresh() async {
         errorMessage = nil
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            products = Self.uiTestProducts
+            shift = Self.uiTestShift
+            message = "Каталог синхронизирован · 3 товара"
+            return
+        }
+        #endif
         do {
             async let catalog: CatalogResponse = api.get("catalog/products")
             async let currentShift: CashShift? = api.get("shifts/current", token: session.accessToken)
@@ -233,6 +245,25 @@ struct POSSaleView: View {
             clientSaleId: activeSaleId,
             approvalId: approvalId
         )
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            message = "POS-4102 · оплачено \(total) сом · Event Ledger"
+            let markup = """
+                AliStore POS
+                Смена: \(shift.id)
+                Товаров: \(request.lines.reduce(0) { $0 + $1.qty })
+                Оплата: \(payments.map { "\($0.method)=\($0.amount)" }.joined(separator: ", "))
+                Итого: \(total) сом
+                """
+            receipt = POSReceipt(markup: markup, svg: "", escposBase64: "")
+            cart = [:]
+            selectedIMEI = [:]
+            approvalId = nil
+            activeSaleId = UUID().uuidString
+            splitCash = ""
+            return
+        }
+        #endif
         do {
             let result: POSSaleResult = try await api.post(
                 "pos/sale", body: request, token: session.accessToken, idempotencyKey: activeSaleId
@@ -270,6 +301,24 @@ struct POSSaleView: View {
         cart[product.id] = next
         if next == 0 { selectedIMEI[product.id] = nil }
     }
+
+    #if DEBUG
+    private static let uiTestProducts: [Product] = [
+        Product(id: "iphone-15-128", sku: "IP15-128-BLK", name: "iPhone 15 128 ГБ Black", price: 109900, category: "phones", availableUnits: 4),
+        Product(id: "airpods-pro-2", sku: "APP2-USB-C", name: "AirPods Pro 2 USB-C", price: 24900, category: "audio", availableUnits: 7),
+        Product(id: "watch-s9", sku: "AWS9-45", name: "Apple Watch Series 9", price: 45900, category: "watch", availableUnits: 2)
+    ]
+
+    private static let uiTestShift = CashShift(
+        id: "shift-pos-ui",
+        staffId: "staff-ui-test",
+        point: "AliStore Центр",
+        openCash: 12000,
+        openedAt: Date(timeIntervalSince1970: 1_784_240_000),
+        payments: [],
+        expected: 12000
+    )
+    #endif
 }
 
 private enum POSLocalError: LocalizedError {
