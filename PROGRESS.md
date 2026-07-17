@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-APP-UI-EVIDENCE-002
+
+- Iteration ID: `IOS-APP-UI-EVIDENCE-002`.
+- Task: refresh the trusted all-iOS-app UI evidence after aligning the Client App Store screenshot gate to `AliStore Клиент App 2.0`.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-app-ui-a015efe4ef53164473af9f6981dc7f642073f1789e9b72b258e91afe460eb499.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ios:ui` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`. The run covered Client `21/21`, Staff `9/9`, Courier `2/2`, and POS `2/2` simulator UI tests.
+- Checks run: trusted ecosystem recorder for `ios-app-ui`; `git diff --check`.
+- Acceptance: accepted for committed simulator UI evidence across all four iOS apps. Physical-device Face ID/APNs/camera/maps/scanner/printer/payment-terminal smoke, production API, signing/provisioning, TestFlight upload and App Store review remain open.
+- Next step: rerun the strict ecosystem audit and refresh the next stale evidence gate that does not require external credentials.
+
 # 2026-07-17 — IOS-CLIENT-VISUAL-018-EVIDENCE
 
 - Iteration ID: `IOS-CLIENT-VISUAL-018-EVIDENCE`.
