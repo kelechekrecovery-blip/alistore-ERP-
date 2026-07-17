@@ -123,6 +123,22 @@ public final class CustomerAuthStore {
 
     public func unlock() { requiresQuickUnlock = false }
 
+    #if DEBUG
+    /// Supplies a non-network session for deterministic SwiftUI account screenshots.
+    /// The fixture is compiled out of Release and never writes to Keychain.
+    public func useUITestSession() {
+        session = CustomerSession(
+            accessToken: "ui-test-access-token",
+            refreshToken: "ui-test-refresh-token",
+            customerId: "ui-test-customer",
+            phone: "+996 700 00 12 34"
+        )
+        isRestoring = false
+        requiresQuickUnlock = false
+        errorMessage = nil
+    }
+    #endif
+
     private func clearQuickUnlock() {
         try? tokens.clear(account: "quick-unlock-pin")
         try? tokens.clear(account: "quick-unlock-pin-attempts")

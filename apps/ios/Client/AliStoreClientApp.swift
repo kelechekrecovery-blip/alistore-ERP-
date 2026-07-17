@@ -575,9 +575,10 @@ private struct ClientRootView: View {
     init(environment: AppEnvironment) {
         self.environment = environment
         _guestMode = State(initialValue: UITestBootstrap.startsAsGuest)
+        _selectedTab = State(initialValue: UITestBootstrap.startsAtAccount ? .account : .home)
         _auth = State(initialValue: CustomerAuthStore(
             environment: environment,
-            restoresStoredSession: !UITestBootstrap.disablesSessionRestore
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore && !UITestBootstrap.startsSignedIn
         ))
     }
 
@@ -625,7 +626,12 @@ private struct ClientRootView: View {
         }
         .task {
             restoreLocalState()
-            async let restore: Void = auth.restore()
+            #if DEBUG
+            if UITestBootstrap.startsSignedIn {
+                auth.useUITestSession()
+            }
+            #endif
+            async let restore: Void = UITestBootstrap.startsSignedIn ? () : auth.restore()
             async let catalog: Void = loadCatalog()
             _ = await (restore, catalog)
         }
@@ -2156,62 +2162,108 @@ private struct AccountView: View {
 
     @ViewBuilder
     private func signedInContent(_ session: CustomerSession) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("МОЙ ALISTORE")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(ClientTheme.lime)
-            Text("Привет, покупатель")
-                .font(ClientTheme.display(25, weight: .black))
-                .foregroundStyle(.white)
-            Text(session.phone)
-                .font(ClientTheme.body(13))
-                .foregroundStyle(ClientTheme.muted)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 13) {
+                Text(session.phone.dropFirst().first.map(String.init) ?? "A")
+                    .font(ClientTheme.display(22, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(
+                        LinearGradient(colors: [ClientTheme.coral, Color(red: 0.91, green: 0.255, blue: 0.055)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: Circle()
+                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text("Покупатель")
+                            .font(ClientTheme.display(16, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("CLIENT")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(ClientTheme.lime, in: Capsule())
+                    }
+                    Text(session.phone)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
 
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Покупки и защита")
-                .font(ClientTheme.body(12, weight: .semibold))
-                .foregroundStyle(ClientTheme.muted)
-            AccountMenuRow(title: "Мои заказы", detail: "Статусы, выдача и доставка", symbol: "shippingbox.fill") {
-                OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
-            }
-            AccountMenuRow(title: "Возвраты", detail: "Заявки, статусы и сумма возврата", symbol: "arrow.uturn.backward.circle.fill") {
-                CustomerReturnsView(environment: environment, auth: auth)
-            }
-            AccountMenuRow(title: "Устройства и гарантия", detail: "IMEI, срок и обращение", symbol: "shield.checkered") {
-                DevicesView(environment: environment, auth: auth)
-            }
-            AccountMenuRow(title: "Поддержка", detail: "Обращения и ответы команды", symbol: "bubble.left.and.bubble.right.fill") {
-                CustomerSupportView(environment: environment, auth: auth)
-            }
-        }
-
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Сервисы")
-                .font(ClientTheme.body(12, weight: .semibold))
-                .foregroundStyle(ClientTheme.muted)
-            AccountMenuRow(title: "Бонусы", detail: "Баланс, купоны и история начислений", symbol: "gift.fill") {
+            NavigationLink {
                 CustomerLoyaltyView(environment: environment, auth: auth)
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("БОНУСЫ И УРОВЕНЬ")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Color(red: 1, green: 0.88, blue: 0.64))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+                    HStack(alignment: .lastTextBaseline) {
+                        Text("Откройте бонусный баланс")
+                            .font(ClientTheme.display(17, weight: .bold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Image(systemName: "gift.fill")
+                            .font(.title3)
+                            .foregroundStyle(Color(red: 1, green: 0.74, blue: 0.32))
+                    }
+                    Text("Купоны, начисления и история покупок")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(Color(red: 1, green: 0.87, blue: 0.73))
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(colors: [Color(red: 0.42, green: 0.22, blue: 0.12), ClientTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 16)
+                )
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(red: 0.54, green: 0.33, blue: 0.19)))
             }
-            AccountMenuRow(title: "Адреса доставки", detail: "Сохранённые адреса и адрес по умолчанию", symbol: "mappin.and.ellipse") {
-                CustomerAddressesView(environment: environment, auth: auth)
-            }
-            AccountMenuRow(title: "Trade-in", detail: "Оценка устройства и договор", symbol: "arrow.triangle.2.circlepath") {
-                CustomerTradeInsView(environment: environment, auth: auth)
-            }
-            AccountMenuRow(title: "Настройки", detail: "Профиль, уведомления и согласия", symbol: "slider.horizontal.3") {
-                CustomerSettingsView(environment: environment, auth: auth)
-            }
-        }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("account-loyalty-card")
 
-        VStack(alignment: .leading, spacing: 10) {
-            AccountMenuRow(title: "Офлайн-операции", detail: pushStatus, symbol: "arrow.triangle.2.circlepath") {
-                OfflineQueueView(environment: environment, auth: auth)
+            Text("Быстрый доступ")
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+                .padding(.top, 2)
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                AccountMenuTile(title: "Мои заказы", detail: "Статусы и доставка", symbol: "shippingbox.fill") {
+                    OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
+                }
+                AccountMenuTile(title: "Устройства", detail: "IMEI и гарантия", symbol: "shield.checkered") {
+                    DevicesView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Возвраты", detail: "Заявки и refund", symbol: "arrow.uturn.backward.circle.fill") {
+                    CustomerReturnsView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Поддержка", detail: "Обращения и ответы", symbol: "bubble.left.and.bubble.right.fill") {
+                    CustomerSupportView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Адреса", detail: "Доставка по умолчанию", symbol: "mappin.and.ellipse") {
+                    CustomerAddressesView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath") {
+                    CustomerTradeInsView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3") {
+                    CustomerSettingsView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Офлайн", detail: pushStatus, symbol: "arrow.triangle.2.circlepath") {
+                    OfflineQueueView(environment: environment, auth: auth)
+                }
             }
+
             Button {
                 onEnablePush()
             } label: {
@@ -2310,7 +2362,7 @@ private struct AccountView: View {
     }
 }
 
-private struct AccountMenuRow<Destination: View>: View {
+private struct AccountMenuTile<Destination: View>: View {
     let title: String
     let detail: String
     let symbol: String
@@ -2318,19 +2370,24 @@ private struct AccountMenuRow<Destination: View>: View {
 
     var body: some View {
         NavigationLink(destination: destination) {
-            HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 9) {
                 Image(systemName: symbol)
                     .foregroundStyle(ClientTheme.lime)
-                    .frame(width: 38, height: 38)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 34, height: 34)
                     .background(ClientTheme.lime.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
-                    Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
-                }
-                Spacer()
-                Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
+                Text(title)
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(ClientTheme.body(10))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineLimit(2)
+                    .frame(minHeight: 26, alignment: .topLeading)
             }
-            .padding(12)
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
             .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
         }

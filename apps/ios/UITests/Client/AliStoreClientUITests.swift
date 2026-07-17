@@ -57,6 +57,22 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Получить код"].exists)
     }
 
+    func testSignedInAccountUsesPrototypeSummaryAndGrid() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Покупатель"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["БОНУСЫ И УРОВЕНЬ"].exists)
+        XCTAssertTrue(app.buttons["account-loyalty-card"].exists)
+        XCTAssertTrue(app.staticTexts["Быстрый доступ"].exists)
+        XCTAssertTrue(app.staticTexts["Мои заказы"].exists)
+        XCTAssertTrue(app.staticTexts["Устройства"].exists)
+        XCTAssertTrue(app.staticTexts["Trade-in"].exists)
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Офлайн"].exists)
+    }
+
     func testCheckoutUsesPrototypeStagesAndRequiresCustomerSession() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-checkout"]

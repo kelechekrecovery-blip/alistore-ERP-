@@ -2573,3 +2573,13 @@
 - Checks run: `npm run ios:build` all 10 targets; `npm run ios:ui` Client `5/5`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: `IOS-CLIENT-007` is accepted at local simulator software level. Full 17-screen visual evidence, authenticated native UI fixtures, physical-device camera/push/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
 - Next step: finish the remaining Client account shell visual pass (returns, Trade-in, bonuses, addresses, settings and notifications), then collect authenticated simulator evidence before physical-device certification.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-008`.
+- Task: align the native Client account shell with the `AliStore Клиент App 2.0` profile reference and add deterministic signed-in UI coverage.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/CustomerAuthStore.swift`, `apps/ios/Shared/UITestBootstrap.swift`, and `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: the signed-in account now uses a compact profile header, bonus summary card and two-column quick-access grid for orders, devices, returns, support, addresses, trade-in, settings and offline operations. A Debug-only synthetic session fixture enables screenshot/UI verification without real credentials, network mutation or Keychain writes; Release compiles the fixture out.
+- Checks run: `npm run ios:build` passed all 10 targets; full `npm run ios:ui` passed Client `6/6`, Staff `1/1`, Courier `1/1` and POS `1/1`; targeted signed-in Client UI test passed `1/1` after scrolling the lazy grid; `git diff --check` passed.
+- Outcome: `IOS-CLIENT-008` is accepted at local simulator software level. Full authenticated data-state fixtures, complete 17-screen visual evidence, physical-device camera/push/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: add authenticated loaded/empty/error fixtures for returns, loyalty, addresses, settings and warranty without weakening customer ownership.
