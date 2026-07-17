@@ -20,6 +20,7 @@ export const EventType = {
   ExchangeExpired: 'exchange.expired',
   // payments
   PaymentReceived: 'payment.received',
+  PaymentParked: 'payment.parked',
   PaymentRefunded: 'payment.refunded',
   PaymentReconciled: 'payment.reconciled',
   CampaignRefundAdjusted: 'campaign.refund_adjusted',

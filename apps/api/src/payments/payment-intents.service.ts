@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { ConflictError, PaymentFailedError, ValidationError } from '../common/errors';
+import { EventType } from '../audit/event-types';
 import { OrdersService } from '../orders/orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentsService } from './payments.service';
@@ -39,6 +40,11 @@ export class PaymentIntentsService {
     if (due !== dto.amount) {
       throw new ValidationError('payment_amount_mismatch', `К оплате ${due}, передано ${dto.amount}`);
     }
+    const replay = await this.prisma.onlinePaymentIntentCommand.findFirst({
+      where: { orderId: order.id, method: dto.method, amount: dto.amount, response: { not: Prisma.DbNull } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (replay?.response) return replay.response as unknown as PaymentIntentView;
     this.gateway.assertOperational();
 
     if (order.isDemo) {
@@ -64,7 +70,7 @@ export class PaymentIntentsService {
       throw new ConflictError('order_not_payable', `Заказ ${order.id} нельзя оплатить в статусе ${status}`);
     }
 
-    return this.gateway.createIntent({
+    const intent = await this.gateway.createIntent({
       idempotencyKey,
       orderId: order.id,
       orderStatus: status,
@@ -72,6 +78,23 @@ export class PaymentIntentsService {
       amount: dto.amount,
       returnUrl: dto.returnUrl,
     });
+    if (!idempotencyKey) {
+      const autoKey = `payment-intent:${order.id}:${dto.method}:${dto.amount}`;
+      await this.prisma.onlinePaymentIntentCommand.upsert({
+        where: { idempotencyKey: autoKey },
+        create: {
+          idempotencyKey: autoKey,
+          customerId: dto.actor ?? 'system:payment-intent',
+          orderId: order.id,
+          method: dto.method,
+          amount: dto.amount,
+          returnUrl: dto.returnUrl,
+          response: intent as unknown as Prisma.InputJsonValue,
+        },
+        update: { response: intent as unknown as Prisma.InputJsonValue },
+      });
+    }
+    return intent;
   }
 
   async createForCustomer(
@@ -153,7 +176,7 @@ export class PaymentIntentsService {
     });
   }
 
-  async webhook(dto: PaymentWebhookDto, request?: Omit<GatewayWebhookRequest, 'payload'>) {
+  async webhook(dto: PaymentWebhookDto, request?: Omit<GatewayWebhookRequest, 'payload'>): Promise<PaymentWebhookResult> {
     const verified = await this.gateway.verifyWebhook({
       payload: dto,
       rawBody: request?.rawBody,
@@ -162,12 +185,56 @@ export class PaymentIntentsService {
     if (verified.status === 'failed') {
       throw new PaymentFailedError('payment_failed', `Провайдер отклонил платёж ${verified.txnId}`);
     }
+    const order = await this.prisma.order.findUnique({ where: { id: verified.orderId } });
+    if (!order) throw new ValidationError('order_not_found', `Заказ ${verified.orderId} не найден`);
+    if (order.status === 'cancelled') {
+      return this.parkCancelledOrderPayment(order.id, verified, verified.actor ?? `provider:${verified.method}`);
+    }
     return this.payments.pay(
       { orderId: verified.orderId, method: verified.method, amount: verified.amount, txnId: verified.txnId },
       verified.actor ?? `provider:${verified.method}`,
     );
   }
+
+  private async parkCancelledOrderPayment(
+    orderId: string,
+    payload: { method: PaymentWebhookDto['method']; amount: number; txnId: string },
+    actor: string,
+  ): Promise<PaymentWebhookResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.payment.findUnique({ where: { txnId: payload.txnId } });
+      if (existing) {
+        if (existing.orderId !== orderId || existing.amount !== payload.amount || existing.method !== payload.method) {
+          throw new ConflictError('payment_txn_reused', 'Provider txnId уже использован для другого платежа');
+        }
+        const existingOrder = await tx.order.findUnique({ where: { id: orderId } });
+        return { order: existingOrder, payment: existing, parked: true, idempotent: true };
+      }
+      const payment = await tx.payment.create({
+        data: {
+          orderId,
+          amount: payload.amount,
+          method: payload.method,
+          status: 'pending',
+          txnId: payload.txnId,
+          receivedBy: actor,
+        },
+      });
+      const parkedOrder = await tx.order.findUnique({ where: { id: orderId } });
+      await tx.auditEvent.create({
+        data: {
+          type: EventType.PaymentParked,
+          actor,
+          payload: { orderId, paymentId: payment.id, amount: payload.amount, method: payload.method, txnId: payload.txnId, reason: 'order_cancelled' },
+          refs: [orderId, payment.id],
+        },
+      });
+      return { order: parkedOrder, payment, parked: true, idempotent: false };
+    });
+  }
 }
+
+type PaymentWebhookResult = Awaited<ReturnType<PaymentsService['pay']>> & { parked?: boolean };
 
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';

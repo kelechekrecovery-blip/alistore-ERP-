@@ -632,6 +632,9 @@ export class OrdersService {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
       this.assertNotDemo(order);
+      if (order.status === 'paid' && to === 'cancelled') {
+        throw new ConflictError('paid_order_cancel_requires_return', 'Оплаченный заказ отменяется через возврат и refund');
+      }
       assertTransition(order.status, to);
       if (order.status === 'reserved' && to === 'picking' && order.paymentMode !== 'cod') {
         throw new ValidationError('cod_picking_required', 'Неоплаченный заказ можно собирать только в режиме COD');
@@ -646,6 +649,22 @@ export class OrdersService {
       if (to === 'completed') assertOrderMoneyReconciled(order);
       const releaseEvents: AuditInput[] = [];
       if (to === 'cancelled') {
+        if (order.courierRunId) {
+          await tx.$executeRaw`SELECT id FROM "CourierRun" WHERE id = ${order.courierRunId} FOR UPDATE`;
+          const run = await tx.courierRun.findUnique({ where: { id: order.courierRunId } });
+          if (run && !run.handedOver) {
+            const codReleased = Math.max(0, order.total - order.payments.reduce((sum, payment) => sum + payment.amount, 0));
+            if (codReleased > 0) {
+              await tx.courierRun.update({ where: { id: run.id }, data: { codTotal: { decrement: codReleased } } });
+              releaseEvents.push({
+                type: 'courier.cod_adjusted',
+                actor,
+                payload: { orderId, runId: run.id, codReleased, reason: 'order_cancelled' },
+                refs: [orderId, run.id],
+              });
+            }
+          }
+        }
         const reservations = await tx.reservation.findMany({
           where: { orderId, active: true },
           include: { quantityAllocation: true },
@@ -702,6 +721,68 @@ export class OrdersService {
           where: { orderId, active: true },
           data: { active: false, releasedAt: new Date() },
         });
+
+        if (order.loyaltyRedeemed > 0) {
+          const sourceRef = `loyalty:cancel-restore:${order.id}`;
+          const existing = await tx.loyaltyEntry.findUnique({ where: { sourceRef } });
+          if (!existing) {
+            const entry = await tx.loyaltyEntry.create({
+              data: {
+                customerId: order.customerId,
+                kind: 'refund_restore',
+                label: 'Возврат бонусов при отмене заказа',
+                amount: order.loyaltyRedeemed,
+                sourceRef,
+                orderId: order.id,
+              },
+            });
+            releaseEvents.push({
+              type: EventType.LoyaltyRefundRestored,
+              actor,
+              payload: { orderId, entryId: entry.id, amount: order.loyaltyRedeemed },
+              refs: [order.id, entry.id],
+            });
+          }
+        }
+
+        for (const payment of order.payments.filter((candidate) => candidate.amount > 0 && candidate.giftCardId)) {
+          const reversalKey = `cancel-refund:${order.id}:${payment.id}`;
+          const alreadyReversed = await tx.payment.findUnique({ where: { idempotencyKey: reversalKey } });
+          if (alreadyReversed) continue;
+          const card = await tx.giftCard.update({
+            where: { id: payment.giftCardId! },
+            data: { balance: { increment: payment.amount }, status: 'active' },
+          });
+          const reversal = await tx.payment.create({
+            data: {
+              orderId: order.id,
+              originalPaymentId: payment.id,
+              amount: -payment.amount,
+              method: payment.method,
+              status: 'refunded',
+              giftCardId: payment.giftCardId,
+              idempotencyKey: reversalKey,
+              receivedBy: actor,
+            },
+          });
+          await tx.giftCardTransaction.create({
+            data: {
+              giftCardId: card.id,
+              paymentId: reversal.id,
+              type: 'refund',
+              amount: payment.amount,
+              balanceAfter: card.balance,
+              sourceRef: `giftcard:cancel-refund:${payment.id}`,
+              actor,
+            },
+          });
+          releaseEvents.push({
+            type: EventType.PaymentRefunded,
+            actor,
+            payload: { orderId, paymentId: reversal.id, originalPaymentId: payment.id, amount: payment.amount, reason: 'order_cancelled' },
+            refs: [order.id, payment.id, reversal.id],
+          });
+        }
       }
       let updated = await tx.order.update({
         where: { id: orderId },
