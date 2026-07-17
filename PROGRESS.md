@@ -2865,6 +2865,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-RELEASE-003`.
+- Task: strengthen native iOS Client App Store preflight and metadata packaging after the latest Client visual evidence.
+- Files changed: `apps/ios/store/client-metadata.json`, `scripts/validate-ios-store-metadata.mjs`, `apps/ios/scripts/store-preflight.sh`, `apps/ios/store/release-runbook.md`, `package.json`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the native Client release path now has committed App Store metadata/review-note source, a metadata validator, privacy/Face ID/bundle/AppIcon checks, exact Release build-setting checks and a root `npm run ios:store-preflight` command. The runbook now matches the current 16-screenshot visual gate instead of the old seven-screenshot wording.
+- Checks run: `node scripts/validate-ios-store-metadata.mjs apps/ios/store/client-metadata.json` passed; `apps/ios/scripts/store-preflight.sh --help` passed; `npm run ios:store-preflight -- --env-file <temporary fake-key env>` passed through metadata, HTTPS API, bundle id, AppIcon, production APNs and App Store Connect presence checks without printing secrets; `git diff --check` passed.
+- Outcome: App Store software preflight is stronger and runnable from the root package. Actual archive, TestFlight upload and App Review remain external-gated by protected Apple credentials/provisioning profiles, production API, physical iPhone Face ID/APNs/camera/offline smoke and owner App Store Connect submission.
+- Next step: if credentials are available on disk, run `npm run ios:store-preflight -- --env-file apps/ios/.env.production` and then create a signed Release archive; otherwise continue non-blocked native Staff/Courier/POS or ecosystem E2E gaps.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-014`.
 - Task: re-record trusted iOS Client visual acceptance after aligning the order status route with `AliStore Клиент App 2.0`.
 - Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-4d41fc8e91c26413d0862d97f708b15eca861bf6c9f74a0bef29b78f8d6a3c97.json`, and `PROGRESS.md`.

@@ -51,10 +51,16 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   archive
 ```
 
+`store-preflight.sh` validates the production HTTPS API URL, Apple team and
+App Store Connect key presence, Release bundle id, AppIcon, production APNs
+resolution, Face ID usage copy, privacy manifest and `apps/ios/store/client-metadata.json`.
+It never prints secret values.
+
 `ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
-Simulator and exports seven retained PNG attachments (home, catalog, product
-detail, cart, account, payment success and payment failure). These are review evidence only;
-they do not replace pixel comparison against the handoff or physical-device
+Simulator and exports 16 retained PNG attachments: home, catalog, product detail,
+cart, account, order status, notifications, loyalty, returns, support, Trade-in,
+warranty, addresses, settings, payment success and payment failure. These are
+review evidence only; they do not replace owner pixel approval or physical-device
 release smoke.
 
 The archive must be signed with an Apple Distribution identity and a
@@ -86,6 +92,10 @@ xcrun altool --upload-app \
 After upload, verify the build in App Store Connect, attach the privacy and
 data-use answers, add screenshots/localized metadata, and distribute through
 TestFlight before requesting App Review.
+
+Use `apps/ios/store/client-metadata.json` as the source for App Store Connect
+text fields and review notes. Enter the real demo customer account only in App
+Store Connect review notes or a protected secret manager; never commit it.
 
 ## Mandatory device gate
 

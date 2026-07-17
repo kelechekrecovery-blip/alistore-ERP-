@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AliStore",
+    "bundleId": "kg.alistore.client",
+    "primaryLocale": "ru-KG",
+    "category": "SHOPPING",
+    "contentRights": "USES_THIRD_PARTY_CONTENT_WITH_RIGHTS"
+  },
+  "urls": {
+    "marketing": "https://alistore.kg",
+    "support": "https://alistore.kg/support",
+    "privacy": "https://alistore.kg/privacy"
+  },
+  "review": {
+    "demoAccountRequired": true,
+    "demoAccountReference": "Provide a production review customer account in App Store Connect notes. Do not commit credentials.",
+    "notes": "AliStore Client is the customer shopping app for catalog browsing, OTP sign-in, cart, checkout, order tracking, warranty, returns, bonuses, addresses and support. Payments, SMS and push must use certified production providers before public release."
+  },
+  "localizations": {
+    "ru-KG": {
+      "name": "AliStore",
+      "subtitle": "Техника, гарантия и доставка",
+      "promotionalText": "Покупайте технику, отслеживайте заказы, гарантию и возвраты в одном приложении.",
+      "description": "AliStore помогает выбрать технику, оформить заказ, выбрать самовывоз или доставку, пройти оплату, отслеживать статус, хранить гарантийные устройства, обращаться в поддержку и пользоваться бонусами.",
+      "keywords": [
+        "техника",
+        "магазин",
+        "смартфоны",
+        "гарантия",
+        "доставка",
+        "Бишкек"
+      ]
+    }
+  },
+  "screenshots": {
+    "source": "apps/ios/build/AliStoreClientVisual-attachments",
+    "requiredSimulator": "iPhone 17 Pro",
+    "requiredPngCount": 16,
+    "requiredStates": [
+      "client-home",
+      "client-catalog",
+      "client-product-detail",
+      "client-cart",
+      "client-account",
+      "client-order-status",
+      "client-notifications",
+      "client-loyalty",
+      "client-returns",
+      "client-support",
+      "client-trade-in",
+      "client-warranty",
+      "client-addresses",
+      "client-settings",
+      "client-payment-success",
+      "client-payment-failure"
+    ]
+  },
+  "privacy": {
+    "tracking": false,
+    "dataSafetyReviewRequired": true,
+    "faceIdPurpose": "Быстрый и защищённый вход в AliStore"
+  }
+}

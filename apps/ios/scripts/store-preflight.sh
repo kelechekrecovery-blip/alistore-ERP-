@@ -9,6 +9,7 @@ fail() {
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ios_root="$repo_root/apps/ios"
 env_file=""
+metadata_file="$ios_root/store/client-metadata.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -44,6 +45,33 @@ if [[ -n "$env_file" ]]; then
   set +a
 fi
 
+[[ -f "$metadata_file" ]] || fail 'apps/ios/store/client-metadata.json is required'
+
+node "$repo_root/scripts/validate-ios-store-metadata.mjs" "$metadata_file" \
+  || fail 'App Store metadata validation failed'
+
+plist_buddy=/usr/libexec/PlistBuddy
+client_plist="$ios_root/Client/Info.plist"
+client_privacy="$ios_root/Client/PrivacyInfo.xcprivacy"
+client_entitlements="$ios_root/Client/Client.entitlements"
+
+[[ -f "$client_plist" ]] || fail 'Client Info.plist is missing'
+[[ -f "$client_privacy" ]] || fail 'Client PrivacyInfo.xcprivacy is missing'
+[[ -f "$client_entitlements" ]] || fail 'Client entitlements file is missing'
+
+display_name="$("$plist_buddy" -c 'Print :CFBundleDisplayName' "$client_plist" 2>/dev/null || true)"
+[[ "$display_name" == "AliStore" ]] || fail 'Client display name must be AliStore'
+short_version="$("$plist_buddy" -c 'Print :CFBundleShortVersionString' "$client_plist" 2>/dev/null || true)"
+[[ "$short_version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || fail 'CFBundleShortVersionString must be a semantic version'
+build_number="$("$plist_buddy" -c 'Print :CFBundleVersion' "$client_plist" 2>/dev/null || true)"
+[[ "$build_number" =~ ^[0-9]+$ ]] || fail 'CFBundleVersion must be numeric'
+face_id_description="$("$plist_buddy" -c 'Print :NSFaceIDUsageDescription' "$client_plist" 2>/dev/null || true)"
+[[ "$face_id_description" == "Быстрый и защищённый вход в AliStore" ]] || fail 'NSFaceIDUsageDescription must match the review metadata purpose'
+tracking="$("$plist_buddy" -c 'Print :NSPrivacyTracking' "$client_privacy" 2>/dev/null || true)"
+[[ "$tracking" == "false" ]] || fail 'PrivacyInfo.xcprivacy must declare NSPrivacyTracking=false'
+aps_environment="$("$plist_buddy" -c 'Print :aps-environment' "$client_entitlements" 2>/dev/null || true)"
+[[ "$aps_environment" == '$(APS_ENVIRONMENT)' ]] || fail 'Client APNs entitlement must be resolved from APS_ENVIRONMENT'
+
 api_base="${ALISTORE_API_BASE_URL:-${API_BASE_URL:-}}"
 team_id="${DEVELOPMENT_TEAM:-${APPLE_DEVELOPMENT_TEAM:-}}"
 asc_key_path="${ASC_API_KEY_PATH:-}"
@@ -70,12 +98,18 @@ settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Dev
   DEVELOPMENT_TEAM="$team_id" ALISTORE_API_BASE_URL="$api_base" 2>/dev/null)" \
   || fail 'xcodebuild could not resolve Release settings'
 
-resolved_api="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /API_BASE_URL$/ {print $2; exit}')"
+resolved_api="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*API_BASE_URL$/ {print $2; exit}')"
 [[ "$resolved_api" == "$api_base" ]] || fail 'Release API_BASE_URL did not resolve to ALISTORE_API_BASE_URL'
-resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /APS_ENVIRONMENT$/ {print $2; exit}')"
+resolved_bundle_id="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER$/ {print $2; exit}')"
+[[ "$resolved_bundle_id" == "kg.alistore.client" ]] || fail 'Release bundle identifier must be kg.alistore.client'
+resolved_icon="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*ASSETCATALOG_COMPILER_APPICON_NAME$/ {print $2; exit}')"
+[[ "$resolved_icon" == "AppIcon" ]] || fail 'Release AppIcon asset catalog must be configured'
+resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*APS_ENVIRONMENT$/ {print $2; exit}')"
 [[ "$resolved_aps" == "production" ]] || fail 'Release APS_ENVIRONMENT must resolve to production'
 
+printf 'store-preflight: App Store metadata and privacy manifest are present\n'
 printf 'store-preflight: Release API URL resolved to HTTPS\n'
+printf 'store-preflight: Release bundle id and AppIcon are configured\n'
 printf 'store-preflight: Release APNs environment resolved to production\n'
 printf 'store-preflight: Apple team and App Store Connect credentials are present\n'
 printf 'store-preflight: native Client configuration passed\n'
