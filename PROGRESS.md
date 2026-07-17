@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-POS-REFUND-EVIDENCE-029`.
+- Task: accept the POS refund reconciliation vertical as the next financial gate.
+- Result: trusted Playwright passed `1/1`: POS sale, customer return, approved refund and warehouse quarantine reconcile exactly once. The result is hash-bound to current HEAD and committed as `21464ba`.
+- Strict audit: POS/refund, courier/COD, iOS UI and Android UI are PASS. The remaining software blockers are service/loaner, procurement/sale, composite ecosystem evidence, durable visual acceptance, and 64 missing linked handoffs.
+- Next step: record the service-center/loaner vertical; live provider and physical device gates remain separate from local acceptance.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-013-COURIER-EVIDENCE-028`.
 - Task: close the courier COD reconciliation evidence after server-authoritative partial collection and rebind native evidence to the final toolchain HEAD.
 - Result: trusted Playwright courier flow passed `1/1` for web COD checkout, warehouse picking, courier delivery, cash handover and exact reconciliation. Native trusted evidence was re-recorded on the same source tree: iOS `34/34`, Android `30/30`.
