@@ -2593,3 +2593,13 @@
 - Checks run: `npm run ios:build` passed all 10 iOS targets; targeted Client UI suite passed `9/9`; full `npm run ios:ui` passed Client `9/9`, Staff `1/1`, Courier `1/1` and POS `1/1`; `git diff --check` passed after the final patch.
 - Outcome: authenticated loaded-state coverage is accepted at local simulator software level. Full 17-screen visual evidence, explicit empty/error fixtures, physical-device Face ID/APNs/camera/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
 - Next step: add Debug-only empty/error fixtures for account routes and continue exact visual parity, then run the signed archive gate when the owner supplies Apple Developer/App Store Connect credentials and profiles.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-010`.
+- Task: add explicit empty and retryable error UI fixtures for authenticated Client account routes.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/UITestBootstrap.swift`, and `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: Debug-only account fixture modes now cover loaded, empty and error states for loyalty, returns, addresses, settings and devices. Empty screens expose actionable copy and the settings screen no longer renders a blank state when the profile is absent; error screens expose the shared retry action. Release has no fixture mode and continues through API/JWT ownership.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; full `npm run ios:ui` passed Client `11/11`, Staff `1/1`, Courier `1/1` and POS `1/1`; `git diff --check` passed.
+- Outcome: account loaded/empty/error simulator coverage is accepted locally. Full 17-screen visual evidence, physical-device Face ID/APNs/camera/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: run strict release preflight and close the next remaining Client prototype screen, while preserving the external credentials/device gates.

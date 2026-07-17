@@ -1,6 +1,12 @@
 import Foundation
 
 public enum UITestBootstrap {
+    public enum AccountFixtureMode: Sendable, Equatable {
+        case loaded
+        case empty
+        case error
+    }
+
     public static var disablesSessionRestore: Bool {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("--ui-testing-signed-out")
@@ -27,9 +33,21 @@ public enum UITestBootstrap {
 
     public static var startsSignedIn: Bool {
         #if DEBUG
-        ProcessInfo.processInfo.arguments.contains("--ui-testing-signed-in")
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("--ui-testing-signed-in") || accountFixtureMode != .loaded
         #else
         false
+        #endif
+    }
+
+    public static var accountFixtureMode: AccountFixtureMode {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--ui-testing-account-error") { return .error }
+        if arguments.contains("--ui-testing-account-empty") { return .empty }
+        return .loaded
+        #else
+        .loaded
         #endif
     }
 

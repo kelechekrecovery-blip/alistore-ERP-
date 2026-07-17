@@ -1748,9 +1748,20 @@ private struct CustomerReturnsView: View {
         defer { isLoading = false }
 #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            returns = ClientUIFixture.returns
-            orders = ClientUIFixture.orders
-            errorMessage = nil
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                returns = ClientUIFixture.returns
+                orders = ClientUIFixture.orders
+                errorMessage = nil
+            case .empty:
+                returns = []
+                orders = []
+                errorMessage = nil
+            case .error:
+                returns = []
+                orders = []
+                errorMessage = "Не удалось загрузить возвраты в UI-тестовом контуре"
+            }
             return
         }
 #endif
@@ -2581,6 +2592,8 @@ private struct CustomerLoyaltyView: View {
                     }
                     .padding(16)
                 }
+            } else {
+                EmptyStateView(title: "Бонусов пока нет", detail: "Бонусный баланс появится после первой покупки.", symbol: "gift")
             }
         }
         .navigationTitle("Бонусы")
@@ -2597,8 +2610,17 @@ private struct CustomerLoyaltyView: View {
         defer { isLoading = false }
 #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            loyalty = ClientUIFixture.loyalty
-            errorMessage = nil
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                loyalty = ClientUIFixture.loyalty
+                errorMessage = nil
+            case .empty:
+                loyalty = nil
+                errorMessage = nil
+            case .error:
+                loyalty = nil
+                errorMessage = "Не удалось получить бонусный баланс в UI-тестовом контуре"
+            }
             return
         }
 #endif
@@ -2703,8 +2725,17 @@ private struct CustomerAddressesView: View {
         defer { isLoading = false }
 #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            addresses = ClientUIFixture.addresses
-            errorMessage = nil
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                addresses = ClientUIFixture.addresses
+                errorMessage = nil
+            case .empty:
+                addresses = []
+                errorMessage = nil
+            case .error:
+                addresses = []
+                errorMessage = "Не удалось загрузить адреса в UI-тестовом контуре"
+            }
             return
         }
 #endif
@@ -2871,6 +2902,8 @@ private struct CustomerSettingsView: View {
                 ProgressView("Загружаем настройки").tint(ClientTheme.lime)
             } else if let errorMessage, settings == nil {
                 ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else if settings == nil {
+                EmptyStateView(title: "Настройки пока недоступны", detail: "Профиль появится после синхронизации аккаунта.", symbol: "person.crop.circle.badge.questionmark")
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
@@ -2934,15 +2967,24 @@ private struct CustomerSettingsView: View {
         defer { isLoading = false }
 #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            let loaded = ClientUIFixture.settings
-            settings = loaded
-            name = loaded.name
-            consent = loaded.consent
-            push = loaded.push
-            whatsapp = loaded.whatsapp
-            service = loaded.service
-            promos = loaded.promos
-            errorMessage = nil
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                let loaded = ClientUIFixture.settings
+                settings = loaded
+                name = loaded.name
+                consent = loaded.consent
+                push = loaded.push
+                whatsapp = loaded.whatsapp
+                service = loaded.service
+                promos = loaded.promos
+                errorMessage = nil
+            case .empty:
+                settings = nil
+                errorMessage = nil
+            case .error:
+                settings = nil
+                errorMessage = "Не удалось загрузить настройки в UI-тестовом контуре"
+            }
             return
         }
 #endif
@@ -3401,8 +3443,17 @@ private struct DevicesView: View {
         defer { isLoading = false }
 #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            devices = ClientUIFixture.devices
-            errorMessage = nil
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                devices = ClientUIFixture.devices
+                errorMessage = nil
+            case .empty:
+                devices = []
+                errorMessage = nil
+            case .error:
+                devices = []
+                errorMessage = "Не удалось загрузить устройства в UI-тестовом контуре"
+            }
             return
         }
 #endif

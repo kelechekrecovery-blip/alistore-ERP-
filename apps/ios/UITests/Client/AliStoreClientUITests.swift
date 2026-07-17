@@ -120,6 +120,40 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Обращение в сервис"].exists)
     }
 
+    func testSignedInAccountFixturesRenderEmptyStates() {
+        let loyaltyApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        loyaltyApp.buttons["account-loyalty-card"].tap()
+        XCTAssertTrue(loyaltyApp.staticTexts["Бонусов пока нет"].waitForExistence(timeout: 5))
+
+        let returnsApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        returnsApp.staticTexts["Возвраты"].tap()
+        XCTAssertTrue(returnsApp.staticTexts["Возвратов пока нет"].waitForExistence(timeout: 5))
+
+        let addressesApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        addressesApp.staticTexts["Адреса"].tap()
+        XCTAssertTrue(addressesApp.staticTexts["Адресов пока нет"].waitForExistence(timeout: 5))
+
+        let settingsApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        settingsApp.swipeUp()
+        settingsApp.staticTexts["Настройки"].tap()
+        XCTAssertTrue(settingsApp.staticTexts["Настройки пока недоступны"].waitForExistence(timeout: 5))
+
+        let devicesApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        devicesApp.staticTexts["Устройства"].tap()
+        XCTAssertTrue(devicesApp.staticTexts["Устройств пока нет"].waitForExistence(timeout: 5))
+    }
+
+    func testSignedInAccountFixturesRenderRetryableErrorState() {
+        let loyaltyApp = launchSignedInAccount(arguments: ["--ui-testing-account-error"])
+        loyaltyApp.buttons["account-loyalty-card"].tap()
+        XCTAssertTrue(loyaltyApp.staticTexts["Данные временно недоступны"].waitForExistence(timeout: 5))
+        XCTAssertTrue(loyaltyApp.buttons["Повторить"].exists)
+
+        let devicesApp = launchSignedInAccount(arguments: ["--ui-testing-account-error"])
+        devicesApp.staticTexts["Устройства"].tap()
+        XCTAssertTrue(devicesApp.staticTexts["Устройства недоступны"].waitForExistence(timeout: 5))
+    }
+
     func testCheckoutUsesPrototypeStagesAndRequiresCustomerSession() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-checkout"]
@@ -135,8 +169,12 @@ final class AliStoreClientUITests: XCTestCase {
     }
 
     private func launchSignedInAccount() -> XCUIApplication {
+        launchSignedInAccount(arguments: [])
+    }
+
+    private func launchSignedInAccount(arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"] + arguments
         app.launch()
         XCTAssertTrue(app.staticTexts["Покупатель"].waitForExistence(timeout: 10))
         return app
