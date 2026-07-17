@@ -45,8 +45,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/android-app-ui-46ccec17db0984c674140f7c4de9254acd5126221b25ea8f890c9867c04012ef.json",
-          "sha256": "46ccec17db0984c674140f7c4de9254acd5126221b25ea8f890c9867c04012ef"
+          "path": "docs/acceptance/artifacts/android-app-ui-37da65746ac01fede7f6be2ba35521a3d8cbc7a7700c4645ca65e662195e6246.json",
+          "sha256": "37da65746ac01fede7f6be2ba35521a3d8cbc7a7700c4645ca65e662195e6246"
         }
       ]
     },
