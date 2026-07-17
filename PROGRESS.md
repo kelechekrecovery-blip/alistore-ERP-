@@ -3378,3 +3378,13 @@
 - Checks run: targeted Playwright `1/1`; full logistics file `2/2` (the pickup-point lifecycle and delivery-zone/slot lifecycle); `git diff --check`.
 - Outcome: the Phase 1 stock/fulfillment availability slice is accepted locally at the ERP-to-checkout boundary. Reservation consumption, dispatch/courier handoff and physical delivery remain covered by existing broader tests and external device/provider gates.
 - Next step: close the remaining Phase 1 publication and promotion acceptance notes, then run the consolidated Phase 1 software gate.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-GATE-005`.
+- Task: run the consolidated Phase 1 ERP-to-storefront browser gate across catalog administration, CMS publication/moderation, promotions, checkout and logistics.
+- Files changed: `BACKLOG.md` and `PROGRESS.md`.
+- Result: the existing CMS tests cover published collections, responsive banner targeting, draft editing, review moderation and server-quoted promotion redemption. Together with the new price and logistics contracts, the Phase 1 browser gate now passes `16/16` after a repeat run; the first run had one dev-server navigation timeout that passed when rerun in isolation.
+- Checks run: consolidated Playwright `16/16`; targeted CMS review rerun `1/1`; previous Web production build passed; `git diff --check`.
+- Outcome: Phase 1 functional ERP-to-storefront slices are locally accepted. Trusted hash-bound evidence must be refreshed after these source commits; strict ecosystem acceptance still remains blocked by the 64 missing design references and external provider/staging/device gates.
+- Next step: refresh trusted visual/native/web evidence, run `npm run mvp:verify` and `npm run ecosystem:audit:strict`, then record the exact remaining gate status before selecting the next finance/native lane.

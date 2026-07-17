@@ -1,7 +1,7 @@
 # BACKLOG
 
 ## Next
-- `PHASE-1-ERP-STOREFRONT-EXECUTION` Execute the five ERP-to-storefront vertical slices (catalog/media, price/tax authority, CMS publication, stock/fulfillment, promotions/reviews) using `docs/PHASE-1-ERP-STOREFRONT-EXECUTION.md`; first implementation slice is the server-price -> catalog -> checkout assertion.
+- `PHASE-1-ERP-STOREFRONT-EXECUTION` Finish Phase 1 acceptance and refresh trusted evidence after the accepted catalog/price/checkout and logistics slices; CMS publication/moderation and promotion/review flows are covered by the consolidated 16-test browser gate. Next: run `mvp:verify`, visual evidence refresh and strict audit, then move to the next financially relevant backlog item.
 - `PLAN-001` Execute `docs/MASTER-EXECUTION-PLAN-CURRENT.md` in gated vertical slices; current next lane is ERP/storefront contract evidence, followed by financial correctness, native parity, ecosystem E2E and release certification.
 - `EXCH-002B` Certify approved non-cash exchange surcharges against the live payment-provider capture/reconciliation flow. Local card/QR/POS surcharge execution now requires a unique provider/terminal reference and records it as `Payment.txnId`; remaining gate is live provider intent/callback/retry evidence, daily statement reconciliation and certification flags.
 - `INV-VAL-001I` Run staging-shaped performance certification for the database-side opening/period aggregates and bounded reconciliation counters in the valuation roll-forward. The reproducible local benchmark harness passed locally (`27,648` rows, `81ms`, `4MB`, repeatable-read stable); acceptance still requires the same one-year report over production-shaped multi-year staging history within the agreed latency/memory budget.
