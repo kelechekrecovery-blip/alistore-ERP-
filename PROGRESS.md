@@ -3398,3 +3398,13 @@
 - Checks run: `customer-account-data.spec.ts` `1/1`; `logistics-ui.spec.ts` `2/2`; protection/return/service-center suite `5/5`; `git diff --check`.
 - Outcome: all previously identified assertion-level regressions from the checkout change are closed. The full `mvp:verify` run had five Playwright failures (including these fixtures and cold-dev-server timeouts); the corrected targeted scenarios are green. A clean full rerun remains required.
 - Next step: commit the fixture correction, rerun full `mvp:verify`, then refresh trusted evidence and strict audit.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-EVIDENCE-007`.
+- Task: execute the broader MVP gate and refresh trusted evidence after the Phase 1 storefront/ERP changes.
+- Files changed: trusted visual/reconciled evidence artifacts were refreshed in separate commits; `PROGRESS.md` records the gate outcome.
+- Result: Prisma validation, all migration upgrade paths, API/Web builds and the first API portion of `mvp:verify` passed. The full run was not accepted as green because shared local PostgreSQL contention from concurrently running test agents caused `3` API suites to timeout in setup (`146/149` passed) and the preceding Playwright run had five failures, four of which passed in clean targeted reruns after fixture correction. The targeted corrected suites are green: account `1/1`, logistics UI `2/2`, protection/return/service `5/5`; the Phase 1 contract suite remains `16/16`.
+- Checks run: full `mvp:verify` executed but failed closed on API hook timeouts; isolated API rerun `10/10`; trusted visual acceptance `3/3`; trusted reconciled ecosystem matrix `4/4`; strict ecosystem audit still reports native evidence/design-corpus gaps.
+- Outcome: no false release claim. Phase 1 web/ERP functional work and its local evidence are accepted, while the global MVP gate remains open until a clean uncontended run completes. Current external/structural blockers remain the 64 missing linked design references, native packaged UI evidence, live providers, physical devices and staging operations.
+- Next step: obtain a clean test window without competing agents, rerun `mvp:verify` to completion, then refresh the remaining hash-bound native/reconciliation profiles and select the next P0/P1 gap from the current gap analysis.
