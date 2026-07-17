@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — RECONCILED-E2E-EVIDENCE-002
+
+- Iteration ID: `RECONCILED-E2E-EVIDENCE-002`.
+- Task: refresh trusted composite reconciled ecosystem software matrix evidence for the current source tree.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/reconciled-e2e-082b9f6bf6fc7b9848641f05fe4ae1b96e8ba7e9bdbcae3e5cbcb214ed57d1a1.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ecosystem:e2e` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`. The composite matrix passed `4/4` verticals: POS refund/quarantine, courier COD/handover, service/loaner and procurement-to-sale.
+- Checks run: trusted ecosystem recorder for `reconciled-e2e`; `git diff --check`.
+- Acceptance: accepted for committed local software matrix evidence. Physical devices, live providers, deep native journeys, staging certification and missing visual handoffs remain separate release gates.
+- Next step: rerun strict ecosystem audit. If only design-corpus gaps remain, restore the missing handoff `.dc.html` files from owner/design source or record owner-approved retirements.
+
 # 2026-07-17 — PROCUREMENT-SALE-EVIDENCE-002
 
 - Iteration ID: `PROCUREMENT-SALE-EVIDENCE-002`.
