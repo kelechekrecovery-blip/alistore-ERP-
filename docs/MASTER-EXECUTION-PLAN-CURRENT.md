@@ -69,6 +69,8 @@ npm run ecosystem:audit
 
 ## Phase 1: ERP and storefront contract
 
+Detailed execution checklist: `docs/PHASE-1-ERP-STOREFRONT-EXECUTION.md`.
+
 Goal: prove that ERP changes are reflected in the customer site through one
 server-authoritative catalog/CMS contract.
 

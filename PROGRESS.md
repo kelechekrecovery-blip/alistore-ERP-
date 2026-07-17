@@ -3331,3 +3331,12 @@
 - Checks run: `git diff --check`.
 - Outcome: planning artifact is committed-ready; implementation continues with the ERP/storefront contract lane.
 - Next step: take one uncovered ERP-to-storefront assertion, implement it with API/browser evidence, refresh affected trusted artifacts, and commit the vertical slice.
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-PLAN-001`.
+- Task: expand Phase 1 into an executable ERP/storefront contract plan with five bounded vertical slices and explicit API, Prisma, RBAC, Ledger, browser and visual gates.
+- Files changed: `docs/PHASE-1-ERP-STOREFRONT-EXECUTION.md`, `docs/MASTER-EXECUTION-PLAN-CURRENT.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: Phase 1 now has a concrete execution order: catalog/media, price/tax authority, CMS publication, stock/fulfillment and promotions/reviews. The plan preserves the fail-closed 64-reference design blocker and distinguishes local software acceptance from live-provider and owner gates.
+- Checks run: `git diff --check`; trusted `visual` evidence recorder passed `3/3` exact screenshot tests; `ecosystem:audit:strict` remains expected to fail on missing design references plus evidence refreshes for other source-bound profiles.
+- Outcome: planning gate is complete; implementation starts with the server-price -> catalog -> checkout assertion.
+- Next step: inspect existing price/quote tests and add only the missing authoritative-price assertion, then rerun targeted API/Playwright/evidence gates.
