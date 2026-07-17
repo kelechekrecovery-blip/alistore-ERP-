@@ -2625,6 +2625,14 @@
 - Outcome: the AR cleanup defect was fixed in the test fixture by detaching debt receipt payments from their Restrict journal foreign keys before deleting the isolated debt ledger. The corrected AR suite passes `1/1` suite and `2/2` tests. The next full serial run passed `148/149` suites and `672/673` tests, with only `store-points-fulfillment.e2e-spec.ts` receiving a transient `socket hang up`; that suite passes `1/1` in isolation. The aggregate MVP gate is not claimed green until a complete run is green.
 - Next step: commit the AR fixture cleanup and rerun the complete API/MVP gate, then continue the ERP/storefront contract gate.
 
+## 2026-07-17
+
+- Iteration ID: `MVP-API-RECHECK-002`.
+- Task: complete the full API regression after the AR fixture cleanup.
+- Checks run: `npm --prefix apps/api test -- --runInBand` passed `149/149` suites and `673/673` tests on commit `c3ae0ec`; AR and store-point suites passed in the same full run.
+- Outcome: the complete serial API gate is green. The expected provider/outbox fallback warnings are test scenarios, not failures. Web E2E and native/strict ecosystem gates remain separate acceptance requirements.
+- Next step: run the ERP/storefront browser gate on the clean commit and refresh only the evidence artifacts affected by the source-tree change.
+
 - Task: refresh `ios-app-ui` on the visual-contract source hash.
 - Checks run: four XCUITest bundles `4/4`, zero failures; artifact SHA-256 `8237873a2593486399a76dbc92287bc6c85eea4099afadb44b90a30f28dfe7cd`; trusted recorder exited zero.
 - Outcome: packaged iOS launch evidence is current again; deep journeys and physical-device certification remain open.
