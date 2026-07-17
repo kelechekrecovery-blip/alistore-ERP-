@@ -3428,3 +3428,13 @@
 - Checks run: `npm run ecosystem:service-loaner:e2e`; `npm run ecosystem:procurement-sale:e2e` (API green, shared UI blocked by contention); isolated `npx playwright test e2e/ecosystem-procurement-sale.spec.ts` green; isolated migration deploy green.
 - Outcome: the functional scenarios are green, but trusted hash-bound evidence was not recorded because the source tree currently contains concurrent uncommitted changes. The strict release audit therefore remains fail-closed.
 - Next step: wait for the concurrent source lane to produce a committed clean SHA, then rerun trusted service/loaner, procurement/sale and full `mvp:verify` evidence against that exact SHA.
+
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-ISOLATED-010`.
+- Task: complete the procurement/sale verification on the current parallel source lane without sharing its database with other agents.
+- Files changed: `PROGRESS.md` only; no source or concurrent worktree files were staged.
+- Result: after generating Prisma Client and applying the current uncommitted schema only to the disposable `alistore_phase1_codex_test` database, the complete procurement command passed API `10/10` and browser reconciliation `1/1`. The API production TypeScript build also passed.
+- Checks run: `npx prisma generate --schema apps/api/prisma/schema.prisma`; disposable `prisma db push`; isolated `npm run ecosystem:procurement-sale:e2e` with `TEST_DATABASE_URL`, `E2E_DATABASE_URL`, `E2E_API_PORT=4420`, `E2E_WEB_PORT=3220`; `npm run build -w @alistore/api`.
+- Outcome: procurement/sale behavior is verified on the current source, but no trusted artifact was recorded because the source tree contains uncommitted parallel changes and therefore fails the recorder's clean-SHA contract.
+- Next step: coordinate a clean commit boundary for the parallel changes, then record hash-bound evidence and rerun the strict audit before advancing Phase 1.
