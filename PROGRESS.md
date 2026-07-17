@@ -2772,3 +2772,13 @@
 - Checks run: committed-HEAD trusted bootstrap invocation; toolchain hash comparison; `apps/ios/scripts/store-preflight.sh` (expected exit `1`); `git diff --check`.
 - Outcome: local simulator software gates remain green, but `ios-client-visual` stays `pending` until the trusted toolchain is restored or deliberately re-pinned and the owner supplies a production HTTPS API URL, Apple Team ID, signing profile and App Store Connect API key.
 - Next step: resolve the trusted toolchain drift, rerun the recorder on clean HEAD, then perform signed archive/TestFlight preflight. Full 17-screen pixel parity, physical-device Face ID/APNs/camera/offline validation and public release remain open.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-003`.
+- Task: align native Client loyalty/coupons and delivery addresses with the `AliStore Клиент App 2.0` handoff.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: the loyalty screen now uses the prototype dark account subflow with the red/orange bonus balance panel, stable `4 820` formatting, coupon rows, delivery coupon fixture and ledger-like history rows. The addresses screen now uses prototype-style dark delivery cards, a lime primary badge, delete affordance and dashed add-address CTA while keeping the existing owner-scoped CRUD/editor behavior.
+- Checks run: `npm run ios:build` passed all 10 targets before final UI polish; targeted Client XCUITest for loyalty/addresses passed; `npm run ios:ui` passed Client `17/17`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
+- Outcome: Client loyalty/coupon and address visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
+- Next step: continue unresolved Client App 2.0 subflow parity or move to Android Client/ERP integration while waiting for production release credentials and physical-device certification.

@@ -2167,12 +2167,13 @@ private enum ClientUIFixture {
     ]
 
     static let loyalty = CustomerLoyalty(
-        balance: 1240,
+        balance: 4820,
         conversion: 1,
         level: "Gold",
         nextLevelSpend: 18500,
         coupons: [
-            CustomerCoupon(id: "ui-coupon-1", title: "Скидка на аксессуары", code: "ALI-GOLD", valueLabel: "−10%", expiresAt: warrantyDate, active: true)
+            CustomerCoupon(id: "ui-coupon-1", title: "Скидка на аксессуары", code: "ALI-GOLD", valueLabel: "−10%", expiresAt: warrantyDate, active: true),
+            CustomerCoupon(id: "ui-coupon-2", title: "Бесплатная доставка", code: "DELIVERY-GOLD", valueLabel: "0 сом", expiresAt: warrantyDate, active: true)
         ],
         history: [
             LoyaltyHistoryEntry(id: "ui-loyalty-1", kind: "earned", label: "Покупка iPhone 15", amount: 899, expiresAt: nil, createdAt: referenceDate),
@@ -3100,82 +3101,109 @@ private struct CustomerLoyaltyView: View {
             } else if let loyalty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("БАЛАНС БОНУСОВ")
-                                .font(ClientTheme.body(11, weight: .bold))
-                                .foregroundStyle(ClientTheme.lime)
-                            Text("\(loyalty.balance)")
-                                .font(ClientTheme.display(36, weight: .black))
+                        HStack(spacing: 10) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(.white)
-                            Text("уровень \(loyalty.level) · 1 бонус = \(loyalty.conversion) сом")
-                                .font(ClientTheme.body(12))
-                                .foregroundStyle(ClientTheme.muted)
-                            if loyalty.nextLevelSpend > 0 {
-                                Text("До следующего уровня: \(loyalty.nextLevelSpend.formatted(.number)) сом покупок")
-                                    .font(ClientTheme.body(12, weight: .semibold))
-                                    .foregroundStyle(.white)
-                            } else {
-                                Text("Максимальный уровень достигнут")
-                                    .font(ClientTheme.body(12, weight: .semibold))
-                                    .foregroundStyle(ClientTheme.lime)
-                            }
+                            Text("Бонусы и купоны")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
                         }
-                        .padding(18)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 18))
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+
+                        VStack(spacing: 6) {
+                            Text("Доступно бонусов")
+                                .font(ClientTheme.body(13, weight: .medium))
+                                .foregroundStyle(Color(red: 1, green: 0.878, blue: 0.835))
+                            Text(groupedNumber(loyalty.balance))
+                                .font(ClientTheme.display(40, weight: .black))
+                                .foregroundStyle(.white)
+                                .accessibilityIdentifier("loyalty-balance-value")
+                            Text("\(loyalty.conversion) бонус = \(loyalty.conversion) сом · \(loyalty.level)-уровень")
+                                .font(ClientTheme.body(12, weight: .medium))
+                                .foregroundStyle(Color(red: 1, green: 0.878, blue: 0.835))
+                        }
+                        .padding(22)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            LinearGradient(
+                                colors: [ClientTheme.coral, Color(red: 0.91, green: 0.255, blue: 0.059)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 18)
+                        )
 
                         if !loyalty.coupons.isEmpty {
-                            Text("Купоны")
-                                .font(ClientTheme.body(12, weight: .semibold))
+                            Text("Мои купоны")
+                                .font(ClientTheme.body(13, weight: .semibold))
                                 .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 2)
                             ForEach(loyalty.coupons) { coupon in
-                                VStack(alignment: .leading, spacing: 5) {
-                                    HStack {
-                                        Text(coupon.title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
-                                        Spacer()
-                                        Text(coupon.valueLabel).font(ClientTheme.body(13, weight: .bold)).foregroundStyle(ClientTheme.coral)
+                                HStack(spacing: 12) {
+                                    Text(couponIcon(coupon))
+                                        .font(.system(size: 24))
+                                        .frame(width: 30)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(coupon.title)
+                                            .font(ClientTheme.body(13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Text(coupon.code)
+                                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                                .foregroundStyle(ClientTheme.muted)
+                                            if let expiresAt = coupon.expiresAt {
+                                                Text("до \(expiresAt, format: .dateTime.day().month().year())")
+                                                    .font(ClientTheme.body(11))
+                                                    .foregroundStyle(ClientTheme.muted)
+                                            }
+                                        }
                                     }
-                                    Text(coupon.code).font(.system(size: 12, design: .monospaced)).foregroundStyle(ClientTheme.lime)
-                                    if let expiresAt = coupon.expiresAt {
-                                        Text("Действует до \(expiresAt, format: .dateTime.day().month().year())")
-                                            .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
-                                    }
+                                    Spacer()
+                                    Text(coupon.valueLabel)
+                                        .font(ClientTheme.body(12, weight: .black))
+                                        .foregroundStyle(.black)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 8))
                                 }
-                                .padding(13)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                                .padding(14)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             }
                         }
 
                         Text("История")
-                            .font(ClientTheme.body(12, weight: .semibold))
+                            .font(ClientTheme.body(13, weight: .semibold))
                             .foregroundStyle(ClientTheme.muted)
                         if loyalty.history.isEmpty {
                             EmptyStateView(title: "История пока пуста", detail: "Начисления и списания появятся после покупки.", symbol: "clock.arrow.circlepath")
                         } else {
                             ForEach(loyalty.history) { entry in
-                                HStack(spacing: 12) {
-                                    Image(systemName: entry.amount >= 0 ? "plus.circle.fill" : "minus.circle.fill")
-                                        .foregroundStyle(entry.amount >= 0 ? ClientTheme.lime : ClientTheme.coral)
+                                HStack {
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(entry.label).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                                        Text(entry.label)
+                                            .font(ClientTheme.body(13, weight: .semibold))
+                                            .foregroundStyle(ClientTheme.muted)
                                         Text(entry.createdAt, format: .dateTime.day().month().year())
-                                            .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
                                     }
                                     Spacer()
                                     Text("\(entry.amount >= 0 ? "+" : "")\(entry.amount)")
-                                        .font(ClientTheme.body(14, weight: .bold))
+                                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
                                         .foregroundStyle(entry.amount >= 0 ? ClientTheme.lime : ClientTheme.coral)
                                 }
-                                .padding(12)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
-                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                                .padding(.vertical, 10)
+                                .overlay(alignment: .bottom) {
+                                    Rectangle().fill(ClientTheme.surface).frame(height: 1)
+                                }
                             }
                         }
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
                 }
             } else {
                 EmptyStateView(title: "Бонусов пока нет", detail: "Бонусный баланс появится после первой покупки.", symbol: "gift")
@@ -3186,6 +3214,21 @@ private struct CustomerLoyaltyView: View {
         .tint(ClientTheme.lime)
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    private func couponIcon(_ coupon: CustomerCoupon) -> String {
+        let value = "\(coupon.title) \(coupon.code)".lowercased()
+        if value.contains("достав") || value.contains("delivery") { return "🚚" }
+        if value.contains("аксесс") { return "🎧" }
+        return "🎟"
+    }
+
+    private func groupedNumber(_ value: Int) -> String {
+        let digits = Array(String(value))
+        let reversed = digits.reversed().enumerated().flatMap { index, character -> [Character] in
+            index > 0 && index % 3 == 0 ? [" ", character] : [character]
+        }
+        return String(reversed.reversed())
     }
 
     @MainActor
@@ -3237,6 +3280,17 @@ private struct CustomerAddressesView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("Адреса доставки")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                        }
+                        .padding(.bottom, 2)
+
                         if addresses.isEmpty {
                             EmptyStateView(title: "Адресов пока нет", detail: "Добавьте адрес, чтобы быстрее оформить доставку.", symbol: "mappin.and.ellipse")
                         } else {
@@ -3248,15 +3302,18 @@ private struct CustomerAddressesView: View {
                             }
                         }
                         Button { editor = AddressEditorRoute(address: nil) } label: {
-                            Label("Добавить адрес", systemImage: "plus")
-                                .font(ClientTheme.body(14, weight: .bold))
-                                .foregroundStyle(.black)
-                                .frame(maxWidth: .infinity, minHeight: 46)
-                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                            Text("+ Добавить адрес")
+                                .font(ClientTheme.body(13, weight: .semibold))
+                                .foregroundStyle(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line, style: StrokeStyle(lineWidth: 1, dash: [6, 5])))
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
                 }
             }
         }
@@ -3277,30 +3334,41 @@ private struct CustomerAddressesView: View {
     }
 
     private func addressRow(_ address: CustomerAddress) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: address.isPrimary ? "mappin.and.ellipse" : "mappin")
-                .foregroundStyle(address.isPrimary ? ClientTheme.lime : ClientTheme.muted)
-                .frame(width: 38, height: 38)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 8) {
-                    Text(address.title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
-                    if address.isPrimary {
-                        Text("По умолчанию").font(ClientTheme.body(10, weight: .semibold)).foregroundStyle(ClientTheme.lime)
-                    }
-                }
-                Text(address.text).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.leading)
-                if let comment = address.comment, !comment.isEmpty {
-                    Text(comment).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted.opacity(0.8))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(address.title)
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if address.isPrimary {
+                    Text("основной")
+                        .font(ClientTheme.body(10, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(ClientTheme.lime.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
                 }
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
+            Text(address.text)
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 5) {
+                if let comment = address.comment, !comment.isEmpty {
+                    Text(comment)
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted.opacity(0.78))
+                }
+            }
+            Text("Удалить")
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(Color(red: 1, green: 0.541, blue: 0.478))
+                .padding(.top, 1)
         }
-        .padding(13)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(address.isPrimary ? ClientTheme.lime.opacity(0.5) : ClientTheme.line))
     }
 
     @MainActor
