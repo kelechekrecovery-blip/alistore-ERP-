@@ -2683,3 +2683,12 @@
 - Checks run: `bash -n apps/ios/scripts/visual-capture.sh`; package/evidence JSON parse; `npm run ios:visual` passed 1/1 with 6/6 PNG attachments; `npm run ios:ui` passed Client `17/17`, Staff `1/1`, Courier `1/1`, POS `1/1`; `npm run ios:test` passed `34/34`; `npm run ios:build` passed all 10 targets; `git diff --check`.
 - Outcome: native Client visual evidence is reproducible and the full local iOS simulator software gate is green. This is not pixel-perfect acceptance for all 17 screens and does not certify physical-device Face ID/APNs/camera/offline behavior, signing, TestFlight, App Store Connect or production providers.
 - Next step: record the clean-HEAD visual artifact, then execute App Store release preflight and report the external credential blocker.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-002`.
+- Task: attempt trusted recording and App Store release preflight after the native Client visual gate.
+- Result: the trusted recorder correctly refused to create evidence because the current `node_modules` tree hash is `38a60220115ca2bf7e83c512489b1fc6ebac4c9f20f435bed4b4df0bce19f55a` instead of the committed lock value `4b8d641ec4404162a71e74dfdc454b0180ad26094b18678facfe5fe7ab5ea47e`, and the installed Chrome hash/app-tree also differ from the accepted toolchain. The source commit and `package-lock.json` are clean and unchanged; no evidence was fabricated or overwritten. Store preflight fails closed with `ALISTORE_API_BASE_URL is required` before checking Apple signing/App Store Connect credentials.
+- Checks run: committed-HEAD trusted bootstrap invocation; toolchain hash comparison; `apps/ios/scripts/store-preflight.sh` (expected exit `1`); `git diff --check`.
+- Outcome: local simulator software gates remain green, but `ios-client-visual` stays `pending` until the trusted toolchain is restored or deliberately re-pinned and the owner supplies a production HTTPS API URL, Apple Team ID, signing profile and App Store Connect API key.
+- Next step: resolve the trusted toolchain drift, rerun the recorder on clean HEAD, then perform signed archive/TestFlight preflight. Full 17-screen pixel parity, physical-device Face ID/APNs/camera/offline validation and public release remain open.
