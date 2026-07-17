@@ -2925,6 +2925,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-016`.
+- Task: tighten native iOS Client Search visual parity against `AliStore Клиент App 2.0`.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the Search route now uses the exact popular queries from the handoff (`iPhone 15`, `AirPods`, `MacBook`, `Samsung`, `Б/У`) and compact result rows with 56 px product imagery, price and server-derived stock state (`В наличии`, `Осталось N шт`, `Нет в наличии`) instead of the previous larger category-style cards.
+- Checks run: targeted `xcodebuild test -project apps/ios/AliStoreNative.xcodeproj -scheme AliStoreUITests -destination 'platform=iOS Simulator,name=iPhone 17 Pro' '-only-testing:AliStoreClientUITests/AliStoreClientUITests/testHeaderRoutesToSearchCompareAndNotifications' CODE_SIGNING_ALLOWED=NO` passed after setting `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`; `git diff --check` passed; `npm run ios:visual` passed and exported 17 PNG attachments including `client-search`.
+- Outcome: Client Search visual parity is accepted at local simulator software level. App Store readiness remains blocked by owner pixel sign-off, production HTTPS API configuration, verified App Store Connect values, provisioning/signing, TestFlight upload and physical-device Face ID/APNs/camera/offline smoke.
+- Next step: continue highest-value remaining ecosystem gaps: Staff/Courier/POS native polish and physical-device gates, Android Client parity, ERP/CMS integration, live provider certification and first-store staging UAT.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-006`.
 - Task: align native Client Trade-in estimator with the `AliStore Клиент App 2.0` handoff while preserving the existing trade-in request/evidence flow.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.

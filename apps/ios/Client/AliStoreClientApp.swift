@@ -389,20 +389,15 @@ private struct ClientOverlayView: View {
                 Text("Популярные запросы")
                     .font(ClientTheme.body(13, weight: .semibold))
                     .foregroundStyle(ClientTheme.muted)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], alignment: .leading, spacing: 8) {
-                    ForEach(["iPhone", "AirPods", "Samsung", "Apple Watch", "Trade-in"], id: \.self) { value in
-                        Button {
-                            query = value.lowercased()
-                        } label: {
-                            Text(value)
-                                .font(ClientTheme.body(12, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
-                        }
-                        .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        searchChip("iPhone 15")
+                        searchChip("AirPods")
+                        searchChip("MacBook")
+                    }
+                    HStack(spacing: 8) {
+                        searchChip("Samsung")
+                        searchChip("Б/У")
                     }
                 }
                 Text("Результаты")
@@ -432,6 +427,21 @@ private struct ClientOverlayView: View {
                 query = "iphone"
             }
         }
+    }
+
+    private func searchChip(_ value: String) -> some View {
+        Button {
+            query = value.lowercased()
+        } label: {
+            Text(value)
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(ClientTheme.surface, in: Capsule())
+                .overlay(Capsule().stroke(ClientTheme.line))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -638,18 +648,32 @@ private struct ClientOverlayView: View {
     private func searchRow(_ product: Product) -> some View {
         HStack(spacing: 12) {
             ClientProductImage(product: product, cornerRadius: 11)
-                .frame(width: 76, height: 76)
-            VStack(alignment: .leading, spacing: 5) {
+                .frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(product.name).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
-                Text(product.category).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
                 Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.display(14, weight: .bold)).foregroundStyle(.white)
+                Text(searchStockLabel(product))
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(searchStockColor(product))
             }
             Spacer()
             Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
         }
-        .padding(10)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        .padding(12)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+
+    private func searchStockLabel(_ product: Product) -> String {
+        if product.availableUnits <= 0 { return "Нет в наличии" }
+        if product.availableUnits < 5 { return "Осталось \(product.availableUnits) шт" }
+        return "В наличии"
+    }
+
+    private func searchStockColor(_ product: Product) -> Color {
+        if product.availableUnits <= 0 { return Color(red: 1, green: 0.541, blue: 0.478) }
+        if product.availableUnits < 5 { return ClientTheme.gold }
+        return ClientTheme.lime
     }
 
     private func compareCard(_ product: Product, isBestPrice: Bool) -> some View {

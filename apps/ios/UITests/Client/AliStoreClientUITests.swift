@@ -56,6 +56,12 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
         XCTAssertTrue(app.navigationBars["Поиск"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Популярные запросы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["iPhone 15"].exists)
+        XCTAssertTrue(app.buttons["MacBook"].exists)
+        XCTAssertTrue(app.buttons["Б/У"].exists)
+        XCTAssertTrue(app.staticTexts["Результаты"].exists)
+        XCTAssertTrue(app.staticTexts["В наличии"].exists || app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Осталось")).firstMatch.exists)
     }
 
     func testSignedInNotificationsUseCustomerInboxShell() {
@@ -351,6 +357,8 @@ final class AliStoreClientUITests: XCTestCase {
         searchButton.tap()
         XCTAssertTrue(search.navigationBars["Поиск"].waitForExistence(timeout: 5))
         XCTAssertTrue(search.staticTexts["Популярные запросы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(search.buttons["iPhone 15"].exists)
+        XCTAssertTrue(search.staticTexts["Осталось 3 шт"].exists)
         capture(search, named: "client-search")
 
         let cart = XCUIApplication()
