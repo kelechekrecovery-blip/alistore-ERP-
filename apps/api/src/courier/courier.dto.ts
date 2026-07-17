@@ -47,6 +47,12 @@ export class RemoveFromRunDto {
 }
 
 export class CompleteDeliveryDto {
-  @ApiProperty({ minimum: 0, example: 109900, description: 'Cash collected at delivery; API verifies the outstanding order amount.' })
+  @ApiProperty({ minimum: 0, example: 109900, description: 'Cash collected at delivery; API rejects amounts above the outstanding COD and records a remaining receivable for partial collection.' })
   @IsInt() @Min(0) codAmount!: number;
+
+  @ApiPropertyOptional({
+    description: 'Required when the customer pays less than the outstanding COD at the door.',
+    example: 'Клиент внёс часть суммы, остаток подтверждён к оплате завтра',
+  })
+  @IsOptional() @IsString() @MaxLength(500) reason?: string;
 }

@@ -402,6 +402,60 @@ describe('Courier COD handover (integration)', () => {
     expect(await prisma.courierRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ collectedTotal: order.total });
   });
 
+  it('records partial COD at the door and leaves the unpaid balance in receivables', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967058${seq.toString().padStart(3, '0')}`, name: 'Partial COD customer' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        paymentMode: 'cod',
+        total: 1500,
+        status: 'packed',
+        items: { create: { lineNumber: 1, sku: `COD-PARTIAL-${seq}`, qty: 1, price: 1500 } },
+      },
+    });
+    const run = await courier.createRun(
+      { courierId: staff.id, codTotal: order.total, orderIds: [order.id] },
+      'dispatcher',
+      `assign-cod-partial-${seq}`,
+    );
+    await courier.startDelivery(order.id, staff.id, `start-cod-partial-${seq}`);
+
+    await expect(courier.completeDelivery(
+      order.id,
+      { codAmount: 500 },
+      staff.id,
+      `deliver-cod-partial-missing-reason-${seq}`,
+    )).rejects.toMatchObject({ code: 'delivery_partial_cod_reason_required' });
+
+    const delivered = await courier.completeDelivery(
+      order.id,
+      { codAmount: 500, reason: 'Клиент внёс часть суммы, остаток подтверждён' },
+      staff.id,
+      `deliver-cod-partial-${seq}`,
+    );
+    expect(delivered).toMatchObject({ status: 'delivered' });
+    expect(await prisma.courierRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({
+      codTotal: 1500,
+      collectedTotal: 500,
+    });
+    const receivable = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { sourceType_sourceRef: { sourceType: 'cod.receivable', sourceRef: order.id } },
+      include: { lines: true },
+    });
+    expect(receivable.documentAmount).toBe(1500);
+    expect(receivable.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 1500 }),
+    ]));
+    const event = await prisma.auditEvent.findFirstOrThrow({ where: { type: 'delivery.delivered', refs: { has: order.id } } });
+    expect(event.payload).toMatchObject({ codAmount: 500, expectedCod: 1500, remainingReceivable: 1000 });
+  });
+
   it('collects COD for mixed stock and service lines while finalizing only tracked inventory', async () => {
     const staff = await createCourier();
     seq += 1;

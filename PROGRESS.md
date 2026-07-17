@@ -12,6 +12,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-013-COD-025`.
+- Task: complete the software portion of partial COD collection at the courier door.
+- Result: `CompleteDeliveryDto` accepts a server-validated collected amount up to outstanding COD and requires a reason for a partial collection. Delivery remains server-owned; the full outstanding amount is posted once to customer receivables, the courier run increments only by actual cash collected, and the delivered Ledger payload exposes the remaining receivable. Replay compatibility canonicalizes optional payload key order and old commands safely.
+- Checks run: `npm run api:build`; `courier.e2e-spec.ts` passed `16/16`; Prisma test database migration `20260718100000_outbox_retry_backoff` applied; `git diff --check`.
+- Acceptance: `LOGIC-013` software scope accepted. Physical courier device, push/maps/camera/network and live first-store reconciliation remain external release gates.
+- Next step: native Courier partial-COD UI/retry coverage, then staging-shaped provider/device certification.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-007-ERP-RESOLVE-023`.
 - Task: connect the stale provider-pending refund resolver to the ERP Return Desk.
 - Result: staff return listing now includes a compact refund/allocation snapshot; ERP operators with `refunds,manage` can choose provider-confirmed or provider-not-executed, enter an auditable reason/reference, and submit a stable session idempotency key to `POST /refunds/:id/resolve`. The browser flow covers cancellation and verifies both Refund and Return become `rejected`.

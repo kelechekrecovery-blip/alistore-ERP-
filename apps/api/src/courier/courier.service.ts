@@ -159,13 +159,17 @@ export class CourierService {
   }
 
   completeDelivery(orderId: string, dto: CompleteDeliveryDto, courierId: string, idempotencyKey: string) {
-    return this.executeCommand(orderId, courierId, idempotencyKey, 'deliver', { codAmount: dto.codAmount }, async (tx, order) => {
+    return this.executeCommand(orderId, courierId, idempotencyKey, 'deliver', { codAmount: dto.codAmount, reason: dto.reason?.trim() || null }, async (tx, order) => {
       if (order.status !== 'out_for_delivery') {
         throw new ConflictError('delivery_not_out', `Заказ ${orderId} имеет статус ${order.status}`);
       }
       const expectedCod = outstandingAmount(order);
-      if (dto.codAmount !== expectedCod) {
-        throw new ValidationError('delivery_cod_mismatch', `Для заказа требуется получить ${expectedCod} сом`);
+      const reason = dto.reason?.trim() || null;
+      if (dto.codAmount > expectedCod) {
+        throw new ValidationError('delivery_cod_mismatch', `Нельзя получить больше задолженности ${expectedCod} сом`);
+      }
+      if (dto.codAmount < expectedCod && !reason) {
+        throw new ValidationError('delivery_partial_cod_reason_required', 'Для частичной оплаты COD требуется причина');
       }
       const updated = await tx.order.updateMany({
         where: { id: orderId, courierId, status: 'out_for_delivery' },
@@ -195,7 +199,7 @@ export class CourierService {
           await assertOrderInventoryFinalizedOnTx(tx, orderId);
         }
       }
-      const receivableEntry = dto.codAmount > 0
+      const receivableEntry = expectedCod > 0
         ? await postOrderReceivableOnTx(tx, {
           idempotencyKey: `accounting:cod.receivable:${order.id}`,
           sourceType: 'cod.receivable',
@@ -203,7 +207,7 @@ export class CourierService {
           description: `COD к получению по заказу ${order.id}`,
           order,
           processedBefore: receivedBefore,
-          amount: dto.codAmount,
+          amount: expectedCod,
           occurredAt: new Date(),
           actor: courierId,
         })
@@ -213,7 +217,15 @@ export class CourierService {
         {
           type: EventType.DeliveryDelivered,
           actor: courierId,
-          payload: { orderId, from: 'out_for_delivery', to: 'delivered', codAmount: dto.codAmount },
+          payload: {
+            orderId,
+            from: 'out_for_delivery',
+            to: 'delivered',
+            codAmount: dto.codAmount,
+            expectedCod,
+            remainingReceivable: expectedCod - dto.codAmount,
+            reason,
+          },
           refs: [orderId, order.courierRunId].filter((value): value is string => Boolean(value)),
         },
         ...inventoryEvents,
@@ -548,15 +560,31 @@ function replayCommand<T>(
   action: string,
   payload: Record<string, unknown>,
 ): T {
+  const storedPayload = normalizeReplayPayload(command.action, command.payload);
+  const requestedPayload = normalizeReplayPayload(action, payload);
   const same = command.courierId === courierId
     && command.orderId === orderId
     && command.action === action
-    && JSON.stringify(command.payload) === JSON.stringify(payload);
+    && canonicalJson(storedPayload) === canonicalJson(requestedPayload);
   if (!same) throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован другой courier-командой');
   if (command.response === null || command.response === undefined) {
     throw new ConflictError('command_in_progress', 'Courier-команда ещё выполняется');
   }
   return command.response as T;
+}
+
+function normalizeReplayPayload(action: string, payload: unknown): unknown {
+  if (action !== 'deliver' || !payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  const record = payload as Record<string, unknown>;
+  return { ...record, reason: typeof record.reason === 'string' ? record.reason : null };
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as Record<string, unknown>).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function isUniqueConflict(error: unknown): boolean {
