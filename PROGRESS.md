@@ -3388,3 +3388,13 @@
 - Checks run: consolidated Playwright `16/16`; targeted CMS review rerun `1/1`; previous Web production build passed; `git diff --check`.
 - Outcome: Phase 1 functional ERP-to-storefront slices are locally accepted. Trusted hash-bound evidence must be refreshed after these source commits; strict ecosystem acceptance still remains blocked by the 64 missing design references and external provider/staging/device gates.
 - Next step: refresh trusted visual/native/web evidence, run `npm run mvp:verify` and `npm run ecosystem:audit:strict`, then record the exact remaining gate status before selecting the next finance/native lane.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-FIXTURE-006`.
+- Task: align legacy browser fixtures with the new checkout server-price/stock revalidation contract uncovered by the Phase 1 gate.
+- Files changed: `e2e/customer-account-data.spec.ts`, `e2e/logistics-ui.spec.ts`, and `PROGRESS.md`.
+- Result: account checkout and logistics availability tests now seed real catalog products instead of synthetic cart IDs. This preserves the intended negative behavior for unavailable points while allowing valid products to pass authoritative catalog revalidation.
+- Checks run: `customer-account-data.spec.ts` `1/1`; `logistics-ui.spec.ts` `2/2`; protection/return/service-center suite `5/5`; `git diff --check`.
+- Outcome: all previously identified assertion-level regressions from the checkout change are closed. The full `mvp:verify` run had five Playwright failures (including these fixtures and cold-dev-server timeouts); the corrected targeted scenarios are green. A clean full rerun remains required.
+- Next step: commit the fixture correction, rerun full `mvp:verify`, then refresh trusted evidence and strict audit.

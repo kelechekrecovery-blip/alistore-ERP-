@@ -1,17 +1,19 @@
 import { expect, test } from '@playwright/test';
-import { API_BASE, prisma, resetDb, seedStaffCredentials } from './helpers';
+import { API_BASE, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
 test.afterEach(async () => resetDb());
 
 test('ERP point availability immediately controls public checkout options', async ({ page, request }) => {
   await resetDb();
+  const { product } = await seedProduct('POINT-AVAILABILITY', 1_000);
   const owner = await seedStaffCredentials('owner', 'e2e-store-point-owner');
   await page.addInitScript(() => {
-    localStorage.setItem('alistore.cart.v1', JSON.stringify([
-      { id: 'point-availability', sku: 'POINT-AVAILABILITY', name: 'Point availability', price: 1_000, qty: 1 },
-    ]));
     localStorage.removeItem('alistore.cart.pricing.v1');
   });
+  await page.addInitScript((item) => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  }, { id: product.id, sku: product.sku, name: product.name, price: product.price });
 
   await page.goto('/erp');
   await page.getByPlaceholder('username').fill(owner.username);

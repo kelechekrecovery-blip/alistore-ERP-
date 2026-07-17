@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { sign } from 'jsonwebtoken';
-import { prisma, resetDb } from './helpers';
+import { prisma, resetDb, seedProduct } from './helpers';
 
 test('customer account data is shared by API, web cabinet and checkout', async ({ page }) => {
   await resetDb();
+  const { product } = await seedProduct('ACCOUNT-SYNC', 10_000);
   const phone = '+996700940001';
   const customer = await prisma.customer.create({ data: { phone, name: 'E2E Account Customer' } });
   const tokens = {
@@ -21,13 +22,13 @@ test('customer account data is shared by API, web cabinet and checkout', async (
     data: { customerId: customer.id, title: 'E2E купон', code: 'SYNC725', valueLabel: '-725 с' },
   });
 
-  await page.addInitScript((auth) => {
+  await page.addInitScript(({ auth, item }) => {
     localStorage.setItem('alistore.auth.v1', JSON.stringify(auth));
     localStorage.setItem('alistore.cart.v1', JSON.stringify([
-      { id: 'account-sync-product', sku: 'ACCOUNT-SYNC', name: 'Account Sync Product', price: 10_000, qty: 1 },
+      { ...item, qty: 1 },
     ]));
     localStorage.removeItem('alistore.addresses.v1');
-  }, tokens);
+  }, { auth: tokens, item: { id: product.id, sku: product.sku, name: product.name, price: product.price } });
 
   await page.goto('/account/bonuses');
   await expect(page.getByText('725', { exact: true })).toBeVisible();
