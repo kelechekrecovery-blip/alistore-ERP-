@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `QA-SERVICE-FK-CLEANUP-024`.
+- Task: make valuation-reversal cleanup respect deferred append-only coverage triggers.
+- Result: the warranty fixture resets `reversedQty` and reversal rows in one transaction, so repeated evidence runs preserve the database invariant instead of using trigger-disabling shortcuts.
+- Checks run: isolated `warranty-rbac.e2e-spec.ts` passed `1/1`; `git diff --check`.
+- Next step: rerun service/loaner reconciliation evidence.
+
+## 2026-07-18
+
 - Iteration ID: `LOGIC-004-RACE-PARK-023`.
 - Task: park provider callbacks that race a cancellation or reservation sweep.
 - Result: the webhook path now catches the locked payment guard, parks only non-demo orders that are no longer payable, and preserves the existing refund path; demo orders remain blocked from payment creation.

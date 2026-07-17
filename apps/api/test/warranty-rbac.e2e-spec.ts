@@ -68,7 +68,10 @@ describe('Warranty console RBAC', () => {
     await prisma.servicePart.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
     await prisma.inventoryQuarantineCase.deleteMany();
-    await prisma.inventoryValuationReversal.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryValuationIssue.updateMany({ data: { reversedQty: 0 } });
+      await tx.inventoryValuationReversal.deleteMany();
+    });
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.orderItem.deleteMany();
