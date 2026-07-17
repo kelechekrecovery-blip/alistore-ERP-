@@ -351,6 +351,20 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(home.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
         capture(home, named: "client-product-detail")
 
+        let favorites = launchGuest()
+        favorites.buttons["Избранное"].tap()
+        XCTAssertTrue(favorites.staticTexts["Избранное"].waitForExistence(timeout: 5))
+        XCTAssertTrue(favorites.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
+        capture(favorites, named: "client-favorites")
+
+        let compare = launchGuest()
+        compare.buttons["Сравнение"].tap()
+        XCTAssertTrue(compare.navigationBars["Сравнение"].waitForExistence(timeout: 5))
+        XCTAssertTrue(compare.staticTexts["До 4 товаров"].waitForExistence(timeout: 5))
+        XCTAssertTrue(compare.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
+        XCTAssertTrue(compare.staticTexts["ЛУЧШАЯ ЦЕНА"].waitForExistence(timeout: 5))
+        capture(compare, named: "client-compare")
+
         let search = launchGuest()
         let searchButton = search.buttons["Поиск техники и брендов"]
         XCTAssertTrue(searchButton.waitForExistence(timeout: 5))
@@ -368,6 +382,14 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(cart.staticTexts["Корзина"].waitForExistence(timeout: 10))
         capture(cart, named: "client-cart")
 
+        let checkout = XCUIApplication()
+        checkout.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account", "--ui-testing-checkout", "--ui-testing-visual-evidence"]
+        checkout.launch()
+        checkout.buttons["Корзина"].tap()
+        XCTAssertTrue(checkout.staticTexts["Оформление"].waitForExistence(timeout: 10))
+        XCTAssertTrue(checkout.staticTexts["Способ получения"].exists)
+        capture(checkout, named: "client-checkout")
+
         let account = launchSignedInAccount()
         capture(account, named: "client-account")
 
@@ -381,11 +403,11 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(orderStatus.buttons["order-status-repeat"].waitForExistence(timeout: 5))
         capture(orderStatus, named: "client-order-status")
 
-        let notifications = launchSignedInAccount()
-        notifications.buttons["Уведомления"].tap()
-        XCTAssertTrue(notifications.navigationBars["Уведомления"].waitForExistence(timeout: 5))
-        XCTAssertTrue(notifications.staticTexts["Заказ №4102 собирается"].waitForExistence(timeout: 5))
-        capture(notifications, named: "client-notifications")
+        let devices = launchSignedInAccount()
+        devices.staticTexts["Устройства"].tap()
+        XCTAssertTrue(devices.navigationBars["Мои устройства"].waitForExistence(timeout: 5))
+        XCTAssertTrue(devices.buttons["Открыть гарантию для iPhone 15 128 GB Black"].waitForExistence(timeout: 5))
+        capture(devices, named: "client-devices")
 
         let loyalty = launchSignedInAccount()
         loyalty.buttons["account-loyalty-card"].tap()
@@ -427,27 +449,6 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(addresses.navigationBars["Адреса доставки"].waitForExistence(timeout: 5))
         XCTAssertTrue(addresses.staticTexts["Бишкек, ул. Киевская, 125, кв. 42"].waitForExistence(timeout: 5))
         capture(addresses, named: "client-addresses")
-
-        let settings = launchSignedInAccount()
-        settings.swipeUp()
-        settings.staticTexts["Настройки"].tap()
-        XCTAssertTrue(settings.navigationBars["Настройки"].waitForExistence(timeout: 5))
-        XCTAssertTrue(settings.staticTexts["Push-уведомления"].waitForExistence(timeout: 5))
-        capture(settings, named: "client-settings")
-
-        let payment = XCUIApplication()
-        payment.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-result", "--ui-testing-visual-evidence"]
-        payment.launch()
-        payment.buttons["Корзина"].tap()
-        XCTAssertTrue(payment.staticTexts["payment-result-title"].waitForExistence(timeout: 10))
-        capture(payment, named: "client-payment-success")
-
-        let failure = XCUIApplication()
-        failure.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-failure", "--ui-testing-visual-evidence"]
-        failure.launch()
-        failure.buttons["Корзина"].tap()
-        XCTAssertTrue(failure.staticTexts["Оплата не прошла"].waitForExistence(timeout: 10))
-        capture(failure, named: "client-payment-failure")
     }
 
     private func launchSignedInAccount() -> XCUIApplication {

@@ -993,6 +993,10 @@ private struct ClientRootView: View {
 #if DEBUG
         if UITestBootstrap.startsAtVisualEvidence {
             products = ClientUIFixture.products
+            if !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart {
+                favorites = ["ui-product-iphone", "ui-product-macbook"]
+                compared = ["ui-product-iphone", "ui-product-samsung", "ui-product-macbook"]
+            }
             if (UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart), let product = products.first {
                 cart[product.id] = 1
             }

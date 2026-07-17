@@ -41,20 +41,20 @@
       "client-home",
       "client-catalog",
       "client-product-detail",
-      "client-search",
+      "client-favorites",
+      "client-compare",
       "client-cart",
-      "client-account",
+      "client-checkout",
       "client-order-status",
-      "client-notifications",
-      "client-loyalty",
+      "client-account",
+      "client-devices",
+      "client-warranty",
       "client-returns",
       "client-support",
       "client-trade-in",
-      "client-warranty",
+      "client-loyalty",
       "client-addresses",
-      "client-settings",
-      "client-payment-success",
-      "client-payment-failure"
+      "client-search"
     ]
   },
   "privacy": {

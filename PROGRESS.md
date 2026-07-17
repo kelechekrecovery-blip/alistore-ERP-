@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-CLIENT-VISUAL-018
+
+- Iteration ID: `IOS-CLIENT-VISUAL-018`.
+- Task: realign native iOS Client visual/App Store screenshot evidence with the 17 review screens listed inside `AliStore Клиент App 2.0.dc.html`.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `apps/ios/scripts/visual-capture.sh`, `apps/ios/store/client-metadata.json`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the visual gate now captures the handoff-declared set: home, catalog, product detail, favorites, compare, cart, checkout, order status, account, devices, warranty, returns, support, Trade-in, loyalty, addresses and search. DEBUG visual evidence seeds deterministic favorites/compare state without changing production behavior, and `ios:visual` now reads the expected attachment count from screenshot metadata.
+- Checks run: `node scripts/validate-ios-store-metadata.mjs apps/ios/store/client-metadata.json`; `bash -n apps/ios/scripts/visual-capture.sh`; `npm run ios:visual` passed with 17 PNG attachments; `npm run ios:store-screenshots` packaged 17 handoff-aligned screenshots; `npm run ios:build` passed all 10 iOS targets.
+- Acceptance: accepted for the local simulator visual/App Store screenshot software gate. This does not certify App Store readiness: physical-device Face ID/APNs/camera/offline smoke, owner pixel sign-off, production HTTPS API, signing/provisioning, verified App Store Connect values, TestFlight upload and review submission remain open.
+- Next step: commit this source gate, then refresh trusted `ios-client-visual` evidence on the committed SHA or continue the next native/ERP gap while release credentials and physical-device gates remain external.
+
 # 2026-07-17 — IOS-POS-UI-001
 
 - Iteration ID: `IOS-POS-UI-001`.

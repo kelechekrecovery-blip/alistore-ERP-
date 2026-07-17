@@ -70,8 +70,8 @@ set for protected Xcode automatic signing.
 
 `ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
 Simulator and exports 17 retained PNG attachments: home, catalog, product detail,
-search, cart, account, order status, notifications, loyalty, returns, support, Trade-in,
-warranty, addresses, settings, payment success and payment failure. These are
+favorites, compare, cart, checkout, order status, account, devices, warranty,
+returns, support, Trade-in, loyalty, addresses and search. These are
 review evidence only; they do not replace owner pixel approval or physical-device
 release smoke.
 

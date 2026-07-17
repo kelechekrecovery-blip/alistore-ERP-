@@ -22,7 +22,10 @@ DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
     --path "$result_bundle" \
     --output-path "$attachments_dir" >/dev/null
 
-expected_attachment_count=17
+expected_attachment_count="$(
+  node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(m.screenshots.requiredPngCount)" \
+    "$repo_root/apps/ios/store/client-metadata.json"
+)"
 attachment_count="$(find "$attachments_dir" -type f -name '*.png' -print | wc -l | tr -d ' ')"
 [[ "$attachment_count" -eq "$expected_attachment_count" ]] || {
   printf 'ios visual capture: expected %s PNG attachments, got %s\n' "$expected_attachment_count" "$attachment_count" >&2
