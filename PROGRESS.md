@@ -3022,3 +3022,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets; targeted `AliStoreStaffUITests` passed 6/6 after correcting the prototype AI label assertion; `git diff --check` passed.
 - Outcome: Staff Add Product and Buyback visual parity is accepted at local simulator targeted level. Physical scanner/camera/APNs, real add-product moderation API, buyback contract handoff, hardware smoke and full native release gates remain open.
 - Next step: continue remaining Staff inner-screen parity, especially Customer 360/support/warranty tools and shift evidence polish, or move to Android Staff parity while external physical-device gates remain blocked.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-017`.
+- Task: refresh trusted native iOS Client visual evidence after the latest Client Search parity and quick-unlock source changes.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-9addb92275c8d025153a404a7061541ee992bab05517901808535c72640420cd.json`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the committed trusted bootstrap reran `npm run ios:visual` against source commit `8b284ab9df74e8ec9fea5579250cc7c2296d7136`, captured 17 retained simulator PNG states, and rebound `ios-client-visual` to source tree `d46b5a37edaad6db6ff90f7203198c8395a06fb1c4af47c04299c88649f07700`. The new artifact SHA-256 is `9addb92275c8d025153a404a7061541ee992bab05517901808535c72640420cd`.
+- Checks run: trusted ecosystem bootstrap for `scripts/record-ecosystem-evidence.mjs ios-client-visual` executed `npm run ios:visual` and the XCUITest passed with 17 PNG attachments; artifact SHA-256 was verified with `shasum -a 256`; `jq` parsed the new evidence; `git diff --check` passed.
+- Outcome: the accepted iOS Client visual evidence is no longer stale relative to the current native Client source tree. This remains simulator visual evidence only; owner pixel sign-off, physical-device Face ID/APNs/camera/offline smoke, production HTTPS API, TestFlight/App Store Connect, provisioning and release signing remain external release gates.
+- Next step: continue the next locally unblocked lane: Staff/Courier/POS native polish, Android Client/Staff parity, ERP/CMS integration, or staging/provider certification once external access is available.
