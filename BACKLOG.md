@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `PLAN-001` Execute `docs/MASTER-EXECUTION-PLAN-CURRENT.md` in gated vertical slices; current next lane is ERP/storefront contract evidence, followed by financial correctness, native parity, ecosystem E2E and release certification.
 - `EXCH-002B` Certify approved non-cash exchange surcharges against the live payment-provider capture/reconciliation flow. Local card/QR/POS surcharge execution now requires a unique provider/terminal reference and records it as `Payment.txnId`; remaining gate is live provider intent/callback/retry evidence, daily statement reconciliation and certification flags.
 - `INV-VAL-001I` Run staging-shaped performance certification for the database-side opening/period aggregates and bounded reconciliation counters in the valuation roll-forward. The reproducible local benchmark harness passed locally (`27,648` rows, `81ms`, `4MB`, repeatable-read stable); acceptance still requires the same one-year report over production-shaped multi-year staging history within the agreed latency/memory budget.
 - `DEPLOY-MIG-001` Move large-table valuation backfills/index creation to a measured staging maintenance/pre-deploy procedure, using concurrent indexes and staged `NOT VALID`/validation where PostgreSQL permits. Gate: production-shaped data proves bounded lock time before the migration is approved for launch.

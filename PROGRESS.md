@@ -3291,3 +3291,12 @@
 - Checks run: `npm run ecosystem:audit:strict` (expected fail: 64 unresolved design references), `git diff --check`.
 - Outcome: documentation and backlog are synchronized with the actual strict blocker. This iteration does not claim strict acceptance; the owner must supply originals or approved dispositions before the gate can turn green.
 - Next step: continue the next locally unblocked implementation lane, ERP/CMS integration, while preserving the design-corpus blocker and its fail-closed gate.
+## 2026-07-17
+
+- Iteration ID: `PLAN-001-MASTER-EXECUTION-PLAN`.
+- Task: consolidate the active AliStore work into one evidence-driven execution plan with phase gates, parallel ownership boundaries and explicit external blockers.
+- Files changed: `docs/MASTER-EXECUTION-PLAN-CURRENT.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the repository now contains the current sequence from controlled baseline through ERP/storefront contract, financial correctness, native parity, ERP expansion, ecosystem E2E, staging, providers and first-store launch. The plan records what is accepted locally and what cannot be certified without owner credentials, missing design decisions, physical devices or live providers.
+- Checks run: `git diff --check`.
+- Outcome: planning artifact is committed-ready; implementation continues with the ERP/storefront contract lane.
+- Next step: take one uncovered ERP-to-storefront assertion, implement it with API/browser evidence, refresh affected trusted artifacts, and commit the vertical slice.
