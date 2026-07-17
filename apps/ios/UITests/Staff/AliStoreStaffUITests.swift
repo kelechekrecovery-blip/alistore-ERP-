@@ -75,4 +75,51 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Выдан"].exists)
         XCTAssertTrue(app.staticTexts["MacBook Air ×1"].exists)
     }
+
+    func testSignedInStaffAddProductMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-add-product"].tap()
+
+        XCTAssertTrue(app.staticTexts["Добавить товар"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Сканировать штрихкод / фото"].exists)
+        app.buttons["Сканировать штрихкод / фото"].tap()
+
+        XCTAssertTrue(app.staticTexts["Штрихкод распознан"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["🤖 AI заполнил карточку"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 15 128 ГБ"].exists)
+        XCTAssertTrue(app.staticTexts["109 900 сом"].exists)
+        app.buttons["Отправить на модерацию"].tap()
+
+        XCTAssertTrue(app.staticTexts["Товар отправлен на модерацию"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["4 870123 456789"].exists)
+        XCTAssertTrue(app.buttons["🖨 Печать этикетки 40×40"].exists)
+        XCTAssertTrue(app.buttons["Добавить ещё"].exists)
+    }
+
+    func testSignedInStaffBuybackMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-buyback"].tap()
+
+        XCTAssertTrue(app.staticTexts["Скупка Б/У"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Проверьте по регламенту. Полный процесс — на экране «Скупка и договор»."].exists)
+        XCTAssertTrue(app.staticTexts["Проверить IMEI по базе краденого"].exists)
+        XCTAssertTrue(app.staticTexts["Осмотреть состояние, присвоить грейд"].exists)
+        XCTAssertTrue(app.staticTexts["Сделать фото (4 ракурса)"].exists)
+        XCTAssertTrue(app.staticTexts["Внести данные клиента и паспорт"].exists)
+        XCTAssertTrue(app.staticTexts["Проверить чек/коробку/комплект"].exists)
+
+        app.buttons["Проверить IMEI по базе краденого"].tap()
+        app.buttons["Осмотреть состояние, присвоить грейд"].tap()
+        app.buttons["Сделать фото (4 ракурса)"].tap()
+
+        XCTAssertTrue(app.buttons["К договору купли-продажи →"].isEnabled)
+    }
 }

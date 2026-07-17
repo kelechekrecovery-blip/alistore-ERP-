@@ -2852,3 +2852,13 @@
 - Checks run: targeted `AliStoreStaffUITests` passed 4/4; `git diff --check` passed.
 - Outcome: Staff Orders visual slice is accepted at local simulator targeted level. Full native suite rerun, physical-device scanner/camera/APNs smoke and complete order operations remain open.
 - Next step: continue Staff Add Product and Buyback screens from the same handoff.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-STAFF-VISUAL-004`.
+- Task: align native Staff Add Product and Buyback flows with the `AliStore Сотрудник App 2.0` handoff.
+- Files changed: `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Staff/StaffScannerView.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: Staff quick actions now open distinct scanner modes. Add Product uses the prototype dark scan tile, deterministic barcode recognition fixture, AI-filled product card, moderation success state, generated barcode and label-print CTA. Buyback uses the regulated five-step checklist and enables the contract CTA after three checks. Evidence Vault remains in the same Staff scanner area as a third mode with the existing staff JWT photo/gallery upload flow.
+- Checks run: `npm run ios:build` passed all 10 targets; targeted `AliStoreStaffUITests` passed 6/6 after correcting the prototype AI label assertion; `git diff --check` passed.
+- Outcome: Staff Add Product and Buyback visual parity is accepted at local simulator targeted level. Physical scanner/camera/APNs, real add-product moderation API, buyback contract handoff, hardware smoke and full native release gates remain open.
+- Next step: continue remaining Staff inner-screen parity, especially Customer 360/support/warranty tools and shift evidence polish, or move to Android Staff parity while external physical-device gates remain blocked.

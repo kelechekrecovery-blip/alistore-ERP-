@@ -68,6 +68,7 @@ private struct StaffRootView: View {
     let logout: () -> Void
     @State private var selectedTab = StaffTab.home
     @State private var workMode = StaffWorkMode.orders
+    @State private var scannerMode = StaffScannerMode.addProduct
     @State private var routedTaskId: String?
     @State private var pushStatus = "Push не настроен"
     private let environment = AppEnvironment.live()
@@ -85,7 +86,18 @@ private struct StaffRootView: View {
                         selectedTab = .kpi
                         workMode = .tasks
                     },
-                    openScanner: { selectedTab = .buyback },
+                    openAddProduct: {
+                        scannerMode = .addProduct
+                        selectedTab = .buyback
+                    },
+                    openBuyback: {
+                        scannerMode = .buyback
+                        selectedTab = .buyback
+                    },
+                    openEvidence: {
+                        scannerMode = .evidence
+                        selectedTab = .buyback
+                    },
                     openShift: { selectedTab = .shift }
                 )
             }
@@ -102,7 +114,7 @@ private struct StaffRootView: View {
             .tabItem { Label("KPI", systemImage: "chart.bar.fill") }
             .tag(StaffTab.kpi)
             NavigationStack {
-                StaffScannerView(session: session)
+                StaffScannerView(session: session, mode: $scannerMode)
             }
             .tabItem { Label("Скупка", systemImage: "barcode.viewfinder") }
             .tag(StaffTab.buyback)
@@ -191,7 +203,9 @@ private struct StaffHomeView: View {
     let session: StaffSession
     let openOrders: () -> Void
     let openTasks: () -> Void
-    let openScanner: () -> Void
+    let openAddProduct: () -> Void
+    let openBuyback: () -> Void
+    let openEvidence: () -> Void
     let openShift: () -> Void
 
     private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
@@ -291,8 +305,8 @@ private struct StaffHomeView: View {
                 .foregroundStyle(primaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 actionTile("Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders", action: openOrders)
-                actionTile("Добавить товар", subtitle: "сканер", icon: "plus.app.fill", tint: lime, identifier: "staff-home-add-product", action: openScanner)
-                actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Color(red: 0.58, green: 0.72, blue: 1), identifier: "staff-home-buyback", action: openScanner)
+                actionTile("Добавить товар", subtitle: "сканер", icon: "plus.app.fill", tint: lime, identifier: "staff-home-add-product", action: openAddProduct)
+                actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Color(red: 0.58, green: 0.72, blue: 1), identifier: "staff-home-buyback", action: openBuyback)
                 actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Color(red: 1, green: 0.77, blue: 0.35), identifier: "staff-home-kpi", action: openTasks)
             }
         }
@@ -329,7 +343,7 @@ private struct StaffHomeView: View {
                 .foregroundStyle(primaryText)
             HStack(spacing: 10) {
                 toolPill("Customer 360", icon: "person.text.rectangle", action: openOrders)
-                toolPill("Evidence", icon: "photo.stack", action: openScanner)
+                toolPill("Evidence", icon: "photo.stack", action: openEvidence)
             }
         }
     }
