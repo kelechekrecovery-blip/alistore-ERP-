@@ -27,6 +27,18 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Кабинет"].exists)
     }
 
+    func testCatalogUsesPrototypeFiltersAndSortControls() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        app.buttons["Каталог"].tap()
+        XCTAssertTrue(app.buttons["Категория: Все"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Только в наличии"].exists)
+        XCTAssertTrue(app.buttons["Сортировка"].exists)
+        XCTAssertTrue(app.staticTexts["Каталог"].exists)
+    }
+
     func testHeaderRoutesToSearchCompareAndNotifications() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]

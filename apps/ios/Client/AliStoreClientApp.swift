@@ -4064,6 +4064,22 @@ private func formattedDate(_ value: String?) -> String? {
 }
 
 private struct CatalogView: View {
+    private enum CatalogSort: String, CaseIterable {
+        case name
+        case priceAsc = "price_asc"
+        case priceDesc = "price_desc"
+        case stockDesc = "stock_desc"
+
+        var title: String {
+            switch self {
+            case .name: "По названию"
+            case .priceAsc: "Сначала дешевле"
+            case .priceDesc: "Сначала дороже"
+            case .stockDesc: "Больше в наличии"
+            }
+        }
+    }
+
     let environment: AppEnvironment
     let products: [Product]
     let isLoading: Bool
@@ -4071,42 +4087,190 @@ private struct CatalogView: View {
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
     @State private var search = ""
+    @State private var selectedCategory = ""
+    @State private var selectedSort: CatalogSort = .name
+    @State private var stockOnly = false
+    @State private var remoteProducts: [Product]?
+    @State private var remoteLoading = false
+    @State private var remoteError: String?
+
+    private var categoryOptions: [(label: String, value: String)] {
+        let values = Set(products.map(\.category)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return [("Все", "")] + values.map { ($0.capitalized, $0) }
+    }
+
+    private var isFiltered: Bool {
+        !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !selectedCategory.isEmpty ||
+        stockOnly ||
+        selectedSort != .name
+    }
+
+    private var localFallbackProducts: [Product] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        var result = products.filter { product in
+            let matchesQuery = query.isEmpty ||
+                product.name.localizedCaseInsensitiveContains(query) ||
+                product.category.localizedCaseInsensitiveContains(query) ||
+                product.sku.localizedCaseInsensitiveContains(query)
+            let matchesCategory = selectedCategory.isEmpty || product.category == selectedCategory
+            let matchesStock = !stockOnly || product.availableUnits > 0
+            return matchesQuery && matchesCategory && matchesStock
+        }
+        switch selectedSort {
+        case .name:
+            result.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .priceAsc:
+            result.sort { $0.price == $1.price ? $0.name < $1.name : $0.price < $1.price }
+        case .priceDesc:
+            result.sort { $0.price == $1.price ? $0.name < $1.name : $0.price > $1.price }
+        case .stockDesc:
+            result.sort { $0.availableUnits == $1.availableUnits ? $0.name < $1.name : $0.availableUnits > $1.availableUnits }
+        }
+        return result
+    }
 
     private var visibleProducts: [Product] {
-        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return products }
-        return products.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.category.localizedCaseInsensitiveContains(query) }
+        remoteProducts ?? localFallbackProducts
+    }
+
+    private var filterKey: String {
+        [search, selectedCategory, selectedSort.rawValue, stockOnly ? "stock" : "all"].joined(separator: "|")
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 ClientTheme.background.ignoresSafeArea()
-                if isLoading {
-                    ProgressView("Загружаем каталог").tint(ClientTheme.lime)
-                } else if let errorMessage {
-                    ContentUnavailableView("Каталог недоступен", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
-                } else if products.isEmpty {
-                    EmptyStateView(title: "Каталог пока пуст", detail: "Товары появятся после синхронизации.", symbol: "square.grid.2x2")
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                            ForEach(visibleProducts) { product in
-                                NavigationLink {
-                                    ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
-                                } label: {
-                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Каталог")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Text("\(visibleProducts.count)")
+                                .font(ClientTheme.body(12, weight: .semibold))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(categoryOptions, id: \.value) { option in
+                                    Button {
+                                        selectedCategory = option.value
+                                    } label: {
+                                        Text(option.label)
+                                            .font(ClientTheme.body(12, weight: .semibold))
+                                            .foregroundStyle(selectedCategory == option.value ? .black : ClientTheme.muted)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 9)
+                                            .background(selectedCategory == option.value ? ClientTheme.lime : ClientTheme.surface, in: Capsule())
+                                            .overlay(Capsule().stroke(selectedCategory == option.value ? ClientTheme.lime : ClientTheme.line))
+                                    }
+                                    .accessibilityLabel("Категория: \(option.label)")
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
-                        .padding(16)
+
+                        HStack(spacing: 8) {
+                            Menu {
+                                ForEach(CatalogSort.allCases, id: \.rawValue) { sort in
+                                    Button {
+                                        selectedSort = sort
+                                    } label: {
+                                        Label(sort.title, systemImage: sort == selectedSort ? "checkmark" : "")
+                                    }
+                                }
+                            } label: {
+                                Label(selectedSort.title, systemImage: "arrow.up.arrow.down")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(ClientTheme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(ClientTheme.line))
+                            }
+                            .accessibilityLabel("Сортировка")
+
+                            Button {
+                                stockOnly.toggle()
+                            } label: {
+                                Label("В наличии", systemImage: stockOnly ? "checkmark" : "shippingbox")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(stockOnly ? .black : ClientTheme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                                    .background(stockOnly ? ClientTheme.lime : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(stockOnly ? ClientTheme.lime : ClientTheme.line))
+                            }
+                            .accessibilityLabel("Только в наличии")
+                        }
+
+                        if let remoteError {
+                            Label("Офлайн-каталог: \(remoteError)", systemImage: "wifi.exclamationmark")
+                                .font(ClientTheme.body(11))
+                                .foregroundStyle(Color(red: 0.898, green: 0.698, blue: 0.235))
+                        }
+
+                        if isLoading || remoteLoading {
+                            ProgressView("Загружаем каталог")
+                                .tint(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 120)
+                        } else if let errorMessage, products.isEmpty {
+                            ClientDataErrorView(message: errorMessage, retry: {})
+                        } else if visibleProducts.isEmpty {
+                            EmptyStateView(title: "Ничего не найдено", detail: "Попробуйте изменить фильтры.", symbol: "magnifyingglass")
+                        } else {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                                ForEach(visibleProducts) { product in
+                                    NavigationLink {
+                                        ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                    } label: {
+                                        NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
-                    .scrollContentBackground(.hidden)
+                    .padding(16)
                 }
             }
             .navigationTitle("Каталог")
             .searchable(text: $search, prompt: "Техника и бренды")
+        }
+        .task(id: filterKey) { await loadFilteredCatalog() }
+    }
+
+    private func loadFilteredCatalog() async {
+        guard isFiltered else {
+            remoteProducts = nil
+            remoteError = nil
+            return
+        }
+
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        guard !Task.isCancelled else { return }
+        remoteLoading = true
+        defer { remoteLoading = false }
+
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        var queryItems = ["limit=100", "sort=\(selectedSort.rawValue)"]
+        if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            queryItems.append("q=\(encoded)")
+        }
+        if !selectedCategory.isEmpty, let encoded = selectedCategory.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            queryItems.append("category=\(encoded)")
+        }
+        if stockOnly { queryItems.append("stockOnly=true") }
+
+        do {
+            let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?\(queryItems.joined(separator: "&"))")
+            remoteProducts = response.items
+            remoteError = nil
+        } catch is CancellationError {
+        } catch {
+            remoteProducts = nil
+            remoteError = error.localizedDescription
         }
     }
 }

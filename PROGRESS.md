@@ -2623,3 +2623,13 @@
 - Checks run: `npm run ios:build` all 10 targets; `npm run ios:test` `34/34`; `npm run ios:ui` Client `12/12`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: product detail API parity is accepted at local simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: continue the remaining Client App 2.0 visual pass and add screenshot evidence for product detail states before moving to the signed archive/store gate.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-013`.
+- Task: connect native Client catalog search, category filters, stock filter and sorting to the server catalog contract.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift` and `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: the catalog now renders prototype-aligned filter chips, stock-only and sort controls, sends `q`, `category`, `stockOnly` and `sort` to `GET /catalog/products`, and falls back to the cached catalog with an explicit offline indicator when the filtered request fails. Product prices and availability remain server-derived.
+- Checks run: `npm run ios:build` all 10 targets; `npm run ios:ui` Client `13/13`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: catalog filter/search vertical is accepted at local simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: continue native Client compare/cart visual evidence and then run the signed archive/store preflight when Apple credentials and profiles are available.
