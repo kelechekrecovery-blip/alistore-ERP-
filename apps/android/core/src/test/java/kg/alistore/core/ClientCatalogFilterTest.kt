@@ -54,4 +54,14 @@ class ClientCatalogFilterTest {
       resolveMediaUrl("https://api.alistore.kg/api", "https://cdn.alistore.kg/products/phone.webp"),
     )
   }
+
+  @Test
+  fun paymentReturnRouteRejectsUntrustedSchemesAndParsesFailure() {
+    assertEquals(null, parsePaymentReturnRoute("https://example.com/payment-return?orderId=order-1"))
+    val route = parsePaymentReturnRoute("alistore://payment-return?orderId=order-1&status=failed&method=card")
+    assertEquals("order-1", route?.orderId)
+    assertEquals("failed", route?.status)
+    assertEquals(OnlinePaymentMethod.CARD, route?.method)
+    assertTrue(route?.isFailed() == true)
+  }
 }

@@ -39,7 +39,7 @@ class CheckoutManagerTest {
 
     assertEquals("intent-1", result.paymentIntent?.intentId)
     assertEquals("payment-key-2", gateway.paymentKey)
-    assertEquals("alistore://payment-return?orderId=order-1", gateway.paymentRequest?.returnUrl)
+    assertEquals("alistore://payment-return?orderId=order-1&method=qr_mbank", gateway.paymentRequest?.returnUrl)
   }
 
   @Test

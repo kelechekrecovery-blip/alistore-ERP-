@@ -53,13 +53,14 @@ internal fun ClientAccount(
   route: String? = null,
   onRoute: (String?) -> Unit = {},
   orderRefreshRevision: Int = 0,
+  paymentReturn: PaymentReturnRoute? = null,
 ) {
   when (state) {
     AuthState.Restoring -> Column(modifier.fillMaxSize().background(AuthInk), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
       CircularProgressIndicator(color = AuthLime)
       Text("Восстанавливаем сессию", color = AuthMuted, modifier = Modifier.padding(top = 12.dp))
     }
-    is AuthState.SignedIn -> SignedInAccount(state, manager, onState, favoriteCount, cartCount, modifier, apiBaseUrl, route, onRoute, orderRefreshRevision)
+    is AuthState.SignedIn -> SignedInAccount(state, manager, onState, favoriteCount, cartCount, modifier, apiBaseUrl, route, onRoute, orderRefreshRevision, paymentReturn)
     else -> OtpLogin(state, manager, onState, modifier)
   }
 }
@@ -147,9 +148,10 @@ private fun SignedInAccount(
   route: String?,
   onRoute: (String?) -> Unit,
   orderRefreshRevision: Int,
+  paymentReturn: PaymentReturnRoute?,
 ) {
   if (route == "orders") {
-    ClientOrdersScreen(apiBaseUrl, state, orderRefreshRevision, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
+    ClientOrdersScreen(apiBaseUrl, state, orderRefreshRevision, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState, paymentReturn = paymentReturn)
     return
   }
   if (route == "devices") {

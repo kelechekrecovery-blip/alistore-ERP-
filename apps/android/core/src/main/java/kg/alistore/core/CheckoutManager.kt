@@ -44,8 +44,14 @@ class CheckoutManager(private val api: PurchaseGateway, private val queue: Mutat
       return CheckoutResult.Queued(queue.enqueue("orders/mine", "POST", request.toJson().toString(), idempotencyKey))
     }
     val intent = paymentMethod?.let {
+      val separator = if (returnUrl.contains("?")) "&" else "?"
       api.createPaymentIntent(
-        CreatePaymentIntentRequest(order.id, it, order.total, "$returnUrl?orderId=${order.id}"),
+        CreatePaymentIntentRequest(
+          order.id,
+          it,
+          order.total,
+          "$returnUrl${separator}orderId=${order.id}&method=${it.wireValue}",
+        ),
         token,
         paymentIdempotencyKey!!,
       )

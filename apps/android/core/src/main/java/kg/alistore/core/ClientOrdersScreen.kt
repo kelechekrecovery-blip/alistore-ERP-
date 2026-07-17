@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalUriHandler
+import java.util.UUID
+import kotlinx.coroutines.launch
 
 interface CustomerOrdersGateway {
   suspend fun orders(token: String): List<CustomerOrder>
@@ -48,12 +52,18 @@ internal fun ClientOrdersScreen(
   providedGateway: CustomerOrdersGateway? = null,
   authManager: AuthSessionManager? = null,
   onAuthState: (AuthState) -> Unit = {},
+  paymentReturn: PaymentReturnRoute? = null,
 ) {
   val gateway = remember(apiBaseUrl, providedGateway) { providedGateway ?: ApiClient(apiBaseUrl) }
+  val paymentApi = paymentGateway(gateway)
+  val scope = rememberCoroutineScope()
+  val uriHandler = LocalUriHandler.current
   var orders by remember { mutableStateOf<List<CustomerOrder>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var manualRefresh by remember { mutableStateOf(0) }
+  var paymentBusy by remember { mutableStateOf(false) }
+  var paymentError by remember { mutableStateOf<String?>(null) }
 
   LaunchedEffect(session.tokens.accessToken, refreshRevision, manualRefresh) {
     loading = true
@@ -80,6 +90,64 @@ internal fun ClientOrdersScreen(
       }
       Text("Мои заказы", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 14.dp).testTag("orders-title"))
       Text("Статусы загружаются с сервера", color = OrdersMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+    }
+    if (paymentReturn != null) {
+      val route = paymentReturn
+      val order = orders.firstOrNull { it.id == route.orderId }
+      item {
+        PaymentReturnCard(
+          route = route,
+          order = order,
+          retryAvailable = paymentApi != null && order != null && route.method != null,
+          busy = paymentBusy,
+          error = paymentError,
+          onRetry = {
+            val retryOrder = order ?: return@PaymentReturnCard
+            val retryMethod = route.method ?: return@PaymentReturnCard
+            val api = paymentApi ?: return@PaymentReturnCard
+            scope.launch {
+              paymentBusy = true
+              paymentError = null
+              val retryKey = UUID.randomUUID().toString()
+              var attempt = runCatching {
+                api.createPaymentIntent(
+                  CreatePaymentIntentRequest(
+                    orderId = retryOrder.id,
+                    method = retryMethod,
+                    amount = retryOrder.total,
+                    returnUrl = "alistore://payment-return?orderId=${retryOrder.id}&method=${retryMethod.wireValue}",
+                  ),
+                  session.tokens.accessToken,
+                  retryKey,
+                )
+              }
+              if (attempt.exceptionOrNull() is ApiException &&
+                (attempt.exceptionOrNull() as ApiException).status == 401 && authManager != null) {
+                val refreshed = authManager.refresh(session)
+                onAuthState(refreshed)
+                if (refreshed is AuthState.SignedIn) {
+                  attempt = runCatching {
+                    api.createPaymentIntent(
+                      CreatePaymentIntentRequest(
+                        orderId = retryOrder.id,
+                        method = retryMethod,
+                        amount = retryOrder.total,
+                        returnUrl = "alistore://payment-return?orderId=${retryOrder.id}&method=${retryMethod.wireValue}",
+                      ),
+                      refreshed.tokens.accessToken,
+                      retryKey,
+                    )
+                  }
+                }
+              }
+              attempt
+                .onSuccess { intent -> uriHandler.openUri(resolvePaymentUrl(apiBaseUrl, intent.paymentUrl)) }
+                .onFailure { paymentError = it.message ?: "Не удалось повторить оплату" }
+              paymentBusy = false
+            }
+          },
+        )
+      }
     }
     when {
       loading -> item {
@@ -108,6 +176,44 @@ internal fun ClientOrdersScreen(
           order.createdAt?.take(10)?.let { Text(it, color = OrdersMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) }
         }
       }
+    }
+  }
+}
+
+private fun paymentGateway(gateway: CustomerOrdersGateway): PaymentGateway? = gateway as? PaymentGateway
+
+@Composable
+private fun PaymentReturnCard(
+  route: PaymentReturnRoute,
+  order: CustomerOrder?,
+  retryAvailable: Boolean,
+  busy: Boolean,
+  error: String?,
+  onRetry: () -> Unit,
+) {
+  val confirmed = order?.status in setOf("paid", "completed")
+  val failed = route.isFailed()
+  val title = when {
+    failed -> "Оплата не прошла"
+    confirmed -> "Оплата подтверждена"
+    else -> "Вернулись из оплаты"
+  }
+  val detail = when {
+    failed -> "Провайдер не подтвердил платёж. Заказ и деньги изменятся только после серверной проверки."
+    confirmed -> "Сервер подтвердил оплату. Актуальный статус заказа показан ниже."
+    else -> "Проверяем результат оплаты на сервере. Не повторяйте оплату, пока статус не обновился."
+  }
+  Column(Modifier.fillMaxWidth().background(OrdersSurface, RoundedCornerShape(8.dp)).padding(16.dp)) {
+    Text(title, color = if (failed) OrdersCoral else OrdersLime, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("payment-return-title"))
+    Text(detail, color = OrdersMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+    route.orderId?.let { Text("Заказ #${it.takeLast(8)}", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
+    if (!error.isNullOrBlank()) Text(error, color = OrdersCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp).testTag("payment-return-error"))
+    if (failed && retryAvailable) {
+      Button(onClick = onRetry, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("payment-return-retry")) {
+        Text(if (busy) "Открываем оплату…" else "Повторить оплату")
+      }
+    } else if (failed) {
+      Text("Если заказ не изменился, обратитесь в поддержку.", color = OrdersMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
     }
   }
 }

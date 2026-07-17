@@ -101,6 +101,7 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
   var authState by remember { mutableStateOf<AuthState>(AuthState.Restoring) }
   var accountRoute by remember { mutableStateOf<String?>(null) }
   var productRoute by remember { mutableStateOf<String?>(null) }
+  var paymentReturn by remember { mutableStateOf<PaymentReturnRoute?>(null) }
   var orderRefreshRevision by remember { mutableStateOf(0) }
   val authManager = remember(apiBaseUrl) {
     AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"))
@@ -129,7 +130,8 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
   }
   LaunchedEffect(authManager) { authState = authManager.restore() }
   LaunchedEffect(deepLinkUrl, deepLinkRevision) {
-    if (deepLinkUrl?.startsWith("alistore://payment-return") == true) {
+    parsePaymentReturnRoute(deepLinkUrl)?.let { route ->
+      paymentReturn = route
       selected = 4
       accountRoute = "orders"
       orderRefreshRevision += 1
@@ -194,6 +196,7 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
           route = accountRoute,
           onRoute = { accountRoute = it },
           orderRefreshRevision = orderRefreshRevision,
+          paymentReturn = paymentReturn,
         )
       }
     }

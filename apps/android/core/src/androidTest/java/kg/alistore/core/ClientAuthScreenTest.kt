@@ -102,6 +102,35 @@ class ClientAuthScreenTest {
   }
 
   @Test
+  fun failedPaymentReturnShowsServerSafeRecoveryState() {
+    val tokens = AuthTokens("access", "refresh")
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    val order = CustomerOrder(
+      "order-failed-1", "awaiting_payment", 125000, "pickup", "BISHKEK-1", null,
+      listOf(CustomerOrderItem("PHONE-1", 1, 125000)), "2026-07-13T01:30:00.000Z",
+    )
+    compose.setContent {
+      MaterialTheme {
+        ClientOrdersScreen(
+          "https://api.alistore.kg/api",
+          state,
+          1,
+          {},
+          providedGateway = UiOrdersGateway(listOf(order)),
+          paymentReturn = PaymentReturnRoute("order-failed-1", "failed", OnlinePaymentMethod.CARD),
+        )
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("order-order-failed-1").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("payment-return-title").assertIsDisplayed().assertTextContains("Оплата не прошла")
+    compose.onNodeWithText("Провайдер не подтвердил платёж", substring = true).assertIsDisplayed()
+    compose.onNodeWithText("Если заказ не изменился, обратитесь в поддержку.", substring = true).assertIsDisplayed()
+  }
+
+  @Test
   fun ownedDeviceOpensWarrantyWithSameKeyAfterTokenRefresh() {
     val tokens = AuthTokens("access", "refresh")
     val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)

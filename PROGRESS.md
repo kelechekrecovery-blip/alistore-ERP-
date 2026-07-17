@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-CLIENT-PAYMENT-RETURN-001
+
+- Iteration ID: `ANDROID-CLIENT-PAYMENT-RETURN-001`.
+- Task: close the Android Client payment-return state and retry gap without giving the deep link authority over money or order status.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/ClientPaymentReturn.kt`, `AliStoreApp.kt`, `ClientAuthScreen.kt`, `ClientOrdersScreen.kt`, `CheckoutManager.kt`, Android Client unit/Compose tests and `CheckoutManagerTest.kt`.
+- Result: only the trusted `alistore://payment-return` route is accepted; query values are decoded consistently on JVM/device, the Client refreshes orders from the API, and the account view distinguishes failed, confirmed and still-pending outcomes. Retry requires the matched server order plus an explicit payment method, sends a provider-neutral intent through the API, reuses one idempotency key after a 401 refresh, and opens only the API-returned payment URL. Checkout return URLs now preserve both order and method for provider callbacks. No client status, amount or payment confirmation authority was introduced.
+- Checks run: `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 29 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `npm run android:build` passed all four debug APKs; `git diff --check`.
+- Acceptance: accepted for the local Android Client payment-return software vertical. Live provider callback/status behavior, physical-device payment/network smoke, release signing, production credentials and complete 17-screen parity remain open; production readiness remains `RED`.
+- Next step: continue Android Client account/warranty/returns parity or take the next unblocked ERP/native vertical while preserving the explicit provider, device and design-reference blockers.
+
 # 2026-07-17 — ANDROID-CLIENT-MEDIA-001
 
 - Iteration ID: `ANDROID-CLIENT-MEDIA-001`.
