@@ -134,7 +134,7 @@ public final class CustomerAuthStore {
             phone: "+996 700 00 12 34"
         )
         isRestoring = false
-        requiresQuickUnlock = false
+        requiresQuickUnlock = UITestBootstrap.requiresQuickUnlock
         errorMessage = nil
     }
     #endif

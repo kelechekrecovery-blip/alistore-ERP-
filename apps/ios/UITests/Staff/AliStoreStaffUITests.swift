@@ -37,6 +37,20 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Скупка"].exists)
     }
 
+    func testSignedInStaffCanUseQuickUnlockShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-quick-unlock"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["AliStore Staff"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].exists)
+        XCTAssertTrue(app.staticTexts["PIN-код"].exists)
+        XCTAssertTrue(app.secureTextFields["6 цифр"].exists)
+        XCTAssertTrue(app.buttons["quick-unlock-pin-submit"].exists)
+        XCTAssertTrue(app.buttons["Настроить PIN"].exists || app.buttons["Изменить PIN"].exists)
+        XCTAssertTrue(app.buttons["Выйти из аккаунта"].exists)
+    }
+
     func testSignedInStaffTasksMatchesPrototypeShell() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-in"]

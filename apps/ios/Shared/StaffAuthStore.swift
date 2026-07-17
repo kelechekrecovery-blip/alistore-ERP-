@@ -21,7 +21,7 @@ public final class StaffAuthStore {
         #if DEBUG
         if UITestBootstrap.startsSignedIn {
             session = StaffSession(accessToken: "ui-test-staff-token", staffId: "staff-ui-test", username: "azizbek", role: "sales")
-            requiresQuickUnlock = false
+            requiresQuickUnlock = UITestBootstrap.requiresQuickUnlock
             isRestoring = false
             return
         }

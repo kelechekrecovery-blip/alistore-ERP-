@@ -2925,6 +2925,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-QUICK-UNLOCK-002`.
+- Task: polish the shared native iOS Face ID/PIN quick-access shell for Client, Staff, Courier and POS.
+- Files changed: `apps/ios/Shared/QuickUnlock.swift`, `apps/ios/Shared/UITestBootstrap.swift`, `apps/ios/Shared/StaffAuthStore.swift`, `apps/ios/Shared/CustomerAuthStore.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the shared quick-unlock screen now uses a branded dark AliStore shell with Face ID primary CTA, custom PIN entry, six-dot progress, Keychain safety copy, lockout/error panels, logout action and a dark PIN setup sheet. A DEBUG-only `--ui-testing-quick-unlock` flag forces restored signed-in sessions into the shell, so the Staff app can prove the UX without real credentials or secrets.
+- Checks run: `npm run ios:build` passed all 10 iOS targets; targeted Staff UI smoke `xcodebuild test -project apps/ios/AliStoreNative.xcodeproj -scheme AliStoreUITests -destination 'platform=iOS Simulator,name=iPhone 17 Pro' '-only-testing:AliStoreStaffUITests/AliStoreStaffUITests/testSignedInStaffCanUseQuickUnlockShell' CODE_SIGNING_ALLOWED=NO` passed with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`; `git diff --check` passed.
+- Outcome: iOS quick-unlock UX is accepted at local simulator software level across the shared component. Physical Face ID/Touch ID/PIN, lockout, APNs/camera/scanner/hardware and release-signing smoke remain external gates before App Store/TestFlight claims.
+- Next step: continue Staff/Courier/POS native operational polish and Android parity while physical-device certification and production credentials are pending.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-016`.
 - Task: tighten native iOS Client Search visual parity against `AliStore Клиент App 2.0`.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
