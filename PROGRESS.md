@@ -3282,3 +3282,12 @@
 - Checks run: targeted Courier signed-in XCUITest passed `1/1`; full `AliStoreCourierUITests` passed `2/2`; `npm run ios:build` passed all 10 iOS targets; `git diff --check` passed.
 - Outcome: iOS Courier now has simulator coverage for its main route/COD surface, not just cold login. Physical APNs, maps, camera/network behavior, real-device COD handover, production signing and first-store delivery UAT remain external release gates.
 - Next step: continue POS native operational UI coverage or Android/ERP parity while keeping physical hardware/provider gates explicit.
+## 2026-07-17
+
+- Iteration ID: `ECO-001A-DESIGN-CORPUS-REGISTER`.
+- Task: establish a current, fail-closed register for the 64 missing design references blocking strict ecosystem acceptance.
+- Files changed: `docs/ECOSYSTEM-TRACEABILITY-MATRIX.md`, `docs/acceptance/DESIGN-CORPUS-BLOCKER.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the traceability matrix now reflects the 2026-07-17 audit and points to an explicit owner-action register. The register records the exact audit command, allowed dispositions (`restore`, `retire`, `replace`), and the rule that no reference or owner approval may be fabricated. It also corrects the stale wording that packaged native/ecosystem commands were missing.
+- Checks run: `npm run ecosystem:audit:strict` (expected fail: 64 unresolved design references), `git diff --check`.
+- Outcome: documentation and backlog are synchronized with the actual strict blocker. This iteration does not claim strict acceptance; the owner must supply originals or approved dispositions before the gate can turn green.
+- Next step: continue the next locally unblocked implementation lane, ERP/CMS integration, while preserving the design-corpus blocker and its fail-closed gate.

@@ -1,6 +1,6 @@
 # AliStore ecosystem traceability matrix
 
-Evidence snapshot: 2026-07-14. This is the execution index for the 23 committed
+Evidence snapshot: 2026-07-17. This is the execution index for the 23 committed
 handoffs. A row is `Accepted` only when routes/apps, authoritative API and models,
 RBAC/ownership, Event Ledger, role E2E and approved visual evidence are all present.
 
@@ -8,11 +8,13 @@ The committed design corpus is incomplete: the 23 tracked handoffs link to 74 di
 `.dc.html` files, but 64 linked files are absent from `design_handoff_alistore/screens`.
 Missing design files are missing acceptance evidence, even when related software exists.
 The graph contains 104 link occurrences, 70 of them broken, and implies 87 distinct designs
-when committed handoffs and referenced targets are combined. No missing original was found
-elsewhere on this machine or in Git history during the independent audit.
+when committed handoffs and referenced targets are combined. The independent audit found no
+missing original elsewhere on this machine or in Git history. The complete blocker register
+and owner action are documented in `docs/acceptance/DESIGN-CORPUS-BLOCKER.md`.
 Run the committed-HEAD bootstrap documented in `docs/TRUSTED-ECOSYSTEM-GATE.md` to recalculate these facts and
-append `--strict` as the fail-closed completion gate. The strict gate is
-expected to remain red until missing handoffs and packaged native/ecosystem E2E commands exist.
+append `--strict` as the fail-closed completion gate. Native packaged-app and reconciled
+ecosystem commands now exist and are separately evidenced; strict acceptance remains red
+until each missing reference is restored or explicitly retired by the owner.
 
 | Handoff | Routes / apps | API, model and control evidence | Automated evidence | Status and remaining acceptance |
 |---|---|---|---|---|
