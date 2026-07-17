@@ -1,9 +1,10 @@
-import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
 import { CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -71,6 +72,29 @@ export class StaffAuthController {
   disableTotp(@CurrentUser() user: AuthPrincipal, @Body() dto: StaffTotpTokenDto) {
     this.assertStaff(user);
     return this.staffAuth.disableTotp(user.customerId, dto.token);
+  }
+
+  /**
+   * STAFF-002: reset a staff member's 2FA without the current code (lost authenticator).
+   * Owner-only via `staff:manage`; writes `staff.totp_reset` to the ledger.
+   */
+  @Post('staff/:id/totp-reset')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  resetTotp(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.staffAuth.resetTotpByAdmin(user.customerId, id);
+  }
+
+  /**
+   * STAFF-001: deactivate a staff account. Open cash shifts and active courier
+   * deliveries block with 409; otherwise the account is cut off immediately and
+   * `staff.deactivated` lands in the ledger. Re-deactivation is idempotent.
+   */
+  @Post('staff/:id/deactivate')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  deactivate(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.staffAuth.deactivateStaff(user.customerId, id);
   }
 
   /** Never expose the password hash. */

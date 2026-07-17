@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `SEC-010-STAFF-ADMIN-018`.
+- Task: close staff access and account-administration gaps across approvals, Customer 360, TOTP recovery and deactivation.
+- Files changed: approval/customer authorization wiring, `authz.model.ts`, staff auth admin routes/service/module, audit event types, `access-staff-batch.e2e-spec.ts`, and this progress entry.
+- Result: Approval Inbox and Customer 360 now require explicit role permissions; owner/admin TOTP reset clears a lost authenticator with an immutable Ledger event; staff deactivation blocks open shifts and active deliveries, revokes active access through the active-staff guard, and is idempotent.
+- Checks run: isolated `test/access-staff-batch.e2e-spec.ts` passed `4/4`; `tsc -p apps/api/tsconfig.build.json --noEmit` passed; the normal build hit a concurrent `dist` cleanup race (`ENOTEMPTY`) before compilation and is not treated as a code failure; `git diff --check`.
+- Outcome: SEC-010, STAFF-001 and STAFF-002 are accepted in tested API code. Production still requires the complete security audit and staging deployment.
+- Next step: commit this API security batch, then validate the courier-run deadlock scenario and refresh the strict audit when the tree is clean.
+
+## 2026-07-18
+
 - Iteration ID: `SEC-011-POS-REPLAY-017`.
 - Task: close push-token rebinding and sandbox payment confirmation bypasses, while preserving exact POS replay validation after a price change.
 - Files changed: notification ownership guard/service, sandbox confirmation guard/controller, POS replay service, `push-sandbox-guard.e2e-spec.ts`, and this progress entry.

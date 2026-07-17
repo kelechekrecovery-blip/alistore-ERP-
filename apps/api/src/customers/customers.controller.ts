@@ -31,6 +31,7 @@ import type { Customer } from '@prisma/client';
 import type { CustomerOverview } from './customer-overview';
 import { issueGuestCheckoutCapability } from '../auth/guest-capability';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { AuthzService } from '../authz/authz.service';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -38,6 +39,7 @@ export class CustomersController {
   constructor(
     private readonly customers: CustomersService,
     private readonly staffAuth: StaffAuthService,
+    private readonly authz: AuthzService,
   ) {}
 
   @Get('me/loyalty')
@@ -182,7 +184,11 @@ export class CustomersController {
     return this.customers.setConsent(id, dto.consent, user.customerId);
   }
 
-  /** A customer may read only their own profile; any authenticated staff may read any. */
+  /**
+   * A customer may read only their own profile. Staff additionally need the
+   * `customers:read` grant (SEC-010) — roles without a CRM need (courier,
+   * warehouse, cashier) must not open Customer 360.
+   */
   private async assertCanReadCustomer(user: AuthPrincipal, id: string): Promise<void> {
     if (user.typ === 'customer' && user.customerId !== id) {
       throw new ForbiddenException('Нельзя смотреть профиль другого клиента');
@@ -191,6 +197,9 @@ export class CustomersController {
       const staff = await this.staffAuth.me(user.customerId);
       if (staff.role !== user.role) {
         throw new ForbiddenException('Роль сотрудника изменена. Войдите снова');
+      }
+      if (!(await this.authz.can(staff.role, 'customers', 'read'))) {
+        throw new ForbiddenException('Недостаточно прав для просмотра клиента');
       }
     }
   }

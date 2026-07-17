@@ -6,6 +6,7 @@ import { StaffAuthController } from './staff-auth.controller';
 import { resolveJwtSecret } from '../auth/jwt-secret';
 import { AuthzModule } from '../authz/authz.module';
 import { AuthModule } from '../auth/auth.module';
+import { AuditModule } from '../audit/audit.module';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 
 /**
@@ -16,6 +17,7 @@ import { ActiveStaffGuard } from '../auth/active-staff.guard';
   imports: [
     AuthzModule,
     AuthModule,
+    AuditModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

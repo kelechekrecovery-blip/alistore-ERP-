@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, Role, StaffUser } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { TotpService } from '../auth/totp.service';
+import { AuditService } from '../audit/audit.service';
+import { EventType } from '../audit/event-types';
 
 export interface StaffTokens {
   accessToken: string;
@@ -27,6 +29,8 @@ export class StaffAuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly totp: TotpService,
+    // Optional: legacy unit wiring constructs the service without the ledger.
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   /** Provision a staff account (owner tooling / seed). Password stored via argon2. */
@@ -134,6 +138,97 @@ export class StaffAuthService {
     return this.publicView(updated);
   }
 
+  /**
+   * STAFF-002: admin reset of a staff member's 2FA (lost authenticator) — no current
+   * code required because the caller holds `staff:manage`. The TOTP secret is cleared
+   * and the ledger event is written in the same transaction.
+   * NOTE: this branch has no staff refresh tokens yet, so there are no sessions to
+   * revoke — access JWTs die on expiry or on deactivation (STAFF-001).
+   */
+  async resetTotpByAdmin(actorId: string, targetStaffId: string) {
+    const target = await this.getActiveStaff(targetStaffId);
+    const updated = await this.auditLedger().transaction(async (tx) => {
+      const staff = await tx.staffUser.update({
+        where: { id: target.id },
+        data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
+      });
+      return {
+        result: staff,
+        events: [
+          {
+            type: EventType.StaffTotpReset,
+            actor: actorId,
+            payload: { targetStaffId: target.id, username: target.username },
+            refs: [target.id],
+          },
+        ],
+      };
+    });
+    return this.publicView(updated);
+  }
+
+  /**
+   * STAFF-001: deactivate a staff account (dismissal). Blockers refuse with 409:
+   * an open cash shift (hand over or close it first) and orders still with the
+   * courier (courier_assigned / out_for_delivery). A clean deactivate flips
+   * `active` and writes the ledger event in one transaction — the active-staff
+   * guard and the login check cut access immediately. Re-deactivation is
+   * idempotent: same result, no duplicate ledger event.
+   */
+  async deactivateStaff(actorId: string, targetStaffId: string) {
+    const updated = await this.auditLedger().transaction(async (tx) => {
+      const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
+      if (!target) {
+        throw new ValidationError('staff_not_found', 'Сотрудник не найден');
+      }
+      if (!target.active) {
+        return { result: target, events: [] };
+      }
+      const [openShift, activeDeliveries] = await Promise.all([
+        tx.cashShift.findFirst({
+          where: { staffId: target.id, closedAt: null },
+          select: { id: true },
+        }),
+        tx.order.findMany({
+          where: {
+            courierId: target.id,
+            status: { in: ['courier_assigned', 'out_for_delivery'] },
+          },
+          select: { id: true, status: true },
+        }),
+      ]);
+      const blockers: string[] = [];
+      if (openShift) {
+        blockers.push(`открытая кассовая смена ${openShift.id} — закройте или передайте смену (handover)`);
+      }
+      for (const order of activeDeliveries) {
+        blockers.push(`активная доставка заказа ${order.id} (${order.status}) — переназначьте курьера`);
+      }
+      if (blockers.length > 0) {
+        throw new ConflictError(
+          'staff_deactivation_blocked',
+          `Деактивация заблокирована: ${blockers.join('; ')}`,
+        );
+      }
+      const staff = await tx.staffUser.update({
+        where: { id: target.id },
+        data: { active: false },
+      });
+      return {
+        result: staff,
+        events: [
+          {
+            type: EventType.StaffDeactivated,
+            actor: actorId,
+            payload: { targetStaffId: target.id, username: target.username },
+            refs: [target.id],
+          },
+        ],
+      };
+    });
+    return this.publicView(updated);
+  }
+
   /** Step-up gate for approving dangerous actions. Rejecting remains fast. */
   async verifyStepUp(staffId: string, token?: string) {
     const staff = await this.getActiveStaff(staffId);
@@ -196,6 +291,14 @@ export class StaffAuthService {
       throw new ForbiddenError('staff_not_found', 'Сотрудник не найден или отключён');
     }
     return staff;
+  }
+
+  /** The ledger is required for admin operations; the ctor param is @Optional for legacy wiring. */
+  private auditLedger(): AuditService {
+    if (!this.audit) {
+      throw new Error('AuditService is not wired into StaffAuthService');
+    }
+    return this.audit;
   }
 
   /** Never expose the password hash or TOTP secret. */

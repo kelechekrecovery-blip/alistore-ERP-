@@ -21,12 +21,14 @@ import { ApprovalsService } from './approvals.service';
 import { DecideApprovalDto } from './approvals.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { Role } from '../rbac/permissions';
 
 @ApiTags('approvals')
-@UseGuards(JwtAuthGuard, ActiveStaffGuard)
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
 @Controller('approvals')
 export class ApprovalsController {
   constructor(private readonly approvals: ApprovalsService) {}
@@ -34,6 +36,8 @@ export class ApprovalsController {
   @ApiOperation({ summary: 'List approvals (default: pending) — Approval Inbox' })
   @ApiBearerAuth()
   @ApiOkResponse({ description: 'Approvals, newest first.' })
+  // SEC-010: the inbox is restricted to roles that may decide approvals.
+  @RequirePermission('approvals', 'read')
   @Get()
   list(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
     this.assertStaff(user);
@@ -43,6 +47,7 @@ export class ApprovalsController {
   @ApiOperation({ summary: 'Get an approval' })
   @ApiBearerAuth()
   @ApiNotFoundResponse({ description: 'Approval does not exist.' })
+  @RequirePermission('approvals', 'read')
   @Get(':id')
   async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     this.assertStaff(user);

@@ -3,9 +3,10 @@ import { ApprovalsService } from './approvals.service';
 import { ApprovalsController } from './approvals.controller';
 import { ExchangesModule } from '../exchanges/exchanges.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { AuthzModule } from '../authz/authz.module';
 
 @Module({
-  imports: [StaffAuthModule, ExchangesModule],
+  imports: [StaffAuthModule, ExchangesModule, AuthzModule],
   providers: [ApprovalsService],
   controllers: [ApprovalsController],
   exports: [ApprovalsService],

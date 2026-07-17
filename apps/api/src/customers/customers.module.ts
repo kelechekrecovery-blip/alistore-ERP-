@@ -3,9 +3,10 @@ import { CustomersService } from './customers.service';
 import { CustomersController } from './customers.controller';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { AuthzModule } from '../authz/authz.module';
 
 @Module({
-  imports: [RateLimitModule, StaffAuthModule],
+  imports: [RateLimitModule, StaffAuthModule, AuthzModule],
   providers: [CustomersService],
   controllers: [CustomersController],
   exports: [CustomersService],

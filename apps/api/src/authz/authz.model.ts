@@ -27,6 +27,14 @@ p, owner, stock_adjust, approve
 p, owner, delete, approve
 p, admin, pii, approve
 p, owner, staff, manage
+p, senior_seller, approvals, read
+p, admin, approvals, read
+p, owner, approvals, read
+p, seller, customers, read
+p, senior_seller, customers, read
+p, service, customers, read
+p, admin, customers, read
+p, owner, customers, read
 p, admin, staff_tasks, manage
 p, owner, staff_tasks, manage
 p, admin, hr, read

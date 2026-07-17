@@ -194,6 +194,9 @@ export const EventType = {
   ProtectionUpdated: 'protection.updated',
   StaffTaskCreated: 'staff_task.created',
   StaffTaskUpdated: 'staff_task.updated',
+  // Staff account administration (STAFF-001/002) — security forensics trail.
+  StaffTotpReset: 'staff.totp_reset',
+  StaffDeactivated: 'staff.deactivated',
   HrScheduleCreated: 'hr.schedule_created',
   HrScheduleUpdated: 'hr.schedule_updated',
   HrScheduleCancelled: 'hr.schedule_cancelled',
