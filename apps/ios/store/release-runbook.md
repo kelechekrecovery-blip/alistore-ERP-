@@ -12,6 +12,7 @@ Set these in the shell or CI protected environment. Never commit them:
 export ALISTORE_API_BASE_URL="https://api.alistore.kg/api"
 export DEVELOPMENT_TEAM="XXXXXXXXXX"
 export ASC_API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_KEYID.p8"
+export ASC_KEY_ID="KEYID_FROM_AUTHKEY_FILENAME"
 export ASC_ISSUER_ID="issuer-uuid-from-app-store-connect"
 ```
 
@@ -33,7 +34,7 @@ Run from the repository root:
 ```bash
 chmod 700 apps/ios/scripts/store-preflight.sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  apps/ios/scripts/store-preflight.sh --env-file apps/ios/.env.production
+  npm run ios:store-preflight -- --env-file apps/ios/.env.production --strict-asc
 
 npm run ios:visual
 
@@ -54,7 +55,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 `store-preflight.sh` validates the production HTTPS API URL, Apple team and
 App Store Connect key presence, Release bundle id, AppIcon, production APNs
 resolution, Face ID usage copy, privacy manifest and `apps/ios/store/client-metadata.json`.
-It never prints secret values.
+With `--strict-asc`, it also signs a short-lived App Store Connect JWT and calls
+Apple's API to prove the issuer/key pair works. It never prints secret values.
 
 `ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
 Simulator and exports 16 retained PNG attachments: home, catalog, product detail,

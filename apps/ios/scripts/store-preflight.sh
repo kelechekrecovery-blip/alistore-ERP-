@@ -10,6 +10,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ios_root="$repo_root/apps/ios"
 env_file=""
 metadata_file="$ios_root/store/client-metadata.json"
+strict_asc="0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,12 +19,17 @@ while [[ $# -gt 0 ]]; do
       env_file="$2"
       shift 2
       ;;
+    --strict-asc)
+      strict_asc="1"
+      shift
+      ;;
     --help|-h)
       cat <<'USAGE'
-Usage: apps/ios/scripts/store-preflight.sh [--env-file path]
+Usage: apps/ios/scripts/store-preflight.sh [--env-file path] [--strict-asc]
 
 Validates the native iOS Client release configuration without printing secrets.
 If --env-file is omitted and apps/ios/.env.production exists, that file is loaded.
+Use --strict-asc to verify the App Store Connect API key against Apple's API.
 USAGE
       exit 0
       ;;
@@ -75,6 +81,7 @@ aps_environment="$("$plist_buddy" -c 'Print :aps-environment' "$client_entitleme
 api_base="${ALISTORE_API_BASE_URL:-${API_BASE_URL:-}}"
 team_id="${DEVELOPMENT_TEAM:-${APPLE_DEVELOPMENT_TEAM:-}}"
 asc_key_path="${ASC_API_KEY_PATH:-}"
+asc_key_id="${ASC_KEY_ID:-}"
 issuer_id="${ASC_ISSUER_ID:-}"
 
 [[ -n "$api_base" ]] || fail 'ALISTORE_API_BASE_URL is required'
@@ -89,8 +96,18 @@ esac
 [[ "$team_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'Apple team id must be a 10-character identifier'
 [[ -n "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH is required for App Store Connect submission'
 [[ -f "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH does not point to a file'
+if [[ -z "$asc_key_id" && "$asc_key_path" =~ AuthKey_([A-Z0-9]{10})\.p8$ ]]; then
+  asc_key_id="${BASH_REMATCH[1]}"
+fi
+[[ -n "$asc_key_id" ]] || fail 'ASC_KEY_ID is required or ASC_API_KEY_PATH must be named AuthKey_<KEYID>.p8'
+[[ "$asc_key_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'ASC_KEY_ID must be a 10-character identifier'
 [[ -n "$issuer_id" ]] || fail 'ASC_ISSUER_ID is required for App Store Connect submission'
 [[ "$issuer_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] || fail 'ASC_ISSUER_ID must be a UUID'
+
+if [[ "$strict_asc" == "1" ]]; then
+  node "$repo_root/scripts/verify-app-store-connect.mjs" "$asc_key_path" "$asc_key_id" "$issuer_id" \
+    || fail 'App Store Connect API verification failed'
+fi
 
 settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
   xcodebuild -project "$ios_root/AliStoreNative.xcodeproj" \
@@ -112,4 +129,7 @@ printf 'store-preflight: Release API URL resolved to HTTPS\n'
 printf 'store-preflight: Release bundle id and AppIcon are configured\n'
 printf 'store-preflight: Release APNs environment resolved to production\n'
 printf 'store-preflight: Apple team and App Store Connect credentials are present\n'
+if [[ "$strict_asc" == "1" ]]; then
+  printf 'store-preflight: App Store Connect API credentials verified\n'
+fi
 printf 'store-preflight: native Client configuration passed\n'

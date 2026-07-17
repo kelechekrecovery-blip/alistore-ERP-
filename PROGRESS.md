@@ -2865,6 +2865,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-RELEASE-004`.
+- Task: add strict App Store Connect API credential verification to native iOS Client store preflight.
+- Files changed: `scripts/verify-app-store-connect.mjs`, `apps/ios/scripts/store-preflight.sh`, `apps/ios/.env.production.example`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: `npm run ios:store-preflight -- --strict-asc` can now prove the App Store Connect issuer/key pair by signing a short-lived JWT and calling Apple's API. The key id is either explicit via `ASC_KEY_ID` or derived from `AuthKey_<KEYID>.p8`.
+- Checks run: non-strict `npm run ios:store-preflight -- --env-file <temporary env>` passed; strict fake-key preflight failed closed while keeping the wrapper command successful for the negative test; metadata validator, `node --check scripts/verify-app-store-connect.mjs`, `bash -n apps/ios/scripts/store-preflight.sh`, and `git diff --check` passed. A local strict attempt with `/Users/alistore/.appstoreconnect/private_keys/AuthKey_47XTPVKBDS.p8`, team `ZYU3F8W56P` and placeholder issuer failed with HTTP 401 as expected.
+- Outcome: App Store Connect verification is now a real gate. Remaining external value for this gate is the real `ASC_ISSUER_ID` tied to the existing key/account; after that, strict preflight can be rerun before signed archive/TestFlight.
+- Next step: create ignored `apps/ios/.env.production` with real `ASC_ISSUER_ID` and production API/team values, rerun strict preflight, then archive with Apple Distribution provisioning and continue physical iPhone smoke.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-RELEASE-003`.
 - Task: strengthen native iOS Client App Store preflight and metadata packaging after the latest Client visual evidence.
 - Files changed: `apps/ios/store/client-metadata.json`, `scripts/validate-ios-store-metadata.mjs`, `apps/ios/scripts/store-preflight.sh`, `apps/ios/store/release-runbook.md`, `package.json`, `BACKLOG.md`, and `PROGRESS.md`.
