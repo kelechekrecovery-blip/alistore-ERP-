@@ -8,6 +8,42 @@ fail() {
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ios_root="$repo_root/apps/ios"
+env_file=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      [[ $# -ge 2 ]] || fail '--env-file requires a path'
+      env_file="$2"
+      shift 2
+      ;;
+    --help|-h)
+      cat <<'USAGE'
+Usage: apps/ios/scripts/store-preflight.sh [--env-file path]
+
+Validates the native iOS Client release configuration without printing secrets.
+If --env-file is omitted and apps/ios/.env.production exists, that file is loaded.
+USAGE
+      exit 0
+      ;;
+    *)
+      fail "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [[ -z "$env_file" && -f "$ios_root/.env.production" ]]; then
+  env_file="$ios_root/.env.production"
+fi
+
+if [[ -n "$env_file" ]]; then
+  [[ -f "$env_file" ]] || fail "--env-file does not point to a file: $env_file"
+  set -a
+  # shellcheck disable=SC1090
+  . "$env_file"
+  set +a
+fi
+
 api_base="${ALISTORE_API_BASE_URL:-${API_BASE_URL:-}}"
 team_id="${DEVELOPMENT_TEAM:-${APPLE_DEVELOPMENT_TEAM:-}}"
 asc_key_path="${ASC_API_KEY_PATH:-}"

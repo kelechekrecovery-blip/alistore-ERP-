@@ -19,6 +19,13 @@ export ASC_ISSUER_ID="issuer-uuid-from-app-store-connect"
 manager. `ASC_ISSUER_ID` is not stored in the repository and cannot be
 derived from the `.p8` file.
 
+For local release preflight, copy the ignored template and fill real values:
+
+```bash
+cp apps/ios/.env.production.example apps/ios/.env.production
+$EDITOR apps/ios/.env.production
+```
+
 ## Preflight and archive
 
 Run from the repository root:
@@ -26,7 +33,7 @@ Run from the repository root:
 ```bash
 chmod 700 apps/ios/scripts/store-preflight.sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  apps/ios/scripts/store-preflight.sh
+  apps/ios/scripts/store-preflight.sh --env-file apps/ios/.env.production
 
 npm run ios:visual
 

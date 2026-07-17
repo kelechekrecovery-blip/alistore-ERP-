@@ -2785,6 +2785,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-RELEASE-002`.
+- Task: make native iOS Client App Store preflight load protected local release credentials from an ignored env file.
+- Files changed: `.gitignore`, `apps/ios/.env.production.example`, `apps/ios/scripts/store-preflight.sh`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: `apps/ios/.env.production` is ignored, a template documents the required production API/App Store values, and `store-preflight.sh` supports `--env-file` plus automatic loading of the ignored local file without printing secrets. The release runbook now points to the env-file flow.
+- Checks run: `bash -n apps/ios/scripts/store-preflight.sh` passed; `apps/ios/scripts/store-preflight.sh --help` passed; `apps/ios/scripts/store-preflight.sh --env-file apps/ios/.env.production.example` failed at the expected external credential gate `ASC_API_KEY_PATH does not point to a file`; `git diff --check` passed.
+- Outcome: iOS Client store preflight is easier to run safely with real owner credentials. App Store publication is still not claimed: real `.p8`, issuer/team, provisioning profile, signed archive, TestFlight upload and physical-device Face ID/APNs/camera/offline smoke remain required.
+- Next step: fill the ignored `apps/ios/.env.production` with protected Apple/App Store Connect values and rerun preflight/archive, or continue closing native/ERP parity while external store credentials remain unavailable to this session.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-010`.
 - Task: record trusted native Client visual evidence for the current `AliStore Клиент App 2.0` software state.
 - Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-b192564522ec3568b75718782955225f2042e24a961abdabd0c1f0eeafb74080.json`, `BACKLOG.md`, and `PROGRESS.md`.
