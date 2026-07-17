@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-SOFTWARE-GATE-032`.
+- Task: close durable visual acceptance and complete the local MVP software gate.
+- Result: trusted visual acceptance passed `3/3` exact screenshot tests; all native and reconciliation evidence remains hash-bound to the same source tree. Artifact committed as `187b49f`.
+- Strict audit: every executable local software gate is PASS, including visual, iOS `34/34`, Android `30/30`, four reconciliation verticals and composite E2E `4/4`.
+- Remaining blocker: 64 linked design references are absent from `design_handoff_alistore/screens`; no visual acceptance is claimed for those missing references. This requires owner-provided files or explicit retirement approvals.
+- Next phase: staging/provider/device readiness can proceed in sandbox; live certification still requires owner credentials, legal documents and physical hardware.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-ECOSYSTEM-MATRIX-031`.
 - Task: close procurement/sale and composite ecosystem reconciliation evidence.
 - Result: procurement API passed `10/10`, procurement browser passed `1/1`, and trusted composite matrix passed all four verticals: POS/refund, courier/COD, service/loaner and procurement/sale.
