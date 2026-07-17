@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-APP-UI-EVIDENCE-003
+
+- Iteration ID: `ANDROID-APP-UI-EVIDENCE-003`.
+- Task: refresh trusted Android packaged-app UI evidence after restoring ecosystem audit npm aliases.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/android-app-ui-56684fc58209d98f663b8f487fea1c5e2029de8badee78d80a6b9c45be666c8a.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run android:ui` with `exitCode: 0` for source tree `6b3989bc1c2c52f0ebdb72a888c21fa117852874941252c25c3b9752e46bc790`. Android instrumentation passed core `30/30` plus packaged Client, Staff, Courier and POS connected smoke tests on `savio_api36_arm64(AVD)`.
+- Checks run: `sh scripts/run-trusted-ecosystem-node.sh scripts/record-ecosystem-evidence.mjs android-app-ui`; `git diff --check`.
+- Acceptance: accepted for emulator packaged-app UI evidence. Physical-device biometric/push/camera/maps/scanner/printer/payment-terminal smoke, release signing, Play Internal credentials and live providers remain external release gates.
+- Next step: refresh POS/refund, courier COD, service/loaner, procurement/sale and reconciled E2E evidence in separate commits.
+
 # 2026-07-17 — IOS-APP-UI-EVIDENCE-003
 
 - Iteration ID: `IOS-APP-UI-EVIDENCE-003`.
