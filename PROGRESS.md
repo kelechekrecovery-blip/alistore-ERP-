@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-FISCAL-001-EVIDENCE-037`.
+- Task: rebind trusted acceptance evidence after adding the informational fiscal receipt boundary.
+- Result: visual `3/3`, iOS `34/34`, Android `30/30`, POS/refund `1/1`, courier/COD `1/1`, service/loaner API `9/9` plus UI `3/3`, procurement API `10/10` plus UI `1/1`, and composite ecosystem reconciliation `4/4` all pass against source tree `fcf29b25...`. The first service/loaner recorder attempt had one transient `socket hang up`; the clean rerun passed `9/9`.
+- Commits: `1010c05`, `c5fb452`, `299bd2e`, `832adf7`, `449f379`, `43b156f`, `b9b9499`, `a2d5b65`.
+- Acceptance: trusted local evidence is current for the fiscal boundary. This does not certify live KKM/OFD, payment/SMS providers, physical devices or missing design references.
+- Next step: run strict ecosystem audit and continue staging/readiness work only after owner supplies the 64 missing references or retirement approvals and production credentials.
+
+## 2026-07-18
+
 - Iteration ID: `GAP-FISCAL-001-SOFTWARE-036`.
 - Task: add a provider-neutral fiscal receipt boundary without pretending to implement Kyrgyz KKM/OFD.
 - Result: receipts now expose an explicit `informational` fiscal state with null fiscal number, QR payload and provider reference. The default provider is uncertified and fails closed; receipt output is visibly marked `Информационный чек — фискализация не выполнена`.
