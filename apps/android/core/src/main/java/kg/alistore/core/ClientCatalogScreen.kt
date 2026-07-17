@@ -77,6 +77,7 @@ internal fun ClientCatalogScreen(
   onCart: (String) -> Unit,
   onOpenProduct: (String) -> Unit = {},
   modifier: Modifier = Modifier,
+  apiBaseUrl: String = "",
 ) {
   var filter by remember { mutableStateOf(CatalogFilter()) }
   val categories = remember(products) { products.map(Product::category).filter(String::isNotBlank).distinct() }
@@ -172,7 +173,7 @@ internal fun ClientCatalogScreen(
           }
         }
         items(visibleProducts, key = Product::id) { product ->
-          ProductCard(product, product.id in favorites, product.id in cart, onFavorite, onCart, onOpen = onOpenProduct)
+          ProductCard(product, apiBaseUrl, product.id in favorites, product.id in cart, onFavorite, onCart, onOpen = onOpenProduct)
         }
       }
     }

@@ -522,14 +522,28 @@ data class RawApiResponse(val status: Int, val body: String)
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
 
-private fun JSONObject.product() = Product(
-  id = getString("id"),
-  sku = getString("sku"),
-  name = getString("name"),
-  price = getInt("price"),
-  category = getString("category"),
-  availableUnits = getInt("availableUnits"),
-)
+private fun JSONObject.product(): Product {
+  val attrs = optJSONObject("attrs")
+  val media = attrs?.optJSONArray("media")?.let { array ->
+    buildList {
+      for (index in 0 until array.length()) add(array.optString(index))
+    }
+  }.orEmpty()
+  val imageUrls = buildList {
+    attrs?.optString("imageUrl")?.takeIf(String::isNotBlank)?.let(::add)
+    attrs?.optString("image")?.takeIf(String::isNotBlank)?.let(::add)
+    addAll(media.filter(String::isNotBlank))
+  }.distinct()
+  return Product(
+    id = getString("id"),
+    sku = getString("sku"),
+    name = getString("name"),
+    price = getInt("price"),
+    category = getString("category"),
+    availableUnits = getInt("availableUnits"),
+    imageUrls = imageUrls,
+  )
+}
 
 private fun JSONObject.catalogProductDetail() = CatalogProductDetail(
   product = getJSONObject("product").product(),

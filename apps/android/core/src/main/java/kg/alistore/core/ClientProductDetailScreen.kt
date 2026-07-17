@@ -86,6 +86,7 @@ internal fun ClientProductDetailScreen(
       onOpenProduct = onOpenProduct,
       modifier = modifier,
       staleError = error,
+      apiBaseUrl = apiBaseUrl,
     )
   }
 }
@@ -101,6 +102,7 @@ internal fun ClientProductDetailContent(
   onOpenProduct: (String) -> Unit,
   modifier: Modifier = Modifier,
   staleError: String? = null,
+  apiBaseUrl: String = "",
 ) {
   val product = detail.product
   LazyColumn(
@@ -116,8 +118,8 @@ internal fun ClientProductDetailContent(
       }
     }
     item {
-      Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).aspectRatio(1.05f).background(Color(0xFFF2EFEB))) {
-        Box(Modifier.size(120.dp, 210.dp).align(Alignment.Center).background(DetailCoral, androidx.compose.foundation.shape.RoundedCornerShape(30.dp)))
+      Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).aspectRatio(1.05f)) {
+        ProductMediaImage(product, apiBaseUrl, Modifier.fillMaxSize(), 0.dp)
         IconButton(onClick = { onFavorite(product.id) }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape)) {
           Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (favorite) DetailCoral else DetailInk)
         }

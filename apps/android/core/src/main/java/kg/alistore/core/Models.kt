@@ -9,6 +9,7 @@ data class Product(
   val price: Int,
   val category: String,
   val availableUnits: Int,
+  val imageUrls: List<String> = emptyList(),
 )
 
 data class CatalogProductDetail(

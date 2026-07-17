@@ -1,6 +1,8 @@
 package kg.alistore.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ClientCatalogFilterTest {
@@ -31,5 +33,25 @@ class ClientCatalogFilterTest {
       filterCatalog(products, CatalogFilter(sort = CatalogSort.PRICE_ASCENDING)).map(Product::id),
     )
     assertEquals(listOf("phone", "laptop", "audio"), products.map(Product::id))
+  }
+
+  @Test
+  fun productMediaAcceptsHttpSourcesAndRelativePathsOnly() {
+    assertTrue(isAllowedMediaUrl("https://cdn.alistore.kg/products/phone.webp"))
+    assertTrue(isAllowedMediaUrl("/media/products/phone.webp"))
+    assertFalse(isAllowedMediaUrl("file:///etc/passwd"))
+    assertFalse(isAllowedMediaUrl("javascript:alert(1)"))
+  }
+
+  @Test
+  fun productMediaResolvesRelativePathAgainstConfiguredApiOrigin() {
+    assertEquals(
+      "https://api.alistore.kg/media/products/phone.webp",
+      resolveMediaUrl("https://api.alistore.kg/api", "/media/products/phone.webp"),
+    )
+    assertEquals(
+      "https://cdn.alistore.kg/products/phone.webp",
+      resolveMediaUrl("https://api.alistore.kg/api", "https://cdn.alistore.kg/products/phone.webp"),
+    )
   }
 }

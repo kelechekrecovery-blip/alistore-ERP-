@@ -1,11 +1,21 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-CLIENT-MEDIA-001
+
+- Iteration ID: `ANDROID-CLIENT-MEDIA-001`.
+- Task: connect Android Client catalog media to the existing server product attributes contract.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/Models.kt`, `ApiClient.kt`, `ProductMedia.kt`, `AliStoreApp.kt`, `ClientCatalogScreen.kt`, `ClientProductDetailScreen.kt`, `ClientProductDetailScreenTest.kt`, `BACKLOG.md`.
+- Result: Android now parses `attrs.imageUrl`, `attrs.image` and `attrs.media`, validates only HTTP(S) or same-origin relative candidates, resolves relative URLs against the configured API base, and renders the first available product image in catalog cards and product detail. Missing media, invalid schemes and failed downloads keep the deterministic product fallback; no client-side price, stock or status authority was introduced.
+- Checks run: `npm run android:build` passed all four debug APKs; `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 28 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `git diff --check`.
+- Acceptance: accepted for the local Android Client media software vertical. Real CDN/storage assets, image delivery monitoring, physical-device visual review, signing and complete 17-screen parity remain open; production readiness remains `RED`.
+- Next step: continue Android Client account/payment state parity or move to the next unblocked native/ERP vertical while preserving explicit external release blockers.
+
 # 2026-07-17 — ANDROID-CLIENT-DETAIL-001
 
 - Iteration ID: `ANDROID-CLIENT-DETAIL-001`.
 - Task: close the Android Client catalog-to-product-detail gap against the existing server contract.
 - Files changed: `apps/android/core/src/main/java/kg/alistore/core/AliStoreApp.kt`, `apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt`, `apps/android/core/src/main/java/kg/alistore/core/ClientCatalogScreen.kt`, `apps/android/core/src/main/java/kg/alistore/core/ClientProductDetailScreen.kt`, `apps/android/core/src/main/java/kg/alistore/core/Models.kt`, `apps/android/core/src/androidTest/java/kg/alistore/core/ClientProductDetailScreenTest.kt`, `BACKLOG.md`.
-- Result: Client catalog cards now open a server-backed product detail route, load variants and related products through `GET /catalog/products/:id`, preserve server-derived price/stock, and expose favorite/cart/back actions. The detail content has a deterministic Compose test; no client-side status or price authority was added. The current API does not expose product media URLs, so the existing neutral media treatment remains an explicit follow-up rather than a fabricated asset.
+- Result: Client catalog cards now open a server-backed product detail route, load variants and related products through `GET /catalog/products/:id`, preserve server-derived price/stock, and expose favorite/cart/back actions. The detail content has a deterministic Compose test; no client-side status or price authority was added. Product media is consumed from the existing `attrs` contract by the follow-up `ANDROID-CLIENT-MEDIA-001`; physical-device visual review remains open.
 - Checks run: `npm run android:build` passed all four debug APKs; `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 28 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `git diff --check`.
 - Acceptance: accepted for the local Android Client product-detail software vertical. Full 17-screen Android parity, product media, physical-device biometric/push/camera/network smoke, signing and store submission remain open; production readiness remains `RED`.
 - Next step: continue Android Client account/payment visual parity or move to the next unblocked ERP/native slice while keeping trusted evidence and external release blockers explicit.

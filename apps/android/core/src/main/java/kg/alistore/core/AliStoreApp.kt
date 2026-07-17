@@ -168,9 +168,9 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
           onOpenProduct = { productRoute = it },
           modifier = Modifier.padding(padding),
         )
-        selected == 0 -> ClientHome(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
-        selected == 1 -> ClientCatalogScreen(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
-        selected == 2 -> ProductGrid("Избранное", products.filter { it.id in favorites }, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
+        selected == 0 -> ClientHome(apiBaseUrl, products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
+        selected == 1 -> ClientCatalogScreen(products, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding), apiBaseUrl)
+        selected == 2 -> ProductGrid(apiBaseUrl, "Избранное", products.filter { it.id in favorites }, favorites, cart.keys, { favorites = favorites.toggle(it) }, addToCart, { productRoute = it }, Modifier.padding(padding))
         selected == 3 -> ClientCheckout(
           apiBaseUrl = apiBaseUrl,
           products = products,
@@ -206,6 +206,7 @@ private fun ClientApp(apiBaseUrl: String, deepLinkUrl: String?, deepLinkRevision
 
 @Composable
 private fun ClientHome(
+  apiBaseUrl: String,
   products: List<Product>,
   favorites: Set<String>,
   cart: Set<String>,
@@ -253,7 +254,7 @@ private fun ClientHome(
     item { Text("Популярное", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp, 8.dp)) }
     items(products.take(6).chunked(2)) { row ->
       Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        row.forEach { product -> ProductCard(product, product.id in favorites, product.id in cart, onFavorite, onCart, Modifier.weight(1f), onOpenProduct) }
+        row.forEach { product -> ProductCard(product, apiBaseUrl, product.id in favorites, product.id in cart, onFavorite, onCart, Modifier.weight(1f), onOpenProduct) }
         if (row.size == 1) Spacer(Modifier.weight(1f))
       }
     }
@@ -262,6 +263,7 @@ private fun ClientHome(
 
 @Composable
 private fun ProductGrid(
+  apiBaseUrl: String,
   title: String,
   products: List<Product>,
   favorites: Set<String>,
@@ -285,13 +287,14 @@ private fun ProductGrid(
     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
       Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(4.dp, 2.dp, 4.dp, 10.dp))
     }
-    items(products, key = Product::id) { product -> ProductCard(product, product.id in favorites, product.id in cart, onFavorite, onCart, onOpen = onOpenProduct) }
+    items(products, key = Product::id) { product -> ProductCard(product, apiBaseUrl, product.id in favorites, product.id in cart, onFavorite, onCart, onOpen = onOpenProduct) }
   }
 }
 
 @Composable
 internal fun ProductCard(
   product: Product,
+  apiBaseUrl: String,
   favorite: Boolean,
   inCart: Boolean,
   onFavorite: (String) -> Unit,
@@ -306,8 +309,8 @@ internal fun ProductCard(
       .background(Surface, RoundedCornerShape(8.dp))
       .padding(10.dp),
   ) {
-    Box(Modifier.fillMaxWidth().aspectRatio(1.15f).background(Color(0xFFF2EFEB), RoundedCornerShape(6.dp))) {
-      Box(Modifier.size(46.dp, 82.dp).align(Alignment.Center).background(Coral, RoundedCornerShape(13.dp)))
+    Box(Modifier.fillMaxWidth().aspectRatio(1.15f)) {
+      ProductMediaImage(product, apiBaseUrl, Modifier.fillMaxSize(), 6.dp)
       IconButton(onClick = { onFavorite(product.id) }, modifier = Modifier.align(Alignment.TopEnd).size(34.dp)) {
         Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (favorite) Coral else Ink)
       }
