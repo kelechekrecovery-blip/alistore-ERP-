@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — POS-REFUND-EVIDENCE-003
+
+- Iteration ID: `POS-REFUND-EVIDENCE-003`.
+- Task: refresh trusted POS sale, customer return, approved refund and warehouse quarantine reconciliation evidence after restoring ecosystem audit npm aliases.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/pos-refund-reconciliation-c5221b90881db05008308f54bbc660c812b39fdefaf0a4e6b1dfe1b29a6d815c.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ecosystem:pos-refund:e2e` with `exitCode: 0` for source tree `6b3989bc1c2c52f0ebdb72a888c21fa117852874941252c25c3b9752e46bc790`. Playwright passed `1/1` POS sale, customer return, approved refund and warehouse receipt reconciliation scenario.
+- Checks run: `sh scripts/run-trusted-ecosystem-node.sh scripts/record-ecosystem-evidence.mjs pos-refund-reconciliation`; `git diff --check`.
+- Acceptance: accepted for committed local POS/refund software reconciliation evidence. Live provider refund certification, physical POS hardware and first-store UAT remain external release gates.
+- Next step: refresh courier COD, service/loaner, procurement/sale and composite reconciled E2E evidence.
+
 # 2026-07-17 — ANDROID-APP-UI-EVIDENCE-003
 
 - Iteration ID: `ANDROID-APP-UI-EVIDENCE-003`.
