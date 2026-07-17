@@ -105,8 +105,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/reconciled-e2e-ce195eae47ac91eb5707e9eafec0f4b71ff2f8d2ece246bc00a6f8b92010aea4.json",
-          "sha256": "ce195eae47ac91eb5707e9eafec0f4b71ff2f8d2ece246bc00a6f8b92010aea4"
+          "path": "docs/acceptance/artifacts/reconciled-e2e-3a64100aba272879473aaf4a4026c176d5e47e6d16c36a6bb689b0699bd1400f.json",
+          "sha256": "3a64100aba272879473aaf4a4026c176d5e47e6d16c36a6bb689b0699bd1400f"
         }
       ]
     }
