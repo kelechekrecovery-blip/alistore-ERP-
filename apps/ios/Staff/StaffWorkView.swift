@@ -14,19 +14,34 @@ struct StaffWorkView: View {
     @Binding var mode: StaffWorkMode
     @Binding var routedTaskId: String?
 
+    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
+    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
+    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
+    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Рабочий день").font(.title2.weight(.black))
-                    Text(session.username).font(.subheadline).foregroundStyle(.secondary)
+                    Text(mode == .tasks ? "Задачи и KPI" : "Рабочий день")
+                        .font(.title2.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text(session.username)
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryText)
                 }
                 Spacer()
-                Text(session.role.uppercased()).font(.caption.weight(.bold)).foregroundStyle(.black)
-                    .padding(.horizontal, 10).padding(.vertical, 7)
-                    .background(Color(red: 0.776, green: 1, blue: 0.239), in: RoundedRectangle(cornerRadius: 7))
+                Text(session.role.uppercased())
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(lime, in: RoundedRectangle(cornerRadius: 7))
             }
-            .padding(.horizontal, 18).padding(.top, 14).padding(.bottom, 12)
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
             Picker("Работа", selection: $mode) {
                 ForEach(StaffWorkMode.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -44,7 +59,7 @@ struct StaffWorkView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .background(Color(red: 0.055, green: 0.047, blue: 0.039))
+        .background(background.ignoresSafeArea())
         .navigationTitle("Работа")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -58,11 +73,21 @@ private struct StaffTasksView: View {
     @State private var busyId: String?
     @State private var errorMessage: String?
     private let environment = AppEnvironment.live()
+    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
+    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    private let surfaceSoft = Color(red: 0.165, green: 0.145, blue: 0.122)
+    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
+    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
+    private let coral = Color(red: 1, green: 0.357, blue: 0.18)
+    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
 
     var body: some View {
-        Group {
+        ZStack {
+            background.ignoresSafeArea()
             if isLoading {
                 ProgressView("Загружаем задачи…")
+                    .tint(lime)
+                    .foregroundStyle(primaryText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
                 ContentUnavailableView {
@@ -75,46 +100,104 @@ private struct StaffTasksView: View {
             } else if tasks.isEmpty {
                 ContentUnavailableView("Нет активных задач", systemImage: "checkmark.circle", description: Text("Новые назначения появятся здесь."))
             } else {
-                List(tasks) { task in
-                    taskRow(task)
-                        .listRowBackground(task.id == routedTaskId ? Color.accentColor.opacity(0.12) : Color.clear)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        kpiCard
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(tasks) { task in taskRow(task) }
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
                 }
-                .listStyle(.plain)
                 .refreshable { await load() }
             }
         }
         .task { await load() }
     }
 
-    private func taskRow(_ task: StaffTask) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(task.title).fontWeight(.semibold)
-                Spacer()
-                Text(priorityLabel(task.priority)).font(.caption).foregroundStyle(priorityColor(task.priority))
-            }
-            if let description = task.description, !description.isEmpty {
-                Text(description).font(.subheadline).foregroundStyle(.secondary)
-            }
+    private var kpiCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label(statusLabel(task.status), systemImage: task.status == "completed" ? "checkmark.circle.fill" : "clock")
-                if let dueAt = task.dueAt {
-                    Spacer()
-                    Text(dueAt.formatted(date: .abbreviated, time: .shortened))
-                        .foregroundStyle(dueAt < Date() && task.status != "completed" ? .red : .secondary)
+                Text("KPI месяца")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(primaryText)
+                Spacer()
+                Text("92%")
+                    .font(.system(.title3, design: .monospaced).weight(.black))
+                    .foregroundStyle(lime)
+            }
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(surfaceSoft)
+                    Capsule().fill(lime)
+                        .frame(width: max(16, proxy.size.width * 0.92))
                 }
             }
-            .font(.caption)
-            if task.status == "open" {
-                Button("Начать", systemImage: "play.fill") { Task { await update(task, to: "in_progress") } }
-                    .disabled(busyId != nil)
+            .frame(height: 8)
+            Text("Цель: аксессуары, ценники, обучение и контроль остатков до конца смены.")
+                .font(.caption)
+                .foregroundStyle(secondaryText)
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private func taskRow(_ task: StaffTask) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Button {
+                Task { await update(task, to: task.status == "completed" ? "in_progress" : "completed") }
+            } label: {
+                Label {
+                    Text("Переключить задачу \(task.title)")
+                } icon: {
+                    Image(systemName: task.status == "completed" ? "checkmark.circle.fill" : "circle")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(task.status == "completed" ? lime : secondaryText)
+                }
+                .labelStyle(.iconOnly)
             }
-            if task.status == "open" || task.status == "in_progress" {
-                Button("Выполнено", systemImage: "checkmark.circle.fill") { Task { await update(task, to: "completed") } }
-                    .disabled(busyId != nil)
+            .buttonStyle(.plain)
+            .disabled(busyId != nil)
+            .accessibilityLabel("Переключить задачу \(task.title)")
+            .accessibilityIdentifier("staff-task-toggle-\(task.id)")
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(task.title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(task.status == "completed" ? secondaryText : primaryText)
+                        .strikethrough(task.status == "completed")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Text(priorityLabel(task.priority))
+                        .font(.caption2.weight(.black))
+                        .foregroundStyle(priorityColor(task.priority))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(priorityColor(task.priority).opacity(0.14), in: Capsule())
+                }
+                if let description = task.description, !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 8) {
+                    Label(statusLabel(task.status), systemImage: task.status == "completed" ? "checkmark.circle.fill" : "clock")
+                    if let dueAt = task.dueAt {
+                        Text(dueAt.formatted(date: .omitted, time: .shortened))
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(task.status == "completed" ? lime : secondaryText)
             }
         }
-        .padding(.vertical, 5)
+        .padding(14)
+        .background(task.id == routedTaskId ? lime.opacity(0.12) : surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(task.id == routedTaskId ? lime.opacity(0.5) : surfaceSoft))
         .accessibilityIdentifier("staff-task-\(task.id)")
     }
 
@@ -123,6 +206,12 @@ private struct StaffTasksView: View {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            tasks = Self.fixtureTasks
+            return
+        }
+        #endif
         do {
             tasks = try await APIClient(baseURL: environment.apiBaseURL).get("staff-tasks/mine", token: session.accessToken)
             if let routedTaskId, !tasks.contains(where: { $0.id == routedTaskId }) {
@@ -159,7 +248,34 @@ private struct StaffTasksView: View {
     }
 
     private func priorityColor(_ priority: String) -> Color {
-        priority == "urgent" ? .red : priority == "high" ? .orange : .secondary
+        priority == "urgent" ? coral : priority == "high" ? Color(red: 1, green: 0.77, blue: 0.35) : secondaryText
+    }
+
+    private static var fixtureTasks: [StaffTask] {
+        let now = Date()
+        return [
+            fixtureTask(id: "task-accessories", title: "Предлагать аксессуары к телефонам", description: "Цель AI: +18 аксессуаров до конца смены.", status: "open", priority: "high", dueAt: now.addingTimeInterval(3600)),
+            fixtureTask(id: "task-prices", title: "Обновить ценники на витрине", description: "Проверить iPhone, Watch и AirPods.", status: "in_progress", priority: "normal", dueAt: now.addingTimeInterval(5400)),
+            fixtureTask(id: "task-training", title: "Пройти тест по новым тарифам", description: "Короткий тест перед вечерним потоком.", status: "completed", priority: "low", dueAt: now.addingTimeInterval(-1800)),
+            fixtureTask(id: "task-stock", title: "Проверить остатки Apple Watch", description: "Сверить витрину и складской остаток.", status: "open", priority: "urgent", dueAt: now.addingTimeInterval(1800)),
+        ]
+    }
+
+    private static func fixtureTask(id: String, title: String, description: String, status: String, priority: String, dueAt: Date) -> StaffTask {
+        StaffTask(
+            id: id,
+            title: title,
+            description: description,
+            status: status,
+            priority: priority,
+            assigneeId: "staff-ui-test",
+            dueAt: dueAt,
+            relatedType: nil,
+            relatedId: nil,
+            createdAt: Date(timeIntervalSince1970: 1_785_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_785_000_000),
+            completedAt: status == "completed" ? dueAt : nil
+        )
     }
 }
 

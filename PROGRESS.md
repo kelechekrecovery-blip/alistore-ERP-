@@ -2832,3 +2832,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `20/20`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
 - Outcome: Client warranty visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
 - Next step: recover trusted visual recording for iOS Client or move to Android/ERP while external release blockers remain.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-STAFF-VISUAL-002`.
+- Task: align native Staff Tasks/KPI with the `AliStore Сотрудник App 2.0` handoff.
+- Files changed: `apps/ios/Staff/StaffWorkView.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the Staff KPI route now uses a prototype-style dark task board with `Задачи и KPI`, a `KPI месяца` card at `92%`, progress bar, handoff task fixtures, priority/status treatments and accessible task toggle labels. Release/live behavior still loads `staff-tasks/mine` through the existing staff JWT API.
+- Checks run: `npm run ios:build` passed all 10 targets before the final accessibility/test polish; targeted `AliStoreStaffUITests` passed 3/3; full `npm run ios:ui` was attempted but Xcode hung during Client runner finalization/worker materialization before Staff execution, so it is not accepted for this slice; `git diff --check` passed.
+- Outcome: Staff Tasks/KPI visual slice is accepted at local simulator targeted level. Physical device, exact pixel pass and complete Staff operational journey remain open.
+- Next step: continue Staff inner screens such as orders, add-product, buyback and Customer tools, or rerun the full `ios:ui` after simulator reset.

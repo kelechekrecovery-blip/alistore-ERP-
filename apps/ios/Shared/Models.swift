@@ -831,6 +831,34 @@ public struct StaffTask: Decodable, Identifiable, Sendable {
     public let createdAt: Date
     public let updatedAt: Date
     public let completedAt: Date?
+
+    public init(
+        id: String,
+        title: String,
+        description: String?,
+        status: String,
+        priority: String,
+        assigneeId: String,
+        dueAt: Date?,
+        relatedType: String?,
+        relatedId: String?,
+        createdAt: Date,
+        updatedAt: Date,
+        completedAt: Date?
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.status = status
+        self.priority = priority
+        self.assigneeId = assigneeId
+        self.dueAt = dueAt
+        self.relatedType = relatedType
+        self.relatedId = relatedId
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.completedAt = completedAt
+    }
 }
 
 public struct UpdateStaffTaskRequest: Encodable, Sendable {
