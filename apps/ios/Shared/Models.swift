@@ -5,6 +5,12 @@ public struct CatalogResponse: Decodable, Sendable {
     public let total: Int
 }
 
+public struct CatalogProductDetail: Decodable, Sendable {
+    public let product: Product
+    public let variants: [Product]
+    public let related: [Product]
+}
+
 public struct Product: Decodable, Identifiable, Sendable {
     public let id: String
     public let sku: String

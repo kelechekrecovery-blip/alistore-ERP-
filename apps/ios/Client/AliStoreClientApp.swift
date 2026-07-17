@@ -390,7 +390,7 @@ private struct ClientOverlayView: View {
                     LazyVStack(spacing: 10) {
                         ForEach(matchingProducts) { product in
                             NavigationLink {
-                                ProductDetail(product: product, cart: $cart, favorites: $favorites)
+                                ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
                             } label: {
                                 searchRow(product)
                             }
@@ -740,7 +740,7 @@ private struct ClientRootView: View {
                         case .home:
                             ClientHomeView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
                         case .catalog:
-                            CatalogView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
+                            CatalogView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
                         case .favorites:
                             FavoritesView(products: products, cart: $cart, favorites: $favorites)
                         case .cart:
@@ -4064,6 +4064,7 @@ private func formattedDate(_ value: String?) -> String? {
 }
 
 private struct CatalogView: View {
+    let environment: AppEnvironment
     let products: [Product]
     let isLoading: Bool
     let errorMessage: String?
@@ -4092,7 +4093,7 @@ private struct CatalogView: View {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                             ForEach(visibleProducts) { product in
                                 NavigationLink {
-                                    ProductDetail(product: product, cart: $cart, favorites: $favorites)
+                                    ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
                                 } label: {
                                     NativeProductCard(product: product, cart: $cart, favorites: $favorites)
                                 }
@@ -4263,44 +4264,66 @@ private struct ServiceCard: View {
 }
 
 private struct ProductDetail: View {
+    let environment: AppEnvironment
     let product: Product
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
+    @State private var detail: CatalogProductDetail?
+    @State private var detailError: String?
+    @State private var detailLoading = false
+
+    private var displayProduct: Product { detail?.product ?? product }
+
+    private var displayVariants: [Product] {
+        let variants = detail?.variants ?? []
+        return variants.isEmpty ? [displayProduct] : variants
+    }
+
+    private var displayRelated: [Product] {
+        detail?.related ?? []
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topTrailing) {
-                    ClientProductImage(product: product, cornerRadius: 0)
+                    ClientProductImage(product: displayProduct, cornerRadius: 0)
                         .frame(height: 260)
                     Button {
-                        if favorites.contains(product.id) { favorites.remove(product.id) } else { favorites.insert(product.id) }
+                        if favorites.contains(displayProduct.id) { favorites.remove(displayProduct.id) } else { favorites.insert(displayProduct.id) }
                     } label: {
-                        Image(systemName: favorites.contains(product.id) ? "heart.fill" : "heart")
-                            .foregroundStyle(favorites.contains(product.id) ? ClientTheme.coral : .white)
+                        Image(systemName: favorites.contains(displayProduct.id) ? "heart.fill" : "heart")
+                            .foregroundStyle(favorites.contains(displayProduct.id) ? ClientTheme.coral : .white)
                             .frame(width: 44, height: 44)
                             .background(.black.opacity(0.5), in: Circle())
                     }
                     .padding(14)
                 }
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(product.availableUnits > 0 ? "В НАЛИЧИИ" : "НЕТ В НАЛИЧИИ")
+                    Text(displayProduct.availableUnits > 0 ? "В НАЛИЧИИ" : "НЕТ В НАЛИЧИИ")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
-                    Text(product.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
-                    Text(product.price.formatted(.currency(code: "KGS")))
+                        .foregroundStyle(displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+                    Text(displayProduct.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
+                    Text(displayProduct.price.formatted(.currency(code: "KGS")))
                         .font(ClientTheme.display(26, weight: .black)).foregroundStyle(.white)
-                    Text("или \(Int(product.price / 12).formatted(.number.grouping(.never))) сом × 12 мес")
+                    Text("или \(Int(displayProduct.price / 12).formatted(.number.grouping(.never))) сом × 12 мес")
                         .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)
                     HStack(spacing: 8) {
-                        ForEach(["128 ГБ", "256 ГБ", "512 ГБ"], id: \.self) { value in
-                            Text(value)
+                        ForEach(displayVariants) { variant in
+                            Text(variant.name == displayProduct.name ? "Текущий" : variant.name)
                                 .font(ClientTheme.body(13, weight: .medium))
-                                .foregroundStyle(value == "128 ГБ" ? ClientTheme.lime : ClientTheme.muted)
+                                .foregroundStyle(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.muted)
                                 .padding(.horizontal, 14).padding(.vertical, 9)
-                                .background(value == "128 ГБ" ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(value == "128 ГБ" ? ClientTheme.lime : ClientTheme.line))
+                                .background(variant.id == displayProduct.id ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.line))
                         }
+                    }
+                    if detailLoading {
+                        ProgressView("Загружаем карточку")
+                            .tint(ClientTheme.lime)
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                    } else if let detailError {
+                        ClientDataErrorView(message: detailError, retry: { Task { await loadDetail() } })
                     }
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         ProductTrustCell(symbol: "shield.checkered", text: "Гарантия 12 мес")
@@ -4310,26 +4333,45 @@ private struct ProductDetail: View {
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Наличие в магазинах").font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
-                        availabilityRow("AliStore Центр", value: product.availableUnits > 0 ? "● есть" : "● нет", color: product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
-                        availabilityRow("AliStore Ош", value: product.availableUnits > 1 ? "● есть" : "● 1 шт", color: product.availableUnits > 1 ? ClientTheme.lime : Color(red: 0.898, green: 0.698, blue: 0.235))
+                        availabilityRow("AliStore Центр", value: displayProduct.availableUnits > 0 ? "● есть" : "● нет", color: displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+                        availabilityRow("AliStore Ош", value: displayProduct.availableUnits > 1 ? "● есть" : "● 1 шт", color: displayProduct.availableUnits > 1 ? ClientTheme.lime : Color(red: 0.898, green: 0.698, blue: 0.235))
                     }
                     .padding(14).background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
                     Text("Характеристики").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
-                    detailRow("SKU", value: product.sku)
-                    detailRow("Категория", value: product.category)
-                    detailRow("Доступно", value: "\(product.availableUnits) шт")
+                    detailRow("SKU", value: displayProduct.sku)
+                    detailRow("Категория", value: displayProduct.category)
+                    detailRow("Доступно", value: "\(displayProduct.availableUnits) шт")
                     Text("Описание").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
                     Text("Оригинальная техника с гарантией AliStore. Проверьте наличие и оформите доставку или самовывоз в удобной точке.")
                         .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).lineSpacing(4)
+                    if !displayRelated.isEmpty {
+                        Text("Похожие товары")
+                            .font(ClientTheme.display(15, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.top, 8)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(displayRelated) { related in
+                                    NavigationLink {
+                                        ProductDetail(environment: environment, product: related, cart: $cart, favorites: $favorites)
+                                    } label: {
+                                        NativeProductCard(product: related, cart: $cart, favorites: $favorites)
+                                            .frame(width: 184)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
                     Button {
-                        cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+                        cart[displayProduct.id] = min(displayProduct.availableUnits, (cart[displayProduct.id] ?? 0) + 1)
                     } label: {
-                        Text(product.availableUnits > 0 ? "Добавить в корзину" : "Нет в наличии")
+                        Text(displayProduct.availableUnits > 0 ? "Добавить в корзину" : "Нет в наличии")
                             .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black)
                             .frame(maxWidth: .infinity).frame(height: 50)
                             .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
                     }
-                    .disabled(product.availableUnits == 0)
+                    .disabled(displayProduct.availableUnits == 0)
                     .padding(.top, 6)
                 }
                 .padding(16)
@@ -4337,6 +4379,19 @@ private struct ProductDetail: View {
         }
         .background(ClientTheme.background)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: displayProduct.id) { await loadDetail() }
+    }
+
+    private func loadDetail() async {
+        detailLoading = true
+        defer { detailLoading = false }
+        do {
+            detail = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products/\(product.id)")
+            detailError = nil
+        } catch is CancellationError {
+        } catch {
+            detailError = error.localizedDescription
+        }
     }
 
     @ViewBuilder

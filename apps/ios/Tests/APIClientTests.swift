@@ -220,6 +220,20 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(response.items.first?.availableUnits, 2)
     }
 
+    func testDecodesCatalogProductDetailContract() async throws {
+        let session = makeSession(status: 200, body: """
+        {"product":{"id":"p1","sku":"IP-1","name":"iPhone","price":100000,"category":"phones","availableUnits":2},"variants":[{"id":"p2","sku":"IP-2","name":"iPhone 256","price":120000,"category":"phones","availableUnits":1}],"related":[{"id":"p3","sku":"CASE-1","name":"Case","price":1500,"category":"accessories","availableUnits":8}]}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let response: CatalogProductDetail = try await client.get("catalog/products/p1")
+
+        XCTAssertEqual(response.product.id, "p1")
+        XCTAssertEqual(response.variants.first?.price, 120000)
+        XCTAssertEqual(response.related.first?.sku, "CASE-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/catalog/products/p1")
+    }
+
     func testSurfacesServerMessage() async throws {
         let session = makeSession(status: 409, body: "{\"message\":\"IMEI уже продан\"}")
         let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)

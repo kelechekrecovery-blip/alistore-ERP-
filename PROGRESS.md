@@ -2613,3 +2613,13 @@
 - Checks run: isolated Prisma migration deploy; `npm run prisma:generate -w @alistore/api`; targeted notification ownership/replay tests `2/2`; `npm run build -w @alistore/api`; `npm run api:test` `149/149` suites and `672/672` tests; `npm run ios:build` all 10 targets; `npm run ios:test` `33/33`; `npm run ios:ui` Client `12/12`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
 - Outcome: notification inbox vertical is accepted at local API and simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
 - Next step: continue the remaining Client App 2.0 screen-by-screen visual pass, then run the signed archive/store preflight when the owner supplies Apple Developer and App Store Connect credentials.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-012`.
+- Task: hydrate the native Client product detail screen from the server catalog detail contract.
+- Files changed: `apps/ios/Shared/Models.swift`, `apps/ios/Client/AliStoreClientApp.swift`, and `apps/ios/Tests/APIClientTests.swift`.
+- Result: product detail now loads the server-authoritative product, variants and related products through `GET /catalog/products/:id`, with loading, retryable error and fallback states. Price, stock, cart and favorite actions continue to use the server-derived product; the native screen no longer relies on static variant/related-product content when the API responds.
+- Checks run: `npm run ios:build` all 10 targets; `npm run ios:test` `34/34`; `npm run ios:ui` Client `12/12`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: product detail API parity is accepted at local simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: continue the remaining Client App 2.0 visual pass and add screenshot evidence for product detail states before moving to the signed archive/store gate.
