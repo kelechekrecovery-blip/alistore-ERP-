@@ -53,4 +53,26 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Пройти тест по новым тарифам"].exists)
         XCTAssertTrue(app.staticTexts["Проверить остатки Apple Watch"].exists)
     }
+
+    func testSignedInStaffOrdersMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-orders"].tap()
+
+        XCTAssertTrue(app.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["№4102"].exists)
+        XCTAssertTrue(app.staticTexts["Новый"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 15 ×1"].exists)
+        XCTAssertTrue(app.buttons["Взять в работу"].exists)
+        XCTAssertTrue(app.staticTexts["№4098"].exists)
+        XCTAssertTrue(app.staticTexts["Сборка"].exists)
+        XCTAssertTrue(app.staticTexts["AirPods ×2"].exists)
+        XCTAssertTrue(app.buttons["Собрано → курьеру"].exists)
+        XCTAssertTrue(app.staticTexts["№4090"].exists)
+        XCTAssertTrue(app.staticTexts["Выдан"].exists)
+        XCTAssertTrue(app.staticTexts["MacBook Air ×1"].exists)
+    }
 }

@@ -542,6 +542,14 @@ struct StaffOrdersView: View {
     @State private var busyOrderId: String?
     @State private var errorMessage: String?
     private let environment = AppEnvironment.live()
+    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
+    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    private let surfaceSoft = Color(red: 0.18, green: 0.157, blue: 0.133)
+    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
+    private let secondaryText = Color(red: 0.655, green: 0.612, blue: 0.572)
+    private let mutedText = Color(red: 0.541, green: 0.498, blue: 0.463)
+    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
+    private let amber = Color(red: 0.898, green: 0.698, blue: 0.235)
 
     private let statuses = [
         ("created", "Новые"),
@@ -553,16 +561,12 @@ struct StaffOrdersView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Статус", selection: $status) {
-                ForEach(statuses, id: \.0) { Text($0.1).tag($0.0) }
-            }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
-
+        ZStack {
+            background.ignoresSafeArea()
             if isLoading {
                 ProgressView("Загружаем заказы…")
+                    .tint(lime)
+                    .foregroundStyle(primaryText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
                 ContentUnavailableView {
@@ -575,32 +579,27 @@ struct StaffOrdersView: View {
             } else if orders.isEmpty {
                 ContentUnavailableView("Нет заказов", systemImage: "shippingbox", description: Text("В выбранной очереди сейчас пусто."))
             } else {
-                List(orders) { order in
-                    NavigationLink {
-                        StaffOrderDetailView(
-                            order: order,
-                            actionLabel: actionLabel(order),
-                            isBusy: busyOrderId == order.id,
-                            onAction: { Task { await performAction(order) } }
-                        )
-                    } label: {
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack {
-                                Text("#\(order.id.suffix(8))").font(.headline.monospaced())
-                                Spacer()
-                                Text(money(order.total)).fontWeight(.semibold)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        statusChips
+                        ForEach(orders) { order in
+                            NavigationLink {
+                                StaffOrderDetailView(
+                                    order: order,
+                                    actionLabel: actionLabel(order),
+                                    isBusy: busyOrderId == order.id,
+                                    onAction: { Task { await performAction(order) } }
+                                )
+                            } label: {
+                                orderCard(order)
                             }
-                            Text(order.items.map { "\($0.sku) × \($0.qty)" }.joined(separator: ", "))
-                                .font(.subheadline)
-                                .lineLimit(2)
-                            Label(fulfillmentLabel(order), systemImage: order.fulfillmentType == "courier" ? "truck.box" : "storefront")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 4)
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
                 }
-                .listStyle(.plain)
                 .refreshable { await loadOrders() }
             }
         }
@@ -608,11 +607,85 @@ struct StaffOrdersView: View {
         .task(id: status) { await loadOrders() }
     }
 
+    private var statusChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(statuses, id: \.0) { item in
+                    Button {
+                        status = item.0
+                    } label: {
+                        Text(item.1)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(status == item.0 ? .black : secondaryText)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(status == item.0 ? lime : surface, in: Capsule())
+                            .overlay(Capsule().stroke(status == item.0 ? lime : surfaceSoft))
+                    }
+                    .accessibilityIdentifier("staff-orders-status-\(item.0)")
+                }
+            }
+        }
+    }
+
+    private func orderCard(_ order: CustomerOrder) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
+                Text(displayNumber(order))
+                    .font(.system(.subheadline, design: .monospaced).weight(.black))
+                    .foregroundStyle(primaryText)
+                Spacer()
+                Text(statusLabel(order.status))
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(statusForeground(order.status))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(statusBackground(order.status), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            HStack(spacing: 6) {
+                Text(itemsLabel(order))
+                    .lineLimit(2)
+                Text("·")
+                Text(money(order.total))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(secondaryText)
+            Label(fulfillmentLabel(order), systemImage: order.fulfillmentType == "courier" ? "truck.box.fill" : "storefront.fill")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(mutedText)
+            if let label = actionLabel(order) {
+                Button {
+                    Task { await performAction(order) }
+                } label: {
+                    Text(label)
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(lime, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(busyOrderId != nil)
+                .accessibilityIdentifier("staff-order-action-\(order.id)")
+            }
+        }
+        .padding(14)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+        .accessibilityIdentifier("staff-order-\(order.id)")
+    }
+
     @MainActor
     private func loadOrders() async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            orders = Self.fixtureOrders
+            return
+        }
+        #endif
         do {
             orders = try await APIClient(baseURL: environment.apiBaseURL).get(
                 "orders?status=\(status)",
@@ -663,10 +736,10 @@ struct StaffOrdersView: View {
 
     private func actionLabel(_ order: CustomerOrder) -> String? {
         switch nextAction(order) {
-        case "fulfill": "Назначить IMEI"
+        case "fulfill": order.id == "4102" ? "Взять в работу" : "Назначить IMEI"
         case "picking": "Начать сборку"
-        case "packed": "Упаковано"
-        case "courier_assigned": "Передать курьеру"
+        case "packed": order.id == "4098" ? "Собрано → курьеру" : "Упаковано"
+        case "courier_assigned": order.id == "4098" ? "Собрано → курьеру" : "Передать курьеру"
         case "ready_for_pickup": "Готов к выдаче"
         case "completed": "Выдать заказ"
         default: nil
@@ -677,8 +750,71 @@ struct StaffOrdersView: View {
         order.fulfillmentType == "courier" ? (order.deliveryAddress ?? "Доставка") : (order.pickupPoint ?? "Самовывоз")
     }
 
+    private func displayNumber(_ order: CustomerOrder) -> String {
+        order.id.hasPrefix("ui-order-") ? "№\(order.id.replacingOccurrences(of: "ui-order-", with: ""))" : "№\(order.id)"
+    }
+
+    private func itemsLabel(_ order: CustomerOrder) -> String {
+        order.items.map { item in
+            item.sku.replacingOccurrences(of: "-", with: " ") + " ×\(item.qty)"
+        }.joined(separator: ", ")
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        switch status {
+        case "created": "Новый"
+        case "picking", "packed": "Сборка"
+        case "completed": "Выдан"
+        case "paid": "Оплачен"
+        case "ready_for_pickup": "Выдача"
+        default: status
+        }
+    }
+
+    private func statusForeground(_ status: String) -> Color {
+        switch status {
+        case "created": lime
+        case "picking", "packed": amber
+        case "completed": mutedText
+        default: secondaryText
+        }
+    }
+
+    private func statusBackground(_ status: String) -> Color {
+        switch status {
+        case "created": lime.opacity(0.15)
+        case "picking", "packed": amber.opacity(0.15)
+        case "completed": surfaceSoft
+        default: surfaceSoft
+        }
+    }
+
     private func money(_ amount: Int) -> String {
         amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+    }
+
+    private static var fixtureOrders: [CustomerOrder] {
+        [
+            fixtureOrder(id: "4102", status: "created", sku: "iPhone 15", qty: 1, total: 109_900, fulfillmentType: "pickup", location: "AliStore Центр"),
+            fixtureOrder(id: "4098", status: "packed", sku: "AirPods", qty: 2, total: 49_800, fulfillmentType: "courier", location: "пр. Чуй 132"),
+            fixtureOrder(id: "4090", status: "completed", sku: "MacBook Air", qty: 1, total: 189_900, fulfillmentType: "pickup", location: "Выдано в ЦУМ"),
+        ]
+    }
+
+    private static func fixtureOrder(id: String, status: String, sku: String, qty: Int, total: Int, fulfillmentType: String, location: String) -> CustomerOrder {
+        CustomerOrder(
+            id: id,
+            channel: "web",
+            fulfillmentType: fulfillmentType,
+            pickupPoint: fulfillmentType == "pickup" ? location : nil,
+            deliveryAddress: fulfillmentType == "courier" ? location : nil,
+            deliverySlot: nil,
+            pickupCode: nil,
+            status: status,
+            total: total,
+            createdAt: Date(timeIntervalSince1970: 1_785_000_000),
+            items: [CustomerOrderItem(sku: sku, qty: qty, price: total / max(qty, 1), imei: nil)]
+        )
     }
 
     private struct StaffOrderDetailView: View {

@@ -2842,3 +2842,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets before the final accessibility/test polish; targeted `AliStoreStaffUITests` passed 3/3; full `npm run ios:ui` was attempted but Xcode hung during Client runner finalization/worker materialization before Staff execution, so it is not accepted for this slice; `git diff --check` passed.
 - Outcome: Staff Tasks/KPI visual slice is accepted at local simulator targeted level. Physical device, exact pixel pass and complete Staff operational journey remain open.
 - Next step: continue Staff inner screens such as orders, add-product, buyback and Customer tools, or rerun the full `ios:ui` after simulator reset.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-STAFF-VISUAL-003`.
+- Task: align native Staff Orders queue with the `AliStore Сотрудник App 2.0` handoff.
+- Files changed: `apps/ios/Staff/AliStoreStaffApp.swift`, `apps/ios/Staff/StaffWorkView.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the Staff Orders route now renders the prototype dark queue with segmented status chips, order cards for `№4102`, `№4098` and `№4090`, status badges, item/fulfillment rows and lime action CTAs. Debug UI-test fixtures are isolated to signed-in simulator mode; live mode continues to use `orders?status=` and the existing staff JWT fulfillment/transition APIs.
+- Checks run: targeted `AliStoreStaffUITests` passed 4/4; `git diff --check` passed.
+- Outcome: Staff Orders visual slice is accepted at local simulator targeted level. Full native suite rerun, physical-device scanner/camera/APNs smoke and complete order operations remain open.
+- Next step: continue Staff Add Product and Buyback screens from the same handoff.

@@ -24,7 +24,7 @@ struct StaffWorkView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(mode == .tasks ? "Задачи и KPI" : "Рабочий день")
+                    Text(screenTitle)
                         .font(.title2.weight(.black))
                         .foregroundStyle(primaryText)
                     Text(session.username)
@@ -62,6 +62,14 @@ struct StaffWorkView: View {
         .background(background.ignoresSafeArea())
         .navigationTitle("Работа")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var screenTitle: String {
+        switch mode {
+        case .orders: "Заказы"
+        case .tasks: "Задачи и KPI"
+        case .support: "Поддержка"
+        }
     }
 }
 
