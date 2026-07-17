@@ -324,10 +324,12 @@ test('authenticated checkout redeems server loyalty and canonical promo exactly 
 });
 
 test('phone checkout preserves the dark Client App handoff theme', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('MOBILE-CHECKOUT', 109_900);
   await page.setViewportSize({ width: 402, height: 858 });
-  await page.addInitScript(() => {
-    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ id: 'mobile-checkout', sku: 'MOBILE-CHECKOUT', name: 'iPhone', price: 109900, qty: 1 }]));
-  });
+  await page.addInitScript((item) => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
+  }, { id: product.id, sku: product.sku, name: product.name, price: product.price });
 
   await page.goto('/checkout');
   await expect(page.getByText('Способ получения')).toBeVisible();

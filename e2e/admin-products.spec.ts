@@ -37,6 +37,19 @@ test('ERP embeds website catalog administration and publishes product changes to
   const catalogResponse = await page.request.get(`${API_BASE}/catalog/products/${product.id}`);
   await expect(catalogResponse).toBeOK();
   await expect(catalogResponse.json()).resolves.toMatchObject({ product: { id: product.id, price: 86000 } });
+
+  await page.evaluate((item) => {
+    localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
+    localStorage.removeItem('alistore.cart.pricing.v1');
+  }, { id: product.id, sku: product.sku, name: 'ERP Published Product', price: 84_000 });
+  await page.goto('/checkout');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900861');
+  await page.getByPlaceholder('Имя').fill('Phase 1 Price Buyer');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByRole('button', { name: /Картой/ }).click();
+  await page.getByRole('button', { name: 'К подтверждению' }).click();
+  await expect(page.getByRole('main').getByText(/86\s?000\s?с/).first()).toBeVisible();
 });
 
 test('admin manages products with AI enrichment and approval-gated danger actions', async ({ page }) => {

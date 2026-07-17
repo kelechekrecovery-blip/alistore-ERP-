@@ -3349,3 +3349,12 @@
 - Checks run: targeted Playwright `1/1`; full `e2e/admin-products.spec.ts` `2/2`; `git diff --check`.
 - Outcome: the first Phase 1 vertical contract slice is locally accepted. Hash-bound ecosystem evidence must be refreshed after this source change; design corpus and live-provider blockers remain unchanged.
 - Next step: add the stale-price checkout negative assertion at the API/browser boundary, then proceed to stock and fulfillment availability.
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-PRICE-CHECKOUT-002`.
+- Task: close stale-cart behavior after an ERP price change.
+- Files changed: `apps/web/app/checkout/page.tsx`, `e2e/admin-products.spec.ts`, `e2e/web-checkout.spec.ts`, and `PROGRESS.md`.
+- Result: checkout now fetches authoritative catalog records before allowing the first step, refreshes unit price and stock limits through `CartContext.reconcileAvailability`, and displays a clear price/stock verification state. A browser scenario proves an `84 000` local cart is shown as `86 000` after the ERP price change; a fake mobile fixture was replaced with a real seeded catalog product.
+- Checks run: production Web build passed; ERP/CMS Playwright `7/7`; checkout Playwright `7/7`; targeted stale-price test passed; `git diff --check`.
+- Outcome: Phase 1 price/tax authority slice is accepted locally. The API already recalculates server prices and remains authoritative at order creation. Trusted evidence needs rebinding after this source change.
+- Next step: verify ERP store-point, stock and delivery-slot changes reach checkout and fail safely when availability changes.

@@ -24,6 +24,7 @@ import {
   type DeliveryZone,
   type StorePoint,
 } from '@/lib/api';
+import { fetchProduct } from '@/lib/api/catalog';
 import { loadAttribution } from '@/lib/attribution';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -61,7 +62,17 @@ function slotLabel(slot: DeliverySlot) {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, total, promoDiscount, bonusDiscount, promoCode, clear, hydrated } = useCart();
+  const {
+    items,
+    subtotal,
+    total,
+    promoDiscount,
+    bonusDiscount,
+    promoCode,
+    clear,
+    hydrated,
+    reconcileAvailability,
+  } = useCart();
   const { user, hydrated: authHydrated, authed } = useAuth();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState('pickup');
@@ -76,6 +87,7 @@ export default function CheckoutPage() {
   const [deliverySlotId, setDeliverySlotId] = useState('');
   const [deliveryCapacityLoading, setDeliveryCapacityLoading] = useState(true);
   const [deliveryCapacityError, setDeliveryCapacityError] = useState(false);
+  const [cartRefreshing, setCartRefreshing] = useState(true);
   const [busy, setBusy] = useState(false);
   const [giftBusy, setGiftBusy] = useState(false);
   const [giftCode, setGiftCode] = useState('');
@@ -98,6 +110,23 @@ export default function CheckoutPage() {
       .then((addresses) => setDeliveryAddress((current) => current || addresses.find((item) => item.isPrimary)?.text || addresses[0]?.text || ''))
       .catch(() => setDeliveryAddress(''));
   }, [authHydrated, user, authed]);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (items.length === 0) {
+      setCartRefreshing(false);
+      return;
+    }
+    let active = true;
+    setCartRefreshing(true);
+    Promise.all(items.map((item) => fetchProduct(item.id))).then((products) => {
+      if (!active) return;
+      reconcileAvailability(products.filter((product): product is NonNullable<typeof product> => Boolean(product)));
+      setCartRefreshing(false);
+    });
+    return () => { active = false; };
+    // The cart context clamps quantity and refreshes the displayed unit price.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, reconcileAvailability]);
   useEffect(() => {
     let active = true;
     fetchCheckoutOptions(logisticsDate())
@@ -387,7 +416,8 @@ export default function CheckoutPage() {
                 )}
               </>
             )}
-            <button type="button" disabled={deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
+            {cartRefreshing && <p className="mb-2 text-xs text-[#A79C92]">Проверяем актуальные цены и остатки…</p>}
+            <button type="button" disabled={cartRefreshing || deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
           </>
         )}
         {step === 1 && (
