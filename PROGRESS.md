@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-2-NATIVE-PACKAGED-GATES-022`.
+- Task: refresh packaged iOS and Android UI evidence against the current source tree.
+- Result: iOS packaged UI passed `34/34` (Client 21, Staff 9, Courier 2, POS 2); Android packaged connected UI passed `30/30` across Core/Client/Staff/Courier/POS on AVD `savio_api36_arm64` (API 36). Both hash-bound evidence artifacts are committed.
+- Checks run: `npm run ios:ui` passed; `npm run android:ui` passed after starting the available AVD; `npm run ecosystem:audit:strict` passes all web/API, visual, native UI and reconciliation checks.
+- Commits: `e2bf4dd`, `f714de2`.
+- Next step: continue native functional parity and staging software preparation; strict audit has one remaining blocker, the 64 missing linked design references requiring owner restore/retire decisions.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-ERP-STOREFRONT-021`.
 - Task: finish Phase 1 web/API reconciliation and refresh trusted acceptance evidence on the current HEAD.
 - Result: refund stale-provider recovery is covered by `refund-provider-stale.e2e-spec.ts` (8/8); full Playwright passes `62/62`; visual acceptance passes `3/3`; POS/refund, courier/COD, service/loaner and procurement/sale evidence plus the reconciled matrix are hash-bound and accepted.
