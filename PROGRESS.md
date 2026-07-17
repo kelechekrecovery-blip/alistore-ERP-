@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — ANDROID-CLIENT-DETAIL-001
+
+- Iteration ID: `ANDROID-CLIENT-DETAIL-001`.
+- Task: close the Android Client catalog-to-product-detail gap against the existing server contract.
+- Files changed: `apps/android/core/src/main/java/kg/alistore/core/AliStoreApp.kt`, `apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt`, `apps/android/core/src/main/java/kg/alistore/core/ClientCatalogScreen.kt`, `apps/android/core/src/main/java/kg/alistore/core/ClientProductDetailScreen.kt`, `apps/android/core/src/main/java/kg/alistore/core/Models.kt`, `apps/android/core/src/androidTest/java/kg/alistore/core/ClientProductDetailScreenTest.kt`, `BACKLOG.md`.
+- Result: Client catalog cards now open a server-backed product detail route, load variants and related products through `GET /catalog/products/:id`, preserve server-derived price/stock, and expose favorite/cart/back actions. The detail content has a deterministic Compose test; no client-side status or price authority was added. The current API does not expose product media URLs, so the existing neutral media treatment remains an explicit follow-up rather than a fabricated asset.
+- Checks run: `npm run android:build` passed all four debug APKs; `npm run android:test` passed unit tests and `lintDebug`; `npm run android:ui` passed 28 shared/core tests plus packaged Client, Staff, Courier and POS smoke tests; `git diff --check`.
+- Acceptance: accepted for the local Android Client product-detail software vertical. Full 17-screen Android parity, product media, physical-device biometric/push/camera/network smoke, signing and store submission remain open; production readiness remains `RED`.
+- Next step: continue Android Client account/payment visual parity or move to the next unblocked ERP/native slice while keeping trusted evidence and external release blockers explicit.
+
 # 2026-07-17 — STORE-OPS-001 verification follow-up
 
 - Iteration ID: `STORE-OPS-001` verification follow-up.

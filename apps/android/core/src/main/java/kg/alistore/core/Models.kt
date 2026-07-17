@@ -11,6 +11,12 @@ data class Product(
   val availableUnits: Int,
 )
 
+data class CatalogProductDetail(
+  val product: Product,
+  val variants: List<Product> = emptyList(),
+  val related: List<Product> = emptyList(),
+)
+
 data class StorePoint(
   val id: String,
   val code: String,

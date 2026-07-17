@@ -27,13 +27,15 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
       buildList {
         for (index in 0 until items.length()) {
           val item = items.getJSONObject(index)
-          add(Product(item.getString("id"), item.getString("sku"), item.getString("name"), item.getInt("price"), item.getString("category"), item.getInt("availableUnits")))
+          add(item.product())
         }
       }
     } finally {
       connection.disconnect()
     }
   }
+
+  suspend fun catalogProduct(id: String): CatalogProductDetail = request("catalog/products/$id", "GET").catalogProductDetail()
 
   suspend fun checkoutStorePoints(): List<StorePoint> = withContext(Dispatchers.IO) {
     val connection = open("logistics/checkout-options", "GET")
@@ -519,6 +521,25 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 data class RawApiResponse(val status: Int, val body: String)
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
+
+private fun JSONObject.product() = Product(
+  id = getString("id"),
+  sku = getString("sku"),
+  name = getString("name"),
+  price = getInt("price"),
+  category = getString("category"),
+  availableUnits = getInt("availableUnits"),
+)
+
+private fun JSONObject.catalogProductDetail() = CatalogProductDetail(
+  product = getJSONObject("product").product(),
+  variants = optJSONArray("variants")?.let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).product()) }
+  }.orEmpty(),
+  related = optJSONArray("related")?.let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).product()) }
+  }.orEmpty(),
+)
 
 private fun JSONObject.order() = CustomerOrder(
   id = getString("id"),

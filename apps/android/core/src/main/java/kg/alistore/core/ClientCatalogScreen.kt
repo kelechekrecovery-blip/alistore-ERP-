@@ -75,6 +75,7 @@ internal fun ClientCatalogScreen(
   cart: Set<String>,
   onFavorite: (String) -> Unit,
   onCart: (String) -> Unit,
+  onOpenProduct: (String) -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   var filter by remember { mutableStateOf(CatalogFilter()) }
@@ -171,7 +172,7 @@ internal fun ClientCatalogScreen(
           }
         }
         items(visibleProducts, key = Product::id) { product ->
-          ProductCard(product, product.id in favorites, product.id in cart, onFavorite, onCart)
+          ProductCard(product, product.id in favorites, product.id in cart, onFavorite, onCart, onOpen = onOpenProduct)
         }
       }
     }
