@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packageLockSha256": "7c8423cca8cf0eed72f77b7fc2f38bb883db97fee05a88096ea73114d24f7792",
-  "nodeModulesTreeSha256": "4b8d641ec4404162a71e74dfdc454b0180ad26094b18678facfe5fe7ab5ea47e",
+  "nodeModulesTreeSha256": "38a60220115ca2bf7e83c512489b1fc6ebac4c9f20f435bed4b4df0bce19f55a",
   "runtime": {
     "platform": "darwin",
     "architecture": "arm64",
@@ -15,8 +15,8 @@
     "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
     "npmTreeSha256": "e67a8e00660f73aa621c1ddada5d5d28972e5118c50835b29d2731ce5b37a2e2",
     "browserPath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "browserSha256": "8bb3895672713f92b34f0b3b8b5f9e8cf9047c6ad1f5fef7353e529dcee00f7b",
-    "browserAppTreeSha256": "54fa59ca563927b9d4a3e11e9b4676257e39054cce212766a6e15ada9a1d637c"
+    "browserSha256": "5acd03e7ff56ad32bc99f27b258b75393795463b53c66dd531c4432e8d0a5a3e",
+    "browserAppTreeSha256": "9543a7ec4ded3d016c8bc3e737faa83a6ddeb1ee0ce14e52a0dc6488f44fc72c"
   },
   "playwright": {
     "version": "1.61.1",

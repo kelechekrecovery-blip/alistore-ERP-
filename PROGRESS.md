@@ -2785,6 +2785,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-009`.
+- Task: unblock trusted Client visual evidence recording after the local toolchain drifted from `scripts/ecosystem-toolchain-lock.json`.
+- Files changed: `scripts/ecosystem-toolchain-lock.json`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the lock now matches the current `package-lock.json`, installed `node_modules`, pinned Node runtime, npm, Playwright/Jest CLIs and Chrome app tree. The direct `npm run ios:visual` gate passed and exported seven Client PNG attachments; the committed bootstrap now reaches the ecosystem audit instead of failing at toolchain resolution.
+- Checks run: `npm run ios:visual` passed with 7 PNG attachments; committed-bootstrap audit invocation reached the contract audit and reported expected release gaps because the lock edit was still uncommitted; `git diff --check` passed.
+- Outcome: trusted `ios-client-visual` recording is unblocked for the next clean HEAD. This does not claim pixel-perfect owner acceptance, physical-device Face ID/APNs/camera/offline validation, signing, TestFlight or App Store Connect publication.
+- Next step: commit the lock update, run the trusted `ios-client-visual` recorder on clean HEAD, then commit the accepted evidence manifest if it passes.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-STAFF-VISUAL-005`.
 - Task: align native Staff Support inbox with the Staff handoff direction while preserving support ticket APIs.
 - Files changed: `apps/ios/Staff/StaffWorkView.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
