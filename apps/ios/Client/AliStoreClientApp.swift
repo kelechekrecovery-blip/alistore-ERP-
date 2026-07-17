@@ -611,8 +611,16 @@ private struct ClientRootView: View {
         do {
             let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
             products = response.items
+            if UITestBootstrap.startsAtCheckout, let product = response.items.first {
+                cart[product.id] = 1
+            }
             catalogError = nil
         } catch {
+            if UITestBootstrap.startsAtCheckout {
+                let fixture = Product(id: "ui-product", sku: "UI-IPHONE", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3)
+                products = [fixture]
+                cart[fixture.id] = 1
+            }
             catalogError = error.localizedDescription
         }
     }
@@ -677,6 +685,169 @@ private struct ClientRootView: View {
     }
 }
 
+private enum ClientCheckoutStep: Int, CaseIterable, Identifiable {
+    case delivery
+    case address
+    case payment
+    case review
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .delivery: "Получение"
+        case .address: "Адрес"
+        case .payment: "Оплата"
+        case .review: "Проверка"
+        }
+    }
+}
+
+private struct ClientChoiceRow: View {
+    let symbol: String
+    let title: String
+    let detail: String
+    let trailing: String?
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(selected ? .black : ClientTheme.lime)
+                    .frame(width: 40, height: 40)
+                    .background(selected ? ClientTheme.lime : ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(detail)
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+                if let trailing {
+                    Text(trailing)
+                        .font(ClientTheme.body(12, weight: .medium))
+                        .foregroundStyle(selected ? ClientTheme.lime : ClientTheme.muted)
+                }
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? ClientTheme.lime : ClientTheme.muted)
+            }
+            .padding(14)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? ClientTheme.lime : ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ClientCheckoutSteps: View {
+    let current: ClientCheckoutStep
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(ClientCheckoutStep.allCases) { step in
+                Capsule()
+                    .fill(step.rawValue <= current.rawValue ? ClientTheme.lime : ClientTheme.line)
+                    .frame(height: 4)
+                    .accessibilityLabel(step.title)
+            }
+        }
+    }
+}
+
+private struct ClientSummaryRow: View {
+    let title: String
+    let value: String
+    let emphasized: Bool
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(ClientTheme.body(emphasized ? 15 : 13, weight: emphasized ? .bold : .regular))
+                .foregroundStyle(emphasized ? .white : ClientTheme.muted)
+            Spacer()
+            Text(value)
+                .font(ClientTheme.display(emphasized ? 19 : 13, weight: emphasized ? .black : .medium))
+                .foregroundStyle(emphasized ? ClientTheme.lime : Color(red: 0.847, green: 0.812, blue: 0.776))
+        }
+    }
+}
+
+private struct ClientReadOnlyField: View {
+    let title: String
+    let value: String
+    let monospaced: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            Text(value)
+                .font(monospaced ? .system(size: 14, design: .monospaced) : ClientTheme.body(14))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(13)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+        }
+    }
+}
+
+private struct ClientInputField: View {
+    let title: String
+    @Binding var text: String
+    let placeholder: String
+    let monospaced: Bool
+
+    init(title: String, text: Binding<String>, placeholder: String = "", monospaced: Bool = false) {
+        self.title = title
+        _text = text
+        self.placeholder = placeholder
+        self.monospaced = monospaced
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            TextField(placeholder, text: $text)
+                .font(monospaced ? .system(size: 14, design: .monospaced) : ClientTheme.body(14))
+                .foregroundStyle(.white)
+                .textInputAutocapitalization(.never)
+                .padding(13)
+                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+        }
+    }
+}
+
+private struct ClientCallout: View {
+    let symbol: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(ClientTheme.lime)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted).lineSpacing(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(13)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+    }
+}
+
 private struct CartView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
@@ -694,6 +865,8 @@ private struct CartView: View {
     @State private var completedOrder: CustomerOrder?
     @State private var paymentIntent: PaymentIntent?
     @State private var queuedOffline = false
+    @State private var checkoutStep: ClientCheckoutStep = .delivery
+    @State private var showingOrderStatus = false
 
     private var lines: [(Product, Int)] {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
@@ -701,103 +874,200 @@ private struct CartView: View {
     private var total: Int { lines.reduce(0) { $0 + $1.0.price * $1.1 } }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if queuedOffline {
-                    ContentUnavailableView(
-                        "Заказ сохранён офлайн",
-                        systemImage: "arrow.triangle.2.circlepath",
-                        description: Text("Повторите отправку в Кабинет → Синхронизация.")
-                    )
-                } else if let order = completedOrder {
-                    VStack(spacing: 18) {
-                        ContentUnavailableView(
-                            paymentIntent == nil ? "Заказ оформлен" : "Ожидает оплаты",
-                            systemImage: paymentIntent == nil ? "checkmark.circle.fill" : "creditcard",
-                            description: Text("#\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
-                        )
-                        if let paymentIntent {
-                            if let url = paymentURL(paymentIntent) {
-                                Link("Перейти к оплате", destination: url)
-                                    .buttonStyle(.borderedProminent)
-                            }
-                            if let qr = paymentIntent.qrPayload {
-                                Text(qr).font(.caption.monospaced()).textSelection(.enabled).padding(.horizontal)
-                            }
-                            Text("Статус подтвердит только платёжный webhook.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    if queuedOffline {
+                        offlineState
+                    } else if let order = completedOrder {
+                        ClientPaymentResultView(order: order, paymentIntent: paymentIntent, paymentURL: paymentIntent.flatMap(paymentURL), onTrack: { showingOrderStatus = true }, onReset: resetCheckout)
+                    } else if lines.isEmpty {
+                        EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
+                    } else {
+                        if checkoutStep == .review {
+                            reviewStep
+                        } else {
+                            stepContent
                         }
+                        footer
                     }
-                } else if lines.isEmpty {
-                    EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
-                } else {
-                    List {
-                        Section("Товары") {
-                            ForEach(lines, id: \.0.id) { product, quantity in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(product.name).font(.headline)
-                                        Text(product.price, format: .currency(code: "KGS")).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Stepper("\(quantity)", value: quantityBinding(product.id), in: 0...max(1, product.availableUnits))
-                                        .fixedSize()
-                                }
-                            }
-                        }
-                        Section("Получение") {
-                            Picker("Способ", selection: $fulfillment) {
-                                Text("Самовывоз").tag("pickup")
-                                Text("Курьер").tag("courier")
-                            }
-                            .pickerStyle(.segmented)
-                            if fulfillment == "courier" {
-                                TextField("Адрес доставки", text: $address)
-                            } else {
-                                if pickupPoints.isEmpty {
-                                    Text(pointError ?? "Загружаем точки…").foregroundStyle(.secondary)
-                                } else {
-                                    Picker("Точка", selection: $selectedStorePointId) {
-                                        ForEach(pickupPoints) { point in
-                                            Text("\(point.name) · \(point.address)").tag(point.id)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Section("Оплата") {
-                            Picker("Способ", selection: $paymentMethod) {
-                                Text("При получении").tag("cash")
-                                Text("Карта").tag(OnlinePaymentMethod.card.rawValue)
-                                Text("MBank QR").tag(OnlinePaymentMethod.qrMBank.rawValue)
-                                Text("O!Деньги QR").tag(OnlinePaymentMethod.qrODengi.rawValue)
-                                Text("Рассрочка").tag(OnlinePaymentMethod.installment.rawValue)
-                            }
-                        }
-                        Section {
-                            LabeledContent("Итого", value: total, format: .currency(code: "KGS"))
-                            if auth.session == nil {
-                                Text("Войдите по SMS-коду во вкладке «Кабинет».").font(.caption).foregroundStyle(.secondary)
-                            }
-                            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
-                            Button {
-                                Task { await checkout() }
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    if isSubmitting { ProgressView() } else { Text("Оформить заказ").fontWeight(.semibold) }
-                                    Spacer()
-                                }
-                            }
-                            .disabled(isSubmitting || auth.session == nil || (fulfillment == "pickup" && selectedStorePointId.isEmpty) || (fulfillment == "courier" && address.trimmingCharacters(in: .whitespaces).isEmpty))
-                        }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 22)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .task { await loadStorePoints() }
+        .sheet(isPresented: $showingOrderStatus) {
+            if let order = completedOrder {
+                ClientOrderStatusView(order: order)
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(completedOrder == nil ? "Оформление" : "Готово")
+                    .font(ClientTheme.display(20, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if completedOrder == nil && !lines.isEmpty {
+                    Text("\(lines.count) поз.")
+                        .font(ClientTheme.body(12, weight: .medium))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if completedOrder == nil && !lines.isEmpty {
+                ClientCheckoutSteps(current: checkoutStep)
+                HStack {
+                    ForEach(ClientCheckoutStep.allCases) { step in
+                        Text(step.title)
+                            .font(ClientTheme.body(10, weight: step == checkoutStep ? .bold : .regular))
+                            .foregroundStyle(step == checkoutStep ? ClientTheme.lime : ClientTheme.muted)
+                            .frame(maxWidth: .infinity, alignment: step == .delivery ? .leading : step == .review ? .trailing : .center)
                     }
                 }
             }
-            .navigationTitle("Корзина")
-            .task { await loadStorePoints() }
         }
+    }
+
+    private var stepContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch checkoutStep {
+            case .delivery:
+                Text("Способ получения").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+                ClientChoiceRow(symbol: "building.2.fill", title: "Самовывоз", detail: "Заберите сегодня из магазина", trailing: "бесплатно", selected: fulfillment == "pickup") { fulfillment = "pickup" }
+                ClientChoiceRow(symbol: "bolt.fill", title: "Курьер", detail: "Доставка по Бишкеку за 1–2 часа", trailing: "от 200 сом", selected: fulfillment == "courier") { fulfillment = "courier" }
+            case .address:
+                Text("Контакты и адрес").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+                ClientReadOnlyField(title: "Телефон", value: auth.session?.phone ?? "Войдите в аккаунт", monospaced: true)
+                if fulfillment == "courier" {
+                    ClientInputField(title: "Адрес доставки", text: $address, placeholder: "г. Бишкек, улица, дом")
+                } else if pickupPoints.isEmpty {
+                    ClientCallout(symbol: "building.2", title: pointError ?? "Точки самовывоза загружаются", detail: "Выберите способ получения после загрузки данных.")
+                } else {
+                    ForEach(pickupPoints) { point in
+                        ClientChoiceRow(symbol: "mappin", title: point.name, detail: point.address, trailing: point.hours, selected: selectedStorePointId == point.id) { selectedStorePointId = point.id }
+                    }
+                }
+            case .payment:
+                Text("Оплата").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+                ClientChoiceRow(symbol: "banknote", title: "При получении", detail: "Наличными или картой в точке", trailing: nil, selected: paymentMethod == "cash") { paymentMethod = "cash" }
+                ClientChoiceRow(symbol: "creditcard.fill", title: "Банковская карта", detail: "Защищённый платёж через провайдера", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.card.rawValue) { paymentMethod = OnlinePaymentMethod.card.rawValue }
+                ClientChoiceRow(symbol: "qrcode", title: "MBank QR", detail: "Оплата в приложении MBank", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrMBank.rawValue) { paymentMethod = OnlinePaymentMethod.qrMBank.rawValue }
+                ClientChoiceRow(symbol: "qrcode", title: "O!Деньги QR", detail: "Оплата в приложении O!Деньги", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrODengi.rawValue) { paymentMethod = OnlinePaymentMethod.qrODengi.rawValue }
+                ClientChoiceRow(symbol: "calendar", title: "Рассрочка", detail: "Условия зависят от банка-партнёра", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.installment.rawValue) { paymentMethod = OnlinePaymentMethod.installment.rawValue }
+            case .review:
+                reviewStep
+            }
+        }
+    }
+
+    private var reviewStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Подтверждение").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(lines, id: \.0.id) { product, quantity in
+                    HStack(spacing: 10) {
+                        ClientProductImage(product: product, cornerRadius: 10).frame(width: 54, height: 54)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
+                            Text("\(quantity) × \(product.price.formatted(.currency(code: "KGS")))").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                        }
+                        Spacer()
+                    }
+                }
+                Divider().overlay(ClientTheme.line)
+                ClientSummaryRow(title: "Получение", value: fulfillment == "pickup" ? (pickupPoints.first(where: { $0.id == selectedStorePointId })?.name ?? "Самовывоз") : "Курьер", emphasized: false)
+                ClientSummaryRow(title: "Оплата", value: paymentLabel, emphasized: false)
+                ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +))", emphasized: false)
+                Divider().overlay(ClientTheme.line)
+                ClientSummaryRow(title: "К оплате", value: total.formatted(.currency(code: "KGS")), emphasized: true)
+            }
+            .padding(16)
+            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+            Text("Нажимая «Подтвердить заказ», вы соглашаетесь с условиями продажи и политикой возврата AliStore.")
+                .font(ClientTheme.body(11))
+                .foregroundStyle(ClientTheme.muted)
+                .lineSpacing(3)
+        }
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if auth.session == nil {
+                ClientCallout(symbol: "person.badge.key", title: "Войдите, чтобы оформить заказ", detail: "Откройте Кабинет и войдите по SMS-коду.")
+            }
+            if let errorMessage {
+                Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(Color(red: 1, green: 0.54, blue: 0.48))
+            }
+            Button {
+                if checkoutStep == .review {
+                    Task { await checkout() }
+                } else if let next = ClientCheckoutStep(rawValue: checkoutStep.rawValue + 1) {
+                    checkoutStep = next
+                }
+            } label: {
+                HStack {
+                    Spacer()
+                    if isSubmitting { ProgressView().tint(.black) } else { Text(checkoutStep == .review ? "Подтвердить заказ" : checkoutStep == .payment ? "К подтверждению" : "Далее") }
+                    Spacer()
+                }
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(canAdvance ? .black : Color(red: 0.431, green: 0.392, blue: 0.361))
+                .frame(height: 50)
+                .background(canAdvance ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .disabled(!canAdvance || isSubmitting)
+            if checkoutStep != .delivery {
+                Button("Назад") { checkoutStep = ClientCheckoutStep(rawValue: checkoutStep.rawValue - 1) ?? .delivery }
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var offlineState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 38)).foregroundStyle(ClientTheme.lime)
+            Text("Заказ сохранён офлайн").font(ClientTheme.display(20, weight: .bold)).foregroundStyle(.white)
+            Text("Он отправится автоматически после восстановления связи. Повторить отправку можно в Кабинет → Синхронизация.")
+                .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
+    }
+
+    private var canAdvance: Bool {
+        guard auth.session != nil else { return false }
+        switch checkoutStep {
+        case .delivery: return fulfillment == "pickup" || fulfillment == "courier"
+        case .address: return fulfillment == "pickup" ? !selectedStorePointId.isEmpty : !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .payment: return !paymentMethod.isEmpty
+        case .review: return !lines.isEmpty
+        }
+    }
+
+    private var paymentLabel: String {
+        switch paymentMethod {
+        case "cash": "При получении"
+        case OnlinePaymentMethod.card.rawValue: "Банковская карта"
+        case OnlinePaymentMethod.qrMBank.rawValue: "MBank QR"
+        case OnlinePaymentMethod.qrODengi.rawValue: "O!Деньги QR"
+        case OnlinePaymentMethod.installment.rawValue: "Рассрочка"
+        default: paymentMethod
+        }
+    }
+
+    private func resetCheckout() {
+        completedOrder = nil
+        paymentIntent = nil
+        queuedOffline = false
+        checkoutStep = .delivery
     }
 
     private func quantityBinding(_ id: String) -> Binding<Int> {
@@ -878,6 +1148,162 @@ private struct CartView: View {
 
     private func paymentURL(_ intent: PaymentIntent) -> URL? {
         URL(string: intent.paymentUrl, relativeTo: environment.apiBaseURL)?.absoluteURL
+    }
+}
+
+private struct ClientPaymentResultView: View {
+    let order: CustomerOrder
+    let paymentIntent: PaymentIntent?
+    let paymentURL: URL?
+    let onTrack: () -> Void
+    let onReset: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: paymentIntent == nil ? "checkmark" : "creditcard")
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(width: 80, height: 80)
+                .background(paymentIntent == nil ? ClientTheme.lime : Color(red: 0.898, green: 0.698, blue: 0.235), in: Circle())
+            Text(paymentIntent == nil ? "Заказ оформлен" : "Ожидает оплаты")
+                .font(ClientTheme.display(24, weight: .black))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Text("Заказ #\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
+                .font(ClientTheme.body(14))
+                .foregroundStyle(ClientTheme.muted)
+            Text(paymentIntent == nil ? "Мы передали заказ в обработку. Актуальный статус будет обновляться в Кабинете." : "Завершите оплату на защищённой странице провайдера. Статус подтвердит только серверный webhook.")
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 10)
+            if let paymentURL {
+                Link("Перейти к оплате", destination: paymentURL)
+                    .font(ClientTheme.body(15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            Button("Отследить заказ", action: onTrack)
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            Button("Вернуться в каталог", action: onReset)
+                .font(ClientTheme.body(13, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 440)
+    }
+}
+
+private struct ClientOrderStatusView: View {
+    let order: CustomerOrder
+    @Environment(\.dismiss) private var dismiss
+
+    private let steps = [
+        ("Заказ создан", "checkmark.circle"),
+        ("Оплата подтверждена", "creditcard"),
+        ("Собираем заказ", "shippingbox"),
+        ("Готов к выдаче или в пути", "truck.box"),
+        ("Получен", "house")
+    ]
+
+    private var currentIndex: Int {
+        let value = order.status.lowercased()
+        if value.contains("deliver") || value.contains("complete") || value.contains("получ") { return 4 }
+        if value.contains("out_for") || value.contains("ready") || value.contains("pickup") || value.contains("courier") { return 3 }
+        if value.contains("process") || value.contains("pack") || value.contains("reserv") { return 2 }
+        if value.contains("paid") || value.contains("confirm") { return 1 }
+        return 0
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Заказ #\(order.id.suffix(6))")
+                            .font(ClientTheme.display(20, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("\(order.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(order.total.formatted(.currency(code: "KGS")))")
+                            .font(ClientTheme.body(12))
+                            .foregroundStyle(ClientTheme.muted)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(spacing: 0) {
+                                    Image(systemName: index <= currentIndex ? "checkmark" : step.1)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(index <= currentIndex ? .black : ClientTheme.muted)
+                                        .frame(width: 26, height: 26)
+                                        .background(index <= currentIndex ? ClientTheme.lime : ClientTheme.background, in: Circle())
+                                    if index < steps.count - 1 {
+                                        Rectangle().fill(ClientTheme.line).frame(width: 2, height: 28)
+                                    }
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(step.0)
+                                        .font(ClientTheme.body(14, weight: index == currentIndex ? .bold : .medium))
+                                        .foregroundStyle(index <= currentIndex ? .white : ClientTheme.muted)
+                                    if index == currentIndex {
+                                        Text("Текущий статус: \(order.status)")
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(ClientTheme.muted)
+                                    }
+                                }
+                                .padding(.top, 3)
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+                    HStack(spacing: 8) {
+                        ClientStatusAction(symbol: "doc.text", title: "Чек")
+                        ClientStatusAction(symbol: "shield.checkered", title: "Гарантия")
+                    }
+                    Text("Статус заказа и оплаты обновляется сервером. Повторное нажатие не создаёт новый заказ.")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineSpacing(3)
+                }
+                .padding(16)
+            }
+            .background(ClientTheme.background)
+            .navigationTitle("Статус заказа")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Закрыть") { dismiss() }
+                }
+            }
+        }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct ClientStatusAction: View {
+    let symbol: String
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol)
+            Text(title).font(ClientTheme.body(13, weight: .medium))
+        }
+        .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
     }
 }
 

@@ -12,6 +12,15 @@ public struct Product: Decodable, Identifiable, Sendable {
     public let price: Int
     public let category: String
     public let availableUnits: Int
+
+    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int) {
+        self.id = id
+        self.sku = sku
+        self.name = name
+        self.price = price
+        self.category = category
+        self.availableUnits = availableUnits
+    }
 }
 
 public struct StorePoint: Decodable, Identifiable, Sendable {

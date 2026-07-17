@@ -16,4 +16,12 @@ public enum UITestBootstrap {
         false
         #endif
     }
+
+    public static var startsAtCheckout: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-checkout")
+        #else
+        false
+        #endif
+    }
 }

@@ -2506,6 +2506,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-002`.
+- Task: align the native Client checkout vertical with the `AliStore Клиент App 2.0` prototype.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Shared/UITestBootstrap.swift`, and `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: replaced the system checkout list with a dark four-stage shell for delivery, address, payment and review; added server-backed payment result and order-status views; preserved stable order/payment idempotency and server-authoritative state; added a debug-only UI fixture path so the checkout can be exercised without creating a real order.
+- Checks run: `npm run ios:build` passed all iOS targets; `npm run ios:test` passed 33/33 core tests; isolated `AliStoreClientUITests` passed 5/5; Staff, Courier and POS UI smoke each passed 1/1 in the shared UI run before the duplicate runner was stopped; `git diff --check` passed. `store-preflight.sh` remains intentionally blocked because `DEVELOPMENT_TEAM`, `ASC_API_KEY_PATH` and `ASC_ISSUER_ID` are not configured.
+- Outcome: the checkout/result/order software vertical is accepted locally. Full Client screen parity, physical-device push/camera/offline validation, release archive and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: persist cart/favorites/compare across app restarts, connect order status navigation, then continue the remaining Client App 2.0 screens and release evidence.
+
+## 2026-07-17
+
 - Iteration ID: `AP-001H`.
 - Task: capitalize landed cost across received serialized procurement units.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260717060000_landed_cost/migration.sql`, `apps/api/src/procurement/procurement.dto.ts`, `apps/api/src/procurement/procurement.controller.ts`, `apps/api/src/procurement/procurement.module.ts`, `apps/api/src/procurement/procurement.service.ts`, `apps/api/test/procurement.e2e-spec.ts`, `apps/api/test/finance-expenses.e2e-spec.ts`, and `PROGRESS.md`.
