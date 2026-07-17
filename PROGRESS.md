@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — SERVICE-LOANER-EVIDENCE-002
+
+- Iteration ID: `SERVICE-LOANER-EVIDENCE-002`.
+- Task: refresh trusted warranty repair, paid service collection and loaner custody reconciliation evidence.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/service-loaner-reconciliation-084c3eec40ee6e3bcee8fc1d309679062371400fce104e5c22c57a05e8d4af38.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run ecosystem:service-loaner:e2e` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`. API Jest passed service-center, service-loaner and warranty RBAC suites `3/3` with `9/9` tests, and Playwright passed service-center UI `3/3`.
+- Checks run: trusted ecosystem recorder for `service-loaner-reconciliation`; `git diff --check`.
+- Acceptance: accepted for committed local software reconciliation evidence. Physical service desk/device evidence capture, live customer/provider notifications and first-store UAT remain open.
+- Next step: refresh procurement/sale and composite reconciled ecosystem evidence.
+
 # 2026-07-17 — COURIER-COD-EVIDENCE-002
 
 - Iteration ID: `COURIER-COD-EVIDENCE-002`.
