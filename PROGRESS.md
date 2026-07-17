@@ -3368,3 +3368,13 @@
 - Checks run: targeted Playwright `1/1`; `git diff --check`.
 - Outcome: the pickup-point lifecycle is accepted locally as part of the Phase 1 logistics slice. Delivery-zone/slot creation and capacity behavior remain the next bounded assertion; physical dispatch, maps, courier devices and live provider gates remain open.
 - Next step: add the ERP-created delivery zone/slot -> courier checkout availability assertion.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-LOGISTICS-004`.
+- Task: prove that an ERP-created delivery zone and capacity slot control courier checkout availability and server-delivery pricing.
+- Files changed: `e2e/erp-logistics-storefront.spec.ts` and `PROGRESS.md`.
+- Result: the browser contract creates a zone with a 350-с тариф and a one-order slot through ERP, then verifies customer checkout selects that zone, exposes the available slot, and carries the ERP tariff into the public delivery option. The test uses a real seeded catalog item so checkout revalidation and availability rules are exercised together.
+- Checks run: targeted Playwright `1/1`; full logistics file `2/2` (the pickup-point lifecycle and delivery-zone/slot lifecycle); `git diff --check`.
+- Outcome: the Phase 1 stock/fulfillment availability slice is accepted locally at the ERP-to-checkout boundary. Reservation consumption, dispatch/courier handoff and physical delivery remain covered by existing broader tests and external device/provider gates.
+- Next step: close the remaining Phase 1 publication and promotion acceptance notes, then run the consolidated Phase 1 software gate.
