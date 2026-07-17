@@ -3766,6 +3766,7 @@ private struct CustomerSupportView: View {
     @State private var submissionKey = UUID().uuidString
     @State private var isSubmitting = false
     @State private var submissionError: String?
+    @State private var isFormOpen = false
 
     private var normalizedSubject: String {
         subject.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3789,91 +3790,107 @@ private struct CustomerSupportView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 8) {
-                            ClientSupportChannel(symbol: "message.fill", title: "В приложении", detail: "Ответим по SLA", tint: ClientTheme.lime)
-                            ClientSupportChannel(symbol: "paperplane.fill", title: "Telegram", detail: "Быстрый вопрос", tint: Color(red: 0.5, green: 0.7, blue: 0.95))
-                            ClientSupportChannel(symbol: "phone.fill", title: "Звонок", detail: "Каждый день", tint: .white)
+                            ClientSupportChannel(icon: "💬", title: "WhatsApp", tint: ClientTheme.lime, background: Color(red: 0.122, green: 0.239, blue: 0.18), bordered: false)
+                            ClientSupportChannel(icon: "✈️", title: "Telegram", tint: Color(red: 0.498, green: 0.69, blue: 0.925), background: Color(red: 0.118, green: 0.2, blue: 0.275), bordered: false)
+                            ClientSupportChannel(icon: "📞", title: "Звонок", tint: Color(red: 0.847, green: 0.812, blue: 0.776), background: ClientTheme.surface, bordered: true)
                         }
 
                         Text("Частые вопросы")
-                            .font(ClientTheme.body(12, weight: .semibold))
+                            .font(ClientTheme.body(13, weight: .semibold))
                             .foregroundStyle(ClientTheme.muted)
-                        ForEach(["Как работает гарантия?", "Где мой заказ?", "Как оформить возврат?", "Что нужно для Trade-in?"], id: \.self) { question in
+                        ForEach(["Как отследить заказ?", "Условия возврата и обмена", "Как работает рассрочка?", "Гарантия на Б/У технику"], id: \.self) { question in
                             HStack {
                                 Text(question)
                                     .font(ClientTheme.body(13))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
                                 Spacer()
-                                Image(systemName: "chevron.down")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ClientTheme.muted)
+                                Text("▾")
+                                    .font(ClientTheme.body(13, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
                             }
                             .padding(13)
                             .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
                         }
 
-                        VStack(alignment: .leading, spacing: 12) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                isFormOpen.toggle()
+                            }
+                        } label: {
                             Text("Создать обращение")
                                 .font(ClientTheme.body(15, weight: .bold))
-                                .foregroundStyle(.white)
-                            TextField("Тема обращения", text: $subject)
-                                .font(ClientTheme.body(14))
-                                .foregroundStyle(.white)
-                                .padding(13)
-                                .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
-                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
-                                .accessibilityIdentifier("support-subject")
-                            TextEditor(text: $details)
-                                .scrollContentBackground(.hidden)
-                                .font(ClientTheme.body(14))
-                                .foregroundStyle(.white)
-                                .frame(minHeight: 92)
-                                .padding(9)
-                                .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
-                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
-                                .accessibilityIdentifier("support-details")
-                            HStack(spacing: 8) {
-                                Text("Срочность")
-                                    .font(ClientTheme.body(12, weight: .semibold))
-                                    .foregroundStyle(ClientTheme.muted)
-                                Spacer()
-                                ForEach([("normal", "Обычная"), ("high", "Высокая"), ("urgent", "Срочная")], id: \.0) { option in
-                                    Button(option.1) { priority = option.0 }
-                                        .font(ClientTheme.body(10, weight: .semibold))
-                                        .foregroundStyle(priority == option.0 ? .black : ClientTheme.muted)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 6)
-                                        .background(priority == option.0 ? ClientTheme.lime : ClientTheme.line, in: Capsule())
-                                }
-                            }
-                            if let submissionError {
-                                Text(submissionError)
-                                    .font(ClientTheme.body(12))
-                                    .foregroundStyle(ClientTheme.coral)
-                            }
-                            Button {
-                                Task { await submit() }
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    if isSubmitting {
-                                        ProgressView().tint(.black)
-                                    } else {
-                                        Label("Отправить обращение", systemImage: "paperplane.fill")
-                                    }
-                                    Spacer()
-                                }
-                                .font(ClientTheme.body(14, weight: .bold))
                                 .foregroundStyle(.black)
-                                .frame(minHeight: 48)
-                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
-                            }
-                            .disabled(isSubmitting || normalizedSubject.isEmpty)
-                            .accessibilityIdentifier("support-submit")
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
                         }
-                        .padding(16)
-                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("support-open-form")
+
+                        if isFormOpen {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Создать обращение")
+                                    .font(ClientTheme.body(15, weight: .bold))
+                                    .foregroundStyle(.white)
+                                TextField("Тема обращения", text: $subject)
+                                    .font(ClientTheme.body(14))
+                                    .foregroundStyle(.white)
+                                    .padding(13)
+                                    .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                    .accessibilityIdentifier("support-subject")
+                                TextEditor(text: $details)
+                                    .scrollContentBackground(.hidden)
+                                    .font(ClientTheme.body(14))
+                                    .foregroundStyle(.white)
+                                    .frame(minHeight: 92)
+                                    .padding(9)
+                                    .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                    .accessibilityIdentifier("support-details")
+                                HStack(spacing: 8) {
+                                    Text("Срочность")
+                                        .font(ClientTheme.body(12, weight: .semibold))
+                                        .foregroundStyle(ClientTheme.muted)
+                                    Spacer()
+                                    ForEach([("normal", "Обычная"), ("high", "Высокая"), ("urgent", "Срочная")], id: \.0) { option in
+                                        Button(option.1) { priority = option.0 }
+                                            .font(ClientTheme.body(10, weight: .semibold))
+                                            .foregroundStyle(priority == option.0 ? .black : ClientTheme.muted)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 6)
+                                            .background(priority == option.0 ? ClientTheme.lime : ClientTheme.line, in: Capsule())
+                                    }
+                                }
+                                if let submissionError {
+                                    Text(submissionError)
+                                        .font(ClientTheme.body(12))
+                                        .foregroundStyle(ClientTheme.coral)
+                                }
+                                Button {
+                                    Task { await submit() }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        if isSubmitting {
+                                            ProgressView().tint(.black)
+                                        } else {
+                                            Label("Отправить обращение", systemImage: "paperplane.fill")
+                                        }
+                                        Spacer()
+                                    }
+                                    .font(ClientTheme.body(14, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .frame(minHeight: 48)
+                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+                                }
+                                .disabled(isSubmitting || normalizedSubject.isEmpty)
+                                .accessibilityIdentifier("support-submit")
+                            }
+                            .padding(16)
+                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                        }
 
                         Text("Мои обращения")
                             .font(ClientTheme.body(12, weight: .semibold))
@@ -3904,9 +3921,16 @@ private struct CustomerSupportView: View {
 
     @MainActor
     private func load() async {
-        guard let token = auth.session?.accessToken else { return }
         isLoading = true
         defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            tickets = []
+            loadError = nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else { return }
         do {
             let loaded: [CustomerSupportTicket] = try await APIClient(baseURL: environment.apiBaseURL).get(
                 "support/tickets/mine",
@@ -3969,28 +3993,23 @@ private struct CustomerSupportView: View {
 }
 
 private struct ClientSupportChannel: View {
-    let symbol: String
+    let icon: String
     let title: String
-    let detail: String
     let tint: Color
+    let background: Color
+    let bordered: Bool
 
     var body: some View {
-        VStack(spacing: 7) {
-            Image(systemName: symbol)
-                .font(.system(size: 21, weight: .medium))
-                .foregroundStyle(tint)
+        VStack(spacing: 6) {
+            Text(icon)
+                .font(.system(size: 24))
             Text(title)
-                .font(ClientTheme.body(11, weight: .semibold))
+                .font(ClientTheme.body(12, weight: .medium))
                 .foregroundStyle(tint)
-            Text(detail)
-                .font(ClientTheme.body(9))
-                .foregroundStyle(ClientTheme.muted)
-                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, minHeight: 78)
-        .padding(.horizontal, 3)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        .frame(maxWidth: .infinity, minHeight: 88)
+        .background(background, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(bordered ? ClientTheme.line : .clear))
     }
 }
 

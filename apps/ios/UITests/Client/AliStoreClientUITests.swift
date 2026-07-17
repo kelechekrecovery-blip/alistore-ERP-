@@ -139,6 +139,23 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(settingsApp.staticTexts["Сервисные сообщения"].exists)
     }
 
+    func testSignedInSupportUsesPrototypeChannelsAndFaq() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Поддержка"].tap()
+        XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["WhatsApp"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Telegram"].exists)
+        XCTAssertTrue(app.staticTexts["Звонок"].exists)
+        XCTAssertTrue(app.staticTexts["Частые вопросы"].exists)
+        XCTAssertTrue(app.staticTexts["Как отследить заказ?"].exists)
+        XCTAssertTrue(app.staticTexts["Условия возврата и обмена"].exists)
+        XCTAssertTrue(app.buttons["support-open-form"].exists)
+
+        app.buttons["support-open-form"].tap()
+        XCTAssertTrue(app.textFields["support-subject"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["support-submit"].exists)
+    }
+
     func testSignedInAccountFixturesRenderDeviceAndWarranty() {
         let app = launchSignedInAccount()
         app.staticTexts["Устройства"].tap()
