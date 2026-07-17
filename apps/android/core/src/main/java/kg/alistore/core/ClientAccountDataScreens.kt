@@ -46,6 +46,10 @@ interface CustomerAccountGateway {
   suspend fun deleteAddress(id: String, token: String)
   suspend fun settings(token: String): CustomerSettings
   suspend fun updateSettings(request: UpdateCustomerSettingsRequest, token: String): CustomerSettings
+  /** Pretty-printed JSON document with all personal data (self-service export). */
+  suspend fun exportData(token: String): String
+  /** Anonymizes PII and revokes sessions; orders stay for accounting. */
+  suspend fun deleteAccount(token: String)
 }
 
 private val AccountInk = Color(0xFF16130F)

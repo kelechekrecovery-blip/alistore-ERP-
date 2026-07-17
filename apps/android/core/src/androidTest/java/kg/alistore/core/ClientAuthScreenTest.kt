@@ -381,6 +381,8 @@ private class UiCustomerAccountGateway(
   override suspend fun updateAddress(id: String, request: UpdateCustomerAddressRequest, token: String) =
     CustomerAddress(id, "Дом", "Бишкек", null, request.isPrimary == true)
   override suspend fun deleteAddress(id: String, token: String) = Unit
+  override suspend fun exportData(token: String) = "{}"
+  override suspend fun deleteAccount(token: String) = Unit
   override suspend fun settings(token: String) = settingsValue
   override suspend fun updateSettings(request: UpdateCustomerSettingsRequest, token: String): CustomerSettings {
     settingsUpdates += request

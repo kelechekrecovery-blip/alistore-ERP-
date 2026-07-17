@@ -166,6 +166,13 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun updateSettings(request: UpdateCustomerSettingsRequest, token: String): CustomerSettings =
     this.request("customers/me/settings", "PATCH", request.toJson(), token).customerSettings()
 
+  override suspend fun exportData(token: String): String =
+    request("customers/me/export", "GET", token = token).toString(2)
+
+  override suspend fun deleteAccount(token: String) {
+    request("customers/me", "DELETE", token = token)
+  }
+
   override suspend fun staffLogin(username: String, password: String): StaffSession = request(
     "staff-auth/login", "POST", JSONObject().put("username", username).put("password", password),
   ).staffSession()
@@ -307,11 +314,11 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).posReturn()) }
   }
 
-  override suspend fun transitionPosReturn(returnId: String, status: String, token: String): PosReturn =
+  override suspend fun transitionPosReturn(returnId: String, status: String, token: String, location: String?): PosReturn =
     request(
       "returns/${java.net.URLEncoder.encode(returnId, Charsets.UTF_8.name())}",
       "PATCH",
-      JSONObject().put("status", status),
+      JSONObject().put("status", status).apply { if (location != null) put("location", location) },
       token,
     ).posReturn()
 

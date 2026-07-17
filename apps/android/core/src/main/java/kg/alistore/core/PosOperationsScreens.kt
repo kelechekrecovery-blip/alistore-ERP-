@@ -406,6 +406,7 @@ private fun PosAfterSaleScreen(
   var exchangeEvidence by remember { mutableStateOf<StaffEvidenceDraft?>(null) }
   var busy by remember { mutableStateOf(false) }
   var message by remember { mutableStateOf<String?>(null) }
+  var restockLocation by rememberSaveable { mutableStateOf("RETURNS-BISHKEK") }
   val exchangeEvidencePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
@@ -517,23 +518,30 @@ private fun PosAfterSaleScreen(
       ) { Text("Создать заявку на обмен") }
 
       Text("Очередь возвратов", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
+      if (returns.any { it.status == "paid" }) {
+        OutlinedTextField(restockLocation, { restockLocation = it.trim() }, label = { Text("Склад возврата") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      }
     }
     items(returns, key = PosReturn::id) { ret ->
       Card(colors = CardDefaults.cardColors(containerColor = PosSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 7.dp)) {
         Column(Modifier.padding(12.dp)) {
           Text("${ret.status} · заказ ${ret.orderId.takeLast(8)}", color = Color.White, fontWeight = FontWeight.Bold)
           Text(ret.reason, color = PosMuted, fontSize = 11.sp)
-          Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            nextReturnStatuses(ret.status).forEach { next ->
-              OutlinedButton(onClick = {
-                busy = true
-                scope.launch {
-                  runCatching { gateway.transitionPosReturn(ret.id, next, session.accessToken) }
-                    .onSuccess { updated -> returns = returns.map { if (it.id == updated.id) updated else it }; message = "Возврат: ${updated.status}" }
-                    .onFailure { message = it.message }
-                  busy = false
-                }
-              }, enabled = !busy, modifier = Modifier.weight(1f)) { Text(returnStatusLabel(next), fontSize = 10.sp) }
+          if (ret.status == "processing") {
+            Text("Ожидает выплаты", color = PosMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp))
+          } else {
+            Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+              nextReturnStatuses(ret.status).forEach { next ->
+                OutlinedButton(onClick = {
+                  busy = true
+                  scope.launch {
+                    runCatching { gateway.transitionPosReturn(ret.id, next, session.accessToken, location = if (next == "reconciled") restockLocation.trim() else null) }
+                      .onSuccess { updated -> returns = returns.map { if (it.id == updated.id) updated else it }; message = "Возврат: ${updated.status}" }
+                      .onFailure { message = it.message }
+                    busy = false
+                  }
+                }, enabled = !busy, modifier = Modifier.weight(1f)) { Text(returnStatusLabel(next), fontSize = 10.sp) }
+              }
             }
           }
         }
@@ -550,8 +558,8 @@ private fun PosAfterSaleScreen(
 private fun nextReturnStatuses(status: String): List<String> = when (status) {
   "requested" -> listOf("under_review", "rejected")
   "under_review" -> listOf("approved", "rejected")
-  "approved" -> listOf("processing")
-  "processing" -> listOf("reconciled")
+  "approved" -> listOf("processing", "rejected")
+  "paid" -> listOf("reconciled")
   else -> emptyList()
 }
 

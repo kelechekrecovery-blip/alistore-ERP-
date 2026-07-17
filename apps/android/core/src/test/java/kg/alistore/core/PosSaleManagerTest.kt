@@ -37,7 +37,7 @@ class PosSaleManagerTest {
       override suspend fun renderPosReceipt(orderId: String, token: String) = error("not used")
       override suspend fun posPayments(orderId: String, token: String) = error("not used")
       override suspend fun posReturns(token: String) = error("not used")
-      override suspend fun transitionPosReturn(returnId: String, status: String, token: String) = error("not used")
+      override suspend fun transitionPosReturn(returnId: String, status: String, token: String, location: String?) = error("not used")
       override suspend fun requestPosRefund(paymentId: String, amount: Int, reason: String, token: String) = error("not used")
       override suspend fun exchangePosDevice(request: PosExchangeRequest, token: String, idempotencyKey: String) = error("not used")
     }
@@ -77,7 +77,7 @@ private class FailingPosGateway(private val error: Exception) : PosGateway {
   override suspend fun renderPosReceipt(orderId: String, token: String) = error("not used")
   override suspend fun posPayments(orderId: String, token: String) = error("not used")
   override suspend fun posReturns(token: String) = error("not used")
-  override suspend fun transitionPosReturn(returnId: String, status: String, token: String) = error("not used")
+  override suspend fun transitionPosReturn(returnId: String, status: String, token: String, location: String?) = error("not used")
   override suspend fun requestPosRefund(paymentId: String, amount: Int, reason: String, token: String) = error("not used")
   override suspend fun exchangePosDevice(request: PosExchangeRequest, token: String, idempotencyKey: String) = error("not used")
 }

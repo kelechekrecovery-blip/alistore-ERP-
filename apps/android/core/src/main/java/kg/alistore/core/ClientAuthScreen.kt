@@ -1,5 +1,7 @@
 package kg.alistore.core
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,12 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,13 +30,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val AuthInk = Color(0xFF16130F)
 private val AuthSurface = Color(0xFF221E19)
@@ -183,7 +190,38 @@ private fun SignedInAccount(
     return
   }
   val scope = rememberCoroutineScope()
+  val context = LocalContext.current
+  val accountGateway = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   var busy by remember { mutableStateOf(false) }
+  var dataBusy by remember { mutableStateOf(false) }
+  var dataMessage by remember { mutableStateOf<String?>(null) }
+  var showDeleteConfirm by remember { mutableStateOf(false) }
+  var pendingExport by remember { mutableStateOf<String?>(null) }
+  val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    val content = pendingExport
+    pendingExport = null
+    if (uri != null && content != null) {
+      scope.launch {
+        dataMessage = runCatching {
+          withContext(Dispatchers.IO) {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+              ?: throw java.io.IOException("Нет доступа к файлу")
+          }
+        }.fold(onSuccess = { "Данные сохранены в файл" }, onFailure = { it.message ?: "Не удалось сохранить файл" })
+      }
+    }
+  }
+
+  /** Retries an account call once with a refreshed token, mirroring the account screens. */
+  suspend fun <T> withFreshToken(block: suspend (String) -> T): T {
+    var attempt = runCatching { block(state.tokens.accessToken) }
+    if (attempt.exceptionOrNull().nativeUnauthorized()) {
+      val renewed = manager.refresh(state); onState(renewed)
+      if (renewed is AuthState.SignedIn) attempt = runCatching { block(renewed.tokens.accessToken) }
+    }
+    return attempt.getOrThrow()
+  }
+
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     item {
       Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("account-title"))
@@ -210,6 +248,32 @@ private fun SignedInAccount(
       )
     }
     item {
+      Text("Мои данные", color = AuthMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+      Button(
+        onClick = {
+          scope.launch {
+            dataBusy = true; dataMessage = null
+            runCatching { withFreshToken { token -> accountGateway.exportData(token) } }
+              .onSuccess { pendingExport = it; exportLauncher.launch("alistore-my-data.json") }
+              .onFailure { dataMessage = it.message ?: "Не удалось выгрузить данные" }
+            dataBusy = false
+          }
+        },
+        enabled = !busy && !dataBusy,
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("account-export"),
+        colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
+        shape = RoundedCornerShape(8.dp),
+      ) { Text(if (dataBusy) "Подождите…" else "Скачать мои данные", fontWeight = FontWeight.Bold) }
+      Button(
+        onClick = { showDeleteConfirm = true },
+        enabled = !busy && !dataBusy,
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("account-delete"),
+        colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = AuthCoral),
+        shape = RoundedCornerShape(8.dp),
+      ) { Text("Удалить аккаунт", fontWeight = FontWeight.Bold) }
+      dataMessage?.let { Text(it, color = AuthMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
+    }
+    item {
       Text("Избранное: $favoriteCount · Корзина: $cartCount", color = AuthMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
       Button(
         onClick = { scope.launch { busy = true; onState(manager.logout(state)); busy = false } },
@@ -219,6 +283,30 @@ private fun SignedInAccount(
         shape = RoundedCornerShape(8.dp),
       ) { Text(if (busy) "Выходим…" else "Выйти", fontWeight = FontWeight.Bold) }
     }
+  }
+
+  if (showDeleteConfirm) {
+    AlertDialog(
+      onDismissRequest = { if (!dataBusy) showDeleteConfirm = false },
+      title = { Text("Удалить аккаунт?") },
+      text = { Text("Профиль, адреса и сессии будут удалены без восстановления. Заказы и история покупок останутся у магазина — они нужны для бухгалтерии.") },
+      confirmButton = {
+        TextButton(
+          enabled = !dataBusy,
+          onClick = {
+            scope.launch {
+              dataBusy = true
+              runCatching { withFreshToken { token -> accountGateway.deleteAccount(token) } }
+                .onSuccess { showDeleteConfirm = false; dataBusy = false; onState(manager.logout(state)) }
+                .onFailure { dataBusy = false; showDeleteConfirm = false; dataMessage = it.message ?: "Не удалось удалить аккаунт" }
+            }
+          },
+        ) { Text(if (dataBusy) "Удаляем…" else "Удалить навсегда", color = AuthCoral, fontWeight = FontWeight.Bold) }
+      },
+      dismissButton = {
+        TextButton(enabled = !dataBusy, onClick = { showDeleteConfirm = false }) { Text("Отмена") }
+      },
+    )
   }
 }
 

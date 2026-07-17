@@ -3431,6 +3431,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MOB-018-ANDROID-ACCOUNT-POS-016`.
+- Task: complete the Android Client account-data entry points and align Android POS return requests with the server contract.
+- Files changed: Android core account/auth/API/ POS gateway and screen sources, `ClientAuthScreenTest.kt`, `PosSaleManagerTest.kt`, and this progress entry.
+- Result: the Android Client can request an authenticated personal-data export, save it through the system document picker, request account deletion with confirmation, refresh an expired token once, and log out after deletion. Android POS now sends a restock location only for reconciliation and exposes the valid return transitions.
+- Checks run: `npm run android:test` passed (unit tests and lint); `npm run android:build` passed with `app`, `staff`, `courier` and `pos` debug APKs; `git diff --check`.
+- Outcome: the Android code/build slice is accepted locally. Emulator connected UI, FCM, biometric/device security and physical-device certification remain open.
+- Next step: commit or isolate the remaining notification/POS API lane, then restore a clean SHA and rerun native/evidence gates.
+
+## 2026-07-18
+
 - Iteration ID: `MOB-013-IOS-POS-015`.
 - Task: align the iOS POS return UI and request contract with the server return state machine.
 - Files changed: `apps/ios/POS/POSOperationsView.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/Shared/POSReturnFlow.swift`, `apps/ios/Tests/POSReturnFlowTests.swift`, `apps/ios/AliStoreNative.xcodeproj/project.pbxproj`, and this progress entry.
