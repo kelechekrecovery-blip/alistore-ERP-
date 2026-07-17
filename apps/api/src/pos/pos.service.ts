@@ -48,8 +48,9 @@ interface NormalizedPosPayment {
  * invariant-guarded services in sequence:
  *   walk-in customer → open cash shift → assign in_stock IMEI units → order →
  *   reserve → payment (attached to the shift).
- * Each step is atomic on its own; the reservation-expiry sweep reclaims stock if a
- * later step fails, so a half-finished sale never strands a unit.
+ * Each step is atomic on its own; a retry with the same idempotency key resumes a
+ * half-finished sale at the failed step (LOGIC-012), and the reservation-expiry sweep
+ * reclaims stock of sales that are never resumed, so a unit is never stranded.
  */
 @Injectable()
 export class PosService {
@@ -117,14 +118,29 @@ export class PosService {
         const expectedPayments = this.normalizePayments(dto, expectedTotal);
         return this.replaySale(existing, dto, storePoint.inventoryLocation, expectedTotal, expectedPayments);
       }
-      const existingZeroOrder = await this.prisma.order.findUnique({
+      const existingOrder = await this.prisma.order.findUnique({
         where: { idempotencyKey: txnId },
         select: { id: true, status: true, total: true, posShiftId: true },
       });
-      if (existingZeroOrder?.status === 'paid' && existingZeroOrder.total === 0) {
-        await this.assertReplayCompatible(existingZeroOrder.id, dto);
-        const replay = await this.completedFromExistingPayment(existingZeroOrder.id, existingZeroOrder.posShiftId);
-        return dto.clientSaleId ? replay : { ...replay, dedupedBy: 'fingerprint' as const };
+      if (existingOrder) {
+        await this.assertReplayCompatible(existingOrder.id, dto);
+        if (existingOrder.status === 'paid') {
+          // Zero-total sales never create a Payment row, so the tender lookup above
+          // misses them; a paid order whose lookup missed is still the same sale.
+          const replay = await this.completedFromExistingPayment(existingOrder.id, existingOrder.posShiftId);
+          return dto.clientSaleId ? replay : { ...replay, dedupedBy: 'fingerprint' as const };
+        }
+        if (existingOrder.status === 'created' || existingOrder.status === 'reserved') {
+          // The first attempt died between order creation/reservation and the payment
+          // batch (LOGIC-012): re-running the whole flow re-created nothing but died on
+          // fulfill (`reserved→reserved` 422) or on stock resolution, because the units
+          // are already held by this order. Resume at the step that failed instead.
+          return this.resumeSale(existingOrder, dto, txnId, storePoint.inventoryLocation);
+        }
+        throw new ConflictError(
+          'sale_key_burned',
+          `Продажа по этому ключу уже ${existingOrder.status === 'cancelled' ? 'отменена' : `завершена (${existingOrder.status})`}; оформите заново с новым ключом`,
+        );
       }
     }
 
@@ -545,11 +561,81 @@ export class PosService {
     };
   }
 
+  /**
+   * Push a half-finished sale through (LOGIC-012). The first attempt committed the order
+   * (and usually its stock reservation) but died before the payment batch committed, so
+   * a retry with the same key resumes at the failed step instead of re-creating the
+   * order: a `created` order is fulfilled now, a `reserved` one already holds its units
+   * and goes straight to tenders. The tenders reuse the exact per-tender txnIds of the
+   * original attempt, so a payment that did commit is replayed by PaymentsService rather
+   * than charged twice; payMany also re-validates reservation coverage before flipping
+   * the order to paid, so a reservation swept in the meantime fails closed.
+   * The tender set itself is taken from the retry (a cashier may switch from a failed
+   * terminal to cash); the key is still bound to staff + cart + total by
+   * `assertReplayCompatible`.
+   */
+  private async resumeSale(
+    existing: { id: string; total: number; posShiftId: string | null },
+    dto: PosSaleDto,
+    txnId: string,
+    inventoryLocation: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: existing.id },
+      select: { status: true },
+    });
+    if (order?.status === 'created') {
+      // The first attempt died before (or inside) fulfillment: reserve the stock now.
+      await this.orders.fulfill(existing.id, dto.staffId);
+    } else if (order?.status !== 'reserved') {
+      throw new ConflictError('sale_not_resumable', `Продажу в статусе ${order?.status ?? 'unknown'} нельзя дожать`);
+    }
+    if (existing.total === 0) {
+      // A zero-total order flips to paid inside fulfill; no Payment row ever exists.
+      return this.completedFromExistingPayment(existing.id, existing.posShiftId);
+    }
+    let shift = await this.shifts.currentOpen(dto.staffId);
+    if (!shift) {
+      shift = await this.shifts.open(
+        { staffId: dto.staffId, point: inventoryLocation, openCash: 0 },
+        dto.staffId,
+      );
+    }
+    const tenders = this.normalizePayments(dto, existing.total);
+    const paid = await this.payments.payMany(
+      {
+        orderId: existing.id,
+        shiftId: shift.id,
+        payments: tenders.map((payment, index) => ({
+          ...payment,
+          txnId: index === 0 ? txnId : `${txnId}:${index}`,
+        })),
+      },
+      dto.staffId,
+      { staffId: dto.staffId },
+    );
+    const completed = await this.orders.get(existing.id);
+    if (!completed) {
+      throw new ValidationError('order_not_found', `Заказ ${existing.id} не найден`);
+    }
+    return {
+      pendingApproval: false as const,
+      orderId: completed.id,
+      receiptNo: `POS-${completed.id.slice(-6).toUpperCase()}`,
+      total: completed.total,
+      status: paid.order?.status ?? completed.status,
+      shiftId: shift.id,
+      imeis: completed.items.filter((item) => item.imei).map((item) => item.imei as string),
+      resumed: true as const,
+    };
+  }
+
   /** Never return a receipt for a different cart or another cashier's key. */
   private async assertReplayCompatible(orderId: string, dto: PosSaleDto) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
+        total: true,
         items: { select: { sku: true, qty: true, price: true }, orderBy: { lineNumber: 'asc' } },
         posShift: { select: { staffId: true } },
       },
@@ -558,16 +644,28 @@ export class PosService {
     if (order.posShift?.staffId && order.posShift.staffId !== dto.staffId) {
       throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже принадлежит другому кассиру');
     }
-    const requested = dto.lines
-      .map((line) => `${line.sku}:${line.qty}:${line.price}`)
-      .sort()
-      .join('|');
-    const existing = order.items
-      .map((line) => `${line.sku}:${line.qty}:${line.price}`)
-      .sort()
-      .join('|');
-    if (requested !== existing) {
+    // Serialized units are split into per-unit rows server-side, so both sides are
+    // aggregated per sku+price (mirroring saleRequestHash) before comparison.
+    const aggregate = (lines: Array<{ sku: string; qty: number; price: number }>) => {
+      const bySkuPrice = new Map<string, { sku: string; qty: number; price: number }>();
+      for (const line of lines) {
+        const key = `${line.sku}:${line.price}`;
+        const seen = bySkuPrice.get(key);
+        if (seen) seen.qty += line.qty;
+        else bySkuPrice.set(key, { sku: line.sku, qty: line.qty, price: line.price });
+      }
+      return [...bySkuPrice.values()]
+        .map((line) => `${line.sku}:${line.qty}:${line.price}`)
+        .sort()
+        .join('|');
+    };
+    if (aggregate(dto.lines) !== aggregate(order.items)) {
       throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже связан с другим составом корзины');
+    }
+    // The discount percentage is part of the composition: the stored total must equal
+    // what this request would charge, or the key is being reused for different money.
+    if (saleTotal(dto.lines, dto.discountPct ?? 0) !== order.total) {
+      throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже связан с другой суммой');
     }
   }
 }
