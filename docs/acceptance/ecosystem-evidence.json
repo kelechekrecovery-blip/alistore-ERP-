@@ -9,8 +9,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/visual-b775b0a2c4382935cdf5a0df4668a4ff84e20c54bf4c6b3bfa7468e5a5b5835d.json",
-          "sha256": "b775b0a2c4382935cdf5a0df4668a4ff84e20c54bf4c6b3bfa7468e5a5b5835d"
+          "path": "docs/acceptance/artifacts/visual-526e471dc8e0be7890266ea8f1a87e96470781c8af95e60634fc35605ba25ee3.json",
+          "sha256": "526e471dc8e0be7890266ea8f1a87e96470781c8af95e60634fc35605ba25ee3"
         }
       ]
     },

@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — VISUAL-EVIDENCE-002
+
+- Iteration ID: `VISUAL-EVIDENCE-002`.
+- Task: refresh the trusted durable Web/ERP visual acceptance artifact for the current source tree.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/visual-526e471dc8e0be7890266ea8f1a87e96470781c8af95e60634fc35605ba25ee3.json`, and `PROGRESS.md`.
+- Result: trusted recorder captured `npm run visual:e2e` with `exitCode: 0` for source commit `b860956617ac00a5fcc61ee871e598794e2fbbbd` and source tree `363734057e5ef8ea45548f6c379bf07826ee6a912e39fed25c898fa2da42779c`. The visual runner passed exactly three screenshot baselines: ERP desktop, storefront desktop and storefront mobile.
+- Checks run: trusted ecosystem recorder for `visual`; `git diff --check`.
+- Acceptance: accepted for the committed durable visual baseline evidence. This still does not replace the 64 missing linked design references or owner sign-off for unavailable handoff screens.
+- Next step: rerun strict ecosystem audit and continue the remaining reconciliation/design-corpus gaps.
+
 # 2026-07-17 — ANDROID-APP-UI-EVIDENCE-002
 
 - Iteration ID: `ANDROID-APP-UI-EVIDENCE-002`.
