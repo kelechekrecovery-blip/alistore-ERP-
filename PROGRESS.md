@@ -2603,3 +2603,13 @@
 - Checks run: `npm run ios:build` passed all 10 iOS targets; full `npm run ios:ui` passed Client `11/11`, Staff `1/1`, Courier `1/1` and POS `1/1`; `git diff --check` passed.
 - Outcome: account loaded/empty/error simulator coverage is accepted locally. Full 17-screen visual evidence, physical-device Face ID/APNs/camera/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
 - Next step: run strict release preflight and close the next remaining Client prototype screen, while preserving the external credentials/device gates.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-011`.
+- Task: add a durable customer notification inbox from the transactional outbox and connect the native Client notification shell to customer-owned read state.
+- Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260717100000_add_customer_notifications/migration.sql`, `apps/api/src/outbox/customer-notifications.ts`, `apps/api/src/notifications/notifications.service.ts`, `apps/api/src/notifications/notifications.controller.ts`, `apps/api/test/notifications-customer.spec.ts`, `apps/ios/Shared/Models.swift`, `apps/ios/Client/AliStoreClientApp.swift`, and `apps/ios/UITests/Client/AliStoreClientUITests.swift`.
+- Result: consented transactional customer notices are projected atomically with the existing outbox transaction; `GET /notifications/mine` and `PATCH /notifications/:id/read` enforce customer JWT ownership; the Client shows loading/empty/error/unread/read states, routes order/warranty/bonus notices, and performs best-effort server read acknowledgement without fabricating business status. Debug-only UI fixtures remain compiled out of Release.
+- Checks run: isolated Prisma migration deploy; `npm run prisma:generate -w @alistore/api`; targeted notification ownership/replay tests `2/2`; `npm run build -w @alistore/api`; `npm run api:test` `149/149` suites and `672/672` tests; `npm run ios:build` all 10 targets; `npm run ios:test` `33/33`; `npm run ios:ui` Client `12/12`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: notification inbox vertical is accepted at local API and simulator software level. Full 17-screen visual evidence, physical-device APNs/Face ID/camera/offline validation, signed archive, TestFlight/App Store Connect submission and production readiness remain open.
+- Next step: continue the remaining Client App 2.0 screen-by-screen visual pass, then run the signed archive/store preflight when the owner supplies Apple Developer and App Store Connect credentials.

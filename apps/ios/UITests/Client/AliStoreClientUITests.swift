@@ -46,6 +46,18 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Поиск"].waitForExistence(timeout: 5))
     }
 
+    func testSignedInNotificationsUseCustomerInboxShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
+        app.launch()
+
+        app.buttons["Уведомления"].tap()
+        XCTAssertTrue(app.navigationBars["Уведомления"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Заказ готов к выдаче"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Гарантия скоро истекает"].exists)
+        XCTAssertTrue(app.staticTexts["Начислены бонусы"].exists)
+    }
+
     func testGuestAccountUsesClientShell() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]

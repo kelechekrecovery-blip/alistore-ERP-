@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForbiddenError, ValidationError } from '../common/errors';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
@@ -43,6 +43,28 @@ export class NotificationsService {
       enabled: token.enabled,
       lastSeenAt: token.lastSeenAt.toISOString(),
     };
+  }
+
+  async listMine(customerId: string, limit = 50) {
+    return this.prisma.customerNotification.findMany({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 100),
+    });
+  }
+
+  async markRead(id: string, customerId: string) {
+    const notification = await this.prisma.customerNotification.findFirst({
+      where: { id, customerId },
+    });
+    if (!notification) throw new NotFoundException('Уведомление не найдено');
+    if (!notification.readAt) {
+      await this.prisma.customerNotification.update({
+        where: { id: notification.id },
+        data: { readAt: new Date() },
+      });
+    }
+    return this.prisma.customerNotification.findUniqueOrThrow({ where: { id: notification.id } });
   }
 
   private async resolveBinding(user: AuthPrincipal | undefined) {

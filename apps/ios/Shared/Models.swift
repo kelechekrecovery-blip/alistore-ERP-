@@ -179,6 +179,30 @@ public struct CustomerPrincipal: Decodable, Sendable {
     public let typ: String
 }
 
+public struct CustomerNotification: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let template: String
+    public let title: String
+    public let detail: String
+    public let symbol: String
+    public let route: String
+    public let referenceId: String?
+    public let createdAt: Date
+    public let readAt: Date?
+
+    public init(id: String, template: String, title: String, detail: String, symbol: String, route: String, referenceId: String?, createdAt: Date, readAt: Date?) {
+        self.id = id
+        self.template = template
+        self.title = title
+        self.detail = detail
+        self.symbol = symbol
+        self.route = route
+        self.referenceId = referenceId
+        self.createdAt = createdAt
+        self.readAt = readAt
+    }
+}
+
 public struct CustomerSession: Codable, Sendable {
     public let accessToken: String
     public let refreshToken: String

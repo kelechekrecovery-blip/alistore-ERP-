@@ -25,7 +25,7 @@ private enum ClientTab: Hashable {
     case home, catalog, favorites, cart, account
 }
 
-private enum ClientOverlay: String, Identifiable {
+private enum ClientOverlay: String, Identifiable, Hashable {
     case search, compare, notifications
 
     var id: String { rawValue }
@@ -304,12 +304,18 @@ private struct ClientLoginView: View {
 
 private struct ClientOverlayView: View {
     let screen: ClientOverlay
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
     let products: [Product]
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
     @Binding var compared: Set<String>
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var notifications: [CustomerNotification] = []
+    @State private var notificationError: String?
+    @State private var notificationsLoading = false
+    let onRoute: (CustomerNotification) -> Void
 
     private var matchingProducts: [Product] {
         let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -349,6 +355,10 @@ private struct ClientOverlayView: View {
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
+        .task {
+            guard screen == .notifications else { return }
+            await loadNotifications()
+        }
     }
 
     private var title: String {
@@ -421,15 +431,145 @@ private struct ClientOverlayView: View {
         }
     }
 
+    @ViewBuilder
     private var notificationContent: some View {
-        ScrollView {
-            VStack(spacing: 10) {
-                ClientNotificationRow(symbol: "shield.fill", title: "Гарантия скоро истекает", detail: "Проверьте гарантию AirPods Pro", time: "вчера")
-                ClientNotificationRow(symbol: "gift.fill", title: "Бонусы начислены", detail: "+300 бонусов за отзыв с фото", time: "2 дня назад")
-                ClientNotificationRow(symbol: "shippingbox.fill", title: "Статус заказа обновлён", detail: "Заказ готовится к выдаче", time: "3 дня назад")
-            }
+        if notificationsLoading {
+            ProgressView("Загружаем уведомления")
+                .tint(ClientTheme.lime)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let notificationError {
+            ClientDataErrorView(message: notificationError, retry: { Task { await loadNotifications() } })
+                .padding(16)
+        } else if notifications.isEmpty {
+            EmptyStateView(
+                title: auth.session == nil ? "Войдите, чтобы увидеть уведомления" : "Уведомлений пока нет",
+                detail: auth.session == nil ? "Статусы заказов, гарантия и бонусы появятся здесь." : "Мы покажем здесь важные обновления по вашим покупкам.",
+                symbol: "bell"
+            )
             .padding(16)
+        } else {
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(notifications) { notification in
+                        notificationDestination(notification)
+                    }
+                }
+                .padding(16)
+            }
         }
+    }
+
+    @ViewBuilder
+    private func notificationDestination(_ notification: CustomerNotification) -> some View {
+        let row = ClientNotificationRow(
+            symbol: notification.symbol,
+            title: notification.title,
+            detail: notification.detail,
+            time: relativeTime(notification.createdAt),
+            isUnread: notification.readAt == nil
+        )
+        switch notification.route {
+        case "order" where notification.referenceId != nil:
+            NavigationLink {
+                ClientNotificationOrderView(environment: environment, auth: auth, orderId: notification.referenceId!)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
+        case "warranty":
+            NavigationLink {
+                DevicesView(environment: environment, auth: auth)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
+        case "bonuses":
+            NavigationLink {
+                CustomerLoyaltyView(environment: environment, auth: auth)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
+        default:
+            Button {
+                markNotificationRead(notification)
+                onRoute(notification)
+            } label: { row }
+                .buttonStyle(.plain)
+        }
+    }
+
+    private func markNotificationRead(_ notification: CustomerNotification) {
+        guard notification.readAt == nil else { return }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            replaceNotification(notification, readAt: Date())
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else { return }
+        Task {
+            do {
+                let updated: CustomerNotification = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                    "notifications/\(notification.id)/read",
+                    body: EmptyRequest(),
+                    token: token
+                )
+                replaceNotification(updated, readAt: updated.readAt ?? Date())
+            } catch is CancellationError {
+            } catch {
+                // Reading a notification is best-effort and must not block navigation.
+            }
+        }
+    }
+
+    private func replaceNotification(_ notification: CustomerNotification, readAt: Date) {
+        guard let index = notifications.firstIndex(where: { $0.id == notification.id }) else { return }
+        notifications[index] = CustomerNotification(
+            id: notification.id,
+            template: notification.template,
+            title: notification.title,
+            detail: notification.detail,
+            symbol: notification.symbol,
+            route: notification.route,
+            referenceId: notification.referenceId,
+            createdAt: notification.createdAt,
+            readAt: readAt
+        )
+    }
+
+    private func loadNotifications() async {
+        notificationsLoading = true
+        defer { notificationsLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            notifications = ClientUIFixture.notifications
+            notificationError = nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else {
+            notifications = []
+            notificationError = nil
+            return
+        }
+        do {
+            notifications = try await APIClient(baseURL: environment.apiBaseURL).get("notifications/mine", token: token)
+            notificationError = nil
+        } catch is CancellationError {
+        } catch {
+            notificationError = error.localizedDescription
+        }
+    }
+
+    private func relativeTime(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     private func searchRow(_ product: Product) -> some View {
@@ -481,6 +621,7 @@ private struct ClientNotificationRow: View {
     let title: String
     let detail: String
     let time: String
+    let isUnread: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -489,7 +630,7 @@ private struct ClientNotificationRow: View {
                 .frame(width: 36, height: 36)
                 .background(ClientTheme.lime.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                Text(title).font(ClientTheme.body(13, weight: isUnread ? .bold : .semibold)).foregroundStyle(.white)
                 Text(detail).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
             }
             Spacer()
@@ -497,7 +638,9 @@ private struct ClientNotificationRow: View {
         }
         .padding(12)
         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(isUnread ? ClientTheme.lime.opacity(0.45) : ClientTheme.line))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(detail). \(time)")
     }
 }
 
@@ -622,7 +765,20 @@ private struct ClientRootView: View {
             }
         }
         .fullScreenCover(item: $overlay) { screen in
-            ClientOverlayView(screen: screen, products: products, cart: $cart, favorites: $favorites, compared: $compared)
+            ClientOverlayView(
+                screen: screen,
+                environment: environment,
+                auth: auth,
+                products: products,
+                cart: $cart,
+                favorites: $favorites,
+                compared: $compared,
+                onRoute: { _ in
+                    overlay = nil
+                    selectedTab = .account
+                    orderRefreshRevision += 1
+                }
+            )
         }
         .task {
             restoreLocalState()
@@ -1368,6 +1524,56 @@ private struct ClientOrderStatusView: View {
     }
 }
 
+private struct ClientNotificationOrderView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let orderId: String
+    @State private var order: CustomerOrder?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if let order {
+                ClientOrderStatusView(order: order, environment: environment, auth: auth)
+            } else if isLoading {
+                ZStack {
+                    ClientTheme.background.ignoresSafeArea()
+                    ProgressView("Открываем заказ")
+                        .tint(ClientTheme.lime)
+                }
+            } else {
+                ZStack {
+                    ClientTheme.background.ignoresSafeArea()
+                    ClientDataErrorView(
+                        message: errorMessage ?? "Заказ недоступен",
+                        retry: { Task { await load() } }
+                    )
+                    .padding(16)
+                }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else {
+            errorMessage = "Войдите в аккаунт, чтобы открыть заказ."
+            isLoading = false
+            return
+        }
+        do {
+            order = try await APIClient(baseURL: environment.apiBaseURL).get("orders/\(orderId)", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
 private struct ClientReceiptView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
@@ -1589,6 +1795,42 @@ private enum ClientUIFixture {
             total: 89900,
             createdAt: referenceDate,
             items: [CustomerOrderItem(sku: "IPHONE-15-128-BLK", qty: 1, price: 89900, imei: "352099999999001")]
+        )
+    ]
+
+    static let notifications: [CustomerNotification] = [
+        CustomerNotification(
+            id: "ui-notification-order",
+            template: "order_ready",
+            title: "Заказ готов к выдаче",
+            detail: "Заказ №2401 можно забрать в ЦУМ",
+            symbol: "shippingbox.fill",
+            route: "order",
+            referenceId: "ui-order-2401",
+            createdAt: referenceDate,
+            readAt: nil
+        ),
+        CustomerNotification(
+            id: "ui-notification-warranty",
+            template: "warranty_created",
+            title: "Гарантия скоро истекает",
+            detail: "Проверьте гарантию iPhone 15",
+            symbol: "shield.fill",
+            route: "warranty",
+            referenceId: "ui-warranty-2401",
+            createdAt: referenceDate.addingTimeInterval(-3600),
+            readAt: nil
+        ),
+        CustomerNotification(
+            id: "ui-notification-bonus",
+            template: "loyalty_earned",
+            title: "Начислены бонусы",
+            detail: "+300 за отзыв о покупке",
+            symbol: "gift.fill",
+            route: "bonuses",
+            referenceId: nil,
+            createdAt: referenceDate.addingTimeInterval(-172800),
+            readAt: referenceDate.addingTimeInterval(-172000)
         )
     ]
 

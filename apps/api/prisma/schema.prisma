@@ -480,6 +480,7 @@ model Customer {
   coupons              CustomerCoupon[]
   promotionRedemptions PromotionRedemption[]
   campaignRecipients   CampaignRecipient[]
+  notifications        CustomerNotification[]
   orders               Order[]
   tradeIns             TradeInDevice[]
   createdAt            DateTime              @default(now())
@@ -510,6 +511,24 @@ model CustomerPreferences {
   service    Boolean  @default(true)
   promos     Boolean  @default(false)
   updatedAt  DateTime @updatedAt
+}
+
+// Durable customer-owned inbox projected from the transactional outbox.
+model CustomerNotification {
+  id           String    @id @default(cuid())
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  template     String
+  title        String
+  detail       String
+  symbol       String    @default("bell.fill")
+  route        String    @default("account")
+  referenceId  String?
+  createdAt    DateTime  @default(now())
+  readAt       DateTime?
+
+  @@index([customerId, createdAt])
+  @@index([customerId, readAt])
 }
 
 model LoyaltyEntry {
