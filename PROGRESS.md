@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-ECOSYSTEM-MATRIX-031`.
+- Task: close procurement/sale and composite ecosystem reconciliation evidence.
+- Result: procurement API passed `10/10`, procurement browser passed `1/1`, and trusted composite matrix passed all four verticals: POS/refund, courier/COD, service/loaner and procurement/sale.
+- Commits: `cf33f1b` (procurement evidence), `e2d52e2` (composite evidence).
+- Strict audit: all four reconciliation gates, native iOS/Android gates and the composite ecosystem E2E are PASS. Remaining blockers are durable visual acceptance and 64 missing linked handoffs.
+- Next step: refresh the trusted visual baseline, then maintain the design-corpus blocker as an owner action while moving into release/staging readiness.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-SERVICE-LOANER-EVIDENCE-030`.
 - Task: accept the Service Center and Loaner reconciliation vertical.
 - Result: API suites passed `3/3` with `9/9` tests; browser UI passed `3/3` for diagnosis/estimate approval, paid third-party repair and loaner issue/return. Evidence is hash-bound to current HEAD and committed as `04886de`.
