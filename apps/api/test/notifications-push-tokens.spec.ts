@@ -1,3 +1,4 @@
+import { UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PUSH_TOKEN_PATTERN } from '../src/notifications/push-token.dto';
@@ -33,17 +34,17 @@ describe('Notifications push token registry (integration)', () => {
     });
   });
 
-  it('stores anonymous app tokens without trusting a requested owner scope', async () => {
-    const registered = await notifications.registerPushToken({
-      token: 'ExponentPushToken[anonymous123]',
-      platform: 'ios',
-      deviceId: 'ios-install-1',
-      scope: 'customer',
-    });
+  it('rejects anonymous token registration (SEC-011: tokens bind to an authenticated owner)', async () => {
+    await expect(
+      notifications.registerPushToken({
+        token: 'ExponentPushToken[anonymous123]',
+        platform: 'ios',
+        deviceId: 'ios-install-1',
+        scope: 'customer',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
 
-    expect(registered.scope).toBe('anonymous');
-    expect(registered.customerId).toBeNull();
-    expect(registered.staffId).toBeNull();
+    expect(await prisma.pushToken.count()).toBe(0);
   });
 
   it('binds and refreshes a token for an authenticated customer', async () => {
