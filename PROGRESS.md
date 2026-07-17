@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-2-STAGING-READINESS-033`.
+- Task: start staging/provider readiness without exposing or inventing credentials.
+- Result: verified `infra/render.staging.yaml`, Docker deployment files and `apps/api/.env.production.example`. `npm run launch:preflight:strict` and `npm run launch:readiness:strict` both stop safely because `.env.production` is absent; no secrets were created or committed.
+- External inputs required: Render/Cloudflare/R2/Sentry credentials, payment/SMS/OFD contracts, push credentials, domain configuration and physical devices.
+- Design corpus check: searched the local `/Users/alistore` tree for representative missing handoffs; none were found outside the 10 references already tracked in the repository.
+- Next step: owner supplies the 64 handoffs or retirement approvals and staging environment credentials; software work can continue against sandbox adapters meanwhile.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-SOFTWARE-GATE-032`.
 - Task: close durable visual acceptance and complete the local MVP software gate.
 - Result: trusted visual acceptance passed `3/3` exact screenshot tests; all native and reconciliation evidence remains hash-bound to the same source tree. Artifact committed as `187b49f`.
