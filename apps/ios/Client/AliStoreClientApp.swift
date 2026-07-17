@@ -501,6 +501,49 @@ private struct ClientNotificationRow: View {
     }
 }
 
+private enum ClientLocalState {
+    private static let cartKey = "alistore.client.cart.v1"
+    private static let favoritesKey = "alistore.client.favorites.v1"
+    private static let comparedKey = "alistore.client.compared.v1"
+
+    static func cart() -> [String: Int] {
+        guard let data = UserDefaults.standard.data(forKey: cartKey),
+              let value = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            return [:]
+        }
+        return value
+    }
+
+    static func favorites() -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: favoritesKey),
+              let value = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return Set(value)
+    }
+
+    static func compared() -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: comparedKey),
+              let value = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return Set(value)
+    }
+
+    static func save(cart: [String: Int], favorites: Set<String>, compared: Set<String>) {
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(cart) {
+            UserDefaults.standard.set(data, forKey: cartKey)
+        }
+        if let data = try? encoder.encode(Array(favorites).sorted()) {
+            UserDefaults.standard.set(data, forKey: favoritesKey)
+        }
+        if let data = try? encoder.encode(Array(compared).sorted()) {
+            UserDefaults.standard.set(data, forKey: comparedKey)
+        }
+    }
+}
+
 @main
 struct AliStoreClientApp: App {
     @UIApplicationDelegateAdaptor(ClientAppDelegate.self) private var appDelegate
@@ -581,6 +624,7 @@ private struct ClientRootView: View {
             ClientOverlayView(screen: screen, products: products, cart: $cart, favorites: $favorites, compared: $compared)
         }
         .task {
+            restoreLocalState()
             async let restore: Void = auth.restore()
             async let catalog: Void = loadCatalog()
             _ = await (restore, catalog)
@@ -596,6 +640,9 @@ private struct ClientRootView: View {
                 Task { await replayPendingOrders() }
             }
         }
+        .onChange(of: cart) { _, _ in saveLocalState() }
+        .onChange(of: favorites) { _, _ in saveLocalState() }
+        .onChange(of: compared) { _, _ in saveLocalState() }
         .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsToken)) { notification in
             guard let token = notification.object as? String else { return }
             Task { await registerPushToken(token) }
@@ -603,6 +650,18 @@ private struct ClientRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsFailure)) { notification in
             pushStatus = notification.object as? String ?? "APNs registration failed"
         }
+    }
+
+    private func restoreLocalState() {
+        guard !UITestBootstrap.startsAtCheckout else { return }
+        cart = ClientLocalState.cart()
+        favorites = ClientLocalState.favorites()
+        compared = ClientLocalState.compared()
+    }
+
+    private func saveLocalState() {
+        guard !UITestBootstrap.startsAtCheckout else { return }
+        ClientLocalState.save(cart: cart, favorites: favorites, compared: compared)
     }
 
     private func loadCatalog() async {
@@ -1328,19 +1387,23 @@ private struct OrdersView: View {
                     EmptyStateView(title: "Заказов пока нет", detail: "Здесь появятся покупки из магазина и приложения.", symbol: "shippingbox")
                 } else {
                     List(orders) { order in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Заказ #\(order.id.suffix(6))").font(.headline)
-                                Spacer()
-                                Text(order.status).font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                        NavigationLink {
+                            ClientOrderStatusView(order: order)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Заказ #\(order.id.suffix(6))").font(.headline)
+                                    Spacer()
+                                    Text(order.status).font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                                }
+                                Text("\(order.items.reduce(0) { $0 + $1.qty }) тов. · \(order.total.formatted(.currency(code: "KGS")))")
+                                    .font(.subheadline)
+                                Text(order.createdAt, format: .dateTime.day().month().year())
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                            Text("\(order.items.reduce(0) { $0 + $1.qty }) тов. · \(order.total.formatted(.currency(code: "KGS")))")
-                                .font(.subheadline)
-                            Text(order.createdAt, format: .dateTime.day().month().year())
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
                     }
                     .listStyle(.plain)
                 }

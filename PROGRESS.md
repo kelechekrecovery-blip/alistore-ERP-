@@ -2516,6 +2516,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-003`.
+- Task: make client catalog state restart-safe and connect order history to the native status screen.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: cart, favorites and compare IDs now persist as versioned JSON in `UserDefaults` and restore on launch; the debug checkout fixture remains isolated from persistence; order history rows now navigate to the server-derived order status screen without changing status locally.
+- Checks run: `npm run ios:build` passed all iOS targets; `npm run ios:test` passed 33/33 core tests; isolated `AliStoreClientUITests` passed 5/5; `git diff --check` passed.
+- Outcome: restart-safe local catalog state and order-status navigation are accepted locally. Full 17-screen prototype parity, physical-device validation, release archive and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: harden Release configuration and store preflight without adding credentials, then continue screen-by-screen Client visual evidence.
+
+## 2026-07-17
+
 - Iteration ID: `AP-001H`.
 - Task: capitalize landed cost across received serialized procurement units.
 - Files changed: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260717060000_landed_cost/migration.sql`, `apps/api/src/procurement/procurement.dto.ts`, `apps/api/src/procurement/procurement.controller.ts`, `apps/api/src/procurement/procurement.module.ts`, `apps/api/src/procurement/procurement.service.ts`, `apps/api/test/procurement.e2e-spec.ts`, `apps/api/test/finance-expenses.e2e-spec.ts`, and `PROGRESS.md`.
