@@ -2865,6 +2865,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-014`.
+- Task: re-record trusted iOS Client visual acceptance after aligning the order status route with `AliStore Клиент App 2.0`.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-4d41fc8e91c26413d0862d97f708b15eca861bf6c9f74a0bef29b78f8d6a3c97.json`, and `PROGRESS.md`.
+- Result: the trusted evidence manifest now points `ios-client-visual` at a fresh artifact for source commit `e6a6288`, covering 16 Client screenshots including `client-order-status`.
+- Checks run: documented trusted bootstrap recorder for `scripts/record-ecosystem-evidence.mjs ios-client-visual` passed; underlying `npm run ios:visual` passed with 16 PNG attachments; `git diff --check` passed. Trusted strict ecosystem audit was also attempted and remains red on known release-level gaps outside this slice: missing linked handoffs, broader native/E2E reconciliation evidence, and uncommitted acceptance evidence before this commit.
+- Outcome: iOS Client visual evidence is accepted for the latest local simulator source tree. App Store readiness remains blocked by protected Apple signing/App Store Connect credentials, production HTTPS API values, TestFlight submission, and physical-device Face ID/APNs/camera/offline smoke.
+- Next step: move to the next non-blocked slice: either native Staff/Courier/POS visual parity, Android Client parity, or ERP/CMS integration while external release credentials remain unavailable.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-004`.
 - Task: align native Client notifications with the `AliStore Клиент App 2.0` handoff while preserving the customer-owned notification API contract.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
