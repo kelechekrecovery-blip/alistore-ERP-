@@ -65,8 +65,10 @@ With `--strict-asc`, it also signs a short-lived App Store Connect JWT and calls
 Apple's API to prove the issuer/key pair works. It never prints secret values.
 With `--strict-signing`, it verifies an Apple Distribution signing identity for
 the configured team and a local App Store provisioning profile for
-`kg.alistore.client`, unless `IOS_ALLOW_PROVISIONING_UPDATE=true` is explicitly
-set for protected Xcode automatic signing.
+`kg.alistore.client` in either `~/Library/MobileDevice/Provisioning Profiles`
+or `~/Library/Developer/Xcode/UserData/Provisioning Profiles`, unless
+`IOS_ALLOW_PROVISIONING_UPDATE=true` is explicitly set for protected Xcode
+automatic signing.
 
 `ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
 Simulator and exports 17 retained PNG attachments: home, catalog, product detail,

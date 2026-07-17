@@ -1,5 +1,15 @@
 # PROGRESS
 
+# 2026-07-17 — IOS-STORE-PREFLIGHT-006
+
+- Iteration ID: `IOS-STORE-PREFLIGHT-006`.
+- Task: align the native iOS Client release preflight with the actual local Xcode provisioning profile storage used by the prior Savio/Manas releases.
+- Files changed: `apps/ios/scripts/store-preflight.sh`, `apps/ios/store/release-runbook.md`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: `--strict-signing` now searches both `~/Library/MobileDevice/Provisioning Profiles` and `~/Library/Developer/Xcode/UserData/Provisioning Profiles`. Local Savio profiles are present in Xcode UserData for `kg.kelechek.savio` and `kg.kelechek.savio.business`, but no local profile currently matches `kg.alistore.client`; the preflight therefore fails closed with a precise AliStore-profile message unless `IOS_ALLOW_PROVISIONING_UPDATE=true` is explicitly set on a protected, authenticated Xcode release machine.
+- Checks run: `bash -n apps/ios/scripts/store-preflight.sh`; temporary-env `npm run ios:store-preflight -- --env-file <tmp>` passed; temporary-env `--strict-signing` with `IOS_ALLOW_PROVISIONING_UPDATE=false` failed closed on missing `kg.alistore.client` profile; temporary-env `--strict-signing` with `IOS_ALLOW_PROVISIONING_UPDATE=true` passed; `git diff --check`.
+- Acceptance: accepted for release tooling accuracy only. Real App Store publication still requires protected `apps/ios/.env.production`, real `ASC_ISSUER_ID`, App Store Connect verification, an AliStore provisioning profile or authenticated auto-provisioning, physical iPhone smoke, archive upload and TestFlight/App Review.
+- Next step: create/download the `kg.alistore.client` App Store provisioning profile or enable authenticated Xcode automatic provisioning, then run `npm run ios:store-preflight -- --env-file apps/ios/.env.production --strict-asc --strict-signing`.
+
 # 2026-07-17 — RECONCILED-E2E-EVIDENCE-002
 
 - Iteration ID: `RECONCILED-E2E-EVIDENCE-002`.

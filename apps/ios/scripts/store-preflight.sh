@@ -121,9 +121,13 @@ if [[ "$strict_signing" == "1" ]]; then
     fail "Apple Distribution signing identity for team $team_id is required"
   fi
 
-  profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
   profile_match="0"
-  if [[ -d "$profile_dir" ]]; then
+  profile_dirs=(
+    "$HOME/Library/MobileDevice/Provisioning Profiles"
+    "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+  )
+  for profile_dir in "${profile_dirs[@]}"; do
+    [[ -d "$profile_dir" ]] || continue
     while IFS= read -r profile; do
       profile_plist="$(security cms -D -i "$profile" 2>/dev/null || true)"
       [[ -n "$profile_plist" ]] || continue
@@ -137,10 +141,11 @@ if [[ "$strict_signing" == "1" ]]; then
           ;;
       esac
     done < <(find "$profile_dir" -maxdepth 1 -type f -name '*.mobileprovision' -print)
-  fi
+    [[ "$profile_match" == "1" ]] && break
+  done
 
   if [[ "$profile_match" != "1" && "${IOS_ALLOW_PROVISIONING_UPDATE:-}" != "true" ]]; then
-    fail 'App Store provisioning profile for kg.alistore.client is required, or set IOS_ALLOW_PROVISIONING_UPDATE=true for an authenticated Xcode account'
+    fail 'App Store provisioning profile for kg.alistore.client is required in MobileDevice or Xcode UserData profiles, or set IOS_ALLOW_PROVISIONING_UPDATE=true for an authenticated Xcode account'
   fi
 fi
 
