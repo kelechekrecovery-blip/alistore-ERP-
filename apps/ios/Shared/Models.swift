@@ -878,6 +878,19 @@ public struct StaffSupportTicket: Decodable, Identifiable, Sendable {
     public let status: String
     public let assignee: String?
     public let createdAt: Date
+
+    public init(id: String, customerId: String, channel: String, subject: String, body: String?, priority: String, sla: Date, status: String, assignee: String?, createdAt: Date) {
+        self.id = id
+        self.customerId = customerId
+        self.channel = channel
+        self.subject = subject
+        self.body = body
+        self.priority = priority
+        self.sla = sla
+        self.status = status
+        self.assignee = assignee
+        self.createdAt = createdAt
+    }
 }
 
 public struct SupportTransitionRequest: Encodable, Sendable {

@@ -122,4 +122,30 @@ final class AliStoreStaffUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["К договору купли-продажи →"].isEnabled)
     }
+
+    func testSignedInStaffSupportMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-orders"].tap()
+        XCTAssertTrue(app.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        app.buttons["Поддержка"].tap()
+
+        XCTAssertTrue(app.staticTexts["Поддержка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Support inbox"].exists)
+        XCTAssertTrue(app.staticTexts["2"].exists)
+        XCTAssertTrue(app.staticTexts["Где мой заказ №4102?"].exists)
+        XCTAssertTrue(app.staticTexts["Клиент C-1042 · Telegram"].exists)
+        XCTAssertTrue(app.staticTexts["Срочно"].exists == false)
+        XCTAssertTrue(app.buttons["В работу"].exists)
+        XCTAssertTrue(app.buttons["Эскалировать"].exists)
+        XCTAssertTrue(app.staticTexts["Нужна гарантия по AirPods"].exists)
+
+        app.buttons["staff-support-status-in_progress"].tap()
+        XCTAssertTrue(app.staticTexts["VIP клиент просит обмен"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Срочно"].exists)
+        XCTAssertFalse(app.buttons["Эскалировать"].exists)
+    }
 }

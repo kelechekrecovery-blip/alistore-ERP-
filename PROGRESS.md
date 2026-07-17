@@ -2785,6 +2785,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-STAFF-VISUAL-005`.
+- Task: align native Staff Support inbox with the Staff handoff direction while preserving support ticket APIs.
+- Files changed: `apps/ios/Staff/StaffWorkView.swift`, `apps/ios/Shared/Models.swift`, `apps/ios/UITests/Staff/AliStoreStaffUITests.swift`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: Support mode now renders a dark queue summary, horizontal status chips, SLA-aware cards with channel/customer context, priority pills and action CTAs. Debug signed-in mode uses deterministic support fixtures; live mode still reads `support/tickets?status=...` and executes the existing staff JWT transition/escalation endpoints.
+- Checks run: `npm run ios:build` passed all 10 targets; targeted `AliStoreStaffUITests` passed 7/7; `git diff --check` passed.
+- Outcome: Staff Support inbox visual slice is accepted at local simulator targeted level. Exact linked support handoff evidence, physical APNs/customer communication smoke, Customer 360 and warranty tool parity remain open.
+- Next step: continue Staff Customer 360/warranty tools or move to Android Staff parity while external physical-device gates remain blocked.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-004`.
 - Task: align native Client notifications with the `AliStore Клиент App 2.0` handoff while preserving the customer-owned notification API contract.
 - Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.

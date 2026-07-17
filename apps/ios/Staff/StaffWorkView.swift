@@ -295,19 +295,24 @@ private struct StaffSupportView: View {
     @State private var busyId: String?
     @State private var errorMessage: String?
     private let environment = AppEnvironment.live()
+    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
+    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
+    private let surfaceSoft = Color(red: 0.165, green: 0.145, blue: 0.122)
+    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
+    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
+    private let coral = Color(red: 1, green: 0.357, blue: 0.18)
+    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
+    private let amber = Color(red: 1, green: 0.77, blue: 0.35)
     private let statuses = [("new", "Новые"), ("in_progress", "В работе"), ("waiting", "Ожидание"), ("resolved", "Решены")]
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Статус", selection: $status) {
-                ForEach(statuses, id: \.0) { Text($0.1).tag($0.0) }
-            }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
-
+        ZStack {
+            background.ignoresSafeArea()
             if isLoading {
-                ProgressView("Загружаем обращения…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView("Загружаем обращения…")
+                    .tint(lime)
+                    .foregroundStyle(primaryText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
                 ContentUnavailableView {
                     Label("Поддержка недоступна", systemImage: "wifi.exclamationmark")
@@ -319,34 +324,133 @@ private struct StaffSupportView: View {
             } else if tickets.isEmpty {
                 ContentUnavailableView("Нет обращений", systemImage: "bubble.left.and.bubble.right", description: Text("В выбранной очереди сейчас пусто."))
             } else {
-                List(tickets) { ticket in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(ticket.subject).fontWeight(.semibold)
-                            Spacer()
-                            Text(ticket.priority).font(.caption).foregroundStyle(ticket.priority == "urgent" ? .red : .secondary)
-                        }
-                        if let body = ticket.body { Text(body).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
-                        Label(ticket.sla.formatted(date: .abbreviated, time: .shortened), systemImage: "clock")
-                            .font(.caption)
-                            .foregroundStyle(ticket.sla < Date() ? .red : .secondary)
-                        HStack {
-                            if let next = nextStatus(ticket.status) {
-                                Button(actionLabel(next), systemImage: "arrow.right.circle") { Task { await transition(ticket, to: next) } }
-                            }
-                            if ticket.priority != "urgent" && ticket.status != "resolved" && ticket.status != "closed" {
-                                Button("Эскалировать", systemImage: "exclamationmark.arrow.triangle.2.circlepath") { Task { await escalate(ticket) } }
-                            }
-                        }
-                        .disabled(busyId != nil)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        queueSummary
+                        statusChips
+                        ForEach(tickets) { ticket in ticketCard(ticket) }
                     }
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
                 }
-                .listStyle(.plain)
                 .refreshable { await load() }
             }
         }
         .task(id: status) { await load() }
+    }
+
+    private var queueSummary: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Support inbox")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(primaryText)
+                Text("Ответьте клиенту, эскалируйте срочное и фиксируйте SLA.")
+                    .font(.caption)
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 10)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(tickets.count)")
+                    .font(.title2.monospacedDigit().weight(.black))
+                    .foregroundStyle(lime)
+                Text("в очереди")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(secondaryText)
+            }
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private var statusChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(statuses, id: \.0) { item in
+                    Button {
+                        status = item.0
+                    } label: {
+                        Text(item.1)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(status == item.0 ? .black : secondaryText)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(status == item.0 ? lime : surface, in: Capsule())
+                            .overlay(Capsule().stroke(status == item.0 ? lime : surfaceSoft))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("staff-support-status-\(item.0)")
+                }
+            }
+        }
+    }
+
+    private func ticketCard(_ ticket: StaffSupportTicket) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .top, spacing: 10) {
+                Text(channelIcon(ticket.channel))
+                    .font(.title2)
+                    .frame(width: 38, height: 38)
+                    .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ticket.subject)
+                        .font(.subheadline.weight(.black))
+                        .foregroundStyle(primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Клиент \(ticket.customerId) · \(channelLabel(ticket.channel))")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(secondaryText)
+                }
+                Spacer(minLength: 8)
+                Text(priorityLabel(ticket.priority))
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(priorityColor(ticket.priority))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(priorityColor(ticket.priority).opacity(0.14), in: Capsule())
+            }
+            if let body = ticket.body, !body.isEmpty {
+                Text(body)
+                    .font(.caption)
+                    .foregroundStyle(secondaryText)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Label(statusLabel(ticket.status), systemImage: "bubble.left.and.bubble.right.fill")
+                Text("SLA \(ticket.sla.formatted(date: .omitted, time: .shortened))")
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(ticket.sla < Date() ? coral : secondaryText)
+            HStack(spacing: 8) {
+                if let next = nextStatus(ticket.status) {
+                    Button(actionLabel(next)) { Task { await transition(ticket, to: next) } }
+                        .buttonStyle(.plain)
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                if ticket.priority != "urgent" && ticket.status != "resolved" && ticket.status != "closed" {
+                    Button("Эскалировать") { Task { await escalate(ticket) } }
+                        .buttonStyle(.plain)
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(primaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
+            .disabled(busyId != nil)
+        }
+        .padding(14)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+        .accessibilityIdentifier("staff-support-\(ticket.id)")
     }
 
     @MainActor
@@ -354,6 +458,12 @@ private struct StaffSupportView: View {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            tickets = Self.fixtureTickets.filter { status == "new" ? $0.status == "new" : $0.status == status }
+            return
+        }
+        #endif
         do {
             tickets = try await APIClient(baseURL: environment.apiBaseURL).get("support/tickets?status=\(status)", token: session.accessToken)
         } catch {
@@ -407,5 +517,71 @@ private struct StaffSupportView: View {
 
     private func actionLabel(_ status: String) -> String {
         ["in_progress": "В работу", "waiting": "Ждём клиента", "resolved": "Решено", "closed": "Закрыть"][status] ?? status
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        ["new": "Новая", "in_progress": "В работе", "waiting": "Ожидание", "resolved": "Решено", "closed": "Закрыта"][status] ?? status
+    }
+
+    private func priorityLabel(_ priority: String) -> String {
+        ["low": "Низкий", "normal": "Обычный", "high": "Высокий", "urgent": "Срочно"][priority] ?? priority
+    }
+
+    private func priorityColor(_ priority: String) -> Color {
+        switch priority {
+        case "urgent": coral
+        case "high": amber
+        default: secondaryText
+        }
+    }
+
+    private func channelLabel(_ channel: String) -> String {
+        ["telegram": "Telegram", "whatsapp": "WhatsApp", "phone": "Звонок", "web": "Сайт"][channel] ?? channel
+    }
+
+    private func channelIcon(_ channel: String) -> String {
+        ["telegram": "✈️", "whatsapp": "☎️", "phone": "📞", "web": "💬"][channel] ?? "💬"
+    }
+
+    private static var fixtureTickets: [StaffSupportTicket] {
+        let base = Date(timeIntervalSince1970: 1_785_000_000)
+        return [
+            StaffSupportTicket(
+                id: "support-4102",
+                customerId: "C-1042",
+                channel: "telegram",
+                subject: "Где мой заказ №4102?",
+                body: "Клиент ждёт курьерский слот и просит подтвердить время доставки.",
+                priority: "high",
+                sla: Date().addingTimeInterval(1_800),
+                status: "new",
+                assignee: nil,
+                createdAt: base
+            ),
+            StaffSupportTicket(
+                id: "support-warranty",
+                customerId: "C-0777",
+                channel: "whatsapp",
+                subject: "Нужна гарантия по AirPods",
+                body: "Попросить фото серийного номера и проверить активную гарантию в Customer 360.",
+                priority: "normal",
+                sla: Date().addingTimeInterval(5_400),
+                status: "new",
+                assignee: nil,
+                createdAt: base
+            ),
+            StaffSupportTicket(
+                id: "support-vip",
+                customerId: "C-0009",
+                channel: "phone",
+                subject: "VIP клиент просит обмен",
+                body: "Нужна эскалация владельцу после проверки IMEI и комплекта.",
+                priority: "urgent",
+                sla: Date().addingTimeInterval(-900),
+                status: "in_progress",
+                assignee: "staff-ui-test",
+                createdAt: base
+            ),
+        ]
     }
 }
