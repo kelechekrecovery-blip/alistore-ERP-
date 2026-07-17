@@ -65,7 +65,10 @@ final class AliStoreClientUITests: XCTestCase {
 
         app.buttons["Уведомления"].tap()
         XCTAssertTrue(app.navigationBars["Уведомления"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Заказ готов к выдаче"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Заказ №4102 собирается"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Скоро передадим курьеру"].exists)
+        XCTAssertTrue(app.staticTexts["Цена снизилась"].exists)
+        XCTAssertTrue(app.staticTexts["Apple Watch S9 теперь дешевле на 5 000"].exists)
         XCTAssertTrue(app.staticTexts["Гарантия скоро истекает"].exists)
         XCTAssertTrue(app.staticTexts["Начислены бонусы"].exists)
     }

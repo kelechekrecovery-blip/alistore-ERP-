@@ -458,12 +458,29 @@ private struct ClientOverlayView: View {
             .padding(16)
         } else {
             ScrollView {
-                VStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Button { dismiss() } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Назад")
+                        Text("Уведомления")
+                            .font(ClientTheme.display(20, weight: .bold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    .padding(.bottom, 4)
+
                     ForEach(notifications) { notification in
                         notificationDestination(notification)
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 20)
             }
         }
     }
@@ -471,11 +488,12 @@ private struct ClientOverlayView: View {
     @ViewBuilder
     private func notificationDestination(_ notification: CustomerNotification) -> some View {
         let row = ClientNotificationRow(
-            symbol: notification.symbol,
+            icon: notificationIcon(notification),
             title: notification.title,
             detail: notification.detail,
             time: relativeTime(notification.createdAt),
-            isUnread: notification.readAt == nil
+            isUnread: notification.readAt == nil,
+            route: notification.route
         )
         switch notification.route {
         case "order" where notification.referenceId != nil:
@@ -572,6 +590,15 @@ private struct ClientOverlayView: View {
         } catch {
             notificationError = error.localizedDescription
         }
+    }
+
+    private func notificationIcon(_ notification: CustomerNotification) -> String {
+        let value = "\(notification.template) \(notification.title) \(notification.route) \(notification.symbol)".lowercased()
+        if value.contains("price") || value.contains("цена") || value.contains("tag") { return "🏷️" }
+        if value.contains("warranty") || value.contains("гарант") || value.contains("shield") { return "🛡" }
+        if value.contains("bonus") || value.contains("loyalty") || value.contains("бонус") || value.contains("gift") { return "🎁" }
+        if value.contains("support") || value.contains("поддерж") { return "💬" }
+        return "📦"
     }
 
     private func relativeTime(_ date: Date) -> String {
@@ -681,30 +708,42 @@ private struct ClientOverlayView: View {
 }
 
 private struct ClientNotificationRow: View {
-    let symbol: String
+    let icon: String
     let title: String
     let detail: String
     let time: String
     let isUnread: Bool
+    let route: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol)
-                .foregroundStyle(ClientTheme.lime)
-                .frame(width: 36, height: 36)
-                .background(ClientTheme.lime.opacity(0.12), in: Circle())
+            Text(icon)
+                .font(.system(size: 20))
+                .frame(width: 24, alignment: .center)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(ClientTheme.body(13, weight: isUnread ? .bold : .semibold)).foregroundStyle(.white)
-                Text(detail).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                Text(title)
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineLimit(2)
+                Text(time)
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
             }
             Spacer()
-            Text(time).font(ClientTheme.body(10)).foregroundStyle(ClientTheme.muted)
         }
-        .padding(12)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(isUnread ? ClientTheme.lime.opacity(0.45) : ClientTheme.line))
+        .padding(14)
+        .background(backgroundColor, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(detail). \(time)")
+    }
+
+    private var backgroundColor: Color {
+        if isUnread && route == "order" { return ClientTheme.surface }
+        return Color(red: 0.086, green: 0.075, blue: 0.059)
     }
 }
 
@@ -2114,8 +2153,8 @@ private enum ClientUIFixture {
         CustomerNotification(
             id: "ui-notification-order",
             template: "order_ready",
-            title: "Заказ готов к выдаче",
-            detail: "Заказ №2401 можно забрать в ЦУМ",
+            title: "Заказ №4102 собирается",
+            detail: "Скоро передадим курьеру",
             symbol: "shippingbox.fill",
             route: "order",
             referenceId: "ui-order-2401",
@@ -2123,21 +2162,32 @@ private enum ClientUIFixture {
             readAt: nil
         ),
         CustomerNotification(
+            id: "ui-notification-price",
+            template: "price_drop",
+            title: "Цена снизилась",
+            detail: "Apple Watch S9 теперь дешевле на 5 000",
+            symbol: "tag.fill",
+            route: "product",
+            referenceId: "ui-product-watch",
+            createdAt: referenceDate.addingTimeInterval(-3600),
+            readAt: nil
+        ),
+        CustomerNotification(
             id: "ui-notification-warranty",
             template: "warranty_created",
             title: "Гарантия скоро истекает",
-            detail: "Проверьте гарантию iPhone 15",
+            detail: "AirPods Pro — осталось 12 дней",
             symbol: "shield.fill",
             route: "warranty",
             referenceId: "ui-warranty-2401",
-            createdAt: referenceDate.addingTimeInterval(-3600),
+            createdAt: referenceDate.addingTimeInterval(-86400),
             readAt: nil
         ),
         CustomerNotification(
             id: "ui-notification-bonus",
             template: "loyalty_earned",
             title: "Начислены бонусы",
-            detail: "+300 за отзыв о покупке",
+            detail: "+300 за отзыв",
             symbol: "gift.fill",
             route: "bonuses",
             referenceId: nil,

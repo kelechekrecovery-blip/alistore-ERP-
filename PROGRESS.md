@@ -2782,3 +2782,13 @@
 - Checks run: `npm run ios:build` passed all 10 targets before final UI polish; targeted Client XCUITest for loyalty/addresses passed; `npm run ios:ui` passed Client `17/17`, Staff `2/2`, Courier `1/1`, POS `1/1`; `git diff --check` passed.
 - Outcome: Client loyalty/coupon and address visual parity is accepted at local simulator software level. App Store readiness remains blocked by production HTTPS API URL, Apple signing/provisioning/App Store Connect credentials, trusted visual recorder drift, and physical-device Face ID/APNs/camera/offline smoke.
 - Next step: continue unresolved Client App 2.0 subflow parity or move to Android Client/ERP integration while waiting for production release credentials and physical-device certification.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-VISUAL-004`.
+- Task: align native Client notifications with the `AliStore Клиент App 2.0` handoff while preserving the customer-owned notification API contract.
+- Files changed: `apps/ios/Client/AliStoreClientApp.swift`, `apps/ios/UITests/Client/AliStoreClientUITests.swift`, and `BACKLOG.md`.
+- Result: the signed-in notification overlay now renders the prototype dark inbox header and four handoff rows for order progress, price drop, warranty expiry and bonus accrual. Rows use emoji-style leading icons, warm dark cards, detail copy and inline timestamps while retaining owner-scoped `GET /notifications/mine`, mark-read behavior and route handling.
+- Checks run: `npm run ios:build` passed all 10 targets; `npm run ios:ui` passed Client `17/17`, Staff `2/2`, Courier `1/1`, POS `1/1`.
+- Outcome: notification inbox visual parity is accepted at local simulator software level. Production provider delivery, APNs physical-device smoke, trusted visual recorder drift, release signing, TestFlight/App Store Connect and production HTTPS API configuration remain open.
+- Next step: continue remaining Client App 2.0 visual subflows and then rerun trusted visual/store preflight after credentials and physical-device access are ready.
