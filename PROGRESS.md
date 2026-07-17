@@ -2619,6 +2619,12 @@
 
 ## 2026-07-17
 
+- Iteration ID: `MVP-GATE-RECHECK-001`.
+- Task: rerun the general MVP verification after consolidating the execution plan.
+- Checks run: `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` completed schema validation, Prisma generation, four migration upgrade paths, API/Web builds, mobile typecheck, clean reset of `alistore_test` through all committed migrations and post-deploy indexes; the API Jest phase encountered one `socket hang up` in `test/finance-expenses.e2e-spec.ts`. The affected suite was rerun in isolation with `npm --prefix apps/api test -- --runInBand test/finance-expenses.e2e-spec.ts` and passed `1/1` suites and `15/15` tests.
+- Outcome: no deterministic Finance defect was reproduced. The aggregate MVP gate is not claimed green from this run because the first full Jest pass stopped on the transient connection failure; the isolated rerun is green and should be followed by a complete serial API rerun before release acceptance.
+- Next step: rerun the full API Jest phase against the reset test database, then continue the ERP/storefront contract gate.
+
 - Task: refresh `ios-app-ui` on the visual-contract source hash.
 - Checks run: four XCUITest bundles `4/4`, zero failures; artifact SHA-256 `8237873a2593486399a76dbc92287bc6c85eea4099afadb44b90a30f28dfe7cd`; trusted recorder exited zero.
 - Outcome: packaged iOS launch evidence is current again; deep journeys and physical-device certification remain open.
