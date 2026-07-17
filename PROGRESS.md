@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MVP-VERIFY-EVIDENCE-034`.
+- Task: rebind every hash-bound acceptance artifact after the outbox test correction.
+- Result: visual `3/3`, POS/refund `1/1`, courier/COD `1/1`, service/loaner API `9/9` plus UI `3/3`, procurement API `10/10` plus UI `1/1`, composite ecosystem `4/4`, iOS UI `34/34`, and Android UI `30/30` all pass on source tree `705b3bf...`.
+- Commits: `1e7ad02`, `b960366`, `96a3ec9`, `3a65569`, `b532796`, `dd46dba`, `99c7c33`, `33e9e3e`.
+- Strict audit: all executable local software gates are PASS. The only remaining audit blocker is the 64 missing linked `.dc.html` references; staging credentials, live providers and physical devices remain external release gates.
+- Next step: obtain owner design references/retirement approvals and staging credentials, then run sandbox deployment, backup/restore, provider certification and physical-device smoke.
+
+## 2026-07-18
+
 - Iteration ID: `MVP-VERIFY-033`.
 - Task: repair the full MVP verification regression and rerun the complete local gate.
 - Result: outbox integration test now advances `nextAttemptAt` explicitly between retry attempts; production backoff remains intact. Full `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` completed migrations, API/Web builds, mobile typecheck, API suite and 62 Playwright scenarios. External provider/hardware readiness is reported separately and remains blocked without credentials.
