@@ -27,8 +27,16 @@
       ]
     },
     "ios-client-visual": {
-      "status": "pending",
-      "packageScript": "ios:visual"
+      "status": "accepted",
+      "packageScript": "ios:visual",
+      "command": "npm run ios:visual",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/ios-client-visual-b192564522ec3568b75718782955225f2042e24a961abdabd0c1f0eeafb74080.json",
+          "sha256": "b192564522ec3568b75718782955225f2042e24a961abdabd0c1f0eeafb74080"
+        }
+      ]
     },
     "android-app-ui": {
       "status": "accepted",

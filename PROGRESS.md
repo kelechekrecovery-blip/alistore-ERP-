@@ -2785,6 +2785,16 @@
 
 ## 2026-07-17
 
+- Iteration ID: `IOS-CLIENT-VISUAL-010`.
+- Task: record trusted native Client visual evidence for the current `AliStore Клиент App 2.0` software state.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-client-visual-b192564522ec3568b75718782955225f2042e24a961abdabd0c1f0eeafb74080.json`, `BACKLOG.md`, and `PROGRESS.md`.
+- Result: the committed trusted bootstrap ran `npm run ios:visual`, the Client XCUITest captured seven retained simulator PNG states (`client-home`, `client-catalog`, `client-product-detail`, `client-cart`, `client-account`, `client-payment-success`, `client-payment-failure`), and the acceptance manifest now marks `ios-client-visual` as `accepted` with source commit `f936309` and source tree hash `bbc2ca2407159dde77ff290f9d286c78c75bf1561b06b06c287efcf432e15cfa`.
+- Checks run: trusted `scripts/record-ecosystem-evidence.mjs ios-client-visual` passed through `scripts/run-trusted-ecosystem-node.sh`; `git diff --check` passed.
+- Outcome: local trusted Client visual evidence is accepted. This does not certify exact owner pixel approval for every handoff state, physical-device Face ID/APNs/camera/offline behavior, production HTTPS API, signing, TestFlight or App Store Connect publication.
+- Next step: run signed Client store preflight after protected Apple/App Store Connect credentials and production API URL are configured, or continue unresolved native/ERP parity while external store gates remain blocked.
+
+## 2026-07-17
+
 - Iteration ID: `IOS-CLIENT-VISUAL-009`.
 - Task: unblock trusted Client visual evidence recording after the local toolchain drifted from `scripts/ecosystem-toolchain-lock.json`.
 - Files changed: `scripts/ecosystem-toolchain-lock.json`, `BACKLOG.md`, and `PROGRESS.md`.
