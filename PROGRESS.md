@@ -2543,3 +2543,13 @@
 - Checks run: `npm run ios:generate`; unsigned arm64 iPhoneOS Release compile for all 10 iOS targets; positive preflight with temporary dummy credentials; expected-negative preflight without a team id; `git diff --check`.
 - Outcome: Release configuration software checks are accepted locally. No signing, provisioning profile, App Store Connect upload, physical-device push check or TestFlight review was claimed because the required owner credentials and profiles are not configured.
 - Next step: continue Client screen-by-screen visual parity and collect simulator visual evidence, then run the signed archive gate when the owner supplies protected Apple/App Store Connect credentials.
+
+## 2026-07-17
+
+- Iteration ID: `IOS-CLIENT-005`.
+- Task: align native Client order history and post-purchase actions with `AliStore Клиент App 2.0` and expose an authenticated customer receipt route.
+- Files changed: `apps/api/src/orders/orders.controller.ts`, `apps/api/test/guest-order-access.e2e-spec.ts`, `apps/ios/Shared/Models.swift`, and `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: order history now uses a dark prototype-aligned card shell with loading/empty/error states and navigates to the server-derived order status screen. Receipt access is customer JWT-owned and available only for paid orders; the native receipt screen renders the server response, while warranty continues through the owner-scoped Devices flow. No client-side payment, fulfillment or warranty status is fabricated.
+- Checks run: `npm run api:build`; targeted authenticated receipt E2E `1/1`; full API Jest `148/148` suites and `670/670` tests; `npm run ios:build` all 10 targets; `npm run ios:test` `33/33`; `npm run ios:ui` Client `5/5`, Staff `1/1`, Courier `1/1`, POS `1/1`; `git diff --check`.
+- Outcome: `IOS-CLIENT-005` is accepted at local software level. Full 17-screen visual parity, physical-device push/camera/Face ID/offline validation, signing, TestFlight and App Store Connect submission remain open. Production and App Store readiness remain RED.
+- Next step: continue the remaining Client App 2.0 screen-by-screen visual pass, prioritizing Devices/Warranty and then support/returns/trade-in, while retaining the external device, credentials and missing-reference gates.

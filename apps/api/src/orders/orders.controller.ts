@@ -130,6 +130,24 @@ export class OrdersController {
     return order;
   }
 
+  @ApiOperation({ summary: 'Render a paid receipt for the authenticated customer' })
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Customer-owned order id' })
+  @ApiOkResponse({ description: 'Receipt markup for the paid order.' })
+  @Get(':id/receipt')
+  @UseGuards(JwtAuthGuard)
+  async customerReceipt(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    const order = await this.orders.get(id);
+    if (!order) throw new NotFoundException(`Заказ ${id} не найден`);
+    if (user.typ !== 'customer' || order.customerId !== user.customerId) {
+      throw new NotFoundException(`Заказ ${id} не найден`);
+    }
+    const paid = order.payments.some((payment) => payment.amount > 0 && ['received', 'reconciled'].includes(payment.status));
+    if (!paid) throw new ConflictException('receipt_not_available');
+    const receipt = await this.receipts.renderOrder(id);
+    return { markup: receipt.markup };
+  }
+
   @ApiOperation({ summary: 'Read one guest order through an order-scoped capability' })
   @ApiParam({ name: 'id', description: 'Order id bound into the capability' })
   @Get(':id/guest')

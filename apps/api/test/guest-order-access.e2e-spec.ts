@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuditModule } from '../src/audit/audit.module';
@@ -17,6 +18,7 @@ describe('Guest order-scoped status and receipt access', () => {
   let customerId = '';
   let productId = '';
   const orderIds: string[] = [];
+  const jwt = new JwtService({ secret: process.env.JWT_SECRET ?? 'dev-insecure-change-me' });
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -82,6 +84,17 @@ describe('Guest order-scoped status and receipt access', () => {
     expect(receipt.body.markup).toContain('25 200');
     expect(receipt.body).not.toHaveProperty('escposBase64');
     expect(receipt.body).not.toHaveProperty('svg');
+
+    const customerToken = jwt.sign({ sub: customer.id, typ: 'customer', phone: customer.phone });
+    const customerReceipt = await request(app.getHttpServer())
+      .get(`/orders/${created.body.id}/receipt`)
+      .set('Authorization', `Bearer ${customerToken}`)
+      .expect(200);
+    expect(customerReceipt.body.markup).toContain('Guest receipt phone');
+    await request(app.getHttpServer())
+      .get(`/orders/${otherOrder.id}/receipt`)
+      .set('Authorization', `Bearer ${customerToken}`)
+      .expect(409);
     const ledger = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } } });
     expect(JSON.stringify(ledger)).not.toContain(capability);
   });

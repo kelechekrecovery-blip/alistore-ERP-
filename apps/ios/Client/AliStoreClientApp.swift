@@ -961,7 +961,7 @@ private struct CartView: View {
         .task { await loadStorePoints() }
         .sheet(isPresented: $showingOrderStatus) {
             if let order = completedOrder {
-                ClientOrderStatusView(order: order)
+                ClientOrderStatusView(order: order, environment: environment, auth: auth)
             }
         }
     }
@@ -1263,6 +1263,8 @@ private struct ClientPaymentResultView: View {
 
 private struct ClientOrderStatusView: View {
     let order: CustomerOrder
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
     @Environment(\.dismiss) private var dismiss
 
     private let steps = [
@@ -1326,8 +1328,18 @@ private struct ClientOrderStatusView: View {
                     .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
                     HStack(spacing: 8) {
-                        ClientStatusAction(symbol: "doc.text", title: "Чек")
-                        ClientStatusAction(symbol: "shield.checkered", title: "Гарантия")
+                        NavigationLink {
+                            ClientReceiptView(environment: environment, auth: auth, order: order)
+                        } label: {
+                            ClientStatusAction(symbol: "doc.text", title: "Чек")
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink {
+                            DevicesView(environment: environment, auth: auth)
+                        } label: {
+                            ClientStatusAction(symbol: "shield.checkered", title: "Гарантия")
+                        }
+                        .buttonStyle(.plain)
                     }
                     Text("Статус заказа и оплаты обновляется сервером. Повторное нажатие не создаёт новый заказ.")
                         .font(ClientTheme.body(11))
@@ -1347,6 +1359,70 @@ private struct ClientOrderStatusView: View {
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
+    }
+}
+
+private struct ClientReceiptView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let order: CustomerOrder
+    @State private var receipt: CustomerOrderReceipt?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Электронный чек")
+                        .font(ClientTheme.display(24, weight: .black))
+                        .foregroundStyle(.white)
+                    Text("Заказ #\(order.id.suffix(6))")
+                        .font(ClientTheme.body(13, weight: .medium))
+                        .foregroundStyle(ClientTheme.muted)
+                    if isLoading {
+                        ProgressView("Запрашиваем чек")
+                            .tint(ClientTheme.lime)
+                            .frame(maxWidth: .infinity, minHeight: 260)
+                    } else if let errorMessage {
+                        ClientCallout(symbol: "doc.text.magnifyingglass", title: "Чек пока недоступен", detail: errorMessage)
+                    } else if let receipt {
+                        Text(receipt.markup)
+                            .font(.system(size: 13, weight: .regular, design: .monospaced))
+                            .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(18)
+                            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                    }
+                }
+                .padding(16)
+            }
+        }
+        .navigationTitle("Чек")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+        .task { await load() }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else {
+            errorMessage = "Войдите в аккаунт, чтобы открыть чек."
+            isLoading = false
+            return
+        }
+        do {
+            receipt = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "orders/\(order.id)/receipt",
+                token: token
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
     }
 }
 
@@ -1376,42 +1452,49 @@ private struct OrdersView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if auth.isRestoring || isLoading {
-                    ProgressView("Загружаем заказы")
-                } else if auth.session == nil {
-                    EmptyStateView(title: "Войдите в аккаунт", detail: "История заказов доступна после входа по SMS-коду.", symbol: "person.badge.key")
-                } else if let errorMessage {
-                    ContentUnavailableView("Заказы недоступны", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
-                } else if orders.isEmpty {
-                    EmptyStateView(title: "Заказов пока нет", detail: "Здесь появятся покупки из магазина и приложения.", symbol: "shippingbox")
-                } else {
-                    List(orders) { order in
-                        NavigationLink {
-                            ClientOrderStatusView(order: order)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Заказ #\(order.id.suffix(6))").font(.headline)
-                                    Spacer()
-                                    Text(order.status).font(.caption.weight(.semibold)).foregroundStyle(.orange)
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Мои заказы")
+                                .font(ClientTheme.display(24, weight: .black))
+                                .foregroundStyle(.white)
+                            Text("Статусы, выдача и доставка")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                        if auth.isRestoring || isLoading {
+                            ProgressView("Загружаем заказы")
+                                .tint(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 260)
+                        } else if auth.session == nil {
+                            EmptyStateView(title: "Войдите в аккаунт", detail: "История заказов доступна после входа по SMS-коду.", symbol: "person.badge.key")
+                        } else if let errorMessage {
+                            ClientCallout(symbol: "wifi.exclamationmark", title: "Заказы недоступны", detail: errorMessage)
+                        } else if orders.isEmpty {
+                            EmptyStateView(title: "Заказов пока нет", detail: "Здесь появятся покупки из магазина и приложения.", symbol: "shippingbox")
+                        } else {
+                            ForEach(orders) { order in
+                                NavigationLink {
+                                    ClientOrderStatusView(order: order, environment: environment, auth: auth)
+                                } label: {
+                                    ClientOrderCard(order: order)
                                 }
-                                Text("\(order.items.reduce(0) { $0 + $1.qty }) тов. · \(order.total.formatted(.currency(code: "KGS")))")
-                                    .font(.subheadline)
-                                Text(order.createdAt, format: .dateTime.day().month().year())
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                .buttonStyle(.plain)
                             }
-                            .padding(.vertical, 4)
                         }
                     }
-                    .listStyle(.plain)
+                    .padding(16)
                 }
             }
             .navigationTitle("Мои заказы")
+            .navigationBarTitleDisplayMode(.inline)
             .task(id: "\(auth.session?.accessToken ?? "guest")-\(refreshRevision)") { await load() }
             .refreshable { await load() }
         }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
     }
 
     private func load() async {
@@ -1427,6 +1510,58 @@ private struct OrdersView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct ClientOrderCard: View {
+    let order: CustomerOrder
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Заказ #\(order.id.suffix(6))")
+                        .font(ClientTheme.body(15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(order.createdAt, format: .dateTime.day().month().year())
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+                Text(order.status)
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(statusColor.opacity(0.14), in: Capsule())
+            }
+            HStack {
+                Label("\(order.items.reduce(0) { $0 + $1.qty }) тов.", systemImage: "shippingbox")
+                Spacer()
+                Text(order.total.formatted(.currency(code: "KGS")))
+                    .font(ClientTheme.display(15, weight: .bold))
+                    .foregroundStyle(ClientTheme.lime)
+            }
+            .font(ClientTheme.body(12, weight: .medium))
+            .foregroundStyle(ClientTheme.muted)
+            HStack {
+                Text(order.fulfillmentType == "courier" ? "Курьерская доставка" : "Самовывоз")
+                Spacer()
+                Image(systemName: "chevron.right")
+            }
+            .font(ClientTheme.body(12, weight: .medium))
+            .foregroundStyle(ClientTheme.muted)
+        }
+        .padding(15)
+        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+    }
+
+    private var statusColor: Color {
+        let value = order.status.lowercased()
+        if value.contains("cancel") || value.contains("reject") || value.contains("fail") { return ClientTheme.coral }
+        if value.contains("complete") || value.contains("deliver") || value.contains("ready") { return ClientTheme.lime }
+        return Color(red: 0.898, green: 0.698, blue: 0.235)
     }
 }
 

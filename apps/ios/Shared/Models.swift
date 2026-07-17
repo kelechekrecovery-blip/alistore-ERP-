@@ -378,6 +378,10 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
     public let items: [CustomerOrderItem]
 }
 
+public struct CustomerOrderReceipt: Decodable, Sendable {
+    public let markup: String
+}
+
 public struct OrderStatusMutation: Decodable, Sendable {
     public let id: String
     public let status: String
