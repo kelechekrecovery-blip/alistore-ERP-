@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-SERVICE-LOANER-EVIDENCE-030`.
+- Task: accept the Service Center and Loaner reconciliation vertical.
+- Result: API suites passed `3/3` with `9/9` tests; browser UI passed `3/3` for diagnosis/estimate approval, paid third-party repair and loaner issue/return. Evidence is hash-bound to current HEAD and committed as `04886de`.
+- Strict audit: POS/refund, courier/COD, service/loaner, iOS UI and Android UI are PASS. Remaining blockers are procurement/sale, composite ecosystem evidence, durable visual acceptance, and 64 missing linked handoffs.
+- Next step: record procurement receiving → serialized stock → sale; then run the composite ecosystem gate.
+
+## 2026-07-18
+
 - Iteration ID: `PHASE-1-POS-REFUND-EVIDENCE-029`.
 - Task: accept the POS refund reconciliation vertical as the next financial gate.
 - Result: trusted Playwright passed `1/1`: POS sale, customer return, approved refund and warehouse quarantine reconcile exactly once. The result is hash-bound to current HEAD and committed as `21464ba`.
