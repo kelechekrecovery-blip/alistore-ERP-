@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-ERP-STOREFRONT-021`.
+- Task: finish Phase 1 web/API reconciliation and refresh trusted acceptance evidence on the current HEAD.
+- Result: refund stale-provider recovery is covered by `refund-provider-stale.e2e-spec.ts` (8/8); full Playwright passes `62/62`; visual acceptance passes `3/3`; POS/refund, courier/COD, service/loaner and procurement/sale evidence plus the reconciled matrix are hash-bound and accepted.
+- Checks run: targeted refund suite 8/8; `npm run e2e` 62/62; `npm run ecosystem:audit:strict` confirms all server/web reconciliation gates and visual acceptance. Strict audit remains RED only for iOS app UI evidence, Android app UI evidence and 64 missing linked `.dc.html` references.
+- Commits: `61a8a1d`, `b1c5769`, `cf680dd`, `e7fbac5`, `87dec73`, `c12cc01`, `c709ab7`, `06b6dd3`.
+- Next step: close native app-specific UI evidence, or obtain owner decisions to restore/retire the 64 missing design references; then rerun strict audit before Phase 2.
+
+## 2026-07-18
+
 - Iteration ID: `QA-TOOLCHAIN-REPIN-025`.
 - Task: re-pin the trusted ecosystem toolchain after restoring dependencies with `npm ci --ignore-scripts`.
 - Result: tracked node_modules tree hash now matches the clean reproducible install; package-lock, Node runtime, npm CLI and Playwright/Jest versions remain unchanged.
