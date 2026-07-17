@@ -3634,3 +3634,15 @@
 - Checks run: API build; `pos-sale-replay.e2e-spec.ts` `5/5`; targeted logistics Playwright `1/1`; full Playwright rerun after the fix had the logistics case passing, with the prior visual baseline still differing.
 - Outcome: POS recovery commit `3ba76b5`; ERP date fix commit `08dcb14`. Refund stale-provider recovery commit `9df8777` adds sweep and operator resolve; existing refund suites pass `27/27`, but dedicated stale-resolve E2E remains open.
 - Next step: add dedicated stale-resolve tests and refresh visual evidence on a committed clean SHA, then rerun `mvp:verify` and strict audit.
+
+## 2026-07-18
+
+- Iteration ID: `LOGIC-007-REFUND-STALE-021`.
+- Task: close LOGIC-007 — refund `provider_pending` must not wait for a webhook forever and must not lock tender capacity; bare-500 refunds need an operator cancel path.
+- Branch: `codex/open-source-integrations`, base `de59abe`.
+- Files changed: `apps/api/src/refunds/refunds.processor.ts`, `refunds.constants.ts`, `refunds.controller.ts`, `refunds.dto.ts`, `refunds.relay.ts`, `apps/api/src/audit/event-types.ts` (source swept into the parallel LOGIC-012 agent's commit `9df8777`); `apps/api/test/refund-provider-stale.e2e-spec.ts` (`3700a0f`); `BACKLOG.md` and this entry.
+- Result: the stale sweep (`REFUND_PROVIDER_PENDING_STALE_MS`, default 24h, RefundRelay tick) parks an aged `provider_pending` allocation as failed `provider_pending_stale:` with an atomic `refund.provider_stale` Ledger event and excludes it from retry selection (re-calling the provider is ambiguous); a late provider webhook restores `provider_pending` and reconciles it exactly once; `POST /refunds/:id/resolve` (`refunds,manage` — owner/admin, mandatory Idempotency-Key, replay via the `refund.resolved` event) confirms a stuck refund with the same compensating payment/accounting/gift-card events a success webhook would post (tender capacity and shift close unblocked), or cancels it without any webhook event — refund and return rejected, reserved tender released, exhausted bare-500 retries covered.
+- Checks run: isolated database `alistore_logic007_test` (CREATE DATABASE → `prisma migrate deploy` 113/113 → jest → DROP): `test/refund-provider-stale.e2e-spec.ts` 8/8 (NODE_PATH=./node_modules npx jest --runInBand, exit 0); regression `refund-aggregate|cancel-compensation|shifts-close-owner` 28/28 (exit 0); `npx tsc --noEmit -p apps/api/tsconfig.json` (exit 0); `git diff --check` (exit 0).
+- Outcome: LOGIC-007 accepted in tested API code. Defects: one self-inflicted test fixture asserted shift close with the pre-refund cash amount — fixed by closing with the drawer total after the executed cash refund; no production defects found.
+- Commit association: `9df8777` (source), `3700a0f` (dedicated E2E), docs commit on top. Remaining gaps: a provider callback arriving after an operator cancel gets 409 by design and requires finance reconciliation against provider statements; the resolve action is API-only, no ERP control yet.
+- Next step: `LOGIC-013` courier COD/outbox slice, then refresh hash-bound evidence on a clean SHA and rerun strict audit.
