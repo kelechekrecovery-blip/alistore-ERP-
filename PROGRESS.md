@@ -3408,3 +3408,13 @@
 - Checks run: full `mvp:verify` executed but failed closed on API hook timeouts; isolated API rerun `10/10`; trusted visual acceptance `3/3`; trusted reconciled ecosystem matrix `4/4`; strict ecosystem audit still reports native evidence/design-corpus gaps.
 - Outcome: no false release claim. Phase 1 web/ERP functional work and its local evidence are accepted, while the global MVP gate remains open until a clean uncontended run completes. Current external/structural blockers remain the 64 missing linked design references, native packaged UI evidence, live providers, physical devices and staging operations.
 - Next step: obtain a clean test window without competing agents, rerun `mvp:verify` to completion, then refresh the remaining hash-bound native/reconciliation profiles and select the next P0/P1 gap from the current gap analysis.
+
+## 2026-07-17
+
+- Iteration ID: `PHASE-1-EVIDENCE-008`.
+- Task: refresh the POS refund reconciliation evidence and rerun the strict ecosystem contract audit.
+- Files changed: `docs/acceptance/ecosystem-evidence.json` and the hash-bound POS reconciliation artifact; this progress entry.
+- Result: trusted POS evidence passed `1/1` and was committed in `1a60c9d`. The strict audit now accepts `pos-refund-reconciliation-gate` and reports 6 remaining blockers: iOS app UI evidence, Android packaged UI evidence, courier COD evidence, service/loaner evidence, procurement/sale evidence, plus the documented 64 missing linked design references. The aggregate reconciled software matrix remains accepted `4/4`.
+- Checks run: `npm run ecosystem:audit:strict`; POS trusted recorder passed; failed/terminated courier refresh was not recorded as evidence because its local dev-server run hung under concurrent processes.
+- Outcome: acceptance remains fail-closed and no production-readiness claim is made. The Phase 1 functional ERP/storefront work remains locally accepted; the global release gate is still open.
+- Next step: obtain an uncontended test window for the remaining reconciliation recorders and full `mvp:verify`, then address native UI evidence and the owner-controlled design corpus blocker.
