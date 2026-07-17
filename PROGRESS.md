@@ -3528,3 +3528,12 @@
 - Checks run: `npx prisma generate --schema apps/api/prisma/schema.prisma`; disposable `prisma db push`; isolated `npm run ecosystem:procurement-sale:e2e` with `TEST_DATABASE_URL`, `E2E_DATABASE_URL`, `E2E_API_PORT=4420`, `E2E_WEB_PORT=3220`; `npm run build -w @alistore/api`.
 - Outcome: procurement/sale behavior is verified on the current source, but no trusted artifact was recorded because the source tree contains uncommitted parallel changes and therefore fails the recorder's clean-SHA contract.
 - Next step: coordinate a clean commit boundary for the parallel changes, then record hash-bound evidence and rerun the strict audit before advancing Phase 1.
+## 2026-07-18
+
+- Iteration ID: `LOGIC-002-COURIER-RUN-018`.
+- Task: unblock failed courier deliveries and make partial COD handover recoverable.
+- Files changed: courier run service/controller/DTO/hand-over replay, audit event catalogue, isolated `courier-run-deadlock.e2e-spec.ts`, and this progress entry.
+- Result: an undelivered order can be removed from an active run with a required reason, server-side COD recalculation, `delivery.unassigned` Ledger event and idempotent replay. Partial handover now reconciles against collected COD, requires a reason when the run is incomplete, and posts accounting only for the collected amount; foreign couriers, handed-over runs and delivered orders remain blocked.
+- Checks run: isolated API `test/courier-run-deadlock.e2e-spec.ts` passed `5/5` with `--no-cache`; `git diff --check`.
+- Outcome: LOGIC-002 is accepted in tested API code. Physical courier device, maps/camera/push, provider and staging certification remain open.
+- Next step: commit this isolated courier slice, then refresh hash-bound evidence on a clean source SHA and rerun the strict audit.

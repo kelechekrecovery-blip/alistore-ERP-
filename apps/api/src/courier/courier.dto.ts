@@ -41,6 +41,11 @@ export class FailDeliveryDto {
   @IsOptional() @IsObject() evidence?: Record<string, unknown>;
 }
 
+export class RemoveFromRunDto {
+  @ApiProperty({ example: 'клиент недоступен, перевоз завтра' })
+  @IsString() @MaxLength(500) reason!: string;
+}
+
 export class CompleteDeliveryDto {
   @ApiProperty({ minimum: 0, example: 109900, description: 'Cash collected at delivery; API verifies the outstanding order amount.' })
   @IsInt() @Min(0) codAmount!: number;

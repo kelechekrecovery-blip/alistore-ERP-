@@ -77,6 +77,7 @@ export const EventType = {
   DeliveryOut: 'delivery.out',
   DeliveryDelivered: 'delivery.delivered',
   DeliveryFailed: 'delivery.failed',
+  DeliveryUnassigned: 'delivery.unassigned',
   // returns / refunds
   ReturnRequested: 'return.requested',
   ReturnCompleted: 'return.completed',
@@ -162,6 +163,7 @@ export const EventType = {
   CustomerAddressCreated: 'customer.address_created',
   CustomerAddressUpdated: 'customer.address_updated',
   CustomerAddressDeleted: 'customer.address_deleted',
+  CustomerDeleted: 'customer.deleted',
   CampaignSent: 'campaign.sent',
   CampaignCreated: 'campaign.created',
   CampaignUpdated: 'campaign.updated',

@@ -21,7 +21,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { CourierService } from './courier.service';
-import { CompleteDeliveryDto, CreateRunDto, HandoverDto } from './courier.dto';
+import { CompleteDeliveryDto, CreateRunDto, HandoverDto, RemoveFromRunDto } from './courier.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -89,6 +89,27 @@ export class CourierController {
     @Body() dto: CompleteDeliveryDto,
   ) {
     return this.courier.completeDelivery(id, dto, user.customerId, requireIdempotencyKey(key));
+  }
+
+  @ApiOperation({ summary: 'Remove an undelivered order from its courier run (delivery.unassigned)' })
+  @ApiParam({ name: 'id', description: 'Order id' })
+  @ApiOkResponse({ description: 'Order returned to paid; run COD recalculated.' })
+  @ApiConflictResponse({ description: 'Order not removable or run already handed over.' })
+  @Post('orders/:id/remove-from-run')
+  @RequirePermission('delivery', 'fail')
+  removeFromRun(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: RemoveFromRunDto,
+  ) {
+    return this.courier.removeOrderFromRun(
+      id,
+      dto,
+      user.customerId,
+      user.role === 'courier' ? user.customerId : undefined,
+      requireIdempotencyKey(key),
+    );
   }
 
   @ApiOperation({

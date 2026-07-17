@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
-import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto } from './courier.dto';
+import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto, RemoveFromRunDto } from './courier.dto';
 import { OutboxService } from '../outbox/outbox.service';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
 import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/accounting-journal';
@@ -17,6 +17,7 @@ import {
 } from '../inventory/order-inventory-sale';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
+const REMOVABLE_FROM_RUN_STATUSES = ['courier_assigned', 'out_for_delivery'] as const;
 const SETTLED_PAYMENT_STATUSES = new Set(['received', 'reconciled']);
 
 @Injectable()
@@ -250,6 +251,90 @@ export class CourierService {
     });
   }
 
+  /**
+   * Pull an undelivered order off its courier run (LOGIC-002): the order returns
+   * to `paid` so it can be dispatched again, and the run COD total shrinks by the
+   * order outstanding amount. Idempotent per courierCommand; the caller is the
+   * run courier or a privileged staff actor (expectedCourierId undefined).
+   */
+  async removeOrderFromRun(
+    orderId: string,
+    dto: RemoveFromRunDto,
+    actor: string,
+    expectedCourierId: string | undefined,
+    idempotencyKey: string,
+  ) {
+    const key = idempotencyKey.trim();
+    if (!key || key.length > 128) throw new ValidationError('invalid_idempotency_key', 'Нужен Idempotency-Key до 128 символов');
+    const payload = { reason: dto.reason.trim() };
+    if (!payload.reason) throw new ValidationError('removal_reason_required', 'Укажите причину снятия заказа с рейса');
+    const action = 'remove_from_run';
+    const replay = await this.prisma.courierCommand.findUnique({ where: { idempotencyKey: key } });
+    if (replay) return replayCommand<RemoveFromRunResult>(replay, actor, orderId, action, payload);
+    try {
+      return await this.audit.transaction(async (tx) => {
+        const existing = await tx.courierCommand.findUnique({ where: { idempotencyKey: key } });
+        if (existing) return { result: replayCommand<RemoveFromRunResult>(existing, actor, orderId, action, payload), events: [] };
+        const order = await tx.order.findUnique({
+          where: { id: orderId },
+          include: { payments: { select: { amount: true, status: true } } },
+        });
+        if (!order) throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+        await tx.courierCommand.create({
+          data: { idempotencyKey: key, courierId: actor, orderId, action, payload: payload as Prisma.InputJsonValue },
+        });
+        if (!order.courierRunId || !order.courierId) {
+          throw new ConflictError('order_not_in_run', `Заказ ${orderId} не назначен на курьерский рейс`);
+        }
+        if (expectedCourierId && order.courierId !== expectedCourierId) {
+          throw new ForbiddenError('delivery_forbidden', 'Доставка назначена другому курьеру');
+        }
+        if (!(REMOVABLE_FROM_RUN_STATUSES as readonly string[]).includes(order.status)) {
+          throw new ConflictError('order_not_removable', `Заказ ${orderId} нельзя снять с рейса из статуса ${order.status}`);
+        }
+        // Serialize against a concurrent handover of the same run.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${order.courierRunId}))`;
+        const run = await tx.courierRun.findUnique({ where: { id: order.courierRunId } });
+        if (!run) throw new ValidationError('run_not_found', `Курьерский рейс ${order.courierRunId} не найден`);
+        if (run.handedOver) throw new ConflictError('cod_already_handed_over', `COD по рейсу ${run.id} уже сдан`);
+        const codReleased = outstandingAmount(order);
+        const updated = await tx.order.updateMany({
+          where: { id: orderId, status: order.status, courierRunId: run.id },
+          data: { status: 'paid', courierId: null, courierRunId: null },
+        });
+        if (updated.count !== 1) throw new ConflictError('delivery_transition_race', 'Доставка уже изменена');
+        const recalculated = await tx.courierRun.update({
+          where: { id: run.id },
+          data: { codTotal: { decrement: codReleased } },
+        });
+        const result: RemoveFromRunResult = {
+          orderId,
+          runId: run.id,
+          status: 'paid',
+          codReleased,
+          codTotal: recalculated.codTotal,
+          collectedTotal: recalculated.collectedTotal,
+        };
+        await tx.courierCommand.update({
+          where: { idempotencyKey: key },
+          data: { response: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue },
+        });
+        return { result, events: [{
+          type: EventType.DeliveryUnassigned,
+          actor,
+          payload: { orderId, runId: run.id, from: order.status, to: 'paid', codReleased, reason: payload.reason },
+          refs: [orderId, run.id],
+        }] };
+      });
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        const raced = await this.prisma.courierCommand.findUniqueOrThrow({ where: { idempotencyKey: key } });
+        return replayCommand<RemoveFromRunResult>(raced, actor, orderId, action, payload);
+      }
+      throw error;
+    }
+  }
+
   async handover(dto: HandoverDto, actor: string, expectedCourierId: string | undefined, idempotencyKey: string) {
     const key = idempotencyKey.trim();
     if (!key || key.length > 128) throw new ValidationError('invalid_idempotency_key', 'Нужен Idempotency-Key до 128 символов');
@@ -274,19 +359,24 @@ export class CourierService {
           }
           throw new ConflictError('cod_already_handed_over', `COD по рейсу ${dto.runId} уже сдан`);
         }
-        if (run.collectedTotal !== run.codTotal) {
+        if (run.collectedTotal > run.codTotal) {
           throw new ConflictError('run_delivery_incomplete', `Собрано ${run.collectedTotal} из ${run.codTotal} сом`);
         }
-        const diff = dto.amount - run.codTotal;
+        // Partial handover (collected < codTotal after failed/undelivered orders) requires a reason.
+        if (run.collectedTotal < run.codTotal && !normalized.reason) {
+          throw new ConflictError('run_delivery_incomplete', `Собрано ${run.collectedTotal} из ${run.codTotal} сом`);
+        }
+        const expected = run.collectedTotal;
+        const diff = dto.amount - expected;
         if (diff !== 0 && !normalized.reason) {
           throw new ValidationError('handover_reason_required', `Расхождение COD ${diff} сом требует причину`);
         }
-        if (run.orders.length > 0 && run.codTotal > 0) {
+        if (run.orders.length > 0 && expected > 0) {
           const recognized = await tx.accountingJournalEntry.aggregate({
             where: { sourceType: 'cod.receivable', sourceRef: { in: run.orders.map((order) => order.id) } },
             _sum: { documentAmount: true },
           });
-          if ((recognized._sum.documentAmount ?? 0) !== run.codTotal) {
+          if ((recognized._sum.documentAmount ?? 0) !== expected) {
             throw new ConflictError('cod_receivable_not_recognized', 'COD нельзя сдать до признания дебиторской задолженности всех доставок');
           }
         }
@@ -300,7 +390,7 @@ export class CourierService {
             handedOverAt: new Date(),
           },
         });
-        const accountingEntry = run.codTotal > 0
+        const accountingEntry = expected > 0
           ? await postAccountingEntryOnTx(tx, {
             idempotencyKey: `accounting:cod.handover:${dto.runId}:${key}`,
             sourceType: 'cod.handover',
@@ -308,34 +398,34 @@ export class CourierService {
             description: `Сдача COD по рейсу ${dto.runId}`,
             occurredAt: settled.handedOverAt ?? new Date(),
             createdBy: actor,
-            lines: dto.amount === run.codTotal
+            lines: dto.amount === expected
               ? [
                 { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
-                { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: run.codTotal, memo: run.orders.length > 0 ? 'Погашение дебиторской задолженности по COD' : 'Выручка legacy COD без заказа' },
+                { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: expected, memo: run.orders.length > 0 ? 'Погашение дебиторской задолженности по COD' : 'Выручка legacy COD без заказа' },
               ]
-              : dto.amount < run.codTotal
+              : dto.amount < expected
                 ? [
                   { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
-                  { accountCode: '6990', debit: run.codTotal - dto.amount, memo: 'Недостача COD' },
-                  { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: run.codTotal, memo: run.orders.length > 0 ? 'Погашение COD с расхождением' : 'Выручка legacy COD без заказа' },
+                  { accountCode: '6990', debit: expected - dto.amount, memo: 'Недостача COD' },
+                  { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: expected, memo: run.orders.length > 0 ? 'Погашение COD с расхождением' : 'Выручка legacy COD без заказа' },
                 ]
                 : [
                   { accountCode: '1000', debit: dto.amount, memo: 'Фактически сданные наличные COD' },
-                  { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: run.codTotal, memo: run.orders.length > 0 ? 'Погашение дебиторской задолженности по COD' : 'Выручка legacy COD без заказа' },
-                  { accountCode: '6990', credit: dto.amount - run.codTotal, memo: 'Излишек COD' },
+                  { accountCode: run.orders.length > 0 ? '1100' : '4000', credit: expected, memo: run.orders.length > 0 ? 'Погашение дебиторской задолженности по COD' : 'Выручка legacy COD без заказа' },
+                  { accountCode: '6990', credit: dto.amount - expected, memo: 'Излишек COD' },
                 ],
           })
           : null;
         const events: AuditInput[] = [{
           type: EventType.CashHandover,
           actor,
-          payload: { runId: dto.runId, codTotal: run.codTotal, amount: dto.amount, diff, reason: normalized.reason },
+          payload: { runId: dto.runId, codTotal: run.codTotal, collectedTotal: run.collectedTotal, amount: dto.amount, diff, reason: normalized.reason },
           refs: [dto.runId],
         }];
         if (accountingEntry) events.push({
           type: EventType.AccountingEntryPosted,
           actor,
-          payload: { accountingEntryId: accountingEntry.id, sourceType: 'cod.handover', sourceRef: `${dto.runId}:${key}`, amount: dto.amount, expected: run.codTotal, diff },
+          payload: { accountingEntryId: accountingEntry.id, sourceType: 'cod.handover', sourceRef: `${dto.runId}:${key}`, amount: dto.amount, expected, diff },
           refs: [accountingEntry.id, dto.runId],
         });
         if (diff !== 0) events.push({
@@ -407,6 +497,15 @@ type CourierOrder = Prisma.OrderGetPayload<{
     items: { select: { taxCode: true; taxRateBps: true; taxAmount: true } };
   };
 }>;
+
+type RemoveFromRunResult = {
+  orderId: string;
+  runId: string;
+  status: 'paid';
+  codReleased: number;
+  codTotal: number;
+  collectedTotal: number;
+};
 
 function outstandingAmount(order: { total: number; payments: Array<{ amount: number; status: string }> }): number {
   return Math.max(0, order.total - settledAmount(order));
