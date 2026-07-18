@@ -55,22 +55,22 @@ export function ProductEditor({
   return (
     <section className="min-h-0 overflow-y-auto px-4 py-5 md:px-6">
       <div className="mx-auto grid max-w-[1120px] gap-4 xl:grid-cols-[1fr_340px]">
-        <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+        <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
           <div className="flex flex-wrap items-start gap-3">
             <div>
               <div className="font-display text-xl font-bold">
                 {selected ? selected.sku : 'Новый товар'}
               </div>
-              <div className="mt-1 text-sm text-[#8A7F76]">
+              <div className="mt-1 text-sm text-subtle">
                 {selected ? 'Обычные поля сохраняются сразу. Цена и архив идут через approval.' : 'Создание товара добавит карточку в каталог.'}
               </div>
             </div>
             {selected && (
               <div className="ml-auto flex flex-wrap gap-2">
-                <span className="rounded-chip bg-[#221E19] px-3 py-1.5 text-xs font-semibold text-[#D8CFC6]">
+                <span className="rounded-chip bg-surface-2 px-3 py-1.5 text-xs font-semibold text-bright">
                   Маржа {productMargin(selected)}%
                 </span>
-                <span className="rounded-chip bg-[#221E19] px-3 py-1.5 text-xs font-semibold text-[#D8CFC6]">
+                <span className="rounded-chip bg-surface-2 px-3 py-1.5 text-xs font-semibold text-bright">
                   Остаток {selected.availableUnits}
                 </span>
               </div>
@@ -85,7 +85,7 @@ export function ProductEditor({
                 disabled={Boolean(selected)}
                 onChange={(event) => onUpdateForm({ sku: event.target.value })}
                 placeholder="IPHONE-15-128-BLK"
-                className={`${inputCls} disabled:text-[#6E645C]`}
+                className={`${inputCls} disabled:text-faint`}
               />
             </div>
             <div>
@@ -121,7 +121,7 @@ export function ProductEditor({
                   type="button"
                   onClick={onAutoCategory}
                   disabled={busy === 'category' || !form.name.trim()}
-                  className="w-[150px] rounded-[10px] bg-lime px-3 py-2 text-sm font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+                  className="w-[150px] rounded-[10px] bg-lime px-3 py-2 text-sm font-bold text-lime-ink disabled:bg-line disabled:text-faint"
                 >
                   {busy === 'category' ? '…' : 'Авто-категория'}
                 </button>
@@ -144,7 +144,7 @@ export function ProductEditor({
                 onChange={(event) => onUpdateForm({ price: event.target.value })}
                 placeholder="109900"
                 inputMode="numeric"
-                className={`${inputCls} disabled:text-[#6E645C]`}
+                className={`${inputCls} disabled:text-faint`}
               />
             </div>
             <div>
@@ -177,11 +177,11 @@ export function ProductEditor({
                 inputMode="numeric"
                 className={inputCls}
               />
-              <p className="mt-1.5 text-xs text-[#6E645C]">1200 bps = 12%. Ставку подтверждает бухгалтер; заказ сохраняет неизменяемый снимок.</p>
+              <p className="mt-1.5 text-xs text-faint">1200 bps = 12%. Ставку подтверждает бухгалтер; заказ сохраняет неизменяемый снимок.</p>
             </div>
             <div className="md:col-span-2">
               <label className={labelCls}>Тип складского учёта</label>
-              <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-[#2E2822] bg-[#16130F] p-1">
+              <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-surface-3 bg-ink-dark p-1">
                 {([
                   ['serialized', 'Серийный / IMEI'],
                   ['quantity', 'Количественный'],
@@ -191,14 +191,14 @@ export function ProductEditor({
                     type="button"
                     onClick={() => onUpdateForm({ trackingMode: value })}
                     className={`rounded-[8px] px-3 py-2.5 text-sm font-semibold transition ${
-                      form.trackingMode === value ? 'bg-lime text-lime-ink' : 'text-[#8A7F76] hover:text-white'
+                      form.trackingMode === value ? 'bg-lime text-lime-ink' : 'text-subtle hover:text-white'
                     }`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="mt-1.5 text-xs text-[#6E645C]">Тип блокируется сервером после появления остатка или включения товара в набор.</p>
+              <p className="mt-1.5 text-xs text-faint">Тип блокируется сервером после появления остатка или включения товара в набор.</p>
             </div>
             <div className="md:col-span-2">
               <label htmlFor="product-bundle" className={labelCls}>Состав набора</label>
@@ -210,7 +210,7 @@ export function ProductEditor({
                 placeholder={'IPHONE-15-128-BLK × 1\nCASE-IP15-BLK × 1'}
                 className={`${inputCls} resize-y font-mono`}
               />
-              <p className="mt-1.5 text-xs text-[#6E645C]">Пусто для обычного товара. Вложенные наборы запрещены.</p>
+              <p className="mt-1.5 text-xs text-faint">Пусто для обычного товара. Вложенные наборы запрещены.</p>
             </div>
             <div className="md:col-span-2">
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -219,7 +219,7 @@ export function ProductEditor({
                   type="button"
                   onClick={onAutoDescription}
                   disabled={busy === 'description' || !form.name.trim()}
-                  className="ml-auto rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-1.5 text-xs font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+                  className="ml-auto rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-1.5 text-xs font-bold text-bright disabled:text-faint"
                 >
                   {busy === 'description' ? 'Генерируем…' : 'Сгенерировать описание'}
                 </button>
@@ -230,17 +230,17 @@ export function ProductEditor({
                 onChange={(event) => onUpdateForm({ attrsText: event.target.value })}
                 rows={12}
                 spellCheck={false}
-                className="w-full resize-y rounded-[12px] border border-[#2E2822] bg-[#16130F] px-3 py-3 font-mono text-[13px] leading-relaxed text-[#D8CFC6] outline-none focus:border-lime"
+                className="w-full resize-y rounded-[12px] border border-surface-3 bg-ink-dark px-3 py-3 font-mono text-[13px] leading-relaxed text-bright outline-none focus:border-lime"
               />
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[#2E2822] pt-4">
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-surface-3 pt-4">
             <button
               type="button"
               onClick={onSave}
               disabled={busy === 'save'}
-              className="rounded-[12px] bg-coral px-5 py-3 text-sm font-bold text-white transition hover:bg-deep disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+              className="rounded-[12px] bg-coral px-5 py-3 text-sm font-bold text-white transition hover:bg-deep disabled:bg-line disabled:text-faint"
             >
               {busy === 'save' ? 'Сохраняем…' : selected ? 'Сохранить изменения' : 'Создать товар'}
             </button>
@@ -251,9 +251,9 @@ export function ProductEditor({
         </div>
 
         <aside className="grid gap-4">
-          <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+          <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
             <div className="font-display text-base font-bold">Цена</div>
-            <p className="mt-1 text-xs leading-relaxed text-[#8A7F76]">
+            <p className="mt-1 text-xs leading-relaxed text-subtle">
               Изменение до ±15% применится сразу, больше порога попадёт в Approval Inbox.
             </p>
             <label className={`${labelCls} mt-4`}>Новая цена</label>
@@ -262,28 +262,28 @@ export function ProductEditor({
               onChange={(event) => onPriceDraftChange(event.target.value)}
               disabled={!selected}
               inputMode="numeric"
-              className={`${inputCls} disabled:text-[#6E645C]`}
+              className={`${inputCls} disabled:text-faint`}
             />
             <label className={`${labelCls} mt-3`}>Причина</label>
             <input
               value={priceReason}
               onChange={(event) => onPriceReasonChange(event.target.value)}
               disabled={!selected}
-              className={`${inputCls} disabled:text-[#6E645C]`}
+              className={`${inputCls} disabled:text-faint`}
             />
             <button
               type="button"
               onClick={onRequestPrice}
               disabled={!selected || busy === 'price'}
-              className="mt-4 w-full rounded-[12px] bg-lime py-3 text-sm font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+              className="mt-4 w-full rounded-[12px] bg-lime py-3 text-sm font-bold text-lime-ink disabled:bg-line disabled:text-faint"
             >
               {busy === 'price' ? 'Отправляем…' : 'Запросить изменение цены'}
             </button>
           </div>
 
-          <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+          <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
             <div className="font-display text-base font-bold">Архивирование</div>
-            <p className="mt-1 text-xs leading-relaxed text-[#8A7F76]">
+            <p className="mt-1 text-xs leading-relaxed text-subtle">
               Архив товара всегда требует approval owner/admin и не удаляет запись физически.
             </p>
             <label className={`${labelCls} mt-4`}>Причина</label>
@@ -291,21 +291,21 @@ export function ProductEditor({
               value={archiveReason}
               onChange={(event) => onArchiveReasonChange(event.target.value)}
               disabled={!selected || selected.archived}
-              className={`${inputCls} disabled:text-[#6E645C]`}
+              className={`${inputCls} disabled:text-faint`}
             />
             <button
               type="button"
               onClick={onRequestArchive}
               disabled={!selected || selected.archived || busy === 'archive'}
-              className="mt-4 w-full rounded-[12px] border border-[#FF8A7A]/40 bg-[#FF8A7A]/10 py-3 text-sm font-bold text-[#FF8A7A] disabled:border-[#2E2822] disabled:bg-[#221E19] disabled:text-[#6E645C]"
+              className="mt-4 w-full rounded-[12px] border border-danger-soft/40 bg-danger-soft/10 py-3 text-sm font-bold text-danger-soft disabled:border-surface-3 disabled:bg-surface-2 disabled:text-faint"
             >
               {selected?.archived ? 'Уже в архиве' : busy === 'archive' ? 'Отправляем…' : 'Запросить архив'}
             </button>
           </div>
 
-          <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+          <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
             <div className="font-display text-base font-bold">AI-поля</div>
-            <div className="mt-3 grid gap-2 text-sm text-[#A79C92]">
+            <div className="mt-3 grid gap-2 text-sm text-muted">
               <div className="flex items-center justify-between gap-3">
                 <span>Категория</span>
                 <span className="font-mono text-lime">{form.category || '—'}</span>

@@ -129,11 +129,11 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
   }
 
   return (
-    <section className="mb-4 border-y border-[#2E2822] bg-[#16130F] py-5" aria-label="Комиссионный склад">
+    <section className="mb-4 border-y border-surface-3 bg-ink-dark py-5" aria-label="Комиссионный склад">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-4">
         <div>
           <h2 className="font-display text-base font-bold text-white">Комиссионный товар</h2>
-          <p className="mt-1 text-xs text-[#8A7F76]">Чужой товар под реализацию · комиссия и долг владельцу считаются отдельно</p>
+          <p className="mt-1 text-xs text-subtle">Чужой товар под реализацию · комиссия и долг владельцу считаются отдельно</p>
         </div>
         {canPayout && chosen.length > 0 && (
           <button type="button" onClick={makePayout} disabled={busy === 'payout'} className="rounded-btn bg-lime px-4 py-2 text-sm font-bold text-lime-ink disabled:opacity-50">
@@ -143,7 +143,7 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
       </div>
 
       <div className="grid gap-4 px-4 xl:grid-cols-[340px_1fr]">
-        <div className="space-y-2 border-r border-[#2E2822] pr-4 max-xl:border-r-0 max-xl:pr-0">
+        <div className="space-y-2 border-r border-surface-3 pr-4 max-xl:border-r-0 max-xl:pr-0">
           <select aria-label="Тип комиссионного учёта" value={form.mode} onChange={(event) => { const mode = event.target.value; setForm({ ...form, mode, productId: products.find((product) => product.trackingMode === mode)?.id || '' }); }} className={inputClass}><option value="serialized">Серийный · IMEI</option><option value="quantity">Количественная партия</option></select>
           <select aria-label="Комиссионный товар" value={form.productId} onChange={(event) => setForm({ ...form, productId: event.target.value })} className={inputClass}>
             {products.filter((product) => product.trackingMode === form.mode).map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}
@@ -157,30 +157,30 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
 
         <div className="min-w-0 overflow-x-auto">
           <div className="min-w-[680px]">
-            <div className="grid grid-cols-[28px_1.5fr_1fr_.7fr_.8fr] gap-3 border-b border-[#2E2822] pb-2 text-[11px] text-[#8A7F76]"><span /><span>Товар</span><span>Владелец</span><span>Комиссия</span><span>Статус</span></div>
-            {items.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Комиссионных товаров пока нет</p>}
+            <div className="grid grid-cols-[28px_1.5fr_1fr_.7fr_.8fr] gap-3 border-b border-surface-3 pb-2 text-[11px] text-subtle"><span /><span>Товар</span><span>Владелец</span><span>Комиссия</span><span>Статус</span></div>
+            {items.length === 0 && <p className="py-8 text-center text-sm text-subtle">Комиссионных товаров пока нет</p>}
             {items.map((item) => {
               const canSelect = canPayout && settleable.some((row) => row.id === item.id);
-              return <div key={item.id} className="grid grid-cols-[28px_1.5fr_1fr_.7fr_.8fr] items-center gap-3 border-b border-[#1A1611] py-3 text-xs">
-                <input aria-label={`Выбрать ${item.product.name}`} type="checkbox" disabled={!canSelect} checked={selected.includes(item.id)} onChange={() => toggle(item)} className="h-4 w-4 accent-[#C6FF3D]" />
-                <span className="min-w-0"><span className="block truncate font-semibold text-white">{item.product.name}</span><span className="font-mono text-[11px] text-[#8A7F76]">{item.unit.imei}</span></span>
-                <span className="truncate text-[#A79C92]">{item.ownerName}</span>
+              return <div key={item.id} className="grid grid-cols-[28px_1.5fr_1fr_.7fr_.8fr] items-center gap-3 border-b border-surface py-3 text-xs">
+                <input aria-label={`Выбрать ${item.product.name}`} type="checkbox" disabled={!canSelect} checked={selected.includes(item.id)} onChange={() => toggle(item)} className="h-4 w-4 accent-lime" />
+                <span className="min-w-0"><span className="block truncate font-semibold text-white">{item.product.name}</span><span className="font-mono text-[11px] text-subtle">{item.unit.imei}</span></span>
+                <span className="truncate text-muted">{item.ownerName}</span>
                 <span className="font-mono text-lime">{item.commissionBps / 100}%{item.commissionAmount != null ? ` · ${som(item.commissionAmount)}` : ''}</span>
-                <span className={item.status === 'active' ? 'text-lime' : item.status === 'settled' ? 'text-[#7FB0EC]' : 'text-[#E5B23C]'}>{statusLabel[item.status]}{item.ownerAmount != null ? ` · ${som(item.ownerAmount)}` : ''}</span>
+                <span className={item.status === 'active' ? 'text-lime' : item.status === 'settled' ? 'text-info' : 'text-warn'}>{statusLabel[item.status]}{item.ownerAmount != null ? ` · ${som(item.ownerAmount)}` : ''}</span>
               </div>;
             })}
           </div>
         </div>
       </div>
 
-      <div className="mt-5 border-t border-[#2E2822] px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-[#8A7F76]">Количественные партии</h3>{quantityLots.length === 0 ? <p className="text-sm text-[#8A7F76]">Количественных партий пока нет</p> : <div className="overflow-x-auto"><div className="min-w-[720px]">{quantityLots.map((lot) => <div key={lot.id} className="border-b border-[#2E2822] py-3 text-xs"><div className="grid grid-cols-[1.5fr_1fr_.7fr_.8fr] gap-3"><span className="font-semibold text-white">{lot.product.name} · {lot.product.sku}</span><span className="text-[#A79C92]">{lot.ownerName}</span><span className="font-mono text-lime">{lot.availableQty} свободно · {lot.reservedQty} резерв</span><span className="text-[#A79C92]">{lot.location} · {lot.commissionBps / 100}%</span></div>{lot.allocations.filter((allocation) => allocation.status === 'sold' && allocation.saleOrder?.status === 'completed' && !allocation.payout).map((allocation) => <div key={allocation.id} className="mt-2 flex items-center justify-end gap-3"><span className="text-[#E5B23C]">Продано {allocation.qty} · владельцу {som(allocation.ownerAmount ?? 0)}</span>{canPayout && <button type="button" onClick={() => makeQuantityPayout(allocation.id, lot.ownerName, allocation.ownerAmount ?? 0)} disabled={busy === allocation.id} className="font-bold text-coral">Создать выплату</button>}</div>)}</div>)}</div></div>}</div>
+      <div className="mt-5 border-t border-surface-3 px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-subtle">Количественные партии</h3>{quantityLots.length === 0 ? <p className="text-sm text-subtle">Количественных партий пока нет</p> : <div className="overflow-x-auto"><div className="min-w-[720px]">{quantityLots.map((lot) => <div key={lot.id} className="border-b border-surface-3 py-3 text-xs"><div className="grid grid-cols-[1.5fr_1fr_.7fr_.8fr] gap-3"><span className="font-semibold text-white">{lot.product.name} · {lot.product.sku}</span><span className="text-muted">{lot.ownerName}</span><span className="font-mono text-lime">{lot.availableQty} свободно · {lot.reservedQty} резерв</span><span className="text-muted">{lot.location} · {lot.commissionBps / 100}%</span></div>{lot.allocations.filter((allocation) => allocation.status === 'sold' && allocation.saleOrder?.status === 'completed' && !allocation.payout).map((allocation) => <div key={allocation.id} className="mt-2 flex items-center justify-end gap-3"><span className="text-warn">Продано {allocation.qty} · владельцу {som(allocation.ownerAmount ?? 0)}</span>{canPayout && <button type="button" onClick={() => makeQuantityPayout(allocation.id, lot.ownerName, allocation.ownerAmount ?? 0)} disabled={busy === allocation.id} className="font-bold text-coral">Создать выплату</button>}</div>)}</div>)}</div></div>}</div>
 
-      {canPayout && payouts.length > 0 && <div className="mt-5 border-t border-[#2E2822] px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-[#8A7F76]">Выплаты владельцам</h3><div className="flex flex-wrap gap-2">{payouts.map((payout) => <div key={payout.id} className="flex items-center gap-3 rounded-btn border border-[#2E2822] px-3 py-2 text-xs"><span className="text-white">{payout.ownerName}</span><span className="font-mono text-lime">{som(payout.ownerAmount)}</span>{payout.status === 'created' ? <button type="button" onClick={() => markPaid(payout)} disabled={busy === payout.id} className="font-bold text-coral">Провести</button> : <span className={payout.status === 'paid' ? 'text-[#7FB0EC]' : 'text-[#8A7F76]'}>{payout.status === 'paid' ? 'Выплачено' : 'Отменено возвратом'}</span>}</div>)}</div></div>}
-      {canPayout && adjustments.length > 0 && <div className="mt-4 border-t border-[#2E2822] px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-coral">Компенсации после возврата</h3><div className="flex flex-wrap gap-2">{adjustments.map((adjustment) => <div key={adjustment.id} className="rounded-btn border border-coral/35 px-3 py-2 text-xs"><span className="text-white">{adjustment.ownerName}</span><span className="ml-3 font-mono text-coral">{som(adjustment.amount)}</span><span className="ml-3 text-[#A79C92]">{adjustment.status === 'open' ? 'к взысканию/зачёту' : 'закрыто'}</span></div>)}</div></div>}
-      {message && <p role="status" className="mx-4 mt-3 rounded-btn bg-[#221E19] px-3 py-2 text-sm text-lime">{message}</p>}
+      {canPayout && payouts.length > 0 && <div className="mt-5 border-t border-surface-3 px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-subtle">Выплаты владельцам</h3><div className="flex flex-wrap gap-2">{payouts.map((payout) => <div key={payout.id} className="flex items-center gap-3 rounded-btn border border-surface-3 px-3 py-2 text-xs"><span className="text-white">{payout.ownerName}</span><span className="font-mono text-lime">{som(payout.ownerAmount)}</span>{payout.status === 'created' ? <button type="button" onClick={() => markPaid(payout)} disabled={busy === payout.id} className="font-bold text-coral">Провести</button> : <span className={payout.status === 'paid' ? 'text-info' : 'text-subtle'}>{payout.status === 'paid' ? 'Выплачено' : 'Отменено возвратом'}</span>}</div>)}</div></div>}
+      {canPayout && adjustments.length > 0 && <div className="mt-4 border-t border-surface-3 px-4 pt-4"><h3 className="mb-2 text-xs font-bold uppercase text-coral">Компенсации после возврата</h3><div className="flex flex-wrap gap-2">{adjustments.map((adjustment) => <div key={adjustment.id} className="rounded-btn border border-coral/35 px-3 py-2 text-xs"><span className="text-white">{adjustment.ownerName}</span><span className="ml-3 font-mono text-coral">{som(adjustment.amount)}</span><span className="ml-3 text-muted">{adjustment.status === 'open' ? 'к взысканию/зачёту' : 'закрыто'}</span></div>)}</div></div>}
+      {message && <p role="status" className="mx-4 mt-3 rounded-btn bg-surface-2 px-3 py-2 text-sm text-lime">{message}</p>}
     </section>
   );
 }
 
-const inputClass = 'w-full min-w-0 rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-coral';
+const inputClass = 'w-full min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral';
 const statusLabel: Record<ConsignmentItem['status'], string> = { active: 'В продаже', sold: 'Начислено', settled: 'Выплачено', withdrawn: 'Снято' };

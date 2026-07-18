@@ -41,12 +41,12 @@ export function StaffSessionLogin({
       onSubmit={submit}
       className={
         dark
-          ? 'w-full max-w-sm rounded-[18px] border border-[#2E2822] bg-[#1A1611] p-5 text-white shadow-2xl'
+          ? 'w-full max-w-sm rounded-[18px] border border-surface-3 bg-surface p-5 text-white shadow-2xl'
           : 'w-full max-w-sm rounded-card border border-ink/10 bg-white p-6 text-ink shadow-soft'
       }
     >
       <div className="font-display text-xl font-bold">{title}</div>
-      <div className={dark ? 'mt-1 text-sm text-[#8A7F76]' : 'mt-1 text-sm text-ink/55'}>
+      <div className={dark ? 'mt-1 text-sm text-subtle' : 'mt-1 text-sm text-ink/55'}>
         {caption}
       </div>
       <input
@@ -56,7 +56,7 @@ export function StaffSessionLogin({
         autoComplete="username"
         className={
           dark
-            ? 'mt-5 w-full rounded-[11px] border border-[#2E2822] bg-[#16130F] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime'
+            ? 'mt-5 w-full rounded-[11px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime'
             : 'mt-5 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40'
         }
       />
@@ -68,11 +68,11 @@ export function StaffSessionLogin({
         autoComplete="current-password"
         className={
           dark
-            ? 'mt-3 w-full rounded-[11px] border border-[#2E2822] bg-[#16130F] px-4 py-3 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime'
+            ? 'mt-3 w-full rounded-[11px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime'
             : 'mt-3 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40'
         }
       />
-      {error && <div className={dark ? 'mt-3 text-sm text-[#FF8A7A]' : 'mt-3 text-sm text-danger'}>{error}</div>}
+      {error && <div className={dark ? 'mt-3 text-sm text-danger-soft' : 'mt-3 text-sm text-danger'}>{error}</div>}
       <button
         type="submit"
         disabled={busy}

@@ -69,7 +69,7 @@ export function CrmView() {
   }
 
   if (!hydrated) {
-    return <p className="font-mono text-sm text-[#6E645C]">Загрузка…</p>;
+    return <p className="font-mono text-sm text-faint">Загрузка…</p>;
   }
 
   if (!session) {
@@ -87,12 +87,12 @@ export function CrmView() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       <div>
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[#8A7F76]">
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-subtle">
           <span>{session.username} · {session.role}</span>
           <button
             type="button"
             onClick={logout}
-            className="rounded-chip border border-[#2E2822] px-3 py-1.5 font-semibold text-[#A79C92] hover:text-white"
+            className="rounded-chip border border-surface-3 px-3 py-1.5 font-semibold text-muted hover:text-white"
           >
             Выйти staff
           </button>
@@ -106,7 +106,7 @@ export function CrmView() {
               type="button"
               onClick={() => setFilter(f)}
               className={`rounded-chip px-3 py-1.5 text-[12px] font-semibold transition ${
-                filter === f ? 'bg-coral text-white' : 'bg-[#221E19] text-[#A79C92] hover:text-white'
+                filter === f ? 'bg-coral text-white' : 'bg-surface-2 text-muted hover:text-white'
               }`}
             >
               {f === 'all' ? 'Все' : STATUS_RU[f]}
@@ -114,11 +114,11 @@ export function CrmView() {
           ))}
         </div>
 
-        {tickets === null && <p className="font-mono text-sm text-[#6E645C]">Загрузка…</p>}
+        {tickets === null && <p className="font-mono text-sm text-faint">Загрузка…</p>}
         {tickets?.length === 0 && (
-          <div className="rounded-[16px] border border-dashed border-[#2E2822] bg-[#1A1611] px-5 py-14 text-center">
+          <div className="rounded-[16px] border border-dashed border-surface-3 bg-surface px-5 py-14 text-center">
             <p className="font-display font-bold">Инбокс пуст</p>
-            <p className="mt-1 text-sm text-[#8A7F76]">Нет обращений в этом статусе.</p>
+            <p className="mt-1 text-sm text-subtle">Нет обращений в этом статусе.</p>
           </div>
         )}
 
@@ -126,8 +126,8 @@ export function CrmView() {
           {tickets?.map((t) => (
             <li
               key={t.id}
-              className={`rounded-[14px] border bg-[#1A1611] p-4 transition ${
-                selected?.id === t.id ? 'border-coral' : 'border-[#2E2822] hover:border-[#3A332B]'
+              className={`rounded-[14px] border bg-surface p-4 transition ${
+                selected?.id === t.id ? 'border-coral' : 'border-surface-3 hover:border-[#3A332B]'
               }`}
             >
               <button type="button" onClick={() => setSelected(t)} className="block w-full text-left">
@@ -141,10 +141,10 @@ export function CrmView() {
                     {t.priority}
                   </span>
                 </div>
-                <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[#8A7F76]">
-                  <span className="rounded bg-[#221E19] px-1.5 py-0.5 font-mono text-[#D8CFC6]">{STATUS_RU[t.status]}</span>
+                <div className="mt-1.5 flex items-center gap-2 text-[11px] text-subtle">
+                  <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-bright">{STATUS_RU[t.status]}</span>
                   {t.assignee && <span>· {t.assignee}</span>}
-                  {overdue(t) && <span className="font-bold text-[#FF5B2E]">● SLA просрочен</span>}
+                  {overdue(t) && <span className="font-bold text-coral">● SLA просрочен</span>}
                   <span className="ml-auto font-mono">{t.channel}</span>
                 </div>
               </button>
@@ -157,7 +157,7 @@ export function CrmView() {
                       type="button"
                       disabled={busy === t.id}
                       onClick={() => act(t, () => transitionTicket(t.id, to, session.accessToken))}
-                      className="rounded-btn bg-[#221E19] px-2.5 py-1 text-[11px] font-semibold text-[#D8CFC6] transition hover:bg-[#2A241F] disabled:opacity-40"
+                      className="rounded-btn bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-bright transition hover:bg-[#2A241F] disabled:opacity-40"
                     >
                       → {STATUS_RU[to]}
                     </button>
@@ -167,7 +167,7 @@ export function CrmView() {
                       type="button"
                       disabled={busy === t.id}
                       onClick={() => act(t, () => escalateTicket(t.id, session.accessToken))}
-                      className="rounded-btn bg-[#3A2016] px-2.5 py-1 text-[11px] font-semibold text-[#FF8A7A] transition hover:bg-[#4A281C] disabled:opacity-40"
+                      className="rounded-btn bg-[#3A2016] px-2.5 py-1 text-[11px] font-semibold text-danger-soft transition hover:bg-[#4A281C] disabled:opacity-40"
                     >
                       ↑ Эскалировать
                     </button>
@@ -184,7 +184,7 @@ export function CrmView() {
         {selected ? (
           <CustomerCard customerId={selected.customerId} accessToken={session.accessToken} />
         ) : (
-          <div className="rounded-[16px] border border-dashed border-[#2E2822] bg-[#1A1611] px-5 py-14 text-center text-sm text-[#8A7F76]">
+          <div className="rounded-[16px] border border-dashed border-surface-3 bg-surface px-5 py-14 text-center text-sm text-subtle">
             Выберите обращение — откроется карточка клиента (Customer 360).
           </div>
         )}

@@ -18,7 +18,7 @@ import {
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const CHANNELS = ['sms', 'push', 'telegram', 'whatsapp'] as const;
-const FIELD_CLASS = 'w-full rounded-btn border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none transition placeholder:text-[#6E645C] focus:border-coral focus:ring-2 focus:ring-coral/20';
+const FIELD_CLASS = 'w-full rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none transition placeholder:text-faint focus:border-coral focus:ring-2 focus:ring-coral/20';
 
 type CampaignForm = {
   name: string;
@@ -142,7 +142,7 @@ export function CampaignsView() {
   }
 
   if (!hydrated) {
-    return <p className="font-mono text-sm text-[#6E645C]">Загрузка…</p>;
+    return <p className="font-mono text-sm text-faint">Загрузка…</p>;
   }
 
   if (!session) {
@@ -159,13 +159,13 @@ export function CampaignsView() {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.2fr]">
-      <section className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[#8A7F76]">
+      <section className="rounded-[16px] border border-surface-3 bg-surface p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-subtle">
           <span>{session.username} · {session.role}</span>
           <button
             type="button"
             onClick={logout}
-            className="rounded-chip border border-[#2E2822] px-3 py-1.5 font-semibold text-[#A79C92] hover:text-white"
+            className="rounded-chip border border-surface-3 px-3 py-1.5 font-semibold text-muted hover:text-white"
           >
             Выйти staff
           </button>
@@ -198,7 +198,7 @@ export function CampaignsView() {
                 key={channel}
                 type="button"
                 onClick={() => setFormValue(setForm, 'channel', channel)}
-                className={`rounded-chip px-3 py-1.5 text-[12px] font-bold ${form.channel === channel ? 'bg-lime text-lime-ink' : 'bg-[#221E19] text-[#A79C92] hover:text-white'}`}
+                className={`rounded-chip px-3 py-1.5 text-[12px] font-bold ${form.channel === channel ? 'bg-lime text-lime-ink' : 'bg-surface-2 text-muted hover:text-white'}`}
               >
                 {channel}
               </button>
@@ -227,14 +227,14 @@ export function CampaignsView() {
           </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
-          <button type="button" disabled={busy === 'preview'} onClick={runPreview} className="rounded-btn bg-[#221E19] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <button type="button" disabled={busy === 'preview'} onClick={runPreview} className="rounded-btn bg-surface-2 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             Предпросмотр
           </button>
           <button type="button" disabled={busy === 'create'} onClick={createDraft} className="rounded-btn bg-lime px-4 py-2 text-sm font-extrabold text-lime-ink disabled:opacity-50">
             Создать черновик
           </button>
         </div>
-        {notice && <p className="mt-3 text-sm text-[#E5B23C]">{notice}</p>}
+        {notice && <p className="mt-3 text-sm text-warn">{notice}</p>}
       </section>
 
       <section className="grid gap-4">
@@ -248,17 +248,17 @@ export function CampaignsView() {
 function PreviewPanel({ preview }: { preview: CampaignPreview | null }) {
   if (!preview) {
     return (
-      <div className="rounded-[16px] border border-dashed border-[#2E2822] bg-[#1A1611] px-5 py-12 text-center text-sm text-[#8A7F76]">
+      <div className="rounded-[16px] border border-dashed border-surface-3 bg-surface px-5 py-12 text-center text-sm text-subtle">
         Соберите preview — здесь появится аудитория с учётом consent.
       </div>
     );
   }
   return (
-    <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+    <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
       <div className="flex flex-wrap items-start gap-3">
         <div>
           <div className="font-display text-[15px] font-bold">Preview</div>
-          <p className="mt-1 text-xs text-[#8A7F76]">{preview.description}</p>
+          <p className="mt-1 text-xs text-subtle">{preview.description}</p>
         </div>
         <div className="ml-auto grid grid-cols-3 gap-2 text-center text-xs">
           <Metric label="match" value={preview.matchedCustomers} />
@@ -268,10 +268,10 @@ function PreviewPanel({ preview }: { preview: CampaignPreview | null }) {
       </div>
       <ul className="mt-4 grid gap-2">
         {preview.audience.slice(0, 8).map((customer) => (
-          <li key={customer.id} className="flex items-center gap-3 rounded-[10px] bg-[#221E19] px-3 py-2 text-sm">
+          <li key={customer.id} className="flex items-center gap-3 rounded-[10px] bg-surface-2 px-3 py-2 text-sm">
             <span className="min-w-0 flex-1 truncate font-semibold">{customer.name}</span>
-            <span className="font-mono text-xs text-[#C6FF3D]">{som(customer.spent)}</span>
-            <span className="text-xs text-[#8A7F76]">{customer.segments.join(', ')}</span>
+            <span className="font-mono text-xs text-lime">{som(customer.spent)}</span>
+            <span className="text-xs text-subtle">{customer.segments.join(', ')}</span>
           </li>
         ))}
       </ul>
@@ -285,21 +285,21 @@ function CampaignList({ campaigns, busy, onAction }: {
   onAction: (id: string, action: 'submit' | 'activate' | 'pause' | 'complete') => void;
 }) {
   return (
-    <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+    <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
       <div className="mb-4 font-display text-[15px] font-bold">Кампании · ROI</div>
-      {campaigns.length === 0 && <p className="text-sm text-[#8A7F76]">Кампаний пока нет.</p>}
+      {campaigns.length === 0 && <p className="text-sm text-subtle">Кампаний пока нет.</p>}
       <ul className="grid gap-3">
         {campaigns.map((item) => (
-          <li key={item.campaign.id} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] p-4">
+          <li key={item.campaign.id} className="rounded-[12px] border border-surface-3 bg-surface-2 p-4">
             <div className="flex flex-wrap items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold">{item.campaign.name}</div>
-                <div className="mt-1 text-xs text-[#8A7F76]">{item.description}</div>
+                <div className="mt-1 text-xs text-subtle">{item.description}</div>
               </div>
-              <span className="rounded-chip bg-[#1A1611] px-2.5 py-1 text-[11px] font-bold text-[#C6FF3D]">{item.campaign.channel}</span>
-              <span className="rounded-chip border border-[#41382F] px-2.5 py-1 text-[11px] font-bold text-[#E5B23C]">{statusLabel(item.campaign.status)}</span>
+              <span className="rounded-chip bg-surface px-2.5 py-1 text-[11px] font-bold text-lime">{item.campaign.channel}</span>
+              <span className="rounded-chip border border-[#41382F] px-2.5 py-1 text-[11px] font-bold text-warn">{statusLabel(item.campaign.status)}</span>
             </div>
-            <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] bg-[#1A1611] px-3 py-2 font-mono text-[11px] text-[#A79C92]" data-testid={`campaign-link-${item.campaign.id}`}>
+            <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] bg-surface px-3 py-2 font-mono text-[11px] text-muted" data-testid={`campaign-link-${item.campaign.id}`}>
               /?utm_source={item.campaign.source}&amp;utm_medium={item.campaign.medium}&amp;utm_campaign={item.campaign.trackingCode}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5" data-testid={`campaign-funnel-${item.campaign.id}`}>
@@ -347,7 +347,7 @@ function statusLabel(status: CampaignRoi['campaign']['status']) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-[#8A7F76]">
+    <label className="grid gap-1.5 text-xs font-semibold text-subtle">
       <span>{label}</span>
       {children}
     </label>
@@ -356,9 +356,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-[10px] bg-[#1A1611] px-3 py-2">
+    <div className="rounded-[10px] bg-surface px-3 py-2">
       <div className="font-mono text-[13px] font-bold text-white">{value}</div>
-      <div className="mt-0.5 text-[10px] uppercase text-[#8A7F76]">{label}</div>
+      <div className="mt-0.5 text-[10px] uppercase text-subtle">{label}</div>
     </div>
   );
 }

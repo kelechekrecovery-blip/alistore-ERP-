@@ -171,19 +171,19 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         <SiteHeader />
         <main className="mx-auto max-w-[1400px] px-5 py-8">
           <nav
-            className="mb-7 flex flex-wrap items-center gap-2 text-xs text-[#8A7F76]"
+            className="mb-7 flex flex-wrap items-center gap-2 text-xs text-subtle"
             aria-label="Хлебные крошки"
           >
             <Link href="/">Главная</Link>
             <span>/</span>
             <Link href="/catalog">Каталог</Link>
             <span>/</span>
-            <span className="text-[#6E645C]">{product.name}</span>
+            <span className="text-faint">{product.name}</span>
           </nav>
           <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
             <div>
               <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-[#E7DDD3] bg-gradient-to-br from-white to-[#F2ECE5] shadow-soft">
-                {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-[#8A7F76]"><ImageOff size={42} /><span>Фото готовится</span></span>}
+                {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
                 <span className="absolute left-5 top-5 rounded-full border border-coral/25 bg-tint px-3 py-1.5 text-xs font-semibold text-deep">
                   {condition}
                 </span>
@@ -210,14 +210,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
             <div className="pt-1">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-[#8A7F76]">
+                <span className="font-mono text-xs text-subtle">
                   {product.sku}
                 </span>
               </div>
               <h1 className="mt-5 font-display text-3xl font-bold leading-tight sm:text-4xl">
                 {product.name}
               </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#6E645C]">
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-faint">
                 <span className="flex items-center gap-1 text-deep">
                   <Star size={16} fill="currentColor" /> {reviewLabel}
                 </span>
@@ -232,7 +232,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 className={`mt-5 flex items-center gap-2 text-sm ${inStock ? "text-[#7ee2a0]" : "text-[#f4c27d]"}`}
               >
                 <span
-                  className={`h-2 w-2 rounded-full ${inStock ? "bg-[#22c55e] shadow-[0_0_10px_#22c55e]" : "bg-[#e5b23c]"}`}
+                  className={`h-2 w-2 rounded-full ${inStock ? "bg-[#22c55e] shadow-[0_0_10px_#22c55e]" : "bg-warn"}`}
                 />
                 {inStock
                   ? `В наличии · ${product.availableUnits} шт.`
@@ -241,7 +241,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
               {variants.length > 0 && (
                 <div className="mt-6">
-                  <div className="mb-2 text-xs font-semibold uppercase text-[#8A7F76]">
+                  <div className="mb-2 text-xs font-semibold uppercase text-subtle">
                     Другие варианты
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -252,7 +252,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       <Link
                         key={variant.id}
                         href={`/product/${variant.id}`}
-                        className="rounded-[10px] border border-[#DED3C8] bg-white px-3 py-2 text-sm text-[#6E645C] hover:border-coral"
+                        className="rounded-[10px] border border-[#DED3C8] bg-white px-3 py-2 text-sm text-faint hover:border-coral"
                       >
                         {variantLabel(variant)} · {som(variant.price)}
                       </Link>
@@ -263,7 +263,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
               {Boolean(product.bundleComponents?.length) && (
                 <div className="mt-6 rounded-[12px] border border-[#DED3C8] bg-white p-4">
-                  <div className="text-xs font-semibold uppercase text-[#8A7F76]">
+                  <div className="text-xs font-semibold uppercase text-subtle">
                     В комплекте
                   </div>
                   <div className="mt-2 grid gap-1.5">
@@ -273,7 +273,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         className="flex justify-between gap-4 text-sm"
                       >
                         <span>{component.name}</span>
-                        <span className="font-mono text-[#6E645C]">
+                        <span className="font-mono text-faint">
                           × {component.qty}
                         </span>
                       </div>
@@ -309,7 +309,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   type="button"
                   onClick={addToCart}
                   disabled={!inStock}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] px-5 font-semibold transition disabled:bg-[#E7DDD3] disabled:text-[#8A7F76] ${added ? "bg-success text-white" : "bg-coral text-white hover:bg-deep"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] px-5 font-semibold transition disabled:bg-[#E7DDD3] disabled:text-subtle ${added ? "bg-success text-white" : "bg-coral text-white hover:bg-deep"}`}
                 >
                   <ShoppingBag size={18} />
                   {added ? "Добавлено" : "В корзину"}
@@ -319,7 +319,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => favorites.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-[#DED3C8] bg-white text-[#6E645C]"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-[#DED3C8] bg-white text-faint"}`}
                 >
                   <Heart
                     size={17}
@@ -330,7 +330,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => compare.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-[#DED3C8] bg-white text-[#6E645C]"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-[#DED3C8] bg-white text-faint"}`}
                 >
                   <GitCompareArrows size={17} />
                   Сравнить
@@ -338,7 +338,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </div>
 
               <div className="mt-7 grid gap-1 border-t border-[#E7DDD3] pt-5">
-                {['warranty','deliveryText','pickupText','returnPolicy'].map((key) => typeof product.attrs?.[key] === 'string' ? <div key={key} className="py-2 text-sm text-[#6E645C]">{String(product.attrs[key])}</div> : null)}
+                {['warranty','deliveryText','pickupText','returnPolicy'].map((key) => typeof product.attrs?.[key] === 'string' ? <div key={key} className="py-2 text-sm text-faint">{String(product.attrs[key])}</div> : null)}
               </div>
             </div>
           </section>
@@ -357,12 +357,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     key={key}
                     className="grid gap-2 border-b border-[#E7DDD3] px-5 py-4 text-sm last:border-0 sm:grid-cols-[220px_1fr]"
                   >
-                    <span className="text-[#8A7F76]">{key}</span>
+                    <span className="text-subtle">{key}</span>
                     <span className="text-ink">{String(value)}</span>
                   </div>
                 ))
               ) : (
-                <div className="px-5 py-10 text-center text-[#8A7F76]">
+                <div className="px-5 py-10 text-center text-subtle">
                   Подробные характеристики уточняются
                 </div>
               )}
@@ -389,14 +389,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         </span>
                       </div>
                       {review.text && (
-                        <p className="mt-3 text-sm leading-6 text-[#6E645C]">
+                        <p className="mt-3 text-sm leading-6 text-faint">
                           {review.text}
                         </p>
                       )}
                     </article>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-[#E7DDD3] bg-white p-7 text-[#6E645C]">
+                  <div className="rounded-[18px] border border-[#E7DDD3] bg-white p-7 text-faint">
                     Будьте первым, кто оставит отзыв об этом товаре.
                   </div>
                 )}
@@ -441,7 +441,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     Опубликовать
                   </button>
                   {reviewMsg && (
-                    <p className="text-xs text-[#6E645C]">{reviewMsg}</p>
+                    <p className="text-xs text-faint">{reviewMsg}</p>
                   )}
                 </form>
               ) : (
@@ -492,7 +492,7 @@ function Perk({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 py-2 text-sm text-[#6E645C]">
+    <div className="flex items-center gap-3 py-2 text-sm text-faint">
       <span className="text-deep">{icon}</span>
       <span>{children}</span>
     </div>
@@ -500,7 +500,7 @@ function Perk({
 }
 function StoreMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-sand text-[#6E645C]">
+    <div className="min-h-screen bg-sand text-faint">
       <SiteHeader />
       <div className="grid min-h-[70vh] place-items-center">{children}</div>
     </div>

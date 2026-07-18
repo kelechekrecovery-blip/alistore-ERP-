@@ -36,8 +36,8 @@ export function ProductList({
   onStartCreate,
 }: ProductListProps) {
   return (
-    <section className="min-h-0 border-b border-[#2E2822] bg-[#12100D] lg:border-b-0 lg:border-r">
-      <div className="flex items-center gap-2 border-b border-[#2E2822] p-4">
+    <section className="min-h-0 border-b border-surface-3 bg-[#12100D] lg:border-b-0 lg:border-r">
+      <div className="flex items-center gap-2 border-b border-surface-3 p-4">
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
@@ -56,8 +56,8 @@ export function ProductList({
           Найти
         </button>
       </div>
-      <div className="flex items-center justify-between border-b border-[#2E2822] px-4 py-3">
-        <label className="flex items-center gap-2 text-xs font-semibold text-[#A79C92]">
+      <div className="flex items-center justify-between border-b border-surface-3 px-4 py-3">
+        <label className="flex items-center gap-2 text-xs font-semibold text-muted">
           <input
             type="checkbox"
             checked={includeArchived}
@@ -75,9 +75,9 @@ export function ProductList({
         </button>
       </div>
       <div className="h-full max-h-[42vh] overflow-y-auto lg:max-h-none">
-        {loading && <div className="p-4 font-mono text-sm text-[#8A7F76]">Загрузка…</div>}
+        {loading && <div className="p-4 font-mono text-sm text-subtle">Загрузка…</div>}
         {!loading && products.length === 0 && (
-          <div className="p-6 text-sm text-[#8A7F76]">Нет товаров по текущему фильтру.</div>
+          <div className="p-6 text-sm text-subtle">Нет товаров по текущему фильтру.</div>
         )}
         {!loading &&
           products.map((product) => (
@@ -85,17 +85,17 @@ export function ProductList({
               key={product.id}
               type="button"
               onClick={() => onSelect(product)}
-              className={`block w-full border-b border-[#221E19] px-4 py-3 text-left transition ${
-                selectedId === product.id ? 'bg-[#221E19]' : 'hover:bg-[#1A1611]'
+              className={`block w-full border-b border-surface-2 px-4 py-3 text-left transition ${
+                selectedId === product.id ? 'bg-surface-2' : 'hover:bg-surface'
               }`}
             >
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold text-white">{product.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[11px] text-[#8A7F76]">{product.sku}</span>
+                    <span className="font-mono text-[11px] text-subtle">{product.sku}</span>
                     {product.variantGroup && (
-                      <span className="rounded-chip bg-[#2B271D] px-2 py-0.5 text-[11px] font-semibold text-[#E5B23C]">
+                      <span className="rounded-chip bg-[#2B271D] px-2 py-0.5 text-[11px] font-semibold text-warn">
                         {product.variantGroup}
                       </span>
                     )}
@@ -104,11 +104,11 @@ export function ProductList({
                         набор · {product.bundleComponents.length}
                       </span>
                     )}
-                    <span className="rounded-chip bg-[#16130F] px-2 py-0.5 text-[11px] font-semibold text-lime">
+                    <span className="rounded-chip bg-ink-dark px-2 py-0.5 text-[11px] font-semibold text-lime">
                       {product.category}
                     </span>
                     {product.archived && (
-                      <span className="rounded-chip bg-[#FF8A7A]/10 px-2 py-0.5 text-[11px] font-semibold text-[#FF8A7A]">
+                      <span className="rounded-chip bg-danger-soft/10 px-2 py-0.5 text-[11px] font-semibold text-danger-soft">
                         архив
                       </span>
                     )}
@@ -116,13 +116,13 @@ export function ProductList({
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-sm font-bold tabular text-white">{som(product.price)}</div>
-                  <div className="mt-1 text-[11px] text-[#8A7F76]">остаток {product.availableUnits}</div>
+                  <div className="mt-1 text-[11px] text-subtle">остаток {product.availableUnits}</div>
                 </div>
               </div>
             </button>
           ))}
       </div>
-      <div className="border-t border-[#2E2822] px-4 py-3 text-[11px] text-[#6E645C]">
+      <div className="border-t border-surface-3 px-4 py-3 text-[11px] text-faint">
         Показано {products.length} из {total}
       </div>
     </section>

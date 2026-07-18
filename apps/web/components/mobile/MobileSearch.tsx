@@ -39,17 +39,17 @@ export default function MobileSearch() {
           <button type="button" onClick={() => router.back()} aria-label="Назад" className="text-[20px] text-white">
             ←
           </button>
-          <div className="flex flex-1 items-center gap-2 rounded-[13px] border border-[#2E2822] bg-[#221E19] px-3.5 py-2.5">
-            <span className="text-[#6E645C]">🔍</span>
+          <div className="flex flex-1 items-center gap-2 rounded-[13px] border border-surface-3 bg-surface-2 px-3.5 py-2.5">
+            <span className="text-faint">🔍</span>
             <input
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Поиск техники, брендов…"
-              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#6E645C]"
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-faint"
             />
             {q && (
-              <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="text-[#6E645C]">
+              <button type="button" onClick={() => setQ('')} aria-label="Очистить" className="text-faint">
                 ✕
               </button>
             )}
@@ -58,14 +58,14 @@ export default function MobileSearch() {
 
         {!trimmed ? (
           <>
-            <div className="mb-2.5 text-[13px] text-[#8A7F76]">Популярные запросы</div>
+            <div className="mb-2.5 text-[13px] text-subtle">Популярные запросы</div>
             <div className="flex flex-wrap gap-2">
               {POPULAR.map((term) => (
                 <button
                   key={term}
                   type="button"
                   onClick={() => setQ(term)}
-                  className="rounded-full border border-[#2E2822] bg-[#221E19] px-3.5 py-2 text-xs text-[#D8CFC6]"
+                  className="rounded-full border border-surface-3 bg-surface-2 px-3.5 py-2 text-xs text-bright"
                 >
                   {term}
                 </button>
@@ -74,7 +74,7 @@ export default function MobileSearch() {
           </>
         ) : results.length > 0 ? (
           <>
-            <div className="mb-2.5 text-[13px] text-[#8A7F76]">Найдено: {results.length}</div>
+            <div className="mb-2.5 text-[13px] text-subtle">Найдено: {results.length}</div>
             <div className="grid grid-cols-2 gap-3">
               {results.slice(0, 20).map((p, i) => (
                 <MobileProductCard key={p.id} product={p} priority={i === 0} />
@@ -82,12 +82,12 @@ export default function MobileSearch() {
             </div>
           </>
         ) : products === null ? (
-          <div className="py-10 text-center text-sm text-[#8A7F76]">Поиск…</div>
+          <div className="py-10 text-center text-sm text-subtle">Поиск…</div>
         ) : (
           <div className="py-12 text-center">
             <div className="text-5xl">🔍</div>
             <div className="mt-3.5 font-display text-[17px] font-bold text-white">Ничего не найдено</div>
-            <div className="mt-2 text-[13px] text-[#A79C92]">Попробуйте другой запрос</div>
+            <div className="mt-2 text-[13px] text-muted">Попробуйте другой запрос</div>
             <Link href="/catalog" className="mt-4 inline-block rounded-[11px] bg-lime px-5 py-2.5 text-[13px] font-bold text-lime-ink">
               Открыть каталог
             </Link>

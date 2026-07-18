@@ -7,13 +7,13 @@ import { som } from '@/lib/format';
 const SEV_COLOR: Record<string, string> = { high: '#FF8A7A', medium: '#E5B23C', low: '#8A7F76' };
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">{children}</div>;
+  return <div className="rounded-[16px] border border-surface-3 bg-surface p-5">{children}</div>;
 }
 
 function Metric({ label, value, color = '#fff' }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611]" style={{ padding: 18 }}>
-      <div className="text-xs text-[#8A7F76]">{label}</div>
+    <div className="rounded-[16px] border border-surface-3 bg-surface" style={{ padding: 18 }}>
+      <div className="text-xs text-subtle">{label}</div>
       <div className="mt-1.5 font-display text-2xl font-extrabold tabular" style={{ color }}>{value}</div>
     </div>
   );
@@ -95,7 +95,7 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
             <span className="font-display text-[15px] font-bold">Выручка · {som(total)}</span>
             <TrendBadge trend={custom ? range.trend : trend} />
             {custom && (
-              <span className="rounded-chip bg-[#221E19] px-2 py-0.5 font-mono text-[11px] text-[#A79C92]">
+              <span className="rounded-chip bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-muted">
                 {range.from} → {range.to} · {range.days} дн
               </span>
             )}
@@ -106,7 +106,7 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
                   type="button"
                   onClick={() => selectPeriod(p)}
                   className={`rounded-chip px-2.5 py-1 text-[11px] font-semibold transition ${
-                    !custom && period === p ? 'bg-lime text-lime-ink' : 'bg-[#221E19] text-[#A79C92] hover:text-white'
+                    !custom && period === p ? 'bg-lime text-lime-ink' : 'bg-surface-2 text-muted hover:text-white'
                   }`}
                 >
                   {p} дн
@@ -116,7 +116,7 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
                 type="button"
                 onClick={() => setPicker((v) => !v)}
                 className={`rounded-chip px-2.5 py-1 text-[11px] font-semibold transition ${
-                  custom ? 'bg-lime text-lime-ink' : 'bg-[#221E19] text-[#A79C92] hover:text-white'
+                  custom ? 'bg-lime text-lime-ink' : 'bg-surface-2 text-muted hover:text-white'
                 }`}
               >
                 Период
@@ -125,23 +125,23 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
           </div>
 
           {picker && (
-            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
-              <label className="flex flex-col gap-1 text-[11px] text-[#8A7F76]">
+            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-[12px] border border-surface-3 bg-surface-2 p-3">
+              <label className="flex flex-col gap-1 text-[11px] text-subtle">
                 С
                 <input
                   type="date"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="rounded-[8px] border border-[#3A342E] bg-[#16130F] px-2 py-1 text-[13px] text-white"
+                  className="rounded-[8px] border border-line bg-ink-dark px-2 py-1 text-[13px] text-white"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[11px] text-[#8A7F76]">
+              <label className="flex flex-col gap-1 text-[11px] text-subtle">
                 По
                 <input
                   type="date"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="rounded-[8px] border border-[#3A342E] bg-[#16130F] px-2 py-1 text-[13px] text-white"
+                  className="rounded-[8px] border border-line bg-ink-dark px-2 py-1 text-[13px] text-white"
                 />
               </label>
               <button
@@ -151,7 +151,7 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
               >
                 Применить
               </button>
-              {err && <span className="text-[11px] text-[#FF8A7A]">{err}</span>}
+              {err && <span className="text-[11px] text-danger-soft">{err}</span>}
             </div>
           )}
 
@@ -159,11 +159,11 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
             {data.map((b, i) => (
               <div key={b.day} className="flex flex-1 flex-col items-center gap-1.5">
                 <div
-                  className="w-full rounded-t-sm bg-gradient-to-b from-[#C6FF3D] to-[#8FD40F]"
+                  className="w-full rounded-t-sm bg-gradient-to-b from-lime to-[#8FD40F]"
                   style={{ height: `${Math.max(3, (b.amount / max) * 150)}px` }}
                   title={`${b.day}: ${som(b.amount)}`}
                 />
-                <span className="text-[9px] text-[#8A7F76]">
+                <span className="text-[9px] text-subtle">
                   {dayCount <= 7
                     ? new Date(b.day).toLocaleDateString('ru-RU', { weekday: 'short' })
                     : i % Math.ceil(data.length / 6) === 0 ? b.day.slice(5) : ''}
@@ -174,7 +174,7 @@ export function DashboardView({ d, risks, revenue, trend, period, accessToken, o
         </Card>
         <Card>
           <div className="mb-3.5 font-display text-[15px] font-bold">Требуют решения</div>
-          {risks.length === 0 && <p className="text-sm text-[#8A7F76]">✓ Тревог нет</p>}
+          {risks.length === 0 && <p className="text-sm text-subtle">✓ Тревог нет</p>}
           {risks.slice(0, 5).map((r, i) => (
             <button
               key={i}

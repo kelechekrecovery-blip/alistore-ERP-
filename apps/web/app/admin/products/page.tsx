@@ -19,10 +19,10 @@ export default function AdminProductsPage() {
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4">
         <Link
           href="/"
-          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
         >
           ⌂ Выйти
         </Link>
@@ -36,24 +36,24 @@ export default function AdminProductsPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A] text-white">
-      <header className="flex flex-wrap items-center gap-4 border-b border-[#2E2822] bg-[#16130F]/95 px-6 py-4 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex flex-col bg-night text-white">
+      <header className="flex flex-wrap items-center gap-4 border-b border-surface-3 bg-ink-dark/95 px-6 py-4 backdrop-blur">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-lime font-display text-lg font-extrabold text-lime-ink">
           P
         </span>
         <div>
           <div className="font-display text-lg font-bold">Админ · Товары</div>
-          <div className="text-xs text-[#8A7F76]">Каталог, AI-обогащение, price/archive через approvals · {session.username}</div>
+          <div className="text-xs text-subtle">Каталог, AI-обогащение, price/archive через approvals · {session.username}</div>
         </div>
         <Link
           href="/erp"
-          className="ml-auto rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#D8CFC6] hover:border-[#3A342E]"
+          className="ml-auto rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line"
         >
           ERP · Сайт
         </Link>
         <Link
           href="/approvals"
-          className="rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#D8CFC6] hover:border-[#3A342E]"
+          className="rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line"
         >
           Approval Inbox
         </Link>
@@ -63,7 +63,7 @@ export default function AdminProductsPage() {
             clearStaffSession();
             setSession(null);
           }}
-          className="rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#3A342E]"
+          className="rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-subtle hover:border-line"
         >
           Выйти staff
         </button>

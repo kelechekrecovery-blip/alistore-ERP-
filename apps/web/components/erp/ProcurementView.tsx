@@ -28,7 +28,7 @@ const STATUS_META: Record<PurchaseOrder['status'], { label: string; color: strin
   cancelled: { label: 'Отменён', color: '#FF8A7A' },
 };
 
-const inputClass = 'h-10 w-full rounded-[8px] border border-[#2E2822] bg-[#16130F] px-3 text-sm text-white outline-none focus:border-[#6E645C]';
+const inputClass = 'h-10 w-full rounded-[8px] border border-surface-3 bg-ink-dark px-3 text-sm text-white outline-none focus:border-faint';
 
 export function ProcurementView({ accessToken }: { accessToken: string }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -129,20 +129,20 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-lg font-bold">Purchase Orders</h2>
-          <p className="mt-0.5 text-xs text-[#8A7F76]">Поставщик → отправка → скан-приёмка → склад и Event Ledger</p>
+          <p className="mt-0.5 text-xs text-subtle">Поставщик → отправка → скан-приёмка → склад и Event Ledger</p>
         </div>
-        <button type="button" title="Обновить" onClick={() => refresh()} className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#2E2822] text-[#A79C92] hover:text-white">
+        <button type="button" title="Обновить" onClick={() => refresh()} className="grid h-9 w-9 place-items-center rounded-[8px] border border-surface-3 text-muted hover:text-white">
           <RefreshCw size={15} />
         </button>
       </div>
 
       {(message || error) && (
-        <div className={`rounded-[8px] border px-3 py-2 text-sm ${error ? 'border-[#FF8A7A]/40 bg-[#FF8A7A]/10 text-[#FF8A7A]' : 'border-lime/30 bg-lime/10 text-lime'}`}>
+        <div className={`rounded-[8px] border px-3 py-2 text-sm ${error ? 'border-danger-soft/40 bg-danger-soft/10 text-danger-soft' : 'border-lime/30 bg-lime/10 text-lime'}`}>
           {error || message}
         </div>
       )}
 
-      {canCreate && <section className="border border-[#2E2822] bg-[#1A1611] p-4">
+      {canCreate && <section className="border border-surface-3 bg-surface p-4">
         <div className="mb-3 text-sm font-semibold">Новый PO</div>
         <div className="grid gap-3 md:grid-cols-2">
           <select aria-label="Поставщик PO" value={form.supplierId} onChange={(event) => setForm((current) => ({ ...current, supplierId: event.target.value }))} className={inputClass}>
@@ -163,7 +163,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
               </select>
               <input aria-label={`Количество PO ${index + 1}`} type="number" min="1" value={line.qty} onChange={(event) => updateLine(index, { qty: event.target.value })} className={inputClass} />
               <input aria-label={`Закупочная цена PO ${index + 1}`} type="number" min="0" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value })} className={inputClass} placeholder="Цена" />
-              <button type="button" title="Удалить строку" disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))} className="grid h-10 w-10 place-items-center rounded-[8px] border border-[#2E2822] text-[#8A7F76] hover:text-[#FF8A7A] disabled:opacity-30">
+              <button type="button" title="Удалить строку" disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))} className="grid h-10 w-10 place-items-center rounded-[8px] border border-surface-3 text-subtle hover:text-danger-soft disabled:opacity-30">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -171,7 +171,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
         </div>
         <input aria-label="Комментарий PO" value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} className={`${inputClass} mt-3`} placeholder="Комментарий" />
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))} className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-[#2E2822] px-3 text-xs font-semibold text-[#D8CFC6]">
+          <button type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))} className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-surface-3 px-3 text-xs font-semibold text-bright">
             <Plus size={14} /> Строка
           </button>
           <button type="button" disabled={busy === 'create'} onClick={submitOrder} className="ml-auto inline-flex h-9 items-center gap-2 rounded-[8px] bg-lime px-4 text-xs font-bold text-[#111] disabled:opacity-50">
@@ -180,33 +180,33 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
         </div>
       </section>}
 
-      <section className="overflow-hidden border border-[#2E2822] bg-[#1A1611]">
-        <div className="grid grid-cols-[120px_1fr_110px_100px] gap-3 border-b border-[#2E2822] bg-[#16130F] px-4 py-2 text-[10px] uppercase text-[#8A7F76]">
+      <section className="overflow-hidden border border-surface-3 bg-surface">
+        <div className="grid grid-cols-[120px_1fr_110px_100px] gap-3 border-b border-surface-3 bg-ink-dark px-4 py-2 text-[10px] uppercase text-subtle">
           <span>PO</span><span>Поставщик · товары</span><span>Сумма</span><span className="text-right">Статус</span>
         </div>
-        {orders.length === 0 && <div className="px-4 py-7 text-center text-sm text-[#6E645C]">Purchase Orders пока нет</div>}
+        {orders.length === 0 && <div className="px-4 py-7 text-center text-sm text-faint">Purchase Orders пока нет</div>}
         {orders.map((order) => {
           const total = order.items.reduce((sum, item) => sum + item.orderedQty * item.unitCost, 0);
           const meta = STATUS_META[order.status];
           return (
-            <div key={order.id} className="grid grid-cols-[120px_1fr_110px_100px] items-center gap-3 border-b border-[#221E19] px-4 py-3 last:border-0">
+            <div key={order.id} className="grid grid-cols-[120px_1fr_110px_100px] items-center gap-3 border-b border-surface-2 px-4 py-3 last:border-0">
               <div className="font-mono text-xs text-white">{order.number}</div>
               <div className="min-w-0">
                 <div className="truncate text-xs font-semibold text-white">{order.supplier.name} · {order.location}</div>
-                <div className="mt-0.5 truncate text-[11px] text-[#8A7F76]">{order.items.map((item) => `${item.product.sku} ${item.receivedQty}/${item.orderedQty}`).join(' · ')}</div>
+                <div className="mt-0.5 truncate text-[11px] text-subtle">{order.items.map((item) => `${item.product.sku} ${item.receivedQty}/${item.orderedQty}`).join(' · ')}</div>
               </div>
-              <div className="font-mono text-xs text-[#D8CFC6]">{som(total)}</div>
+              <div className="font-mono text-xs text-bright">{som(total)}</div>
               <div className="flex items-center justify-end gap-1.5">
                 <span className="text-[11px] font-semibold" style={{ color: meta.color }}>{meta.label}</span>
-                {order.status === 'draft' && <button type="button" title="Отправить PO" disabled={busy === order.id} onClick={() => run(order.id, () => sendPurchaseOrder(order.id, accessToken), `${order.number} отправлен`)} className="grid h-7 w-7 place-items-center rounded-[6px] border border-[#2E2822] text-[#A79C92] hover:text-white"><Send size={13} /></button>}
-                {(order.status === 'draft' || order.status === 'sent') && <button type="button" title="Отменить PO" disabled={busy === order.id} onClick={() => run(order.id, () => cancelPurchaseOrder(order.id, accessToken), `${order.number} отменён`)} className="grid h-7 w-7 place-items-center rounded-[6px] border border-[#2E2822] text-[#A79C92] hover:text-[#FF8A7A]"><X size={13} /></button>}
+                {order.status === 'draft' && <button type="button" title="Отправить PO" disabled={busy === order.id} onClick={() => run(order.id, () => sendPurchaseOrder(order.id, accessToken), `${order.number} отправлен`)} className="grid h-7 w-7 place-items-center rounded-[6px] border border-surface-3 text-muted hover:text-white"><Send size={13} /></button>}
+                {(order.status === 'draft' || order.status === 'sent') && <button type="button" title="Отменить PO" disabled={busy === order.id} onClick={() => run(order.id, () => cancelPurchaseOrder(order.id, accessToken), `${order.number} отменён`)} className="grid h-7 w-7 place-items-center rounded-[6px] border border-surface-3 text-muted hover:text-danger-soft"><X size={13} /></button>}
               </div>
             </div>
           );
         })}
       </section>
 
-      <section className="border border-[#2E2822] bg-[#1A1611] p-4">
+      <section className="border border-surface-3 bg-surface p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><PackageCheck size={16} /> Приёмка по PO</div>
         <div className="grid gap-3 md:grid-cols-3">
           <select aria-label="PO для приёмки" value={selectedOrder?.id ?? ''} onChange={(event) => setReceive((current) => ({ ...current, orderId: event.target.value, itemId: '' }))} className={inputClass}>
@@ -221,7 +221,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
             <option value="A">Grade A</option><option value="B">Grade B</option><option value="C">Grade C</option>
           </select>
         </div>
-        <textarea aria-label="IMEI для приёмки" value={receive.imeis} onChange={(event) => setReceive((current) => ({ ...current, imeis: event.target.value }))} rows={4} className="mt-3 w-full resize-y rounded-[8px] border border-[#2E2822] bg-[#16130F] p-3 font-mono text-xs text-white outline-none focus:border-[#6E645C]" placeholder="Сканируйте IMEI/SN — по одному в строке" />
+        <textarea aria-label="IMEI для приёмки" value={receive.imeis} onChange={(event) => setReceive((current) => ({ ...current, imeis: event.target.value }))} rows={4} className="mt-3 w-full resize-y rounded-[8px] border border-surface-3 bg-ink-dark p-3 font-mono text-xs text-white outline-none focus:border-faint" placeholder="Сканируйте IMEI/SN — по одному в строке" />
         <button type="button" disabled={busy === 'receive' || !selectedItem} onClick={submitReceipt} className="mt-3 inline-flex h-9 items-center gap-2 rounded-[8px] bg-white px-4 text-xs font-bold text-[#111] disabled:opacity-40">
           <PackageCheck size={14} /> Принять на склад
         </button>

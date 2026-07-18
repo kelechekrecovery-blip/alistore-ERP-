@@ -89,15 +89,15 @@ export function PosCheckout(props: PosCheckoutProps) {
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(10,8,6,0.82)] p-4">
-      <div className="w-full max-w-[640px] rounded-[22px] border border-[#2E2822] bg-[#1A1611] p-7">
+      <div className="w-full max-w-[640px] rounded-[22px] border border-surface-3 bg-surface p-7">
         {route === 'pending' && pending && (
           <div className="py-4 text-center">
             <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-warn/15 text-4xl text-warn">🔒</div>
             <div className="mt-4 font-display text-2xl font-extrabold text-white">Нужно одобрение</div>
-            <div className="mt-2 text-sm text-[#A79C92]">
+            <div className="mt-2 text-sm text-muted">
               {pendingMessage} Продажа не проведена — ожидает одобрения старшего в Approval Inbox.
             </div>
-            <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] px-4 py-2.5 font-mono text-xs text-[#8A7F76]">
+            <div className="mt-3 rounded-[12px] border border-surface-3 bg-surface-2 px-4 py-2.5 font-mono text-xs text-subtle">
               approval #{pending.approvalId.slice(-8)}
             </div>
             <div className="mt-6 flex gap-2.5">
@@ -105,11 +105,11 @@ export function PosCheckout(props: PosCheckoutProps) {
                 type="button"
                 disabled={busy}
                 onClick={() => props.onFinish(activePayments)}
-                className="flex-1 rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+                className="flex-1 rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint"
               >
                 {busy ? 'Проверяем…' : 'Провести после одобрения'}
               </button>
-              <button type="button" onClick={props.onCancel} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] px-6 py-3.5 text-[15px] font-semibold text-[#D8CFC6]">
+              <button type="button" onClick={props.onCancel} className="rounded-[12px] border border-surface-3 bg-surface-2 px-6 py-3.5 text-[15px] font-semibold text-bright">
                 Отмена
               </button>
             </div>
@@ -122,11 +122,11 @@ export function PosCheckout(props: PosCheckoutProps) {
               <span className="font-display text-xl font-bold text-white">{props.title ?? 'Оплата'}</span>
               <span className="ml-auto font-display text-2xl font-extrabold text-lime tabular">{som(total)}</span>
             </div>
-            <div className="mb-4 flex rounded-[12px] border border-[#2E2822] bg-[#120F0C] p-1">
+            <div className="mb-4 flex rounded-[12px] border border-surface-3 bg-[#120F0C] p-1">
               <button
                 type="button"
                 onClick={() => setSplit(false)}
-                className={`flex-1 rounded-[9px] px-3 py-2 text-sm font-semibold ${!split ? 'bg-lime text-lime-ink' : 'text-[#A79C92]'}`}
+                className={`flex-1 rounded-[9px] px-3 py-2 text-sm font-semibold ${!split ? 'bg-lime text-lime-ink' : 'text-muted'}`}
               >
                 Один способ
               </button>
@@ -136,7 +136,7 @@ export function PosCheckout(props: PosCheckoutProps) {
                   setSplitPayments(defaultSplit(total, method, methods));
                   setSplit(true);
                 }}
-                className={`flex-1 rounded-[9px] px-3 py-2 text-sm font-semibold ${split ? 'bg-lime text-lime-ink' : 'text-[#A79C92]'}`}
+                className={`flex-1 rounded-[9px] px-3 py-2 text-sm font-semibold ${split ? 'bg-lime text-lime-ink' : 'text-muted'}`}
               >
                 Split
               </button>
@@ -148,8 +148,8 @@ export function PosCheckout(props: PosCheckoutProps) {
                     key={m.id}
                     type="button"
                     onClick={() => props.onSelectMethod(m.id)}
-                    className={`flex items-center gap-2.5 rounded-[12px] border bg-[#221E19] p-3.5 text-left transition ${
-                      method === m.id ? 'border-lime ring-1 ring-lime/40' : 'border-[#2E2822] hover:border-[#3A342E]'
+                    className={`flex items-center gap-2.5 rounded-[12px] border bg-surface-2 p-3.5 text-left transition ${
+                      method === m.id ? 'border-lime ring-1 ring-lime/40' : 'border-surface-3 hover:border-line'
                     }`}
                   >
                     <span className="text-xl">{m.icon}</span>
@@ -166,7 +166,7 @@ export function PosCheckout(props: PosCheckoutProps) {
                       aria-label={`Способ оплаты ${index + 1}`}
                       value={payment.method}
                       onChange={(event) => updateSplitPayment(index, { method: event.target.value })}
-                      className="min-w-0 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm font-semibold text-white outline-none focus:border-lime"
+                      className="min-w-0 rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-lime"
                     >
                       {methods.map((m) => (
                         <option key={m.id} value={m.id}>{m.name}</option>
@@ -181,12 +181,12 @@ export function PosCheckout(props: PosCheckoutProps) {
                       step={1}
                       value={payment.amount}
                       onChange={(event) => updateSplitPayment(index, { amount: Math.max(0, Math.round(Number(event.target.value) || 0)) })}
-                      className="min-w-0 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-right font-mono text-sm text-white outline-none focus:border-lime"
+                      className="min-w-0 rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2 text-right font-mono text-sm text-white outline-none focus:border-lime"
                     />
                     <button
                       type="button"
                       onClick={() => fillRemainder(index)}
-                      className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-2 text-xs font-semibold text-[#D8CFC6]"
+                      className="rounded-[10px] border border-surface-3 bg-surface-2 px-2 text-xs font-semibold text-bright"
                     >
                       Остаток
                     </button>
@@ -194,15 +194,15 @@ export function PosCheckout(props: PosCheckoutProps) {
                       type="button"
                       disabled={splitPayments.length <= 2}
                       onClick={() => removeSplitPayment(index)}
-                      className="rounded-[10px] border border-[#2E2822] bg-[#221E19] text-lg font-semibold text-[#D8CFC6] disabled:text-[#4B433B]"
+                      className="rounded-[10px] border border-surface-3 bg-surface-2 text-lg font-semibold text-bright disabled:text-[#4B433B]"
                     >
                       ×
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center gap-3 rounded-[10px] border border-[#2E2822] bg-[#120F0C] px-3 py-2 text-xs">
-                  <span className="text-[#8A7F76]">Распределено</span>
-                  <span className="font-mono text-[#D8CFC6]">{som(splitTotal)}</span>
+                <div className="flex items-center gap-3 rounded-[10px] border border-surface-3 bg-[#120F0C] px-3 py-2 text-xs">
+                  <span className="text-subtle">Распределено</span>
+                  <span className="font-mono text-bright">{som(splitTotal)}</span>
                   <span className={splitRemainder === 0 ? 'text-lime' : 'text-warn'}>
                     Остаток {som(splitRemainder)}
                   </span>
@@ -223,7 +223,7 @@ export function PosCheckout(props: PosCheckoutProps) {
               >
                 {busy ? 'Проводим…' : (props.confirmLabel ?? 'Завершить продажу')}
               </button>
-              <button type="button" onClick={props.onCancel} className="rounded-[12px] border border-[#2E2822] bg-[#221E19] px-6 py-3.5 text-[15px] font-semibold text-[#D8CFC6]">
+              <button type="button" onClick={props.onCancel} className="rounded-[12px] border border-surface-3 bg-surface-2 px-6 py-3.5 text-[15px] font-semibold text-bright">
                 Отмена
               </button>
             </div>
@@ -239,23 +239,23 @@ export function PosCheckout(props: PosCheckoutProps) {
               {props.completion?.title ?? (result ? 'Продажа завершена' : 'Продажа сохранена offline')}
             </div>
             {props.completion ? (
-              <div className="mt-2 text-sm text-[#A79C92]">{props.completion.reference} · {som(props.completion.total)} · записано в Event Ledger</div>
+              <div className="mt-2 text-sm text-muted">{props.completion.reference} · {som(props.completion.total)} · записано в Event Ledger</div>
             ) : result ? (
-              <div className="mt-2 text-sm text-[#A79C92]">Чек {result.receiptNo} · {som(result.total)} · записано в Event Ledger</div>
+              <div className="mt-2 text-sm text-muted">Чек {result.receiptNo} · {som(result.total)} · записано в Event Ledger</div>
             ) : (
-              <div className="mt-2 text-sm text-[#A79C92]">
+              <div className="mt-2 text-sm text-muted">
                 Локальный чек {offlineResult?.localReceiptNo} · {som(offlineResult?.snapshot.total ?? total)} · уйдёт в синхронизацию
               </div>
             )}
             {result?.imeis.length ? (
-              <div className="mt-2 font-mono text-xs text-[#6E645C]">IMEI: {result.imeis.join(', ')}</div>
+              <div className="mt-2 font-mono text-xs text-faint">IMEI: {result.imeis.join(', ')}</div>
             ) : null}
             <div className="mt-6 flex justify-center gap-2.5">
               <button type="button" onClick={props.onNewSale} className="rounded-[11px] bg-lime px-6 py-3 font-bold text-lime-ink">
                 {props.newLabel ?? 'Новая продажа'}
               </button>
               {props.onPrintReceipt && (
-                <button type="button" onClick={props.onPrintReceipt} className="rounded-[11px] border border-[#2E2822] bg-[#221E19] px-6 py-3 font-bold text-[#D8CFC6]">
+                <button type="button" onClick={props.onPrintReceipt} className="rounded-[11px] border border-surface-3 bg-surface-2 px-6 py-3 font-bold text-bright">
                   Печать
                 </button>
               )}
@@ -264,14 +264,14 @@ export function PosCheckout(props: PosCheckoutProps) {
                   type="button"
                   disabled={props.serverPrintBusy}
                   onClick={props.onPrintServerReceipt}
-                  className="rounded-[11px] border border-[#2E2822] bg-[#221E19] px-6 py-3 font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+                  className="rounded-[11px] border border-surface-3 bg-surface-2 px-6 py-3 font-bold text-bright disabled:text-faint"
                 >
                   {props.serverPrintBusy ? 'Печать…' : 'Чек (сервер)'}
                 </button>
               )}
             </div>
             {offlineResult && (
-              <div className="mx-auto mt-3 max-w-[420px] text-xs leading-relaxed text-[#6E645C]">
+              <div className="mx-auto mt-3 max-w-[420px] text-xs leading-relaxed text-faint">
                 Это не резерв на сервере. Если при синхронизации товар уже продан, строка останется в очереди как конфликт.
               </div>
             )}

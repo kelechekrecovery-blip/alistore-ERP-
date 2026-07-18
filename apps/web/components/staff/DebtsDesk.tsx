@@ -111,13 +111,13 @@ export function DebtsDesk({
   }
 
   if (!canCreateDebt(role) && !canReadDebts(role)) {
-    return <p className="py-8 text-center text-sm text-[#8A7F76]">Нет доступа к операциям с долгами</p>;
+    return <p className="py-8 text-center text-sm text-subtle">Нет доступа к операциям с долгами</p>;
   }
 
   return (
     <>
       {canCreateDebt(role) && (
-        <form onSubmit={submitCreate} className="mb-4 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
+        <form onSubmit={submitCreate} className="mb-4 rounded-[16px] border border-surface-3 bg-surface-2 p-4">
           <div className="mb-3 font-display text-[15px] font-bold">Оформить долг / рассрочку</div>
           <DeskField
             label="Заказ"
@@ -161,7 +161,7 @@ export function DebtsDesk({
         </form>
       )}
 
-      {debts === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+      {debts === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
       {loadError && (
         <div className="py-7 text-center">
           <p className="text-sm text-[#D69A83]">{loadError}</p>
@@ -170,20 +170,20 @@ export function DebtsDesk({
           </button>
         </div>
       )}
-      {!loadError && debts?.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Открытых долгов нет</p>}
+      {!loadError && debts?.length === 0 && <p className="py-8 text-center text-sm text-subtle">Открытых долгов нет</p>}
       {(debts ?? []).map((debt) => (
-        <article key={debt.id} className="mb-2.5 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
+        <article key={debt.id} className="mb-2.5 rounded-[14px] border border-surface-3 bg-surface-2 p-3.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold">#{debt.id.slice(-6)}</span>
             <span className={`rounded-md px-2 py-0.5 text-[11px] ${new Date(debt.dueDate) < new Date() ? 'bg-warn/15 text-warn' : 'bg-lime/15 text-lime'}`}>
               до {debt.dueDate.slice(0, 10)}
             </span>
           </div>
-          <div className="mt-1.5 text-[13px] text-[#A79C92]">
+          <div className="mt-1.5 text-[13px] text-muted">
             заказ #{debt.orderId.slice(-6)} · {debt.installments} плат.
           </div>
           <div className="mt-1 font-display text-base font-extrabold">
-            {som(debt.balance)} <span className="text-[11px] font-normal text-[#8A7F76]">из {som(debt.principal)}</span>
+            {som(debt.balance)} <span className="text-[11px] font-normal text-subtle">из {som(debt.principal)}</span>
           </div>
           {canPayDebt(role) && debt.status === 'open' && (
             <div className="mt-3 flex gap-2">
@@ -192,7 +192,7 @@ export function DebtsDesk({
                 type="number"
                 value={payAmounts[debt.id] ?? ''}
                 onChange={(event) => setPayAmounts((current) => ({ ...current, [debt.id]: event.target.value }))}
-                className="min-w-0 flex-1 rounded-[9px] border border-[#2E2822] bg-[#16130F] px-3 py-2 font-mono text-xs outline-none focus:border-lime"
+                className="min-w-0 flex-1 rounded-[9px] border border-surface-3 bg-ink-dark px-3 py-2 font-mono text-xs outline-none focus:border-lime"
               />
               <button
                 type="button"
@@ -227,14 +227,14 @@ function DeskField({
 }) {
   return (
     <label className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
-      <span className="text-[12px] font-semibold text-[#8A7F76]">{label}</span>
+      <span className="text-[12px] font-semibold text-subtle">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         inputMode={inputMode}
         required={required}
         placeholder={placeholder}
-        className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
+        className="rounded-[10px] border border-surface-3 bg-ink-dark px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
       />
     </label>
   );

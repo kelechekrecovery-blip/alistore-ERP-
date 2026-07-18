@@ -53,14 +53,14 @@ export default function MobileHome() {
             </div>
           </Pressable>
           <Pressable className="flex-1" hover={false}>
-            <div className="rounded-[15px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <div className="rounded-[15px] border border-surface-3 bg-surface-2 p-3.5">
               <div className="text-xl">⌖</div>
               <div className="mt-1.5 text-[13px] font-bold text-white">Получение</div>
-              <div className="text-[11px] text-[#A79C92]">условия в checkout</div>
+              <div className="text-[11px] text-muted">условия в checkout</div>
             </div>
           </Pressable>
           <Pressable className="flex-1" hover={false}>
-            <Link href="/trade-in" className="block rounded-[15px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <Link href="/trade-in" className="block rounded-[15px] border border-surface-3 bg-surface-2 p-3.5">
               <div className="text-xl">♻️</div>
               <div className="mt-1.5 text-[13px] font-bold text-white">Trade-in</div>
               <div className="text-[11px] text-lime">оценка устройства</div>
@@ -74,10 +74,10 @@ export default function MobileHome() {
             <Pressable key={name} className="flex-shrink-0" hover={false}>
               <Link
                 href={`/catalog?category=${encodeURIComponent(name)}`}
-                className="block rounded-[12px] border border-[#2E2822] bg-[#221E19] px-3.5 py-2.5 text-center"
+                className="block rounded-[12px] border border-surface-3 bg-surface-2 px-3.5 py-2.5 text-center"
               >
                 <div className="text-[22px]">{icon}</div>
-                <div className="mt-1 whitespace-nowrap text-[11px] text-[#D8CFC6]">{name}</div>
+                <div className="mt-1 whitespace-nowrap text-[11px] text-bright">{name}</div>
               </Link>
             </Pressable>
           ))}
@@ -88,11 +88,11 @@ export default function MobileHome() {
           <Pressable hover={false}>
             <Link
               href={storefront?.content.heroCtaHref ?? '/catalog'}
-              className="relative block overflow-hidden rounded-[20px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#16130F] p-[22px]"
+              className="relative block overflow-hidden rounded-[20px] border border-surface-3 bg-gradient-to-br from-[#2A2A2E] to-ink-dark p-[22px]"
             >
               <div className="font-mono text-[11px] text-lime">{storefront?.content.heroEyebrow ?? 'ALISTORE'}</div>
               <div className="mt-2 font-display text-[24px] font-extrabold leading-[1.05] text-white">{storefront?.content.heroTitle ?? 'Техника из актуального каталога'}</div>
-              <div className="mt-1 text-[13px] text-[#A79C92]">{storefront?.content.heroBody ?? 'Цена и остаток подтверждаются сервером.'}</div>
+              <div className="mt-1 text-[13px] text-muted">{storefront?.content.heroBody ?? 'Цена и остаток подтверждаются сервером.'}</div>
               <span className="mt-4 inline-block rounded-[10px] bg-lime px-[18px] py-2.5 text-[13px] font-bold text-lime-ink">
                 {storefront?.content.heroCtaLabel ?? 'Смотреть'}
               </span>
@@ -111,7 +111,7 @@ export default function MobileHome() {
         {products === null ? (
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="h-[232px] animate-pulse rounded-[16px] border border-[#2E2822] bg-[#221E19]" />
+              <div key={i} className="h-[232px] animate-pulse rounded-[16px] border border-surface-3 bg-surface-2" />
             ))}
           </div>
         ) : hits.length > 0 ? (
@@ -121,7 +121,7 @@ export default function MobileHome() {
             ))}
           </StaggerItem>
         ) : (
-          <div className="rounded-[16px] border border-[#2E2822] bg-[#221E19] px-4 py-10 text-center text-sm text-[#A79C92]">
+          <div className="rounded-[16px] border border-surface-3 bg-surface-2 px-4 py-10 text-center text-sm text-muted">
             Каталог скоро наполнится.{' '}
             <Link href="/catalog" className="text-lime">
               Открыть каталог
@@ -135,7 +135,7 @@ export default function MobileHome() {
 
 function mobileTone(tone: StorefrontBlock['tone']) {
   if (tone === 'coral') return 'border-coral bg-coral text-white';
-  if (tone === 'light') return 'border-white bg-white text-[#14110E]';
+  if (tone === 'light') return 'border-white bg-white text-lime-ink';
   if (tone === 'lime') return 'border-lime bg-lime text-lime-ink';
-  return 'border-[#2E2822] bg-[#16130F] text-white';
+  return 'border-surface-3 bg-ink-dark text-white';
 }

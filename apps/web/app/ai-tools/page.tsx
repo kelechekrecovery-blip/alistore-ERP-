@@ -30,11 +30,11 @@ function toAttrs(rows: AttrRow[]): Record<string, string> {
   }, {});
 }
 
-const labelCls = 'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#8A7F76]';
+const labelCls = 'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-subtle';
 const inputCls =
-  'w-full rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2.5 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime';
-const cardCls = 'rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5';
-const errCls = 'mt-3 rounded-[10px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-2.5 text-sm text-[#FF8A7A]';
+  'w-full rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2.5 text-sm text-white outline-none placeholder:text-faint focus:border-lime';
+const cardCls = 'rounded-[16px] border border-surface-3 bg-surface p-5';
+const errCls = 'mt-3 rounded-[10px] border border-danger-soft/30 bg-danger-soft/5 p-2.5 text-sm text-danger-soft';
 
 export default function AiToolsPage() {
   const [name, setName] = useState('');
@@ -92,10 +92,10 @@ export default function AiToolsPage() {
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4">
         <Link
           href="/staff"
-          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
         >
           ⌂ Сотрудник
         </Link>
@@ -109,12 +109,12 @@ export default function AiToolsPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A] font-sans text-white">
-      <header className="flex items-center gap-4 border-b border-[#2E2822] bg-[#16130F] px-6 py-4">
+    <div className="fixed inset-0 z-50 flex flex-col bg-night font-sans text-white">
+      <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark px-6 py-4">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-lime font-display text-lg font-extrabold text-lime-ink">✦</span>
         <div>
           <div className="font-display text-lg font-bold">AI-инструменты</div>
-          <div className="text-xs text-[#8A7F76]">Категоризация и описание карточки · правила без ключа, LLM при ключе</div>
+          <div className="text-xs text-subtle">Категоризация и описание карточки · правила без ключа, LLM при ключе</div>
         </div>
         <button
           type="button"
@@ -122,7 +122,7 @@ export default function AiToolsPage() {
             clearStaffSession();
             setSession(null);
           }}
-          className="ml-auto rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+          className="ml-auto rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
         >
           Выйти staff
         </button>
@@ -149,8 +149,8 @@ export default function AiToolsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <button type="button" disabled={catBusy || !name.trim()} onClick={runCategorize} className="w-full rounded-[12px] bg-lime py-3 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{catBusy ? 'Определяем…' : 'Определить категорию'}</button>
-              <button type="button" disabled={descBusy || !name.trim()} onClick={runDescribe} className="w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] py-3 text-[15px] font-bold text-white disabled:text-[#6E645C]">{descBusy ? 'Генерируем…' : 'Сгенерировать описание'}</button>
+              <button type="button" disabled={catBusy || !name.trim()} onClick={runCategorize} className="w-full rounded-[12px] bg-lime py-3 text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">{catBusy ? 'Определяем…' : 'Определить категорию'}</button>
+              <button type="button" disabled={descBusy || !name.trim()} onClick={runDescribe} className="w-full rounded-[12px] border border-surface-3 bg-surface-2 py-3 text-[15px] font-bold text-white disabled:text-faint">{descBusy ? 'Генерируем…' : 'Сгенерировать описание'}</button>
             </div>
             {catErr && <div className={errCls}>{catErr}</div>}
             {descErr && <div className={errCls}>{descErr}</div>}
@@ -159,7 +159,7 @@ export default function AiToolsPage() {
           {/* results */}
           <div className={cardCls}>
             {!cat && !desc ? (
-              <div className="grid h-full min-h-[200px] place-items-center text-center text-sm text-[#8A7F76]">Введите товар и нажмите одну из кнопок.</div>
+              <div className="grid h-full min-h-[200px] place-items-center text-center text-sm text-subtle">Введите товар и нажмите одну из кнопок.</div>
             ) : (
               <div className="flex flex-col gap-4">
                 {cat && (
@@ -167,33 +167,33 @@ export default function AiToolsPage() {
                     <div className={labelCls}>Категория</div>
                     <div className="flex items-baseline gap-2">
                       <span className="font-display text-2xl font-extrabold text-lime">{cat.category}</span>
-                      <span className="font-mono text-[13px] text-[#8A7F76]">увер. {Math.round(cat.confidence * 100)}%</span>
+                      <span className="font-mono text-[13px] text-subtle">увер. {Math.round(cat.confidence * 100)}%</span>
                     </div>
                     {cat.matched.length > 0 && (
-                      <div className="mt-2 text-[12px] text-[#A79C92]">Совпало: {cat.matched.join(', ')}</div>
+                      <div className="mt-2 text-[12px] text-muted">Совпало: {cat.matched.join(', ')}</div>
                     )}
                     {cat.alternatives.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {cat.alternatives.map((a) => (
-                          <span key={a.category} className="rounded-chip border border-[#2E2822] bg-[#221E19] px-3 py-1.5 text-[12px] font-semibold text-[#A79C92]">{a.category} · {a.score}</span>
+                          <span key={a.category} className="rounded-chip border border-surface-3 bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-muted">{a.category} · {a.score}</span>
                         ))}
                       </div>
                     )}
                   </div>
                 )}
 
-                {cat && desc && <div className="border-t border-[#221E19]" />}
+                {cat && desc && <div className="border-t border-surface-2" />}
 
                 {desc && (
                   <div>
                     <div className="mb-1.5 flex items-center gap-2">
                       <span className={`${labelCls} mb-0`}>Описание</span>
-                      <span className={`rounded-chip px-2 py-0.5 text-[11px] font-semibold ${isLlm ? 'bg-lime/15 text-lime' : 'bg-[#221E19] text-[#A79C92]'}`}>{isLlm ? 'LLM' : 'шаблон'}</span>
+                      <span className={`rounded-chip px-2 py-0.5 text-[11px] font-semibold ${isLlm ? 'bg-lime/15 text-lime' : 'bg-surface-2 text-muted'}`}>{isLlm ? 'LLM' : 'шаблон'}</span>
                     </div>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#D8CFC6]">{desc.description}</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-bright">{desc.description}</p>
                     {desc.highlights.length > 0 && (
-                      <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
-                        {desc.highlights.map((h) => <div key={h} className="py-0.5 text-[12px] text-[#A79C92]">• {h}</div>)}
+                      <div className="mt-3 rounded-[12px] border border-surface-3 bg-surface-2 p-3">
+                        {desc.highlights.map((h) => <div key={h} className="py-0.5 text-[12px] text-muted">• {h}</div>)}
                       </div>
                     )}
                   </div>
@@ -202,7 +202,7 @@ export default function AiToolsPage() {
             )}
           </div>
         </div>
-        <p className="mx-auto mt-4 max-w-[860px] text-[11px] text-[#6E645C]">Правила работают без ключа. При настроенном ключе LLM описание генерирует модель — бейдж покажет источник.</p>
+        <p className="mx-auto mt-4 max-w-[860px] text-[11px] text-faint">Правила работают без ключа. При настроенном ключе LLM описание генерирует модель — бейдж покажет источник.</p>
       </div>
     </div>
   );

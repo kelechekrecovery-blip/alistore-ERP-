@@ -40,20 +40,20 @@ export default function NotificationsPage() {
   return (
     <MobileAppFrame title="Уведомления" subtitle="Статусы заказов, гарантия, бонусы и настройки связи." backHref="/account">
       {notifications.map((n) => (
-        <div key={n.title} className="mb-2 flex gap-3 rounded-[13px] border border-[#2E2822] p-3.5" style={{ background: n.bg }}>
+        <div key={n.title} className="mb-2 flex gap-3 rounded-[13px] border border-surface-3 p-3.5" style={{ background: n.bg }}>
           <span className="text-xl">{n.icon}</span>
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold">{n.title}</div>
-            <div className="mt-1 text-[12px] leading-relaxed text-[#A79C92]">{n.text}</div>
-            <div className="mt-1 font-mono text-[11px] text-[#6E645C]">{n.time}</div>
+            <div className="mt-1 text-[12px] leading-relaxed text-muted">{n.text}</div>
+            <div className="mt-1 font-mono text-[11px] text-faint">{n.time}</div>
           </div>
         </div>
       ))}
 
-      {!user && <a href="/login?next=/account/notifications" className="mt-4 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-4 text-sm text-[#A79C92]">Войдите по OTP, чтобы синхронизировать каналы.</a>}
-      {error && <div className="mt-3 rounded-[13px] border border-[#FF8A7A]/30 bg-[#221E19] p-4 text-sm text-[#FF8A7A]">{error}</div>}
+      {!user && <a href="/login?next=/account/notifications" className="mt-4 block rounded-[13px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">Войдите по OTP, чтобы синхронизировать каналы.</a>}
+      {error && <div className="mt-3 rounded-[13px] border border-danger-soft/30 bg-surface-2 p-4 text-sm text-danger-soft">{error}</div>}
 
-      <div className="mt-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+      <div className="mt-4 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
         <div className="mb-3 text-sm font-semibold">Каналы</div>
         {settings && (
           <>
@@ -63,15 +63,15 @@ export default function NotificationsPage() {
             <Toggle label="Акции и промокоды" on={settings.promos} disabled={Boolean(saving)} onClick={() => toggle('promos')} />
           </>
         )}
-        {user && !settings && !error && <div className="py-5 text-center text-sm text-[#A79C92]">Загружаем каналы…</div>}
+        {user && !settings && !error && <div className="py-5 text-center text-sm text-muted">Загружаем каналы…</div>}
       </div>
 
-      <button type="button" disabled={!settings || Boolean(saving)} onClick={() => toggle('consent')} className="mt-3 flex w-full items-center justify-between rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left disabled:opacity-60">
+      <button type="button" disabled={!settings || Boolean(saving)} onClick={() => toggle('consent')} className="mt-3 flex w-full items-center justify-between rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-left disabled:opacity-60">
         <span>
           <span className="block text-sm font-semibold">Маркетинговое согласие</span>
-          <span className="mt-1 block text-[12px] leading-relaxed text-[#8A7F76]">Выключение останавливает кампании и промо-рассылки.</span>
+          <span className="mt-1 block text-[12px] leading-relaxed text-subtle">Выключение останавливает кампании и промо-рассылки.</span>
         </span>
-        <span className={`ml-3 flex-shrink-0 rounded-chip px-3 py-1 text-[11px] font-bold ${settings?.consent ? 'bg-lime text-lime-ink' : 'bg-[#2E2822] text-[#8A7F76]'}`}>
+        <span className={`ml-3 flex-shrink-0 rounded-chip px-3 py-1 text-[11px] font-bold ${settings?.consent ? 'bg-lime text-lime-ink' : 'bg-surface-3 text-subtle'}`}>
           {saving === 'consent' ? '...' : settings?.consent ? 'ON' : 'OFF'}
         </span>
       </button>
@@ -81,9 +81,9 @@ export default function NotificationsPage() {
 
 function Toggle({ label, on, disabled, onClick }: { label: string; on: boolean; disabled: boolean; onClick: () => void }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} className="flex w-full items-center justify-between border-t border-[#2E2822] py-3 text-left first:border-t-0 disabled:opacity-60">
-      <span className="text-[13px] text-[#D8CFC6]">{label}</span>
-      <span className={`h-6 w-11 rounded-chip p-0.5 transition ${on ? 'bg-lime' : 'bg-[#3A342E]'}`}>
+    <button type="button" disabled={disabled} onClick={onClick} className="flex w-full items-center justify-between border-t border-surface-3 py-3 text-left first:border-t-0 disabled:opacity-60">
+      <span className="text-[13px] text-bright">{label}</span>
+      <span className={`h-6 w-11 rounded-chip p-0.5 transition ${on ? 'bg-lime' : 'bg-line'}`}>
         <span className={`block h-5 w-5 rounded-full bg-white transition ${on ? 'translate-x-5' : ''}`} />
       </span>
     </button>

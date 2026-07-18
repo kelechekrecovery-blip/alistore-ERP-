@@ -215,10 +215,10 @@ export default function ErpPage() {
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4">
         <Link
           href="/"
-          className="fixed right-4 top-4 z-[60] rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
+          className="fixed right-4 top-4 z-[60] rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
         >
           ⌂ Выйти
         </Link>
@@ -238,10 +238,10 @@ export default function ErpPage() {
   const activeRoute: Route = erpRouteAllowed(session.role, route) ? route : 'admin';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden bg-[#0E0C0A] font-sans text-white sm:items-center sm:overflow-auto sm:p-5">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden bg-night font-sans text-white sm:items-center sm:overflow-auto sm:p-5">
       <div
         data-testid="erp-shell"
-        className="relative flex h-full w-full max-w-[1280px] overflow-hidden bg-[#16130F] shadow-2xl sm:h-[820px] sm:max-h-full sm:rounded-[20px] sm:border sm:border-[#2E2822]"
+        className="relative flex h-full w-full max-w-[1280px] overflow-hidden bg-ink-dark shadow-2xl sm:h-[820px] sm:max-h-full sm:rounded-[20px] sm:border sm:border-surface-3"
       >
       {navigationOpen && (
         <button
@@ -262,15 +262,15 @@ export default function ErpPage() {
         aria-hidden={mobileNavigation && !navigationOpen ? true : undefined}
         inert={mobileNavigation && !navigationOpen ? true : undefined}
         data-testid="erp-sidebar"
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-shrink-0 flex-col border-r border-[#2E2822] bg-[#1A1611] px-3 py-[18px] shadow-2xl transition-transform duration-200 sm:relative sm:z-auto sm:w-[230px] sm:translate-x-0 sm:shadow-none ${navigationOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-shrink-0 flex-col border-r border-surface-3 bg-surface px-3 py-[18px] shadow-2xl transition-transform duration-200 sm:relative sm:z-auto sm:w-[230px] sm:translate-x-0 sm:shadow-none ${navigationOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center gap-2.5 px-2 pb-4">
           <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-coral font-display text-base font-extrabold text-white">A</span>
           <div>
             <div className="font-display text-sm font-extrabold">AliStore ERP</div>
-            <div className="text-[10px] text-[#8A7F76]">Владелец</div>
+            <div className="text-[10px] text-subtle">Владелец</div>
           </div>
-          <button ref={navigationCloseRef} type="button" onClick={() => closeNavigation()} aria-label="Закрыть меню" className="ml-auto grid h-9 w-9 place-items-center rounded-[8px] text-[#A79C92] hover:bg-[#221E19] hover:text-white sm:hidden">
+          <button ref={navigationCloseRef} type="button" onClick={() => closeNavigation()} aria-label="Закрыть меню" className="ml-auto grid h-9 w-9 place-items-center rounded-[8px] text-muted hover:bg-surface-2 hover:text-white sm:hidden">
             <X size={18} />
           </button>
         </div>
@@ -281,7 +281,7 @@ export default function ErpPage() {
               type="button"
               onClick={() => navigate(m.id)}
               className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] transition ${
-                activeRoute === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
+                activeRoute === m.id ? 'bg-surface-2 font-bold text-white' : 'font-medium text-muted hover:text-white'
               }`}
             >
               <span className="text-base">{m.icon}</span>
@@ -295,7 +295,7 @@ export default function ErpPage() {
             </button>
           ))}
           {extendedNav.length > 0 && (
-            <div className="mb-1 mt-3 border-t border-[#2E2822] px-3 pt-3 text-[10px] font-semibold uppercase text-[#6E645C]">
+            <div className="mb-1 mt-3 border-t border-surface-3 px-3 pt-3 text-[10px] font-semibold uppercase text-faint">
               Расширенные модули
             </div>
           )}
@@ -305,7 +305,7 @@ export default function ErpPage() {
               type="button"
               onClick={() => navigate(m.id)}
               className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-[13px] transition ${
-                activeRoute === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
+                activeRoute === m.id ? 'bg-surface-2 font-bold text-white' : 'font-medium text-muted hover:text-white'
               }`}
             >
               <span className="text-base">{m.icon}</span>
@@ -315,8 +315,8 @@ export default function ErpPage() {
             </button>
           ))}
         </nav>
-        <div className="mt-auto rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
-          <div className="text-[11px] text-[#8A7F76]">Сеть</div>
+        <div className="mt-auto rounded-[12px] border border-surface-3 bg-surface-2 p-3">
+          <div className="text-[11px] text-subtle">Сеть</div>
           <div className="mt-0.5 text-[13px] font-semibold">
             {d ? `${d.ops.openShifts} смен · онлайн` : '…'}
           </div>
@@ -325,13 +325,13 @@ export default function ErpPage() {
 
       {/* MAIN */}
       <main inert={mobileNavigation && navigationOpen ? true : undefined} data-testid="erp-main" className="min-w-0 w-full flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-20 flex min-h-[68px] items-center border-b border-[#2E2822] bg-[#16130F]/95 px-3 py-3 backdrop-blur sm:px-[26px] sm:py-4">
-          <button ref={navigationTriggerRef} type="button" aria-label="Открыть навигацию" aria-controls="erp-navigation" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)} className="mr-2 grid h-10 w-10 flex-none place-items-center rounded-[8px] border border-[#2E2822] bg-[#1A1611] text-[#D8CFC6] sm:hidden">
+        <div className="sticky top-0 z-20 flex min-h-[68px] items-center border-b border-surface-3 bg-ink-dark/95 px-3 py-3 backdrop-blur sm:px-[26px] sm:py-4">
+          <button ref={navigationTriggerRef} type="button" aria-label="Открыть навигацию" aria-controls="erp-navigation" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)} className="mr-2 grid h-10 w-10 flex-none place-items-center rounded-[8px] border border-surface-3 bg-surface text-bright sm:hidden">
             <Menu size={19} />
           </button>
           <div className="min-w-0">
             <div className="truncate font-display text-base font-bold sm:text-xl">{TITLES[activeRoute][0]}</div>
-            <div className="hidden truncate text-xs text-[#8A7F76] sm:block">{TITLES[activeRoute][1]}</div>
+            <div className="hidden truncate text-xs text-subtle sm:block">{TITLES[activeRoute][1]}</div>
           </div>
           <div className="ml-auto flex flex-none items-center gap-1.5 sm:gap-3">
             <button
@@ -349,7 +349,7 @@ export default function ErpPage() {
                 setSession(null);
               }}
               aria-label="Выйти из staff-сессии"
-              className="flex h-10 items-center gap-2 rounded-[8px] bg-[#221E19] px-3 text-xs font-semibold text-white/80 hover:text-white sm:px-4"
+              className="flex h-10 items-center gap-2 rounded-[8px] bg-surface-2 px-3 text-xs font-semibold text-white/80 hover:text-white sm:px-4"
             >
               <LogOut size={16} /><span className="hidden lg:inline">Выйти staff</span>
             </button>
@@ -390,10 +390,10 @@ function LedgerView({ ledger }: { ledger: LedgerEvent[] }) {
     <Card>
       <ul className="flex flex-col gap-2">
         {ledger.slice(0, 50).map((e) => (
-          <li key={e.id} className="flex items-center gap-2 border-b border-[#221E19] pb-2 text-xs">
-            <span className="rounded bg-[#221E19] px-1.5 py-0.5 font-mono text-[11px] text-[#C6FF3D]">{e.type}</span>
-            <span className="text-[#8A7F76]">{e.actor}</span>
-            <span className="ml-auto font-mono text-[10px] text-[#6E645C]">{e.ts.slice(11, 19)}</span>
+          <li key={e.id} className="flex items-center gap-2 border-b border-surface-2 pb-2 text-xs">
+            <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-lime">{e.type}</span>
+            <span className="text-subtle">{e.actor}</span>
+            <span className="ml-auto font-mono text-[10px] text-faint">{e.ts.slice(11, 19)}</span>
           </li>
         ))}
       </ul>

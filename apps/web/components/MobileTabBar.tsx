@@ -19,7 +19,7 @@ export function MobileTabBar({ active }: { active: Tab }) {
   const { count, hydrated } = useCart();
   const { count: favCount } = useFavorites();
   return (
-    <div className="flex flex-shrink-0 border-t border-[#2E2822] bg-[#1A1611] px-1.5 pb-6 pt-2">
+    <div className="flex flex-shrink-0 border-t border-surface-3 bg-surface px-1.5 pb-6 pt-2">
       {TABS.map((t) => {
         const badge = t.id === 'cart' ? (hydrated ? count : 0) : t.id === 'favorites' ? favCount : 0;
         return (
@@ -30,7 +30,7 @@ export function MobileTabBar({ active }: { active: Tab }) {
                 {badge}
               </span>
             )}
-            <div className={`mt-1 text-[10px] ${active === t.id ? 'font-bold text-lime' : 'text-[#8A7F76]'}`}>
+            <div className={`mt-1 text-[10px] ${active === t.id ? 'font-bold text-lime' : 'text-subtle'}`}>
               {t.label}
             </div>
           </Link>

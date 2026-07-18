@@ -43,15 +43,15 @@ export function PosTicket({
   onCheckout,
 }: PosTicketProps) {
   return (
-    <aside data-testid="pos-ticket" className="flex w-[420px] flex-shrink-0 flex-col bg-[#1A1611]">
-      <div className="flex flex-shrink-0 items-center border-b border-[#2E2822] px-5 py-4">
+    <aside data-testid="pos-ticket" className="flex w-[420px] flex-shrink-0 flex-col bg-surface">
+      <div className="flex flex-shrink-0 items-center border-b border-surface-3 px-5 py-4">
         <span className="font-display text-[17px] font-bold text-white">Чек</span>
-        <span className="ml-2 text-sm text-[#8A7F76]">{count} поз.</span>
+        <span className="ml-2 text-sm text-subtle">{count} поз.</span>
         {count > 0 && (
           <button
             type="button"
             onClick={onClear}
-            className="ml-auto text-sm text-[#FF8A7A] hover:text-danger"
+            className="ml-auto text-sm text-danger-soft hover:text-danger"
           >
             Очистить
           </button>
@@ -60,21 +60,21 @@ export function PosTicket({
 
       <div className="flex-1 overflow-y-auto px-5 py-3">
         {lines.length === 0 ? (
-          <div className="py-16 text-center text-[#6E645C]">
+          <div className="py-16 text-center text-faint">
             <div className="text-5xl">🧾</div>
             <div className="mt-3 text-sm">Добавьте товары тапом</div>
           </div>
         ) : (
           lines.map((l) => (
-            <div key={l.product.id} className="flex gap-3 border-b border-[#221E19] py-3">
+            <div key={l.product.id} className="flex gap-3 border-b border-surface-2 py-3">
               <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-[9px] bg-[#2A2620]">
                 {productImage(l.product) ? <Image src={productImage(l.product)!} alt={l.product.name} fill sizes="44px" className="object-contain p-1" /> : <span className="grid h-full place-items-center font-bold text-[#8a8a8a]">{l.product.name.slice(0,1)}</span>}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold text-white">{l.product.name}</div>
-                <div className="mt-0.5 text-xs text-[#8A7F76]">{som(l.product.price)}</div>
+                <div className="mt-0.5 text-xs text-subtle">{som(l.product.price)}</div>
                 <div className="mt-1.5 flex items-center gap-2">
-                  <div className="flex items-center gap-3 rounded-[7px] bg-[#221E19] px-2 py-1">
+                  <div className="flex items-center gap-3 rounded-[7px] bg-surface-2 px-2 py-1">
                     <button type="button" onClick={() => onSetQty(l.product.id, l.qty - 1)} className="text-white">
                       −
                     </button>
@@ -94,7 +94,7 @@ export function PosTicket({
       </div>
 
       {count > 0 && (
-        <div className="flex-shrink-0 border-t border-[#2E2822] px-5 py-4">
+        <div className="flex-shrink-0 border-t border-surface-3 px-5 py-4">
           <div className="mb-3 flex gap-2">
             {discounts.map((d, i) => (
               <button
@@ -104,15 +104,15 @@ export function PosTicket({
                 className={`flex-1 rounded-[9px] border py-2 text-center text-xs font-semibold transition ${
                   discIdx === i
                     ? 'border-lime bg-lime text-lime-ink'
-                    : 'border-[#2E2822] bg-[#221E19] text-[#D8CFC6]'
+                    : 'border-surface-3 bg-surface-2 text-bright'
                 }`}
               >
                 {d}%
               </button>
             ))}
           </div>
-          <div className="flex justify-between py-0.5 text-[13px] text-[#A79C92]">
-            Подытог <span className="text-[#D8CFC6] tabular">{som(subtotal)}</span>
+          <div className="flex justify-between py-0.5 text-[13px] text-muted">
+            Подытог <span className="text-bright tabular">{som(subtotal)}</span>
           </div>
           {discPct > 0 && (
             <div className="flex justify-between py-0.5 text-[13px] text-lime">

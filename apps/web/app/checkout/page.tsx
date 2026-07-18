@@ -327,26 +327,26 @@ export default function CheckoutPage() {
       <div className="flex flex-1 flex-col items-center justify-center px-7 text-center">
         <div className="grid h-20 w-20 place-items-center rounded-full bg-lime/15 text-4xl">✓</div>
         <div className="mt-5 font-display text-2xl font-extrabold">{done.intent && !done.paid ? 'Ожидаем оплату' : 'Заказ оформлен!'}</div>
-        <div className="mt-2.5 text-sm text-[#A79C92]">№ <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · {done.order.status}. Мы свяжемся для подтверждения.</div>
+        <div className="mt-2.5 text-sm text-muted">№ <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · {done.order.status}. Мы свяжемся для подтверждения.</div>
         {done.order.pickupCode && (
-          <div className="checkout-surface mt-4 rounded-[14px] border border-[#2E2822] bg-[#221E19] px-5 py-3">
-            <div className="text-[12px] text-[#A79C92]">Код выдачи</div>
+          <div className="checkout-surface mt-4 rounded-[14px] border border-surface-3 bg-surface-2 px-5 py-3">
+            <div className="text-[12px] text-muted">Код выдачи</div>
             <div className="mt-1 font-display text-xl font-extrabold text-lime">{done.order.pickupCode}</div>
           </div>
         )}
         {done.intent && !done.paid && (
-          <div className="checkout-surface mt-5 w-full rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4 text-left">
+          <div className="checkout-surface mt-5 w-full rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-left">
             <div className="text-[13px] font-semibold text-white">{PAYMENT.find((p) => p.id === done.intent?.method)?.name}</div>
-            <div className="mt-1 font-mono text-[11px] break-all text-[#8A7F76]">{done.intent.qrPayload ?? done.intent.paymentUrl}</div>
-            <div className="mt-2 text-[12px] text-[#A79C92]">Sandbox intent: {done.intent.intentId} · до {new Date(done.intent.expiresAt).toLocaleTimeString('ru-RU')}</div>
+            <div className="mt-1 font-mono text-[11px] break-all text-subtle">{done.intent.qrPayload ?? done.intent.paymentUrl}</div>
+            <div className="mt-2 text-[12px] text-muted">Sandbox intent: {done.intent.intentId} · до {new Date(done.intent.expiresAt).toLocaleTimeString('ru-RU')}</div>
             <button type="button" disabled={busy} onClick={confirmPayment} className="checkout-primary mt-3 w-full rounded-[12px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60">
               {busy ? 'Проверяем…' : 'Подтвердить sandbox-платёж'}
             </button>
-            {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
+            {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
           </div>
         )}
         <Link href={done.order.guestAccess ? guestOrderLink(done.order.id, done.order.guestAccess.capability) : `/account/orders/${done.order.id}`} className="checkout-primary mt-6 rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">Статус и чек</Link>
-        <Link href="/" className="mt-4 text-sm text-[#A79C92]">На главную</Link>
+        <Link href="/" className="mt-4 text-sm text-muted">На главную</Link>
       </div>,
     );
   }
@@ -361,7 +361,7 @@ export default function CheckoutPage() {
         <span className="font-display text-xl font-bold">Оформление</span>
       </div>
       <div className="flex gap-1.5 px-5 pb-5 sm:px-7">
-        {STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-chip ${i <= step ? 'bg-lime' : 'bg-[#2E2822]'}`} />)}
+        {STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-chip ${i <= step ? 'bg-lime' : 'bg-surface-3'}`} />)}
       </div>
 
       <div className="px-5 pb-7 sm:px-7">
@@ -369,26 +369,26 @@ export default function CheckoutPage() {
           <>
             <div className="mb-3 font-display text-base font-bold">Способ получения</div>
             {DELIVERY.map((d) => (
-              <button key={d.id} type="button" aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={d.id} type="button" aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-surface-3'}`}>
                 <span className="text-2xl">{d.icon}</span>
-                <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-[#A79C92]">{d.meta}</div></div>
-                <span className="text-[13px] text-[#D8CFC6]">{d.price}</span>
+                <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-muted">{d.meta}</div></div>
+                <span className="text-[13px] text-bright">{d.price}</span>
               </button>
             ))}
             {delivery === 'pickup' && (
-              <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+              <div className="checkout-surface mb-2.5 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
                 <div className="mb-2 text-[13px] font-semibold">Точка самовывоза</div>
                 {pickupPoints.map((point) => (
                   <button
                     key={point.id}
                     type="button"
                     onClick={() => setPickupPoint(point.id)}
-                    className={`checkout-nested mb-2 flex w-full items-start gap-3 rounded-[11px] border p-3 text-left last:mb-0 ${pickupPoint === point.id ? 'border-lime bg-lime/5' : 'border-[#3A342E] bg-[#16130F]'}`}
+                    className={`checkout-nested mb-2 flex w-full items-start gap-3 rounded-[11px] border p-3 text-left last:mb-0 ${pickupPoint === point.id ? 'border-lime bg-lime/5' : 'border-line bg-ink-dark'}`}
                   >
-                    <span className={`mt-0.5 h-4 w-4 rounded-full border-2 ${pickupPoint === point.id ? 'border-lime bg-lime' : 'border-[#3A342E]'}`} />
+                    <span className={`mt-0.5 h-4 w-4 rounded-full border-2 ${pickupPoint === point.id ? 'border-lime bg-lime' : 'border-line'}`} />
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold text-white">{point.name}</span>
-                      <span className="mt-0.5 block text-xs text-[#A79C92]">{point.address} · {point.hours}</span>
+                      <span className="mt-0.5 block text-xs text-muted">{point.address} · {point.hours}</span>
                     </span>
                   </button>
                 ))}
@@ -399,7 +399,7 @@ export default function CheckoutPage() {
             )}
             {delivery !== 'pickup' && (
               <>
-                <label className="checkout-surface mb-2.5 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                <label className="checkout-surface mb-2.5 block rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
                   <span className="text-[13px] font-semibold">Точный адрес доставки</span>
                   <textarea
                     aria-label="Точный адрес доставки"
@@ -407,19 +407,19 @@ export default function CheckoutPage() {
                     onChange={(event) => setDeliveryAddress(event.target.value)}
                     placeholder="Город, улица, дом, квартира и ориентир"
                     rows={3}
-                    className="checkout-field mt-2 w-full resize-none rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
+                    className="checkout-field mt-2 w-full resize-none rounded-[10px] border border-line bg-ink-dark px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
                   />
                 </label>
                 {delivery === 'courier' && deliveryCapacityLoading && (
-                  <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5 text-sm text-[#A79C92]">Проверяем доступное время…</div>
+                  <div className="checkout-surface mb-2.5 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-sm text-muted">Проверяем доступное время…</div>
                 )}
                 {delivery === 'courier' && deliveryCapacityError && (
                   <div className="mb-2.5 rounded-[13px] border border-[#6B3B32] bg-[#2A1818] p-3.5 text-sm text-[#FFAA9D]">Не удалось загрузить доступные точки и интервалы. Обновите страницу.</div>
                 )}
                 {delivery === 'courier' && deliveryZones.length > 0 && (
-                  <div className="checkout-surface mb-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                  <div className="checkout-surface mb-2.5 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
                     <div className="mb-2 text-[13px] font-semibold">Зона и время доставки</div>
-                    <label className="block text-[11px] text-[#A79C92]" htmlFor="delivery-zone">Зона</label>
+                    <label className="block text-[11px] text-muted" htmlFor="delivery-zone">Зона</label>
                     <select
                       id="delivery-zone"
                       aria-label="Зона доставки"
@@ -429,7 +429,7 @@ export default function CheckoutPage() {
                         setDeliveryZoneId(event.target.value);
                         setDeliverySlotId(zone?.slots.find((slot) => slot.available)?.id ?? '');
                       }}
-                      className="checkout-field mt-1 w-full rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
+                      className="checkout-field mt-1 w-full rounded-[10px] border border-line bg-ink-dark px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
                     >
                       {deliveryZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name} · {som(zone.fee)}</option>)}
                     </select>
@@ -440,10 +440,10 @@ export default function CheckoutPage() {
                           type="button"
                           disabled={!slot.available}
                           onClick={() => setDeliverySlotId(slot.id)}
-                          className={`checkout-nested rounded-[10px] border p-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45 ${deliverySlotId === slot.id ? 'border-lime bg-lime/5' : 'border-[#3A342E] bg-[#16130F]'}`}
+                          className={`checkout-nested rounded-[10px] border p-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45 ${deliverySlotId === slot.id ? 'border-lime bg-lime/5' : 'border-line bg-ink-dark'}`}
                         >
                           <span className="block text-sm font-semibold">{slotLabel(slot)}</span>
-                          <span className="mt-0.5 block text-[11px] text-[#A79C92]">{slot.available ? `осталось ${slot.remaining}` : 'мест нет'}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted">{slot.available ? `осталось ${slot.remaining}` : 'мест нет'}</span>
                         </button>
                       ))}
                     </div>
@@ -452,37 +452,37 @@ export default function CheckoutPage() {
                 )}
               </>
             )}
-            {cartRefreshing && <p className="mb-2 text-xs text-[#A79C92]">Проверяем актуальные цены и остатки…</p>}
+            {cartRefreshing && <p className="mb-2 text-xs text-muted">Проверяем актуальные цены и остатки…</p>}
             <button type="button" disabled={cartRefreshing || deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
           </>
         )}
         {step === 1 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Контакты</div>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="checkout-field mb-2.5 w-full rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5 text-sm text-white outline-none focus:border-lime" />
-            {error && <p className="text-sm text-[#FF8A7A]">{error}</p>}
-            <button type="button" disabled={!phoneValid} onClick={() => setStep(2)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">Далее</button>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 text-sm text-white outline-none focus:border-lime" />
+            {error && <p className="text-sm text-danger-soft">{error}</p>}
+            <button type="button" disabled={!phoneValid} onClick={() => setStep(2)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">Далее</button>
           </>
         )}
         {step === 2 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
             {PAYMENT.filter((p) => p.id !== 'cash' || delivery === 'courier').map((p) => (
-              <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-[#221E19] p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
                 <span className="text-xl">{p.icon}</span>
                 <span className="flex-1 text-sm">{p.name}</span>
-                <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-[#3A342E]'}`} style={{ height: 18, width: 18 }} />
+                <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-line'}`} style={{ height: 18, width: 18 }} />
               </button>
             ))}
-            <div className="checkout-surface mt-3 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <div className="checkout-surface mt-3 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
               <div className="mb-2 text-sm font-semibold">Подарочная карта</div>
               <div className="flex gap-2">
-                <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="checkout-field min-w-0 flex-1 rounded-[10px] border border-[#3A342E] bg-[#16130F] px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
+                <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="checkout-field min-w-0 flex-1 rounded-[10px] border border-line bg-ink-dark px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
                 <button type="button" disabled={giftBusy} onClick={applyGiftCard} className="checkout-primary rounded-[10px] bg-lime px-3 text-sm font-bold text-lime-ink disabled:opacity-60">{giftBusy ? '...' : 'OK'}</button>
               </div>
               {giftCard && <div className="mt-2 text-[12px] text-lime">Баланс {som(giftCard.balance)} · спишем {som(giftAmount)}</div>}
-              {giftError && <div className="mt-2 text-[12px] text-[#FF8A7A]">{giftError}</div>}
+              {giftError && <div className="mt-2 text-[12px] text-danger-soft">{giftError}</div>}
             </div>
             <button type="button" onClick={() => setStep(3)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">К подтверждению</button>
           </>
@@ -490,7 +490,7 @@ export default function CheckoutPage() {
         {step === 3 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
-            <div className="checkout-surface rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+            <div className="checkout-surface rounded-[14px] border border-surface-3 bg-surface-2 p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
               {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint?.name ?? 'не выбрана'} />}
               {delivery !== 'pickup' && <Row k="Адрес" v={deliveryAddress || 'не указан'} />}
@@ -499,7 +499,7 @@ export default function CheckoutPage() {
               <Row k="Оплата" v={PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
               <Row k="Телефон" v={phone} />
               <Row k="Товаров" v={String(items.reduce((s, i) => s + i.qty, 0))} />
-              <div className="my-2 border-t border-[#2E2822]" />
+              <div className="my-2 border-t border-surface-3" />
               <Row k="Товары" v={som(subtotal)} />
               {promoDiscount > 0 && <Row k={`Промокод ${promoCode ?? ''}`} v={`−${som(promoDiscount)}`} />}
               {bonusDiscount > 0 && <Row k="Бонусы" v={`−${som(bonusDiscount)}`} />}
@@ -507,21 +507,21 @@ export default function CheckoutPage() {
               {giftAmount > 0 && <Row k={`Подарочная ${giftCard?.code ?? ''}`} v={`−${som(giftAmount)}`} />}
               <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span></div>
             </div>
-            <label className="checkout-surface mt-3 flex cursor-pointer items-start gap-3 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <label className="checkout-surface mt-3 flex cursor-pointer items-start gap-3 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
               <input
                 type="checkbox"
                 checked={piiConsent}
                 onChange={(event) => setPiiConsent(event.target.checked)}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
               />
-              <span className="text-[13px] leading-5 text-[#D8CFC6]">
+              <span className="text-[13px] leading-5 text-bright">
                 Согласен с условиями{' '}
                 <Link href="/oferta" target="_blank" rel="noreferrer" className="text-lime underline">публичной оферты</Link>
                 {' '}и{' '}
                 <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
               </span>
             </label>
-            {error && <p className="mt-3 text-sm text-[#FF8A7A]">{error}</p>}
+            {error && <p className="mt-3 text-sm text-danger-soft">{error}</p>}
             <button type="button" disabled={busy || !piiConsent} onClick={place} className="checkout-primary mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
           </>
         )}
@@ -532,9 +532,9 @@ export default function CheckoutPage() {
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex gap-3 py-1.5 text-[13px] text-[#A79C92]">
+    <div className="flex gap-3 py-1.5 text-[13px] text-muted">
       <span className="flex-shrink-0">{k}</span>
-      <span className="ml-auto min-w-0 text-right text-[#D8CFC6]">{v}</span>
+      <span className="ml-auto min-w-0 text-right text-bright">{v}</span>
     </div>
   );
 }

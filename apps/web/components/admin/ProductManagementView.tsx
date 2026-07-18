@@ -219,7 +219,7 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
   return (
     <div
       data-testid="erp-product-management"
-      className="relative grid min-h-[620px] overflow-hidden rounded-[8px] border border-[#2E2822] bg-[#16130F] lg:grid-cols-[minmax(300px,360px)_1fr]"
+      className="relative grid min-h-[620px] overflow-hidden rounded-[8px] border border-surface-3 bg-ink-dark lg:grid-cols-[minmax(300px,360px)_1fr]"
     >
       <ProductList
         products={products}

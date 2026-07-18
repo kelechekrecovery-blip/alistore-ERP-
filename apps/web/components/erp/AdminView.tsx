@@ -30,29 +30,29 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
   const internal = INTERNAL_MODULES.filter((module) => module.roles.includes(role));
   return (
     <div className="max-w-6xl space-y-5">
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-[#2E2822] pb-5">
+      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-surface-3 pb-5">
         <div>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8A7F76]">Центр управления</div>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-subtle">Центр управления</div>
           <h2 className="font-display text-2xl font-bold">Администрирование AliStore</h2>
-          <p className="mt-2 max-w-2xl text-sm text-[#A79C92]">Все служебные разделы сайта, кассы и склада доступны из единого ERP-контекста.</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted">Все служебные разделы сайта, кассы и склада доступны из единого ERP-контекста.</p>
         </div>
-        <div className="rounded-[8px] border border-[#2E2822] bg-[#1A1611] px-4 py-3 text-right text-xs">
-          <div className="text-[#8A7F76]">Текущая сессия</div>
-          <strong className="mt-1 block text-[#C6FF3D]">{username}</strong>
-          <span className="text-[#A79C92]">{role}</span>
+        <div className="rounded-[8px] border border-surface-3 bg-surface px-4 py-3 text-right text-xs">
+          <div className="text-subtle">Текущая сессия</div>
+          <strong className="mt-1 block text-lime">{username}</strong>
+          <span className="text-muted">{role}</span>
         </div>
       </section>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {visible.map((module) => (
-          <Link key={module.href} href={module.href} className="group rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4 transition hover:border-[#C6FF3D]/60 hover:bg-[#221E19]">
+          <Link key={module.href} href={module.href} className="group rounded-[8px] border border-surface-3 bg-surface p-4 transition hover:border-lime/60 hover:bg-surface-2">
             <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-[#C6FF3D]">{module.icon}</span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-lime">{module.icon}</span>
               <span className="min-w-0">
-                <strong className="block text-sm text-white group-hover:text-[#C6FF3D]">{module.title}</strong>
-                <span className="mt-1 block text-xs leading-5 text-[#8A7F76]">{module.description}</span>
+                <strong className="block text-sm text-white group-hover:text-lime">{module.title}</strong>
+                <span className="mt-1 block text-xs leading-5 text-subtle">{module.description}</span>
               </span>
-              <span className="ml-auto text-[#8A7F76]">→</span>
+              <span className="ml-auto text-subtle">→</span>
             </div>
           </Link>
         ))}
@@ -61,15 +61,15 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
             key={module.route}
             type="button"
             onClick={() => onNavigate(module.route)}
-            className="group rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4 text-left transition hover:border-[#C6FF3D]/60 hover:bg-[#221E19]"
+            className="group rounded-[8px] border border-surface-3 bg-surface p-4 text-left transition hover:border-lime/60 hover:bg-surface-2"
           >
             <span className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-[#C6FF3D]">{module.icon}</span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-lime">{module.icon}</span>
               <span className="min-w-0">
-                <strong className="block text-sm text-white group-hover:text-[#C6FF3D]">{module.title}</strong>
-                <span className="mt-1 block text-xs leading-5 text-[#8A7F76]">{module.description}</span>
+                <strong className="block text-sm text-white group-hover:text-lime">{module.title}</strong>
+                <span className="mt-1 block text-xs leading-5 text-subtle">{module.description}</span>
               </span>
-              <span className="ml-auto text-[#8A7F76]">→</span>
+              <span className="ml-auto text-subtle">→</span>
             </span>
           </button>
         ))}
@@ -81,8 +81,8 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h3 className="font-display text-[15px] font-bold">Контур доступа</h3><p className="mt-1 text-xs text-[#8A7F76]">Доступ ограничен staff JWT и серверным RBAC. Ссылки не расширяют права пользователя.</p></div>
-          <Link href="/" className="rounded-[6px] border border-[#3A332C] px-3 py-2 text-xs text-[#D8CFC6] hover:border-[#C6FF3D] hover:text-[#C6FF3D]">Открыть витрину</Link>
+          <div><h3 className="font-display text-[15px] font-bold">Контур доступа</h3><p className="mt-1 text-xs text-subtle">Доступ ограничен staff JWT и серверным RBAC. Ссылки не расширяют права пользователя.</p></div>
+          <Link href="/" className="rounded-[6px] border border-line px-3 py-2 text-xs text-bright hover:border-lime hover:text-lime">Открыть витрину</Link>
         </div>
       </Card>
     </div>

@@ -56,7 +56,7 @@ export function RiskCenterView({
         <div className="flex flex-col items-center gap-2 py-10 text-center">
           <div className="text-4xl">✓</div>
           <div className="font-display text-lg font-bold text-lime">Тревог нет — всё сходится</div>
-          <div className="text-sm text-[#8A7F76]">
+          <div className="text-sm text-subtle">
             Касса, COD, резервы, маржа, склад, SLA и долги в норме по Event Ledger.
           </div>
         </div>
@@ -70,19 +70,19 @@ export function RiskCenterView({
       <Card>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-wide text-[#8A7F76]">Центр рисков</div>
+            <div className="text-xs uppercase tracking-wide text-subtle">Центр рисков</div>
             <div className="mt-1 font-display text-2xl font-extrabold">
               {risks.length} {risks.length === 1 ? 'сигнал' : 'сигналов'} требуют внимания
             </div>
-            <div className="mt-1 text-sm text-[#A79C92]">Кликните по сигналу — переход на экран решения.</div>
+            <div className="mt-1 text-sm text-muted">Кликните по сигналу — переход на экран решения.</div>
           </div>
           <div className="grid min-w-[280px] grid-cols-3 gap-2 text-center">
             {SEV_ORDER.map((sev) => (
-              <div key={sev} className="rounded-[10px] border border-[#2E2822] bg-[#221E19] p-3">
+              <div key={sev} className="rounded-[10px] border border-surface-3 bg-surface-2 p-3">
                 <div className="font-display text-2xl font-extrabold" style={{ color: SEV_META[sev].color }}>
                   {counts[sev]}
                 </div>
-                <div className="mt-1 text-[10px] uppercase tracking-wide text-[#8A7F76]">{SEV_META[sev].label}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-wide text-subtle">{SEV_META[sev].label}</div>
               </div>
             ))}
           </div>
@@ -95,7 +95,7 @@ export function RiskCenterView({
           <div className="mb-3 flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: SEV_META[sev].color }} />
             <span className="font-display text-[15px] font-bold text-white">{SEV_META[sev].label} приоритет</span>
-            <span className="ml-auto rounded-chip bg-[#221E19] px-2.5 py-0.5 text-xs font-semibold text-[#D8CFC6]">
+            <span className="ml-auto rounded-chip bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-bright">
               {counts[sev]}
             </span>
           </div>
@@ -109,19 +109,19 @@ export function RiskCenterView({
                     <button
                       type="button"
                       onClick={() => onSignal(r.kind)}
-                      className="flex w-full items-center gap-3 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2.5 text-left transition hover:border-[#3A342E]"
+                      className="flex w-full items-center gap-3 rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2.5 text-left transition hover:border-line"
                     >
                       <span className="text-lg">{m.icon}</span>
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-semibold text-white">{m.label}</span>
-                          <span className="rounded-chip bg-[#16130F] px-2 py-0.5 text-[10px] font-semibold text-[#8A7F76]">
+                          <span className="rounded-chip bg-ink-dark px-2 py-0.5 text-[10px] font-semibold text-subtle">
                             {m.area}
                           </span>
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-[#A79C92]">{r.detail}</span>
+                        <span className="mt-0.5 block truncate text-xs text-muted">{r.detail}</span>
                       </span>
-                      <span className="text-[#6E645C]">→</span>
+                      <span className="text-faint">→</span>
                     </button>
                   </li>
                 );

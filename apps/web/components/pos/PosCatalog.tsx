@@ -73,21 +73,21 @@ export function PosCatalog({
   onLogoutStaff,
 }: PosCatalogProps) {
   return (
-    <section data-testid="pos-catalog" className="flex min-w-0 flex-1 flex-col border-r border-[#2E2822]">
-      <div className="flex flex-shrink-0 items-center gap-3 border-b border-[#2E2822] px-5 py-4">
+    <section data-testid="pos-catalog" className="flex min-w-0 flex-1 flex-col border-r border-surface-3">
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-surface-3 px-5 py-4">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-coral font-display text-lg font-extrabold text-white">
           A
         </span>
         <div>
           <div className="font-display text-base font-bold text-white">POS · Касса</div>
-          <div className="text-xs text-[#8A7F76]">
+          <div className="text-xs text-subtle">
             Смена · {cashier} · {shop}
           </div>
         </div>
         <button
           type="button"
           onClick={onLogoutStaff}
-          className="rounded-chip border border-[#2E2822] px-3 py-1.5 text-xs font-semibold text-[#8A7F76] transition hover:border-[#3A342E] hover:text-white"
+          className="rounded-chip border border-surface-3 px-3 py-1.5 text-xs font-semibold text-subtle transition hover:border-line hover:text-white"
         >
           Выйти staff
         </button>
@@ -96,7 +96,7 @@ export function PosCatalog({
         </span>
       </div>
 
-      <div className="flex flex-shrink-0 flex-col gap-2 border-b border-[#2E2822] px-5 py-3">
+      <div className="flex flex-shrink-0 flex-col gap-2 border-b border-surface-3 px-5 py-3">
         <div className="flex gap-2">
           <input
             value={scanCode}
@@ -106,7 +106,7 @@ export function PosCatalog({
             }}
             aria-label="Поиск или сканирование товара"
             placeholder="Поиск или скан штрихкода…"
-            className="min-w-0 flex-1 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2 text-sm text-white outline-none placeholder:text-[#6E645C] focus:border-lime"
+            className="min-w-0 flex-1 rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-lime"
           />
           <button type="button" onClick={() => onScan(scanCode)} className="rounded-[10px] bg-lime px-4 py-2 text-sm font-bold text-lime-ink">
             Скан
@@ -115,7 +115,7 @@ export function PosCatalog({
             type="button"
             disabled={syncing || queueSummary.pending === 0}
             onClick={onSync}
-            className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+            className="rounded-[10px] border border-surface-3 bg-surface-2 px-4 py-2 text-sm font-bold text-bright disabled:text-faint"
           >
             {syncing ? 'Синк…' : `Синк ${queueSummary.pending}`}
           </button>
@@ -123,12 +123,12 @@ export function PosCatalog({
             type="button"
             disabled={!canPrint}
             onClick={onPrint}
-            className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+            className="rounded-[10px] border border-surface-3 bg-surface-2 px-4 py-2 text-sm font-bold text-bright disabled:text-faint"
           >
             Печать
           </button>
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#8A7F76]">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-subtle">
           <span>Сканер: keyboard-wedge</span>
           <span>Принтер: browser/thermal print</span>
           <span>{catalogSync}</span>
@@ -140,13 +140,13 @@ export function PosCatalog({
           )}
         </div>
         {queue.length > 0 && (
-          <div className="max-h-[78px] overflow-y-auto rounded-[10px] border border-[#2E2822] bg-[#120F0C]">
+          <div className="max-h-[78px] overflow-y-auto rounded-[10px] border border-surface-3 bg-[#120F0C]">
             {queue.slice(0, 4).map((item) => (
-              <div key={item.id} className="flex items-center gap-2 border-b border-[#221E19] px-3 py-2 text-xs last:border-0">
-                <span className={`h-2 w-2 rounded-full ${item.status === 'synced' ? 'bg-lime' : item.status === 'failed' ? 'bg-danger' : item.status === 'approval_required' ? 'bg-warn' : 'bg-[#8A7F76]'}`} />
-                <span className="font-mono text-[#D8CFC6]">{item.localReceiptNo}</span>
-                <span className="text-[#8A7F76]">{QUEUE_STATUS_LABELS[item.status]}</span>
-                <span className="ml-auto text-[#A79C92]">{som(item.snapshot.total)}</span>
+              <div key={item.id} className="flex items-center gap-2 border-b border-surface-2 px-3 py-2 text-xs last:border-0">
+                <span className={`h-2 w-2 rounded-full ${item.status === 'synced' ? 'bg-lime' : item.status === 'failed' ? 'bg-danger' : item.status === 'approval_required' ? 'bg-warn' : 'bg-subtle'}`} />
+                <span className="font-mono text-bright">{item.localReceiptNo}</span>
+                <span className="text-subtle">{QUEUE_STATUS_LABELS[item.status]}</span>
+                <span className="ml-auto text-muted">{som(item.snapshot.total)}</span>
               </div>
             ))}
           </div>
@@ -162,7 +162,7 @@ export function PosCatalog({
             className={`flex-shrink-0 whitespace-nowrap rounded-chip border px-4 py-2 text-sm font-semibold transition ${
               cat === c
                 ? 'border-lime bg-lime text-lime-ink'
-                : 'border-[#2E2822] bg-[#221E19] text-[#D8CFC6] hover:border-[#3A342E]'
+                : 'border-surface-3 bg-surface-2 text-bright hover:border-line'
             }`}
           >
             {c === 'all' ? 'Все' : c}
@@ -177,9 +177,9 @@ export function PosCatalog({
               key={p.id}
               type="button"
               onClick={() => onAdd(p)}
-              className="min-w-0 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3 text-left transition hover:border-lime/40 focus-visible:border-lime focus-visible:outline-none"
+              className="min-w-0 rounded-[14px] border border-surface-3 bg-surface-2 p-3 text-left transition hover:border-lime/40 focus-visible:border-lime focus-visible:outline-none"
             >
-              <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
+              <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark">
                 {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-xl font-bold text-[#8a8a8a]">{p.name.slice(0,1)}</span>}
                 {p.availableUnits < 5 && (
                   <span className="absolute right-1.5 top-1.5 rounded bg-warn px-1.5 py-0.5 text-[9px] font-bold text-lime-ink">

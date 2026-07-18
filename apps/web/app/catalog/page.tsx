@@ -53,8 +53,8 @@ export default function CatalogPage() {
         <aside className="h-fit rounded-[12px] border border-[#e5e5e7] bg-white p-5 lg:sticky lg:top-24">
           <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display font-semibold"><SlidersHorizontal size={17} /> Фильтры</h2><button type="button" onClick={reset} className="text-xs font-semibold text-deep">Сбросить</button></div>
           <FilterTitle>Категория</FilterTitle>
-          <div className="grid gap-1">{categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setOffset(0); }} className={`rounded-[9px] px-3 py-2 text-left text-sm ${category === item ? 'bg-tint font-semibold text-deep' : 'text-[#6E645C] hover:bg-[#F7F2EC] hover:text-ink'}`}>{item}</button>)}</div>
-          <label className="mt-6 flex cursor-pointer items-center gap-3 text-sm text-[#6E645C]"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setOffset(0); }} className="h-4 w-4 accent-coral" /> Только в наличии</label>
+          <div className="grid gap-1">{categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setOffset(0); }} className={`rounded-[9px] px-3 py-2 text-left text-sm ${category === item ? 'bg-tint font-semibold text-deep' : 'text-faint hover:bg-sand hover:text-ink'}`}>{item}</button>)}</div>
+          <label className="mt-6 flex cursor-pointer items-center gap-3 text-sm text-faint"><input type="checkbox" checked={stockOnly} onChange={(event) => { setStockOnly(event.target.checked); setOffset(0); }} className="h-4 w-4 accent-coral" /> Только в наличии</label>
         </aside>
 
         <section>
@@ -71,4 +71,4 @@ export default function CatalogPage() {
   </>;
 }
 
-function FilterTitle({ children }: { children: React.ReactNode }) { return <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-[0.1em] text-[#8A7F76]">{children}</h3>; }
+function FilterTitle({ children }: { children: React.ReactNode }) { return <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-[0.1em] text-subtle">{children}</h3>; }

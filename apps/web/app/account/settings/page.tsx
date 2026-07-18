@@ -75,52 +75,52 @@ export default function SettingsPage() {
 
   return (
     <MobileAppFrame title="Настройки" subtitle="Профиль, безопасность и управление данными." backHref="/account">
-      {!user && <Link href="/login?next=/account/settings" className="mb-3 block rounded-[13px] border border-[#2E2822] bg-[#221E19] p-4 text-sm text-[#A79C92]">Войдите по OTP, чтобы изменить профиль.</Link>}
-      {error && <div className="mb-3 rounded-[13px] border border-[#FF8A7A]/30 bg-[#221E19] p-4 text-sm text-[#FF8A7A]">{error}</div>}
-      {user && !settings && !error && <div className="py-10 text-center text-sm text-[#A79C92]">Загружаем профиль…</div>}
+      {!user && <Link href="/login?next=/account/settings" className="mb-3 block rounded-[13px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">Войдите по OTP, чтобы изменить профиль.</Link>}
+      {error && <div className="mb-3 rounded-[13px] border border-danger-soft/30 bg-surface-2 p-4 text-sm text-danger-soft">{error}</div>}
+      {user && !settings && !error && <div className="py-10 text-center text-sm text-muted">Загружаем профиль…</div>}
 
-      <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
-        <div className="text-[12px] uppercase text-[#8A7F76]">Аккаунт</div>
+      <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+        <div className="text-[12px] uppercase text-subtle">Аккаунт</div>
         <div className="mt-2 font-display text-lg font-bold">{settings?.phone ?? user?.phone ?? 'Гость'}</div>
-        <div className="mt-1 font-mono text-[11px] text-[#6E645C]">{user?.customerId ?? 'Войдите по OTP'}</div>
+        <div className="mt-1 font-mono text-[11px] text-faint">{user?.customerId ?? 'Войдите по OTP'}</div>
         {settings && <>
-          <label htmlFor="customer-name" className="mt-4 block text-[12px] text-[#A79C92]">Имя</label>
-          <input id="customer-name" value={name} onChange={(event) => { setName(event.target.value); setSaved(false); }} className="mt-1.5 w-full rounded-[8px] border border-[#2E2822] bg-[#16130F] p-3 text-sm outline-none focus:border-lime" />
-          <button type="button" disabled={busy || name.trim() === settings.name} onClick={save} className="mt-3 w-full rounded-[8px] bg-lime py-3 text-sm font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Сохраняем…' : saved ? 'Сохранено' : 'Сохранить профиль'}</button>
+          <label htmlFor="customer-name" className="mt-4 block text-[12px] text-muted">Имя</label>
+          <input id="customer-name" value={name} onChange={(event) => { setName(event.target.value); setSaved(false); }} className="mt-1.5 w-full rounded-[8px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none focus:border-lime" />
+          <button type="button" disabled={busy || name.trim() === settings.name} onClick={save} className="mt-3 w-full rounded-[8px] bg-lime py-3 text-sm font-bold text-lime-ink disabled:bg-line disabled:text-faint">{busy ? 'Сохраняем…' : saved ? 'Сохранено' : 'Сохранить профиль'}</button>
         </>}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Link href="/account/notifications" className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <Link href="/account/notifications" className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
           <div className="text-2xl">🔔</div>
           <div className="mt-2 text-[13px] font-semibold">Уведомления</div>
         </Link>
-        <Link href="/account/addresses" className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <Link href="/account/addresses" className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
           <div className="text-2xl">📍</div>
           <div className="mt-2 text-[13px] font-semibold">Адреса</div>
         </Link>
       </div>
 
-      <div className="mt-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+      <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
         <div className="text-sm font-semibold">Безопасность</div>
-        <div className="mt-2 flex items-center justify-between py-2 text-[13px] text-[#A79C92]">
+        <div className="mt-2 flex items-center justify-between py-2 text-[13px] text-muted">
           <span>Вход по телефону и OTP</span>
           <span className="text-lime">активен</span>
         </div>
-        <div className="flex items-center justify-between border-t border-[#2E2822] py-2 text-[13px] text-[#A79C92]">
+        <div className="flex items-center justify-between border-t border-surface-3 py-2 text-[13px] text-muted">
           <span>Сессия</span>
           <span>обновляется автоматически</span>
         </div>
       </div>
 
-      <div className="mt-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+      <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
         <div className="text-sm font-semibold">Мои данные</div>
-        <div className="mt-1 text-[12px] text-[#8A7F76]">Выгрузка и удаление персональных данных.</div>
+        <div className="mt-1 text-[12px] text-subtle">Выгрузка и удаление персональных данных.</div>
         <button
           type="button"
           disabled={exporting || !user}
           onClick={downloadMyData}
-          className="mt-3 w-full rounded-[8px] border border-[#2E2822] bg-[#16130F] py-3 text-sm font-semibold disabled:text-[#6E645C]"
+          className="mt-3 w-full rounded-[8px] border border-surface-3 bg-ink-dark py-3 text-sm font-semibold disabled:text-faint"
         >
           {exporting ? 'Готовим файл…' : 'Скачать мои данные'}
         </button>
@@ -129,13 +129,13 @@ export default function SettingsPage() {
             type="button"
             disabled={!user}
             onClick={() => setConfirmingDelete(true)}
-            className="mt-2 w-full rounded-[8px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 py-3 text-sm font-semibold text-[#FF8A7A] disabled:opacity-50"
+            className="mt-2 w-full rounded-[8px] border border-danger-soft/30 bg-danger-soft/5 py-3 text-sm font-semibold text-danger-soft disabled:opacity-50"
           >
             Удалить аккаунт
           </button>
         ) : (
-          <div className="mt-2 rounded-[8px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-3">
-            <div className="text-[13px] text-[#FF8A7A]">
+          <div className="mt-2 rounded-[8px] border border-danger-soft/30 bg-danger-soft/5 p-3">
+            <div className="text-[13px] text-danger-soft">
               Профиль, адреса и сессии будут удалены без восстановления. Заказы и история покупок останутся у магазина — они нужны для бухгалтерии.
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -143,7 +143,7 @@ export default function SettingsPage() {
                 type="button"
                 disabled={deleting}
                 onClick={() => setConfirmingDelete(false)}
-                className="rounded-[8px] border border-[#2E2822] bg-[#16130F] py-2.5 text-[13px] font-semibold"
+                className="rounded-[8px] border border-surface-3 bg-ink-dark py-2.5 text-[13px] font-semibold"
               >
                 Отмена
               </button>
@@ -151,7 +151,7 @@ export default function SettingsPage() {
                 type="button"
                 disabled={deleting}
                 onClick={deleteAccount}
-                className="rounded-[8px] bg-[#FF8A7A] py-2.5 text-[13px] font-bold text-[#221E19] disabled:opacity-50"
+                className="rounded-[8px] bg-danger-soft py-2.5 text-[13px] font-bold text-surface-2 disabled:opacity-50"
               >
                 {deleting ? 'Удаляем…' : 'Удалить навсегда'}
               </button>
@@ -163,7 +163,7 @@ export default function SettingsPage() {
       <button
         type="button"
         onClick={async () => { await logout(); router.push('/'); }}
-        className="mt-4 w-full rounded-[13px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 py-3.5 text-center text-[13px] font-semibold text-[#FF8A7A]"
+        className="mt-4 w-full rounded-[13px] border border-danger-soft/30 bg-danger-soft/5 py-3.5 text-center text-[13px] font-semibold text-danger-soft"
       >
         Выйти из аккаунта
       </button>

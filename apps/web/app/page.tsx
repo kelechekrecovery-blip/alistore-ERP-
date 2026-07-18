@@ -118,7 +118,7 @@ function ManagedBanner({ block }: { block: StorefrontBlock }) {
 function desktopTone(tone: StorefrontBlock['tone']) {
   if (tone === 'coral') return 'bg-[#ff4d2e] text-white';
   if (tone === 'light') return 'border border-[#e5e5e7] bg-white text-[#0f0f0f]';
-  if (tone === 'lime') return 'bg-[#c6ff3d] text-[#14110e]';
+  if (tone === 'lime') return 'bg-lime text-lime-ink';
   return 'bg-[#1a1a1a] text-white';
 }
 

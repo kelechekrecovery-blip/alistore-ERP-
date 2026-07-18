@@ -22,7 +22,7 @@ export default function WarrantyCertificatePage({ params }: { params: { imei: st
   }, [user, authed]);
 
   if (!hydrated || !user) {
-    return <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
+    return <div className="fixed inset-0 z-40 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
   }
 
   const device = devices?.find((d) => d.imei === imei) ?? null;
@@ -35,7 +35,7 @@ export default function WarrantyCertificatePage({ params }: { params: { imei: st
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-8">
-          {devices === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+          {devices === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
           {devices !== null && !device && (
             <div className="py-12 text-center">
               <div className="text-5xl">🔍</div>

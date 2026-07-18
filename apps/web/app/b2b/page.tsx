@@ -121,7 +121,7 @@ export default function B2BPage() {
   }
 
   if (!hydrated || !user) {
-    return <div className="fixed inset-0 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
+    return <div className="fixed inset-0 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
   }
 
   return (
@@ -132,7 +132,7 @@ export default function B2BPage() {
       backHref="/account"
     >
       <form onSubmit={submit} className="space-y-4" data-testid="b2b-form">
-        <section className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <section className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
           <h2 className="font-display text-[15px] font-bold">Реквизиты покупателя</h2>
           <div className="mt-3 space-y-2">
             <Input testId="b2b-company" label="Компания" value={profile.companyName} onChange={(companyName) => setProfile((p) => ({ ...p, companyName }))} />
@@ -143,20 +143,20 @@ export default function B2BPage() {
           </div>
         </section>
 
-        <section className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <section className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
           <h2 className="font-display text-[15px] font-bold">Состав заявки</h2>
           {lines.map((line, index) => (
-            <div key={index} className="mt-3 border-b border-[#2E2822] pb-3 last:border-b-0 last:pb-0">
+            <div key={index} className="mt-3 border-b border-surface-3 pb-3 last:border-b-0 last:pb-0">
               <div className="flex items-end gap-2">
-                <label className="min-w-0 flex-1 text-[12px] text-[#A79C92]">
+                <label className="min-w-0 flex-1 text-[12px] text-muted">
                   Товар {index + 1}
-                  <select data-testid={index === 0 ? 'b2b-sku' : `b2b-sku-${index}`} value={line.sku} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sku: event.target.value } : item))} className="mt-1.5 w-full rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-3 text-sm text-white">
+                  <select data-testid={index === 0 ? 'b2b-sku' : `b2b-sku-${index}`} value={line.sku} onChange={(event) => setLines((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sku: event.target.value } : item))} className="mt-1.5 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-3 py-3 text-sm text-white">
                     <option value="" disabled>Выберите товар</option>
                     {products.map((product) => <option key={product.sku} value={product.sku}>{product.name} · {som(product.price)}</option>)}
                   </select>
                 </label>
                 {lines.length > 1 && (
-                  <button type="button" aria-label={`Удалить товар ${index + 1}`} onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-11 w-11 place-items-center rounded-[10px] border border-[#49342D] text-lg text-[#FF8A7A]">×</button>
+                  <button type="button" aria-label={`Удалить товар ${index + 1}`} onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-11 w-11 place-items-center rounded-[10px] border border-[#49342D] text-lg text-danger-soft">×</button>
                 )}
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -165,14 +165,14 @@ export default function B2BPage() {
               </div>
             </div>
           ))}
-          <button type="button" onClick={() => setLines((current) => [...current, { sku: products[0]?.sku ?? '', qty: '1', targetPrice: '' }])} className="mt-3 w-full rounded-[10px] border border-dashed border-[#3A342E] py-2.5 text-xs font-semibold text-[#A79C92]">+ Добавить товар</button>
+          <button type="button" onClick={() => setLines((current) => [...current, { sku: products[0]?.sku ?? '', qty: '1', targetPrice: '' }])} className="mt-3 w-full rounded-[10px] border border-dashed border-line py-2.5 text-xs font-semibold text-muted">+ Добавить товар</button>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setPaymentIntent('invoice')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${paymentIntent === 'invoice' ? 'border-lime text-lime' : 'border-[#2E2822] text-[#A79C92]'}`}>Счёт на оплату</button>
-            <button type="button" onClick={() => setPaymentIntent('bank_transfer')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${paymentIntent === 'bank_transfer' ? 'border-lime text-lime' : 'border-[#2E2822] text-[#A79C92]'}`}>Банковский перевод</button>
-            <button type="button" onClick={() => setFulfillmentType('delivery')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${fulfillmentType === 'delivery' ? 'border-lime text-lime' : 'border-[#2E2822] text-[#A79C92]'}`}>Доставка</button>
-            <button type="button" onClick={() => setFulfillmentType('pickup')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${fulfillmentType === 'pickup' ? 'border-lime text-lime' : 'border-[#2E2822] text-[#A79C92]'}`}>Самовывоз</button>
+            <button type="button" onClick={() => setPaymentIntent('invoice')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${paymentIntent === 'invoice' ? 'border-lime text-lime' : 'border-surface-3 text-muted'}`}>Счёт на оплату</button>
+            <button type="button" onClick={() => setPaymentIntent('bank_transfer')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${paymentIntent === 'bank_transfer' ? 'border-lime text-lime' : 'border-surface-3 text-muted'}`}>Банковский перевод</button>
+            <button type="button" onClick={() => setFulfillmentType('delivery')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${fulfillmentType === 'delivery' ? 'border-lime text-lime' : 'border-surface-3 text-muted'}`}>Доставка</button>
+            <button type="button" onClick={() => setFulfillmentType('pickup')} className={`rounded-[10px] border px-3 py-2.5 text-xs font-semibold ${fulfillmentType === 'pickup' ? 'border-lime text-lime' : 'border-surface-3 text-muted'}`}>Самовывоз</button>
           </div>
-          <textarea data-testid="b2b-comment" value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Срок поставки, требования к документам" className="mt-3 min-h-[84px] w-full rounded-[10px] border border-[#2E2822] bg-[#16130F] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
+          <textarea data-testid="b2b-comment" value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Срок поставки, требования к документам" className="mt-3 min-h-[84px] w-full rounded-[10px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
         </section>
 
         {message && <p className="text-center text-sm text-lime" role="status">{message}</p>}
@@ -183,15 +183,15 @@ export default function B2BPage() {
         <section className="mt-6">
           <h2 className="mb-3 font-display text-base font-bold">Мои заявки</h2>
           {quotes.map((quote) => (
-            <article key={quote.id} className="mb-2.5 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+            <article key={quote.id} className="mb-2.5 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-xs">#{quote.id.slice(-8)}</span>
                 <span className="rounded-md bg-lime/15 px-2 py-1 text-[10px] font-bold text-lime">{STATUS[quote.status]}</span>
               </div>
               <div className="mt-2 text-sm font-semibold">{quote.items.map((item) => `${item.name} × ${item.qty}`).join(', ')}</div>
-              <div className="mt-1 text-xs text-[#8A7F76]">Розница {som(quote.listTotal)} · {quote.paymentIntent === 'invoice' ? 'счёт' : 'перевод'}</div>
+              <div className="mt-1 text-xs text-subtle">Розница {som(quote.listTotal)} · {quote.paymentIntent === 'invoice' ? 'счёт' : 'перевод'}</div>
               {quote.quotedTotal !== null && <div className="mt-2 font-display text-lg font-extrabold text-lime">КП: {som(quote.quotedTotal)}</div>}
-              {quote.staffNote && <p className="mt-1 text-xs text-[#A79C92]">{quote.staffNote}</p>}
+              {quote.staffNote && <p className="mt-1 text-xs text-muted">{quote.staffNote}</p>}
               {quote.status === 'quoted' && <button type="button" disabled={busy} onClick={() => accept(quote.id)} className="mt-3 w-full rounded-[9px] bg-lime py-2.5 text-xs font-bold text-lime-ink">Принять предложение</button>}
             </article>
           ))}
@@ -217,9 +217,9 @@ function Input({
   required?: boolean;
 }) {
   return (
-    <label className="block text-[12px] text-[#A79C92]">
+    <label className="block text-[12px] text-muted">
       {label}
-      <input data-testid={testId} required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-3 text-sm text-white outline-none focus:border-lime" />
+      <input data-testid={testId} required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-3 py-3 text-sm text-white outline-none focus:border-lime" />
     </label>
   );
 }

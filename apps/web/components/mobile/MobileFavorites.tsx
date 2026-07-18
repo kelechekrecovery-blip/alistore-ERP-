@@ -34,19 +34,19 @@ export default function MobileFavorites() {
         {products === null ? (
           <div className="space-y-2.5">
             {Array.from({ length: 3 }, (_, i) => (
-              <div key={i} className="h-[98px] animate-pulse rounded-[14px] border border-[#2E2822] bg-[#221E19]" />
+              <div key={i} className="h-[98px] animate-pulse rounded-[14px] border border-surface-3 bg-surface-2" />
             ))}
           </div>
         ) : items.length > 0 ? (
           items.map((p) => {
             const inStock = p.availableUnits > 0;
             return (
-              <div key={p.id} className="mb-2.5 flex gap-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3">
+              <div key={p.id} className="mb-2.5 flex gap-3 rounded-[14px] border border-surface-3 bg-surface-2 p-3">
                 <Link
                   href={`/product/${p.id}`}
-                  className="relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]"
+                  className="relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark"
                 >
-                  {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="74px" className="object-contain p-1.5" /> : <span className="grid h-full place-items-center text-lg font-bold text-[#8A7F76]">{p.name.slice(0,1)}</span>}
+                  {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="74px" className="object-contain p-1.5" /> : <span className="grid h-full place-items-center text-lg font-bold text-subtle">{p.name.slice(0,1)}</span>}
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link href={`/product/${p.id}`} className="block text-[13px] font-semibold text-white">
@@ -62,7 +62,7 @@ export default function MobileFavorites() {
                       disabled={!inStock}
                       onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price, stockLimit: p.availableUnits })}
                       className={`rounded-[8px] px-3 py-1.5 text-[12px] font-bold ${
-                        inStock ? 'bg-lime text-lime-ink' : 'bg-[#2E2822] text-[#6E645C]'
+                        inStock ? 'bg-lime text-lime-ink' : 'bg-surface-3 text-faint'
                       }`}
                     >
                       В корзину
@@ -70,7 +70,7 @@ export default function MobileFavorites() {
                     <button
                       type="button"
                       onClick={() => favorites.toggle(p.id)}
-                      className="rounded-[8px] bg-[#2E2822] px-3 py-1.5 text-[12px] text-[#A79C92]"
+                      className="rounded-[8px] bg-surface-3 px-3 py-1.5 text-[12px] text-muted"
                     >
                       Убрать
                     </button>
@@ -83,7 +83,7 @@ export default function MobileFavorites() {
           <div className="py-12 text-center">
             <div className="text-5xl">🤍</div>
             <div className="mt-3.5 font-display text-[17px] font-bold text-white">Пока пусто</div>
-            <div className="mt-2 text-[13px] leading-[1.5] text-[#A79C92]">
+            <div className="mt-2 text-[13px] leading-[1.5] text-muted">
               Сохраняйте товары, чтобы не потерять и следить за ценой
             </div>
             <Link href="/catalog" className="mt-4 inline-block rounded-[11px] bg-lime px-[22px] py-3 text-[13px] font-bold text-lime-ink">

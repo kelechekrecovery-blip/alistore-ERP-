@@ -94,12 +94,12 @@ export default function ExchangePage() {
   }
 
   if (!hydrated) {
-    return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0E0C0A] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
+    return <div className="fixed inset-0 z-50 grid place-items-center bg-night font-mono text-sm text-subtle">Загрузка…</div>;
   }
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-[#0E0C0A] p-5 font-sans">
+      <div className="fixed inset-0 z-50 grid place-items-center bg-night p-5 font-sans">
         <StaffSessionLogin
           title="Обмен · вход"
           caption="Нужна роль кассира, продавца или администратора."
@@ -110,53 +110,53 @@ export default function ExchangePage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A] font-sans text-white">
-      <header className="flex items-center gap-4 border-b border-[#2E2822] bg-[#16130F] px-6 py-4">
+    <div className="fixed inset-0 z-50 flex flex-col bg-night font-sans text-white">
+      <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark px-6 py-4">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-coral font-display text-lg font-extrabold text-white">⇄</span>
         <div>
           <div className="font-display text-lg font-bold">Обмен товара</div>
-          <div className="text-xs text-[#8A7F76]">Возврат старого + продажа нового + доплата</div>
+          <div className="text-xs text-subtle">Возврат старого + продажа нового + доплата</div>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-xs text-[#8A7F76] sm:inline">{session.username} · {session.role}</span>
-          <button type="button" onClick={logout} className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">Выйти</button>
-          <Link href="/pos" className="rounded-chip bg-[#221E19] px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">⌂ POS</Link>
+          <span className="hidden text-xs text-subtle sm:inline">{session.username} · {session.role}</span>
+          <button type="button" onClick={logout} className="rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">Выйти</button>
+          <Link href="/pos" className="rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white">⌂ POS</Link>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-[560px]">
           {result ? (
-            <div className="rounded-[18px] border border-[#2E2822] bg-[#1A1611] p-7 text-center">
+            <div className="rounded-[18px] border border-surface-3 bg-surface p-7 text-center">
               <div className="mx-auto grid h-[76px] w-[76px] place-items-center rounded-full bg-warn/15 text-3xl font-bold text-warn">2FA</div>
               <div className="mt-4 font-display text-2xl font-extrabold">Отправлено на одобрение</div>
-              <div className="mt-2 text-sm text-[#A79C92]">
+              <div className="mt-2 text-sm text-muted">
                 {result.oldImei} → {result.newImei}
               </div>
-              <div className="mt-1 text-sm text-[#A79C92]">
+              <div className="mt-1 text-sm text-muted">
                 Доплата: <span className="font-mono text-warn">{som(result.surchargeAmount)}</span> · approval #{result.approvalId.slice(-6)}
               </div>
-              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-[#8A7F76]">Фото сохранено в Evidence Vault. Деньги и склад не изменены: второй сотрудник должен подтвердить точный IMEI и суммы в Approval Inbox.</p>
+              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-subtle">Фото сохранено в Evidence Vault. Деньги и склад не изменены: второй сотрудник должен подтвердить точный IMEI и суммы в Approval Inbox.</p>
               <Link href="/approvals" className="mt-5 inline-flex rounded-[11px] border border-warn/30 px-5 py-3 text-sm font-bold text-warn">Открыть Approval Inbox</Link>
               <button type="button" onClick={reset} className="mt-6 rounded-[11px] bg-lime px-6 py-3 font-bold text-lime-ink">Новый обмен</button>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               {/* step 1: old device */}
-              <div className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">1 · Возвращаемое устройство</div>
+              <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">1 · Возвращаемое устройство</div>
                 <div className="flex gap-2">
                   <input
                     value={imei}
                     onChange={(e) => setImei(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && lookup()}
                     placeholder="IMEI проданного устройства"
-                    className="flex-1 rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2.5 text-sm outline-none focus:border-coral"
+                    className="flex-1 rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-coral"
                   />
-                  <button type="button" disabled={busy} onClick={lookup} className="rounded-[10px] bg-[#221E19] px-4 py-2.5 text-sm font-semibold text-[#D8CFC6] hover:bg-[#2A241F] disabled:opacity-40">Найти</button>
+                  <button type="button" disabled={busy} onClick={lookup} className="rounded-[10px] bg-surface-2 px-4 py-2.5 text-sm font-semibold text-bright hover:bg-[#2A241F] disabled:opacity-40">Найти</button>
                 </div>
-                <label className="mt-3 block rounded-[10px] border border-dashed border-[#4A4139] bg-[#221E19] p-3 text-sm text-[#D8CFC6]">
-                  <span className="block text-xs font-semibold uppercase text-[#8A7F76]">Фото состояния до обмена</span>
+                <label className="mt-3 block rounded-[10px] border border-dashed border-[#4A4139] bg-surface-2 p-3 text-sm text-bright">
+                  <span className="block text-xs font-semibold uppercase text-subtle">Фото состояния до обмена</span>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -165,10 +165,10 @@ export default function ExchangePage() {
                   />
                 </label>
                 {unit && (
-                  <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
+                  <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-surface-3 bg-surface-2 p-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-semibold">{unit.product}</div>
-                      <div className="font-mono text-[11px] text-[#8A7F76]">{unit.imei} · {som(unit.price)}</div>
+                      <div className="font-mono text-[11px] text-subtle">{unit.imei} · {som(unit.price)}</div>
                     </div>
                     <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${unit.status === 'sold' ? 'bg-lime/15 text-lime' : 'bg-warn/15 text-warn'}`}>
                       {unit.status === 'sold' ? 'продан' : unit.status}
@@ -176,18 +176,18 @@ export default function ExchangePage() {
                   </div>
                 )}
                 {unit && unit.status !== 'sold' && (
-                  <div className="mt-2 text-xs text-[#FF8A7A]">Устройство не в статусе «продан» — обмен невозможен.</div>
+                  <div className="mt-2 text-xs text-danger-soft">Устройство не в статусе «продан» — обмен невозможен.</div>
                 )}
               </div>
 
               {/* step 2: new device */}
-              <div className={`rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5 ${!unit ? 'opacity-40' : ''}`}>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">2 · Новое устройство</div>
+              <div className={`rounded-[16px] border border-surface-3 bg-surface p-5 ${!unit ? 'opacity-40' : ''}`}>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">2 · Новое устройство</div>
                 <select
                   value={newId}
                   disabled={!unit}
                   onChange={(e) => setNewId(e.target.value)}
-                  className="w-full rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3 py-2.5 text-sm outline-none focus:border-coral"
+                  className="w-full rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-coral"
                 >
                   <option value="">— выберите товар —</option>
                   {products.map((p) => (
@@ -195,19 +195,19 @@ export default function ExchangePage() {
                   ))}
                 </select>
                 {unit && newProduct && (
-                  <div className="mt-3 flex items-center justify-between rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3 text-sm">
-                    <span className="text-[#A79C92]">Доплата</span>
-                    <span className={`font-mono text-lg font-bold ${surcharge >= 0 ? 'text-lime' : 'text-[#FF8A7A]'}`}>{som(surcharge)}</span>
+                  <div className="mt-3 flex items-center justify-between rounded-[12px] border border-surface-3 bg-surface-2 p-3 text-sm">
+                    <span className="text-muted">Доплата</span>
+                    <span className={`font-mono text-lg font-bold ${surcharge >= 0 ? 'text-lime' : 'text-danger-soft'}`}>{som(surcharge)}</span>
                   </div>
                 )}
                 {unit && newProduct && surcharge < 0 && (
-                  <div className="mt-2 text-xs text-[#FF8A7A]">Новый товар дешевле — оформите возврат, а не обмен.</div>
+                  <div className="mt-2 text-xs text-danger-soft">Новый товар дешевле — оформите возврат, а не обмен.</div>
                 )}
               </div>
 
               {/* step 3: method + submit */}
-              <div className={`rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5 ${!canSubmit ? 'opacity-40' : ''}`}>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8A7F76]">3 · Доплата — способ</div>
+              <div className={`rounded-[16px] border border-surface-3 bg-surface p-5 ${!canSubmit ? 'opacity-40' : ''}`}>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">3 · Доплата — способ</div>
                 <div className="flex gap-2">
                   {METHODS.map((m) => (
                     <button
@@ -216,7 +216,7 @@ export default function ExchangePage() {
                       disabled={!unit || !newProduct || (surcharge > 0 && m.id !== 'cash')}
                       onClick={() => setMethod(m.id)}
                       className={`flex-1 rounded-[10px] border px-3 py-2.5 text-sm font-semibold transition ${
-                        method === m.id ? 'border-lime bg-lime/10 text-lime' : 'border-[#2E2822] bg-[#221E19] text-[#D8CFC6]'
+                        method === m.id ? 'border-lime bg-lime/10 text-lime' : 'border-surface-3 bg-surface-2 text-bright'
                       }`}
                     >
                       {m.name}
@@ -224,7 +224,7 @@ export default function ExchangePage() {
                   ))}
                 </div>
                 {surcharge > 0 && (
-                  <p className="mt-2 text-xs leading-5 text-[#A79C92]">
+                  <p className="mt-2 text-xs leading-5 text-muted">
                     Безналичная доплата будет доступна после подключения подтверждённого payment capture.
                   </p>
                 )}
@@ -232,13 +232,13 @@ export default function ExchangePage() {
                   type="button"
                   disabled={!canSubmit || busy}
                   onClick={submit}
-                  className="mt-4 w-full rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]"
+                  className="mt-4 w-full rounded-[12px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint"
                 >
                   {busy ? 'Отправляем…' : 'Запросить обмен'}
                 </button>
               </div>
 
-              {err && <div className="rounded-[12px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-3 text-sm text-[#FF8A7A]">{err}</div>}
+              {err && <div className="rounded-[12px] border border-danger-soft/30 bg-danger-soft/5 p-3 text-sm text-danger-soft">{err}</div>}
             </div>
           )}
         </div>

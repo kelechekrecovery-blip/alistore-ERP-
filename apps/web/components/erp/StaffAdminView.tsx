@@ -89,48 +89,48 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
   }
 
   return (
-    <section data-testid="staff-admin" className="rounded-[16px] border border-[#2E2822] bg-[#1A1611] p-5">
+    <section data-testid="staff-admin" className="rounded-[16px] border border-surface-3 bg-surface p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 className="font-display text-[15px] font-bold">Учётки сотрудников</h3>
-          <p className="mt-1 text-xs text-[#8A7F76]">Создание, деактивация и сброс 2FA. Деактивация блокируется открытой сменой или активными доставками.</p>
+          <p className="mt-1 text-xs text-subtle">Создание, деактивация и сброс 2FA. Деактивация блокируется открытой сменой или активными доставками.</p>
         </div>
-        <button type="button" onClick={reload} className="rounded-[6px] border border-[#3A332C] px-3 py-2 text-xs text-[#D8CFC6] hover:border-[#C6FF3D] hover:text-[#C6FF3D]">Обновить</button>
+        <button type="button" onClick={reload} className="rounded-[6px] border border-line px-3 py-2 text-xs text-bright hover:border-lime hover:text-lime">Обновить</button>
       </div>
 
       {message && <div role="alert" className="mt-3 rounded-[6px] border border-[#FF6B55]/40 bg-[#FF6B55]/10 px-3 py-2 text-xs text-[#FFB5AA]">{message}</div>}
-      {notice && <div role="status" className="mt-3 rounded-[6px] border border-[#C6FF3D]/30 bg-[#C6FF3D]/10 px-3 py-2 text-xs text-[#C6FF3D]">{notice}</div>}
+      {notice && <div role="status" className="mt-3 rounded-[6px] border border-lime/30 bg-lime/10 px-3 py-2 text-xs text-lime">{notice}</div>}
 
-      <form onSubmit={submitCreate} className="mt-4 grid gap-2 rounded-[10px] border border-[#2E2822] bg-[#16130F] p-3 sm:grid-cols-[1fr_1fr_160px_140px_auto]">
-        <input aria-label="Логин" placeholder="Логин" required value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} className="h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs text-white" />
-        <input aria-label="Пароль" placeholder="Пароль" type="password" required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} className="h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs text-white" />
-        <select aria-label="Роль" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as StaffRole }))} className="h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs text-white">
+      <form onSubmit={submitCreate} className="mt-4 grid gap-2 rounded-[10px] border border-surface-3 bg-ink-dark p-3 sm:grid-cols-[1fr_1fr_160px_140px_auto]">
+        <input aria-label="Логин" placeholder="Логин" required value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" />
+        <input aria-label="Пароль" placeholder="Пароль" type="password" required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" />
+        <select aria-label="Роль" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as StaffRole }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white">
           {STAFF_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
         </select>
-        <input aria-label="Точка" placeholder="Точка" required value={form.point} onChange={(event) => setForm((current) => ({ ...current, point: event.target.value }))} className="h-9 rounded-[6px] border border-[#3A332C] bg-[#1A1611] px-2 text-xs text-white" />
-        <button type="submit" disabled={busy === 'create'} className="h-9 rounded-[6px] bg-[#C6FF3D] px-4 text-xs font-bold text-[#1A2300] disabled:opacity-60">{busy === 'create' ? '…' : 'Создать'}</button>
+        <input aria-label="Точка" placeholder="Точка" required value={form.point} onChange={(event) => setForm((current) => ({ ...current, point: event.target.value }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" />
+        <button type="submit" disabled={busy === 'create'} className="h-9 rounded-[6px] bg-lime px-4 text-xs font-bold text-[#1A2300] disabled:opacity-60">{busy === 'create' ? '…' : 'Создать'}</button>
       </form>
 
-      {staff === null && !message && <p className="mt-4 font-mono text-xs text-[#8A7F76]">Загрузка…</p>}
-      {staff?.length === 0 && <p className="mt-4 text-xs text-[#8A7F76]">Активных учёток нет</p>}
-      <ul className="mt-3 divide-y divide-[#221E19]">
+      {staff === null && !message && <p className="mt-4 font-mono text-xs text-subtle">Загрузка…</p>}
+      {staff?.length === 0 && <p className="mt-4 text-xs text-subtle">Активных учёток нет</p>}
+      <ul className="mt-3 divide-y divide-surface-2">
         {(staff ?? []).map((person) => (
           <li key={person.id} className="py-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-white">{person.username}</span>
-              <span className="rounded bg-[#221E19] px-1.5 py-0.5 font-mono text-[10px] text-[#C6FF3D]">{person.role}</span>
+              <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-lime">{person.role}</span>
               <span className="ml-auto flex gap-2">
                 <button
                   type="button"
                   disabled={busy === person.id}
                   onClick={() => setPending({ kind: 'totp-reset', staff: person })}
-                  className="rounded-[6px] border border-[#3A332C] px-2.5 py-1.5 text-[11px] text-[#D8CFC6] hover:border-[#C6FF3D] hover:text-[#C6FF3D] disabled:opacity-50"
+                  className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-bright hover:border-lime hover:text-lime disabled:opacity-50"
                 >Сбросить 2FA</button>
                 <button
                   type="button"
                   disabled={busy === person.id}
                   onClick={() => setPending({ kind: 'deactivate', staff: person })}
-                  className="rounded-[6px] border border-[#49342D] px-2.5 py-1.5 text-[11px] text-[#FF8A7A] hover:border-[#FF6B55] disabled:opacity-50"
+                  className="rounded-[6px] border border-[#49342D] px-2.5 py-1.5 text-[11px] text-danger-soft hover:border-[#FF6B55] disabled:opacity-50"
                 >Деактивировать</button>
               </span>
             </div>
@@ -144,7 +144,7 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
                 <button type="button" disabled={busy === person.id} onClick={confirmPending} className="ml-auto rounded-[6px] bg-[#FF6B55] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
                   {busy === person.id ? '…' : 'Подтвердить'}
                 </button>
-                <button type="button" onClick={() => setPending(null)} className="rounded-[6px] border border-[#3A332C] px-3 py-1.5 text-[11px] text-[#D8CFC6]">Отмена</button>
+                <button type="button" onClick={() => setPending(null)} className="rounded-[6px] border border-line px-3 py-1.5 text-[11px] text-bright">Отмена</button>
               </div>
             )}
             {rowError[person.id] && (

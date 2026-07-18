@@ -21,12 +21,12 @@ interface MobileFrameProps {
 export function MobileFrame({ active, children, header = true, city = 'Бишкек' }: MobileFrameProps) {
   const { count: favCount } = useFavorites();
   return (
-    <div className="flex min-h-screen justify-center bg-[#0E0C0A] font-sans text-white">
-      <div className="flex min-h-screen w-full max-w-[440px] flex-col bg-[#16130F]">
+    <div className="flex min-h-screen justify-center bg-night font-sans text-white">
+      <div className="flex min-h-screen w-full max-w-[440px] flex-col bg-ink-dark">
         {header && (
-          <header className="sticky top-0 z-20 flex-shrink-0 bg-[#16130F]/95 px-4 pb-3 pt-3 backdrop-blur">
+          <header className="sticky top-0 z-20 flex-shrink-0 bg-ink-dark/95 px-4 pb-3 pt-3 backdrop-blur">
             <div className="mb-2.5 flex items-center gap-2">
-              <span className="flex items-center gap-1 text-xs text-[#A79C92]">📍 {city} ▾</span>
+              <span className="flex items-center gap-1 text-xs text-muted">📍 {city} ▾</span>
               <div className="ml-auto flex items-center gap-3.5">
                 <Link href="/compare" className="relative text-[17px]" aria-label="Сравнение">
                   ⇄
@@ -44,10 +44,10 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
             </div>
             <Link
               href="/search"
-              className="flex items-center gap-2.5 rounded-[13px] border border-[#2E2822] bg-[#221E19] px-3.5 py-2.5"
+              className="flex items-center gap-2.5 rounded-[13px] border border-surface-3 bg-surface-2 px-3.5 py-2.5"
             >
-              <span className="text-[#6E645C]">🔍</span>
-              <span className="text-sm text-[#6E645C]">Поиск техники, брендов…</span>
+              <span className="text-faint">🔍</span>
+              <span className="text-sm text-faint">Поиск техники, брендов…</span>
             </Link>
           </header>
         )}

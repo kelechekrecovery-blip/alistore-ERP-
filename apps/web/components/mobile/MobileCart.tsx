@@ -55,7 +55,7 @@ export default function MobileCart() {
             <div className="mt-3.5 font-display text-[17px] font-bold text-white">
               Корзина пуста
             </div>
-            <div className="mt-2 text-[13px] text-[#A79C92]">
+            <div className="mt-2 text-[13px] text-muted">
               Добавьте товары из каталога
             </div>
             <Link
@@ -70,13 +70,13 @@ export default function MobileCart() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="mb-2.5 flex gap-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3"
+                className="mb-2.5 flex gap-3 rounded-[14px] border border-surface-3 bg-surface-2 p-3"
               >
                 <Link
                   href={`/product/${item.id}`}
-                  className="relative h-[70px] w-[70px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-[#16130F]"
+                  className="relative h-[70px] w-[70px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark"
                 >
-                  <span className="grid h-full place-items-center text-xl font-bold text-[#8A7F76]">{item.name.slice(0, 1)}</span>
+                  <span className="grid h-full place-items-center text-xl font-bold text-subtle">{item.name.slice(0, 1)}</span>
                 </Link>
                 <div className="min-w-0 flex-1">
                   <Link
@@ -89,7 +89,7 @@ export default function MobileCart() {
                     {som(item.price * item.qty)}
                   </div>
                   <div className="mt-2 flex items-center gap-2.5">
-                    <div className="flex items-center gap-3 rounded-[8px] bg-[#2E2822] px-2.5 py-[5px]">
+                    <div className="flex items-center gap-3 rounded-[8px] bg-surface-3 px-2.5 py-[5px]">
                       <button
                         type="button"
                         onClick={() => setQty(item.id, item.qty - 1)}
@@ -114,7 +114,7 @@ export default function MobileCart() {
                     <button
                       type="button"
                       onClick={() => remove(item.id)}
-                      className="text-[12px] text-[#8A7F76]"
+                      className="text-[12px] text-subtle"
                     >
                       Удалить
                     </button>
@@ -131,13 +131,13 @@ export default function MobileCart() {
                     value={promoInput}
                     onChange={(e) => setPromoInput(e.target.value)}
                     placeholder="Промокод"
-                    className="min-w-0 flex-1 rounded-[11px] border border-[#2E2822] bg-[#221E19] px-3 py-3 text-[13px] uppercase text-white outline-none placeholder:normal-case placeholder:text-[#6E645C] focus:border-lime"
+                    className="min-w-0 flex-1 rounded-[11px] border border-surface-3 bg-surface-2 px-3 py-3 text-[13px] uppercase text-white outline-none placeholder:normal-case placeholder:text-faint focus:border-lime"
                   />
                   <button
                     type="button"
                     onClick={submitPromo}
                     disabled={promoLoading}
-                    className="rounded-[11px] bg-[#2E2822] px-[18px] text-[13px] font-semibold text-lime"
+                    className="rounded-[11px] bg-surface-3 px-[18px] text-[13px] font-semibold text-lime"
                   >
                     {promoCode ? "Убрать" : promoLoading ? "Проверяем…" : "Применить"}
                   </button>
@@ -158,18 +158,18 @@ export default function MobileCart() {
                   type="button"
                   onClick={toggleBonus}
                   disabled={bonusLoading || bonusBalance <= 0}
-                  className="mt-2 flex w-full items-center gap-2.5 rounded-[11px] border border-[#2E2822] bg-[#221E19] p-3 text-left"
+                  className="mt-2 flex w-full items-center gap-2.5 rounded-[11px] border border-surface-3 bg-surface-2 p-3 text-left"
                 >
                   <span
                     className={`grid h-5 w-5 place-items-center rounded-[6px] border-2 text-[12px] ${
                       bonusApplied
                         ? "border-lime bg-lime text-lime-ink"
-                        : "border-[#3A342E]"
+                        : "border-line"
                     }`}
                   >
                     {bonusApplied ? "✓" : ""}
                   </span>
-                  <span className="text-[13px] text-[#D8CFC6]">
+                  <span className="text-[13px] text-bright">
                     {bonusLoading
                       ? "Проверяем бонусы…"
                       : `Списать до ${bonusBalance.toLocaleString("ru-RU")}`}
@@ -189,21 +189,21 @@ export default function MobileCart() {
                 )}
 
                 {/* totals */}
-                <div className="mt-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
-                  <div className="flex justify-between py-1 text-[13px] text-[#A79C92]">
+                <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+                  <div className="flex justify-between py-1 text-[13px] text-muted">
                     Товары ({count}){" "}
-                    <span className="text-[#D8CFC6]">{som(subtotal)}</span>
+                    <span className="text-bright">{som(subtotal)}</span>
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between py-1 text-[13px] text-lime">
                       Скидка <span>−{som(discount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between py-1 text-[13px] text-[#A79C92]">
+                  <div className="flex justify-between py-1 text-[13px] text-muted">
                     Доставка{" "}
-                    <span className="text-[#D8CFC6]">рассчитаем далее</span>
+                    <span className="text-bright">рассчитаем далее</span>
                   </div>
-                  <div className="my-2 border-t border-[#2E2822]" />
+                  <div className="my-2 border-t border-surface-3" />
                   <div className="flex items-center justify-between">
                     <span className="font-display text-[16px] font-bold text-white">
                       Итого

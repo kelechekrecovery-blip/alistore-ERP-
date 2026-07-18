@@ -74,13 +74,13 @@ export default function MobileProduct({
     <MobileFrame active="catalog">
       <div className="pb-6">
         {/* hero */}
-        <div className="relative h-[260px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="440px" priority className="object-contain p-8" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-[#8A7F76]"><ImageOff size={38} /><span>Фото готовится</span></span>}
+        <div className="relative h-[260px] bg-gradient-to-br from-[#2A2620] to-ink-dark">
+          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="440px" priority className="object-contain p-8" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-subtle"><ImageOff size={38} /><span>Фото готовится</span></span>}
           <button
             type="button"
             onClick={() => router.back()}
             aria-label="Назад"
-            className="absolute left-3 top-3 grid h-[34px] w-[34px] place-items-center rounded-full bg-[#14110E]/55 text-white"
+            className="absolute left-3 top-3 grid h-[34px] w-[34px] place-items-center rounded-full bg-lime-ink/55 text-white"
           >
             ←
           </button>
@@ -90,7 +90,7 @@ export default function MobileProduct({
             aria-label={
               faved(product.id) ? "Убрать из избранного" : "В избранное"
             }
-            className="absolute right-3 top-3 grid h-[34px] w-[34px] place-items-center rounded-full bg-[#14110E]/55"
+            className="absolute right-3 top-3 grid h-[34px] w-[34px] place-items-center rounded-full bg-lime-ink/55"
           >
             <span className={faved(product.id) ? "text-coral" : "text-white"}>
               {faved(product.id) ? "♥" : "♡"}
@@ -110,7 +110,7 @@ export default function MobileProduct({
               {som(product.price)}
             </span>
             {oldPrice > product.price && (
-              <span className="text-[15px] text-[#8A7F76] line-through">
+              <span className="text-[15px] text-subtle line-through">
                 {som(oldPrice)}
               </span>
             )}
@@ -119,7 +119,7 @@ export default function MobileProduct({
 
           {/* add to cart */}
           <div className="mt-4 flex gap-2">
-            <div className="flex items-center gap-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] px-3">
+            <div className="flex items-center gap-3 rounded-[12px] border border-surface-3 bg-surface-2 px-3">
               <button
                 type="button"
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
@@ -148,7 +148,7 @@ export default function MobileProduct({
                   ? "bg-success text-white"
                   : inStock
                     ? "bg-lime text-lime-ink"
-                    : "bg-[#2E2822] text-[#6E645C]"
+                    : "bg-surface-3 text-faint"
               }`}
             >
               {added ? "Добавлено ✓" : inStock ? "В корзину" : "Под заказ"}
@@ -158,7 +158,7 @@ export default function MobileProduct({
           {/* variants */}
           {(siblingVariants.length > 0 || optionValues.length > 0) && (
             <>
-              <div className="mb-2 mt-[18px] text-[12px] text-[#A79C92]">
+              <div className="mb-2 mt-[18px] text-[12px] text-muted">
                 Цвет / память
               </div>
               <div className="flex flex-wrap gap-2">
@@ -169,7 +169,7 @@ export default function MobileProduct({
                   <Link
                     key={variant.id}
                     href={`/product/${variant.id}`}
-                    className="rounded-[10px] border border-[#2E2822] bg-[#221E19] px-3.5 py-2.5 text-[13px] text-[#D8CFC6]"
+                    className="rounded-[10px] border border-surface-3 bg-surface-2 px-3.5 py-2.5 text-[13px] text-bright"
                   >
                     {variantOptionLabel(variant)}
                   </Link>
@@ -179,14 +179,14 @@ export default function MobileProduct({
           )}
 
           {Boolean(product.bundleComponents?.length) && (
-            <div className="mt-[18px] rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5">
+            <div className="mt-[18px] rounded-[12px] border border-surface-3 bg-surface-2 p-3.5">
               <div className="mb-2 text-[13px] font-semibold text-white">
                 В комплекте
               </div>
               {product.bundleComponents?.map((component) => (
                 <div
                   key={component.productId}
-                  className="flex justify-between py-1 text-[12px] text-[#A79C92]"
+                  className="flex justify-between py-1 text-[12px] text-muted"
                 >
                   <span>{component.name}</span>
                   <span>× {component.qty}</span>
@@ -200,7 +200,7 @@ export default function MobileProduct({
             {['warranty','deliveryText','pickupText','returnPolicy'].map((key) => typeof attrs[key] === 'string' ? String(attrs[key]) : null).filter(Boolean).map((t) => (
               <div
                 key={t}
-                className="rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3 text-[12px] text-[#D8CFC6]"
+                className="rounded-[12px] border border-surface-3 bg-surface-2 p-3 text-[12px] text-bright"
               >
                 {t}
               </div>
@@ -208,11 +208,11 @@ export default function MobileProduct({
           </div>
 
           {/* availability */}
-          <div className="mt-3 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5">
+          <div className="mt-3 rounded-[12px] border border-surface-3 bg-surface-2 p-3.5">
             <div className="mb-2 text-[13px] font-semibold text-white">
               Наличие
             </div>
-            <div className="flex justify-between py-1 text-[12px] text-[#A79C92]">
+            <div className="flex justify-between py-1 text-[12px] text-muted">
               Доступно к заказу{" "}
               <span style={{ color: inStock ? "#C6FF3D" : "#FF8A7A" }}>
                 ● {inStock ? `${product.availableUnits} шт` : "нет"}
@@ -229,10 +229,10 @@ export default function MobileProduct({
               {specs.map(([k, v]) => (
                 <div
                   key={k}
-                  className="flex justify-between border-b border-[#221E19] py-[9px] text-[13px]"
+                  className="flex justify-between border-b border-surface-2 py-[9px] text-[13px]"
                 >
-                  <span className="text-[#8A7F76]">{k}</span>
-                  <span className="text-[#D8CFC6]">{String(v)}</span>
+                  <span className="text-subtle">{k}</span>
+                  <span className="text-bright">{String(v)}</span>
                 </div>
               ))}
             </>
@@ -245,7 +245,7 @@ export default function MobileProduct({
                 <div className="mb-2 mt-5 font-display text-[15px] font-bold text-white">
                   Описание
                 </div>
-                <div className="text-[13px] leading-[1.6] text-[#A79C92]">
+                <div className="text-[13px] leading-[1.6] text-muted">
                   {attrs.description}
                 </div>
               </>
@@ -256,7 +256,7 @@ export default function MobileProduct({
             <span className="font-display text-[15px] font-bold text-white">
               Отзывы
             </span>
-            <span className="ml-auto text-[13px] text-[#E5B23C]">
+            <span className="ml-auto text-[13px] text-warn">
               {reviews?.count
                 ? `★ ${(reviews.avgRating ?? 0).toFixed(1)} · ${reviews.count}`
                 : "пока нет"}
@@ -265,18 +265,18 @@ export default function MobileProduct({
           {(reviews?.items ?? []).slice(0, 4).map((r) => (
             <div
               key={r.id}
-              className="mb-2 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3.5"
+              className="mb-2 rounded-[12px] border border-surface-3 bg-surface-2 p-3.5"
             >
               <div className="flex justify-between">
                 <span className="text-[13px] font-semibold text-white">
                   {r.customerName}
                 </span>
-                <span className="text-[12px] text-[#E5B23C]">
+                <span className="text-[12px] text-warn">
                   {stars(r.rating)}
                 </span>
               </div>
               {r.text && (
-                <div className="mt-1.5 text-[12px] leading-[1.5] text-[#A79C92]">
+                <div className="mt-1.5 text-[12px] leading-[1.5] text-muted">
                   {r.text}
                 </div>
               )}
@@ -296,10 +296,10 @@ export default function MobileProduct({
                     href={`/product/${s.id}`}
                     className="w-[120px] flex-shrink-0"
                   >
-                    <div className="relative h-[92px] overflow-hidden rounded-[12px] bg-gradient-to-br from-[#2A2620] to-[#16130F]">
-                      {productImage(s) ? <Image src={productImage(s)!} alt={s.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-[#8A7F76]"><ImageOff size={20} /></span>}
+                    <div className="relative h-[92px] overflow-hidden rounded-[12px] bg-gradient-to-br from-[#2A2620] to-ink-dark">
+                      {productImage(s) ? <Image src={productImage(s)!} alt={s.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-subtle"><ImageOff size={20} /></span>}
                     </div>
-                    <div className="mt-1.5 line-clamp-2 text-[11px] leading-[1.3] text-[#D8CFC6]">
+                    <div className="mt-1.5 line-clamp-2 text-[11px] leading-[1.3] text-bright">
                       {s.name}
                     </div>
                     <div className="text-[12px] font-bold text-white">

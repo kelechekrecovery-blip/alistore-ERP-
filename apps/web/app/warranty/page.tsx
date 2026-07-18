@@ -86,12 +86,12 @@ export default function WarrantyConsolePage() {
   }
 
   if (!hydrated) {
-    return <div className="fixed inset-0 z-50 bg-[#0E0C0A]" />;
+    return <div className="fixed inset-0 z-50 bg-night" />;
   }
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-[#0E0C0A] px-4">
+      <div className="fixed inset-0 z-50 grid place-items-center bg-night px-4">
         <StaffSessionLogin
           title="Гарантия · вход"
           caption="Нужна роль склада или администратора."
@@ -102,37 +102,37 @@ export default function WarrantyConsolePage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0E0C0A]">
-      <header className="flex items-center gap-4 border-b border-[#2E2822] bg-[#16130F]/90 px-6 py-4 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex flex-col bg-night">
+      <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark/90 px-6 py-4 backdrop-blur">
         <span className="grid h-9 w-9 place-items-center rounded-btn bg-info font-display text-lg font-extrabold text-white">
           🛡
         </span>
         <div>
           <div className="font-display text-lg font-bold text-white">Гарантия · Обращения</div>
-          <div className="text-xs text-[#8A7F76]">
+          <div className="text-xs text-subtle">
             {session.username} · {session.role} · SLA 14 дней
           </div>
         </div>
         <button
           type="button"
           onClick={logout}
-          className="ml-auto rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]"
+          className="ml-auto rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-subtle hover:border-surface-3"
         >
           Выйти staff
         </button>
-        <Link href="/" className="rounded-chip border border-[#2E2822] px-4 py-2 text-sm font-medium text-[#8A7F76] hover:border-[#2E2822]">
+        <Link href="/" className="rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-subtle hover:border-surface-3">
           ⌂ Выйти
         </Link>
       </header>
 
-      <div className="flex flex-shrink-0 gap-2 overflow-x-auto border-b border-[#2E2822] bg-[#1A1611] px-6 py-3">
+      <div className="flex flex-shrink-0 gap-2 overflow-x-auto border-b border-surface-3 bg-surface px-6 py-3">
         {STAGES.map((s) => (
           <button
             key={s.status}
             type="button"
             onClick={() => setStage(s)}
             className={`flex-shrink-0 rounded-chip px-4 py-2 text-sm font-semibold transition ${
-              stage.status === s.status ? 'bg-lime text-lime-ink' : 'border border-[#2E2822] bg-[#1A1611] text-[#8A7F76] hover:border-[#2E2822]'
+              stage.status === s.status ? 'bg-lime text-lime-ink' : 'border border-surface-3 bg-surface text-subtle hover:border-surface-3'
             }`}
           >
             {s.label}
@@ -142,11 +142,11 @@ export default function WarrantyConsolePage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl">
-          {cases === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+          {cases === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
           {cases && cases.length === 0 && (
-            <div className="rounded-card border border-dashed border-[#2E2822] bg-[#1A1611] px-6 py-16 text-center">
+            <div className="rounded-card border border-dashed border-surface-3 bg-surface px-6 py-16 text-center">
               <p className="font-display text-lg font-bold text-white">Пусто</p>
-              <p className="mt-1 text-sm text-[#8A7F76]">Нет обращений в статусе «{stage.label}».</p>
+              <p className="mt-1 text-sm text-subtle">Нет обращений в статусе «{stage.label}».</p>
             </div>
           )}
           {cases && cases.length > 0 && (
@@ -154,21 +154,21 @@ export default function WarrantyConsolePage() {
               {cases.map((wc) => {
                 const overdue = new Date(wc.sla).getTime() < Date.now();
                 return (
-                  <li key={wc.id} className="rounded-card border border-[#2E2822] bg-[#1A1611] p-5 ">
+                  <li key={wc.id} className="rounded-card border border-surface-3 bg-surface p-5 ">
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="font-mono text-sm font-semibold text-white">{wc.imei}</span>
-                      <span className={`rounded-chip px-2.5 py-0.5 text-xs font-semibold ${overdue ? 'bg-danger/10 text-danger' : 'bg-[#221E19] text-lime'}`}>
+                      <span className={`rounded-chip px-2.5 py-0.5 text-xs font-semibold ${overdue ? 'bg-danger/10 text-danger' : 'bg-surface-2 text-lime'}`}>
                         SLA {new Date(wc.sla).toLocaleDateString('ru-RU')}{overdue ? ' · просрочено' : ''}
                       </span>
-                      <span className="font-mono text-xs text-[#8A7F76]">#{wc.id.slice(-8)}</span>
+                      <span className="font-mono text-xs text-subtle">#{wc.id.slice(-8)}</span>
                     </div>
-                    <p className="mt-2 text-sm text-[#8A7F76]">Проблема: {wc.problem}</p>
+                    <p className="mt-2 text-sm text-subtle">Проблема: {wc.problem}</p>
                     <div className="mt-4 flex justify-end gap-2">
                       <button
                         type="button"
                         disabled={busy === `talon-${wc.id}`}
                         onClick={() => downloadTalon(wc)}
-                        className="rounded-btn border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-semibold text-[#D8CFC6] transition hover:border-[#3A342E] disabled:text-[#6E645C]"
+                        className="rounded-btn border border-surface-3 bg-surface-2 px-4 py-2 text-sm font-semibold text-bright transition hover:border-line disabled:text-faint"
                       >
                         {busy === `talon-${wc.id}` ? '…' : 'Талон'}
                       </button>
@@ -176,7 +176,7 @@ export default function WarrantyConsolePage() {
                         type="button"
                         disabled={busy === wc.id}
                         onClick={() => advance(wc)}
-                        className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-[#2E2822]"
+                        className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-surface-3"
                       >
                         {busy === wc.id ? '…' : stage.action}
                       </button>

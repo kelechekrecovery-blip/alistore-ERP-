@@ -79,7 +79,7 @@ export default function ReturnsPage() {
   }
 
   if (!hydrated || !user) {
-    return <div className="fixed inset-0 z-40 grid place-items-center bg-[#16130F] font-mono text-sm text-[#8A7F76]">Загрузка…</div>;
+    return <div className="fixed inset-0 z-40 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
   }
 
   if (done) {
@@ -88,10 +88,10 @@ export default function ReturnsPage() {
         <div className="py-7 text-center">
           <div className="mx-auto grid h-18 w-18 place-items-center rounded-full bg-lime/15 text-4xl" style={{ height: 72, width: 72 }}>✓</div>
           <div className="mt-4 font-display text-lg font-bold">Заявка отправлена</div>
-          <div className="mt-2 text-[13px] leading-relaxed text-[#A79C92]">Рассмотрим за 24 часа. Статус придёт в уведомления и Support Inbox.</div>
+          <div className="mt-2 text-[13px] leading-relaxed text-muted">Рассмотрим за 24 часа. Статус придёт в уведомления и Support Inbox.</div>
           <div className="mt-2 font-mono text-[12px] text-lime">Evidence Vault: {done.evidenceCount} фото</div>
         </div>
-        <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
+        <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
           <Step active label="Заявка принята" />
           <Step label="Проверка товара" />
           <Step label="Возврат денег" />
@@ -103,9 +103,9 @@ export default function ReturnsPage() {
 
   return (
     <MobileAppFrame title="Возврат товара" subtitle="Выберите заказ, причину и отправьте заявку на проверку." backHref="/account">
-      {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка заказов…</p>}
+      {orders === null && <p className="font-mono text-sm text-subtle">Загрузка заказов…</p>}
       {orders && eligible.length === 0 && (
-        <div className="rounded-[14px] border border-[#2E2822] bg-[#221E19] p-5 text-center">
+        <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-5 text-center">
           <div className="font-display text-base font-bold">Нет заказов для возврата</div>
           <Link href="/" className="mt-3 inline-block text-sm text-lime">В каталог</Link>
         </div>
@@ -113,36 +113,36 @@ export default function ReturnsPage() {
 
       {eligible.length > 0 && (
         <>
-          <div className="mb-2 text-[13px] text-[#A79C92]">Заказ</div>
+          <div className="mb-2 text-[13px] text-muted">Заказ</div>
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
             {eligible.map((o) => (
-              <button key={o.id} type="button" onClick={() => selectOrder(o)} className={`w-[170px] flex-shrink-0 rounded-[13px] border bg-[#221E19] p-3 text-left ${orderId === o.id ? 'border-lime' : 'border-[#2E2822]'}`}>
+              <button key={o.id} type="button" onClick={() => selectOrder(o)} className={`w-[170px] flex-shrink-0 rounded-[13px] border bg-surface-2 p-3 text-left ${orderId === o.id ? 'border-lime' : 'border-surface-3'}`}>
                 <div className="font-mono text-[12px] font-bold">#{o.id.slice(-8)}</div>
-                <div className="mt-1 text-[11px] text-[#8A7F76]">{o.status} · {o.items.length} поз.</div>
+                <div className="mt-1 text-[11px] text-subtle">{o.status} · {o.items.length} поз.</div>
                 <div className="mt-2 font-display text-[15px] font-extrabold">{som(o.total)}</div>
               </button>
             ))}
           </div>
 
           {selected && (
-            <div className="mb-3 rounded-[14px] border border-lime bg-[#221E19] p-3">
-              <div className="text-[12px] text-[#A79C92]">Выбран заказ #{selected.id.slice(-8)}</div>
+            <div className="mb-3 rounded-[14px] border border-lime bg-surface-2 p-3">
+              <div className="text-[12px] text-muted">Выбран заказ #{selected.id.slice(-8)}</div>
               <div className="mt-3 space-y-2">
                 {selected.items.map((item) => {
                   const qty = quantities[item.id] ?? 0;
                   return (
-                    <div key={item.id} className="flex items-center gap-3 rounded-[10px] border border-[#3A342E] p-2.5">
-                      <button type="button" aria-label={`Выбрать ${item.sku}`} onClick={() => setItemQty(item.id, qty > 0 ? 0 : item.qty, item.qty)} className={`h-5 w-5 flex-none rounded border ${qty > 0 ? 'border-lime bg-lime text-lime-ink' : 'border-[#6E645C]'}`}>
+                    <div key={item.id} className="flex items-center gap-3 rounded-[10px] border border-line p-2.5">
+                      <button type="button" aria-label={`Выбрать ${item.sku}`} onClick={() => setItemQty(item.id, qty > 0 ? 0 : item.qty, item.qty)} className={`h-5 w-5 flex-none rounded border ${qty > 0 ? 'border-lime bg-lime text-lime-ink' : 'border-faint'}`}>
                         {qty > 0 ? '✓' : ''}
                       </button>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[13px] font-semibold">{item.sku}</div>
-                        <div className="text-[11px] text-[#8A7F76]">{som(item.price)} · куплено {item.qty}</div>
+                        <div className="text-[11px] text-subtle">{som(item.price)} · куплено {item.qty}</div>
                       </div>
-                      <div className="flex h-8 items-center overflow-hidden rounded-[8px] border border-[#3A342E]">
-                        <button type="button" aria-label={`Уменьшить ${item.sku}`} onClick={() => setItemQty(item.id, qty - 1, item.qty)} className="h-full w-8 text-[#A79C92]">−</button>
+                      <div className="flex h-8 items-center overflow-hidden rounded-[8px] border border-line">
+                        <button type="button" aria-label={`Уменьшить ${item.sku}`} onClick={() => setItemQty(item.id, qty - 1, item.qty)} className="h-full w-8 text-muted">−</button>
                         <span className="w-7 text-center font-mono text-xs">{qty}</span>
-                        <button type="button" aria-label={`Увеличить ${item.sku}`} onClick={() => setItemQty(item.id, qty + 1, item.qty)} className="h-full w-8 text-[#A79C92]">+</button>
+                        <button type="button" aria-label={`Увеличить ${item.sku}`} onClick={() => setItemQty(item.id, qty + 1, item.qty)} className="h-full w-8 text-muted">+</button>
                       </div>
                     </div>
                   );
@@ -151,19 +151,19 @@ export default function ReturnsPage() {
             </div>
           )}
 
-          <div className="mb-2 text-[13px] text-[#A79C92]">Причина возврата</div>
+          <div className="mb-2 text-[13px] text-muted">Причина возврата</div>
           {reasons.map((r) => (
-            <button key={r} type="button" onClick={() => setReason(r)} className={`mb-2 flex w-full items-center gap-2.5 rounded-[11px] border bg-[#221E19] p-3 text-left ${reason === r ? 'border-lime' : 'border-[#2E2822]'}`}>
-              <span className={`h-[18px] w-[18px] rounded-full border-2 ${reason === r ? 'border-lime bg-lime' : 'border-[#3A342E]'}`} />
-              <span className="text-[13px] text-[#D8CFC6]">{r}</span>
+            <button key={r} type="button" onClick={() => setReason(r)} className={`mb-2 flex w-full items-center gap-2.5 rounded-[11px] border bg-surface-2 p-3 text-left ${reason === r ? 'border-lime' : 'border-surface-3'}`}>
+              <span className={`h-[18px] w-[18px] rounded-full border-2 ${reason === r ? 'border-lime bg-lime' : 'border-line'}`} />
+              <span className="text-[13px] text-bright">{r}</span>
             </button>
           ))}
-          <textarea value={photoNote} onChange={(e) => setPhotoNote(e.target.value)} placeholder="Комментарий, IMEI или детали проблемы" className="mt-1 min-h-[86px] w-full rounded-[12px] border border-[#3A342E] bg-[#221E19] p-3 text-sm outline-none placeholder:text-[#6E645C] focus:border-lime" />
+          <textarea value={photoNote} onChange={(e) => setPhotoNote(e.target.value)} placeholder="Комментарий, IMEI или детали проблемы" className="mt-1 min-h-[86px] w-full rounded-[12px] border border-line bg-surface-2 p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
           <div className="mt-2">
             <EvidencePicker files={files} onChange={setFiles} label="Фото товара/чека" hint="Фото дефекта, комплекта, упаковки или чека" />
           </div>
-          {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
-          <button type="button" disabled={busy || !reason || !orderId || !Object.values(quantities).some((qty) => qty > 0)} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Отправляем…' : 'Отправить заявку'}</button>
+          {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
+          <button type="button" disabled={busy || !reason || !orderId || !Object.values(quantities).some((qty) => qty > 0)} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">{busy ? 'Отправляем…' : 'Отправить заявку'}</button>
         </>
       )}
     </MobileAppFrame>
@@ -172,7 +172,7 @@ export default function ReturnsPage() {
 
 function Step({ label, active = false }: { label: string; active?: boolean }) {
   return (
-    <div className={`flex gap-2 py-1 text-[12px] ${active ? 'text-[#A79C92]' : 'text-[#6E645C]'}`}>
+    <div className={`flex gap-2 py-1 text-[12px] ${active ? 'text-muted' : 'text-faint'}`}>
       <span className={active ? 'text-lime' : ''}>{active ? '●' : '○'}</span>
       {label}
     </div>

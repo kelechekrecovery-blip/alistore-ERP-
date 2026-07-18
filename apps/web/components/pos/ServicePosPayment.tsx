@@ -56,27 +56,27 @@ export function ServicePosPayment({ workOrderId, session, onBack }: { workOrderI
   const total = context?.estimateAmount ?? 0;
   const fullyPaid = total > 0 && paidTotal >= total;
   const partiallyRefunded = paidTotal > 0 && paidTotal < total;
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4 font-sans text-white">
-    <main data-testid="service-payment-ticket" className="relative h-[720px] max-h-[94vh] w-full max-w-[920px] overflow-hidden rounded-[24px] border-8 border-[#201B17] bg-[#16130F] shadow-2xl">
-      <header className="flex items-center gap-3 border-b border-[#2E2822] px-6 py-4">
-        <button type="button" onClick={onBack} aria-label="Назад к продаже" className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#3B342D] text-[#D8CFC6]"><ArrowLeft size={18} /></button>
-        <div><div className="font-display text-lg font-bold">Оплата ремонта</div><div className="font-mono text-[11px] text-[#8A7F76]">POS · {session.username}</div></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4 font-sans text-white">
+    <main data-testid="service-payment-ticket" className="relative h-[720px] max-h-[94vh] w-full max-w-[920px] overflow-hidden rounded-[24px] border-8 border-ink bg-ink-dark shadow-2xl">
+      <header className="flex items-center gap-3 border-b border-surface-3 px-6 py-4">
+        <button type="button" onClick={onBack} aria-label="Назад к продаже" className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#3B342D] text-bright"><ArrowLeft size={18} /></button>
+        <div><div className="font-display text-lg font-bold">Оплата ремонта</div><div className="font-mono text-[11px] text-subtle">POS · {session.username}</div></div>
       </header>
-      {loading && <div className="grid h-[600px] place-items-center font-mono text-sm text-[#8A7F76]">Загрузка заказ-наряда…</div>}
+      {loading && <div className="grid h-[600px] place-items-center font-mono text-sm text-subtle">Загрузка заказ-наряда…</div>}
       {!loading && error && !context && <div className="grid h-[600px] place-items-center px-6 text-center text-sm text-danger">{error}</div>}
       {!loading && context && <div className="grid h-[calc(100%-73px)] grid-cols-[1fr_340px]">
         <section className="p-7">
-          <div className="flex items-center gap-3"><div className="grid h-12 w-12 place-items-center rounded-[8px] bg-coral/15 text-coral"><Wrench /></div><div><div className="font-display text-xl font-bold">{context.warrantyCase.deviceName ?? 'Устройство'}</div><div className="font-mono text-xs text-[#8A7F76]">{context.warrantyCase.imei}</div></div></div>
+          <div className="flex items-center gap-3"><div className="grid h-12 w-12 place-items-center rounded-[8px] bg-coral/15 text-coral"><Wrench /></div><div><div className="font-display text-xl font-bold">{context.warrantyCase.deviceName ?? 'Устройство'}</div><div className="font-mono text-xs text-subtle">{context.warrantyCase.imei}</div></div></div>
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
             <Info icon={<UserRound size={16} />} label="Клиент" value={`${context.customer?.name ?? 'Клиент'} · ${context.customer?.phone ?? ''}`} />
             <Info icon={<Smartphone size={16} />} label="Статус" value={fullyPaid ? 'Оплачено' : partiallyRefunded ? 'Частичный возврат' : 'Смета подтверждена'} />
           </div>
-          <div className="mt-5 rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4"><div className="text-xs font-semibold text-[#D8CFC6]">Диагностика</div><p className="mt-2 text-sm leading-6 text-[#A79C92]">{context.diagnosticSummary}</p></div>
+          <div className="mt-5 rounded-[8px] border border-surface-3 bg-surface p-4"><div className="text-xs font-semibold text-bright">Диагностика</div><p className="mt-2 text-sm leading-6 text-muted">{context.diagnosticSummary}</p></div>
           {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
         </section>
-        <aside className="border-l border-[#2E2822] bg-[#1A1611] p-6">
-          <div className="text-xs font-semibold uppercase text-[#8A7F76]">Заказ-наряд</div><div className="mt-1 font-mono text-sm text-white">SRV-{context.id.slice(-8).toUpperCase()}</div>
-          <div className="mt-8 flex items-end justify-between border-b border-[#2E2822] pb-5"><span className="text-sm text-[#A79C92]">К оплате</span><span className="font-display text-3xl font-extrabold text-lime">{som(total)}</span></div>
+        <aside className="border-l border-surface-3 bg-surface p-6">
+          <div className="text-xs font-semibold uppercase text-subtle">Заказ-наряд</div><div className="mt-1 font-mono text-sm text-white">SRV-{context.id.slice(-8).toUpperCase()}</div>
+          <div className="mt-8 flex items-end justify-between border-b border-surface-3 pb-5"><span className="text-sm text-muted">К оплате</span><span className="font-display text-3xl font-extrabold text-lime">{som(total)}</span></div>
           {fullyPaid ? <div data-testid="service-payment-success" className="mt-6 rounded-[8px] border border-lime/30 bg-lime/10 p-4 text-sm font-semibold text-lime">Оплачено · {som(paidTotal)}</div> : partiallyRefunded ? <div data-testid="service-payment-partial-refund" className="mt-6 rounded-[8px] border border-warn/30 bg-warn/10 p-4 text-sm font-semibold text-warn">Частичный возврат · осталось оплачено {som(paidTotal)}</div> : <button data-testid="service-payment-open" type="button" onClick={() => { setMethod(null); setRoute('pay'); }} className="mt-6 w-full rounded-[8px] bg-lime px-4 py-3.5 text-sm font-bold text-lime-ink">Принять оплату</button>}
         </aside>
       </div>}
@@ -86,5 +86,5 @@ export function ServicePosPayment({ workOrderId, session, onBack }: { workOrderI
 }
 
 function Info({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return <div className="rounded-[8px] border border-[#2E2822] bg-[#1A1611] p-4"><div className="flex items-center gap-2 text-xs text-[#8A7F76]">{icon}{label}</div><div className="mt-2 text-sm font-semibold text-white">{value}</div></div>;
+  return <div className="rounded-[8px] border border-surface-3 bg-surface p-4"><div className="flex items-center gap-2 text-xs text-subtle">{icon}{label}</div><div className="mt-2 text-sm font-semibold text-white">{value}</div></div>;
 }

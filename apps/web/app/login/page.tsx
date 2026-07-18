@@ -96,7 +96,7 @@ function LoginForm() {
         <div className="mt-6 font-display text-3xl font-extrabold leading-none">
           {recovery ? 'Восстановление доступа' : 'Вход в AliStore'}
         </div>
-        <div className="mt-2.5 text-sm leading-relaxed text-[#A79C92]">
+        <div className="mt-2.5 text-sm leading-relaxed text-muted">
           {stepCode
             ? `Код отправлен на ${phone}`
             : recovery
@@ -106,45 +106,45 @@ function LoginForm() {
 
         {!stepCode ? (
           <form onSubmit={send} className="mt-6">
-            <div className="login-tabs mb-3 grid grid-cols-2 gap-2 rounded-[13px] bg-[#221E19] p-1">
+            <div className="login-tabs mb-3 grid grid-cols-2 gap-2 rounded-[13px] bg-surface-2 p-1">
               <button
                 type="button"
                 onClick={() => switchMode(false)}
-                className={`rounded-[10px] px-3 py-2 text-sm font-bold ${!recovery ? 'bg-lime text-lime-ink' : 'text-[#A79C92]'}`}
+                className={`rounded-[10px] px-3 py-2 text-sm font-bold ${!recovery ? 'bg-lime text-lime-ink' : 'text-muted'}`}
               >
                 Войти
               </button>
               <button
                 type="button"
                 onClick={() => switchMode(true)}
-                className={`rounded-[10px] px-3 py-2 text-sm font-bold ${recovery ? 'bg-lime text-lime-ink' : 'text-[#A79C92]'}`}
+                className={`rounded-[10px] px-3 py-2 text-sm font-bold ${recovery ? 'bg-lime text-lime-ink' : 'text-muted'}`}
               >
                 Восстановить
               </button>
             </div>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="login-field w-full rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
-            {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
+            {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
             <button type="submit" disabled={busy} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-[#180f02] disabled:opacity-60">{busy ? 'Отправляем…' : recovery ? 'Получить код восстановления' : 'Получить код по SMS'}</button>
             <div className="mt-3 flex gap-2.5">
-              <button type="button" disabled className="flex-1 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3 text-center text-sm text-[#6E645C] opacity-70">Apple</button>
+              <button type="button" disabled className="flex-1 rounded-[13px] border border-surface-3 bg-surface-2 p-3 text-center text-sm text-faint opacity-70">Apple</button>
               <button
                 type="button"
                 onClick={loginTelegram}
                 disabled={busy || !telegramInitData}
-                className="flex-1 rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3 text-center text-sm font-semibold text-white disabled:text-[#6E645C] disabled:opacity-70"
+                className="flex-1 rounded-[13px] border border-surface-3 bg-surface-2 p-3 text-center text-sm font-semibold text-white disabled:text-faint disabled:opacity-70"
               >
                 Telegram
               </button>
             </div>
-            <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-[#A79C92]">Продолжить как гость →</button>
+            <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-muted">Продолжить как гость →</button>
           </form>
         ) : (
           <form onSubmit={confirm} className="mt-6">
-            <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-значный код" className="login-field w-full rounded-[13px] border border-[#2E2822] bg-[#221E19] p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
-            {devCode && <p className="mt-2 rounded-[10px] bg-[#221E19] px-3 py-2 text-center font-mono text-xs text-lime">dev-код: {devCode}</p>}
-            {error && <p className="mt-2 text-sm text-[#FF8A7A]">{error}</p>}
-            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-[#180f02] disabled:bg-[#3A342E] disabled:text-[#6E645C]">{busy ? 'Проверяем…' : recovery ? 'Восстановить доступ' : 'Войти'}</button>
-            <button type="button" onClick={() => { setStepCode(false); setCode(''); setDevCode(null); }} className="mt-3 w-full text-center text-[13px] text-[#A79C92]">← Изменить номер</button>
+            <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-значный код" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
+            {devCode && <p className="mt-2 rounded-[10px] bg-surface-2 px-3 py-2 text-center font-mono text-xs text-lime">dev-код: {devCode}</p>}
+            {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
+            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-[#180f02] disabled:bg-line disabled:text-faint">{busy ? 'Проверяем…' : recovery ? 'Восстановить доступ' : 'Войти'}</button>
+            <button type="button" onClick={() => { setStepCode(false); setCode(''); setDevCode(null); }} className="mt-3 w-full text-center text-[13px] text-muted">← Изменить номер</button>
           </form>
         )}
       </div>
@@ -155,5 +155,5 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return <Suspense fallback={<div className="fixed inset-0 z-40 bg-[#16130F]" />}><LoginForm /></Suspense>;
+  return <Suspense fallback={<div className="fixed inset-0 z-40 bg-ink-dark" />}><LoginForm /></Suspense>;
 }

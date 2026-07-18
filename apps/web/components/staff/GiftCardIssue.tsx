@@ -48,30 +48,30 @@ export function GiftCardIssue({
   }
 
   if (!canIssueGiftCard(role)) {
-    return <p className="py-8 text-center text-sm text-[#8A7F76]">Нет права выпуска подарочных карт</p>;
+    return <p className="py-8 text-center text-sm text-subtle">Нет права выпуска подарочных карт</p>;
   }
 
   return (
     <>
-      <form onSubmit={submit} className="mb-4 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
+      <form onSubmit={submit} className="mb-4 rounded-[16px] border border-surface-3 bg-surface-2 p-4">
         <div className="mb-3 font-display text-[15px] font-bold">Выпустить подарочную карту</div>
         <label className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
-          <span className="text-[12px] font-semibold text-[#8A7F76]">Номинал</span>
+          <span className="text-[12px] font-semibold text-subtle">Номинал</span>
           <input
             value={form.amount}
             onChange={(event) => setForm((f) => ({ ...f, amount: event.target.value }))}
             inputMode="numeric"
             required
-            className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
+            className="rounded-[10px] border border-surface-3 bg-ink-dark px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
           />
         </label>
         <label className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
-          <span className="text-[12px] font-semibold text-[#8A7F76]">Заметка</span>
+          <span className="text-[12px] font-semibold text-subtle">Заметка</span>
           <input
             value={form.note}
             onChange={(event) => setForm((f) => ({ ...f, note: event.target.value }))}
             placeholder="Подарочная карта за возврат"
-            className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
+            className="rounded-[10px] border border-surface-3 bg-ink-dark px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
           />
         </label>
         <button
@@ -85,9 +85,9 @@ export function GiftCardIssue({
 
       {issued && (
         <div className="rounded-[16px] border border-lime/20 bg-lime/10 p-4">
-          <div className="text-[11px] font-semibold uppercase text-[#8A7F76]">Код карты — сообщите клиенту</div>
+          <div className="text-[11px] font-semibold uppercase text-subtle">Код карты — сообщите клиенту</div>
           <div className="mt-1.5 break-all font-mono text-lg font-bold text-lime">{issued.code}</div>
-          <div className="mt-2 text-[13px] text-[#D8CFC6]">
+          <div className="mt-2 text-[13px] text-bright">
             {som(issued.balance)} · {issued.status}
             {issued.expiresAt && <span> · до {issued.expiresAt.slice(0, 10)}</span>}
           </div>

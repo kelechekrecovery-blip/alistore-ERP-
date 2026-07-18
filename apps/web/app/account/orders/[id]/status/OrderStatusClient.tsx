@@ -45,7 +45,7 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
     <AccountDetailFrame>{children}</AccountDetailFrame>
   );
 
-  if (order === null) return frame(<div className="grid flex-1 place-items-center font-mono text-sm text-[#8A7F76]">Загрузка…</div>);
+  if (order === null) return frame(<div className="grid flex-1 place-items-center font-mono text-sm text-subtle">Загрузка…</div>);
   if (order === 'missing') return frame(<div className="grid flex-1 place-items-center text-center"><div><p className="font-display text-lg font-bold">Заказ не найден</p><Link href="/account" className="mt-3 inline-block text-sm text-lime">← В кабинет</Link></div></div>);
 
   const bad = TERMINAL_BAD[order.status];
@@ -56,38 +56,38 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
         <button type="button" onClick={() => router.back()} className="text-xl">←</button>
         <span className="font-display text-xl font-bold">Заказ #{order.id.slice(-8)}</span>
       </div>
-      <div className="mb-4 ml-8 text-[13px] text-[#A79C92]">{fmt(order.createdAt)} · {som(order.total)}</div>
+      <div className="mb-4 ml-8 text-[13px] text-muted">{fmt(order.createdAt)} · {som(order.total)}</div>
 
       {bad && (
-        <div className="mb-3 rounded-[14px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/5 p-4 text-sm font-semibold text-[#FF8A7A]">{bad}</div>
+        <div className="mb-3 rounded-[14px] border border-danger-soft/30 bg-danger-soft/5 p-4 text-sm font-semibold text-danger-soft">{bad}</div>
       )}
 
       {(order.pickupPoint || order.deliveryAddress || order.pickupCode) && (
-        <div className="mb-3 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-4">
-          <div className="mb-1 text-xs uppercase tracking-wide text-[#8A7F76]">Получение</div>
+        <div className="mb-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+          <div className="mb-1 text-xs uppercase tracking-wide text-subtle">Получение</div>
           <div className="text-sm font-semibold text-white">
             {order.pickupPoint ?? order.deliveryAddress ?? order.fulfillmentType}
           </div>
-          {order.deliverySlot && <div className="mt-1 text-xs text-[#A79C92]">{order.deliverySlot}</div>}
+          {order.deliverySlot && <div className="mt-1 text-xs text-muted">{order.deliverySlot}</div>}
           {order.pickupCode && <div className="mt-2 font-display text-lg font-extrabold text-lime">{order.pickupCode}</div>}
         </div>
       )}
 
-      <div className="rounded-[16px] border border-[#2E2822] bg-[#221E19] p-[18px]">
+      <div className="rounded-[16px] border border-surface-3 bg-surface-2 p-[18px]">
         {steps.map((s, i) => {
           const last = i === steps.length - 1;
           const mark = s.state === 'done' ? '✓' : s.state === 'current' ? '•' : i + 1;
           const circle =
-            s.state === 'done' ? 'bg-lime text-lime-ink' : s.state === 'current' ? 'bg-coral text-white' : 'bg-[#2E2822] text-[#8A7F76]';
+            s.state === 'done' ? 'bg-lime text-lime-ink' : s.state === 'current' ? 'bg-coral text-white' : 'bg-surface-3 text-subtle';
           return (
             <div key={s.title} className="flex gap-3">
               <div className="flex flex-col items-center">
                 <span className={`grid h-[26px] w-[26px] flex-shrink-0 place-items-center rounded-full text-[13px] ${circle}`}>{mark}</span>
-                {!last && <span className={`min-h-[14px] w-0.5 flex-1 ${s.state === 'done' ? 'bg-lime' : 'bg-[#2E2822]'}`} />}
+                {!last && <span className={`min-h-[14px] w-0.5 flex-1 ${s.state === 'done' ? 'bg-lime' : 'bg-surface-3'}`} />}
               </div>
               <div className="pb-4">
-                <div className={`text-sm font-semibold ${s.state === 'future' ? 'text-[#8A7F76]' : 'text-white'}`}>{s.title}</div>
-                <div className="mt-0.5 text-xs text-[#8A7F76]">{s.time ? fmt(s.time) : s.state === 'current' ? 'в процессе' : '—'}</div>
+                <div className={`text-sm font-semibold ${s.state === 'future' ? 'text-subtle' : 'text-white'}`}>{s.title}</div>
+                <div className="mt-0.5 text-xs text-subtle">{s.time ? fmt(s.time) : s.state === 'current' ? 'в процессе' : '—'}</div>
               </div>
             </div>
           );
@@ -95,10 +95,10 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
-        <Link href="/account/orders" className="rounded-[11px] border border-[#2E2822] bg-[#221E19] py-3 text-center text-[#D8CFC6]">🧾 Чек</Link>
-        <Link href="/account/devices" className="rounded-[11px] border border-[#2E2822] bg-[#221E19] py-3 text-center text-[#D8CFC6]">🛡 Гарантия</Link>
-        <a href="https://wa.me/996700000000" target="_blank" rel="noreferrer" className="rounded-[11px] border border-[#2E2822] bg-[#221E19] py-3 text-center text-[#D8CFC6]">💬 WhatsApp</a>
-        <Link href={`/account/orders/${order.id}`} className="rounded-[11px] border border-[#2E2822] bg-[#221E19] py-3 text-center text-[#A79C92]">Детали</Link>
+        <Link href="/account/orders" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">🧾 Чек</Link>
+        <Link href="/account/devices" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">🛡 Гарантия</Link>
+        <a href="https://wa.me/996700000000" target="_blank" rel="noreferrer" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">💬 WhatsApp</a>
+        <Link href={`/account/orders/${order.id}`} className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-muted">Детали</Link>
       </div>
     </div>,
   );
