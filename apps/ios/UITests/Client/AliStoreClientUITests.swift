@@ -167,7 +167,7 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["24 900 сом"].exists)
         XCTAssertTrue(app.staticTexts["Причина возврата"].exists)
         XCTAssertTrue(app.buttons["return-reason-Не подошёл цвет"].exists)
-        XCTAssertTrue(app.staticTexts["return-photo-placeholder"].exists)
+        XCTAssertTrue(app.buttons["return-photo-picker"].exists)
         XCTAssertTrue(app.buttons["return-submit"].exists)
     }
 
