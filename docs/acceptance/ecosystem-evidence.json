@@ -57,8 +57,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-3a864aa20a151ad9d051388ae8311f8ac752409f85c13fb420c2279a9853a4da.json",
-          "sha256": "3a864aa20a151ad9d051388ae8311f8ac752409f85c13fb420c2279a9853a4da"
+          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-87b07a13e3dc7fdf4b59e191a7087dbc629ac9bf1aa95aaf757f0cf19c39042f.json",
+          "sha256": "87b07a13e3dc7fdf4b59e191a7087dbc629ac9bf1aa95aaf757f0cf19c39042f"
         }
       ]
     },
