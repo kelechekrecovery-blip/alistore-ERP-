@@ -367,6 +367,20 @@
   .checkout-panel .text-bright {
     color: #201b17 !important;
   }
+  .checkout-panel .bg-surface-2,
+  .checkout-panel .bg-ink-dark,
+  .checkout-panel .bg-surface {
+    background: #fff !important;
+  }
+  .checkout-panel .border-surface-3,
+  .checkout-panel .border-line {
+    border-color: #e7ddd3 !important;
+  }
+  .checkout-panel .text-muted,
+  .checkout-panel .text-subtle,
+  .checkout-panel .text-faint {
+    color: #6e645c !important;
+  }
 }
 
 @media (max-width: 767px) {

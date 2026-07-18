@@ -43,6 +43,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [reviewMsg, setReviewMsg] = useState("");
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
+  const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -183,7 +184,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
             <div>
               <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-linen bg-gradient-to-br from-white to-sand shadow-soft">
-                {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
+                {productImage(product) ? <Image src={(productImages(product)[activeImage] ?? productImage(product))!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
                 <span className="absolute left-5 top-5 rounded-full border border-coral/25 bg-tint px-3 py-1.5 text-xs font-semibold text-deep">
                   {condition}
                 </span>
@@ -193,7 +194,9 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   <button
                     key={`${src}-${index}`}
                     type="button"
-                    className={`relative aspect-square overflow-hidden rounded-[13px] border bg-white ${index === 0 ? "border-coral" : "border-bright"}`}
+                    onClick={() => setActiveImage(index)}
+                    aria-pressed={index === activeImage}
+                    className={`relative aspect-square overflow-hidden rounded-[13px] border bg-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 ${index === activeImage ? "border-coral" : "border-linen hover:border-faint"}`}
                     aria-label={`Фото товара ${index + 1}`}
                   >
                     <Image
@@ -201,7 +204,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       alt=""
                       fill
                       sizes="120px"
-                      className="object-contain p-3 opacity-80"
+                      className={`object-contain p-3 transition ${index === activeImage ? "opacity-100" : "opacity-70"}`}
                     />
                   </button>
                 ))}
@@ -229,10 +232,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </div>
               {typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-deep">{product.attrs.financingText}</div>}
               <div
-                className={`mt-5 flex items-center gap-2 text-sm ${inStock ? "text-success-soft" : "text-[#f4c27d]"}`}
+                className={`mt-5 flex items-center gap-2 text-sm font-semibold ${inStock ? "text-success" : "text-warn"}`}
               >
                 <span
-                  className={`h-2 w-2 rounded-full ${inStock ? "bg-success shadow-[0_0_10px_#22c55e]" : "bg-warn"}`}
+                  className={`h-2 w-2 rounded-full ${inStock ? "bg-success shadow-[0_0_10px_#2e7d46]" : "bg-warn"}`}
                 />
                 {inStock
                   ? `В наличии · ${product.availableUnits} шт.`

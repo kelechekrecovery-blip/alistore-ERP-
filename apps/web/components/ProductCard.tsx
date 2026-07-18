@@ -84,7 +84,7 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
         <Link href={href} className="mt-1.5 min-h-[38px] text-[13px] font-medium leading-[1.4] text-ink transition hover:text-coral">{product.name}</Link>
         <div className="mt-2 flex flex-wrap gap-1">{productSpecEntries(product).slice(0, 3).map(([key, value]) => <span key={key} className="rounded-[4px] bg-sand px-2 py-1 text-[10px] text-faint">{String(value)}</span>)}</div>
         <div className={`mt-2 flex items-center gap-1 text-[11px] ${inStock ? 'text-success' : 'text-faint'}`}><span className="text-[8px]">●</span>{inStock ? `В наличии · ${product.availableUnits} шт.` : 'Под заказ'}</div>
-        <div className="mt-2 font-mono tabular text-[18px] font-extrabold text-ink">{som(product.price)}</div>
+        <div className="mt-2 font-display tabular text-[18px] font-extrabold text-ink">{som(product.price)}</div>
         {typeof product.attrs?.financingText === 'string' && <div className="mt-1 text-[11px] text-faint">{product.attrs.financingText}</div>}
         <div className="mt-auto flex gap-1.5 pt-3">
           <button type="button" disabled={!inStock} onClick={addToCart} className={`flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-linen disabled:text-faint ${added ? 'bg-success text-white' : 'bg-coral text-white hover:bg-deep'}`}>
