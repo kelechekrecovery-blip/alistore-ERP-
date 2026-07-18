@@ -21,7 +21,7 @@ test('owner opens and closes store operations checklists and resolves an inciden
   await page.getByRole('button', { name: /Операции точки/ }).click();
 
   const view = page.getByTestId('store-operations-view');
-  await expect(view.getByRole('heading', { name: 'Операционка точки' })).toBeVisible();
+  await expect(view.getByRole('heading', { name: 'Операционка точки' }).first()).toBeVisible();
   await view.getByLabel('Дата операций точки').fill(businessDate);
   await view.getByLabel('Код операционной точки').fill('BISHKEK-1');
 
@@ -47,12 +47,12 @@ test('owner opens and closes store operations checklists and resolves an inciden
 
   await view.getByLabel('Заголовок инцидента').fill('Повреждена витринная полка');
   await view.getByLabel('Описание инцидента').fill('Зафиксирована трещина перед открытием точки');
-  await view.getByRole('button', { name: 'Зафиксировать' }).click();
+  await view.getByRole('button', { name: 'Добавить' }).click();
   await expect(view.getByText('Повреждена витринная полка')).toBeVisible();
 
   await view.getByRole('button', { name: 'Закрыть' }).click();
   await view.getByLabel('Решение инцидента Повреждена витринная полка').fill('Полка заменена, фото добавлено в Evidence Vault');
-  await view.getByRole('button', { name: 'Подтвердить' }).click();
+  await view.getByRole('button', { name: 'Сохранить' }).click();
   await expect(view.getByText('Решение: Полка заменена, фото добавлено в Evidence Vault')).toBeVisible();
   await expect(view.getByText('закрыт', { exact: true })).toBeVisible();
 

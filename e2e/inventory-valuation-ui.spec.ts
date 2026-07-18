@@ -27,8 +27,8 @@ test('owner sees owned inventory valuation and GL reconciliation in ERP stock', 
   await expect(page.getByText('Движение стоимости запасов')).toBeVisible();
   await expect(page.getByText('Начало + поступления + возвраты')).toBeVisible();
   await expect(page.getByText('Оценка запасов и GL 1200')).toBeVisible();
-  await expect(page.getByText('Количественный')).toBeVisible();
-  await expect(page.getByText('Серийный')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Количественный' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Серийный' })).toBeVisible();
   await expect(page.getByText('GL 1200', { exact: true })).toBeVisible();
   await expect(page.getByText('GL на начало', { exact: true })).toBeVisible();
   await expect(page.getByText('Разница начала', { exact: true })).toBeVisible();

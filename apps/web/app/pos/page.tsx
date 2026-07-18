@@ -344,7 +344,7 @@ export default function PosPage() {
 
       <main
         data-testid="pos-terminal"
-        className="erp3-shell relative flex h-[820px] max-h-[95vh] w-full max-w-[1180px] overflow-hidden border-[10px] border-ink"
+        className="erp3-shell relative flex h-[820px] max-h-[95vh] w-full max-w-[1180px] overflow-hidden border-[10px] border-ink bg-ink-dark"
       >
         <PosCatalog
           cashier={cashier}

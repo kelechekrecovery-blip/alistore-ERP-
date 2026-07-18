@@ -83,16 +83,16 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
 
   await page.goto(`/product/${product.id}`);
   await expect(page.getByRole('heading', { name: product.name })).toBeVisible();
-  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
 
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: 'Корзина', exact: true })).toBeVisible();
-  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
 
   await page.goto('/checkout');
   await expect(page.getByText('Способ получения')).toBeVisible();
-  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
-  expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)');
+  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+  expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(255, 255, 255, 0.04)');
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900001');
   await page.getByPlaceholder('Имя').fill('E2E Buyer');
@@ -337,7 +337,7 @@ test('phone checkout preserves the dark Client App handoff theme', async ({ page
 
   await page.goto('/checkout');
   await expect(page.getByText('Способ получения')).toBeVisible();
-  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(12, 12, 23)');
-  expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(17, 17, 32)');
+  expect(await page.locator('.checkout-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(22, 19, 15)');
+  expect(await page.locator('.checkout-panel').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(22, 19, 15)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });
