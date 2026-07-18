@@ -4004,3 +4004,13 @@
 - Outcome: local software slice `accepted`; live staging deploy remains `externally blocked` on owner accounts/secrets per contract. Commit association: `fccef3c` (workflow), `a4e2efd` (env templates), `5450b56` (owner runbook), docs commit on top (BACKLOG + this entry).
 - Remaining gaps (owner/next gates): create accounts per `docs/OWNER-LAUNCH-CHECKLIST.md` and paste secrets (Render env, GitHub `RENDER_DEPLOY_HOOK_*`); first live staging deploy + soak/rollback drill on Render; signed native release workflows; Apple/Google review timelines; final privacy-policy texts from the lawyer.
 - Next step: per backlog order — native release workflows after the owner supplies store credentials, or the next unblocked P1 in `BACKLOG.md` «Next».
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-EXECUTION-023`.
+- Task: execute the first detailed Phase 1 slice across Web/ERP, Android operations and iOS client contracts.
+- Accepted commits: `13219a3` Android POS/Courier conflict reconciliation; `dfc21da` Web/ERP staff and operations surfaces; `6f2263e` iOS account/order contract tests and Xcode wiring; `23ba312` Android Staff support/order parity.
+- Result: Web production build passed; Web RBAC targeted tests passed `21/21`; Android `:core:test` passed after resolving duplicate parallel declarations; iOS core sources compiled and new contract files are wired into `AliStoreCoreTests`.
+- Gate status: iOS XCTest runner was interrupted while waiting for test workers, so iOS test/UI evidence is not accepted. Notification coverage E2E is present but currently fails TypeScript compilation because its constructor calls target older service signatures; it is not committed or counted as green.
+- Remaining dirty parallel files: API notification integration changes, Android packaged UI test edits, iOS Client changes and Web Staff changes. They must be reviewed before the next clean-SHA evidence run.
+- Documentation: detailed gate order is recorded in `docs/PHASE-1-EXECUTION-PLAN.md`.
+- Next step: stabilize the remaining parallel API/native changes, repair notification E2E against current constructors, then record fresh iOS/Android evidence on one clean HEAD and rerun strict audit.
