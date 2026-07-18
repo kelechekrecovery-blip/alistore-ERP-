@@ -158,8 +158,8 @@
     z-index: auto;
     display: block;
     min-height: 100vh;
-    background: #f5f5f7;
-    color: #1d1d1f;
+    background: #f7f2ec;
+    color: #201b17;
   }
 
   .account-detail-header,
@@ -175,7 +175,7 @@
     margin-inline: auto;
     padding-block: 32px 64px;
     background: transparent;
-    color: #1d1d1f;
+    color: #201b17;
   }
 
   .account-detail-panel > .overflow-y-auto {
@@ -189,32 +189,32 @@
   }
 
   .account-detail-panel .border-\[\#2E2822\] {
-    border-color: #e5e5e7 !important;
+    border-color: #e7ddd3 !important;
   }
 
   .account-detail-panel .text-white,
   .account-detail-panel .text-\[\#D8CFC6\] {
-    color: #1d1d1f !important;
+    color: #201b17 !important;
   }
 
   .account-detail-panel .text-\[\#A79C92\],
   .account-detail-panel .text-\[\#8A7F76\],
   .account-detail-panel .text-\[\#6E645C\] {
-    color: #6e6e73 !important;
+    color: #6e645c !important;
   }
 
   .account-detail-panel .bg-lime {
-    background: #1d1d1f !important;
+    background: #201b17 !important;
     color: #fff !important;
   }
 
   .account-detail-panel .text-lime {
-    color: #ff4d2e !important;
+    color: #ff5b2e !important;
   }
 
   .customer-service-shell {
-    background: #f5f5f7;
-    color: #1d1d1f;
+    background: #f7f2ec;
+    color: #201b17;
   }
 
   .customer-service-main {
@@ -223,18 +223,18 @@
   }
 
   .customer-service-back {
-    border-color: #e5e5e7;
+    border-color: #e7ddd3;
     background: #fff;
-    color: #1d1d1f;
+    color: #201b17;
   }
 
   .customer-service-title {
-    color: #1d1d1f;
+    color: #201b17;
     font-size: 32px;
   }
 
   .customer-service-subtitle {
-    color: #6e6e73;
+    color: #6e645c;
   }
 
   .customer-service-content {
@@ -250,89 +250,89 @@
   }
 
   .customer-service-content .border-\[\#2E2822\] {
-    border-color: #e5e5e7 !important;
+    border-color: #e7ddd3 !important;
   }
 
   .customer-service-content .text-\[\#D8CFC6\],
   .customer-service-content .text-\[\#A79C92\] {
-    color: #424245 !important;
+    color: #4a4139 !important;
   }
 
   .customer-service-content .text-\[\#8A7F76\],
   .customer-service-content .text-\[\#6E645C\] {
-    color: #6e6e73 !important;
+    color: #6e645c !important;
   }
 
   .customer-service-content .bg-lime {
-    background: #1d1d1f !important;
+    background: #201b17 !important;
     color: #fff !important;
   }
 
   .login-shell {
-    background: #f5f5f7 !important;
-    color: #0f0f0f !important;
+    background: #f7f2ec !important;
+    color: #201b17 !important;
   }
 
   .login-panel {
-    border-color: #e5e5e7 !important;
+    border-color: #e7ddd3 !important;
     background: #ffffff !important;
     box-shadow: none !important;
   }
 
   .login-tabs {
-    background: #f5f5f7 !important;
+    background: #f7f2ec !important;
   }
 
   .login-field {
-    border-color: #d2d2d7 !important;
+    border-color: #e7ddd3 !important;
     background: #ffffff !important;
-    color: #0f0f0f !important;
+    color: #201b17 !important;
   }
 
   .checkout-shell {
-    background: #f5f5f7 !important;
-    color: #0f0f0f !important;
+    background: #f7f2ec !important;
+    color: #201b17 !important;
   }
 
   .checkout-panel {
-    border-color: #e5e5e7 !important;
+    border-color: #e7ddd3 !important;
     background: #ffffff !important;
     box-shadow: none !important;
   }
 
   .checkout-surface,
   .checkout-nested {
-    border-color: #d2d2d7 !important;
+    border-color: #e7ddd3 !important;
     background: #ffffff !important;
-    color: #0f0f0f !important;
+    color: #201b17 !important;
   }
 
   .checkout-field {
-    border-color: #d2d2d7 !important;
+    border-color: #e7ddd3 !important;
     background: #ffffff !important;
-    color: #0f0f0f !important;
+    color: #201b17 !important;
   }
 
   .checkout-primary {
-    background: #ff4d2e !important;
+    background: #ff5b2e !important;
     color: #ffffff !important;
   }
 
   .checkout-panel .text-white,
   .checkout-panel .text-\[\#D8CFC6\] {
-    color: #0f0f0f !important;
+    color: #201b17 !important;
   }
 
   .checkout-panel .text-lime {
-    color: #ff4d2e !important;
+    color: #ff5b2e !important;
   }
 
   .checkout-panel .border-lime {
-    border-color: #ff4d2e !important;
+    border-color: #ff5b2e !important;
   }
 
   .checkout-panel .bg-lime {
-    background: #ff4d2e !important;
+    background: #ff5b2e !important;
   }
 
   /* Token-class equivalents of the hex overrides above. After Phase-2 tokenization
@@ -346,26 +346,26 @@
   }
   .account-detail-panel .border-surface-3,
   .customer-service-content .border-surface-3 {
-    border-color: #e5e5e7 !important;
+    border-color: #e7ddd3 !important;
   }
   .account-detail-panel .text-bright {
-    color: #1d1d1f !important;
+    color: #201b17 !important;
   }
   .account-detail-panel .text-muted,
   .account-detail-panel .text-subtle,
   .account-detail-panel .text-faint {
-    color: #6e6e73 !important;
+    color: #6e645c !important;
   }
   .customer-service-content .text-bright,
   .customer-service-content .text-muted {
-    color: #424245 !important;
+    color: #4a4139 !important;
   }
   .customer-service-content .text-subtle,
   .customer-service-content .text-faint {
-    color: #6e6e73 !important;
+    color: #6e645c !important;
   }
   .checkout-panel .text-bright {
-    color: #0f0f0f !important;
+    color: #201b17 !important;
   }
 }
 

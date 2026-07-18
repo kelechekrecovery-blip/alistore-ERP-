@@ -43,7 +43,7 @@ export default function AccountPage() {
   useEffect(() => { if (user) authed(fetchMyOrders).then(setOrders).catch(() => setOrders([])); }, [user, authed]);
   useEffect(() => { if (user) authed(fetchMyLoyalty).then(setLoyalty).catch(() => setLoyalty(null)); }, [user, authed]);
 
-  if (!hydrated || !user) return <div className="min-h-screen bg-paper text-steel"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
+  if (!hydrated || !user) return <div className="min-h-screen bg-sand text-faint"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
   return <>
     <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} loyalty={loyalty} onLogout={async () => { await logout(); router.push('/'); }} /></div>

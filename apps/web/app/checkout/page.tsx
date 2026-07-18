@@ -311,7 +311,7 @@ export default function CheckoutPage() {
   }
 
   const wrap = (children: React.ReactNode) => (
-    <div className="checkout-shell min-h-screen bg-coal font-sans text-white">
+    <div className="checkout-shell min-h-screen bg-ink-dark font-sans text-white">
       <SiteHeader />
       <main className="mx-auto w-[min(900px,92vw)] py-10 sm:py-14">
         <div className="checkout-panel overflow-hidden rounded-[22px] border border-white/[0.1] bg-[#111120] shadow-[0_28px_90px_-55px_rgba(249,115,22,.55)]">

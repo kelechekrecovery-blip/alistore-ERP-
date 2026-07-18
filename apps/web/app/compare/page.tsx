@@ -41,17 +41,17 @@ export default function ComparePage() {
     <div className="min-h-screen bg-sand text-ink font-sans">
       <SiteHeader />
       <main className="mx-auto min-h-[620px] max-w-[1400px] px-5 py-10">
-        <div className="text-xs text-slate">Главная / Сравнение</div>
+        <div className="text-xs text-faint">Главная / Сравнение</div>
         <h1 className="mt-3 text-[34px] font-extrabold">Сравнение</h1>
-        <p className="mt-2 text-steel">
+        <p className="mt-2 text-faint">
           Сопоставьте цены, состояние, память и наличие.
         </p>
         {compare.hydrated && list.length === 0 ? (
-          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-mist bg-white text-center">
+          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-linen bg-white text-center">
             <div>
-              <GitCompareArrows className="mx-auto text-slate" size={40} />
+              <GitCompareArrows className="mx-auto text-faint" size={40} />
               <h2 className="mt-5 text-2xl font-bold">Нечего сравнивать</h2>
-              <p className="mt-2 text-steel">
+              <p className="mt-2 text-faint">
                 Добавьте до четырёх товаров из карточки товара.
               </p>
               <Link
@@ -63,25 +63,25 @@ export default function ComparePage() {
             </div>
           </div>
         ) : (
-          <div className="mt-10 overflow-x-auto rounded-[12px] border border-mist bg-white">
+          <div className="mt-10 overflow-x-auto rounded-[12px] border border-linen bg-white">
             <div
               className="grid min-w-[760px]"
               style={{
                 gridTemplateColumns: `180px repeat(${Math.max(list.length, 1)}, minmax(220px, 1fr))`,
               }}
             >
-              <div className="border-b border-r border-mist p-5 text-sm text-slate">
+              <div className="border-b border-r border-linen p-5 text-sm text-faint">
                 Товар
               </div>
               {list.map((product) => (
                 <div
                   key={product.id}
-                  className="relative border-b border-r border-mist p-5 last:border-r-0"
+                  className="relative border-b border-r border-linen p-5 last:border-r-0"
                 >
                   <button
                     type="button"
                     onClick={() => compare.remove(product.id)}
-                    className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-[8px] border border-mist text-slate hover:text-coral"
+                    className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-[8px] border border-linen text-faint hover:text-coral"
                     aria-label="Убрать"
                   >
                     <Trash2 size={15} />
@@ -90,7 +90,7 @@ export default function ComparePage() {
                     href={`/product/${product.id}`}
                     className="relative mx-auto block h-36 w-36"
                   >
-                    {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="144px" className="object-contain" /> : <span className="flex h-full items-center justify-center text-slate"><ImageOff size={28} /></span>}
+                    {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="144px" className="object-contain" /> : <span className="flex h-full items-center justify-center text-faint"><ImageOff size={28} /></span>}
                   </Link>
                   <Link
                     href={`/product/${product.id}`}
@@ -99,7 +99,7 @@ export default function ComparePage() {
                     {product.name}
                   </Link>
                   {product.price === bestPrice && (
-                    <span className="mt-2 inline-flex rounded-[4px] bg-[#eaf8f0] px-2 py-1 text-[10px] text-success">
+                    <span className="mt-2 inline-flex rounded-[4px] bg-success/10 px-2 py-1 text-[10px] text-success">
                       Лучшая цена
                     </span>
                   )}
@@ -118,7 +118,7 @@ export default function ComparePage() {
                         stockLimit: product.availableUnits,
                       })
                     }
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-[8px] bg-coal py-2.5 text-sm font-bold text-white hover:bg-coral disabled:bg-mist disabled:text-slate"
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-[8px] bg-coral py-2.5 text-sm font-bold text-white hover:bg-deep disabled:bg-linen disabled:text-faint"
                   >
                     <ShoppingBag size={16} /> В корзину
                   </button>
@@ -177,13 +177,13 @@ function CompareRow({
 }) {
   return (
     <>
-      <div className="border-b border-r border-mist p-5 text-sm text-slate">
+      <div className="border-b border-r border-linen p-5 text-sm text-faint">
         {label}
       </div>
       {products.map((product) => (
         <div
           key={`${label}-${product.id}`}
-          className="border-b border-r border-mist p-5 text-sm text-steel last:border-r-0"
+          className="border-b border-r border-linen p-5 text-sm text-faint last:border-r-0"
         >
           {value(product)}
         </div>
