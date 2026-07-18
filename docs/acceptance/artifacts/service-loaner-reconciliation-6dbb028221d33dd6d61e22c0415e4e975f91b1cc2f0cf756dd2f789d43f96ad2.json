@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "gate": "service-loaner-reconciliation",
+  "command": "npm run ecosystem:service-loaner:e2e",
+  "executionCommand": "npm run ecosystem:service-loaner:e2e",
+  "exitCode": 0,
+  "packageCommandSha256": "31cfc21819d1726c0aaa8f88f31c75d439e2544239b6a5fc7de8f11535e9cdc8",
+  "sourceTreeSha256": "61c6d4ad71b6894ae4e6059449964aacd488da19589346df47574428da5a4f3d",
+  "sourceCommit": "0a29ce74b621b7ff8e75c23dcfd1936a3a29d14a",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "gitPath": "/usr/bin/git",
+    "gitSha256": "a961f78075d8e7621ef4f5d764c64ef8a41bf66c0a98ab5cb6ca39b85ce31c93",
+    "npmCliPath": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
+    "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
+    "npmTreeSha256": "e67a8e00660f73aa621c1ddada5d5d28972e5118c50835b29d2731ce5b37a2e2",
+    "scriptShellPath": "/bin/sh",
+    "scriptShellSha256": "a3a314699fd6128c288842c9bbe3c8c82bd9dc22abfa7efad22ac4f6047d5d4f",
+    "nodePath": "/opt/homebrew/Cellar/node/25.9.0_3/bin/node",
+    "nodeSha256": "fba87e4402c55ea4fc7ca9b9838790c32534e3e77c9c7834c37073752d070678",
+    "nodeKegSha256": "65c4bb19d66915f662bc6ae9ba9d8dd7488ee97978105e2bcf288af29e9d0c34",
+    "nodeRuntimeLibrariesSha256": "9c394a51b03c0909bc87e05d2d738b06fda4a2a0500d8d7b9f8f9d39c383819a",
+    "browserPath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "browserSha256": "5acd03e7ff56ad32bc99f27b258b75393795463b53c66dd531c4432e8d0a5a3e",
+    "browserAppTreeSha256": "9543a7ec4ded3d016c8bc3e737faa83a6ddeb1ee0ce14e52a0dc6488f44fc72c",
+    "packageLockSha256": "167243a119251409eabb12df1f1e18fcd2744b3a2c27904a4e0bf622085394e5",
+    "nodeModulesTreeSha256": "19d87cafeeb3e1c7a987d850f0a18a1abe44d9c3797bbb7036a9429a0743acde",
+    "playwrightCliPath": "/Users/alistore/Desktop/alistore-erp/node_modules/@playwright/test/cli.js",
+    "playwrightCliSha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69",
+    "playwrightShim": {
+      "path": "/Users/alistore/Desktop/alistore-erp/node_modules/.bin/playwright",
+      "target": "/Users/alistore/Desktop/alistore-erp/node_modules/@playwright/test/cli.js",
+      "linkSha256": "9f09dcf8c128cb5828b07cd0290050ce16035f813a4fa1892bd4c591b5d01ece"
+    },
+    "jestCliPath": "/Users/alistore/Desktop/alistore-erp/node_modules/jest/bin/jest.js",
+    "jestCliSha256": "2a9b435eab8a343bd09fe285b2e2043ff9ff89fae4e1d1f46ba3df28659d8a2c",
+    "jestShim": {
+      "path": "/Users/alistore/Desktop/alistore-erp/node_modules/.bin/jest",
+      "target": "/Users/alistore/Desktop/alistore-erp/node_modules/jest/bin/jest.js",
+      "linkSha256": "4347cb0072e26d934e530c501804a4e292e646e9bd7bcadab22dd636369c2f5a"
+    },
+    "acceptanceDatabaseIdentity": "postgresql://127.0.0.1:5432/alistore_test",
+    "toolchain": "v25.9.0"
+  },
+  "executionEnvironmentSha256": "77ae50b1e47ca99cd500109c449680ca5150d03cec5d40dae2ed1119ecbfe6ab",
+  "completedAt": "2026-07-18T07:25:07.529Z"
+}
