@@ -1067,7 +1067,10 @@ private struct ClientRootView: View {
         catalogLoading = true
         defer { catalogLoading = false }
 #if DEBUG
-        if UITestBootstrap.startsAsGuest, !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart {
+        if UITestBootstrap.startsAsGuest,
+           !UITestBootstrap.startsAtVisualEvidence,
+           !UITestBootstrap.startsAtCheckout,
+           !UITestBootstrap.startsAtCart {
             products = ClientUIFixture.products
             catalogError = nil
             return
