@@ -3,7 +3,7 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 import UIKit
-import UserNotifications
+@preconcurrency import UserNotifications
 
 private extension Notification.Name {
     static let alistoreAPNsToken = Notification.Name("alistore.apns.token")
@@ -11,9 +11,12 @@ private extension Notification.Name {
     static let alistorePushRoute = Notification.Name("alistore.push.route")
 }
 
-private final class ClientAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+@MainActor
+private final class ClientAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = ClientNotificationDelegate()
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().delegate = notificationDelegate
         return true
     }
 
@@ -26,6 +29,9 @@ private final class ClientAppDelegate: NSObject, UIApplicationDelegate, UNUserNo
         NotificationCenter.default.post(name: .alistoreAPNsFailure, object: error.localizedDescription)
     }
 
+}
+
+private final class ClientNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -41,7 +47,9 @@ private final class ClientAppDelegate: NSObject, UIApplicationDelegate, UNUserNo
         if let referenceId = stringValue(userInfo["referenceId"]) ?? stringValue(userInfo["orderId"]) ?? stringValue(userInfo["warrantyId"]) {
             payload["referenceId"] = referenceId
         }
-        NotificationCenter.default.post(name: .alistorePushRoute, object: nil, userInfo: payload)
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .alistorePushRoute, object: nil, userInfo: payload)
+        }
     }
 
     private func stringValue(_ value: Any?) -> String? {
