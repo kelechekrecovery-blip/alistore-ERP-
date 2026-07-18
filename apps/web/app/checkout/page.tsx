@@ -30,18 +30,19 @@ import { loadAttribution } from '@/lib/attribution';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
+import { Banknote, CalendarClock, CreditCard, QrCode, Smartphone, Store, Truck, Zap } from 'lucide-react';
 
 const DELIVERY = [
-  { id: 'pickup', icon: '🏬', name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
-  { id: 'courier', icon: '🚚', name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с', fee: 200 },
-  { id: 'express', icon: '⚡', name: 'Экспресс', meta: 'в течение часа', price: '400 с', fee: 400 },
+  { id: 'pickup', icon: Store, name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
+  { id: 'courier', icon: Truck, name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с', fee: 200 },
+  { id: 'express', icon: Zap, name: 'Экспресс', meta: 'в течение часа', price: '400 с', fee: 400 },
 ];
 const PAYMENT = [
-  { id: 'cash', icon: '💵', name: 'Наличными при получении' },
-  { id: 'card', icon: '💳', name: 'Картой' },
-  { id: 'qr_mbank', icon: '📱', name: 'QR · MBank' },
-  { id: 'qr_odengi', icon: '📲', name: 'QR · O!Деньги' },
-  { id: 'installment', icon: '📅', name: 'Рассрочка (условия провайдера)' },
+  { id: 'cash', icon: Banknote, name: 'Наличными при получении' },
+  { id: 'card', icon: CreditCard, name: 'Картой' },
+  { id: 'qr_mbank', icon: Smartphone, name: 'QR · MBank' },
+  { id: 'qr_odengi', icon: QrCode, name: 'QR · O!Деньги' },
+  { id: 'installment', icon: CalendarClock, name: 'Рассрочка (условия провайдера)' },
 ] as const;
 type PaymentChoice = (typeof PAYMENT)[number]['id'];
 const STEPS = ['Получение', 'Контакты', 'Оплата', 'Подтверждение'];
@@ -370,7 +371,7 @@ export default function CheckoutPage() {
             <div className="mb-3 font-display text-base font-bold">Способ получения</div>
             {DELIVERY.map((d) => (
               <button key={d.id} type="button" aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-surface-3'}`}>
-                <span className="text-2xl">{d.icon}</span>
+                <d.icon size={22} className="text-ink" />
                 <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-muted">{d.meta}</div></div>
                 <span className="text-[13px] text-bright">{d.price}</span>
               </button>
@@ -470,7 +471,7 @@ export default function CheckoutPage() {
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
             {PAYMENT.filter((p) => p.id !== 'cash' || delivery === 'courier').map((p) => (
               <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
-                <span className="text-xl">{p.icon}</span>
+                <p.icon size={20} className="text-ink" />
                 <span className="flex-1 text-sm">{p.name}</span>
                 <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-line'}`} style={{ height: 18, width: 18 }} />
               </button>
