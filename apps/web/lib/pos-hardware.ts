@@ -73,7 +73,7 @@ export function printPosReceipt(snapshot: PosReceiptSnapshot, result?: PosSaleRe
 }
 
 /** Print a server-rendered SVG document (receipt preview, barcode label) in a popup. */
-export function printServerSvg(svg: string, title: string) {
+export function printServerSvg(svg: string, title: string, caption?: string) {
   if (typeof window === 'undefined') return;
   const popup = window.open('', `alistore-print-${title}`, 'width=420,height=720');
   if (!popup) return;
@@ -83,9 +83,37 @@ export function printServerSvg(svg: string, title: string) {
     <head>
       <meta charset="utf-8" />
       <title>${escapeHtml(title)}</title>
-      <style>body { margin: 0; display: grid; place-items: center; } svg { max-width: 100%; }</style>
+      <style>
+        body { margin: 0; display: grid; place-items: center; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        svg { max-width: 100%; }
+        .caption { margin: 4mm 0 2mm; font-weight: 700; text-align: center; }
+      </style>
     </head>
-    <body>${svg}</body>
+    <body>${caption ? `<div class="caption">${escapeHtml(caption)}</div>` : ''}${svg}</body>
+  </html>`);
+  popup.document.close();
+  popup.focus();
+  window.setTimeout(() => popup.print(), 100);
+}
+
+/** Print several server-rendered SVG labels in one popup — one label per page. */
+export function printServerSvgLabels(svgs: string[], title: string) {
+  if (typeof window === 'undefined' || svgs.length === 0) return;
+  const popup = window.open('', `alistore-print-${title}`, 'width=420,height=720');
+  if (!popup) return;
+
+  popup.document.write(`<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${escapeHtml(title)}</title>
+      <style>
+        body { margin: 0; }
+        .label { display: grid; place-items: center; min-height: 40mm; page-break-after: always; }
+        .label svg { max-width: 100%; }
+      </style>
+    </head>
+    <body>${svgs.map((svg) => `<div class="label">${svg}</div>`).join('')}</body>
   </html>`);
   popup.document.close();
   popup.focus();

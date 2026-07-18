@@ -6,6 +6,7 @@ import type { FormEvent } from 'react';
 import {
   decideApproval,
   downloadReturnAct,
+  downloadWriteOffActByApproval,
   fetchStaffReturns,
   fetchApprovals,
   requestReturnRefund,
@@ -19,7 +20,7 @@ import {
   type StaffTotpSetupResult,
 } from '@/lib/api';
 import { ApprovalList } from '@/components/approvals/ApprovalList';
-import { canReadRefunds } from '@/lib/staff-permissions';
+import { canPrintDocuments, canReadRefunds } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
   loadStaffSession,
@@ -137,6 +138,19 @@ export default function ApprovalsPage() {
       flash('Акт возврата скачан');
     } catch (error) {
       flash(error instanceof Error ? error.message : 'Ошибка акта возврата');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadWriteOffAct(a: Approval) {
+    if (!session) return;
+    setBusy(`writeoff-act-${a.id}`);
+    try {
+      await downloadWriteOffActByApproval(a.id, session.accessToken);
+      flash('Акт списания скачан');
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка акта списания');
     } finally {
       setBusy(null);
     }
@@ -564,7 +578,13 @@ export default function ApprovalsPage() {
                 </div>
               )}
               {items && items.length > 0 && (
-                <ApprovalList items={items} tabStatus={tab.status} busy={busy} onDecide={decide} />
+                <ApprovalList
+                  items={items}
+                  tabStatus={tab.status}
+                  busy={busy}
+                  onDecide={decide}
+                  onDownloadWriteOffAct={canPrintDocuments(session.role) ? downloadWriteOffAct : undefined}
+                />
               )}
             </>
           )}

@@ -3,6 +3,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationError } from '../common/errors';
+import { EventType } from '../audit/event-types';
 import { ROBOTO_REGULAR_BASE64 } from './roboto-font';
 import { buildOrderInvoiceLines } from './order-invoice';
 import { buildTradeInContractLines } from './trade-in-contract';
@@ -195,6 +196,32 @@ export class DocumentsService {
       pdfBase64: Buffer.from(bytes).toString('base64'),
       bytes: bytes.length,
     };
+  }
+
+  /**
+   * Render the write-off act authorized by an approval. The approval executor
+   * records the created movement only in the `stock.written_off` Ledger event
+   * payload, so the movement id is resolved from there — read-only, the Ledger
+   * stays the source of truth.
+   */
+  async writeOffActByApproval(
+    approvalId: string,
+  ): Promise<{ pdfBase64: string; bytes: number }> {
+    const event = await this.prisma.auditEvent.findFirst({
+      where: {
+        type: EventType.StockWrittenOff,
+        payload: { path: ['approvalId'], equals: approvalId },
+      },
+      orderBy: { ts: 'desc' },
+    });
+    const movementId = (event?.payload as { movementId?: unknown } | null)?.movementId;
+    if (!event || typeof movementId !== 'string') {
+      throw new ValidationError(
+        'writeoff_not_found',
+        `Списание по approval ${approvalId} не найдено`,
+      );
+    }
+    return this.writeOffAct(movementId);
   }
 
   /** Render a return act (акт возврата) for a Return record. */

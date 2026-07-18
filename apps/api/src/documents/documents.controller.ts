@@ -32,6 +32,12 @@ export class DocumentsController {
     return this.documents.warrantyTalon(imei);
   }
 
+  /** Write-off act PDF resolved via the approval that authorized the write-off. */
+  @Get('writeoff/by-approval/:approvalId/act')
+  writeOffActByApproval(@Param('approvalId') approvalId: string) {
+    return this.documents.writeOffActByApproval(approvalId);
+  }
+
   /** Write-off act (акт списания) PDF for an InventoryMovement (base64). */
   @Get('writeoff/:movementId/act')
   writeOffAct(@Param('movementId') movementId: string) {

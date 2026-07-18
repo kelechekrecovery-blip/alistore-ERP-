@@ -18,6 +18,10 @@ export const fetchWarrantyTalon = (imei: string, accessToken: string) =>
 export const fetchWriteOffAct = (movementId: string, accessToken: string) =>
   getJson<ServerDocument>(`/documents/writeoff/${movementId}/act`, accessToken);
 
+/** Write-off act resolved by the approval that authorized the write-off. */
+export const fetchWriteOffActByApproval = (approvalId: string, accessToken: string) =>
+  getJson<ServerDocument>(`/documents/writeoff/by-approval/${approvalId}/act`, accessToken);
+
 export const fetchReturnAct = (returnId: string, accessToken: string) =>
   getJson<ServerDocument>(`/documents/return/${returnId}/act`, accessToken);
 
@@ -32,6 +36,9 @@ export const downloadWarrantyTalon = (imei: string, accessToken: string) =>
 
 export const downloadWriteOffAct = (movementId: string, accessToken: string) =>
   downloadServerDocument(fetchWriteOffAct(movementId, accessToken), `writeoff-act-${movementId}.pdf`);
+
+export const downloadWriteOffActByApproval = (approvalId: string, accessToken: string) =>
+  downloadServerDocument(fetchWriteOffActByApproval(approvalId, accessToken), `writeoff-act-${approvalId}.pdf`);
 
 export const downloadReturnAct = (returnId: string, accessToken: string) =>
   downloadServerDocument(fetchReturnAct(returnId, accessToken), `return-act-${returnId}.pdf`);

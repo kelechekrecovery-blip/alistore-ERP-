@@ -222,6 +222,42 @@ describe('DocumentsService.tradeInContract (integration)', () => {
     expect((err as ValidationError).code).toBe('not_a_writeoff');
   });
 
+  it('renders a write-off act resolved by the authorizing approval', async () => {
+    const product = await prisma.product.create({
+      data: {
+        sku: `SKU-WOA-${RUN}`,
+        name: 'Samsung Galaxy',
+        price: 30000,
+        cost: 22000,
+        category: 'phones',
+        attrs: {},
+      },
+    });
+    const movement = await prisma.inventoryMovement.create({
+      data: { productId: product.id, qty: -1, type: 'write_off', reason: 'порча' },
+    });
+    const approvalId = `approval-woa-${RUN}`;
+    await prisma.auditEvent.create({
+      data: {
+        type: 'stock.written_off',
+        actor: 'jest-owner',
+        payload: { approvalId, productId: product.id, movementId: movement.id, qty: 1 },
+        refs: [product.id, movement.id],
+      },
+    });
+
+    const out = await documents.writeOffActByApproval(approvalId);
+    const pdf = Buffer.from(out.pdfBase64, 'base64');
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(out.bytes).toBeGreaterThan(1000);
+  });
+
+  it('throws 422 when no write-off event references the approval', async () => {
+    const err = await documents.writeOffActByApproval(`missing-${RUN}`).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).code).toBe('writeoff_not_found');
+  });
+
   it('renders a return act PDF for a Return record', async () => {
     const customer = await prisma.customer.create({
       data: { phone: `+996${RUN}03`, name: 'Возврат Клиент' },

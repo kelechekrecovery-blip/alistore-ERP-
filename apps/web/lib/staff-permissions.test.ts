@@ -43,6 +43,26 @@ describe('staffCan (casbin mirror)', () => {
     expect(staffCan('senior_seller', 'staff', 'manage')).toBe(false);
   });
 
+  it('print grants mirror the casbin matrix (UI-PRINT)', () => {
+    // documents:read — seller/cashier/warehouse/admin/owner
+    for (const role of ['seller', 'cashier', 'warehouse', 'admin', 'owner']) {
+      expect(staffCan(role, 'documents', 'read')).toBe(true);
+    }
+    for (const role of ['senior_seller', 'franchise', 'service', 'courier', 'marketer', 'technician']) {
+      expect(staffCan(role, 'documents', 'read')).toBe(false);
+    }
+    // labels:print — seller/cashier/warehouse/admin/owner
+    expect(staffCan('warehouse', 'labels', 'print')).toBe(true);
+    expect(staffCan('franchise', 'labels', 'print')).toBe(false);
+    // receipts:print — seller/cashier/senior_seller/franchise/admin/owner, NOT warehouse
+    for (const role of ['seller', 'cashier', 'senior_seller', 'franchise', 'admin', 'owner']) {
+      expect(staffCan(role, 'receipts', 'print')).toBe(true);
+    }
+    for (const role of ['warehouse', 'service', 'courier', 'marketer', 'technician']) {
+      expect(staffCan(role, 'receipts', 'print')).toBe(false);
+    }
+  });
+
   it('denies unknown roles and unknown permissions', () => {
     expect(staffCan('superroot', 'orders', 'queue')).toBe(false);
     expect(staffCan('owner', 'orders', 'teleport')).toBe(false);

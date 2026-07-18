@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchCatalog, inventoryCount, receiveInventoryBatch, receiveQuantityInventory, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, inventoryCount, printServerSvgLabels, receiveInventoryBatch, receiveQuantityInventory, renderImeiLabel, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
 
 /** Transfer + inventory-count operations for the warehouse console. */
@@ -29,6 +29,8 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [adjustReason, setAdjustReason] = useState('');
   const [transferFiles, setTransferFiles] = useState<File[]>([]);
   const [countFiles, setCountFiles] = useState<File[]>([]);
+  const [receivedImeis, setReceivedImeis] = useState<string[]>([]);
+  const [labelsBusy, setLabelsBusy] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -136,6 +138,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
         ? await receiveQuantityInventory(selected.id, receiveLocation.trim(), quantity, accessToken)
         : await receiveInventoryBatch(selected.id, receiveLocation.trim(), imeis, accessToken, receiveGrade);
       flash(`✓ Принято ${r.received} шт · ${r.location}`);
+      setReceivedImeis(selected.trackingMode === 'quantity' ? [] : imeis);
       setReceiveImeis('');
       setReceiveQuantity('');
       const refreshed = await fetchCatalog({ limit: 100 });
@@ -144,6 +147,20 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
       flash(e instanceof Error ? errMsg(e) : 'Ошибка приёмки');
     } finally {
       setBusy(null);
+    }
+  }
+
+  /** Print one Code128 sticker per IMEI of the last received batch (labels/imei). */
+  async function printReceivedLabels() {
+    if (receivedImeis.length === 0) return;
+    setLabelsBusy(true);
+    try {
+      const labels = await Promise.all(receivedImeis.map((value) => renderImeiLabel(value, accessToken)));
+      printServerSvgLabels(labels.map((label) => label.svg), `Этикетки приёмки (${labels.length})`);
+    } catch (e) {
+      flash(e instanceof Error ? errMsg(e) : 'Ошибка печати этикеток');
+    } finally {
+      setLabelsBusy(false);
     }
   }
 
@@ -200,6 +217,16 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
               />
             )}
             <button type="button" disabled={busy === 'receive'} onClick={doReceive} className="rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-[#2E2822]">Принять</button>
+            {receivedImeis.length > 0 && (
+              <button
+                type="button"
+                disabled={labelsBusy}
+                onClick={printReceivedLabels}
+                className="rounded-btn border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-semibold text-[#D8CFC6] transition hover:border-lime disabled:opacity-50"
+              >
+                {labelsBusy ? '…' : `⎙ Печать этикеток (${receivedImeis.length})`}
+              </button>
+            )}
           </div>
         </div>
         {/* transfer */}

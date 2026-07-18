@@ -33,6 +33,9 @@ const GRANTS: Record<string, readonly string[]> = {
   'refunds:read': ['admin', 'owner'],
   'refunds:retry': ['admin', 'owner'],
   'refunds:manage': ['admin', 'owner'],
+  'documents:read': ['seller', 'cashier', 'warehouse', 'admin', 'owner'],
+  'labels:print': ['seller', 'cashier', 'warehouse', 'admin', 'owner'],
+  'receipts:print': ['seller', 'cashier', 'senior_seller', 'franchise', 'admin', 'owner'],
 };
 
 /** `g, child, parent` policy edges: a role also holds every grant of its parent. */
@@ -61,6 +64,9 @@ export const canIssueGiftCard = (role: string) => staffCan(role, 'giftcards', 'i
 export const canReadRefunds = (role: string) => staffCan(role, 'refunds', 'read');
 export const canRetryRefund = (role: string) => staffCan(role, 'refunds', 'retry');
 export const canManageRefunds = (role: string) => staffCan(role, 'refunds', 'manage');
+export const canPrintDocuments = (role: string) => staffCan(role, 'documents', 'read');
+export const canPrintLabels = (role: string) => staffCan(role, 'labels', 'print');
+export const canPrintReceipts = (role: string) => staffCan(role, 'receipts', 'print');
 
 /** ERP shell routes (app/erp/page.tsx). `null` — route is open to every staff role. */
 export type ErpRoute =

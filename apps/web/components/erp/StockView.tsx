@@ -1,10 +1,12 @@
 'use client';
 
-import { Camera, Check, RefreshCw, ShieldCheck, Wrench } from 'lucide-react';
+import { Camera, Check, QrCode, RefreshCw, ShieldCheck, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from './Card';
 import { som } from '@/lib/format';
-import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, printServerSvg, renderQrLabel, type CatalogProduct } from '@/lib/api';
+import { SITE_URL } from '@/lib/site';
+import { canPrintLabels } from '@/lib/staff-permissions';
 import {
   diagnoseInventoryQuarantine,
   disposeInventoryQuarantine,
@@ -58,6 +60,22 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
   const [evidence, setEvidence] = useState<Record<string, File | null>>({});
   const canReadFinance = role === 'admin' || role === 'owner';
   const canManageQuarantine = role === 'admin' || role === 'owner' || role === 'warehouse';
+  const canPrintPriceTags = canPrintLabels(role);
+  const [priceTagBusy, setPriceTagBusy] = useState('');
+  const [priceTagError, setPriceTagError] = useState('');
+
+  async function printPriceTag(product: CatalogProduct) {
+    setPriceTagBusy(product.id);
+    setPriceTagError('');
+    try {
+      const { svg } = await renderQrLabel(`${SITE_URL}/product/${product.id}`, accessToken);
+      printServerSvg(svg, `Ценник ${product.name}`, `${product.name} · ${som(product.price)}`);
+    } catch (error) {
+      setPriceTagError(error instanceof Error ? error.message : 'Не удалось напечатать ценник');
+    } finally {
+      setPriceTagBusy('');
+    }
+  }
 
   const loadQuarantine = useCallback(() => {
     if (!canManageQuarantine) return;
@@ -178,6 +196,11 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
       {/* inventory table */}
       <Card>
         <div className="mb-3 font-display text-[15px] font-bold text-white">Остатки по товарам</div>
+        {priceTagError && (
+          <div role="alert" className="mb-3 rounded-[7px] border border-[#FF8A7A]/30 bg-[#FF8A7A]/10 p-3 text-sm text-[#FF8A7A]">
+            {priceTagError}
+          </div>
+        )}
         <div className="grid grid-cols-[2fr_1fr_1fr_1fr] border-b border-[#2E2822] pb-2 text-xs text-[#8A7F76]">
           <span>Товар</span>
           <span className="text-right">Остаток</span>
@@ -197,13 +220,25 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                   {p.availableUnits}
                 </span>
                 <span className="text-right font-mono text-[#D8CFC6]">{som(p.price)}</span>
-                <span className="text-right">
+                <span className="flex items-center justify-end gap-2 text-right">
                   <span
                     className="rounded-chip px-2 py-0.5 text-[11px]"
                     style={{ background: `${chip.color}1a`, color: chip.color }}
                   >
                     {chip.label}
                   </span>
+                  {canPrintPriceTags && (
+                    <button
+                      type="button"
+                      title={`Печать ценника с QR: ${p.name}`}
+                      aria-label={`Печать ценника: ${p.name}`}
+                      disabled={priceTagBusy === p.id}
+                      onClick={() => printPriceTag(p)}
+                      className="grid size-7 shrink-0 place-items-center rounded-[6px] border border-[#3A342E] text-[#A79C92] hover:border-[#5A5148] hover:text-white disabled:opacity-50"
+                    >
+                      <QrCode size={14} />
+                    </button>
+                  )}
                 </span>
               </div>
             );

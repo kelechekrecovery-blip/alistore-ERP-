@@ -7,9 +7,12 @@ import { closeShift, currentShift, fetchShift, openShift, type Shift } from '@/l
 import {
   createCustomer,
   createTradeIn,
+  downloadOrderInvoice,
   downloadTradeInContract,
+  fetchOrderReceipt,
   fetchOrdersByStatus,
   fulfillOrder,
+  printServerSvg,
   transitionOrder,
   uploadEvidenceImages,
   fetchB2BQuotes,
@@ -36,7 +39,7 @@ import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { DebtsDesk } from '@/components/staff/DebtsDesk';
 import { GiftCardIssue } from '@/components/staff/GiftCardIssue';
-import { canCreateDebt, canIssueGiftCard, canPayDebt, staffTabAllowed, type StaffAppTab } from '@/lib/staff-permissions';
+import { canCreateDebt, canIssueGiftCard, canPayDebt, canPrintDocuments, canPrintReceipts, staffTabAllowed, type StaffAppTab } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
   loadStaffSession,
@@ -273,6 +276,22 @@ export default function StaffPage() {
       loadOrders();
     } catch (e) { flash(e instanceof Error ? e.message : 'Ошибка'); } finally { setBusy(null); }
   }
+  async function printInvoice(o: QueueOrder) {
+    if (!session) return;
+    setBusy(`invoice-${o.id}`);
+    try {
+      await downloadOrderInvoice(o.id, session.accessToken);
+      flash('Накладная скачана');
+    } catch (e) { flash(e instanceof Error ? e.message : 'Ошибка накладной'); } finally { setBusy(null); }
+  }
+  async function printReceipt(o: QueueOrder) {
+    if (!session) return;
+    setBusy(`receipt-${o.id}`);
+    try {
+      const rendered = await fetchOrderReceipt(o.id, session.accessToken);
+      printServerSvg(rendered.svg, `Чек ${o.id.slice(-6)}`);
+    } catch (e) { flash(e instanceof Error ? e.message : 'Ошибка чека'); } finally { setBusy(null); }
+  }
   async function quoteAction(quote: StaffB2BQuote, status: 'reviewing' | 'quoted' | 'rejected') {
     if (!session) return;
     setBusy(quote.id);
@@ -452,10 +471,13 @@ export default function StaffPage() {
               )}
 
               <div className="mb-4 grid grid-cols-2 gap-2.5" data-testid="staff-primary-actions">
-                <Action icon="📦" label="Заказы" badge="Новые заказы" onClick={() => setTab('orders')} />
+                {staffTabAllowed(session.role, 'orders') && (
+                  <Action icon="📦" label="Заказы" badge="Новые заказы" onClick={() => setTab('orders')} />
+                )}
                 <ActionLink icon="＋" label="Добавить товар" badge="Каталог" href="/admin/products" />
                 <Action icon="♻️" label="Скупка Б/У" badge="По регламенту" onClick={() => setTab('buyback')} />
                 <Action icon="📊" label="Задачи и KPI" badge="2 активных" onClick={() => setTab('tasks')} />
+                <Action icon="◫" label="Моя неделя" badge="Смены · отгулы" onClick={() => setTab('hr')} />
               </div>
 
               <div className="mb-4 flex gap-2 overflow-x-auto" aria-label="Дополнительные операции">
@@ -503,6 +525,18 @@ export default function StaffPage() {
                   <button type="button" disabled={busy === o.id} onClick={() => orderAction(o)} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
                     {busy === o.id ? '…' : o.status === 'created' ? 'Собрать · назначить IMEI' : 'В сборку'}
                   </button>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {canPrintDocuments(session.role) && (
+                      <button type="button" disabled={busy === `invoice-${o.id}`} onClick={() => printInvoice(o)} className="rounded-[9px] border border-[#2E2822] bg-[#16130F] py-2 text-center text-xs font-semibold text-[#D8CFC6] hover:border-lime disabled:opacity-60">
+                        {busy === `invoice-${o.id}` ? '…' : '⎙ Накладная'}
+                      </button>
+                    )}
+                    {canPrintReceipts(session.role) && (
+                      <button type="button" disabled={busy === `receipt-${o.id}`} onClick={() => printReceipt(o)} className="rounded-[9px] border border-[#2E2822] bg-[#16130F] py-2 text-center text-xs font-semibold text-[#D8CFC6] hover:border-lime disabled:opacity-60">
+                        {busy === `receipt-${o.id}` ? '…' : '⎙ Чек'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -718,6 +752,109 @@ export default function StaffPage() {
               <GiftCardIssue accessToken={session.accessToken} role={session.role} flash={flash} />
             </div>
           )}
+
+          {tab === 'hr' && (
+            <div className="pt-1">
+              <SectionTitle title="Моя неделя" onBack={() => setTab('home')} />
+              {hrError && (
+                <div className="py-7 text-center">
+                  <p className="text-sm text-[#D69A83]">{hrError}</p>
+                  <button type="button" onClick={loadHr} className="mt-3 rounded-[9px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink">
+                    Повторить
+                  </button>
+                </div>
+              )}
+              {!hrError && hrWeek === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+              {hrWeek && (
+                <>
+                  {hrWeek.schedules.length === 0 && <p className="py-4 text-center text-sm text-[#8A7F76]">Смен на этой неделе нет</p>}
+                  {hrWeek.schedules.map((schedule) => (
+                    <div key={schedule.id} className="mb-2.5 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold">{schedule.shiftDate.slice(0, 10)}</span>
+                        <span className={`rounded-md px-2 py-0.5 text-[11px] ${schedule.attendance?.checkedOutAt ? 'bg-lime/15 text-lime' : schedule.attendance ? 'bg-warn/15 text-warn' : 'bg-[#16130F] text-[#8A7F76]'}`}>
+                          {schedule.attendance?.checkedOutAt ? 'Отработана' : schedule.attendance ? 'На смене' : 'План'}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 text-[13px] text-[#A79C92]">{clock(schedule.startsAt)}–{clock(schedule.endsAt)} · {schedule.point}</div>
+                      {schedule.attendance && (
+                        <div className="mt-1 font-mono text-[11px] text-[#8A7F76]">
+                          приход {clock(schedule.attendance.checkedInAt)}{schedule.attendance.checkedOutAt ? ` · уход ${clock(schedule.attendance.checkedOutAt)}` : ''}
+                        </div>
+                      )}
+                      {!schedule.cancelledAt && !schedule.attendance && (
+                        <button type="button" disabled={busy === schedule.id} onClick={() => attendanceAction(schedule, 'open')} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
+                          {busy === schedule.id ? '…' : 'Отметить приход'}
+                        </button>
+                      )}
+                      {schedule.attendance && !schedule.attendance.checkedOutAt && (
+                        <button type="button" disabled={busy === schedule.id} onClick={() => attendanceAction(schedule, 'close')} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
+                          {busy === schedule.id ? '…' : 'Отметить уход'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <form onSubmit={submitAbsence} className="mt-4 rounded-[16px] border border-[#2E2822] bg-[#221E19] p-4">
+                    <div className="mb-3 font-display text-[15px] font-bold">Запрос отсутствия</div>
+                    <div className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
+                      <span className="text-[12px] font-semibold text-[#8A7F76]">Тип</span>
+                      <select
+                        aria-label="Тип отсутствия"
+                        value={absenceForm.type}
+                        onChange={(e) => setAbsenceForm((f) => ({ ...f, type: e.target.value as HrAbsenceType }))}
+                        className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
+                      >
+                        {Object.entries(ABSENCE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </div>
+                    <Field
+                      label="С"
+                      value={absenceForm.startsOn}
+                      onChange={(startsOn) => setAbsenceForm((f) => ({ ...f, startsOn }))}
+                      type="date"
+                      required
+                    />
+                    <Field
+                      label="По"
+                      value={absenceForm.endsOn}
+                      onChange={(endsOn) => setAbsenceForm((f) => ({ ...f, endsOn }))}
+                      type="date"
+                      required
+                    />
+                    <Field
+                      label="Причина"
+                      value={absenceForm.reason}
+                      onChange={(reason) => setAbsenceForm((f) => ({ ...f, reason }))}
+                    />
+                    <button
+                      type="submit"
+                      disabled={busy === 'absence'}
+                      className="mt-2 w-full rounded-[11px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60"
+                    >
+                      {busy === 'absence' ? '…' : 'Отправить запрос'}
+                    </button>
+                  </form>
+
+                  {hrWeek.absences.length > 0 && (
+                    <div className="mt-4">
+                      <div className="mb-2 font-display text-[15px] font-bold">Мои отсутствия</div>
+                      {hrWeek.absences.map((absence) => (
+                        <div key={absence.id} className="mb-2 rounded-[12px] border border-[#2E2822] bg-[#221E19] p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[13px] font-semibold">{ABSENCE_LABEL[absence.type] ?? absence.type}</span>
+                            <span className="rounded-md bg-[#16130F] px-2 py-0.5 text-[11px] text-[#A79C92]">{ABSENCE_STATUS_LABEL[absence.status] ?? absence.status}</span>
+                          </div>
+                          <div className="mt-1 font-mono text-[11px] text-[#8A7F76]">{absence.startsOn.slice(0, 10)} → {absence.endsOn.slice(0, 10)}</div>
+                          {absence.reason && <div className="mt-1 text-[11px] text-[#8A7F76]">{absence.reason}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {toast && (
@@ -726,7 +863,7 @@ export default function StaffPage() {
 
         {/* bottom nav */}
         <div className="flex flex-shrink-0 border-t border-[#2E2822] bg-[#1A1611] px-1.5 pb-6 pt-2">
-          {NAV.map((n) => (
+          {NAV.filter((n) => staffTabAllowed(session.role, n.id)).map((n) => (
             <button key={n.id} type="button" onClick={() => setTab(n.id)} className="flex-1 text-center">
               <div className="text-xl">{n.icon}</div>
               <div className={`mt-0.5 text-[10px] ${tab === n.id ? 'font-bold text-lime' : 'text-[#8A7F76]'}`}>{n.label}</div>
@@ -789,12 +926,14 @@ function Field({
   onChange,
   inputMode,
   required,
+  type,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   inputMode?: HTMLAttributes<HTMLInputElement>['inputMode'];
   required?: boolean;
+  type?: string;
 }) {
   return (
     <label className="mb-2 grid grid-cols-[86px_1fr] items-center gap-2">
@@ -804,6 +943,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         inputMode={inputMode}
         required={required}
+        type={type}
         className="rounded-[10px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5 text-[13px] text-white outline-none focus:border-lime"
       />
     </label>

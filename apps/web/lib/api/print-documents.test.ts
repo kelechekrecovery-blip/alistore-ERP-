@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { downloadAuthFile } from './http';
 import {
   downloadReturnAct,
+  downloadWriteOffActByApproval,
   fetchOrderInvoice,
   fetchReturnAct,
   fetchTradeInContract,
   fetchWarrantyTalon,
   fetchWriteOffAct,
+  fetchWriteOffActByApproval,
 } from './documents';
 import { fetchUnitLabel, renderImeiLabel, renderQrLabel } from './labels';
 import { buildReceiptData, fetchOrderReceipt, renderServerReceipt } from './receipts';
@@ -87,6 +89,21 @@ describe('documents API mapping (UI-PRINT)', () => {
     const blob = (URL.createObjectURL as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as Blob;
     expect(blob.type).toBe('application/pdf');
     expect(new TextDecoder().decode(await blob.arrayBuffer())).toBe('%PDF-1.4');
+  });
+
+  it('fetchWriteOffActByApproval GETs /documents/writeoff/by-approval/:id/act', async () => {
+    const calls = stubFetch({ pdfBase64: 'JVBERi0=', bytes: 8 });
+    await fetchWriteOffActByApproval('approval-3', 'token-12');
+    expect(calls[0].url).toMatch(/\/documents\/writeoff\/by-approval\/approval-3\/act$/);
+    expect((calls[0].init.headers as Record<string, string>).authorization).toBe('Bearer token-12');
+  });
+
+  it('downloadWriteOffActByApproval saves the decoded PDF under the approval id', async () => {
+    stubFetch({ pdfBase64: 'JVBERi0xLjQ=', bytes: 8 });
+    const anchor = stubAnchorDownload();
+    await downloadWriteOffActByApproval('approval-3', 'token-12');
+    expect(anchor.download).toBe('writeoff-act-approval-3.pdf');
+    expect(anchor.click).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces the API error message on failure', async () => {

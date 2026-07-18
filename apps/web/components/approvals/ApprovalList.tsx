@@ -7,6 +7,7 @@ const ACTION_LABEL: Record<string, string> = {
   refund: 'Возврат денег',
   discount: 'Скидка сверх лимита',
   write_off: 'Списание',
+  quarantine_write_off: 'Списание карантина',
   price: 'Изменение цены',
   stock_adjust: 'Изменение остатка',
   debt: 'Продажа в долг',
@@ -15,11 +16,16 @@ const ACTION_LABEL: Record<string, string> = {
   exchange: 'Обмен устройства',
 };
 
+/** Approval actions whose approved result is a write-off movement with a printable act. */
+const WRITE_OFF_ACTIONS = new Set(['write_off', 'quarantine_write_off']);
+
 interface ApprovalListProps {
   items: Approval[];
   tabStatus: string;
   busy: string | null;
   onDecide: (approval: Approval, status: 'approved' | 'rejected') => void;
+  /** Present only when the role holds documents:read — wires the write-off act download. */
+  onDownloadWriteOffAct?: (approval: Approval) => void;
 }
 
 /**
@@ -27,7 +33,7 @@ interface ApprovalListProps {
  * row exposes approve/reject; other tabs show the resolved status + approver.
  * Presentational — decide/2FA state lives in the Approval Inbox page.
  */
-export function ApprovalList({ items, tabStatus, busy, onDecide }: ApprovalListProps) {
+export function ApprovalList({ items, tabStatus, busy, onDecide, onDownloadWriteOffAct }: ApprovalListProps) {
   return (
     <ul className="flex flex-col gap-3">
       {items.map((a) => {
@@ -77,9 +83,21 @@ export function ApprovalList({ items, tabStatus, busy, onDecide }: ApprovalListP
                 </button>
               </div>
             ) : (
-              <p className="mt-3 font-mono text-xs text-ink/40">
-                {a.status} · {a.approver ?? '—'}
-              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="font-mono text-xs text-ink/40">
+                  {a.status} · {a.approver ?? '—'}
+                </p>
+                {a.status === 'approved' && WRITE_OFF_ACTIONS.has(a.action) && onDownloadWriteOffAct && (
+                  <button
+                    type="button"
+                    disabled={busy === `writeoff-act-${a.id}`}
+                    onClick={() => onDownloadWriteOffAct(a)}
+                    className="rounded-btn border border-ink/15 px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink/30 disabled:opacity-50"
+                  >
+                    {busy === `writeoff-act-${a.id}` ? '…' : '⎙ Акт списания'}
+                  </button>
+                )}
+              </div>
             )}
           </li>
         );
