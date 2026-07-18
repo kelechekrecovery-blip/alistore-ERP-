@@ -93,8 +93,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-7d12acf58b71184f7ad2d77616e4f61903df0eefe5fcf250c92111f0339428ab.json",
-          "sha256": "7d12acf58b71184f7ad2d77616e4f61903df0eefe5fcf250c92111f0339428ab"
+          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-c797248d0ae6fd4a3d1cb003cd1cacc47b392ee8eb1676555bfde9997508b307.json",
+          "sha256": "c797248d0ae6fd4a3d1cb003cd1cacc47b392ee8eb1676555bfde9997508b307"
         }
       ]
     },
