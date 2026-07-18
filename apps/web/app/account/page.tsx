@@ -47,7 +47,7 @@ export default function AccountPage() {
 
   return <>
     <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} loyalty={loyalty} onLogout={async () => { await logout(); router.push('/'); }} /></div>
-    <div className="hidden min-h-screen bg-paper text-coal [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
+    <div className="hidden min-h-screen bg-sand text-ink font-sans md:block">
     <SiteHeader />
     <main className="mx-auto max-w-[1400px] px-5 py-10">
       <div className="text-xs text-subtle">Главная / Кабинет</div>

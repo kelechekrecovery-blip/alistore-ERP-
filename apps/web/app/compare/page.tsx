@@ -38,7 +38,7 @@ export default function ComparePage() {
     list.length > 1 ? Math.min(...list.map((product) => product.price)) : -1;
 
   return (
-    <div className="min-h-screen bg-paper text-coal [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif]">
+    <div className="min-h-screen bg-sand text-ink font-sans">
       <SiteHeader />
       <main className="mx-auto min-h-[620px] max-w-[1400px] px-5 py-10">
         <div className="text-xs text-slate">Главная / Сравнение</div>

@@ -59,7 +59,7 @@ export default function CartPage() {
       <div className="md:hidden">
         <MobileCart />
       </div>
-      <div className="hidden min-h-screen bg-paper text-coal [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
+      <div className="hidden min-h-screen bg-sand text-ink font-sans md:block">
         <SiteHeader />
         <main className="mx-auto max-w-[1400px] px-5 py-10">
           <div className="text-xs text-slate">Главная / Корзина</div>

@@ -334,6 +334,39 @@
   .checkout-panel .bg-lime {
     background: #ff4d2e !important;
   }
+
+  /* Token-class equivalents of the hex overrides above. After Phase-2 tokenization
+     the dark mobile classes (.bg-[#221E19] etc.) became token classes, so the desktop
+     light-shell overrides must also target the tokens or the desktop panels render dark. */
+  .account-detail-panel .bg-surface-2,
+  .account-detail-panel .bg-ink-dark,
+  .customer-service-content .bg-surface-2,
+  .customer-service-content .bg-ink-dark {
+    background: #fff !important;
+  }
+  .account-detail-panel .border-surface-3,
+  .customer-service-content .border-surface-3 {
+    border-color: #e5e5e7 !important;
+  }
+  .account-detail-panel .text-bright {
+    color: #1d1d1f !important;
+  }
+  .account-detail-panel .text-muted,
+  .account-detail-panel .text-subtle,
+  .account-detail-panel .text-faint {
+    color: #6e6e73 !important;
+  }
+  .customer-service-content .text-bright,
+  .customer-service-content .text-muted {
+    color: #424245 !important;
+  }
+  .customer-service-content .text-subtle,
+  .customer-service-content .text-faint {
+    color: #6e6e73 !important;
+  }
+  .checkout-panel .text-bright {
+    color: #0f0f0f !important;
+  }
 }
 
 @media (max-width: 767px) {

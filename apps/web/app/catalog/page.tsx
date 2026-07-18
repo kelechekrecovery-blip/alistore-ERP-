@@ -41,7 +41,7 @@ export default function CatalogPage() {
 
   return <>
     <div className="md:hidden"><MobileCatalog /></div>
-    <div className="hidden min-h-screen bg-paper text-coal [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
+    <div className="hidden min-h-screen bg-sand text-ink font-sans md:block">
     <SiteHeader />
     <main className="mx-auto max-w-[1400px] px-5 py-8">
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

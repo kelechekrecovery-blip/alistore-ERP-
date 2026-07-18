@@ -41,7 +41,7 @@ export default function HomePage() {
   return (
     <>
       <div className="md:hidden"><MobileHome /></div>
-      <div className="hidden min-h-screen bg-paper text-coal [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
+      <div className="hidden min-h-screen bg-sand text-ink font-sans md:block">
         <SiteHeader />
         <main className="mx-auto max-w-[1400px] px-5 py-5">
           {blocks.length > 0 ? <ManagedDesktopBlocks blocks={blocks} /> : <section className="grid grid-cols-[minmax(0,1fr)_340px] gap-4" aria-label="Предложения AliStore">
