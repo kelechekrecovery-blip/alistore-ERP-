@@ -40,10 +40,22 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Быстрый и защищённый вход в AliStore</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Выбор фото состояния товара для заявки на возврат</string>
 	<key>PAYMENT_RETURN_URL</key>
 	<string>$(PAYMENT_RETURN_URL)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Manrope-Regular.ttf</string>
+		<string>Manrope-Medium.ttf</string>
+		<string>Manrope-SemiBold.ttf</string>
+		<string>Manrope-Bold.ttf</string>
+		<string>Manrope-ExtraBold.ttf</string>
+		<string>GolosText-Regular.ttf</string>
+		<string>GolosText-Medium.ttf</string>
+		<string>GolosText-SemiBold.ttf</string>
+		<string>GolosText-Bold.ttf</string>
+		<string>JetBrainsMono-Regular.ttf</string>
+		<string>JetBrainsMono-Medium.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>
