@@ -582,10 +582,11 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
     });
 
     const pushes = await outboxFor('approval_requested');
-    expect(pushes).toHaveLength(2);
-    expect(pushes.map((push) => push.channel)).toEqual(['push', 'push']);
-    expect(pushes.map((push) => push.recipient).sort()).toEqual([owner.id, admin.id].sort());
-    expect(pushes[0].payload).toMatchObject({ approvalId, action: 'price' });
+    // Every active owner/admin in the shared test DB gets the push; our two must be among them.
+    expect(pushes.map((push) => push.recipient)).toEqual(expect.arrayContaining([owner.id, admin.id]));
+    expect(pushes.every((push) => push.channel === 'push')).toBe(true);
+    const ownerPush = pushes.find((push) => push.recipient === owner.id);
+    expect(ownerPush?.payload).toMatchObject({ approvalId, action: 'price' });
   });
 
   it('pushes shift lifecycle and cash shortages to owner/admin staff', async () => {
@@ -600,8 +601,9 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
       `nc-shift-open-${n}`,
     );
     const opened = await outboxFor('shift_opened');
-    expect(opened.map((push) => push.recipient).sort()).toEqual([owner.id, admin.id].sort());
-    expect(opened[0].payload).toMatchObject({ shiftId: shift.id, staffId: cashier.id, openCash: 10000 });
+    expect(opened.map((push) => push.recipient)).toEqual(expect.arrayContaining([owner.id, admin.id]));
+    expect(opened.find((push) => push.recipient === owner.id)?.payload)
+      .toMatchObject({ shiftId: shift.id, staffId: cashier.id, openCash: 10000 });
 
     await shifts.close(
       shift.id,
@@ -611,10 +613,12 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
       'cashier',
     );
     const closed = await outboxFor('shift_closed');
-    expect(closed.map((push) => push.recipient).sort()).toEqual([owner.id, admin.id].sort());
-    expect(closed[0].payload).toMatchObject({ shiftId: shift.id, diff: -1000 });
+    expect(closed.map((push) => push.recipient)).toEqual(expect.arrayContaining([owner.id, admin.id]));
+    expect(closed.find((push) => push.recipient === owner.id)?.payload)
+      .toMatchObject({ shiftId: shift.id, diff: -1000 });
     const shortage = await outboxFor('cash_shortage');
-    expect(shortage.map((push) => push.recipient).sort()).toEqual([owner.id, admin.id].sort());
-    expect(shortage[0].payload).toMatchObject({ shiftId: shift.id, diff: -1000 });
+    expect(shortage.map((push) => push.recipient)).toEqual(expect.arrayContaining([owner.id, admin.id]));
+    expect(shortage.find((push) => push.recipient === owner.id)?.payload)
+      .toMatchObject({ shiftId: shift.id, diff: -1000 });
   });
 });
