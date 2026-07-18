@@ -1,28 +1,57 @@
 import type { Config } from 'tailwindcss';
 
-// Design tokens — source: design_handoff_alistore (README «Design Tokens»).
+// Design tokens — canonical source: design_handoff_alistore/docs/Native Design System.md §1.
+//
+// Canon ↔ code name map (values identical; code keeps its shipped names to avoid churn):
+//   coralDeep → deep · bgLight → sand · onLime → lime-ink · bgDark → ink-dark
+// Dark-surface neutrals (canon §5 "инверсия нейтралей") are tokenized here so no UI
+// hardcodes them: night/surface*/line + on-dark text bright/muted/subtle/faint.
 export default {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        coral: '#FF5B2E',
-        deep: '#E8410F',
-        ink: '#201B17',
-        'ink-dark': '#16130F',
-        tint: '#FFEFE7',
-        sand: '#F7F2EC',
-        lime: '#C6FF3D',
-        'lime-ink': '#14110E',
+        // Brand
+        coral: '#FF5B2E', // основной бренд, CTA
+        deep: '#E8410F', // = canon coralDeep — цена, pressed/hover
+        ink: '#201B17', // основной текст, тёмные шапки
+        'ink-dark': '#16130F', // = canon bgDark — фон тёмных экранов
+        night: '#0E0C0A', // = canon bgDark (darkest) — фон страницы
+        tint: '#FFEFE7', // мягкий фон акции/бейджа
+        sand: '#F7F2EC', // = canon bgLight — нейтральный фон витрины
+        // Action accent on dark (POS/ERP)
+        lime: '#C6FF3D', // основное действие на тёмном
+        'lime-dark': '#A8E23A', // pressed lime (аналог deep для coral)
+        'lime-ink': '#14110E', // = canon onLime — текст на lime
+        // Functional / status
         success: '#2E7D46',
+        'success-soft': '#7FD3A0', // on-dark success (✓ на тёмном)
         warn: '#E5B23C',
         danger: '#C6362C',
+        'danger-soft': '#FF8A7A', // on-dark danger
         info: '#7FB0EC',
+        // Dark-surface neutral scale (backgrounds)
+        surface: '#1A1611', // приподнятая поверхность на night
+        'surface-2': '#221E19', // панель/карточка на тёмном
+        'surface-3': '#2E2822', // бордер-заливка/hover на тёмном
+        line: '#3A332C', // хайрлайн/бордер на тёмном
+        // On-dark text scale
+        bright: '#D8CFC6', // яркий текст на тёмном
+        muted: '#A79C92', // приглушённый
+        subtle: '#8A7F76', // вторичный
+        faint: '#6E645C', // третичный/подписи
       },
       fontFamily: {
-        display: ['Sora', 'system-ui', 'sans-serif'],
-        sans: ['"Golos Text"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        // next/font CSS vars (see app/fonts.ts). Display falls back to Golos
+        // (--font-sans) for Cyrillic, since Sora has no Cyrillic glyphs.
+        display: [
+          'var(--font-display)',
+          'var(--font-sans)',
+          'system-ui',
+          'sans-serif',
+        ],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       borderRadius: {
         card: '18px',

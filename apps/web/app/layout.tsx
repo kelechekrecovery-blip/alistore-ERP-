@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { MotionConfig } from 'motion/react';
+import { fontDisplay, fontSans, fontMono } from './fonts';
 import { CartProvider } from '@/lib/cart';
 import { AuthProvider } from '@/lib/auth';
 import { FavoritesProvider } from '@/lib/favorites';
@@ -20,21 +21,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
+    <html
+      lang="ru"
+      className={`${fontDisplay.variable} ${fontSans.variable} ${fontMono.variable}`}
+    >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
-          rel="stylesheet"
-        />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       </head>
-      <body className="min-h-screen bg-[#0E0C0A]">
+      <body className="min-h-screen bg-night">
         <AttributionCapture />
         <AuthProvider>
           <CartProvider>

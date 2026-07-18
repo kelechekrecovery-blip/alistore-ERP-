@@ -3,11 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --sand: #f7f2ec;
-  --tint: #ffefe7;
-  --ink: #201b17;
+  /* Canonical palette — design_handoff_alistore/docs/Native Design System.md §1.
+     Mirrors tailwind.config.ts so non-Tailwind CSS + desktop overrides stay 1:1. */
   --coral: #ff5b2e;
   --deep: #e8410f;
+  --ink: #201b17;
+  --ink-dark: #16130f;
+  --night: #0e0c0a;
+  --tint: #ffefe7;
+  --sand: #f7f2ec;
+  --lime: #c6ff3d;
+  --lime-dark: #a8e23a;
+  --lime-ink: #14110e;
+  --success: #2e7d46;
+  --success-soft: #7fd3a0;
+  --warn: #e5b23c;
+  --danger: #c6362c;
+  --danger-soft: #ff8a7a;
+  --info: #7fb0ec;
+  --surface: #1a1611;
+  --surface-2: #221e19;
+  --surface-3: #2e2822;
+  --line: #3a332c;
+  --bright: #d8cfc6;
+  --muted: #a79c92;
+  --subtle: #8a7f76;
+  --faint: #6e645c;
 }
 
 @layer base {
@@ -17,7 +38,7 @@
   body {
     background-color: var(--sand);
     color: var(--ink);
-    font-family: 'Golos Text', system-ui, sans-serif;
+    font-family: var(--font-sans), system-ui, sans-serif;
     font-feature-settings: 'ss01';
     -webkit-font-smoothing: antialiased;
   }
@@ -25,7 +46,7 @@
   h2,
   h3,
   h4 {
-    font-family: 'Sora', system-ui, sans-serif;
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
     letter-spacing: 0;
   }
   ::selection {
