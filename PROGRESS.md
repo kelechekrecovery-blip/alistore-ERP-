@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-ERP-CMS-CONTRACT-002`.
+- Task: verify the ERP/CMS to customer storefront contract on the current source tree.
+- Result: added `npm run ecosystem:erp-cms:e2e`; it passed `5/5` for ordered product collections, desktop/mobile storefront blocks, draft editing, review moderation and promotion redemption through checkout.
+- Checks: targeted Playwright `5/5`, `git diff --check` pass.
+- Acceptance: local ERP/CMS contract slice accepted. Staging RBAC, production CMS data and live payment/SMS/fiscal providers remain external gates.
+- Next step: continue staging-shaped verification and production operations work.
+
 - Iteration ID: `GAP-DEEPLINK-003`.
 - Task: prevent platform drift in the HTTPS deep-link contract.
 - Result: added `native:deeplink-preflight`, which structurally checks API exact-host validation, Web AASA/assetlinks environment inputs, iOS associated domains, Android verified intent filters and Release payment return URLs.

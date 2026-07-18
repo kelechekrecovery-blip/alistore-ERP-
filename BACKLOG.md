@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `PHASE-1-ERP-CMS-CONTRACT-002` Local acceptance renewed: `npm run ecosystem:erp-cms:e2e` passed `5/5` for ERP publication → desktop/mobile storefront, draft/version workflow, review moderation and promo → checkout redemption. Staging data, owner RBAC policy and live provider certification remain separate gates.
 - `GAP-DEEPLINK-003` Structural gate accepted: `npm run native:deeplink-preflight` is wired into `.github/workflows/ci.yml` and verifies the API/Web/iOS/Android HTTPS deep-link contract without reading secrets. Real domain association and physical-device verification remain external.
 - `GAP-DEEPLINK-002` Local software slice accepted: production Client release builds now use HTTPS payment return URLs, iOS associated-domains and Android verified app-link intent filters; web serves AASA/assetlinks only when real signing identifiers are configured, and API/native parsers reject untrusted hosts. Remaining gate is domain deployment with real Apple team ID, Android release fingerprints and physical-device verification.
 - `GAP-STORE-ASSETS-002` Local release slice accepted: added a validated Android Data Safety worksheet for Client/Staff/Courier/POS with collection, sharing, encryption and deletion-request declarations. It remains explicitly owner/legal-review-required and does not claim Google Play approval.

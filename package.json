@@ -48,6 +48,7 @@
     "ecosystem:service-loaner:e2e": "npm --prefix apps/api test -- --runInBand test/service-center.e2e-spec.ts test/service-loaner.e2e-spec.ts test/warranty-rbac.e2e-spec.ts && playwright test e2e/service-center-ui.spec.ts",
     "ecosystem:procurement-sale:e2e": "npm --prefix apps/api test -- --runInBand test/procurement.e2e-spec.ts && playwright test e2e/ecosystem-procurement-sale.spec.ts",
     "ecosystem:e2e": "node scripts/run-reconciled-ecosystem-e2e.mjs",
+    "ecosystem:erp-cms:e2e": "playwright test e2e/storefront-cms-ui.spec.ts",
     "web": "npm run dev -w @alistore/web",
     "local:up": "bash scripts/local-up.sh",
     "local:down": "bash scripts/local-down.sh",
