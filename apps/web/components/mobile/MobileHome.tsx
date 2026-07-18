@@ -91,7 +91,7 @@ export default function MobileHome() {
               className="relative block overflow-hidden rounded-[20px] border border-surface-3 bg-gradient-to-br from-surface-3 to-ink-dark p-[22px]"
             >
               <div className="font-mono text-[11px] text-lime">{storefront?.content.heroEyebrow ?? 'ALISTORE'}</div>
-              <div className="mt-2 font-display text-[24px] font-extrabold leading-[1.05] text-white">{storefront?.content.heroTitle ?? 'Техника из актуального каталога'}</div>
+              <div className="mt-2 font-display text-[24px] font-extrabold leading-[1.05] text-white">{storefront?.content.heroTitle ?? 'Техника с гарантией. Новое и Б/У.'}</div>
               <div className="mt-1 text-[13px] text-muted">{storefront?.content.heroBody ?? 'Цена и остаток подтверждаются сервером.'}</div>
               <span className="mt-4 inline-block rounded-[10px] bg-lime px-[18px] py-2.5 text-[13px] font-bold text-lime-ink">
                 {storefront?.content.heroCtaLabel ?? 'Смотреть'}
