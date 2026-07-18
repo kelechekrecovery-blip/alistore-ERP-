@@ -25,7 +25,7 @@ export function MobileAppFrame({
 
   return (
     <div className="customer-service-shell min-h-screen bg-ink-dark font-sans text-white">
-      <SiteHeader />
+      <SiteHeader variant="design3" />
       <main className="customer-service-main mx-auto w-[min(980px,92vw)] py-10 sm:py-14">
         <div className="mb-7 flex items-start gap-4">
           {backHref ? (

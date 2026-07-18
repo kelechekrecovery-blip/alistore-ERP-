@@ -38,22 +38,22 @@ export default function ComparePage() {
     list.length > 1 ? Math.min(...list.map((product) => product.price)) : -1;
 
   return (
-    <div className="min-h-screen bg-sand text-ink font-sans">
-      <SiteHeader />
+    <div className="min-h-screen bg-[#0b0a08] text-[#e5dcd3] font-sans">
+      <SiteHeader variant="design3" />
       <main className="mx-auto min-h-[620px] max-w-[1400px] px-5 py-10">
-        <div className="text-xs text-faint">Главная / Сравнение</div>
-        <h1 className="mt-3 text-[34px] font-extrabold">Сравнение</h1>
-        <p className="mt-2 text-faint">
+        <div className="text-xs text-white/40">Главная / Сравнение</div>
+        <h1 className="mt-3 text-[34px] font-extrabold text-white">Сравнение</h1>
+        <p className="mt-2 text-white/45">
           Сопоставьте цены, состояние, память и наличие.
         </p>
         {products === null ? (
-          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-linen bg-white"><div className="h-8 w-48 animate-pulse rounded-full bg-linen" /></div>
+          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-white/10 bg-white/[.04]"><div className="h-8 w-48 animate-pulse rounded-full bg-white/10" /></div>
         ) : compare.hydrated && list.length === 0 ? (
-          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-linen bg-white text-center">
+          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-white/10 bg-white/[.04] text-center">
             <div>
               <GitCompareArrows className="mx-auto text-faint" size={40} />
-              <h2 className="mt-5 text-2xl font-bold">Нечего сравнивать</h2>
-              <p className="mt-2 text-faint">
+              <h2 className="mt-5 text-2xl font-bold text-white">Нечего сравнивать</h2>
+              <p className="mt-2 text-white/45">
                 Добавьте до четырёх товаров из карточки товара.
               </p>
               <Link
@@ -65,7 +65,7 @@ export default function ComparePage() {
             </div>
           </div>
         ) : (
-          <div className="mt-10 overflow-x-auto rounded-[12px] border border-linen bg-white">
+          <div className="mt-10 overflow-x-auto rounded-[12px] border border-white/10 bg-white/[.04]">
             <div
               className="grid min-w-[760px]"
               style={{
