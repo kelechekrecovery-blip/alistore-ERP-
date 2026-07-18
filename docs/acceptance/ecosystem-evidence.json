@@ -81,8 +81,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-393972251c04dd8fa8f899405aa07b8fc78586ffab0b8e1aead6aa59d1888d9c.json",
-          "sha256": "393972251c04dd8fa8f899405aa07b8fc78586ffab0b8e1aead6aa59d1888d9c"
+          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-545a3e693501cc08aae95bdfe407eb64f620b13e17dcba1b74eaaca2a1facbf2.json",
+          "sha256": "545a3e693501cc08aae95bdfe407eb64f620b13e17dcba1b74eaaca2a1facbf2"
         }
       ]
     },
