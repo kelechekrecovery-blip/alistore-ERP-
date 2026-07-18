@@ -27,6 +27,7 @@
     "android:build": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleDebug :staff:assembleDebug :courier:assembleDebug :pos:assembleDebug",
     "android:test": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew test lintDebug",
     "android:store-preflight": "node scripts/validate-android-store-data-safety.mjs",
+    "native:deeplink-preflight": "node scripts/validate-deeplink-contract.mjs",
     "android:ui": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew --no-parallel --max-workers=1 :core:connectedDebugAndroidTest :app:connectedDebugAndroidTest :staff:connectedDebugAndroidTest :courier:connectedDebugAndroidTest :pos:connectedDebugAndroidTest",
     "android:ui:all": "npm run android:ui",
     "launch:check": "npm run launch:preflight:strict && npm run launch:readiness:strict",

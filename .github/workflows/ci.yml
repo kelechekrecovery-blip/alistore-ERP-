@@ -63,6 +63,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run native:deeplink-preflight
       - run: npm run prisma:generate -w @alistore/api
       - run: npm run test:refund-migration-upgrade -w @alistore/api
       - run: npm run db:deploy -w @alistore/api

@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `GAP-DEEPLINK-003` Structural gate accepted: `npm run native:deeplink-preflight` is wired into `.github/workflows/ci.yml` and verifies the API/Web/iOS/Android HTTPS deep-link contract without reading secrets. Real domain association and physical-device verification remain external.
 - `GAP-DEEPLINK-002` Local software slice accepted: production Client release builds now use HTTPS payment return URLs, iOS associated-domains and Android verified app-link intent filters; web serves AASA/assetlinks only when real signing identifiers are configured, and API/native parsers reject untrusted hosts. Remaining gate is domain deployment with real Apple team ID, Android release fingerprints and physical-device verification.
 - `GAP-STORE-ASSETS-002` Local release slice accepted: added a validated Android Data Safety worksheet for Client/Staff/Courier/POS with collection, sharing, encryption and deletion-request declarations. It remains explicitly owner/legal-review-required and does not claim Google Play approval.
 - `GAP-E2E-BROWSERS-002` Local software slice accepted: Playwright now accepts `E2E_BROWSERS=chromium,webkit,firefox`; `npm run e2e:cross-browser` passed `27/27` across Chromium, WebKit and Firefox for checkout/consent flows. CI/staging browser execution remains a release-hardening gate.

@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-DEEPLINK-003`.
+- Task: prevent platform drift in the HTTPS deep-link contract.
+- Result: added `native:deeplink-preflight`, which structurally checks API exact-host validation, Web AASA/assetlinks environment inputs, iOS associated domains, Android verified intent filters and Release payment return URLs.
+- Checks: `npm run native:deeplink-preflight` and `git diff --check` pass; the structural gate is wired into `.github/workflows/ci.yml` after dependency installation.
+- Acceptance: CI structural gate accepted; it intentionally cannot certify real domain files, signing fingerprints or physical-device routing.
+- Next step: wire the preflight into CI and continue ERP/CMS contract E2E.
+
 - Iteration ID: `GAP-DEEPLINK-002`.
 - Task: connect production payment returns and account/order links to native HTTPS deep links.
 - Result: API accepts only `alistore://payment-return` or exact `https://alistore.kg|www.alistore.kg/payment-return`; iOS Client has associated domains and Release HTTPS return URL; Android Client has verified app-link filters and release HTTPS return URL; Web serves AASA and assetlinks from environment-backed routes and fails closed until signing values exist; native parsers accept HTTPS links while retaining local custom-scheme fallback.
