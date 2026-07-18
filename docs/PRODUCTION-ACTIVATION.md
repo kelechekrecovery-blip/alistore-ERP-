@@ -39,6 +39,7 @@ Required for a production-ready report:
 - Native Android Staff push: `FCM_SERVICE_ACCOUNT_JSON` (or the mounted `FCM_SERVICE_ACCOUNT_KEY_PATH`), ignored app `google-services.json`, and `FCM_PROVIDER_CERTIFIED=false` until physical-device delivery/routing passes. iOS still requires APNs credentials and device certification; Expo remains legacy compatibility only.
 - Media: S3/MinIO values for production Evidence Vault storage.
 - Observability: `SENTRY_DSN` or compatible GlitchTip/Sentry DSN.
+- Metrics: a random high-entropy `METRICS_TOKEN`; scrape `/api/metrics` only through a private monitoring path.
 - `POS_HARDWARE_CERTIFIED=true` only after the on-site hardware checks below pass.
 
 ## 3. Check external readiness

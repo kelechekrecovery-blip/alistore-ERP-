@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-OBSERVE-002`.
+- Task: add the first production observability slice for API traffic.
+- Result: `/api/metrics` now renders Prometheus text with process start time, request/error counters and latency histograms; the global interceptor excludes the scrape endpoint, normalizes numeric/UUID route segments and limits label cardinality. Production access requires `Bearer METRICS_TOKEN`; no secret values are rendered.
+- Checks: metrics Jest `2/2`, API production build and `git diff --check` pass.
+- Acceptance: local observability slice accepted. Private monitoring networking, uptime/alert delivery, worker/outbox dashboard and staging soak remain open.
+- Next step: continue the next unblocked Phase 1 slice, prioritizing WebKit checkout coverage or the ERP/CMS contract gap while owner credentials and missing design references remain external blockers.
+
 - Iteration ID: `MVP-VERIFY-034`.
 - Task: make the local API/Web MVP gate deterministic after lifecycle failures and validate the store-point operational guard end to end.
 - Result: API isolation runner executes one Jest file per clean database/process; full isolated API gate passed `163/163` test files, including `739` tests across the suites. Migration `20260718120000_fix_bundle_allocation_lifecycle` replaces the historical global IMEI uniqueness with an active-only partial unique index, preserving released allocation history. Storefront CMS requests now send `Connection: close` to avoid late socket resets. The logistics UI fixture keeps catalog stock outside the point so it tests pickup availability without violating the server guard.

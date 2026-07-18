@@ -8,6 +8,7 @@
 - Текущий полный worktree gate: **143/143 API suites / 653/653 теста** на изолированной test-БД после применения всех 100 миграций.
 - **46/46 Playwright flows подтверждены**, включая multi-tender refund, exchange, campaign → storefront → checkout, Marketing CMS, Finance и Service Center.
 - Прод-сборки: `npm run api:build` ✓ · `next build` ✓
+- API публикует Prometheus-compatible `/api/metrics`: счётчики запросов, 5xx и histogram latency с нормализованными маршрутами; в production endpoint требует bearer `METRICS_TOKEN` и не содержит секретов.
 - Native foundations: **4 SwiftUI targets + AliStoreCore** and **4 Kotlin/Jetpack Compose APKs + Android core** build successfully. iOS Client UI/XCTest passes on the iPhone 17 Pro Simulator. Staff now loads its JWT-owned HR schedule and opens/closes attendance with a durable SwiftData queue and attendance deep links; Courier/POS retain persistent offline recovery. Native quick unlock uses iOS Keychain v1 PIN storage and Android Keystore HMAC, checks biometric availability, throttles five failed PIN attempts for 30 seconds and clears local unlock state on logout. Android four-APK build, unit tests and Lint pass, and **31/31** connected tests pass on API 36, including Client trade-in evidence and all packaged app smoke tests. Live push and physical biometric/camera/maps/scanner/printer/payment-terminal certification remain open. Expo is retained only as a legacy behavior reference.
 - Запуск: см. [`HANDOFF.md`](./HANDOFF.md). Детальный план фаз: [`PHASES.md`](./PHASES.md).
 
@@ -31,7 +32,7 @@
 | **10A** Сервис-центр | Warranty и внешний платный intake, диагностика/смета, клиентское подтверждение, POS split payment/open-shift reconciliation, запчасти, lifecycle, 30-дневная гарантия ремонта и DeviceUnit-backed подменный фонд с Evidence/overdue готовы; exact detail handoff и физический UAT остаются | 🟡 |
 | **11** AI-слой | **AI-ассистент владельца** (`/ai/insights`) + **оценка Б/У** (`/ai/assess`, `/assess`) — бесключевые правила за портом | 🟡 |
 | **12** Каналы и рост | Подарочные карты, Telegram shell, B2B/опт и защита устройств работают; click&collect требует authoritative point/location, франшиза/реклама — каркас | 🟡 |
-| **13** Инфраструктура | Docker/Render blueprint, health, backup tooling, Sentry ports, realtime и offline software готовы; staging/restore/rollback/soak ещё не сертифицированы | 🟡 |
+| **13** Инфраструктура | Docker/Render blueprint, health, Prometheus-compatible metrics, backup tooling, Sentry ports, realtime и offline software готовы; alerting/staging/restore/rollback/soak ещё не сертифицированы | 🟡 |
 
 ## Работает вживую сейчас (прод-режим)
 `/` витрина · `/erp` кокпит (+ AI-ассистент, Маржа/KPI, Command Center, Готовность запуска) · `/pos` касса

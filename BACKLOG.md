@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `GAP-OBSERVE-002` Local software slice accepted: API now exposes Prometheus-compatible `/api/metrics` with request totals, 5xx counters and latency histograms; dynamic route labels are normalized and the scrape route is excluded. Production requires a secret `METRICS_TOKEN`; remaining work is private scrape networking, uptime checks, alert delivery, worker/outbox dashboard and staging soak.
 - `MVP-VERIFY-034` Local MVP gate revalidated after two lifecycle fixes: API isolated gate `163/163` test files, full Playwright `62/62`, Web/API builds and mobile typecheck pass. The API gate now starts each Jest file with a clean test database/process; the bundle allocation lifecycle uses an active-only IMEI index; CMS E2E requests explicitly close connections. Remaining gates are strict evidence refresh, staging and external providers.
 - `LOGIC-009-041` Store-point deactivation E2E now reflects the operational guard: catalog stock is kept outside the point for the availability-only scenario. The server still blocks deactivation when the point owns active stock, open shifts or fulfillment state.
 - `LOGIC-009` Local software slice accepted: deactivating a store point now locks the point row and rejects open cash shifts, active non-demo orders, serialized stock and quantity stock in the point's inventory location with `store_point_deactivation_blocked`; clean deactivation remains audited and idempotent. Remaining gate: staging/first-store operational UAT for handover, stock relocation and owner approval policy.
