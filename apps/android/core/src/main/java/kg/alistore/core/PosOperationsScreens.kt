@@ -295,7 +295,12 @@ private fun PosSaleScreen(
     item {
       OutlinedTextField(discount, { discount = it.filter(Char::isDigit).take(3) }, label = { Text("Скидка, %") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
       Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf("cash" to "Наличные", "card" to "Карта", "qr_mbank" to "MBank").forEach { (wire, label) ->
+        posTenderOptions.take(4).forEach { (wire, label) ->
+          OutlinedButton(onClick = { method = wire }, modifier = Modifier.weight(1f)) { Text(if (method == wire) "✓ $label" else label, fontSize = 11.sp) }
+        }
+      }
+      Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        posTenderOptions.drop(4).forEach { (wire, label) ->
           OutlinedButton(onClick = { method = wire }, modifier = Modifier.weight(1f)) { Text(if (method == wire) "✓ $label" else label, fontSize = 11.sp) }
         }
       }
@@ -480,7 +485,12 @@ private fun PosAfterSaleScreen(
       OutlinedTextField(oldImei, { oldImei = normalizeStaffCode(it) }, label = { Text("Старый IMEI") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
       OutlinedTextField(newProductId, { newProductId = it.trim() }, label = { Text("ID нового товара") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
       Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf("cash" to "Наличные", "card" to "Карта", "qr_mbank" to "MBank").forEach { (wire, label) ->
+        posTenderOptions.take(4).forEach { (wire, label) ->
+          OutlinedButton(onClick = { exchangeMethod = wire }, modifier = Modifier.weight(1f)) { Text(if (exchangeMethod == wire) "✓ $label" else label, fontSize = 10.sp) }
+        }
+      }
+      Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        posTenderOptions.drop(4).forEach { (wire, label) ->
           OutlinedButton(onClick = { exchangeMethod = wire }, modifier = Modifier.weight(1f)) { Text(if (exchangeMethod == wire) "✓ $label" else label, fontSize = 10.sp) }
         }
       }

@@ -247,7 +247,7 @@ private fun CourierWorkspace(
     when {
       loading -> CourierLoading(Modifier.padding(padding))
       selected == 0 -> CourierRoute(deliveries, focusedDeliveryId, message, session, commands, api, apiBaseUrl, { revision++ }, Modifier.padding(padding))
-      selected == 1 -> CourierCod(deliveries, queue.pending(), session, api, apiBaseUrl, { revision++ }, Modifier.padding(padding))
+      selected == 1 -> CourierCod(deliveries, queue.pending(), session, commands, apiBaseUrl, { revision++ }, Modifier.padding(padding))
       else -> CourierProfile(session, queue.pending(), onLogout, Modifier.padding(padding))
     }
   }
@@ -428,11 +428,6 @@ private fun CourierActionButton(label: String, busy: Boolean, action: () -> Unit
     Text(label, fontWeight = FontWeight.Bold)
   }
 }
-
-// The server reconciles against collectedTotal and demands a reason when the handed
-// amount differs from it or when the run was collected partially (HandoverDto).
-internal fun handoverReasonRequired(run: CourierRunSummary, amount: Int): Boolean =
-  amount != run.collectedTotal || run.collectedTotal < run.codTotal
 
 @Composable
 private fun CourierCod(
