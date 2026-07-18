@@ -403,3 +403,8 @@ Independent fresh-eyes sweep recorded in `docs/GAP-ANALYSIS-2026-07-17.md`. Thes
 - `PHASE-1-EVIDENCE-009` Refresh the trusted visual evidence after the AliStore iOS icon and reproducible Prisma toolchain lock changes. Storefront visual is now recorded for source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`; iOS/Android/reconciliation artifacts still require fresh recording before strict audit can be accepted. The design-corpus owner decision and physical-device/provider gates remain open.
 - `PHASE-1-EVIDENCE-010` Refresh trusted Android packaged UI evidence on source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`. The four AliStore APK targets pass `30 + 1 + 1 + 1 + 1` connected tests on the technical AVD `savio_api36_arm64`; the AVD name is not an app identity. iOS/reconciliation evidence, design corpus approval, physical devices and providers remain open.
 - `PHASE-1-EVIDENCE-011` Refresh trusted iOS UI evidence on source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`. The four native targets pass `21 + 9 + 2 + 2 = 34/34` simulator UI tests, including AliStore labels and Staff Quick Unlock shell. Physical devices, signing, push/camera/offline certification and owner pixel approval remain open.
+# PHASE-1-EVIDENCE-012 — Composite reconciliation evidence
+
+- [x] Re-record the composite ecosystem matrix after refreshing POS refund, courier COD, service loaner, and procurement-sale evidence.
+- [x] Confirm the reconciled matrix covers all four verticals and records the remaining release exclusions honestly.
+- [ ] Run strict audit and resolve only actionable local blockers; owner-controlled design corpus gaps remain external.

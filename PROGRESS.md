@@ -4124,3 +4124,9 @@
 - Outcome: iOS simulator UI evidence is current and locally accepted. This is not physical iPhone Face ID/APNs/camera/offline certification, signing, TestFlight or App Store approval.
 - Commit: pending in this iteration.
 - Next step: commit iOS evidence, then run trusted strict audit and refresh reconciliation gates if it reports source-hash drift.
+# 2026-07-18 — Composite ecosystem reconciliation evidence
+
+- Task: refresh the composite `reconciled-e2e` acceptance artifact after the four vertical reconciliation gates.
+- Checks: trusted toolchain recorder; 4/4 verticals passed (POS refund, courier COD, service loaner, procurement receiving-to-sale).
+- Result: composite evidence recorded against source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`; live providers, physical devices, deep native journeys, and missing visual handoffs remain separate gates.
+- Next: run `ecosystem-contract-audit.mjs --strict` and document remaining blockers.
