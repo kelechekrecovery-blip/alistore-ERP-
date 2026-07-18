@@ -124,6 +124,7 @@ test('remaining desktop customer routes use the shop system through account entr
   await page.goto('/compare');
   expect(await page.locator('main').locator('..').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
   await page.goto('/login?next=/account');
+  await expect(page.locator('.login-shell')).toHaveCount(1);
   expect(await page.locator('.login-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
 
