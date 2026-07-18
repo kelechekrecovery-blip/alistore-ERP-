@@ -135,7 +135,7 @@ export default function MobileHome() {
 
 function mobileTone(tone: StorefrontBlock['tone']) {
   if (tone === 'coral') return 'border-coral bg-coral text-white';
-  if (tone === 'light') return 'border-white bg-white text-lime-ink';
+  if (tone === 'light') return 'border-white/10 bg-white/[.06] text-white shadow-[0_12px_30px_rgba(0,0,0,.24)]';
   if (tone === 'lime') return 'border-lime bg-lime text-lime-ink';
   return 'border-surface-3 bg-ink-dark text-white';
 }

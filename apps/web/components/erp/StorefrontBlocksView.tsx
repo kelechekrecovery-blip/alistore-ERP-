@@ -144,4 +144,4 @@ function Icon({ title, disabled, onClick, children }: { title: string; disabled?
 function labelType(type: StorefrontBlockType) { return ({ hero: 'Главный баннер', promo: 'Промо-блок', info: 'Инфо-блок', collection: 'Подборка' })[type]; }
 function labelDevice(device: StorefrontBlockDevice) { return device === 'all' ? 'все устройства' : device; }
 function labelStatus(block: StorefrontBlock) { if (block.status === 'scheduled') return `с ${new Date(block.startsAt!).toLocaleString('ru-RU')}`; return ({ draft: 'черновик', published: 'включён', archived: 'архив' })[block.status]; }
-function tone(value: StorefrontBlock['tone']) { return value === 'coral' ? 'bg-coral text-white' : value === 'light' ? 'bg-white text-black' : value === 'lime' ? 'bg-lime text-lime-ink' : 'bg-night text-muted'; }
+function tone(value: StorefrontBlock['tone']) { return value === 'coral' ? 'bg-coral text-white' : value === 'light' ? 'border border-white/10 bg-white/[.06] text-white' : value === 'lime' ? 'bg-lime text-lime-ink' : 'bg-night text-muted'; }
