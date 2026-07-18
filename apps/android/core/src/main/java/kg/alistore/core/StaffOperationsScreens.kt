@@ -245,10 +245,10 @@ private fun StaffHome(session: StaffSession, modifier: Modifier, onTab: (Int) ->
     }
     item { StaffShortcut("Очередь заказов", "Комплектация и выдача", StaffCoral) { onTab(1) } }
     item { StaffShortcut("Задачи и KPI", "Назначения на сегодня", StaffLime, StaffInk) { onTab(2) } }
-    item { StaffShortcut("Customer 360", "Покупки, гарантия и поддержка", Color(0xFF82B1FF)) { onTab(5) } }
-    if (session.role in supportRoles) item { StaffShortcut("Поддержка", "Очередь обращений и SLA", Color(0xFFFFB26B)) { onTab(6) } }
+    item { StaffShortcut("Customer 360", "Покупки, гарантия и поддержка", Design3.blue) { onTab(5) } }
+    if (session.role in supportRoles) item { StaffShortcut("Поддержка", "Очередь обращений и SLA", Design3.orangeSoft) { onTab(6) } }
     item { StaffShortcut("Сканер", "EAN, QR и IMEI", StaffCoral) { onTab(3) } }
-    item { StaffShortcut("Кассовая смена", "Открытие и сверка", Color(0xFFFFD166), StaffInk) { onTab(4) } }
+    item { StaffShortcut("Кассовая смена", "Открытие и сверка", Design3.gold, StaffInk) { onTab(4) } }
     item {
       Text(
         if (session.totpEnabled) "2FA включена для опасных операций" else "Включите 2FA перед approval-операциями",
@@ -422,7 +422,7 @@ fun StaffSupportScreen(session: StaffSession, gateway: StaffCustomerGateway, mod
                 Text(ticket.subject, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text(
                   ticket.priority,
-                  color = if (ticket.priority == "urgent") StaffCoral else if (ticket.priority == "high") Color(0xFFFFD166) else StaffMuted,
+                  color = if (ticket.priority == "urgent") StaffCoral else if (ticket.priority == "high") Design3.gold else StaffMuted,
                   fontSize = 11.sp,
                 )
               }

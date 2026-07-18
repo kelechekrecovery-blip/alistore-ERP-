@@ -47,7 +47,7 @@ internal fun ProductMediaImage(
   Box(
     modifier = modifier
       .clip(RoundedCornerShape(cornerRadius))
-      .background(Color(0xFFF2EFEB))
+      .background(Design3.surfaceRaised)
       .testTag("product-media-${product.id}"),
     contentAlignment = Alignment.Center,
   ) {

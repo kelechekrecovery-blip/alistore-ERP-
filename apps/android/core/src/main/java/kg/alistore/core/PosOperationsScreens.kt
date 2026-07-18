@@ -346,7 +346,7 @@ private fun PosSaleScreen(
           Column(Modifier.padding(14.dp)) {
             Text("Чек с сервера", color = PosInk, fontWeight = FontWeight.Bold)
             Text(rendered.markup, color = PosInk, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
-            Text("ESC/POS готов к печати", color = Color(0xFF456400), fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            Text("ESC/POS готов к печати", color = Design3.lime, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
           }
         }
       }

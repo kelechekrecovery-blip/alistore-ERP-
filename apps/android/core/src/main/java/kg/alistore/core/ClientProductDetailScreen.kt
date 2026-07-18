@@ -168,7 +168,7 @@ internal fun ClientProductDetailContent(
           Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 5.dp).background(DetailSurface, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).clickable { onOpenProduct(related.id) }.padding(12.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Box(Modifier.size(52.dp).background(Color(0xFFF2EFEB), androidx.compose.foundation.shape.RoundedCornerShape(6.dp)))
+          Box(Modifier.size(52.dp).background(Design3.surfaceRaised, androidx.compose.foundation.shape.RoundedCornerShape(6.dp)))
           Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(related.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
             Text("${related.price} сом", color = DetailLime, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))

@@ -90,9 +90,9 @@ internal fun ClientBonusesScreen(
         val data = loyalty!!
         item {
           Column(Modifier.fillMaxWidth().background(AccountCoral, RoundedCornerShape(8.dp)).padding(22.dp).testTag("bonus-balance"), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Доступно бонусов", color = Color(0xFFFFE0D5), fontSize = 13.sp)
+            Text("Доступно бонусов", color = Design3.textBright, fontSize = 13.sp)
             Text(data.balance.toString(), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Black)
-            Text("1 бонус = ${data.conversion} сом · ${data.level}-уровень", color = Color(0xFFFFE0D5), fontSize = 12.sp)
+            Text("1 бонус = ${data.conversion} сом · ${data.level}-уровень", color = Design3.textBright, fontSize = 12.sp)
           }
         }
         item { AccountSection("Мои купоны") }

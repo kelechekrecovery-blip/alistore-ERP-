@@ -186,7 +186,7 @@ fun QuickUnlockGate(
     OutlinedTextField(confirmation, { confirmation = it.filter(Char::isDigit).take(6) }, label = { Text("Повторите PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     Button(onClick = { message = if (setup == confirmation && store.savePin(setup)) { pinStatus = store.pinStatus(); "PIN сохранён" } else "Введите одинаковые PIN-коды из 6 цифр" }, enabled = setup.length == 6 && confirmation.length == 6, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Настроить PIN") }
     message?.let { Text(it, color = StaffCoral, modifier = Modifier.padding(top = 12.dp)) }
-    if (!pinStatus.allowed) Text("Слишком много попыток. Повторите через ${pinStatus.retryAfterSeconds} сек.", color = Color(0xFFFFB74D), modifier = Modifier.padding(top = 8.dp))
+    if (!pinStatus.allowed) Text("Слишком много попыток. Повторите через ${pinStatus.retryAfterSeconds} сек.", color = Design3.gold, modifier = Modifier.padding(top = 8.dp))
     Button(onClick = { store.clear(); onLogout() }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Выйти из аккаунта") }
   }
 }

@@ -299,7 +299,7 @@ private fun ClientHome(
       }
     }
     item {
-      Box(Modifier.fillMaxWidth().padding(16.dp).height(150.dp).background(Color(0xFF2C2926), RoundedCornerShape(8.dp))) {
+      Box(Modifier.fillMaxWidth().padding(16.dp).height(150.dp).background(Design3.surfaceRaised, RoundedCornerShape(8.dp))) {
         Column(Modifier.padding(18.dp).align(Alignment.CenterStart)) {
           Text("iPhone для каждого", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Black)
           Text("Проверенная техника с гарантией", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
