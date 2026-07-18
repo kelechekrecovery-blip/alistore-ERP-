@@ -4056,3 +4056,12 @@
 - Commits: `a9a3b09`, `055fc5b`; supporting native commits `80c9276`, `1015aa2`.
 - Outcome: local software slice accepted. Physical printers/scanners, native UI/device evidence, staging credentials and production certification remain open.
 - Next step: verify catalog, price/promotion, CMS publication and checkout revalidation as one server-authoritative ERP → storefront contract.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-ERP-STOREFRONT-CONTRACT-003`.
+- Task: verify the catalog, price, CMS, promotion and checkout consequences as one ERP → storefront contract.
+- Files changed: no source files in this verification slice; current parallel `StockView` change remains uncommitted and untouched.
+- Result: ERP product administration changes flowed to product detail and checkout server pricing; CMS collection/block publication and ordering flowed to desktop/mobile storefront; review moderation controlled public visibility; managed promotion redemption produced the same server quote and one payment/redemption/Ledger consequence.
+- Checks run: fresh Playwright API/Web servers on ports `4270/3270`, `admin-products.spec.ts` + `storefront-cms-ui.spec.ts` `7/7`; prior Web production build and targeted API gates remain green.
+- Outcome: local ERP → storefront contract slice accepted. Full MVP, strict evidence audit, owner handoff corpus, staging, live providers and physical device gates remain separate.
+- Next step: run the complete local MVP and strict audit on a clean source boundary, then resolve each reported blocker with evidence or owner action.
