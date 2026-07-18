@@ -4206,7 +4206,7 @@ private struct CustomerLoyaltyView: View {
                                             .foregroundStyle(ClientTheme.muted)
                                         Text(entry.createdAt, format: .dateTime.day().month().year())
                                             .font(ClientTheme.body(11))
-                        .foregroundStyle(Design3.textSubtle)
+                                            .foregroundStyle(Design3.textSubtle)
                                     }
                                     Spacer()
                                     Text("\(entry.amount >= 0 ? "+" : "")\(entry.amount)")
@@ -5830,7 +5830,7 @@ private struct ClientHomeView: View {
                     }
                     Button(action: openCatalog) {
                         ZStack(alignment: .bottomTrailing) {
-                    LinearGradient(colors: [Design3.surfaceRaised, ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            LinearGradient(colors: [Design3.surfaceRaised, ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
                             Image("client-product-iphone")
                                 .resizable()
                                 .scaledToFit()
