@@ -490,6 +490,33 @@ describe('Finance expenses (integration + RBAC)', () => {
     expect(clear.body).toMatchObject({ period, ready: true, blockers: [], counts: { openCashShifts: 0 } });
   });
 
+  it('fails closed for foreign expenses until an FX revaluation policy is posted', async () => {
+    const period = '2099-02';
+    await prisma.expense.create({
+      data: {
+        idempotencyKey: `fx-close-${run}`,
+        category: 'supplier',
+        description: 'Иностранный документ до FX-переоценки',
+        amount: 90_000,
+        documentAmount: 1_000,
+        currency: 'USD',
+        exchangeRateMicros: 90_000_000,
+        taxBaseAmount: 90_000,
+        requestedBy: ownerId,
+        incurredAt: new Date('2099-02-10T12:00:00.000Z'),
+      },
+    });
+
+    const readiness = await request(app.getHttpServer())
+      .get(`/finance/periods/${period}/readiness`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(readiness.body).toMatchObject({ ready: false, counts: { openForeignExpenses: 1 } });
+    expect(readiness.body.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'fx_revaluation_required' }),
+    ]));
+  });
+
   it('records cash incassation as an idempotent 1010/1000 journal movement', async () => {
     const now = new Date();
     const shift = await prisma.cashShift.create({

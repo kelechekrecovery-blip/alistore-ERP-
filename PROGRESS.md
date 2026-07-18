@@ -10,6 +10,14 @@
 - Outcome: local period-close control is accepted. Staging-shaped close-window/load evidence, accountant/tax validation and live provider reconciliation remain open.
 - Next step: run the full API/build gate, then choose the next bounded accounting slice: posted FX revaluation requires a new accrual/revaluation aggregate, not a reinterpretation of open expense documents.
 
+- Iteration ID: `PHASE-2-ACC-FX-GUARD-001`.
+- Task: fail closed on open foreign expense documents until FX revaluation policy is posted.
+- Files changed: `apps/api/src/finance/finance.service.ts`, `apps/api/test/finance-expenses.e2e-spec.ts`, `BACKLOG.md`.
+- Result: period readiness adds `openForeignExpenses` and `fx_revaluation_required`; hard close cannot silently pass an open non-KGS document. The system intentionally creates no synthetic gain/loss or payable entry; the missing accrual/revaluation aggregate remains explicit.
+- Checks run: targeted Finance expenses suite `17/17`; `git diff --check` (pass).
+- Outcome: local FX safety guard accepted; posted FX revaluation, accountant/tax policy and staging/live validation remain open.
+- Next step: design a source-document accrual/revaluation aggregate with accountant input before posting FX journal entries.
+
 - Iteration ID: `PHASE-1-FIN-003E-GATE-002`.
 - Task: close the full local Phase 1 finance gate after adding the explicit pending-payment void contract.
 - Files changed: `apps/api/src/promotions/promotions.dto.ts`, `BACKLOG.md`, and this progress entry.

@@ -2187,7 +2187,7 @@ async function accountingPeriodReadinessOnTx(
   period: string,
 ) {
   const [from, to] = periodBounds(period);
-  const [openSettlements, openCashShifts, openRefunds, openSupplierInvoices, openBankStatements, openPayrollRuns, openAdvances] = await Promise.all([
+  const [openSettlements, openCashShifts, openRefunds, openSupplierInvoices, openBankStatements, openPayrollRuns, openAdvances, openForeignExpenses] = await Promise.all([
     tx.financeSettlementRun.count({
       where: {
         periodStart: { lt: to },
@@ -2233,6 +2233,13 @@ async function accountingPeriodReadinessOnTx(
         status: { in: ['open', 'partially_settled'] },
       },
     }),
+    tx.expense.count({
+      where: {
+        incurredAt: { gte: from, lt: to },
+        currency: { not: 'KGS' },
+        status: { in: ['submitted', 'approved'] },
+      },
+    }),
   ]);
 
   const blockers = [
@@ -2243,6 +2250,7 @@ async function accountingPeriodReadinessOnTx(
     openBankStatements > 0 && { code: 'bank_statement_open', message: `В периоде остались несверенные банковские выписки: ${openBankStatements}` },
     openPayrollRuns > 0 && { code: 'payroll_open', message: `В периоде остались ненаправленные в выплату payroll-запуски: ${openPayrollRuns}` },
     openAdvances > 0 && { code: 'accountable_advance_open', message: `В периоде остались незакрытые подотчётные авансы: ${openAdvances}` },
+    openForeignExpenses > 0 && { code: 'fx_revaluation_required', message: `В периоде остались иностранные расходы без утверждённой FX-переоценки: ${openForeignExpenses}` },
   ].filter((blocker): blocker is { code: string; message: string } => Boolean(blocker));
 
   return {
@@ -2251,7 +2259,7 @@ async function accountingPeriodReadinessOnTx(
     to,
     ready: blockers.length === 0,
     blockers,
-    counts: { openSettlements, openCashShifts, openRefunds, openSupplierInvoices, openBankStatements, openPayrollRuns, openAdvances },
+    counts: { openSettlements, openCashShifts, openRefunds, openSupplierInvoices, openBankStatements, openPayrollRuns, openAdvances, openForeignExpenses },
   };
 }
 
