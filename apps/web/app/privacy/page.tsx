@@ -82,7 +82,7 @@ export default function PrivacyPage() {
         <div className="text-xs text-white/40">
           <Link href="/">Главная</Link> / Политика конфиденциальности
         </div>
-        <h1 className="mt-5 text-[38px] font-extrabold text-white">Политика конфиденциальности</h1>
+        <h1 className="mt-5 break-words text-3xl font-extrabold leading-tight text-white sm:text-[38px]">Политика конфиденциальности</h1>
         <p className="mt-3 max-w-[75ch] text-sm text-white/50">
           Редакция от [Дата]. Настоящий документ размещён в ознакомительных целях и не является
           окончательной версией.
