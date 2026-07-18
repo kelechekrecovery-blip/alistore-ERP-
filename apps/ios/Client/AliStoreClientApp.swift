@@ -94,21 +94,24 @@ private enum ClientOverlay: String, Identifiable, Hashable {
     var id: String { rawValue }
 }
 
+// 3.0: forwards to the Design3 token system (AliStoreCore). Existing screens keep using
+// ClientTheme.* while migrating; this instantly swaps Avenir → Manrope/Golos and the 2.0
+// palette → 3.0 dark liquid-glass tokens. Remove once all screens use Design3 directly.
 private enum ClientTheme {
-    static let background = Color(red: 0.055, green: 0.047, blue: 0.039)
-    static let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
-    static let line = Color(red: 0.18, green: 0.157, blue: 0.133)
-    static let coral = Color(red: 1, green: 0.357, blue: 0.18)
-    static let lime = Color(red: 0.776, green: 1, blue: 0.239)
-    static let muted = Color(red: 0.655, green: 0.612, blue: 0.573)
-    static let gold = Color(red: 0.898, green: 0.698, blue: 0.235)
+    static let background = Design3.screen
+    static let surface = Design3.surface
+    static let line = Design3.hairline
+    static let coral = Design3.orange
+    static let lime = Design3.lime
+    static let muted = Design3.textMuted
+    static let gold = Design3.gold
 
     static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
-        .custom("Avenir Next", size: size).weight(weight)
+        Design3.heading(size, weight)
     }
 
     static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .custom("Avenir Next", size: size).weight(weight)
+        Design3.body(size, weight)
     }
 }
 
