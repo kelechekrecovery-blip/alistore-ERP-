@@ -73,12 +73,12 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 
-internal val StaffInk = Color(0xFF151515)
-internal val StaffSurface = Color(0xFF222222)
-internal val StaffLine = Color(0xFF373737)
-internal val StaffMuted = Color(0xFFA7A7A7)
-internal val StaffCoral = Color(0xFFFF5B2E)
-internal val StaffLime = Color(0xFFC6FF3D)
+internal val StaffInk = Design3.screen
+internal val StaffSurface = Design3.surface
+internal val StaffLine = Design3.hairline
+internal val StaffMuted = Design3.textMuted
+internal val StaffCoral = Design3.orange
+internal val StaffLime = Design3.lime
 
 private data class StaffTab(val label: String, val icon: ImageVector)
 

@@ -68,11 +68,11 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
-private val PosInk = Color(0xFF171411)
-private val PosSurface = Color(0xFF24201C)
-private val PosMuted = Color(0xFFA79C92)
-private val PosCoral = Color(0xFFFF5B2E)
-private val PosLime = Color(0xFFC6FF3D)
+private val PosInk = Design3.screen
+private val PosSurface = Design3.surface
+private val PosMuted = Design3.textMuted
+private val PosCoral = Design3.orange
+private val PosLime = Design3.lime
 
 sealed interface PosSubmitResult {
   data class Online(val result: PosSaleResult) : PosSubmitResult

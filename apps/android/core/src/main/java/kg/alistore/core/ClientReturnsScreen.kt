@@ -40,12 +40,12 @@ interface CustomerReturnsGateway : CustomerEvidenceGateway {
   suspend fun openReturn(request: CreateReturnRequest, token: String, idempotencyKey: String): CustomerReturn
 }
 
-private val ReturnsInk = Color(0xFF201B17)
-private val ReturnsSurface = Color(0xFF2A231D)
-private val ReturnsLine = Color(0xFF463C31)
-private val ReturnsMuted = Color(0xFFA79C92)
-private val ReturnsCoral = Color(0xFFFF5B2E)
-private val ReturnsLime = Color(0xFFC6FF3D)
+private val ReturnsInk = Design3.screen
+private val ReturnsSurface = Design3.surface
+private val ReturnsLine = Design3.hairline
+private val ReturnsMuted = Design3.textMuted
+private val ReturnsCoral = Design3.orange
+private val ReturnsLime = Design3.lime
 
 private val returnReasons = listOf(
   "Не подошёл / передумал",

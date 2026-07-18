@@ -72,11 +72,11 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-private val CourierInk = Color(0xFF151515)
-private val CourierSurface = Color(0xFF242424)
-private val CourierMuted = Color(0xFFA7A7A7)
-private val CourierCoral = Color(0xFFFF5B2E)
-private val CourierLime = Color(0xFFC6FF3D)
+private val CourierInk = Design3.screen
+private val CourierSurface = Design3.surface
+private val CourierMuted = Design3.textMuted
+private val CourierCoral = Design3.orange
+private val CourierLime = Design3.lime
 
 sealed interface CourierCommandResult {
   data object Sent : CourierCommandResult

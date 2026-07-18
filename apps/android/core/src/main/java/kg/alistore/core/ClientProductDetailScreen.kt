@@ -39,11 +39,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val DetailInk = Color(0xFF201B17)
-private val DetailSurface = Color(0xFF2A231D)
-private val DetailMuted = Color(0xFFA79C92)
-private val DetailCoral = Color(0xFFFF5B2E)
-private val DetailLime = Color(0xFFC6FF3D)
+private val DetailInk = Design3.screen
+private val DetailSurface = Design3.surface
+private val DetailMuted = Design3.textMuted
+private val DetailCoral = Design3.orange
+private val DetailLime = Design3.lime
 
 @Composable
 internal fun ClientProductDetailScreen(
