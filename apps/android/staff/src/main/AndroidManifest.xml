@@ -5,7 +5,7 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.USE_BIOMETRIC" />
   <uses-feature android:name="android.hardware.camera.any" android:required="false" />
-  <application android:label="AliStore Staff" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:usesCleartextTraffic="${usesCleartextTraffic}">
+  <application android:icon="@drawable/ic_alistore_launcher" android:label="AliStore Staff" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:usesCleartextTraffic="${usesCleartextTraffic}">
     <service android:name=".StaffFirebaseMessagingService" android:exported="false">
       <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
     </service>
