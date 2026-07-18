@@ -59,27 +59,27 @@ export default function CartPage() {
       <div className="md:hidden">
         <MobileCart />
       </div>
-      <div className="hidden min-h-screen bg-sand text-ink font-sans md:block">
-        <SiteHeader />
+      <div className="hidden min-h-screen bg-[#0b0a08] font-sans text-[#e5dcd3] md:block">
+        <SiteHeader variant="design3" />
         <main className="mx-auto max-w-[1400px] px-5 py-10">
-          <div className="text-xs text-faint">Главная / Корзина</div>
-          <h1 className="mt-3 font-display text-4xl font-bold sm:text-5xl">
+          <div className="text-xs text-white/40">Главная / Корзина</div>
+          <h1 className="mt-3 font-display text-4xl font-bold text-white sm:text-5xl">
             Корзина
           </h1>
-          <p className="mt-3 text-faint">
+          <p className="mt-3 text-white/45">
             Проверьте товары, примените промокод и переходите к оформлению.
           </p>
 
           {!hydrated ? (
-            <div className="mt-12 grid min-h-[360px] place-items-center rounded-[12px] border border-linen bg-white"><div className="h-8 w-56 animate-pulse rounded-full bg-linen" /></div>
+            <div className="mt-12 grid min-h-[360px] place-items-center rounded-[16px] border border-white/10 bg-white/[.04]"><div className="h-8 w-56 animate-pulse rounded-full bg-white/10" /></div>
           ) : hydrated && items.length === 0 ? (
-            <div className="mt-12 grid min-h-[360px] place-items-center rounded-[12px] border border-linen bg-white px-6 text-center">
+            <div className="mt-12 grid min-h-[360px] place-items-center rounded-[16px] border border-white/10 bg-white/[.04] px-6 text-center">
               <div>
-                <span className="mx-auto grid h-16 w-16 place-items-center rounded-[12px] bg-tint text-coral">
+                <span className="mx-auto grid h-16 w-16 place-items-center rounded-[16px] bg-coral/15 text-[#ff9a6e]">
                   <ShoppingBag size={30} />
                 </span>
-                <h2 className="mt-5 text-2xl font-bold">Корзина пуста</h2>
-                <p className="mt-2 text-faint">
+                <h2 className="mt-5 text-2xl font-bold text-white">Корзина пуста</h2>
+                <p className="mt-2 text-white/45">
                   Добавьте технику из каталога AliStore.
                 </p>
                 <Link
@@ -96,30 +96,30 @@ export default function CartPage() {
                 {items.map((item) => (
                   <article
                     key={item.id}
-                    className="grid grid-cols-[86px_1fr] gap-4 rounded-[12px] border border-linen bg-white p-4 sm:grid-cols-[110px_1fr_auto] sm:items-center"
+                    className="grid grid-cols-[86px_1fr] gap-4 rounded-[16px] border border-white/10 bg-white/[.04] p-4 shadow-[0_10px_25px_rgba(0,0,0,.28)] sm:grid-cols-[110px_1fr_auto] sm:items-center"
                   >
                     <Link
                       href={`/product/${item.id}`}
-                      className="grid aspect-square place-items-center rounded-[8px] bg-sand text-3xl font-bold text-coral/20"
+                      className="grid aspect-square place-items-center rounded-[11px] bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6] text-3xl font-bold text-coral/40"
                     >
                       {item.name.slice(0, 1)}
                     </Link>
                     <div className="min-w-0">
                       <Link
                         href={`/product/${item.id}`}
-                        className="font-medium leading-6 text-ink hover:text-coral"
+                        className="font-medium leading-6 text-white hover:text-[#ff9a6e]"
                       >
                         {item.name}
                       </Link>
-                      <div className="mt-1 font-mono text-xs text-faint">
+                      <div className="mt-1 font-mono text-xs text-white/40">
                         {item.sku}
                       </div>
                       <div className="mt-4 flex items-center gap-3">
-                        <div className="flex items-center rounded-[9px] border border-linen bg-white p-1">
+                        <div className="flex items-center rounded-[9px] border border-white/10 bg-white/[.05] p-1">
                           <button
                             type="button"
                             onClick={() => setQty(item.id, item.qty - 1)}
-                            className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
+                            className="grid h-11 w-11 place-items-center rounded-btn hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                             aria-label="Уменьшить"
                           >
                             <Minus size={14} />
@@ -140,7 +140,7 @@ export default function CartPage() {
                         <button
                           type="button"
                           onClick={() => remove(item.id)}
-                          className="flex items-center gap-1.5 text-xs text-faint hover:text-coral"
+                          className="flex items-center gap-1.5 text-xs text-white/45 hover:text-[#ff9a6e]"
                         >
                           <Trash2 size={14} /> Удалить
                         </button>
@@ -150,7 +150,7 @@ export default function CartPage() {
                       <div className="font-display text-xl font-bold">
                         {som(item.price * item.qty)}
                       </div>
-                      <div className="mt-1 text-xs text-faint">
+                      <div className="mt-1 text-xs text-white/40">
                         {som(item.price)} / шт.
                       </div>
                     </div>
@@ -158,19 +158,19 @@ export default function CartPage() {
                 ))}
 
                 {items.length > 0 && (
-                  <div className="mt-2 rounded-[12px] border border-linen bg-white p-5">
-                    <h2 className="font-semibold">Промокод и бонусы</h2>
+                  <div className="mt-2 rounded-[16px] border border-white/10 bg-white/[.04] p-5">
+                    <h2 className="font-semibold text-white">Промокод и бонусы</h2>
                     <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                       <input
                         value={promoInput}
                         onChange={(event) => setPromoInput(event.target.value)}
                         placeholder="Введите промокод"
-                        className="min-w-0 flex-1 rounded-[9px] border border-linen bg-white px-4 py-3 text-sm uppercase outline-none placeholder:normal-case placeholder:text-faint focus:border-coal"
+                        className="min-w-0 flex-1 rounded-[9px] border border-white/10 bg-white/[.05] px-4 py-3 text-sm uppercase text-white outline-none placeholder:normal-case placeholder:text-white/35 focus:border-coral"
                       />
                       <button
                         type="button"
                         onClick={submitPromo}
-                        className="rounded-[9px] border border-linen bg-sand px-5 py-3 text-sm font-semibold hover:border-coral"
+                        className="rounded-[9px] border border-white/10 bg-white/[.05] px-5 py-3 text-sm font-semibold text-white hover:border-coral"
                       >
                         {promoCode ? "Убрать" : promoLoading ? "Проверяем…" : "Применить"}
                       </button>
@@ -187,14 +187,14 @@ export default function CartPage() {
                       type="button"
                       onClick={toggleBonus}
                       disabled={bonusLoading || bonusBalance <= 0}
-                      className="mt-4 flex w-full items-center gap-3 rounded-[9px] border border-linen bg-sand p-4 text-left disabled:opacity-60"
+                      className="mt-4 flex w-full items-center gap-3 rounded-[9px] border border-white/10 bg-white/[.05] p-4 text-left disabled:opacity-60"
                     >
                       <span
                         className={`grid h-5 w-5 place-items-center rounded-[5px] border text-xs ${bonusApplied ? "border-coral bg-coral text-white" : "border-slate"}`}
                       >
                         {bonusApplied ? "✓" : ""}
                       </span>
-                      <span className="text-sm text-ink">
+                      <span className="text-sm text-white/75">
                         {bonusLoading
                           ? "Проверяем бонусы…"
                           : `Списать до ${bonusBalance.toLocaleString("ru-RU")} бонусов`}
@@ -215,9 +215,9 @@ export default function CartPage() {
               </section>
 
               {items.length > 0 && (
-                <aside className="h-fit rounded-[12px] border border-linen bg-white p-6 lg:sticky lg:top-24">
-                  <h2 className="text-xl font-bold">Ваш заказ</h2>
-                  <div className="mt-5 grid gap-3 text-sm text-faint">
+                <aside className="h-fit rounded-[16px] border border-white/10 bg-gradient-to-br from-white/[.08] to-white/[.02] p-6 shadow-[0_12px_30px_rgba(0,0,0,.35)] lg:sticky lg:top-24">
+                  <h2 className="text-xl font-bold text-white">Ваш заказ</h2>
+                  <div className="mt-5 grid gap-3 text-sm text-white/45">
                     <SummaryRow
                       label={`Товары (${items.reduce((sum, item) => sum + item.qty, 0)})`}
                       value={som(subtotal)}
@@ -238,20 +238,20 @@ export default function CartPage() {
                     )}
                     <SummaryRow label="Доставка" value="Рассчитаем далее" />
                   </div>
-                  <div className="my-5 h-px bg-linen" />
+                  <div className="my-5 h-px bg-white/10" />
                   <div className="flex items-end justify-between">
-                    <span className="font-semibold">Итого</span>
-                    <span className="font-display text-3xl font-extrabold">
+                    <span className="font-semibold text-white">Итого</span>
+                    <span className="font-display text-3xl font-extrabold text-white">
                       {som(total)}
                     </span>
                   </div>
                   <Link
                     href="/checkout"
-                    className="mt-6 flex w-full items-center justify-center rounded-[9px] bg-coral py-3.5 text-sm font-bold text-white hover:bg-deep"
+                    className="erp3-coral-action mt-6 flex w-full items-center justify-center rounded-[12px] py-3.5 text-sm font-bold text-white"
                   >
                     Перейти к оформлению
                   </Link>
-                  <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-faint">
+                  <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-white/45">
                     <ShieldCheck
                       className="mt-0.5 shrink-0 text-success"
                       size={16}
@@ -282,7 +282,7 @@ function SummaryRow({
   return (
     <div className="flex justify-between gap-4">
       <span>{label}</span>
-      <span className={accent ? "text-success" : "text-ink"}>{value}</span>
+      <span className={accent ? "text-[#7fd3a0]" : "text-white/80"}>{value}</span>
     </div>
   );
 }
