@@ -1,5 +1,14 @@
 # PROGRESS
 
+## 2026-07-18 — PHASE-1-NOTIF-003
+
+- Task: complete transactional customer/staff notification coverage across payment, order, courier, refund, return, service, loaner, exchange, trade-in, support, approvals and shifts.
+- Files: API domain services/modules, notification projections, and `apps/api/test/notification-coverage.e2e-spec.ts`.
+- Checks: clean test DB migration reset; notification integration `15/15`; API production build; `git diff --check`.
+- Commit: `bfbebed` (`test(api): complete transactional notification coverage`).
+- Outcome: local notification vertical accepted. Live SMS/push provider delivery, staging soak and physical-device certification remain open.
+- Next: review the still-dirty parallel Web/Android/iOS changes, then rerun native evidence and strict ecosystem audit on one clean source SHA.
+
 ## 2026-07-18
 
 - Iteration ID: `GAP-OBSERVE-001` (CEO mission, local slice verification + backlog closure).
