@@ -4073,5 +4073,15 @@
 - Changes: pinned the generated Prisma dependency tree; recorded committed visual, iOS app UI, four reconciliation and composite artifacts under `docs/acceptance`.
 - Checks run: visual `3/3`; iOS app UI `34/34`; POS refund `1/1`; courier COD `1/1`; service/loaner API `9/9` plus browser `3/3`; procurement-sale API `10/10` plus browser `1/1`; composite reconciliation `4/4`; strict audit passes all recorded evidence checks.
 - Commits: `b2b53cd`, `0a29ce7`, `ab839ce`, `b956121`, `b18160e`, `b8b8d1d`, `0d71414`, `f13c449`, `7db7104`.
-- Outcome: strict audit is reduced to two blockers: Android packaged connected evidence and 64 missing linked design references. The `savio_api36_arm64` AVD existed but exited before ADB registration; no false evidence was recorded. Physical devices, live providers and staging remain external release gates.
-- Next step: repair/boot Android API 36 emulator or use an owner device; recover or owner-retire the 64 missing handoffs.
+- Outcome: strict audit is reduced to one blocker: 64 missing linked design references. Android packaged connected evidence, visual, iOS UI and all reconciliation evidence were subsequently refreshed on the branded source boundary. Physical devices, live providers and staging remain external release gates.
+- Next step: recover or owner-retire the 64 missing handoffs.
+
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-ANDROID-BRANDING-005`.
+- Task: brand the Android applications as AliStore and close the packaged connected-test gate on the branded source boundary.
+- Changes: Client label changed from `AliStore Native` to `AliStore`; a shared dark/lime AliStore launcher was added for Client, Staff, Courier and POS; role labels remain `AliStore Staff`, `AliStore Courier` and `AliStore POS`.
+- Checks run: all four debug APKs assembled; connected Android tests passed on `savio_api36_arm64` with `30 + 1 + 1 + 1` tests; trusted evidence recorded for source hash `80ac86dabbe39a01c3fb9d60e7d71e3da067fe62b446428f9e99fe97ce34e7b5`.
+- Commits: `6b008f4`, `ad0ae87`.
+- Outcome: Android packaged connected evidence is accepted locally. The AVD name is a technical emulator name only; the installed applications are AliStore-branded. Physical Android device, provider credentials, store signing and the 64 missing handoff references remain open.
+- Next step: rerun strict audit, then resolve the design corpus blocker through recovered references or owner-approved retirement records.
