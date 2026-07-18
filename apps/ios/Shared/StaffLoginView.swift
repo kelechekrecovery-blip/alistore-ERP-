@@ -13,9 +13,9 @@ public struct StaffLoginView: View {
 
     public var body: some View {
         ZStack {
-            Color(red: 0.055, green: 0.047, blue: 0.039).ignoresSafeArea()
+            Design3.frame.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 16) {
-                Image(systemName: "checklist").font(.system(size: 34, weight: .black)).foregroundStyle(Color(red: 0.776, green: 1, blue: 0.239))
+                Image(systemName: "checklist").font(.system(size: 34, weight: .black)).foregroundStyle(Design3.lime)
                 Text(title).font(.largeTitle.weight(.black)).foregroundStyle(.white)
                 Text("Рабочее место для заказов, клиентов и смены").foregroundStyle(.secondary)
                 VStack(spacing: 12) {
@@ -36,7 +36,7 @@ public struct StaffLoginView: View {
                     if auth.isLoading { ProgressView().frame(maxWidth: .infinity) }
                     else { Label("Войти в рабочее место", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity) }
                 }
-                .buttonStyle(.borderedProminent).tint(Color(red: 0.776, green: 1, blue: 0.239)).foregroundStyle(.black).controlSize(.large)
+                .buttonStyle(.borderedProminent).tint(Design3.lime).foregroundStyle(.black).controlSize(.large)
                 .disabled(auth.isLoading || username.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty)
                 Text("После первого входа можно использовать Face ID или PIN-код.").font(.caption).foregroundStyle(.secondary).padding(.top, 6)
             }

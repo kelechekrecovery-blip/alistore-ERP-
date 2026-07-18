@@ -340,6 +340,19 @@ private struct ClientLoginView: View {
                     .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (requested && code.filter(\.isNumber).count != 6))
                     .padding(.top, 12)
                     .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
+                    Button {
+                        Task {
+                            if await BiometricAuthenticator().unlock(reason: "Вход в AliStore по Face ID") { onGuest() }
+                        }
+                    } label: {
+                        HStack { Spacer(); Image(systemName: "faceid"); Text("Войти по Face ID"); Spacer() }
+                            .font(ClientTheme.body(15, weight: .semibold))
+                            .foregroundStyle(Design3.blue)
+                            .frame(height: 50)
+                            .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(Design3.blue.opacity(0.4), lineWidth: 1))
+                    }
+                    .padding(.top, 10)
+                    .accessibilityIdentifier("client-faceid")
                     HStack(spacing: 10) {
                         loginProvider("Apple", symbol: "applelogo")
                         loginProvider("Telegram", symbol: "paperplane.fill")
@@ -2613,7 +2626,7 @@ private struct ClientOrderCard: View {
         let value = order.status.lowercased()
         if value.contains("cancel") || value.contains("reject") || value.contains("fail") { return ClientTheme.coral }
         if value.contains("complete") || value.contains("deliver") || value.contains("ready") { return ClientTheme.lime }
-        return Color(red: 0.898, green: 0.698, blue: 0.235)
+        return ClientTheme.gold
     }
 }
 
@@ -3168,14 +3181,11 @@ private struct CustomerReturnRequestView: View {
 private struct ClientReturnProductTile: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 10)
-            .fill(LinearGradient(colors: [
-                Color(red: 0.937, green: 0.906, blue: 0.863),
-                Color(red: 0.969, green: 0.949, blue: 0.925)
-            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .fill(LinearGradient(colors: [Design3.surfaceRaised, Design3.surface], startPoint: .topLeading, endPoint: .bottomTrailing))
             .overlay {
                 Image(systemName: "shippingbox")
                     .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.086, green: 0.067, blue: 0.051).opacity(0.72))
+                    .foregroundStyle(Design3.textBright.opacity(0.72))
             }
     }
 }
@@ -4196,7 +4206,7 @@ private struct CustomerLoyaltyView: View {
                                             .foregroundStyle(ClientTheme.muted)
                                         Text(entry.createdAt, format: .dateTime.day().month().year())
                                             .font(ClientTheme.body(11))
-                                            .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                        .foregroundStyle(Design3.textSubtle)
                                     }
                                     Spacer()
                                     Text("\(entry.amount >= 0 ? "+" : "")\(entry.amount)")
@@ -5438,7 +5448,7 @@ private struct ClientWarrantyCertificate: View {
         .padding(20)
         .background(
             LinearGradient(
-                colors: [Color(red: 0.165, green: 0.165, blue: 0.18), ClientTheme.surface],
+                colors: [Design3.surfaceRaised, ClientTheme.surface],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
@@ -5820,7 +5830,7 @@ private struct ClientHomeView: View {
                     }
                     Button(action: openCatalog) {
                         ZStack(alignment: .bottomTrailing) {
-                            LinearGradient(colors: [Color(red: 0.16, green: 0.16, blue: 0.18), ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    LinearGradient(colors: [Design3.surfaceRaised, ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
                             Image("client-product-iphone")
                                 .resizable()
                                 .scaledToFit()

@@ -139,7 +139,7 @@ public struct QuickUnlockView: View {
     @State private var showingSetup = false
     @State private var setupPin = ""
     @State private var confirmPin = ""
-    private static let lime = Color(red: 0.776, green: 1, blue: 0.239)
+    private static let lime = Design3.lime
     private static let card = Color.white.opacity(0.07)
     private static let surface = Color.white.opacity(0.055)
     private static let field = Color.white.opacity(0.09)
@@ -347,7 +347,7 @@ public struct QuickUnlockView: View {
 
     private var quickBackground: some View {
         LinearGradient(
-            colors: [Color(red: 0.055, green: 0.047, blue: 0.039), Color(red: 0.02, green: 0.024, blue: 0.022)],
+            colors: [Design3.frame, Design3.screen],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
