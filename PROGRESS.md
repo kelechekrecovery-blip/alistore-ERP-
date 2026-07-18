@@ -4138,3 +4138,11 @@
 - Checks: trusted strict audit; all local software gates passed, including web/API, iOS UI, Android packaged UI, four reconciliation flows, composite 4/4 matrix, and source/evidence hash integrity.
 - Result: one blocker remains: 64 linked handoff references are absent from the repository (23 tracked, 10 present, 64 missing). No visual acceptance is claimed for those references.
 - Next: owner must provide the missing references or approve their retirement; continue external staging/provider/device gates without claiming production readiness.
+
+# 2026-07-18 — PHASE-1-TRUSTED-EVIDENCE-005
+
+- Task: refresh the final procurement and composite reconciliation evidence after the AliStore branding and realtime authorization changes.
+- Checks: procurement API `10/10` plus browser `1/1`; composite reconciliation matrix `4/4`; trusted strict ecosystem audit.
+- Commits: `750de77` and `f2f4a44`.
+- Result: every local software/evidence gate passes and the strict audit reports exactly one blocker: 64 linked design handoffs are missing from the committed corpus. The technical Android AVD name `savio_api36_arm64` remains only an emulator identifier; packaged applications are AliStore-branded.
+- Remaining gates: owner restore/retire/replace decision for the 64 references, staging credentials and deploy, live provider certification, physical-device biometrics/push/camera/maps/scanner/printer smoke, signing and store release. Production readiness is not claimed.
