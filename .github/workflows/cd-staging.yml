@@ -1,0 +1,130 @@
+name: CD — Staging
+
+# Controlled staging deploy for the Render Blueprint `infra/render.staging.yaml`.
+#
+# Trigger model: the Blueprint already carries `autoDeployTrigger: checksPass`,
+# so Render also auto-deploys the connected branch once required checks pass.
+# This workflow is the explicit, gated path: it rehearses every Prisma migration
+# against an ephemeral PostgreSQL (same shape as the CI `test` job), then fires
+# the Render deploy hooks and verifies public health before reporting success.
+#
+# Owner configuration (one-time, see docs/OWNER-LAUNCH-CHECKLIST.md §1/§2):
+#   Secrets: RENDER_DEPLOY_HOOK_API / RENDER_DEPLOY_HOOK_WEB / RENDER_DEPLOY_HOOK_WORKER
+#     Render dashboard → service → Settings → Deploy Hook → copy URL.
+#   Vars (optional): STAGING_API_BASE_URL, STAGING_WEB_BASE_URL override the
+#     default staging hostnames from infra/render.staging.yaml.
+# No secret values belong in this file or anywhere in git.
+#
+# ROLLBACK: Render dashboard → service → Events → "Rollback" on the previous
+# successful deploy (re-deploys the previous image; the Blueprint preDeployCommand
+# re-runs `prisma migrate deploy`, which is a no-op on an already-migrated DB).
+# Never reverse a data-bearing migration during an image rollback — ship a
+# forward migration instead (docs/MANAGED-CLOUD-LAUNCH.md §5).
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-staging
+  cancel-in-progress: false
+
+env:
+  STAGING_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL || 'https://api-staging.alistore.kg' }}
+  STAGING_WEB_BASE_URL: ${{ vars.STAGING_WEB_BASE_URL || 'https://staging.alistore.kg' }}
+
+jobs:
+  migration-rehearsal:
+    # Proves every pending migration applies cleanly before any deploy trigger.
+    # The real staging migration runs on Render via the Blueprint
+    # preDeployCommand (`npm run db:deploy -w @alistore/api`).
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: alistore
+          POSTGRES_PASSWORD: alistore
+          POSTGRES_DB: alistore_cd_rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alistore -d alistore_cd_rehearsal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_cd_rehearsal?schema=public
+      DIRECT_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_cd_rehearsal?schema=public
+      JWT_SECRET: cd-rehearsal-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @alistore/api
+      - run: npm run db:deploy -w @alistore/api
+
+  deploy:
+    needs: migration-rehearsal
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hooks
+        env:
+          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+          WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+        run: |
+          set -euo pipefail
+          triggered=0
+          for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
+            name="${pair%%:*}"
+            url="${pair#*:}"
+            if [ -n "$url" ]; then
+              echo "Triggering $name deploy hook"
+              curl -fsS -X POST "$url"
+              triggered=1
+            else
+              echo "::notice::RENDER_DEPLOY_HOOK_$(echo "$name" | tr '[:lower:]' '[:upper:]') is not set — skipping $name (owner gate, docs/OWNER-LAUNCH-CHECKLIST.md §2)"
+            fi
+          done
+          if [ "$triggered" -eq 0 ]; then
+            echo "::error::No Render deploy hooks configured; nothing was deployed."
+            exit 1
+          fi
+
+  health-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for staging health endpoints
+        # Render builds and swaps images asynchronously after the hook fires;
+        # poll the Blueprint healthCheckPath endpoints until both are live.
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1200 ))
+          until curl -fsS "$STAGING_API_BASE_URL/api/health/live" >/dev/null \
+             && curl -fsS "$STAGING_WEB_BASE_URL/healthz" >/dev/null; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Staging health checks did not pass within 20 minutes — inspect the Render deploy events and consider the rollback note in the workflow header."
+              exit 1
+            fi
+            echo "Waiting for staging health (api=$STAGING_API_BASE_URL web=$STAGING_WEB_BASE_URL)..."
+            sleep 30
+          done
+          echo "Staging health endpoints are live."
+      - name: Deployment smoke
+        # scripts/deployment-smoke.mjs: web /healthz, api /api/health/live +
+        # /api/health/ready, catalog read. Node 20+ on the runner provides fetch.
+        env:
+          WEB_BASE_URL: ${{ env.STAGING_WEB_BASE_URL }}
+          API_BASE_URL: ${{ env.STAGING_API_BASE_URL }}
+        run: node scripts/deployment-smoke.mjs
