@@ -302,7 +302,7 @@ export default function ApprovalsPage() {
               setTotpSetup(null);
               setTotpToken('');
             }}
-            className="ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
+            className="ml-auto rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line"
           >
             Выйти staff
           </button>
@@ -310,21 +310,21 @@ export default function ApprovalsPage() {
         {session && canReadRefunds(session.role) && (
           <Link
             href="/refunds"
-            className="rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
+            className="rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line"
           >
             Возвраты денег
           </Link>
         )}
         <Link
           href="/"
-          className={session ? 'rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30' : 'ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30'}
+          className={session ? 'rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line' : 'ml-auto rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line'}
         >
           ⌂ Выйти
         </Link>
       </header>
 
       {session && (
-        <div className="flex flex-shrink-0 gap-2 border-b border-ink/10 bg-white/50 px-6 py-3">
+        <div className="flex flex-shrink-0 gap-2 border-b border-surface-3 bg-surface/70 px-6 py-3">
           {TABS.map((t) => (
             <button
               key={t.status}
@@ -332,8 +332,8 @@ export default function ApprovalsPage() {
               onClick={() => setTab(t)}
               className={`rounded-chip px-4 py-2 text-sm font-semibold transition ${
                 tab.status === t.status
-                  ? 'bg-ink text-sand'
-                  : 'border border-ink/15 bg-white text-ink/70 hover:border-ink/30'
+                  ? 'bg-coral text-white'
+                  : 'border border-surface-3 bg-surface-2 text-muted hover:border-line'
               }`}
             >
               {t.label}
@@ -345,15 +345,15 @@ export default function ApprovalsPage() {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl">
           {!session && (
-            <form onSubmit={doLogin} className="rounded-card border border-ink/10 bg-white p-6 shadow-soft">
-              <div className="font-display text-xl font-bold text-ink">Вход сотрудника</div>
-              <div className="mt-1 text-sm text-ink/55">Введите рабочий логин, чтобы открыть очередь одобрений.</div>
+            <form onSubmit={doLogin} className="erp3-glass rounded-[14px] p-6 text-bright">
+              <div className="font-display text-xl font-bold text-white">Вход сотрудника</div>
+              <div className="mt-1 text-sm text-muted">Введите рабочий логин, чтобы открыть очередь одобрений.</div>
               <input
                 value={login.username}
                 onChange={(e) => setLogin((v) => ({ ...v, username: e.target.value }))}
                 placeholder="username"
                 autoComplete="username"
-                className="mt-5 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40"
+                className="mt-5 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime"
               />
               <input
                 value={login.password}
@@ -361,9 +361,9 @@ export default function ApprovalsPage() {
                 placeholder="password"
                 type="password"
                 autoComplete="current-password"
-                className="mt-3 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40"
+                className="mt-3 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime"
               />
-              <button type="submit" disabled={busy === 'login'} className="mt-4 rounded-btn bg-ink px-5 py-3 text-sm font-semibold text-sand disabled:opacity-50">
+              <button type="submit" disabled={busy === 'login'} className="mt-4 rounded-[10px] bg-lime px-5 py-3 text-sm font-bold text-lime-ink disabled:opacity-50">
                 {busy === 'login' ? 'Входим…' : 'Войти'}
               </button>
             </form>

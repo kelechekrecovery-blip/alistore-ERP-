@@ -185,7 +185,7 @@ export default function RefundsPage() {
           {!session && (
             <div className="flex justify-center">
               <StaffSessionLogin
-                mode="light"
+                mode="dark"
                 title="Возвраты денег · вход"
                 caption="Войдите учётной записью admin/owner, чтобы оперировать refund."
                 onAuthenticated={setSession}
