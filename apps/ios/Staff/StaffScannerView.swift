@@ -255,9 +255,11 @@ struct StaffScannerView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(13)
+                        .contentShape(Rectangle())
                         .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("staff-buyback-check-\(index)")
                 }
             }
             Button("К договору купли-продажи →") {
