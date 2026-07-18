@@ -79,11 +79,17 @@
   }
 
   .erp3-stage {
-    background: linear-gradient(135deg, #17120e 0%, var(--erp-bg) 48%, #11100e 100%);
+    background:
+      radial-gradient(circle at 22% 0%, rgba(255, 91, 46, 0.24), transparent 38%),
+      radial-gradient(circle at 88% 16%, rgba(123, 36, 117, 0.2), transparent 34%),
+      linear-gradient(135deg, #17120e 0%, var(--erp-bg) 48%, #11100e 100%);
   }
 
   .erp3-shell {
-    background: linear-gradient(135deg, #1b1510 0%, #13100d 42%, var(--erp-bg) 100%);
+    background:
+      radial-gradient(circle at 24% 0%, rgba(255, 91, 46, 0.18), transparent 35%),
+      radial-gradient(circle at 88% 20%, rgba(123, 36, 117, 0.14), transparent 32%),
+      linear-gradient(135deg, #1b1510 0%, #13100d 42%, var(--erp-bg) 100%);
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 26px;
     box-shadow: 0 50px 120px rgba(0, 0, 0, 0.62);
