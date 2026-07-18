@@ -25,7 +25,7 @@ private struct GlassBackground: ViewModifier {
 
 extension View {
     /// Liquid-glass surface behind the view (material + warm tint + hairline).
-    func glass(radius: CGFloat = Design3.Radius.card, strong: Bool = false) -> some View {
+    nonisolated func glass(radius: CGFloat = Design3.Radius.card, strong: Bool = false) -> some View {
         modifier(GlassBackground(radius: radius, strong: strong))
     }
 }

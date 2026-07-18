@@ -198,7 +198,7 @@ private struct ClientHeader: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 44)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
             }
             .buttonStyle(.plain)
@@ -301,7 +301,7 @@ private struct ClientLoginView: View {
                         .foregroundStyle(.white)
                         .font(.system(size: 15, design: .monospaced))
                         .padding(14)
-                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                        .glass(radius: 13)
                         .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                         .padding(.top, 26)
                         .accessibilityIdentifier("client-phone")
@@ -311,7 +311,7 @@ private struct ClientLoginView: View {
                             .textContentType(.oneTimeCode)
                             .foregroundStyle(.white)
                             .padding(14)
-                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                            .glass(radius: 13)
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
                             .padding(.top, 10)
                             .accessibilityIdentifier("client-otp")
@@ -372,7 +372,7 @@ private struct ClientLoginView: View {
             .font(ClientTheme.body(14, weight: .medium))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+            .glass(radius: 13)
             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
             .accessibilityLabel("Войти через \(title)")
     }
@@ -464,7 +464,7 @@ private struct ClientOverlayView: View {
                         .foregroundStyle(.white)
                 }
                 .padding(14)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .glass(radius: 12)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.lime))
                 Text("Популярные запросы")
                     .font(ClientTheme.body(13, weight: .semibold))
@@ -740,7 +740,7 @@ private struct ClientOverlayView: View {
             Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
         }
         .padding(12)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+        .glass(radius: 13)
         .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
     }
 
@@ -807,7 +807,7 @@ private struct ClientOverlayView: View {
         }
         .padding(10)
         .frame(width: 160, alignment: .topLeading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(isBestPrice ? ClientTheme.lime : ClientTheme.line))
     }
 
@@ -833,7 +833,7 @@ private struct ClientOverlayView: View {
             .accessibilityLabel(selected ? "Убрать из сравнения" : "Добавить к сравнению")
         }
         .padding(10)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+        .glass(radius: 13)
         .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
     }
 }
@@ -1235,7 +1235,7 @@ private struct ClientChoiceRow: View {
                     .foregroundStyle(selected ? ClientTheme.lime : ClientTheme.muted)
             }
             .padding(14)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+            .glass(radius: 13)
             .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? ClientTheme.lime : ClientTheme.line))
         }
         .buttonStyle(.plain)
@@ -1290,7 +1290,7 @@ private struct ClientReadOnlyField: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(13)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .glass(radius: 12)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
         }
     }
@@ -1319,7 +1319,7 @@ private struct ClientInputField: View {
                 .foregroundStyle(.white)
                 .textInputAutocapitalization(.never)
                 .padding(13)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .glass(radius: 12)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
         }
     }
@@ -1340,7 +1340,7 @@ private struct ClientCallout: View {
             Spacer(minLength: 0)
         }
         .padding(13)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+        .glass(radius: 12)
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
     }
 }
@@ -1532,7 +1532,7 @@ private struct CartView: View {
                         .multilineTextAlignment(.trailing)
                 }
                 .padding(12)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                .glass(radius: 14)
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
                 .accessibilityElement(children: .contain)
             }
@@ -1543,7 +1543,7 @@ private struct CartView: View {
                 ClientSummaryRow(title: "Итого", value: total.formatted(.currency(code: "KGS")), emphasized: true)
             }
             .padding(16)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .glass(radius: 14)
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
         }
     }
@@ -1637,7 +1637,7 @@ private struct CartView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding(13)
-                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .glass(radius: 12)
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
                     .accessibilityIdentifier("checkout-promo-input")
                 Button {
@@ -1711,7 +1711,7 @@ private struct CartView: View {
                 ClientSummaryRow(title: "К оплате", value: payable.formatted(.currency(code: "KGS")), emphasized: true)
             }
             .padding(16)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .glass(radius: 14)
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
             Text("Нажимая «Подтвердить заказ», вы соглашаетесь с условиями продажи и политикой возврата AliStore.")
                 .font(ClientTheme.body(11))
@@ -2199,7 +2199,7 @@ private struct ClientOrderStatusView: View {
                         }
                     }
                     .padding(18)
-                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .glass(radius: 16)
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         NavigationLink {
@@ -2467,7 +2467,7 @@ private struct ClientStatusAction: View {
         }
         .foregroundStyle(tint)
         .frame(maxWidth: .infinity, minHeight: 44)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+        .glass(radius: 11)
         .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
     }
 }
@@ -2603,7 +2603,7 @@ private struct ClientOrderCard: View {
             .foregroundStyle(ClientTheme.muted)
         }
         .padding(15)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .glass(radius: 16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("client-order-card-\(order.id)")
@@ -2937,7 +2937,7 @@ private struct CustomerReturnsView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 
@@ -3039,7 +3039,7 @@ private struct CustomerReturnRequestView: View {
                         .tint(ClientTheme.lime)
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                        .glass(radius: 13)
                     }
                     if let item = selectedItem {
                         HStack(spacing: 12) {
@@ -3059,7 +3059,7 @@ private struct CustomerReturnRequestView: View {
                                 .foregroundStyle(ClientTheme.lime)
                         }
                         .padding(12)
-                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                        .glass(radius: 14)
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.lime))
                     }
 
@@ -3087,7 +3087,7 @@ private struct CustomerReturnRequestView: View {
                                     Spacer()
                                 }
                                 .padding(12)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                                .glass(radius: 11)
                                 .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedReason == option ? ClientTheme.lime : ClientTheme.line))
                             }
                             .buttonStyle(.plain)
@@ -3096,7 +3096,7 @@ private struct CustomerReturnRequestView: View {
                         TextField("Опишите, что не подошло", text: $reason, axis: .vertical)
                             .lineLimit(3...7)
                             .foregroundStyle(.white).padding(13)
-                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                            .glass(radius: 13)
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             .accessibilityIdentifier("return-reason-details")
                     }
@@ -3108,7 +3108,7 @@ private struct CustomerReturnRequestView: View {
                         .font(ClientTheme.body(12, weight: .semibold))
                         .foregroundStyle(selectedPhoto == nil ? ClientTheme.muted : ClientTheme.lime)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                        .glass(radius: 11)
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedPhoto == nil ? ClientTheme.line : ClientTheme.lime, style: StrokeStyle(lineWidth: 1, dash: selectedPhoto == nil ? [5, 4] : [])))
                     }
                     .buttonStyle(.plain)
@@ -3275,7 +3275,7 @@ private struct CustomerTradeInsView: View {
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(13)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                .glass(radius: 12)
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
 
                             Text("Состояние")
@@ -3301,7 +3301,7 @@ private struct CustomerTradeInsView: View {
                                         Spacer()
                                     }
                                     .padding(12)
-                                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                                    .glass(radius: 11)
                                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedCondition == index ? ClientTheme.lime : ClientTheme.line))
                                 }
                                 .buttonStyle(.plain)
@@ -3312,7 +3312,7 @@ private struct CustomerTradeInsView: View {
                                 .font(ClientTheme.body(12))
                                 .foregroundStyle(Design3.textFaint)
                                 .frame(maxWidth: .infinity, minHeight: 54)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                                .glass(radius: 11)
                                 .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                                 .accessibilityIdentifier("tradein-photo-placeholder")
 
@@ -3458,7 +3458,7 @@ private struct CustomerTradeInCard: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
@@ -3561,7 +3561,7 @@ private struct CustomerTradeInFormView: View {
                                     Spacer()
                                 }
                                 .padding(12)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                .glass(radius: 12)
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(grade == option.0 ? ClientTheme.lime : ClientTheme.line))
                             }
                             .buttonStyle(.plain)
@@ -3619,7 +3619,7 @@ private struct CustomerTradeInFormView: View {
                 .textInputAutocapitalization(.sentences)
                 .foregroundStyle(.white)
                 .padding(13)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
         }
     }
@@ -3737,7 +3737,7 @@ private struct AccountView: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+            .glass(radius: 16)
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
 
             NavigationLink {
@@ -3842,7 +3842,7 @@ private struct AccountView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
             }
             .buttonStyle(.plain)
@@ -3862,7 +3862,7 @@ private struct AccountView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
             }
             .buttonStyle(.plain)
@@ -3885,7 +3885,7 @@ private struct AccountView: View {
                 .font(ClientTheme.body(14, weight: .semibold))
                 .foregroundStyle(ClientTheme.coral)
                 .frame(maxWidth: .infinity, minHeight: 46)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
         }
         .buttonStyle(.plain)
@@ -3952,7 +3952,7 @@ private struct AccountView: View {
                 .textContentType(.telephoneNumber)
                 .foregroundStyle(.white)
                 .padding(14)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
             if codeRequested {
                 TextField("6-значный код", text: $code)
@@ -3960,7 +3960,7 @@ private struct AccountView: View {
                     .textContentType(.oneTimeCode)
                     .foregroundStyle(.white)
                     .padding(14)
-                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                    .glass(radius: 13)
                     .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
                 if let devCode = auth.devCode {
                     Text("Код для тестового контура: \(devCode)")
@@ -3998,7 +3998,7 @@ private struct AccountView: View {
             .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (codeRequested && code.filter(\.isNumber).count != 6))
         }
         .padding(18)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+        .glass(radius: 18)
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
     }
 
@@ -4086,7 +4086,7 @@ private struct AccountMenuTile<Destination: View>: View {
             }
             .padding(13)
             .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .glass(radius: 14)
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
         }
         .buttonStyle(.plain)
@@ -4177,7 +4177,7 @@ private struct CustomerLoyaltyView: View {
                                         .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 8))
                                 }
                                 .padding(14)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                                .glass(radius: 13)
                                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             }
                         }
@@ -4315,7 +4315,7 @@ private struct CustomerAddressesView: View {
                                 .font(ClientTheme.body(13, weight: .semibold))
                                 .foregroundStyle(ClientTheme.lime)
                                 .frame(maxWidth: .infinity, minHeight: 50)
-                                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                                .glass(radius: 14)
                                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line, style: StrokeStyle(lineWidth: 1, dash: [6, 5])))
                         }
                         .buttonStyle(.plain)
@@ -4376,7 +4376,7 @@ private struct CustomerAddressesView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(address.isPrimary ? ClientTheme.lime.opacity(0.5) : ClientTheme.line))
     }
 
@@ -4484,7 +4484,7 @@ private struct CustomerAddressEditorView: View {
             TextField(placeholder, text: text, axis: axis)
                 .lineLimit(3...6)
                 .foregroundStyle(.white).padding(13)
-                .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .glass(radius: 13)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
         }
     }
@@ -4594,7 +4594,7 @@ private struct CustomerSettingsView: View {
                             .font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
                         TextField("Имя", text: $name)
                             .foregroundStyle(.white).padding(13)
-                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                            .glass(radius: 13)
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                         if let settings {
                             Text(settings.phone).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
@@ -4639,7 +4639,7 @@ private struct CustomerSettingsView: View {
             Toggle("", isOn: isOn).labelsHidden().tint(ClientTheme.lime)
         }
         .padding(13)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 
@@ -4729,7 +4729,7 @@ private struct ClientDataErrorView: View {
         }
         .padding(24)
         .frame(maxWidth: 330)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .glass(radius: 16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
     }
 }
@@ -4789,7 +4789,7 @@ private struct CustomerSupportView: View {
                                     .foregroundStyle(Design3.textFaint)
                             }
                             .padding(13)
-                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                            .glass(radius: 11)
                             .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
                         }
 
@@ -4868,7 +4868,7 @@ private struct CustomerSupportView: View {
                                 .accessibilityIdentifier("support-submit")
                             }
                             .padding(16)
-                            .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                            .glass(radius: 14)
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
                         }
 
@@ -5029,7 +5029,7 @@ private struct ClientSupportTicketCard: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 }
@@ -5255,7 +5255,7 @@ private struct ClientDeviceCard: View {
             }
         }
         .padding(16)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .glass(radius: 16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
     }
 }
@@ -5297,7 +5297,7 @@ private struct ClientStateCard: View {
         }
         .padding(24)
         .frame(maxWidth: 360)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .glass(radius: 16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
         .padding(16)
     }
@@ -5361,7 +5361,7 @@ private struct WarrantyRequestView: View {
                         .accessibilityIdentifier("client-open-warranty")
                     }
                     .padding(16)
-                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    .glass(radius: 14)
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
                 }
                 ClientWarrantyCoverageCard()
@@ -5478,7 +5478,7 @@ private struct ClientWarrantyActionRow: View {
                     .font(ClientTheme.body(13, weight: .medium))
                     .foregroundStyle(Design3.textBright)
                     .frame(maxWidth: .infinity, minHeight: 46)
-                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                    .glass(radius: 11)
                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
             }
             .buttonStyle(.plain)
@@ -5527,7 +5527,7 @@ private struct ClientWarrantyStatusCard: View {
         }
         .font(ClientTheme.body(13))
         .padding(16)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 }
@@ -5551,7 +5551,7 @@ private struct ClientWarrantyCoverageCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
     }
 }
@@ -5687,7 +5687,7 @@ private struct CatalogView: View {
                                     .font(ClientTheme.body(12, weight: .semibold))
                                     .foregroundStyle(ClientTheme.muted)
                                     .frame(maxWidth: .infinity, minHeight: 38)
-                                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                                    .glass(radius: 10)
                                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(ClientTheme.line))
                             }
                             .accessibilityLabel("Сортировка")
@@ -5805,7 +5805,7 @@ private struct ClientHomeView: View {
                                     }
                                     .foregroundStyle(.white)
                                     .frame(width: 82, height: 70)
-                                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                    .glass(radius: 12)
                                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
                                 }
                             }
@@ -5847,7 +5847,7 @@ private struct ClientHomeView: View {
                     } else if let errorMessage {
                         Text(errorMessage).font(.caption).foregroundStyle(.red)
                     } else if products.isEmpty {
-                        Text("Каталог скоро наполнится").foregroundStyle(ClientTheme.muted).frame(maxWidth: .infinity).padding(30).background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                        Text("Каталог скоро наполнится").foregroundStyle(ClientTheme.muted).frame(maxWidth: .infinity).padding(30).glass(radius: 16)
                     } else {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                             ForEach(products.prefix(6)) { product in
@@ -5903,7 +5903,7 @@ private struct NativeProductCard: View {
             Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
         }
         .padding(10)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .glass(radius: 16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
     }
 }
@@ -6100,7 +6100,7 @@ private struct ProductTrustCell: View {
         }
         .padding(12)
         .frame(minHeight: 54)
-        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+        .glass(radius: 12)
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
     }
 }
