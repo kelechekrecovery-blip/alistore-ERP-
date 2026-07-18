@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   decideApproval,
+  downloadReturnAct,
   fetchStaffReturns,
   fetchApprovals,
   requestReturnRefund,
@@ -125,6 +126,19 @@ export default function ApprovalsPage() {
       reason: ret.reason,
       shiftId: '',
     });
+  }
+
+  async function downloadAct(ret: ReturnRequest) {
+    if (!session) return;
+    setBusy(`return-act-${ret.id}`);
+    try {
+      await downloadReturnAct(ret.id, session.accessToken);
+      flash('Акт возврата скачан');
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка акта возврата');
+    } finally {
+      setBusy(null);
+    }
   }
 
   function prepareResolve(refundId: string, action: 'confirm' | 'cancel') {
@@ -363,6 +377,9 @@ export default function ApprovalsPage() {
                           <div className="mt-1 text-xs text-ink/55">{ret.items.length} поз. · {ret.refundAmount.toLocaleString('ru-RU')} сом</div>
                         </div>
                         <span className="rounded-chip bg-sand px-3 py-1 text-xs font-semibold text-ink/65">{ret.status}</span>
+                        <button type="button" disabled={busy === `return-act-${ret.id}`} onClick={() => downloadAct(ret)} className="rounded-btn border border-ink/15 px-3 py-2 text-xs font-semibold text-ink disabled:opacity-50">
+                          {busy === `return-act-${ret.id}` ? '…' : 'Акт возврата'}
+                        </button>
                         {ret.status === 'processing' && (
                           <button type="button" onClick={() => prepareRefund(ret)} className="rounded-btn border border-ink/15 px-3 py-2 text-xs font-semibold text-ink">
                             В refund

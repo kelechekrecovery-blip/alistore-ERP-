@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  buildReceiptData,
   checkPaymentTerminal,
   clearSyncedOfflinePosQueue,
   createLocalReceiptNo,
@@ -15,6 +16,8 @@ import {
   offlineQueueStats,
   posSale,
   printPosReceipt,
+  printServerSvg,
+  renderServerReceipt,
   syncOfflinePosQueue,
   syncPosCatalogCache,
   type CatalogProduct,
@@ -62,6 +65,7 @@ export default function PosPage() {
   const [catalogSync, setCatalogSync] = useState('Каталог готов к delta sync');
   const [session, setSession] = useState<StaffSession | null>(null);
   const [serviceWorkOrderId, setServiceWorkOrderId] = useState('');
+  const [serverPrintBusy, setServerPrintBusy] = useState(false);
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -291,6 +295,19 @@ export default function PosPage() {
     void refreshCatalog();
   }
 
+  async function printServerReceipt() {
+    if (!session || !receiptSnapshot) return;
+    setServerPrintBusy(true);
+    try {
+      const rendered = await renderServerReceipt(buildReceiptData(receiptSnapshot, result), session.accessToken);
+      printServerSvg(rendered.svg, result?.receiptNo ?? receiptSnapshot.localReceiptNo);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка серверной печати');
+    } finally {
+      setServerPrintBusy(false);
+    }
+  }
+
   if (!session) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0E0C0A] p-4 font-sans">
@@ -390,6 +407,8 @@ export default function PosPage() {
             onCancel={() => { setPending(null); setRoute('sell'); }}
             onNewSale={newSale}
             onPrintReceipt={() => receiptSnapshot && printPosReceipt(receiptSnapshot, result)}
+            onPrintServerReceipt={receiptSnapshot ? printServerReceipt : undefined}
+            serverPrintBusy={serverPrintBusy}
           />
         )}
 

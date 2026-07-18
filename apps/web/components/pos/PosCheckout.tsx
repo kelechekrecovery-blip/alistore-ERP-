@@ -34,6 +34,8 @@ interface PosCheckoutProps {
   onCancel: () => void;
   onNewSale: () => void;
   onPrintReceipt?: () => void;
+  onPrintServerReceipt?: () => void;
+  serverPrintBusy?: boolean;
 }
 
 /** POS checkout overlay: payment method → pending-approval (discount over limit) → done. */
@@ -255,6 +257,16 @@ export function PosCheckout(props: PosCheckoutProps) {
               {props.onPrintReceipt && (
                 <button type="button" onClick={props.onPrintReceipt} className="rounded-[11px] border border-[#2E2822] bg-[#221E19] px-6 py-3 font-bold text-[#D8CFC6]">
                   Печать
+                </button>
+              )}
+              {props.onPrintServerReceipt && (
+                <button
+                  type="button"
+                  disabled={props.serverPrintBusy}
+                  onClick={props.onPrintServerReceipt}
+                  className="rounded-[11px] border border-[#2E2822] bg-[#221E19] px-6 py-3 font-bold text-[#D8CFC6] disabled:text-[#6E645C]"
+                >
+                  {props.serverPrintBusy ? 'Печать…' : 'Чек (сервер)'}
                 </button>
               )}
             </div>

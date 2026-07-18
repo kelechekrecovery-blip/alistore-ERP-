@@ -30,6 +30,9 @@ const GRANTS: Record<string, readonly string[]> = {
   'debts:create': ['senior_seller', 'admin', 'owner'],
   'debts:pay': ['seller', 'senior_seller', 'cashier', 'admin', 'owner'],
   'giftcards:issue': ['admin', 'owner'],
+  'refunds:read': ['admin', 'owner'],
+  'refunds:retry': ['admin', 'owner'],
+  'refunds:manage': ['owner'],
 };
 
 /** `g, child, parent` policy edges: a role also holds every grant of its parent. */
@@ -55,6 +58,9 @@ export const canReadDebts = (role: string) => staffCan(role, 'debts', 'read');
 export const canCreateDebt = (role: string) => staffCan(role, 'debts', 'create');
 export const canPayDebt = (role: string) => staffCan(role, 'debts', 'pay');
 export const canIssueGiftCard = (role: string) => staffCan(role, 'giftcards', 'issue');
+export const canReadRefunds = (role: string) => staffCan(role, 'refunds', 'read');
+export const canRetryRefund = (role: string) => staffCan(role, 'refunds', 'retry');
+export const canManageRefunds = (role: string) => staffCan(role, 'refunds', 'manage');
 
 /** ERP shell routes (app/erp/page.tsx). `null` — route is open to every staff role. */
 export type ErpRoute =

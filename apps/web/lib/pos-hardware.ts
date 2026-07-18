@@ -72,6 +72,26 @@ export function printPosReceipt(snapshot: PosReceiptSnapshot, result?: PosSaleRe
   window.setTimeout(() => popup.print(), 100);
 }
 
+/** Print a server-rendered SVG document (receipt preview, barcode label) in a popup. */
+export function printServerSvg(svg: string, title: string) {
+  if (typeof window === 'undefined') return;
+  const popup = window.open('', `alistore-print-${title}`, 'width=420,height=720');
+  if (!popup) return;
+
+  popup.document.write(`<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${escapeHtml(title)}</title>
+      <style>body { margin: 0; display: grid; place-items: center; } svg { max-width: 100%; }</style>
+    </head>
+    <body>${svg}</body>
+  </html>`);
+  popup.document.close();
+  popup.focus();
+  window.setTimeout(() => popup.print(), 100);
+}
+
 function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: PosSaleResult | null) {
   const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const rows = snapshot.lines.map((line) => `
