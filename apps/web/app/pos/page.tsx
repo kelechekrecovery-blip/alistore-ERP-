@@ -310,7 +310,7 @@ export default function PosPage() {
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4 font-sans">
+      <div className="erp3-stage fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
         <Link
           href="/"
           className="fixed right-4 top-4 z-[60] rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
@@ -334,7 +334,7 @@ export default function PosPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4 font-sans text-white">
+    <div className="erp3-stage fixed inset-0 z-50 flex items-center justify-center p-4 font-sans text-white">
       <Link
         href="/"
         className="fixed right-4 top-4 z-[60] rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
@@ -344,7 +344,7 @@ export default function PosPage() {
 
       <main
         data-testid="pos-terminal"
-        className="relative flex h-[820px] max-h-[95vh] w-full max-w-[1180px] overflow-hidden rounded-[24px] border-8 border-ink bg-ink-dark shadow-2xl"
+        className="erp3-shell relative flex h-[820px] max-h-[95vh] w-full max-w-[1180px] overflow-hidden border-[10px] border-ink"
       >
         <PosCatalog
           cashier={cashier}
