@@ -19,6 +19,8 @@ export default function CatalogPage() {
   const [categories, setCategories] = useState<string[]>(['Все']);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -30,12 +32,13 @@ export default function CatalogPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setProducts(null);
+      setError(false);
       fetchCatalog({ q: query.trim() || undefined, category: category === 'Все' ? undefined : category, stockOnly, sort, limit: PAGE_SIZE, offset })
         .then((response) => { setProducts(response.items); setTotal(response.total); })
-        .catch(() => { setProducts([]); setTotal(0); });
+        .catch(() => { setProducts([]); setTotal(0); setError(true); });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [query, category, stockOnly, sort, offset]);
+  }, [query, category, stockOnly, sort, offset, reloadKey]);
 
   const reset = () => { setQuery(''); setCategory('Все'); setStockOnly(false); setSort('stock_desc'); setOffset(0); };
 
@@ -62,7 +65,7 @@ export default function CatalogPage() {
             <div className="flex min-w-0 flex-1 items-center rounded-[10px] border border-linen bg-sand px-3 focus-within:border-coal focus-within:bg-white"><input value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} placeholder="Поиск по названию, SKU и категории" className="min-w-0 flex-1 bg-transparent py-3 text-sm text-ink outline-none placeholder:text-faint" />{query && <button type="button" onClick={() => { setQuery(''); setOffset(0); }} aria-label="Очистить поиск" className="text-faint"><X size={17} /></button>}</div>
             <select value={sort} onChange={(event) => { setSort(event.target.value as CatalogQuery['sort']); setOffset(0); }} aria-label="Сортировка" className="rounded-[10px] border border-linen bg-white px-3 py-3 text-sm text-ink outline-none"><option value="stock_desc">Сначала в наличии</option><option value="price_asc">Сначала дешевле</option><option value="price_desc">Сначала дороже</option><option value="name">По названию</option></select>
           </div>
-          {products === null ? <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[.62] animate-pulse rounded-[10px] border border-linen bg-white" />)}</div> : products.length ? <><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div><div className="mt-6 flex items-center justify-center gap-3"><button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} className="rounded-[8px] border bg-white px-4 py-2 text-sm disabled:opacity-40">Назад</button><span className="text-sm text-faint">{Math.floor(offset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span><button type="button" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)} className="rounded-[8px] border bg-white px-4 py-2 text-sm disabled:opacity-40">Дальше</button></div></> : <div className="rounded-[12px] border border-linen bg-white py-20 text-center text-faint">По выбранным фильтрам ничего не найдено</div>}
+          {products === null ? <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[.62] animate-pulse rounded-[10px] border border-linen bg-white" />)}</div> : error ? <div className="rounded-[12px] border border-danger/30 bg-danger/5 py-20 text-center"><p className="font-display font-bold text-danger">Не удалось загрузить каталог</p><p className="mt-1 text-sm text-faint">Проверьте соединение и попробуйте снова.</p><button type="button" onClick={() => setReloadKey((key) => key + 1)} className="mt-5 rounded-btn bg-coral px-5 py-2.5 text-sm font-bold text-white transition hover:bg-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-coral/25">Повторить</button></div> : products.length ? <><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div><div className="mt-6 flex items-center justify-center gap-3"><button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} className="rounded-btn border border-linen bg-white px-4 py-2 text-sm transition hover:border-ink/30 hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 disabled:opacity-40">Назад</button><span className="text-sm text-faint">{Math.floor(offset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span><button type="button" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)} className="rounded-btn border border-linen bg-white px-4 py-2 text-sm transition hover:border-ink/30 hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 disabled:opacity-40">Дальше</button></div></> : <div className="rounded-[12px] border border-linen bg-white py-20 text-center text-faint">По выбранным фильтрам ничего не найдено</div>}
         </section>
       </div>
     </main>
