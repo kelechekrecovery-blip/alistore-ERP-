@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-VISUAL-EVIDENCE-003`.
+- Task: refresh durable visual acceptance after the toolchain and finance commits.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/visual-7ac1baa71f1835b8880fb15355cd1b0ccc268be70a427fca9a89755662543731.json`, `BACKLOG.md`, and this progress entry.
+- Result: the trusted visual recorder completed `3/3` exact screenshot tests and wrote a new hash-bound result for the current source tree.
+- Checks run: `sh scripts/run-trusted-ecosystem-node.sh scripts/record-ecosystem-evidence.mjs visual` (`3/3`, pass); `git diff --check` (pass).
+- Outcome: the durable visual acceptance contract is locally refreshed for the implemented shells. It does not certify absent handoff references or native physical-device behavior.
+- Next step: refresh the four reconciliation artifacts and composite matrix on the same HEAD.
+
 - Iteration ID: `PHASE-0-TOOLCHAIN-LOCK-001`.
 - Task: restore the trusted ecosystem audit after dependency-tree drift.
 - Files changed: `scripts/ecosystem-toolchain-lock.json`, `BACKLOG.md`, and this progress entry.
