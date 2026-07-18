@@ -2,7 +2,7 @@ import AliStoreCore
 import SwiftData
 import SwiftUI
 import UIKit
-import UserNotifications
+@preconcurrency import UserNotifications
 
 private extension Notification.Name {
     static let staffAPNsToken = Notification.Name("alistore.staff.apns.token")
@@ -10,9 +10,22 @@ private extension Notification.Name {
     static let staffNotificationRoute = Notification.Name("alistore.staff.notification.route")
 }
 
-private final class StaffAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+private final class StaffNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let value = response.notification.request.content.userInfo["deepLink"] as? String,
+              let url = URL(string: value) else { return }
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .staffNotificationRoute, object: url)
+        }
+    }
+}
+
+@MainActor
+private final class StaffAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = StaffNotificationDelegate()
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().delegate = notificationDelegate
         return true
     }
 
@@ -25,11 +38,6 @@ private final class StaffAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         NotificationCenter.default.post(name: .staffAPNsFailure, object: error.localizedDescription)
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard let value = response.notification.request.content.userInfo["deepLink"] as? String,
-              let url = URL(string: value) else { return }
-        NotificationCenter.default.post(name: .staffNotificationRoute, object: url)
-    }
 }
 
 @main

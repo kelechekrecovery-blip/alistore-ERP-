@@ -76,6 +76,8 @@ struct POSOfflineView: View {
 
 struct POSShiftView: View {
     let session: StaffSession
+    let pushStatus: String
+    let enablePush: () -> Void
     let logout: () -> Void
     @State private var shift: CashShift?
     @State private var point = "BISHKEK-1"
@@ -93,6 +95,8 @@ struct POSShiftView: View {
                 Section("Кассир") {
                     LabeledContent("Сотрудник", value: session.username)
                     LabeledContent("Роль", value: session.role)
+                    LabeledContent("Push", value: pushStatus)
+                    Button("Включить уведомления", systemImage: "bell.badge", action: enablePush)
                 }
                 if let shift {
                     Section("Открытая смена") {

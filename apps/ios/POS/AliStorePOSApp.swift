@@ -1,9 +1,47 @@
 import AliStoreCore
 import SwiftData
 import SwiftUI
+import UIKit
+@preconcurrency import UserNotifications
+
+private extension Notification.Name {
+    static let posAPNsToken = Notification.Name("alistore.pos.apns.token")
+    static let posAPNsFailure = Notification.Name("alistore.pos.apns.failure")
+    static let posNotificationRoute = Notification.Name("alistore.pos.notification.route")
+}
+
+private final class POSNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let raw = response.notification.request.content.userInfo["deepLink"] as? String,
+              let url = URL(string: raw) else { return }
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .posNotificationRoute, object: url)
+        }
+    }
+}
+
+@MainActor
+private final class POSAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = POSNotificationDelegate()
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(name: .posAPNsToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .posAPNsFailure, object: error.localizedDescription)
+    }
+}
 
 @main
 struct AliStorePOSApp: App {
+    @UIApplicationDelegateAdaptor(POSAppDelegate.self) private var appDelegate
     @State private var auth: StaffAuthStore
 
     init() {
@@ -90,6 +128,7 @@ private struct POSRootView: View {
     let logout: () -> Void
     @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 0
+    @State private var pushStatus = "Push не настроен"
     private let api = APIClient(baseURL: AppEnvironment.live().apiBaseURL)
 
     var body: some View {
@@ -100,7 +139,7 @@ private struct POSRootView: View {
             POSOfflineView(session: session)
                 .tabItem { Label("Офлайн", systemImage: "arrow.triangle.2.circlepath") }
                 .tag(1)
-            POSShiftView(session: session, logout: logout)
+            POSShiftView(session: session, pushStatus: pushStatus, enablePush: enablePush, logout: logout)
                 .tabItem { Label("Смена", systemImage: "clock") }
                 .tag(2)
             POSOperationsView(session: session)
@@ -108,7 +147,64 @@ private struct POSRootView: View {
                 .tag(3)
         }
         .tint(POSPalette.lime)
+        .onOpenURL(perform: route)
+        .onReceive(NotificationCenter.default.publisher(for: .posNotificationRoute)) { notification in
+            guard let url = notification.object as? URL else { return }
+            route(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .posAPNsToken)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await registerPushToken(token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .posAPNsFailure)) { notification in
+            pushStatus = notification.object as? String ?? "APNs registration failed"
+        }
         .task { await replayQueuedSales() }
+    }
+
+    private func route(_ url: URL) {
+        guard url.scheme == "alistore-pos" else { return }
+        switch url.host {
+        case "offline": selectedTab = 1
+        case "shift", "attendance": selectedTab = 2
+        case "operations", "returns", "refunds", "exchange": selectedTab = 3
+        default: selectedTab = 0
+        }
+    }
+
+    private func enablePush() {
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+                guard granted else { pushStatus = "Уведомления отключены"; return }
+                pushStatus = "Регистрация APNs…"
+                await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+            } catch {
+                pushStatus = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func registerPushToken(_ token: String) async {
+        do {
+            let registered: RegisteredPushToken = try await api.post(
+                "notifications/push-tokens",
+                body: RegisterPushTokenRequest(token: token, deviceId: installationId(), scope: "staff"),
+                token: session.accessToken
+            )
+            pushStatus = registered.enabled ? "Push подключён" : "Push отключён"
+        } catch {
+            pushStatus = error.localizedDescription
+        }
+    }
+
+    private func installationId() -> String {
+        let key = "alistore.pos.installation-id"
+        if let value = UserDefaults.standard.string(forKey: key) { return value }
+        let value = UUID().uuidString
+        UserDefaults.standard.set(value, forKey: key)
+        return value
     }
 
     @MainActor private func replayQueuedSales() async {

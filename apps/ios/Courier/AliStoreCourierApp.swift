@@ -2,7 +2,7 @@ import AliStoreCore
 import SwiftData
 import SwiftUI
 import UIKit
-import UserNotifications
+@preconcurrency import UserNotifications
 
 extension Notification.Name {
     static let courierAPNsToken = Notification.Name("alistore.courier.apns.token")
@@ -10,9 +10,22 @@ extension Notification.Name {
     static let courierNotificationRoute = Notification.Name("alistore.courier.notification.route")
 }
 
-final class CourierAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+private final class CourierNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let raw = response.notification.request.content.userInfo["deepLink"] as? String,
+              let url = URL(string: raw) else { return }
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .courierNotificationRoute, object: url)
+        }
+    }
+}
+
+@MainActor
+final class CourierAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = CourierNotificationDelegate()
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().delegate = notificationDelegate
         return true
     }
 
@@ -25,11 +38,6 @@ final class CourierAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         NotificationCenter.default.post(name: .courierAPNsFailure, object: error.localizedDescription)
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard let raw = response.notification.request.content.userInfo["deepLink"] as? String,
-              let url = URL(string: raw) else { return }
-        NotificationCenter.default.post(name: .courierNotificationRoute, object: url)
-    }
 }
 
 @main
