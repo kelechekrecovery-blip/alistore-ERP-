@@ -44,8 +44,9 @@ import { StorefrontView } from '@/components/erp/StorefrontView';
 import { AdminView } from '@/components/erp/AdminView';
 import { StoreOperationsView } from '@/components/erp/StoreOperationsView';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { erpRouteAllowed, type ErpRoute } from '@/lib/staff-permissions';
 
-type Route = 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr' | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns' | 'storefront' | 'risks' | 'readiness' | 'ledger';
+type Route = ErpRoute;
 
 const CORE_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'dash', icon: '▦', label: 'Дашборд' },
@@ -230,6 +231,12 @@ export default function ErpPage() {
     );
   }
 
+  // UI-STAFF-ADMIN: hide navigation the role has no API grant for (each view would 403).
+  const coreNav = CORE_NAV.filter((m) => erpRouteAllowed(session.role, m.id));
+  const extendedNav = EXTENDED_NAV.filter((m) => erpRouteAllowed(session.role, m.id));
+  // Fall back to the always-open launcher when the current route is not granted.
+  const activeRoute: Route = erpRouteAllowed(session.role, route) ? route : 'admin';
+
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden bg-[#0E0C0A] font-sans text-white sm:items-center sm:overflow-auto sm:p-5">
       <div
@@ -268,13 +275,13 @@ export default function ErpPage() {
           </button>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-          {CORE_NAV.map((m) => (
+          {coreNav.map((m) => (
             <button
               key={m.id}
               type="button"
               onClick={() => navigate(m.id)}
               className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] transition ${
-                route === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
+                activeRoute === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
               }`}
             >
               <span className="text-base">{m.icon}</span>
@@ -287,16 +294,18 @@ export default function ErpPage() {
               ) : null}
             </button>
           ))}
-          <div className="mb-1 mt-3 border-t border-[#2E2822] px-3 pt-3 text-[10px] font-semibold uppercase text-[#6E645C]">
-            Расширенные модули
-          </div>
-          {EXTENDED_NAV.map((m) => (
+          {extendedNav.length > 0 && (
+            <div className="mb-1 mt-3 border-t border-[#2E2822] px-3 pt-3 text-[10px] font-semibold uppercase text-[#6E645C]">
+              Расширенные модули
+            </div>
+          )}
+          {extendedNav.map((m) => (
             <button
               key={m.id}
               type="button"
               onClick={() => navigate(m.id)}
               className={`flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-left text-[13px] transition ${
-                route === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
+                activeRoute === m.id ? 'bg-[#221E19] font-bold text-white' : 'font-medium text-[#A79C92] hover:text-white'
               }`}
             >
               <span className="text-base">{m.icon}</span>
@@ -321,8 +330,8 @@ export default function ErpPage() {
             <Menu size={19} />
           </button>
           <div className="min-w-0">
-            <div className="truncate font-display text-base font-bold sm:text-xl">{TITLES[route][0]}</div>
-            <div className="hidden truncate text-xs text-[#8A7F76] sm:block">{TITLES[route][1]}</div>
+            <div className="truncate font-display text-base font-bold sm:text-xl">{TITLES[activeRoute][0]}</div>
+            <div className="hidden truncate text-xs text-[#8A7F76] sm:block">{TITLES[activeRoute][1]}</div>
           </div>
           <div className="ml-auto flex flex-none items-center gap-1.5 sm:gap-3">
             <button
@@ -349,26 +358,26 @@ export default function ErpPage() {
         </div>
 
         <div className="min-w-0 px-3 py-4 sm:px-[26px] sm:py-[22px]">
-          {route === 'dash' && (
+          {activeRoute === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
-          {route === 'admin' && <AdminView role={session.role} username={session.username} onNavigate={setRoute} />}
-          {route === 'ai' && <AiView insights={insights} />}
-          {route === 'pricing' && <PricingView accessToken={session.accessToken} />}
-          {route === 'reorder' && <ReorderView accessToken={session.accessToken} />}
-          {route === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
-          {route === 'hr' && <HrView accessToken={session.accessToken} />}
-          {route === 'logistics' && <LogisticsView accessToken={session.accessToken} />}
-          {route === 'operations' && <StoreOperationsView accessToken={session.accessToken} />}
-          {route === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} role={session.role} />}
-          {route === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
-          {route === 'stock' && <StockView d={d} accessToken={session.accessToken} role={session.role} staffId={session.staffId} />}
-          {route === 'crm' && <CrmView />}
-          {route === 'campaigns' && <CampaignsView />}
-          {route === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}
-          {route === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
-          {route === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}
-          {route === 'ledger' && <LedgerView ledger={ledger} />}
+          {activeRoute === 'admin' && <AdminView role={session.role} username={session.username} accessToken={session.accessToken} onNavigate={setRoute} />}
+          {activeRoute === 'ai' && <AiView insights={insights} />}
+          {activeRoute === 'pricing' && <PricingView accessToken={session.accessToken} />}
+          {activeRoute === 'reorder' && <ReorderView accessToken={session.accessToken} />}
+          {activeRoute === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
+          {activeRoute === 'hr' && <HrView accessToken={session.accessToken} />}
+          {activeRoute === 'logistics' && <LogisticsView accessToken={session.accessToken} />}
+          {activeRoute === 'operations' && <StoreOperationsView accessToken={session.accessToken} />}
+          {activeRoute === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} role={session.role} />}
+          {activeRoute === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
+          {activeRoute === 'stock' && <StockView d={d} accessToken={session.accessToken} role={session.role} staffId={session.staffId} />}
+          {activeRoute === 'crm' && <CrmView />}
+          {activeRoute === 'campaigns' && <CampaignsView />}
+          {activeRoute === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}
+          {activeRoute === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
+          {activeRoute === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}
+          {activeRoute === 'ledger' && <LedgerView ledger={ledger} />}
         </div>
       </main>
       </div>

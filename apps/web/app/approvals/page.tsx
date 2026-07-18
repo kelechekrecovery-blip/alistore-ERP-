@@ -19,6 +19,7 @@ import {
   type StaffTotpSetupResult,
 } from '@/lib/api';
 import { ApprovalList } from '@/components/approvals/ApprovalList';
+import { canReadRefunds } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
   loadStaffSession,
@@ -292,6 +293,14 @@ export default function ApprovalsPage() {
           >
             Выйти staff
           </button>
+        )}
+        {session && canReadRefunds(session.role) && (
+          <Link
+            href="/refunds"
+            className="rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
+          >
+            Возвраты денег
+          </Link>
         )}
         <Link
           href="/"

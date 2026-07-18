@@ -26,13 +26,13 @@ const GRANTS: Record<string, readonly string[]> = {
   'protection:read': ['seller', 'senior_seller', 'admin', 'owner'],
   'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
   'staff:manage': ['owner'],
-  'debts:read': ['seller', 'senior_seller', 'cashier', 'admin', 'owner'],
-  'debts:create': ['senior_seller', 'admin', 'owner'],
-  'debts:pay': ['seller', 'senior_seller', 'cashier', 'admin', 'owner'],
-  'giftcards:issue': ['admin', 'owner'],
+  'debts:read': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
+  'debts:create': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
+  'debts:pay': ['cashier', 'senior_seller', 'admin', 'owner'],
+  'giftcards:issue': ['cashier', 'senior_seller', 'admin', 'owner'],
   'refunds:read': ['admin', 'owner'],
   'refunds:retry': ['admin', 'owner'],
-  'refunds:manage': ['owner'],
+  'refunds:manage': ['admin', 'owner'],
 };
 
 /** `g, child, parent` policy edges: a role also holds every grant of its parent. */

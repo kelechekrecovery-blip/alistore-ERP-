@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchOrdersByStatus,
+  fetchUnitLabel,
   fulfillOrder,
+  printServerSvg,
   transitionOrder,
   type QueueOrder,
 } from '@/lib/api';
@@ -76,6 +78,19 @@ export default function WarehousePage() {
       load(stage);
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function printLabel(imei: string) {
+    if (!session) return;
+    setBusy(`label-${imei}`);
+    try {
+      const label = await fetchUnitLabel(imei, session.accessToken);
+      printServerSvg(label.svg, `IMEI ${label.imei}`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка этикетки');
     } finally {
       setBusy(null);
     }
@@ -198,7 +213,15 @@ export default function WarehousePage() {
                         >
                           {i.sku}
                           {i.imei ? (
-                            <span className="ml-1.5 font-mono text-lime">✓ {i.imei}</span>
+                            <button
+                              type="button"
+                              disabled={busy === `label-${i.imei}`}
+                              onClick={() => printLabel(i.imei!)}
+                              title="Печать этикетки IMEI"
+                              className="ml-1.5 font-mono text-lime underline decoration-dotted underline-offset-2 hover:text-white disabled:text-[#6E645C]"
+                            >
+                              {busy === `label-${i.imei}` ? '…' : `✓ ${i.imei}`}
+                            </button>
                           ) : (
                             <span className="ml-1.5 text-[#8A7F76]">× {i.qty}</span>
                           )}

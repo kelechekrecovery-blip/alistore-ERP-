@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { fetchWarranty, transitionWarranty, type WarrantyCase } from '@/lib/warranty';
+import { downloadWarrantyTalon } from '@/lib/api';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
@@ -60,6 +61,19 @@ export default function WarrantyConsolePage() {
       load(stage);
     } catch {
       flash('Ошибка перехода');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadTalon(wc: WarrantyCase) {
+    if (!session) return;
+    setBusy(`talon-${wc.id}`);
+    try {
+      await downloadWarrantyTalon(wc.imei, session.accessToken);
+      flash('Гарантийный талон скачан');
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка талона');
     } finally {
       setBusy(null);
     }
@@ -149,7 +163,15 @@ export default function WarrantyConsolePage() {
                       <span className="font-mono text-xs text-[#8A7F76]">#{wc.id.slice(-8)}</span>
                     </div>
                     <p className="mt-2 text-sm text-[#8A7F76]">Проблема: {wc.problem}</p>
-                    <div className="mt-4 flex justify-end">
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={busy === `talon-${wc.id}`}
+                        onClick={() => downloadTalon(wc)}
+                        className="rounded-btn border border-[#2E2822] bg-[#221E19] px-4 py-2 text-sm font-semibold text-[#D8CFC6] transition hover:border-[#3A342E] disabled:text-[#6E645C]"
+                      >
+                        {busy === `talon-${wc.id}` ? '…' : 'Талон'}
+                      </button>
                       <button
                         type="button"
                         disabled={busy === wc.id}

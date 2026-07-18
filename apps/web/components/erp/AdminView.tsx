@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { Card } from './Card';
+import { StaffAdminView } from './StaffAdminView';
+import { staffCan } from '@/lib/staff-permissions';
 
 type AdminViewProps = {
   role: string;
   username: string;
+  accessToken: string;
   onNavigate: (route: 'campaigns' | 'storefront') => void;
 };
 
@@ -22,7 +25,7 @@ const INTERNAL_MODULES = [
   { route: 'campaigns' as const, icon: '◌', title: 'Кампании и промо', description: 'Сегменты, промокоды, согласования и ROI', roles: ['admin', 'owner', 'marketer'] },
 ];
 
-export function AdminView({ role, username, onNavigate }: AdminViewProps) {
+export function AdminView({ role, username, accessToken, onNavigate }: AdminViewProps) {
   const visible = MODULES.filter((module) => (module.roles as readonly string[]).includes(role));
   const internal = INTERNAL_MODULES.filter((module) => module.roles.includes(role));
   return (
@@ -73,6 +76,8 @@ export function AdminView({ role, username, onNavigate }: AdminViewProps) {
       </div>
 
       {!visible.length && <Card><p className="text-sm text-[#FFB5AA]">Для роли {role} нет административных разделов.</p></Card>}
+
+      {staffCan(role, 'staff', 'manage') && <StaffAdminView accessToken={accessToken} />}
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">

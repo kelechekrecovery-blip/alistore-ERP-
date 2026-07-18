@@ -7,6 +7,7 @@ import { closeShift, currentShift, fetchShift, openShift, type Shift } from '@/l
 import {
   createCustomer,
   createTradeIn,
+  downloadTradeInContract,
   fetchOrdersByStatus,
   fulfillOrder,
   transitionOrder,
@@ -23,12 +24,19 @@ import {
   fetchMyStaffTasks,
   updateMyStaffTask,
   type StaffTask,
+  fetchMyHrWeek,
+  openMyAttendance,
+  closeMyAttendance,
+  requestMyAbsence,
+  type HrAbsenceType,
+  type HrSchedule,
+  type HrWeek,
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { DebtsDesk } from '@/components/staff/DebtsDesk';
 import { GiftCardIssue } from '@/components/staff/GiftCardIssue';
-import { canCreateDebt, canIssueGiftCard, canPayDebt } from '@/lib/staff-permissions';
+import { canCreateDebt, canIssueGiftCard, canPayDebt, staffTabAllowed, type StaffAppTab } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
   loadStaffSession,
@@ -38,14 +46,25 @@ import {
 const POINT = 'BISHKEK-1';
 const SHOP = 'AliStore Центр';
 
-type Tab = 'home' | 'orders' | 'b2b' | 'protection' | 'tasks' | 'buyback' | 'debts' | 'cards';
-const NAV: { id: Tab; icon: string; label: string }[] = [
+type Tab = StaffAppTab | 'debts' | 'cards';
+const NAV: { id: StaffAppTab; icon: string; label: string }[] = [
   { id: 'home', icon: '⌂', label: 'Главная' },
   { id: 'orders', icon: '📦', label: 'Заказы' },
   { id: 'tasks', icon: '📊', label: 'KPI' },
   { id: 'buyback', icon: '♻️', label: 'Скупка' },
+  { id: 'hr', icon: '◫', label: 'HR' },
 ];
 const BUYBACK = ['Проверить IMEI по базе краденого', 'Осмотреть состояние, присвоить грейд', 'Сделать фото (4 ракурса)', 'Внести данные клиента и паспорт'];
+const ABSENCE_LABEL: Record<string, string> = { annual_leave: 'Отпуск', sick_leave: 'Больничный', unpaid_leave: 'Без оплаты', other: 'Другое' };
+const ABSENCE_STATUS_LABEL: Record<string, string> = { requested: 'На согласовании', approved: 'Одобрено', rejected: 'Отклонено', cancelled: 'Отменено' };
+
+function mondayIso() {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  now.setDate(now.getDate() - day + 1);
+  return now.toISOString().slice(0, 10);
+}
+function clock(value: string) { return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Bishkek' }); }
 
 export default function StaffPage() {
   const [tab, setTab] = useState<Tab>('home');
@@ -73,6 +92,9 @@ export default function StaffPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [openShiftFiles, setOpenShiftFiles] = useState<File[]>([]);
   const [closeShiftFiles, setCloseShiftFiles] = useState<File[]>([]);
+  const [hrWeek, setHrWeek] = useState<HrWeek | null>(null);
+  const [hrError, setHrError] = useState('');
+  const [absenceForm, setAbsenceForm] = useState({ type: 'annual_leave' as HrAbsenceType, startsOn: '', endsOn: '', reason: '' });
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -94,7 +116,7 @@ export default function StaffPage() {
     ]);
     setOrders([...a, ...b]);
   }, [session]);
-  useEffect(() => { if (tab === 'orders' && session) loadOrders(); }, [tab, loadOrders, session]);
+  useEffect(() => { if (tab === 'orders' && session && staffTabAllowed(session.role, 'orders')) loadOrders(); }, [tab, loadOrders, session]);
 
   const loadB2B = useCallback(async () => {
     if (!session) return;
@@ -132,6 +154,53 @@ export default function StaffPage() {
     }
   }, [session]);
   useEffect(() => { if (tab === 'tasks' && session) loadTasks(); }, [tab, loadTasks, session]);
+
+  const loadHr = useCallback(async () => {
+    if (!session) return;
+    setHrWeek(null);
+    setHrError('');
+    try {
+      setHrWeek(await fetchMyHrWeek(mondayIso(), session.accessToken));
+    } catch (error) {
+      setHrWeek(null);
+      setHrError(error instanceof Error ? error.message : 'Не удалось загрузить неделю');
+    }
+  }, [session]);
+  useEffect(() => { if (tab === 'hr' && session) loadHr(); }, [tab, loadHr, session]);
+
+  async function attendanceAction(schedule: HrSchedule, action: 'open' | 'close') {
+    if (!session) return;
+    setBusy(schedule.id);
+    try {
+      if (action === 'open') { await openMyAttendance(schedule.id, session.accessToken); flash('Приход отмечен'); }
+      else { await closeMyAttendance(schedule.id, session.accessToken); flash('Уход отмечен'); }
+      await loadHr();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка отметки');
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function submitAbsence(e: FormEvent) {
+    e.preventDefault();
+    if (!session) return;
+    setBusy('absence');
+    try {
+      await requestMyAbsence({
+        type: absenceForm.type,
+        startsOn: absenceForm.startsOn,
+        endsOn: absenceForm.endsOn,
+        reason: absenceForm.reason.trim() || undefined,
+      }, session.accessToken);
+      setAbsenceForm({ type: 'annual_leave', startsOn: '', endsOn: '', reason: '' });
+      flash('Запрос отсутствия отправлен');
+      await loadHr();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Ошибка запроса');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   function flash(m: string) { setToast(m); window.setTimeout(() => setToast(''), 1600); }
 
@@ -259,6 +328,19 @@ export default function StaffPage() {
       flash('Договор оформлен');
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка скупки');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadContract() {
+    if (!session || !tradeIn) return;
+    setBusy('buyback-contract');
+    try {
+      await downloadTradeInContract(tradeIn.id, session.accessToken);
+      flash('Договор скупки скачан');
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Ошибка договора');
     } finally {
       setBusy(null);
     }
@@ -609,6 +691,14 @@ export default function StaffPage() {
                     <div className="mt-1 text-[11px] text-[#8A7F76]">
                       Паспорт {tradeIn.sellerPassportMasked}
                     </div>
+                    <button
+                      type="button"
+                      disabled={busy === 'buyback-contract'}
+                      onClick={downloadContract}
+                      className="mt-2.5 w-full rounded-[9px] border border-lime/30 bg-lime/15 py-2 text-center text-xs font-bold text-lime disabled:opacity-60"
+                    >
+                      {busy === 'buyback-contract' ? '…' : 'Скачать договор (PDF)'}
+                    </button>
                   </div>
                 )}
               </form>
