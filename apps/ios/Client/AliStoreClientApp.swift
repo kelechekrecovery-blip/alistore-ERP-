@@ -190,10 +190,10 @@ private struct ClientHeader: View {
             .foregroundStyle(.white)
             Button(action: onSearch) {
                 HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                    Image(systemName: "magnifyingglass").foregroundStyle(Design3.textFaint)
                     Text("Поиск техники, брендов…")
                         .font(ClientTheme.body(14))
-                        .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                        .foregroundStyle(Design3.textFaint)
                     Spacer()
                 }
                 .padding(.horizontal, 14)
@@ -515,7 +515,7 @@ private struct ClientOverlayView: View {
         } label: {
             Text(value)
                 .font(ClientTheme.body(12, weight: .semibold))
-                .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                .foregroundStyle(Design3.textBright)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(ClientTheme.surface, in: Capsule())
@@ -751,7 +751,7 @@ private struct ClientOverlayView: View {
     }
 
     private func searchStockColor(_ product: Product) -> Color {
-        if product.availableUnits <= 0 { return Color(red: 1, green: 0.541, blue: 0.478) }
+        if product.availableUnits <= 0 { return Design3.danger }
         if product.availableUnits < 5 { return ClientTheme.gold }
         return ClientTheme.lime
     }
@@ -861,7 +861,7 @@ private struct ClientNotificationRow: View {
                     .lineLimit(2)
                 Text(time)
                     .font(ClientTheme.body(11))
-                    .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                    .foregroundStyle(Design3.textFaint)
             }
             Spacer()
         }
@@ -874,7 +874,7 @@ private struct ClientNotificationRow: View {
 
     private var backgroundColor: Color {
         if isUnread && route == "order" { return ClientTheme.surface }
-        return Color(red: 0.086, green: 0.075, blue: 0.059)
+        return Design3.frame
     }
 }
 
@@ -1270,7 +1270,7 @@ private struct ClientSummaryRow: View {
             Spacer()
             Text(value)
                 .font(ClientTheme.display(emphasized ? 19 : 13, weight: emphasized ? .black : .medium))
-                .foregroundStyle(emphasized ? ClientTheme.lime : Color(red: 0.847, green: 0.812, blue: 0.776))
+                .foregroundStyle(emphasized ? ClientTheme.lime : Design3.textBright)
         }
     }
 }
@@ -1668,7 +1668,7 @@ private struct CartView: View {
                 }
             }
             if let promoError {
-                Text(promoError).font(ClientTheme.body(12)).foregroundStyle(Color(red: 1, green: 0.54, blue: 0.48))
+                Text(promoError).font(ClientTheme.body(12)).foregroundStyle(Design3.danger)
             }
         }
     }
@@ -1726,7 +1726,7 @@ private struct CartView: View {
                 ClientCallout(symbol: "person.badge.key", title: "Войдите, чтобы оформить заказ", detail: "Откройте Кабинет и войдите по SMS-коду.")
             }
             if let errorMessage {
-                Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(Color(red: 1, green: 0.54, blue: 0.48))
+                Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(Design3.danger)
             }
             Button {
                 if checkoutStep == .review {
@@ -1741,7 +1741,7 @@ private struct CartView: View {
                     Spacer()
                 }
                 .font(ClientTheme.body(15, weight: .bold))
-                .foregroundStyle(canAdvance ? .black : Color(red: 0.431, green: 0.392, blue: 0.361))
+                .foregroundStyle(canAdvance ? .black : Design3.textFaint)
                 .frame(height: 50)
                 .background(canAdvance ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 13))
             }
@@ -2031,7 +2031,7 @@ private struct ClientPaymentResultView: View {
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.black)
                 .frame(width: 80, height: 80)
-                .background(resultState == .success ? ClientTheme.lime : resultState == .failed ? ClientTheme.coral : Color(red: 0.898, green: 0.698, blue: 0.235), in: Circle())
+                .background(resultState == .success ? ClientTheme.lime : resultState == .failed ? ClientTheme.coral : Design3.gold, in: Circle())
             Text(title)
                 .font(ClientTheme.display(24, weight: .black))
                 .foregroundStyle(.white)
@@ -2205,7 +2205,7 @@ private struct ClientOrderStatusView: View {
                         NavigationLink {
                             ClientReceiptView(environment: environment, auth: auth, order: order)
                         } label: {
-                            ClientStatusAction(symbol: "doc.text", title: "Чек", tint: Color(red: 0.847, green: 0.812, blue: 0.776))
+                            ClientStatusAction(symbol: "doc.text", title: "Чек", tint: Design3.textBright)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("order-status-receipt")
@@ -2213,7 +2213,7 @@ private struct ClientOrderStatusView: View {
                         NavigationLink {
                             DevicesView(environment: environment, auth: auth)
                         } label: {
-                            ClientStatusAction(symbol: "shield.checkered", title: "Гарантия", tint: Color(red: 0.847, green: 0.812, blue: 0.776))
+                            ClientStatusAction(symbol: "shield.checkered", title: "Гарантия", tint: Design3.textBright)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("order-status-warranty")
@@ -2221,7 +2221,7 @@ private struct ClientOrderStatusView: View {
                         NavigationLink {
                             CustomerSupportView(environment: environment, auth: auth)
                         } label: {
-                            ClientStatusAction(symbol: "bubble.left.and.bubble.right", title: "WhatsApp", tint: Color(red: 0.847, green: 0.812, blue: 0.776))
+                            ClientStatusAction(symbol: "bubble.left.and.bubble.right", title: "WhatsApp", tint: Design3.textBright)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("order-status-whatsapp")
@@ -2419,7 +2419,7 @@ private struct ClientReceiptView: View {
                     } else if let receipt {
                         Text(receipt.markup)
                             .font(.system(size: 13, weight: .regular, design: .monospaced))
-                            .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                            .foregroundStyle(Design3.textBright)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(18)
@@ -2912,7 +2912,7 @@ private struct CustomerReturnsView: View {
                 timelineRow(title: "Возврат денег", isActive: ["paid", "reconciled"].contains(item.status))
             }
             .padding(14)
-            .background(Color(red: 0.133, green: 0.118, blue: 0.098), in: RoundedRectangle(cornerRadius: 14))
+            .background(Design3.surface, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
 
             VStack(alignment: .leading, spacing: 8) {
@@ -2921,19 +2921,19 @@ private struct CustomerReturnsView: View {
                     .foregroundStyle(ClientTheme.muted)
                 Text(item.reason)
                     .font(ClientTheme.body(13))
-                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                    .foregroundStyle(Design3.textBright)
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading)
                     .padding(12)
-                    .background(Color(red: 0.133, green: 0.118, blue: 0.098), in: RoundedRectangle(cornerRadius: 11))
+                    .background(Design3.surface, in: RoundedRectangle(cornerRadius: 11))
                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
             }
 
             Text("📷 Фото товара приложены при оформлении")
                 .font(ClientTheme.body(12))
-                .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                .foregroundStyle(Design3.textFaint)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Color(red: 0.133, green: 0.118, blue: 0.098), in: RoundedRectangle(cornerRadius: 11))
-                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(red: 0.227, green: 0.204, blue: 0.180), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                .background(Design3.surface, in: RoundedRectangle(cornerRadius: 11))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2945,10 +2945,10 @@ private struct CustomerReturnsView: View {
         HStack(spacing: 10) {
             Image(systemName: isActive ? "circle.fill" : "circle")
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(isActive ? ClientTheme.lime : Color(red: 0.431, green: 0.392, blue: 0.361))
+                .foregroundStyle(isActive ? ClientTheme.lime : Design3.textFaint)
             Text(title)
                 .font(ClientTheme.body(12))
-                .foregroundStyle(isActive ? ClientTheme.muted : Color(red: 0.431, green: 0.392, blue: 0.361))
+                .foregroundStyle(isActive ? ClientTheme.muted : Design3.textFaint)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
@@ -3074,7 +3074,7 @@ private struct CustomerReturnRequestView: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     Circle()
-                                        .stroke(selectedReason == option ? ClientTheme.lime : Color(red: 0.431, green: 0.392, blue: 0.361), lineWidth: 2)
+                                        .stroke(selectedReason == option ? ClientTheme.lime : Design3.textFaint, lineWidth: 2)
                                         .frame(width: 18, height: 18)
                                         .overlay {
                                             if selectedReason == option {
@@ -3083,7 +3083,7 @@ private struct CustomerReturnRequestView: View {
                                         }
                                     Text(option)
                                         .font(ClientTheme.body(13))
-                                        .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                                        .foregroundStyle(Design3.textBright)
                                     Spacer()
                                 }
                                 .padding(12)
@@ -3226,7 +3226,7 @@ private struct CustomerTradeInsView: View {
                                     .foregroundStyle(ClientTheme.lime)
                                 Text("Точная цена — после диагностики в магазине. Можно зачесть в счёт нового устройства.")
                                     .font(ClientTheme.body(12))
-                                    .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
+                                    .foregroundStyle(Design3.textMuted)
                                     .multilineTextAlignment(.center)
                                     .lineSpacing(3)
                             }
@@ -3288,7 +3288,7 @@ private struct CustomerTradeInsView: View {
                                 } label: {
                                     HStack(spacing: 10) {
                                         Circle()
-                                            .stroke(selectedCondition == index ? ClientTheme.lime : Color(red: 0.227, green: 0.204, blue: 0.18), lineWidth: 2)
+                                            .stroke(selectedCondition == index ? ClientTheme.lime : Design3.hairline, lineWidth: 2)
                                             .frame(width: 18, height: 18)
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(condition.0)
@@ -3296,7 +3296,7 @@ private struct CustomerTradeInsView: View {
                                                 .foregroundStyle(.white)
                                             Text(condition.1)
                                                 .font(ClientTheme.body(11))
-                                                .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
+                                                .foregroundStyle(Design3.textMuted)
                                         }
                                         Spacer()
                                     }
@@ -3310,10 +3310,10 @@ private struct CustomerTradeInsView: View {
 
                             Text("📷 Фото устройства (4 ракурса)")
                                 .font(ClientTheme.body(12))
-                                .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                                .foregroundStyle(Design3.textFaint)
                                 .frame(maxWidth: .infinity, minHeight: 54)
                                 .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
-                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(red: 0.227, green: 0.204, blue: 0.18), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
                                 .accessibilityIdentifier("tradein-photo-placeholder")
 
                             Button {
@@ -3747,7 +3747,7 @@ private struct AccountView: View {
                     HStack {
                         Text(loyalty.map { "Уровень \($0.level)" } ?? "Бонусы и купоны")
                             .font(ClientTheme.body(13, weight: .semibold))
-                            .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                            .foregroundStyle(Design3.textBright)
                         Spacer()
                         if let loyalty {
                             Text("\(clientGroupedDigits(loyalty.balance)) бонусов")
@@ -3765,7 +3765,7 @@ private struct AccountView: View {
                     .frame(height: 7)
                     Text(loyalty.map { $0.nextLevelSpend > 0 ? "До следующего уровня осталось \(clientGroupedDigits($0.nextLevelSpend)) сом" : "У вас максимальный уровень" } ?? "Баланс и купоны — в разделе бонусов")
                         .font(ClientTheme.body(11))
-                        .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
+                        .foregroundStyle(Design3.textMuted)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -4371,7 +4371,7 @@ private struct CustomerAddressesView: View {
             }
             Text("Удалить")
                 .font(ClientTheme.body(12, weight: .semibold))
-                .foregroundStyle(Color(red: 1, green: 0.541, blue: 0.478))
+                .foregroundStyle(Design3.danger)
                 .padding(.top, 1)
         }
         .padding(16)
@@ -4786,7 +4786,7 @@ private struct CustomerSupportView: View {
                                 Spacer()
                                 Text("▾")
                                     .font(ClientTheme.body(13, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                                    .foregroundStyle(Design3.textFaint)
                             }
                             .padding(13)
                             .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
@@ -5338,7 +5338,7 @@ private struct WarrantyRequestView: View {
                         if let errorMessage {
                             Text(errorMessage)
                                 .font(ClientTheme.body(12))
-                                .foregroundStyle(Color(red: 1, green: 0.54, blue: 0.48))
+                                .foregroundStyle(Design3.danger)
                         }
                         Button {
                             Task { await submit() }
@@ -5476,7 +5476,7 @@ private struct ClientWarrantyActionRow: View {
             Button {} label: {
                 Text("🧾 Чек")
                     .font(ClientTheme.body(13, weight: .medium))
-                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                    .foregroundStyle(Design3.textBright)
                     .frame(maxWidth: .infinity, minHeight: 46)
                     .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
@@ -5708,7 +5708,7 @@ private struct CatalogView: View {
                         if let remoteError {
                             Label("Офлайн-каталог: \(remoteError)", systemImage: "wifi.exclamationmark")
                                 .font(ClientTheme.body(11))
-                                .foregroundStyle(Color(red: 0.898, green: 0.698, blue: 0.235))
+                                .foregroundStyle(Design3.gold)
                         }
 
                         if isLoading || remoteLoading {
@@ -5899,7 +5899,7 @@ private struct NativeProductCard: View {
             Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
             Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
             Text(product.availableUnits > 0 ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии") : "Нет в наличии")
-                .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Color(red: 1, green: 0.541, blue: 0.478))
+                .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Design3.danger)
             Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
         }
         .padding(10)
@@ -6083,7 +6083,7 @@ private struct ProductDetail: View {
 
     @ViewBuilder
     private func detailRow(_ title: String, value: String) -> some View {
-        HStack { Text(title).font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted); Spacer(); Text(value).font(ClientTheme.body(13)).foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776)) }
+        HStack { Text(title).font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted); Spacer(); Text(value).font(ClientTheme.body(13)).foregroundStyle(Design3.textBright) }
             .padding(.vertical, 8).overlay(alignment: .bottom) { Rectangle().fill(ClientTheme.surface).frame(height: 1) }
     }
 }
