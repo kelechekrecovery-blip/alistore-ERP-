@@ -45,7 +45,9 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
   let loaner: ServiceLoanerService;
   let tradeins: TradeInsService;
   let support: SupportService;
-  let seq = 0;
+  // Run-unique sequence: idempotency keys and journal entries are append-only in
+  // the shared test DB, so keys must never repeat across runs.
+  let seq = Date.now() % 1_000_000;
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -76,6 +78,8 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
   beforeEach(async () => {
     await prisma.outboxMessage.deleteMany();
     await prisma.customerNotification.deleteMany();
+    // ExchangeRequest is append-only at the DB level (P0001) — truncate like exchange.e2e-spec.
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "ExchangeRequest" CASCADE');
     await prisma.courierCommand.deleteMany();
     await prisma.serviceWorkOrderCommand.deleteMany();
     await prisma.servicePart.deleteMany();
@@ -83,19 +87,32 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
     await prisma.loanerDevice.deleteMany();
     await prisma.serviceWorkOrder.deleteMany();
     await prisma.warrantyCase.deleteMany();
-    // ExchangeRequest is append-only by design; use unique fixtures per test
-    // instead of bypassing its database guard during cleanup.
     await prisma.refundAllocation.deleteMany();
     await prisma.refundLine.deleteMany();
     await prisma.refund.deleteMany();
-    // Approvals referenced by append-only exchange requests are retained; all
-    // fixtures use unique ids and never depend on destructive cleanup.
+    await prisma.approval.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.returnItem.deleteMany();
-    // Domain fixtures are intentionally retained because several aggregates are
-    // append-only or referenced by the exchange snapshot. Every fixture uses a
-    // unique sequence value; only ephemeral notifications are reset above.
+    await prisma.return.deleteMany();
+    await prisma.payment.deleteMany();
+    await prisma.supportTicket.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
+    await prisma.loyaltyEntry.deleteMany();
+    await prisma.reservation.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.courierRun.deleteMany();
+    await prisma.cashShiftHandover.deleteMany();
+    await prisma.cashShift.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
+    await prisma.$transaction([
+      prisma.inventoryValuationReversal.deleteMany(),
+      prisma.inventoryValuationIssue.deleteMany(),
+    ]);
+    await prisma.deviceUnit.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.customer.deleteMany({ where: { phone: { startsWith: '+9965550199' } } });
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'notif-' } } });
   });
 
