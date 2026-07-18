@@ -4068,6 +4068,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-BRANDING-008`.
+- Task: give the native AliStore applications a single branded name/icon contract for the new app identity.
+- Files changed: `apps/ios/Branding/Assets.xcassets`, `apps/ios/project.yml`, regenerated `apps/ios/AliStoreNative.xcodeproj/project.pbxproj`, `BACKLOG.md`.
+- Result: a shared dark/lime `AppIcon` is bundled into the iOS Client, Staff, Courier and POS targets; Android branding remains `AliStore`, `AliStore Staff`, `AliStore Courier` and `AliStore POS`. The technical AVD name `savio_api36_arm64` is unrelated to the application identity.
+- Checks run: `xcodegen generate`; iOS all-target simulator build passed; `npm run android:build` passed for all four APKs; Android data-safety preflight passed; 1024x1024 AppIcon PNG verified. `ios:store-preflight` intentionally stopped at missing owner-supplied `ALISTORE_API_BASE_URL`.
+- Outcome: branding slice accepted locally. Physical-device testing, production API URL, signing, APNs/FCM and store submission remain external release gates. New source changes require a fresh trusted evidence hash before strict audit acceptance.
+- Commit: pending in this iteration.
+- Next step: refresh trusted evidence on the new source boundary, rerun strict audit, and keep the design-corpus owner decision as the only local audit blocker.
+
 - Iteration ID: `PHASE-1-TRUSTED-EVIDENCE-004`.
 - Task: refresh the current Phase 1 acceptance boundary and remove stale evidence drift from the strict ecosystem audit.
 - Changes: pinned the generated Prisma dependency tree; recorded committed visual, iOS app UI, four reconciliation and composite artifacts under `docs/acceptance`.

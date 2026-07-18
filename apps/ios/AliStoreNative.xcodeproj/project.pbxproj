@@ -8,11 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		01C9B58409FE5FF2AA3F5A3E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		033C0B97BDD273CF2129F40B /* alistore-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */; };
 		03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5A549F226050ACB113FF4E /* OfflineQueue.swift */; };
 		09D8C1D12D770FC850E10E98 /* POSOperationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCB230F61743790D08A7C6 /* POSOperationsView.swift */; };
 		189C03F1DEAE49BBDFDDDA40 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1A0DD02233D463CD63BCE9C0 /* alistore-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */; };
+		21A26D50DD49AB956D2FE4D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2984688119D5255CF5B06009 /* Assets.xcassets */; };
 		247D979D2B6ABCFDFDA09A5C /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */; };
+		3469A62E39FDA40C52D6CCCB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2984688119D5255CF5B06009 /* Assets.xcassets */; };
 		351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */; };
 		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
@@ -45,11 +49,15 @@
 		DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */; };
 		E3B3670272FF6B5A0E381FFE /* CourierOperationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */; };
 		E4AFBA9E7AA4F56F3FB28A7E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E57E3F0730FC547D46F22256 /* alistore-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */; };
 		E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A617D85C85DD435B687E350 /* StaffLoginView.swift */; };
+		E9AD728C67345D0B10525495 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2984688119D5255CF5B06009 /* Assets.xcassets */; };
 		EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1835E8741DBB19503E6334A1 /* QuickUnlock.swift */; };
+		F02017A9DEDB594FB4F87FF2 /* alistore-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */; };
 		F5420D98BEB7F7E63A8AFCAE /* AliStoreCourierApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */; };
 		FA0AB9B3D7316B9DA3538939 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42436819B18857A22AC06504 /* APIClientTests.swift */; };
+		FD8E6345CCA48F01DDC039E5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2984688119D5255CF5B06009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -185,6 +193,7 @@
 		1897622CBA172469A7099983 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerMeContractTests.swift; sourceTree = "<group>"; };
 		23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSReturnFlowTests.swift; sourceTree = "<group>"; };
+		2984688119D5255CF5B06009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2A617D85C85DD435B687E350 /* StaffLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffLoginView.swift; sourceTree = "<group>"; };
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourierOperationsView.swift; sourceTree = "<group>"; };
@@ -199,6 +208,7 @@
 		524C0236048CC4F9188201E1 /* AliStoreCourier.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreCourier.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		557B30E507B5DA9C404D290C /* AliStorePOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStorePOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		599A4AFDBA80DE5C617B96C9 /* AliStoreCourierUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreCourierUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */ = {isa = PBXFileReference; path = "alistore-icon.svg"; sourceTree = "<group>"; };
 		7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerAuthStore.swift; sourceTree = "<group>"; };
 		72CCB230F61743790D08A7C6 /* POSOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSOperationsView.swift; sourceTree = "<group>"; };
 		7596CAED282254008F7309B8 /* StaffWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffWorkView.swift; sourceTree = "<group>"; };
@@ -293,6 +303,15 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		0CA3A7A71EC8900FC09389B5 /* Branding */ = {
+			isa = PBXGroup;
+			children = (
+				6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */,
+				2984688119D5255CF5B06009 /* Assets.xcassets */,
+			);
+			path = Branding;
+			sourceTree = "<group>";
+		};
 		1BB465B1D36CFDB9F5FF6922 /* Staff */ = {
 			isa = PBXGroup;
 			children = (
@@ -339,6 +358,7 @@
 		62642BFF471DBC6589C5F93D = {
 			isa = PBXGroup;
 			children = (
+				0CA3A7A71EC8900FC09389B5 /* Branding */,
 				AFE690C0BC04797125C4CBEF /* Client */,
 				1E3305AE1F101B36F90EE541 /* Client */,
 				30160F294B75A406B6360903 /* Courier */,
@@ -504,6 +524,7 @@
 			buildConfigurationList = 91FC872B723CC0143095C8B1 /* Build configuration list for PBXNativeTarget "AliStoreCourier" */;
 			buildPhases = (
 				539D3B29BFA12829B33EEA30 /* Sources */,
+				D30E1702BA1E655B9AEF2CB0 /* Resources */,
 				213C24D8A5A56CCCADC3BB14 /* Frameworks */,
 				562D47FA3544BB4AD03928E6 /* Embed Frameworks */,
 			);
@@ -524,6 +545,7 @@
 			buildConfigurationList = B2E1B25443BEB0E157A8E8DD /* Build configuration list for PBXNativeTarget "AliStoreStaff" */;
 			buildPhases = (
 				1DE12775BCA27DE3EEE707C4 /* Sources */,
+				61118C834926619891543954 /* Resources */,
 				FC4360CF959C9BF3C1897FE0 /* Frameworks */,
 				5520EFDBB144DF693FA49EA8 /* Embed Frameworks */,
 			);
@@ -600,6 +622,7 @@
 			buildConfigurationList = 080C24DEE8C0E45FE5C079AD /* Build configuration list for PBXNativeTarget "AliStorePOS" */;
 			buildPhases = (
 				7932F1F6D0AC11F4E7ACC3FB /* Sources */,
+				9C99FE79EF027E2A37FE9981 /* Resources */,
 				BC15B8EDBA4BC6C1A914037F /* Frameworks */,
 				6D2BA5158165A16AC72A4850 /* Embed Frameworks */,
 			);
@@ -707,12 +730,41 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		61118C834926619891543954 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E9AD728C67345D0B10525495 /* Assets.xcassets in Resources */,
+				E57E3F0730FC547D46F22256 /* alistore-icon.svg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7BBF5A1180968AA4C9C937D7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				AD8F4AD7E5412004A4DE7F90 /* Assets.xcassets in Resources */,
+				FD8E6345CCA48F01DDC039E5 /* Assets.xcassets in Resources */,
 				D10A68419B9AC3F5E5048EBC /* PrivacyInfo.xcprivacy in Resources */,
+				033C0B97BDD273CF2129F40B /* alistore-icon.svg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9C99FE79EF027E2A37FE9981 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3469A62E39FDA40C52D6CCCB /* Assets.xcassets in Resources */,
+				F02017A9DEDB594FB4F87FF2 /* alistore-icon.svg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D30E1702BA1E655B9AEF2CB0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21A26D50DD49AB956D2FE4D5 /* Assets.xcassets in Resources */,
+				1A0DD02233D463CD63BCE9C0 /* alistore-icon.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

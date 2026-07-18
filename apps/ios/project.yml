@@ -23,7 +23,7 @@ targets:
   AliStoreClient:
     type: application
     platform: iOS
-    sources: Client
+    sources: [Client, Branding]
     dependencies:
       - target: AliStoreCore
     info:
@@ -43,6 +43,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.client
         PRODUCT_NAME: AliStore
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Client/Client.entitlements
         PAYMENT_RETURN_URL: alistore://payment-return
@@ -56,7 +57,7 @@ targets:
   AliStoreStaff:
     type: application
     platform: iOS
-    sources: Staff
+    sources: [Staff, Branding]
     dependencies:
       - target: AliStoreCore
     info:
@@ -77,6 +78,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.staff
         PRODUCT_NAME: AliStoreStaff
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Staff/Staff.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
@@ -88,7 +90,7 @@ targets:
   AliStoreCourier:
     type: application
     platform: iOS
-    sources: Courier
+    sources: [Courier, Branding]
     dependencies:
       - target: AliStoreCore
     info:
@@ -109,6 +111,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.courier
         PRODUCT_NAME: AliStoreCourier
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Courier/Courier.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
@@ -120,7 +123,7 @@ targets:
   AliStorePOS:
     type: application
     platform: iOS
-    sources: POS
+    sources: [POS, Branding]
     dependencies:
       - target: AliStoreCore
     info:
@@ -141,6 +144,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.pos
         PRODUCT_NAME: AliStorePOS
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         API_BASE_URL: http://127.0.0.1:4000/api
       configs:
