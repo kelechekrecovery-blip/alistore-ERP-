@@ -68,7 +68,7 @@ test('admin manages products with AI enrichment and approval-gated danger action
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
 
-  await expect(page.getByText('Админ · Товары')).toBeVisible();
+  await expect(page.getByText('Управление товарами')).toBeVisible();
   await page.locator('input[placeholder="IPHONE-15-128-BLK"]').fill(sku);
   await page.getByLabel('Штрихкод варианта').fill(`194253${Date.now()}`);
   await page.getByLabel('Семья вариантов').fill('iphone-15-ui');
@@ -125,7 +125,7 @@ test('admin manages products with AI enrichment and approval-gated danger action
     .resolves.toMatchObject({ price: 120000, archived: false });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByText('Админ · Товары')).toBeVisible();
+  await expect(page.getByText('Управление товарами')).toBeVisible();
   await expect(page.getByPlaceholder('SKU, штрихкод, семья, название')).toBeVisible();
   await page.locator('main section').nth(1).evaluate((element) => {
     element.scrollTop = element.scrollHeight;

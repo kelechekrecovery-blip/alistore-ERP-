@@ -36,14 +36,13 @@ export default function AdminProductsPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-night text-white">
-      <header className="flex flex-wrap items-center gap-4 border-b border-surface-3 bg-ink-dark/95 px-6 py-4 backdrop-blur">
-        <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-lime font-display text-lg font-extrabold text-lime-ink">
-          P
-        </span>
+    <div className="erp3-stage fixed inset-0 z-50 flex flex-col bg-[#0B0A08] text-white">
+      <header className="flex flex-wrap items-center gap-4 border-b border-white/10 bg-black/25 px-6 py-4 backdrop-blur-2xl">
+        <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#FF5B2E] font-display text-lg font-extrabold text-white shadow-[0_0_24px_rgba(255,91,46,0.25)]">A</span>
         <div>
-          <div className="font-display text-lg font-bold">Админ · Товары</div>
-          <div className="text-xs text-subtle">Каталог, AI-обогащение, price/archive через approvals · {session.username}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Products 3.0</div>
+          <div className="font-display text-lg font-bold">Управление товарами</div>
+          <div className="text-xs text-subtle">Каталог, варианты, цены и публикация через approvals · {session.username}</div>
         </div>
         <Link
           href="/erp"
@@ -68,7 +67,8 @@ export default function AdminProductsPage() {
           Выйти staff
         </button>
       </header>
-      <main className="min-h-0 flex-1 overflow-y-auto p-4">
+      <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-subtle"><span className="rounded-full border border-[#FF5B2E]/40 bg-[#FF5B2E]/10 px-3 py-1.5 text-[#FF7A4D]">Варианты и наборы</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">История цены</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">AI-обогащение</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Публикация</span></div>
         <ProductManagementView accessToken={session.accessToken} />
       </main>
     </div>
