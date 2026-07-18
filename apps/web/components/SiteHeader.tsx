@@ -82,7 +82,7 @@ export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'desig
           <HeaderTool dark={design3} href="/compare" label="Сравнить" icon={<Scale size={22} />} count={compareCount} hideLabel />
           <HeaderTool dark={design3} href={user ? '/account' : '/login'} label={user ? 'Профиль' : 'Войти'} icon={<User size={22} />} hideLabel />
           <HeaderTool dark={design3} href="/cart" label="Корзина" icon={<ShoppingBag size={22} />} count={cartHydrated ? count : 0} />
-          <button type="button" onClick={() => setOpen((value) => !value)} className="grid h-11 w-11 place-items-center rounded-lg text-faint md:hidden" aria-label={open ? 'Закрыть меню' : 'Открыть меню'}>
+          <button type="button" onClick={() => setOpen((value) => !value)} className={`grid h-11 w-11 place-items-center rounded-lg md:hidden ${design3 ? 'text-white/70 hover:bg-white/[.08] hover:text-white' : 'text-faint hover:bg-sand'}`} aria-label={open ? 'Закрыть меню' : 'Открыть меню'}>
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -98,8 +98,8 @@ export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'desig
       </nav>
 
       {open && (
-        <nav className="border-t border-linen bg-white px-4 py-3 md:hidden" aria-label="Мобильная навигация">
-          {MOBILE_NAV.map((item) => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="block border-b border-linen px-2 py-3 text-sm font-semibold last:border-0">{item.label}</Link>)}
+        <nav className={`border-t px-4 py-3 md:hidden ${design3 ? 'border-white/[.08] bg-[#181410] text-white' : 'border-linen bg-white'}`} aria-label="Мобильная навигация">
+          {MOBILE_NAV.map((item) => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={`block border-b px-2 py-3 text-sm font-semibold last:border-0 ${design3 ? 'border-white/[.08] text-white/75 hover:text-white' : 'border-linen'}`}>{item.label}</Link>)}
         </nav>
       )}
       <ScrollProgress />
