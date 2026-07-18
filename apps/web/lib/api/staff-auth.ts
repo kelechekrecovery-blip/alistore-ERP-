@@ -43,3 +43,49 @@ export function staffTotpDisable(
 ): Promise<StaffPublicProfile> {
   return postAuthJson('/staff-auth/2fa/disable', { token }, accessToken);
 }
+
+/** Prisma Role enum — keep in sync with apps/api/prisma/schema.prisma. */
+export const STAFF_ROLES = [
+  'seller',
+  'senior_seller',
+  'cashier',
+  'warehouse',
+  'service',
+  'technician',
+  'courier',
+  'marketer',
+  'admin',
+  'owner',
+  'franchise',
+] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export interface CreateStaffInput {
+  username: string;
+  password: string;
+  role: StaffRole;
+  point: string;
+}
+
+/** STAFF-001/002 account admin — every call requires the owner-only staff:manage grant. */
+export function createStaffAccount(
+  input: CreateStaffInput,
+  accessToken: string,
+): Promise<StaffPublicProfile> {
+  return postAuthJson('/staff-auth/staff', input, accessToken);
+}
+
+/** 409 surfaces the blockers (open cash shift, active courier deliveries) in the message. */
+export function deactivateStaffAccount(
+  staffId: string,
+  accessToken: string,
+): Promise<StaffPublicProfile> {
+  return postAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/deactivate`, {}, accessToken);
+}
+
+export function resetStaffTotp(
+  staffId: string,
+  accessToken: string,
+): Promise<StaffPublicProfile> {
+  return postAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/totp-reset`, {}, accessToken);
+}

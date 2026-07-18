@@ -26,6 +26,10 @@ const GRANTS: Record<string, readonly string[]> = {
   'protection:read': ['seller', 'senior_seller', 'admin', 'owner'],
   'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
   'staff:manage': ['owner'],
+  'debts:read': ['seller', 'senior_seller', 'cashier', 'admin', 'owner'],
+  'debts:create': ['senior_seller', 'admin', 'owner'],
+  'debts:pay': ['seller', 'senior_seller', 'cashier', 'admin', 'owner'],
+  'giftcards:issue': ['admin', 'owner'],
 };
 
 /** `g, child, parent` policy edges: a role also holds every grant of its parent. */
@@ -46,6 +50,11 @@ export function staffCan(role: string, obj: string, act: string): boolean {
   if (!roles) return false;
   return roleWithAncestors(role).some((candidate) => roles.includes(candidate));
 }
+
+export const canReadDebts = (role: string) => staffCan(role, 'debts', 'read');
+export const canCreateDebt = (role: string) => staffCan(role, 'debts', 'create');
+export const canPayDebt = (role: string) => staffCan(role, 'debts', 'pay');
+export const canIssueGiftCard = (role: string) => staffCan(role, 'giftcards', 'issue');
 
 /** ERP shell routes (app/erp/page.tsx). `null` — route is open to every staff role. */
 export type ErpRoute =

@@ -26,6 +26,9 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
+import { DebtsDesk } from '@/components/staff/DebtsDesk';
+import { GiftCardIssue } from '@/components/staff/GiftCardIssue';
+import { canCreateDebt, canIssueGiftCard, canPayDebt } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
   loadStaffSession,
@@ -35,7 +38,7 @@ import {
 const POINT = 'BISHKEK-1';
 const SHOP = 'AliStore Центр';
 
-type Tab = 'home' | 'orders' | 'b2b' | 'protection' | 'tasks' | 'buyback';
+type Tab = 'home' | 'orders' | 'b2b' | 'protection' | 'tasks' | 'buyback' | 'debts' | 'cards';
 const NAV: { id: Tab; icon: string; label: string }[] = [
   { id: 'home', icon: '⌂', label: 'Главная' },
   { id: 'orders', icon: '📦', label: 'Заказы' },
@@ -376,6 +379,12 @@ export default function StaffPage() {
               <div className="mb-4 flex gap-2 overflow-x-auto" aria-label="Дополнительные операции">
                 <CompactAction label="B2B · Опт" onClick={() => setTab('b2b')} />
                 <CompactAction label="Защита" onClick={() => setTab('protection')} />
+                {(canCreateDebt(session.role) || canPayDebt(session.role)) && (
+                  <CompactAction label="Долги" onClick={() => setTab('debts')} />
+                )}
+                {canIssueGiftCard(session.role) && (
+                  <CompactAction label="Карты" onClick={() => setTab('cards')} />
+                )}
                 <Link href="/pos" className="flex-shrink-0 rounded-chip border border-[#2E2822] bg-[#221E19] px-3 py-2 text-xs font-semibold text-[#D8CFC6]">POS · Касса</Link>
               </div>
 
@@ -603,6 +612,20 @@ export default function StaffPage() {
                   </div>
                 )}
               </form>
+            </div>
+          )}
+
+          {tab === 'debts' && (
+            <div className="pt-1">
+              <SectionTitle title="Долги и рассрочка" onBack={() => setTab('home')} />
+              <DebtsDesk accessToken={session.accessToken} role={session.role} flash={flash} />
+            </div>
+          )}
+
+          {tab === 'cards' && (
+            <div className="pt-1">
+              <SectionTitle title="Подарочные карты" onBack={() => setTab('home')} />
+              <GiftCardIssue accessToken={session.accessToken} role={session.role} flash={flash} />
             </div>
           )}
         </div>

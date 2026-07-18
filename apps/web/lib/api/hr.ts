@@ -81,3 +81,23 @@ export function postHrPayroll(period: string, point: string, token: string) {
 export function payHrPayroll(id: string, externalRef: string, token: string, fundingAccountCode: '1000' | '1010' | '1020' = '1010') {
   return postAuthJson<HrPayrollRun>(`/hr/payroll/runs/${encodeURIComponent(id)}/pay`, { externalRef, fundingAccountCode }, token, { 'idempotency-key': crypto.randomUUID() });
 }
+
+/** Self-service (hr/me/*) — open to every staff role, no hr:read grant required. */
+export type HrAbsenceType = 'annual_leave' | 'sick_leave' | 'unpaid_leave' | 'other';
+
+export function fetchMyHrWeek(weekStart: string, token: string) {
+  const query = new URLSearchParams({ weekStart });
+  return getJson<HrWeek>(`/hr/me/week?${query}`, token);
+}
+
+export function openMyAttendance(scheduleId: string, token: string) {
+  return postAuthJson<HrAttendance>('/hr/me/attendance/open', { scheduleId }, token, { 'idempotency-key': crypto.randomUUID() });
+}
+
+export function closeMyAttendance(scheduleId: string, token: string) {
+  return postAuthJson<HrAttendance>('/hr/me/attendance/close', { scheduleId }, token, { 'idempotency-key': crypto.randomUUID() });
+}
+
+export function requestMyAbsence(input: { type: HrAbsenceType; startsOn: string; endsOn: string; reason?: string }, token: string) {
+  return postAuthJson<HrAbsence>('/hr/me/absences', input, token, { 'idempotency-key': crypto.randomUUID() });
+}
