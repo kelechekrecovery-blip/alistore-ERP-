@@ -25,14 +25,14 @@ function attr(product: CatalogProduct, keys: string[]) {
 export default function ComparePage() {
   const compare = useCompare();
   const { add } = useCart();
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   useEffect(() => {
     fetchCatalog({ limit: 100 })
       .then((response) => setProducts(response.items))
       .catch(() => setProducts([]));
   }, []);
   const list = compare.ids
-    .map((id) => products.find((product) => product.id === id))
+    .map((id) => (products ?? []).find((product) => product.id === id))
     .filter(Boolean) as CatalogProduct[];
   const bestPrice =
     list.length > 1 ? Math.min(...list.map((product) => product.price)) : -1;
@@ -46,7 +46,9 @@ export default function ComparePage() {
         <p className="mt-2 text-faint">
           Сопоставьте цены, состояние, память и наличие.
         </p>
-        {compare.hydrated && list.length === 0 ? (
+        {products === null ? (
+          <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-linen bg-white"><div className="h-8 w-48 animate-pulse rounded-full bg-linen" /></div>
+        ) : compare.hydrated && list.length === 0 ? (
           <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-linen bg-white text-center">
             <div>
               <GitCompareArrows className="mx-auto text-faint" size={40} />

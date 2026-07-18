@@ -38,10 +38,11 @@ export default function AccountPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
   const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
+  const [loyaltyError, setLoyaltyError] = useState(false);
 
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account'); }, [hydrated, user, router]);
   useEffect(() => { if (user) authed(fetchMyOrders).then(setOrders).catch(() => setOrders([])); }, [user, authed]);
-  useEffect(() => { if (user) authed(fetchMyLoyalty).then(setLoyalty).catch(() => setLoyalty(null)); }, [user, authed]);
+  useEffect(() => { if (user) { setLoyaltyError(false); authed(fetchMyLoyalty).then(setLoyalty).catch(() => { setLoyalty(null); setLoyaltyError(true); }); } }, [user, authed]);
 
   if (!hydrated || !user) return <div className="min-h-screen bg-sand text-faint"><SiteHeader /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
@@ -55,7 +56,7 @@ export default function AccountPage() {
 
       <section className="mt-9 grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
         <div className="flex items-center gap-5 rounded-[22px] border border-linen bg-tint p-6 shadow-soft sm:p-8"><span className="grid h-16 w-16 shrink-0 place-items-center rounded-[16px] bg-coral font-display text-xl font-bold text-white">{user.phone.slice(-2)}</span><div><div className="flex flex-wrap items-center gap-3"><h2 className="font-display text-2xl font-bold">Клиент AliStore</h2><span className="rounded-full border border-coral/25 bg-white px-2.5 py-1 text-[11px] font-semibold text-deep">GOLD</span></div><p className="mt-1 font-mono text-sm text-faint">{user.phone}</p></div></div>
-        <div className="rounded-[22px] border border-linen bg-white p-6 shadow-soft sm:p-8"><div className="flex items-center justify-between"><span className="text-sm text-faint">Уровень {loyalty?.level ?? '...'}</span><strong className="font-display text-xl text-deep">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : 'Загрузка...'}</strong></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-linen"><div className="h-full rounded-full bg-coral" style={{ width: loyalty ? `${Math.max(4, Math.min(100, 100 - loyalty.nextLevelSpend / 1000))}%` : '4%' }} /></div><p className="mt-3 text-xs text-subtle">{loyalty ? `До следующего уровня осталось ${som(loyalty.nextLevelSpend)}` : 'Загружаем программу лояльности'}</p></div>
+        <div className="rounded-[22px] border border-linen bg-white p-6 shadow-soft sm:p-8"><div className="flex items-center justify-between"><span className="text-sm text-faint">Уровень {loyalty?.level ?? '...'}</span><strong className="font-display text-xl text-deep">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : loyaltyError ? 'Ошибка загрузки' : 'Загрузка...'}</strong></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-linen"><div className="h-full rounded-full bg-coral" style={{ width: loyalty ? `${Math.max(4, Math.min(100, 100 - loyalty.nextLevelSpend / 1000))}%` : '4%' }} /></div><p className="mt-3 text-xs text-subtle">{loyalty ? `До следующего уровня осталось ${som(loyalty.nextLevelSpend)}` : loyaltyError ? 'Не удалось загрузить программу лояльности' : 'Загружаем программу лояльности'}</p></div>
       </section>
 
       <section className="pt-14"><h2 className="font-display text-2xl font-bold">Сервисы кабинета</h2><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{MENU.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className="group rounded-[18px] border border-linen bg-white p-5 shadow-soft transition hover:-translate-y-1 hover:border-coral/35"><span className="grid h-11 w-11 place-items-center rounded-[12px] border border-coral/20 bg-tint text-deep"><Icon size={20} /></span><h3 className="mt-4 font-display font-semibold group-hover:text-deep">{item.label}</h3><p className="mt-1 text-xs text-subtle">{item.meta}</p></Link>; })}</div></section>

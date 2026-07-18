@@ -70,7 +70,9 @@ export default function CartPage() {
             Проверьте товары, примените промокод и переходите к оформлению.
           </p>
 
-          {hydrated && items.length === 0 ? (
+          {!hydrated ? (
+            <div className="mt-12 grid min-h-[360px] place-items-center rounded-[12px] border border-linen bg-white"><div className="h-8 w-56 animate-pulse rounded-full bg-linen" /></div>
+          ) : hydrated && items.length === 0 ? (
             <div className="mt-12 grid min-h-[360px] place-items-center rounded-[12px] border border-linen bg-white px-6 text-center">
               <div>
                 <span className="mx-auto grid h-16 w-16 place-items-center rounded-[12px] bg-tint text-coral">
@@ -239,7 +241,7 @@ export default function CartPage() {
                   <div className="my-5 h-px bg-linen" />
                   <div className="flex items-end justify-between">
                     <span className="font-semibold">Итого</span>
-                    <span className="text-3xl font-extrabold">
+                    <span className="font-display text-3xl font-extrabold">
                       {som(total)}
                     </span>
                   </div>

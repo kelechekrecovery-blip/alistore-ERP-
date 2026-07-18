@@ -2,7 +2,7 @@ const nf = new Intl.NumberFormat('ru-RU');
 
 /** Format сом amounts (integer minor-unit-free сом). */
 export function som(value: number): string {
-  return `${nf.format(value)} с`;
+  return `${nf.format(value)} сом`;
 }
 
 /** Derive a human condition label from product attrs (новое / Б/У). */
