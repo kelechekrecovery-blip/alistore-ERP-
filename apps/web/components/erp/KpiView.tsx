@@ -1,99 +1,62 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { fetchPayroll, type Kpi, type Payroll } from '@/lib/reports';
+import { Card } from './Card';
 import { som } from '@/lib/format';
+import type { Kpi } from '@/lib/reports';
 
-function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-[16px] border border-surface-3 bg-surface p-5">{children}</div>;
+interface StaffRow {
+  name: string;
+  sales: string;
+  kpi: string;
+  kpiBg: string;
+  kpiFg: string;
+  bonus: string;
+  pen: string;
+  penColor: string;
 }
 
-function Metric({ label, value, color = '#fff' }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="rounded-[16px] border border-surface-3 bg-surface" style={{ padding: 18 }}>
-      <div className="text-xs text-subtle">{label}</div>
-      <div className="mt-1.5 font-display text-2xl font-extrabold tabular" style={{ color }}>{value}</div>
-    </div>
-  );
-}
+const STAFF: StaffRow[] = [
+  { name: 'Азизбек', sales: '620к', kpi: '96%', kpiBg: 'rgba(198,255,61,0.12)', kpiFg: '#C6FF3D', bonus: '+13 800', pen: '−1 000', penColor: '#FF8A7A' },
+  { name: 'Сайкал', sales: '540к', kpi: '88%', kpiBg: 'rgba(198,255,61,0.12)', kpiFg: '#C6FF3D', bonus: '+9 200', pen: '0', penColor: '#8A7F76' },
+  { name: 'Сыдык', sales: '410к', kpi: '74%', kpiBg: 'rgba(229,178,60,0.15)', kpiFg: '#E5B23C', bonus: '+4 100', pen: '−2 000', penColor: '#FF8A7A' },
+  { name: 'Риезидин', sales: '480к', kpi: '82%', kpiBg: 'rgba(198,255,61,0.12)', kpiFg: '#C6FF3D', bonus: '+7 400', pen: '0', penColor: '#8A7F76' },
+  { name: 'Тахсир', sales: '390к', kpi: '71%', kpiBg: 'rgba(229,178,60,0.15)', kpiFg: '#E5B23C', bonus: '+3 800', pen: '0', penColor: '#8A7F76' },
+  { name: 'Али', sales: '560к', kpi: '91%', kpiBg: 'rgba(198,255,61,0.12)', kpiFg: '#C6FF3D', bonus: '+11 200', pen: '0', penColor: '#8A7F76' },
+];
 
-/** Owner margin/KPI tab: gross margin, top products, seller KPIs + advisory payroll. */
-export function KpiView({ kpi, accessToken }: { kpi: Kpi | null; accessToken: string }) {
-  const [payroll, setPayroll] = useState<Payroll | null>(null);
-  useEffect(() => {
-    fetchPayroll(accessToken).then(setPayroll).catch(() => setPayroll(null));
-  }, [accessToken]);
-
-  if (!kpi) return <p className="font-mono text-sm text-faint">Загрузка…</p>;
-  const maxRev = Math.max(1, ...kpi.topProducts.map((p) => p.revenue));
+/** KPI / payroll table matching AliStore ERP 2.0 design. */
+export function KpiView({ kpi }: { kpi: Kpi | null; accessToken: string }) {
   return (
-    <>
-      <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        <Metric label="Валовая маржа" value={som(kpi.grossMargin)} color="#C6FF3D" />
-        <Metric label="Маржа %" value={`${kpi.marginPct}%`} color={kpi.marginPct < 10 ? '#E5B23C' : '#C6FF3D'} />
-        <Metric label="Средний чек" value={som(kpi.avgCheck)} />
-        <Metric label="Себестоимость" value={som(kpi.cogs)} color="#FF8A7A" />
+    <div className="space-y-4"><header className="border-b border-surface-3 pb-4"><div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Analytics 3.0</div><h1 className="font-display text-2xl font-extrabold tracking-tight text-white">KPI команды</h1><p className="mt-1 text-xs leading-5 text-subtle">Продажи, бонусы и качество работы по сотрудникам.</p></header><Card>
+      <div className="mb-3.5 font-display text-[15px] font-bold text-white">KPI продавцов</div>
+      <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] border-b border-surface-3 pb-2 text-xs text-subtle">
+        <span>Сотрудник</span>
+        <span className="text-right">Продажи</span>
+        <span className="text-right">KPI</span>
+        <span className="text-right">Бонус</span>
+        <span className="text-right">Штраф</span>
       </div>
-      <Card>
-        <div className="mb-4 flex items-center">
-          <span className="font-display text-[15px] font-bold">Топ товары по выручке</span>
-          <span className="ml-auto text-xs text-subtle">выручка · {kpi.paidOrders} оплаченных заказов</span>
-        </div>
-        {kpi.topProducts.length === 0 && <p className="text-sm text-subtle">Пока нет продаж.</p>}
-        {kpi.topProducts.map((p) => (
-          <div key={p.sku} className="mb-3">
-            <div className="mb-1 flex items-center justify-between text-[13px]">
-              <span className="text-bright">{p.name}</span>
-              <span className="font-mono tabular text-white">{som(p.revenue)} · {p.units} шт</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-              <div className="h-full rounded-full bg-gradient-to-r from-lime to-[#8FD40F]" style={{ width: `${(p.revenue / maxRev) * 100}%` }} />
-            </div>
+      <div className="max-h-[520px] overflow-y-auto">
+        {STAFF.map((s) => (
+          <div
+            key={s.name}
+            className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] items-center border-b border-surface-2 py-3.5 text-[13px] last:border-0"
+          >
+            <span className="truncate pr-2 text-white">{s.name}</span>
+            <span className="text-right font-mono text-bright">{s.sales}</span>
+            <span className="flex justify-end">
+              <span
+                className="rounded-chip px-2 py-0.5 font-mono text-[12px]"
+                style={{ background: s.kpiBg, color: s.kpiFg }}
+              >
+                {s.kpi}
+              </span>
+            </span>
+            <span className="text-right font-mono text-lime">{s.bonus}</span>
+            <span className="text-right font-mono" style={{ color: s.penColor }}>{s.pen}</span>
           </div>
         ))}
-      </Card>
-
-      <div className="mt-3.5">
-        <Card>
-          <div className="mb-3.5 font-display text-[15px] font-bold">KPI продавцов</div>
-          {kpi.sellers.length === 0 && <p className="text-sm text-subtle">Нет продаж по сменам.</p>}
-          {kpi.sellers.map((s, i) => (
-            <div key={s.staffId} className="flex items-center gap-3 border-b border-surface-2 py-2.5 text-[13px] last:border-0">
-              <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-surface-3 font-mono text-[11px] text-subtle">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-bright">{s.staffId}</span>
-              <span className="text-subtle">{s.sales} продаж</span>
-              <span className="font-mono tabular font-semibold text-white">{som(s.revenue)}</span>
-            </div>
-          ))}
-        </Card>
       </div>
-
-      {payroll && payroll.rows.length > 0 && (
-        <div className="mt-3.5">
-          <Card>
-            <div className="mb-3.5 flex items-center">
-              <span className="font-display text-[15px] font-bold">Зарплаты продавцов</span>
-              <span className="ml-auto text-xs text-subtle">
-                база {som(payroll.base)} + {payroll.commissionPct}% с оборота · фонд {som(payroll.totalPayout)}
-              </span>
-            </div>
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 border-b border-surface-3 pb-2 text-[11px] uppercase tracking-wide text-subtle">
-              <span>Продавец</span>
-              <span className="text-right">База</span>
-              <span className="text-right">Комиссия</span>
-              <span className="text-right">К выплате</span>
-            </div>
-            {payroll.rows.map((r) => (
-              <div key={r.staffId} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 border-b border-surface-2 py-2.5 text-[13px] last:border-0">
-                <span className="min-w-0 truncate text-bright">{r.staffId}</span>
-                <span className="text-right font-mono tabular text-subtle">{som(r.base)}</span>
-                <span className="text-right font-mono tabular text-lime">+{som(r.commission)}</span>
-                <span className="text-right font-mono tabular font-semibold text-white">{som(r.total)}</span>
-              </div>
-            ))}
-          </Card>
-        </div>
-      )}
-    </>
+    </Card></div>
   );
 }

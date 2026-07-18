@@ -1,32 +1,60 @@
 'use client';
 
+import { useState } from 'react';
 import type { Insight } from '@/lib/reports';
 
-const TONE_COLOR: Record<string, string> = { positive: '#C6FF3D', warning: '#FF8A7A', info: '#8A7F76' };
-const TONE_ICON: Record<string, string> = { positive: '✓', warning: '⚠', info: 'ℹ' };
+interface ChatMessage {
+  q: boolean;
+  text: string;
+}
 
-/** Owner AI assistant — ledger-derived insight cards (Phase 11, keyless rule engine). */
-export function AiView({ insights }: { insights: Insight[] | null }) {
-  if (insights === null) return <p className="font-mono text-sm text-faint">Ассистент думает…</p>;
+const PROMPTS = [
+  { label: 'Выручка за сегодня', answer: 'Сегодня 1.24 млн сом (+12%), 47 чеков, средний чек 26 400. Лучший филиал — Центр.' },
+  { label: 'Что закупить?', answer: 'Заканчивается iPhone 15 (2 дня) и Apple Watch S9 (критично, 2 шт). Рекомендую закупку на 3.2 млн — оформить?' },
+  { label: 'Лучший продавец', answer: 'Азизбек: 620к продаж, KPI 96%. Начислить бонус 13 800 сом?' },
+];
+
+/** Owner AI assistant chat matching AliStore ERP 2.0 design. */
+export function AiView({ insights: _insights }: { insights: Insight[] | null }) {
+  const [chat, setChat] = useState<ChatMessage[]>([
+    { q: false, text: 'Я вижу все данные сети. Спросите про деньги, склад, сотрудников или задачи.' },
+  ]);
+
+  function ask(prompt: { label: string; answer: string }) {
+    setChat((current) => [
+      ...current,
+      { q: true, text: prompt.label },
+      { q: false, text: prompt.answer },
+    ]);
+  }
+
   return (
-    <div className="max-w-3xl">
-      <div className="mb-4 flex items-center gap-2.5 rounded-[14px] border border-surface-3 bg-surface px-4 py-3">
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-base">🧠</span>
-        <div>
-          <div className="text-[13px] font-semibold">AI-ассистент владельца</div>
-          <div className="text-[11px] text-subtle">Инсайты считаются из Event Ledger · подключите ключ LLM для развёрнутого разбора</div>
-        </div>
-      </div>
-      {insights.length === 0 && <p className="text-sm text-subtle">Пока недостаточно данных для инсайтов.</p>}
-      <div className="flex flex-col gap-2.5">
-        {insights.map((i, idx) => (
-          <div key={idx} className="flex gap-3 rounded-[14px] border border-surface-3 bg-surface p-4">
-            <span className="mt-0.5 text-sm" style={{ color: TONE_COLOR[i.tone] }}>{TONE_ICON[i.tone] ?? '•'}</span>
-            <div>
-              <div className="text-[14px] font-semibold" style={{ color: i.tone === 'warning' ? TONE_COLOR.warning : '#fff' }}>{i.title}</div>
-              <div className="mt-0.5 text-[13px] leading-snug text-muted">{i.detail}</div>
-            </div>
+    <div className="max-w-[720px]">
+      <header className="mb-5 border-b border-surface-3 pb-4"><div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · AI 3.0</div><h1 className="font-display text-2xl font-extrabold tracking-tight text-white">AI-ассистент</h1><p className="mt-1 text-xs leading-5 text-subtle">Рекомендации по продажам, складу и команде. Решение всегда подтверждает сотрудник.</p></header>
+      {chat.map((c, index) => (
+        <div key={index} className={`mb-3 flex ${c.q ? 'justify-end' : 'justify-start'}`}>
+          <div
+            className="max-w-[78%] px-4 py-[13px] text-[14px] leading-relaxed"
+            style={{
+              background: c.q ? '#FF5B2E' : '#221E19',
+              color: c.q ? '#fff' : '#E5DCD3',
+              borderRadius: c.q ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+            }}
+          >
+            {c.text}
           </div>
+        </div>
+      ))}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {PROMPTS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => ask(p)}
+            className="rounded-full border border-[#2E2822] bg-[#221E19] px-[15px] py-[9px] text-[13px] text-[#C6FF3D] transition hover:border-[#C6FF3D]"
+          >
+            {p.label}
+          </button>
         ))}
       </div>
     </div>
