@@ -314,7 +314,7 @@ export default function CheckoutPage() {
     <div className="checkout-shell min-h-screen bg-ink-dark font-sans text-white">
       <SiteHeader />
       <main className="mx-auto w-[min(900px,92vw)] py-10 sm:py-14">
-        <div className="checkout-panel overflow-hidden rounded-[22px] border border-white/[0.1] bg-[#111120] shadow-[0_28px_90px_-55px_rgba(249,115,22,.55)]">
+        <div className="checkout-panel overflow-hidden rounded-[22px] border border-white/[0.1] bg-ink-dark shadow-[0_28px_90px_-55px_rgba(249,115,22,.55)]">
           {children}
         </div>
       </main>
@@ -393,7 +393,7 @@ export default function CheckoutPage() {
                   </button>
                 ))}
                 {!deliveryCapacityLoading && pickupPoints.length === 0 && (
-                  <p className="rounded-[10px] border border-[#6B3B32] bg-surface-3 p-3 text-sm text-coral-tint">Сейчас нет доступных точек самовывоза.</p>
+                  <p className="rounded-[10px] border border-line bg-surface-3 p-3 text-sm text-coral-tint">Сейчас нет доступных точек самовывоза.</p>
                 )}
               </div>
             )}
@@ -414,7 +414,7 @@ export default function CheckoutPage() {
                   <div className="checkout-surface mb-2.5 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-sm text-muted">Проверяем доступное время…</div>
                 )}
                 {delivery === 'courier' && deliveryCapacityError && (
-                  <div className="mb-2.5 rounded-[13px] border border-[#6B3B32] bg-surface-3 p-3.5 text-sm text-coral-tint">Не удалось загрузить доступные точки и интервалы. Обновите страницу.</div>
+                  <div className="mb-2.5 rounded-[13px] border border-line bg-surface-3 p-3.5 text-sm text-coral-tint">Не удалось загрузить доступные точки и интервалы. Обновите страницу.</div>
                 )}
                 {delivery === 'courier' && deliveryZones.length > 0 && (
                   <div className="checkout-surface mb-2.5 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">

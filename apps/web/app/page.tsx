@@ -64,7 +64,7 @@ export default function HomePage() {
                 <RotateCcw className="absolute bottom-5 right-5 text-coral/30 transition-transform duration-500 group-hover:-rotate-12" size={68} />
               </Link>
               <Link href="/delivery" className="group relative overflow-hidden rounded-[14px] bg-ink-dark p-6 text-white">
-                <span className="text-xs font-bold uppercase text-[#ffb800]">Получение заказа</span>
+                <span className="text-xs font-bold uppercase text-warn">Получение заказа</span>
                 <h2 className="mt-2 text-2xl font-extrabold">Доставка и самовывоз</h2>
                 <p className="mt-1 text-sm text-white/65">Условия рассчитываются при оформлении</p>
               </Link>
@@ -100,8 +100,8 @@ function ManagedDesktopBlocks({ blocks }: { blocks: StorefrontBlock[] }) {
   return <section className="grid gap-4" aria-label="Предложения AliStore" data-testid="managed-storefront-blocks">
     {blocks.map((block) => block.type === 'collection'
       ? <div key={block.id} className="py-8" data-storefront-block={block.id}>
-          <div className="mb-5 flex items-end justify-between"><div>{block.eyebrow && <p className="text-xs font-bold uppercase text-coral">{block.eyebrow}</p>}<h2 className="mt-1 text-[28px] font-extrabold">{block.title}</h2>{block.body && <p className="mt-1 text-sm text-[#6e6e73]">{block.body}</p>}</div>{block.ctaHref && <Link href={block.ctaHref} className="flex items-center gap-2 text-sm font-bold">{block.ctaLabel ?? 'Смотреть все'} <ArrowRight size={17} /></Link>}</div>
-          {block.products?.length ? <div className="grid grid-cols-4 gap-4">{block.products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="rounded-[12px] border border-linen bg-white px-6 py-10 text-center text-[#6e6e73]">Подборка временно недоступна</div>}
+          <div className="mb-5 flex items-end justify-between"><div>{block.eyebrow && <p className="text-xs font-bold uppercase text-coral">{block.eyebrow}</p>}<h2 className="mt-1 text-[28px] font-extrabold">{block.title}</h2>{block.body && <p className="mt-1 text-sm text-faint">{block.body}</p>}</div>{block.ctaHref && <Link href={block.ctaHref} className="flex items-center gap-2 text-sm font-bold">{block.ctaLabel ?? 'Смотреть все'} <ArrowRight size={17} /></Link>}</div>
+          {block.products?.length ? <div className="grid grid-cols-4 gap-4">{block.products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="rounded-[12px] border border-linen bg-white px-6 py-10 text-center text-faint">Подборка временно недоступна</div>}
         </div>
       : <ManagedBanner key={block.id} block={block} />)}
   </section>;

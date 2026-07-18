@@ -148,7 +148,7 @@ export default function CartPage() {
                       <div className="font-display text-xl font-bold">
                         {som(item.price * item.qty)}
                       </div>
-                      <div className="mt-1 text-xs text-[#6c7080]">
+                      <div className="mt-1 text-xs text-faint">
                         {som(item.price)} / шт.
                       </div>
                     </div>

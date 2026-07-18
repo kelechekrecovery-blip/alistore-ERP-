@@ -289,6 +289,20 @@
     color: #201b17 !important;
   }
 
+  /* Login is dark+lime on mobile (canon §5 dark accent); flip lime -> brand coral on the light desktop shell. */
+  .login-shell .bg-lime,
+  .login-panel .bg-lime {
+    background: #ff5b2e !important;
+    color: #fff !important;
+  }
+  .login-shell .text-lime,
+  .login-panel .text-lime {
+    color: #ff5b2e !important;
+  }
+  .login-field:focus {
+    border-color: #ff5b2e !important;
+  }
+
   .checkout-shell {
     background: #f7f2ec !important;
     color: #201b17 !important;
