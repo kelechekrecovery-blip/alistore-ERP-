@@ -8,9 +8,15 @@ import UserNotifications
 private extension Notification.Name {
     static let alistoreAPNsToken = Notification.Name("alistore.apns.token")
     static let alistoreAPNsFailure = Notification.Name("alistore.apns.failure")
+    static let alistorePushRoute = Notification.Name("alistore.push.route")
 }
 
-private final class ClientAppDelegate: NSObject, UIApplicationDelegate {
+private final class ClientAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
         NotificationCenter.default.post(name: .alistoreAPNsToken, object: token)
@@ -18,6 +24,38 @@ private final class ClientAppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         NotificationCenter.default.post(name: .alistoreAPNsFailure, object: error.localizedDescription)
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .badge, .sound])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let userInfo = response.notification.request.content.userInfo
+        let route = stringValue(userInfo["route"]) ?? routeFromDeepLink(stringValue(userInfo["deepLink"])) ?? "account"
+        var payload: [AnyHashable: Any] = ["route": route]
+        if let referenceId = stringValue(userInfo["referenceId"]) ?? stringValue(userInfo["orderId"]) ?? stringValue(userInfo["warrantyId"]) {
+            payload["referenceId"] = referenceId
+        }
+        NotificationCenter.default.post(name: .alistorePushRoute, object: nil, userInfo: payload)
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        if let value = value as? String, !value.isEmpty { return value }
+        return nil
+    }
+
+    private func routeFromDeepLink(_ rawValue: String?) -> String? {
+        guard let rawValue, let url = URL(string: rawValue) else { return nil }
+        let value = "\(url.host ?? "")\(url.path)".lowercased()
+        if value.contains("warranty") || value.contains("service") { return "warranty" }
+        if value.contains("order") { return "order" }
+        if value.contains("account") || value.contains("profile") { return "account" }
+        return nil
     }
 }
 
@@ -993,6 +1031,15 @@ private struct ClientRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsFailure)) { notification in
             pushStatus = notification.object as? String ?? "APNs registration failed"
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .alistorePushRoute)) { notification in
+            guard auth.session != nil else { return }
+            selectedTab = .account
+            orderRefreshRevision += 1
+            // The inbox owns the authenticated, entity-scoped destination link.
+            // Opening it here keeps push payloads non-authoritative and lets the
+            // API decide whether the referenced order or warranty is still visible.
+            overlay = .notifications
         }
     }
 

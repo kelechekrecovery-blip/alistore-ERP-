@@ -4146,3 +4146,13 @@
 - Commits: `750de77` and `f2f4a44`.
 - Result: every local software/evidence gate passes and the strict audit reports exactly one blocker: 64 linked design handoffs are missing from the committed corpus. The technical Android AVD name `savio_api36_arm64` remains only an emulator identifier; packaged applications are AliStore-branded.
 - Remaining gates: owner restore/retire/replace decision for the 64 references, staging credentials and deploy, live provider certification, physical-device biometrics/push/camera/maps/scanner/printer smoke, signing and store release. Production readiness is not claimed.
+
+# 2026-07-18 — IOS-CLIENT-PUSH-ROUTING-001
+
+- Task: add native APNs handling to AliStore Client and route notifications into the authenticated account/inbox shell.
+- Files: `apps/ios/Client/AliStoreClientApp.swift`.
+- Result: foreground notifications present as banner/badge/sound; background taps normalize order/warranty/account payloads and open the authenticated notification inbox. Payload identifiers are treated as hints only; entity visibility remains server-authoritative.
+- Checks: `git diff --check`; iOS Release-style build attempted with the installed Xcode toolchain. The build is currently blocked by the local Swift `ObservationMacros.ObservableMacro` plugin returning a malformed response and unavailable CoreSimulator service, not by a reported error in the APNs routing code.
+- Outcome: code change is isolated and ready for a clean Xcode/Simulator rerun. Physical APNs and deep-link certification remain pending.
+- Commit: pending in this iteration.
+- Next: restore the local iOS toolchain gate, refresh Client UI evidence on the new source boundary, then continue Staff/Courier/POS native parity.
