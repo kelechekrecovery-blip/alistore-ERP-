@@ -8,11 +8,14 @@ import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import type { PgBoss as PgBossClient } from 'pg-boss';
+import { AlerterService } from '../observability/alerter.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from './outbox.service';
 
 const QUEUE = 'outbox-relay';
 const EVERY_MINUTE = '* * * * *';
 const SCHEDULER_ID = 'outbox-relay-every-minute';
+const HEARTBEAT_ID = 'outbox-relay';
 
 /**
  * Durable relay for the outbox, on the SAME Postgres via pg-boss (no Redis). The
@@ -31,6 +34,8 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly outbox: OutboxService,
+    private readonly alerter: AlerterService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -54,9 +59,14 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
     try {
       const { PgBoss } = await import('pg-boss');
       this.boss = new PgBoss(connectionString);
-      this.boss.on('error', (err) =>
-        this.logger.error('pg-boss error', err as Error),
-      );
+      this.boss.on('error', (err) => {
+        this.logger.error('pg-boss error', err as Error);
+        this.alerter.notifyCritical({
+          source: HEARTBEAT_ID,
+          message: 'pg-boss error in outbox relay',
+          error: err,
+        });
+      });
       await this.boss.start();
       await this.boss.createQueue(QUEUE);
       await this.boss.work(QUEUE, async () => {
@@ -64,12 +74,18 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
         if (sent > 0 || failed > 0) {
           this.logger.log(`Outbox relay: ${sent} sent, ${failed} failed`);
         }
+        await this.heartbeat();
       });
       await this.boss.schedule(QUEUE, EVERY_MINUTE);
       this.logger.log('Outbox relay scheduled (every minute via pg-boss)');
     } catch (err) {
       this.boss = undefined;
       this.logger.error('Failed to start outbox relay', err as Error);
+      this.alerter.notifyCritical({
+        source: HEARTBEAT_ID,
+        message: 'Failed to start outbox relay',
+        error: err,
+      });
     }
   }
 
@@ -102,12 +118,18 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
             if (sent > 0 || failed > 0) {
               this.logger.log(`Outbox relay: ${sent} sent, ${failed} failed`);
             }
+            await this.heartbeat();
           },
           { connection: this.redis, concurrency: 1 },
         );
-        this.worker.on('error', (error) =>
-          this.logger.error('BullMQ outbox worker error', error),
-        );
+        this.worker.on('error', (error) => {
+          this.logger.error('BullMQ outbox worker error', error);
+          this.alerter.notifyCritical({
+            source: HEARTBEAT_ID,
+            message: 'BullMQ outbox worker error',
+            error,
+          });
+        });
         await this.worker.waitUntilReady();
         this.logger.log('BullMQ outbox worker ready');
         return;
@@ -128,6 +150,24 @@ export class OutboxRelay implements OnModuleInit, OnModuleDestroy {
       this.redis = undefined;
       if (processRole === 'worker') throw error;
       this.logger.error('Failed to connect BullMQ outbox producer', error as Error);
+      this.alerter.notifyCritical({
+        source: HEARTBEAT_ID,
+        message: 'Failed to connect BullMQ outbox producer',
+        error,
+      });
+    }
+  }
+
+  /** Liveness signal for the status dashboard; never breaks the relay pass. */
+  private async heartbeat(): Promise<void> {
+    try {
+      await this.prisma.workerHeartbeat.upsert({
+        where: { id: HEARTBEAT_ID },
+        update: {},
+        create: { id: HEARTBEAT_ID },
+      });
+    } catch (error) {
+      this.logger.warn(`Heartbeat write failed: ${(error as Error).message}`);
     }
   }
 }

@@ -9,6 +9,7 @@ import { RealtimeNotificationTransport } from './transports/realtime.transport';
 import { ChannelNotificationTransport } from './transports/channel.transport';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { ObservabilityModule } from '../observability/observability.module';
 import { NOTIFICATION_TRANSPORT, NotificationTransport } from './outbox.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -20,7 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * producers.
  */
 @Module({
-  imports: [RealtimeModule],
+  imports: [RealtimeModule, ObservabilityModule],
   providers: [
     OutboxService,
     OutboxRelay,

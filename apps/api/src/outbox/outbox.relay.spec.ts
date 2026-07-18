@@ -1,4 +1,6 @@
 import { ConfigService } from '@nestjs/config';
+import { AlerterService } from '../observability/alerter.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { OutboxRelay } from './outbox.relay';
 import { OutboxService } from './outbox.service';
 
@@ -6,6 +8,8 @@ function relay(config: Record<string, string>): OutboxRelay {
   return new OutboxRelay(
     new ConfigService(config),
     { relayPending: jest.fn() } as unknown as OutboxService,
+    { notifyCritical: jest.fn() } as unknown as AlerterService,
+    { workerHeartbeat: { upsert: jest.fn() } } as unknown as PrismaService,
   );
 }
 

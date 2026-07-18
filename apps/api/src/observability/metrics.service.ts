@@ -36,6 +36,27 @@ export class MetricsService {
     this.requests.set(key, metric);
   }
 
+  /** Aggregates for the protected status dashboard. */
+  snapshot(): {
+    startedAt: string;
+    uptimeSeconds: number;
+    requestsTotal: number;
+    errors5xxTotal: number;
+  } {
+    let requestsTotal = 0;
+    let errors5xxTotal = 0;
+    for (const metric of this.requests.values()) {
+      requestsTotal += metric.count;
+      errors5xxTotal += metric.errorCount;
+    }
+    return {
+      startedAt: new Date(this.startedAt).toISOString(),
+      uptimeSeconds: Math.floor((Date.now() - this.startedAt) / 1000),
+      requestsTotal,
+      errors5xxTotal,
+    };
+  }
+
   renderPrometheus(): string {
     const lines = [
       '# HELP alistore_process_start_time_seconds Unix timestamp of process start.',

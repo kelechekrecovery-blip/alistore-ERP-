@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthzModule } from '../authz/authz.module';
+import { ObservabilityModule } from '../observability/observability.module';
 import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from '../payments/payment-gateway-provider';
 import { selectPaymentGatewayProvider } from '../payments/payment-gateway-selector';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
@@ -11,7 +12,7 @@ import { RefundRelay } from './refunds.relay';
 import { RefundWebhooksController } from './refund-webhooks.controller';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule],
+  imports: [StaffAuthModule, AuthzModule, ObservabilityModule],
   providers: [
     RefundsService,
     RefundProcessor,

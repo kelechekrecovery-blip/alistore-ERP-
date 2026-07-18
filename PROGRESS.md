@@ -2,6 +2,20 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-OBSERVE-003`.
+- Task: complete the local operations alert/status slice while preserving fail-safe behavior.
+- Files changed: observability module/filter/metrics/status/alerter, outbox/refund relay hooks, authz permissions, WorkerHeartbeat schema/migration, env examples, and targeted tests.
+- Result: critical API/relay failures can be deduplicated and rate-capped for an optional Telegram channel; alerts remain local no-ops until credentials exist. Owner/admin staff can query API metrics, outbox depth, relay heartbeats and recent alerts through a protected status endpoint. No secrets are logged or committed.
+- Checks run: API build (pass); observability and metrics tests `5/5` (pass); Prisma validate with test `DATABASE_URL` (pass); `git diff --check` (pass).
+- Outcome: local observability software slice accepted. Live alert delivery, private metrics networking, worker/DLQ dashboards and staging soak remain open.
+
+- Iteration ID: `GAP-BACKUP-OPS-002`.
+- Task: record a local PostgreSQL backup/restore and developer-machine schedule proof.
+- Files changed: `infra/backup.sh`, `infra/RUNBOOK.md`, `infra/macos/kg.alistore.backup.plist`, and `docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md`.
+- Result: local drill restored all 129 public tables with matching row counts/schema and documented LaunchAgent scheduling. The acceptance document explicitly keeps staging restore, PITR and Evidence object backup open.
+- Checks run: recorded local `pg_dump`/`pg_restore` drill (pass); LaunchAgent smoke (pass, documented); `git diff --check` (pass).
+- Outcome: local backup procedure is accepted; production backup readiness is not claimed.
+
 - Iteration ID: `PHASE-1-VISUAL-EVIDENCE-003`.
 - Task: refresh durable visual acceptance after the toolchain and finance commits.
 - Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/visual-7ac1baa71f1835b8880fb15355cd1b0ccc268be70a427fca9a89755662543731.json`, `BACKLOG.md`, and this progress entry.

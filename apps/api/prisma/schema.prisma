@@ -2993,6 +2993,15 @@ model OutboxMessage {
   @@index([campaignId, status])
 }
 
+// Liveness signal written by worker relays/schedulers after each pass. The
+// protected operations status endpoint flags a worker as stale when its
+// heartbeat is older than the freshness window.
+model WorkerHeartbeat {
+  id         String   @id
+  lastSeenAt DateTime @updatedAt
+  meta       Json?
+}
+
 // Durable compensation queue for media objects that were uploaded before a
 // later database validation failed. Deletion is idempotent and retried until
 // the object store accepts it.
