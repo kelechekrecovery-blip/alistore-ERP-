@@ -14,6 +14,7 @@ import {
 } from './social-login';
 import { NoopOtpSender } from './noop-otp.sender';
 import { OTP_SENDER, OtpSender } from './otp-sender';
+import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 
 export interface AuthTokens {
   accessToken: string;
@@ -42,6 +43,20 @@ export class AuthService {
     private readonly config: ConfigService,
     @Inject(OTP_SENDER) private readonly otpSender: OtpSender = new NoopOtpSender(),
   ) {}
+
+  /** Verify a short-lived access token for non-HTTP transports (for example Socket.IO). */
+  async verifyAccessToken(token: string): Promise<AuthPrincipal> {
+    const payload = await this.jwt.verifyAsync<JwtPayload>(token);
+    if (!payload.sub || !['customer', 'staff'].includes(payload.typ)) {
+      throw new ValidationError('access_token_invalid', 'Недействительный access-токен');
+    }
+    return {
+      customerId: payload.sub,
+      phone: payload.phone,
+      typ: payload.typ,
+      role: payload.role,
+    };
+  }
 
   /**
    * Issue a login OTP for a phone. The code is stored hashed and never logged.

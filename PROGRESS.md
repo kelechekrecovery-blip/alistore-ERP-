@@ -4124,6 +4124,14 @@
 - Outcome: iOS simulator UI evidence is current and locally accepted. This is not physical iPhone Face ID/APNs/camera/offline certification, signing, TestFlight or App Store approval.
 - Commit: pending in this iteration.
 - Next step: commit iOS evidence, then run trusted strict audit and refresh reconciliation gates if it reports source-hash drift.
+# 2026-07-18 — GAP-REALTIME-IDOR-001
+
+- Task: harden Socket.IO order-status subscriptions for the public launch.
+- Files: `apps/api/src/auth/auth.service.ts`, `apps/api/src/realtime/realtime.gateway.ts`, `apps/api/src/realtime/realtime.module.ts`, and realtime tests.
+- Result: connections require a verified access JWT; customer sockets may join only their own order room; staff sockets require an active staff account and `orders:queue` permission; production CORS uses the configured allowlist and no longer uses `origin: *`.
+- Checks: realtime Jest `6/6`, API production build, `git diff --check`.
+- Next: commit this vertical, then continue the next unblocked staging/release hardening item; live proxy/origin behavior remains external.
+
 # 2026-07-18 — Strict ecosystem audit after reconciliation refresh
 
 - Task: run the strict ecosystem contract audit after refreshing the composite reconciliation evidence.

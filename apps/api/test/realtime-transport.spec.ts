@@ -31,4 +31,33 @@ describe('RealtimeNotificationTransport (outbox → socket.io)', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('requires an access token before a socket can subscribe', async () => {
+    const gateway = new RealtimeGateway({ verifyAccessToken: jest.fn() } as never);
+    const use = jest.fn();
+    gateway.afterInit({ use } as never);
+    const middleware = use.mock.calls[0][0] as (client: unknown, next: (error?: Error) => void) => Promise<void>;
+    const next = jest.fn();
+
+    await middleware({ handshake: { auth: {}, headers: {} }, data: {} }, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(next.mock.calls[0][0].message).toBe('unauthorized');
+  });
+
+  it('stores the verified customer principal on the socket', async () => {
+    const verifyAccessToken = jest.fn().mockResolvedValue({ customerId: 'customer-1', typ: 'customer' });
+    const gateway = new RealtimeGateway({ verifyAccessToken } as never);
+    const use = jest.fn();
+    gateway.afterInit({ use } as never);
+    const middleware = use.mock.calls[0][0] as (client: unknown, next: (error?: Error) => void) => Promise<void>;
+    const next = jest.fn();
+    const client = { handshake: { auth: { token: 'access-token' }, headers: {} }, data: {} };
+
+    await middleware(client, next);
+
+    expect(verifyAccessToken).toHaveBeenCalledWith('access-token');
+    expect(client.data).toEqual({ principal: { customerId: 'customer-1', typ: 'customer' } });
+    expect(next).toHaveBeenCalledWith();
+  });
 });

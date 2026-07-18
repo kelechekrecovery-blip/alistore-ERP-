@@ -14,11 +14,17 @@ describe('RealtimeGateway (socket.io)', () => {
   beforeAll(async () => {
     httpServer = createServer();
     socketServer = new Server(httpServer, { cors: { origin: '*' } });
-    gateway = new RealtimeGateway();
+    gateway = new RealtimeGateway(
+      undefined,
+      { order: { findUnique: jest.fn().mockResolvedValue({ customerId: 'customer-1' }) } } as never,
+      undefined,
+      undefined,
+    );
     gateway.server = socketServer;
     socketServer.on('connection', (client) => {
       client.on('subscribe:order', (orderId: string, ack: (value: { subscribed: string }) => void) => {
-        ack(gateway.subscribeOrder(client, orderId));
+        client.data.principal = { customerId: 'customer-1', typ: 'customer' };
+        void gateway.subscribeOrder(client, orderId).then(ack);
       });
     });
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
@@ -53,5 +59,19 @@ describe('RealtimeGateway (socket.io)', () => {
     } finally {
       client.close();
     }
+  });
+
+  it('rejects a cross-customer room subscription', async () => {
+    const gatewayWithForeignOrder = new RealtimeGateway(
+      undefined,
+      { order: { findUnique: jest.fn().mockResolvedValue({ customerId: 'other-customer' }) } } as never,
+      undefined,
+      undefined,
+    );
+    const client = {
+      data: { principal: { customerId: 'customer-1', typ: 'customer' } },
+      join: jest.fn(),
+    };
+    await expect(gatewayWithForeignOrder.subscribeOrder(client as never, 'order-1')).rejects.toThrow('order_not_found');
   });
 });
