@@ -1,5 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { EventType } from '../audit/event-types';
+import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   NOTIFICATION_TRANSPORT,
@@ -25,6 +28,9 @@ export class OutboxService {
     private readonly prisma: PrismaService,
     @Inject(NOTIFICATION_TRANSPORT)
     private readonly transport: NotificationTransport,
+    // Optional so existing unit constructions with two args keep working; Nest
+    // always injects it (AuditModule is global).
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   /** Enqueue inside an existing transaction (atomic with the business change). */
@@ -88,6 +94,56 @@ export class OutboxService {
       }
     }
     return { sent, failed };
+  }
+
+  /**
+   * Operator re-drive (LOGIC-013): return a `failed` message to the pending
+   * queue with the attempt counter and schedule reset, so the relay picks it up
+   * on the next pass. Writes an `outbox.redriven` ledger event naming the
+   * operator in the same transaction. State-guarded: only a failed message can
+   * be re-driven — a repeated request is a 409, never a duplicate enqueue.
+   */
+  async redrive(id: string, actor: string) {
+    const audit = this.audit ?? new AuditService(this.prisma);
+    return audit.transaction(async (tx) => {
+      const message = await tx.outboxMessage.findUnique({ where: { id } });
+      if (!message) {
+        throw new ValidationError('outbox_message_not_found', 'Сообщение outbox не найдено');
+      }
+      const reset = await tx.outboxMessage.updateMany({
+        where: { id, status: 'failed' },
+        data: {
+          status: 'pending',
+          attempts: 0,
+          lastError: null,
+          sentAt: null,
+          nextAttemptAt: new Date(),
+        },
+      });
+      if (reset.count === 0) {
+        throw new ConflictError(
+          'outbox_message_not_failed',
+          'Повторно в очередь можно вернуть только сообщение со статусом failed',
+        );
+      }
+      const result = await tx.outboxMessage.findUniqueOrThrow({ where: { id } });
+      return {
+        result,
+        events: [
+          {
+            type: EventType.OutboxMessageRedriven,
+            actor,
+            payload: {
+              messageId: id,
+              channel: message.channel,
+              template: message.template,
+              previousAttempts: message.attempts,
+            },
+            refs: [id, ...(message.campaignId ? [message.campaignId] : [])],
+          },
+        ],
+      };
+    });
   }
 
   private toData(input: OutboxInput): Prisma.OutboxMessageCreateInput {

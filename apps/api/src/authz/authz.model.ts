@@ -369,6 +369,8 @@ p, admin, reports, read
 p, owner, reports, read
 p, admin, observability, read
 p, owner, observability, read
+p, admin, outbox, manage
+p, owner, outbox, manage
 p, admin, ai, read
 p, owner, ai, read
 p, cashier, evidence, read

@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuthzModule } from '../authz/authz.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { OutboxService } from './outbox.service';
+import { OutboxController } from './outbox.controller';
 import { OutboxRelay } from './outbox.relay';
 import { LogNotificationTransport } from './transports/log.transport';
 import { NovuHttpTransport } from './transports/novu.transport';
@@ -21,7 +24,8 @@ import { PrismaService } from '../prisma/prisma.service';
  * producers.
  */
 @Module({
-  imports: [RealtimeModule, ObservabilityModule],
+  imports: [RealtimeModule, ObservabilityModule, StaffAuthModule, AuthzModule],
+  controllers: [OutboxController],
   providers: [
     OutboxService,
     OutboxRelay,

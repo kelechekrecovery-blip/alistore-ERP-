@@ -185,7 +185,7 @@ export class LogisticsService {
       const current = await tx.storePoint.findUnique({ where: { id } });
       if (!current) throw new ValidationError('store_point_not_found', 'Точка не найдена');
       if (current.active && normalized.active === false) {
-        const [openShift, openOrders, serializedStock, quantityStock] = await Promise.all([
+        const [openShift, openOrders, serializedStock, quantityStock, otherActivePoints] = await Promise.all([
           tx.cashShift.findFirst({
             where: { point: current.inventoryLocation, closedAt: null },
             select: { id: true },
@@ -208,12 +208,15 @@ export class LogisticsService {
             select: { id: true, onHand: true, reserved: true },
             take: 10,
           }),
+          tx.storePoint.count({ where: { active: true, id: { not: id } } }),
         ]);
         const blockers: string[] = [];
         if (openShift) blockers.push(`открытая кассовая смена ${openShift.id}`);
         if (openOrders.length > 0) blockers.push(`активные заказы: ${openOrders.map((order) => `${order.id} (${order.status})`).join(', ')}`);
         if (serializedStock.length > 0) blockers.push(`серийный остаток: ${serializedStock.length}${serializedStock.length === 10 ? '+' : ''} единиц`);
         if (quantityStock.length > 0) blockers.push(`количественный остаток: ${quantityStock.length}${quantityStock.length === 10 ? '+' : ''} позиций`);
+        // LOGIC-009: checkout and POS require at least one active store point.
+        if (otherActivePoints === 0) blockers.push('это последняя активная точка — отключение сломает checkout и POS');
         if (blockers.length > 0) {
           throw new ConflictError(
             'store_point_deactivation_blocked',

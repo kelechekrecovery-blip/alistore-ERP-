@@ -37,24 +37,23 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 
   suspend fun catalogProduct(id: String): CatalogProductDetail = request("catalog/products/$id", "GET").catalogProductDetail()
 
-  suspend fun checkoutStorePoints(): List<StorePoint> = withContext(Dispatchers.IO) {
+  suspend fun checkoutOptions(): CheckoutOptions = withContext(Dispatchers.IO) {
     val connection = open("logistics/checkout-options", "GET")
     try {
       val status = connection.responseCode
       val stream = if (status in 200..299) connection.inputStream else connection.errorStream
       val payload = stream.bufferedReader().use { it.readText() }
-      if (status !in 200..299) throw ApiException(status, "Не удалось загрузить точки самовывоза")
-      val points = JSONObject(payload).getJSONArray("pickupPoints")
-      buildList {
-        for (index in 0 until points.length()) {
-          val point = points.getJSONObject(index)
-          add(StorePoint(point.getString("id"), point.getString("code"), point.getString("name"), point.getString("address"), point.getString("inventoryLocation"), point.getString("hours")))
-        }
-      }
+      if (status !in 200..299) throw ApiException(status, "Не удалось загрузить опции оформления")
+      JSONObject(payload).checkoutOptions()
     } finally {
       connection.disconnect()
     }
   }
+
+  suspend fun checkoutStorePoints(): List<StorePoint> = checkoutOptions().pickupPoints
+
+  suspend fun quotePromotion(request: PromotionQuoteRequest, token: String? = null): PromotionQuote =
+    request("promotions/quote", "POST", request.toJson(), token).promotionQuote()
 
   override suspend fun requestOtp(phone: String): OtpChallenge = request("auth/otp/request", "POST", JSONObject().put("phone", phone)).let {
     OtpChallenge(it.optString("devCode").takeIf(String::isNotBlank))
@@ -527,6 +526,50 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 }
 
 data class RawApiResponse(val status: Int, val body: String)
+
+internal fun JSONObject.checkoutOptions() = CheckoutOptions(
+  pickupPoints = getJSONArray("pickupPoints").let { points ->
+    buildList {
+      for (index in 0 until points.length()) {
+        val point = points.getJSONObject(index)
+        add(StorePoint(point.getString("id"), point.getString("code"), point.getString("name"), point.getString("address"), point.getString("inventoryLocation"), point.getString("hours")))
+      }
+    }
+  },
+  deliveryZones = optJSONArray("deliveryZones")?.let { zones ->
+    buildList {
+      for (index in 0 until zones.length()) add(zones.getJSONObject(index).deliveryZone())
+    }
+  }.orEmpty(),
+)
+
+internal fun JSONObject.deliveryZone() = DeliveryZone(
+  id = getString("id"),
+  code = optString("code"),
+  name = getString("name"),
+  fee = optInt("fee"),
+  slots = optJSONArray("slots")?.let { slots ->
+    buildList {
+      for (index in 0 until slots.length()) add(slots.getJSONObject(index).deliverySlot())
+    }
+  }.orEmpty(),
+)
+
+internal fun JSONObject.deliverySlot() = DeliverySlot(
+  id = getString("id"),
+  startsAt = getString("startsAt"),
+  endsAt = getString("endsAt"),
+  remaining = optInt("remaining"),
+  available = optBoolean("available", true),
+)
+
+internal fun JSONObject.promotionQuote() = PromotionQuote(
+  code = getString("code"),
+  name = optString("name"),
+  subtotal = optInt("subtotal"),
+  eligibleSubtotal = optInt("eligibleSubtotal"),
+  discount = getInt("discount"),
+)
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
 

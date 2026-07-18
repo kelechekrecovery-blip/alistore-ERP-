@@ -70,6 +70,40 @@ fun CreateOrderRequest.toJson(): JSONObject = JSONObject()
   .put("items", JSONArray().apply {
     items.forEach { item -> put(JSONObject().put("sku", item.sku).put("qty", item.qty).put("price", item.price)) }
   })
+  .apply {
+    paymentMode?.let { put("paymentMode", it) }
+    deliverySlot?.let { put("deliverySlot", it) }
+    deliveryZoneId?.let { put("deliveryZoneId", it) }
+    deliverySlotId?.let { put("deliverySlotId", it) }
+    promoCode?.let { put("promoCode", it) }
+    loyaltyPoints?.let { put("loyaltyPoints", it) }
+  }
+
+fun PromotionQuoteRequest.toJson(): JSONObject = JSONObject()
+  .put("code", code)
+  .put("items", JSONArray().apply {
+    items.forEach { item -> put(JSONObject().put("sku", item.sku).put("qty", item.qty)) }
+  })
+
+// COD exists only for courier delivery (API cod_courier_required); cash at pickup stays prepaid, like the web checkout.
+fun resolvePaymentMode(paymentMethod: String, fulfillmentType: String): String =
+  if (paymentMethod == "cash" && fulfillmentType == "courier") "cod" else "prepaid"
+
+// One loyalty point redeems as one som, capped by the discounted subtotal, like the web checkout.
+fun loyaltyRedemption(balance: Int, subtotal: Int, promoDiscount: Int): Int =
+  minOf(balance.coerceAtLeast(0), (subtotal - promoDiscount).coerceAtLeast(0))
+
+fun checkoutPayableEstimate(subtotal: Int, promoDiscount: Int, loyaltyPoints: Int, deliveryFee: Int): Int =
+  (subtotal - promoDiscount - loyaltyPoints).coerceAtLeast(0) + deliveryFee
+
+fun deliverySlotLabel(startsAt: String, endsAt: String): String {
+  fun localTime(value: String): String = runCatching {
+    java.time.OffsetDateTime.parse(value)
+      .atZoneSameInstant(java.time.ZoneId.systemDefault())
+      .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+  }.getOrDefault(value)
+  return "${localTime(startsAt)}–${localTime(endsAt)}"
+}
 
 fun CreatePaymentIntentRequest.toJson(): JSONObject = JSONObject()
   .put("orderId", orderId)

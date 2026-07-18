@@ -46,8 +46,28 @@ public struct StorePoint: Decodable, Identifiable, Sendable {
     public let sortOrder: Int
 }
 
+public struct DeliverySlot: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let zoneId: String
+    public let startsAt: Date
+    public let endsAt: Date
+    public let capacity: Int
+    public let reserved: Int
+    public let remaining: Int
+    public let available: Bool
+}
+
+public struct DeliveryZone: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let code: String
+    public let name: String
+    public let fee: Int
+    public let slots: [DeliverySlot]
+}
+
 public struct CheckoutOptions: Decodable, Sendable {
     public let pickupPoints: [StorePoint]
+    public let deliveryZones: [DeliveryZone]
 }
 
 public struct StaffSession: Codable, Sendable {
@@ -752,6 +772,12 @@ public struct CreateOrderRequest: Codable, Sendable {
     public let deliveryAddress: String?
     public let total: Int
     public let items: [CreateOrderItem]
+    public let paymentMode: String?
+    public let promoCode: String?
+    public let loyaltyPoints: Int?
+    public let deliveryZoneId: String?
+    public let deliverySlotId: String?
+    public let deliverySlot: String?
 
     public init(
         customerId: String,
@@ -759,7 +785,13 @@ public struct CreateOrderRequest: Codable, Sendable {
         storePointId: String?,
         deliveryAddress: String?,
         total: Int,
-        items: [CreateOrderItem]
+        items: [CreateOrderItem],
+        paymentMode: String? = nil,
+        promoCode: String? = nil,
+        loyaltyPoints: Int? = nil,
+        deliveryZoneId: String? = nil,
+        deliverySlotId: String? = nil,
+        deliverySlot: String? = nil
     ) {
         self.customerId = customerId
         self.channel = "mobile"
@@ -768,7 +800,44 @@ public struct CreateOrderRequest: Codable, Sendable {
         self.deliveryAddress = deliveryAddress
         self.total = total
         self.items = items
+        self.paymentMode = paymentMode
+        self.promoCode = promoCode
+        self.loyaltyPoints = loyaltyPoints
+        self.deliveryZoneId = deliveryZoneId
+        self.deliverySlotId = deliverySlotId
+        self.deliverySlot = deliverySlot
     }
+}
+
+public struct PromotionQuoteItem: Encodable, Sendable {
+    public let sku: String
+    public let qty: Int
+
+    public init(sku: String, qty: Int) {
+        self.sku = sku
+        self.qty = qty
+    }
+}
+
+public struct PromotionQuoteRequest: Encodable, Sendable {
+    public let code: String
+    public let items: [PromotionQuoteItem]
+
+    public init(code: String, items: [PromotionQuoteItem]) {
+        self.code = code
+        self.items = items
+    }
+}
+
+public struct PromotionQuote: Decodable, Sendable {
+    public let id: String
+    public let code: String
+    public let name: String
+    public let subtotal: Int
+    public let eligibleSubtotal: Int
+    public let discount: Int
+    public let customerLimitVerified: Bool
+    public let validUntil: String?
 }
 
 public enum OnlinePaymentMethod: String, CaseIterable, Identifiable, Sendable {

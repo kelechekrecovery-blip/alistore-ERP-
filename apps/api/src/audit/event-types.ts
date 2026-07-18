@@ -225,6 +225,8 @@ export const EventType = {
   StoreChecklistCompleted: 'store.checklist_completed',
   StoreIncidentCreated: 'store.incident_created',
   StoreIncidentResolved: 'store.incident_resolved',
+  // outbox (LOGIC-013) — operator returned a parked (failed) message to the queue.
+  OutboxMessageRedriven: 'outbox.redriven',
 } as const;
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType];

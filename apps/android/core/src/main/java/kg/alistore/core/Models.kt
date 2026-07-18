@@ -48,6 +48,8 @@ data class OtpChallenge(val devCode: String?)
 
 data class CreateOrderItem(val sku: String, val qty: Int, val price: Int)
 
+// Optional fields mirror CreateOrderDto in apps/api/src/orders/orders.dto.ts.
+// Attribution is not collected by the app (no UTM capture), so it is never sent.
 data class CreateOrderRequest(
   val customerId: String,
   val fulfillmentType: String,
@@ -55,6 +57,45 @@ data class CreateOrderRequest(
   val deliveryAddress: String?,
   val total: Int,
   val items: List<CreateOrderItem>,
+  val paymentMode: String? = null,
+  val deliverySlot: String? = null,
+  val deliveryZoneId: String? = null,
+  val deliverySlotId: String? = null,
+  val promoCode: String? = null,
+  val loyaltyPoints: Int? = null,
+)
+
+data class DeliverySlot(
+  val id: String,
+  val startsAt: String,
+  val endsAt: String,
+  val remaining: Int,
+  val available: Boolean,
+)
+
+data class DeliveryZone(
+  val id: String,
+  val code: String,
+  val name: String,
+  val fee: Int,
+  val slots: List<DeliverySlot> = emptyList(),
+)
+
+data class CheckoutOptions(
+  val pickupPoints: List<StorePoint>,
+  val deliveryZones: List<DeliveryZone>,
+)
+
+data class PromotionQuoteItem(val sku: String, val qty: Int)
+
+data class PromotionQuoteRequest(val code: String, val items: List<PromotionQuoteItem>)
+
+data class PromotionQuote(
+  val code: String,
+  val name: String,
+  val subtotal: Int,
+  val eligibleSubtotal: Int,
+  val discount: Int,
 )
 
 data class CustomerOrder(

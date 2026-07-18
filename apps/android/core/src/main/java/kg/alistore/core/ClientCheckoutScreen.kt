@@ -73,6 +73,15 @@ internal fun ClientCheckout(
   var pickupPoints by remember { mutableStateOf<List<StorePoint>>(emptyList()) }
   var selectedStorePointId by rememberSaveable { mutableStateOf("") }
   var pointError by remember { mutableStateOf<String?>(null) }
+  var deliveryZones by remember { mutableStateOf<List<DeliveryZone>>(emptyList()) }
+  var selectedZoneId by rememberSaveable { mutableStateOf("") }
+  var selectedSlotId by rememberSaveable { mutableStateOf("") }
+  var promoInput by rememberSaveable { mutableStateOf("") }
+  var appliedPromo by remember { mutableStateOf<PromotionQuote?>(null) }
+  var promoBusy by remember { mutableStateOf(false) }
+  var promoError by remember { mutableStateOf<String?>(null) }
+  var loyaltyBalance by remember { mutableStateOf<Int?>(null) }
+  var redeemLoyalty by rememberSaveable { mutableStateOf(false) }
   var idempotencyKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var paymentIdempotencyKey by rememberSaveable { mutableStateOf(UUID.randomUUID().toString()) }
   var busy by remember { mutableStateOf(false) }
@@ -80,15 +89,39 @@ internal fun ClientCheckout(
   var result by remember { mutableStateOf<CheckoutResult?>(null) }
   val lines = cart.mapNotNull { (id, quantity) -> products.firstOrNull { it.id == id }?.let { it to quantity.coerceAtMost(it.availableUnits) } }
   val total = lines.sumOf { (product, quantity) -> product.price * quantity }
+  val selectedZone = deliveryZones.firstOrNull { it.id == selectedZoneId }
+  val selectedSlot = selectedZone?.slots?.firstOrNull { it.id == selectedSlotId }
+  val promoDiscount = appliedPromo?.discount ?: 0
+  val loyaltyAmount = if (redeemLoyalty) loyaltyRedemption(loyaltyBalance ?: 0, total, promoDiscount) else 0
+  val deliveryFee = if (fulfillment == "courier") selectedZone?.fee ?: 0 else 0
+  val payable = checkoutPayableEstimate(total, promoDiscount, loyaltyAmount, deliveryFee)
 
   LaunchedEffect(apiBaseUrl) {
-    runCatching { api.checkoutStorePoints() }
-      .onSuccess { points ->
-        pickupPoints = points
-        if (points.none { it.id == selectedStorePointId }) selectedStorePointId = points.firstOrNull()?.id.orEmpty()
-        pointError = if (points.isEmpty()) "Самовывоз временно недоступен" else null
+    runCatching { api.checkoutOptions() }
+      .onSuccess { options ->
+        pickupPoints = options.pickupPoints
+        if (options.pickupPoints.none { it.id == selectedStorePointId }) selectedStorePointId = options.pickupPoints.firstOrNull()?.id.orEmpty()
+        pointError = if (options.pickupPoints.isEmpty()) "Самовывоз временно недоступен" else null
+        deliveryZones = options.deliveryZones
+        if (options.deliveryZones.none { it.id == selectedZoneId }) {
+          selectedZoneId = options.deliveryZones.firstOrNull()?.id.orEmpty()
+          selectedSlotId = ""
+        }
       }
-      .onFailure { failure -> pointError = failure.message; pickupPoints = emptyList(); selectedStorePointId = "" }
+      .onFailure { failure ->
+        pointError = failure.message; pickupPoints = emptyList(); selectedStorePointId = ""
+        deliveryZones = emptyList(); selectedZoneId = ""; selectedSlotId = ""
+      }
+  }
+
+  LaunchedEffect(authState) {
+    val signedIn = authState as? AuthState.SignedIn
+    loyaltyBalance = null
+    redeemLoyalty = false
+    if (signedIn != null) {
+      runCatching { api.loyalty(signedIn.tokens.accessToken) }
+        .onSuccess { loyaltyBalance = it.balance }
+    }
   }
 
   if (result != null) {
@@ -143,6 +176,27 @@ internal fun ClientCheckout(
               focusedLabelColor = CheckoutLime, unfocusedLabelColor = CheckoutMuted,
             ),
           )
+          if (deliveryZones.isNotEmpty()) {
+            deliveryZones.forEach { zone ->
+              FulfillmentButton(
+                "${zone.name} · доставка ${zone.fee} сом",
+                selectedZoneId == zone.id,
+                Modifier.fillMaxWidth().padding(top = 8.dp).testTag("checkout-zone-${zone.id}"),
+              ) { selectedZoneId = zone.id; selectedSlotId = ""; error = null }
+            }
+            val zoneSlots = selectedZone?.slots.orEmpty()
+            if (selectedZone != null && zoneSlots.isEmpty()) {
+              Text("Нет доступных слотов доставки", color = CheckoutMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+            }
+            zoneSlots.forEach { slot ->
+              val slotTitle = "${deliverySlotLabel(slot.startsAt, slot.endsAt)} · осталось ${slot.remaining}"
+              FulfillmentButton(
+                slotTitle,
+                selectedSlotId == slot.id,
+                Modifier.fillMaxWidth().padding(top = 8.dp).testTag("checkout-slot-${slot.id}"),
+              ) { if (slot.available) { selectedSlotId = slot.id; error = null } }
+            }
+          }
         } else {
           if (pickupPoints.isEmpty()) {
             Text(pointError ?: "Загружаем точки…", color = CheckoutMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
@@ -154,6 +208,72 @@ internal fun ClientCheckout(
                 Modifier.fillMaxWidth().padding(top = 8.dp),
               ) { selectedStorePointId = point.id; error = null }
             }
+          }
+        }
+      }
+    }
+    item {
+      Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).background(CheckoutSurface, RoundedCornerShape(8.dp)).padding(14.dp)) {
+        Text("Промокод и бонусы", color = Color.White, fontWeight = FontWeight.Bold)
+        val applied = appliedPromo
+        if (applied == null) {
+          Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+              value = promoInput,
+              onValueChange = { promoInput = it; promoError = null },
+              label = { Text("Промокод") },
+              singleLine = true,
+              modifier = Modifier.weight(1f).testTag("checkout-promo-input"),
+              colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                focusedBorderColor = CheckoutLime, unfocusedBorderColor = CheckoutLine,
+                focusedLabelColor = CheckoutLime, unfocusedLabelColor = CheckoutMuted,
+              ),
+            )
+            Button(
+              onClick = {
+                val code = promoInput.trim()
+                if (code.isEmpty()) return@Button
+                scope.launch {
+                  promoBusy = true
+                  promoError = null
+                  runCatching {
+                    api.quotePromotion(
+                      PromotionQuoteRequest(code, lines.map { (product, quantity) -> PromotionQuoteItem(product.sku, quantity) }),
+                      (authState as? AuthState.SignedIn)?.tokens?.accessToken,
+                    )
+                  }
+                    .onSuccess { quote -> appliedPromo = quote; promoInput = quote.code }
+                    .onFailure { failure -> appliedPromo = null; promoError = failure.message ?: "Промокод не применён" }
+                  promoBusy = false
+                }
+              },
+              enabled = !promoBusy && promoInput.isNotBlank(),
+              modifier = Modifier.padding(top = 6.dp).testTag("checkout-promo-apply"),
+              colors = ButtonDefaults.buttonColors(containerColor = CheckoutLine, contentColor = Color.White),
+              shape = RoundedCornerShape(8.dp),
+            ) { Text(if (promoBusy) "…" else "ОК") }
+          }
+          if (!promoError.isNullOrBlank()) Text(promoError!!, color = CheckoutCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+        } else {
+          Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("${applied.code} · −${applied.discount} сом", color = CheckoutLime, fontSize = 13.sp, modifier = Modifier.weight(1f).testTag("checkout-promo-applied"))
+            Button(
+              onClick = { appliedPromo = null; promoInput = ""; promoError = null },
+              colors = ButtonDefaults.buttonColors(containerColor = CheckoutLine, contentColor = Color.White),
+              shape = RoundedCornerShape(8.dp),
+            ) { Text("Убрать") }
+          }
+        }
+        val balance = loyaltyBalance
+        if (authState is AuthState.SignedIn && balance != null && balance > 0) {
+          FulfillmentButton(
+            "Списать бонусы (доступно $balance)",
+            redeemLoyalty,
+            Modifier.fillMaxWidth().padding(top = 10.dp).testTag("checkout-loyalty-toggle"),
+          ) { redeemLoyalty = !redeemLoyalty }
+          if (redeemLoyalty && loyaltyAmount > 0) {
+            Text("Будет списано $loyaltyAmount сом", color = CheckoutMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
           }
         }
       }
@@ -179,9 +299,27 @@ internal fun ClientCheckout(
     }
     item {
       Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        if (promoDiscount > 0 || loyaltyAmount > 0 || deliveryFee > 0) {
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Товары", color = CheckoutMuted, fontSize = 13.sp)
+            Text("$total сом", color = Color.White, fontSize = 13.sp)
+          }
+          if (promoDiscount > 0) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Промокод ${appliedPromo?.code.orEmpty()}", color = CheckoutMuted, fontSize = 13.sp)
+            Text("−$promoDiscount сом", color = CheckoutLime, fontSize = 13.sp)
+          }
+          if (loyaltyAmount > 0) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Бонусы", color = CheckoutMuted, fontSize = 13.sp)
+            Text("−$loyaltyAmount сом", color = CheckoutLime, fontSize = 13.sp)
+          }
+          if (deliveryFee > 0) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Доставка", color = CheckoutMuted, fontSize = 13.sp)
+            Text("$deliveryFee сом", color = Color.White, fontSize = 13.sp)
+          }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
           Text("Итого", color = CheckoutMuted)
-          Text("$total сом", color = CheckoutLime, fontSize = 20.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("checkout-total"))
+          Text("$payable сом", color = CheckoutLime, fontSize = 20.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("checkout-total"))
         }
         if (authState !is AuthState.SignedIn) {
           Text("Войдите по SMS-коду, чтобы оформить заказ", color = CheckoutCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
@@ -198,8 +336,17 @@ internal fun ClientCheckout(
                   fulfillmentType = fulfillment,
                   storePointId = if (fulfillment == "pickup") selectedStorePointId else null,
                   deliveryAddress = if (fulfillment == "courier") address.trim() else null,
-                  total = total,
+                  total = payable,
                   items = lines.map { (product, quantity) -> CreateOrderItem(product.sku, quantity, product.price) },
+                  paymentMode = resolvePaymentMode(paymentMethod, fulfillment),
+                  deliverySlot = when {
+                    fulfillment == "courier" -> selectedSlot?.let { deliverySlotLabel(it.startsAt, it.endsAt) }
+                    else -> pickupPoints.firstOrNull { it.id == selectedStorePointId }?.hours
+                  },
+                  deliveryZoneId = if (fulfillment == "courier") selectedZone?.id else null,
+                  deliverySlotId = if (fulfillment == "courier") selectedSlot?.id else null,
+                  promoCode = appliedPromo?.code,
+                  loyaltyPoints = loyaltyAmount.takeIf { it > 0 },
                 )
                 val onlineMethod = OnlinePaymentMethod.entries.firstOrNull { it.wireValue == paymentMethod }
                 suspend fun submit(token: String) = checkout.submit(
@@ -229,7 +376,9 @@ internal fun ClientCheckout(
                 busy = false
               }
             },
-            enabled = !busy && (fulfillment != "pickup" || selectedStorePointId.isNotBlank()) && (fulfillment != "courier" || address.isNotBlank()),
+            enabled = !busy &&
+              (fulfillment != "pickup" || selectedStorePointId.isNotBlank()) &&
+              (fulfillment != "courier" || (address.isNotBlank() && (deliveryZones.isEmpty() || selectedSlot != null))),
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("checkout-submit"),
             colors = ButtonDefaults.buttonColors(containerColor = CheckoutLime, contentColor = CheckoutInk),
             shape = RoundedCornerShape(8.dp),

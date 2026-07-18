@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { api } from '@mobile/api-client';
+import { posSaleKey } from '@mobile/checkout-idempotency';
 import { formatSom, shortId } from '@mobile/format';
 import { clearStaffSession, getStoredStaffSession, saveStaffSession } from '@mobile/secure-session';
 import { radius, theme } from '@mobile/theme';
@@ -61,6 +62,9 @@ export function StaffScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saleResult, setSaleResult] = useState<PosSaleOutcome | null>(null);
+  // Rotation seed for the idempotency key: bumped only after a successful sale, never
+  // between retries, so a retried attempt reuses the key of the same cart (LOGIC-012).
+  const [saleAttempt, setSaleAttempt] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -156,23 +160,35 @@ export function StaffScreen({
     setError(null);
     setSaleResult(null);
     try {
+      const lines = cartLines.map((line) => ({
+        productId: line.product.id,
+        sku: line.product.sku,
+        price: line.product.price,
+        qty: line.qty,
+      }));
       const result = await api.posSale({
         staffId: session.staffId,
         point: 'BISHKEK-1',
         discountPct,
         payments: [{ method, amount: total }],
-        clientSaleId: `mobile-${session.staffId}-${Date.now()}`,
-        lines: cartLines.map((line) => ({
-          productId: line.product.id,
-          sku: line.product.sku,
-          price: line.product.price,
-          qty: line.qty,
-        })),
+        // Stable key from the cart snapshot: a retry after a timeout resumes the same
+        // sale server-side instead of posting a second one (LOGIC-012).
+        clientSaleId: posSaleKey({
+          staffId: session.staffId,
+          point: 'BISHKEK-1',
+          discountPct,
+          total,
+          attempt: saleAttempt,
+          lines,
+        }),
+        lines,
       }, session.accessToken);
       setSaleResult(result);
       if (!result.pendingApproval) {
         setCart({});
         setDiscountPct(0);
+        // Rotate the key only after success, so the next identical cart is a new sale.
+        setSaleAttempt((attempt) => attempt + 1);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Продажа не проведена.');

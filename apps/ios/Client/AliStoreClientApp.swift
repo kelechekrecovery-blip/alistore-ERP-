@@ -1260,6 +1260,16 @@ private struct CartView: View {
     @State private var pickupPoints: [StorePoint] = []
     @State private var selectedStorePointId = ""
     @State private var pointError: String?
+    @State private var deliveryZones: [DeliveryZone] = []
+    @State private var selectedDeliveryZoneId = ""
+    @State private var selectedDeliverySlotId = ""
+    @State private var promoInput = ""
+    @State private var appliedPromoCode: String?
+    @State private var promoDiscount = 0
+    @State private var promoError: String?
+    @State private var isApplyingPromo = false
+    @State private var loyaltyBalance = 0
+    @State private var bonusApplied = false
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var completedOrder: CustomerOrder?
@@ -1277,6 +1287,12 @@ private struct CartView: View {
         cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
     }
     private var total: Int { lines.reduce(0) { $0 + $1.0.price * $1.1 } }
+    private var selectedDeliveryZone: DeliveryZone? { deliveryZones.first(where: { $0.id == selectedDeliveryZoneId }) }
+    private var selectedDeliverySlot: DeliverySlot? { selectedDeliveryZone?.slots.first(where: { $0.id == selectedDeliverySlotId }) }
+    private var managedCourierDelivery: Bool { fulfillment == "courier" && !deliveryZones.isEmpty }
+    private var deliveryFee: Int { fulfillment == "courier" ? selectedDeliveryZone?.fee ?? 200 : 0 }
+    private var bonusDiscount: Int { bonusApplied ? min(max(total - promoDiscount, 0), loyaltyBalance) : 0 }
+    private var payable: Int { total - promoDiscount - bonusDiscount + deliveryFee }
 
     var body: some View {
         ZStack {
@@ -1330,6 +1346,7 @@ private struct CartView: View {
             }
             #endif
             await loadStorePoints()
+            await loadLoyalty()
         }
         .sheet(isPresented: $showingOrderStatus) {
             if let order = completedOrder {
@@ -1466,6 +1483,26 @@ private struct CartView: View {
                 ClientReadOnlyField(title: "Телефон", value: auth.session?.phone ?? "Войдите в аккаунт", monospaced: true)
                 if fulfillment == "courier" {
                     ClientInputField(title: "Адрес доставки", text: $address, placeholder: "г. Бишкек, улица, дом")
+                    if managedCourierDelivery {
+                        Text("Зона доставки").font(ClientTheme.body(11, weight: .medium)).foregroundStyle(ClientTheme.muted)
+                        ForEach(deliveryZones) { zone in
+                            ClientChoiceRow(symbol: "map", title: zone.name, detail: "Доставка по зоне", trailing: zone.fee.formatted(.currency(code: "KGS")), selected: selectedDeliveryZoneId == zone.id) {
+                                selectedDeliveryZoneId = zone.id
+                                selectedDeliverySlotId = zone.slots.first(where: { $0.available })?.id ?? ""
+                            }
+                        }
+                        if let zone = selectedDeliveryZone {
+                            Text("Интервал").font(ClientTheme.body(11, weight: .medium)).foregroundStyle(ClientTheme.muted)
+                            ForEach(zone.slots) { slot in
+                                ClientChoiceRow(symbol: "clock", title: slotLabel(slot), detail: slot.available ? "Осталось мест: \(slot.remaining)" : "Интервал занят", trailing: nil, selected: selectedDeliverySlotId == slot.id) {
+                                    if slot.available { selectedDeliverySlotId = slot.id }
+                                }
+                            }
+                            if zone.slots.isEmpty {
+                                ClientCallout(symbol: "calendar.badge.exclamationmark", title: "Нет свободных интервалов", detail: "Попробуйте оформить заказ позже или выберите самовывоз.")
+                            }
+                        }
+                    }
                 } else if pickupPoints.isEmpty {
                     ClientCallout(symbol: "building.2", title: pointError ?? "Точки самовывоза загружаются", detail: "Выберите способ получения после загрузки данных.")
                 } else {
@@ -1480,8 +1517,61 @@ private struct CartView: View {
                 ClientChoiceRow(symbol: "qrcode", title: "MBank QR", detail: "Оплата в приложении MBank", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrMBank.rawValue) { paymentMethod = OnlinePaymentMethod.qrMBank.rawValue }
                 ClientChoiceRow(symbol: "qrcode", title: "O!Деньги QR", detail: "Оплата в приложении O!Деньги", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrODengi.rawValue) { paymentMethod = OnlinePaymentMethod.qrODengi.rawValue }
                 ClientChoiceRow(symbol: "calendar", title: "Рассрочка", detail: "Условия зависят от банка-партнёра", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.installment.rawValue) { paymentMethod = OnlinePaymentMethod.installment.rawValue }
+                promoSection
+                if loyaltyBalance > 0 {
+                    ClientChoiceRow(symbol: "gift.fill", title: "Списать бонусы", detail: "Доступно \(loyaltyBalance.formatted()) · спишем \(bonusDiscount.formatted(.currency(code: "KGS")))", trailing: bonusApplied ? "−\(bonusDiscount.formatted(.currency(code: "KGS")))" : nil, selected: bonusApplied) { bonusApplied.toggle() }
+                    .accessibilityIdentifier("checkout-bonus-toggle")
+                }
             case .review:
                 reviewStep
+            }
+        }
+    }
+
+    private var promoSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Промокод")
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            HStack(spacing: 8) {
+                TextField("SALE5000", text: $promoInput)
+                    .font(.system(size: 14, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(13)
+                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                    .accessibilityIdentifier("checkout-promo-input")
+                Button {
+                    Task { await applyPromo() }
+                } label: {
+                    if isApplyingPromo { ProgressView().tint(.black) } else { Text("OK") }
+                }
+                .font(ClientTheme.body(14, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(width: 56, height: 46)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 12))
+                .disabled(isApplyingPromo || promoInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("checkout-promo-apply")
+            }
+            if let appliedPromoCode {
+                HStack(spacing: 6) {
+                    Text("\(appliedPromoCode): −\(promoDiscount.formatted(.currency(code: "KGS")))")
+                        .font(ClientTheme.body(12, weight: .medium))
+                        .foregroundStyle(ClientTheme.lime)
+                    Spacer()
+                    Button("Убрать") {
+                        self.appliedPromoCode = nil
+                        promoDiscount = 0
+                        promoError = nil
+                    }
+                    .font(ClientTheme.body(12, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let promoError {
+                Text(promoError).font(ClientTheme.body(12)).foregroundStyle(Color(red: 1, green: 0.54, blue: 0.48))
             }
         }
     }
@@ -1502,10 +1592,26 @@ private struct CartView: View {
                 }
                 Divider().overlay(ClientTheme.line)
                 ClientSummaryRow(title: "Получение", value: fulfillment == "pickup" ? (pickupPoints.first(where: { $0.id == selectedStorePointId })?.name ?? "Самовывоз") : "Курьер", emphasized: false)
+                if fulfillment == "courier", let selectedDeliveryZone {
+                    ClientSummaryRow(title: "Зона", value: selectedDeliveryZone.name, emphasized: false)
+                }
+                if fulfillment == "courier", let selectedDeliverySlot {
+                    ClientSummaryRow(title: "Интервал", value: slotLabel(selectedDeliverySlot), emphasized: false)
+                }
                 ClientSummaryRow(title: "Оплата", value: paymentLabel, emphasized: false)
                 ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +))", emphasized: false)
                 Divider().overlay(ClientTheme.line)
-                ClientSummaryRow(title: "К оплате", value: total.formatted(.currency(code: "KGS")), emphasized: true)
+                ClientSummaryRow(title: "Сумма товаров", value: total.formatted(.currency(code: "KGS")), emphasized: false)
+                if deliveryFee > 0 {
+                    ClientSummaryRow(title: "Доставка", value: deliveryFee.formatted(.currency(code: "KGS")), emphasized: false)
+                }
+                if promoDiscount > 0 {
+                    ClientSummaryRow(title: "Промокод \(appliedPromoCode ?? "")", value: "−\(promoDiscount.formatted(.currency(code: "KGS")))", emphasized: false)
+                }
+                if bonusDiscount > 0 {
+                    ClientSummaryRow(title: "Бонусы", value: "−\(bonusDiscount.formatted(.currency(code: "KGS")))", emphasized: false)
+                }
+                ClientSummaryRow(title: "К оплате", value: payable.formatted(.currency(code: "KGS")), emphasized: true)
             }
             .padding(16)
             .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
@@ -1566,7 +1672,10 @@ private struct CartView: View {
         guard auth.session != nil else { return false }
         switch checkoutStep {
         case .delivery: return fulfillment == "pickup" || fulfillment == "courier"
-        case .address: return fulfillment == "pickup" ? !selectedStorePointId.isEmpty : !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .address:
+            if fulfillment == "pickup" { return !selectedStorePointId.isEmpty }
+            guard !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            return !managedCourierDelivery || !selectedDeliverySlotId.isEmpty
         case .payment: return !paymentMethod.isEmpty
         case .review: return !lines.isEmpty
         }
@@ -1589,6 +1698,11 @@ private struct CartView: View {
         isRetryingPayment = false
         retryErrorMessage = nil
         queuedOffline = false
+        promoInput = ""
+        appliedPromoCode = nil
+        promoDiscount = 0
+        promoError = nil
+        bonusApplied = false
         checkoutStep = .delivery
         showingCheckout = false
     }
@@ -1614,8 +1728,16 @@ private struct CartView: View {
             fulfillmentType: fulfillment,
             storePointId: fulfillment == "pickup" ? selectedStorePointId : nil,
             deliveryAddress: fulfillment == "courier" ? address.trimmingCharacters(in: .whitespaces) : nil,
-            total: total,
-            items: lines.map { CreateOrderItem(sku: $0.0.sku, qty: $0.1, price: $0.0.price) }
+            total: payable,
+            items: lines.map { CreateOrderItem(sku: $0.0.sku, qty: $0.1, price: $0.0.price) },
+            paymentMode: paymentMethod == "cash" && fulfillment == "courier" ? "cod" : "prepaid",
+            promoCode: appliedPromoCode,
+            loyaltyPoints: bonusDiscount > 0 ? bonusDiscount : nil,
+            deliveryZoneId: fulfillment == "courier" ? selectedDeliveryZone?.id : nil,
+            deliverySlotId: fulfillment == "courier" ? selectedDeliverySlot?.id : nil,
+            deliverySlot: fulfillment == "pickup"
+                ? pickupPoints.first(where: { $0.id == selectedStorePointId })?.hours
+                : selectedDeliverySlot.map { slotLabel($0) }
         )
         let idempotencyKey = UUID().uuidString
         do {
@@ -1692,11 +1814,61 @@ private struct CartView: View {
                 selectedStorePointId = pickupPoints.first?.id ?? ""
             }
             pointError = pickupPoints.isEmpty ? "Самовывоз временно недоступен" : nil
+            deliveryZones = options.deliveryZones
+            let zone = deliveryZones.first(where: { $0.slots.contains(where: { $0.available }) })
+            selectedDeliveryZoneId = zone?.id ?? ""
+            selectedDeliverySlotId = zone?.slots.first(where: { $0.available })?.id ?? ""
         } catch {
             pickupPoints = []
             selectedStorePointId = ""
+            deliveryZones = []
+            selectedDeliveryZoneId = ""
+            selectedDeliverySlotId = ""
             pointError = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func loadLoyalty() async {
+        guard let token = auth.session?.accessToken else { return }
+        do {
+            let loyalty: CustomerLoyalty = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/loyalty", token: token)
+            loyaltyBalance = loyalty.balance
+        } catch {
+            loyaltyBalance = 0
+            bonusApplied = false
+        }
+    }
+
+    @MainActor
+    private func applyPromo() async {
+        let code = promoInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty, !isApplyingPromo else { return }
+        isApplyingPromo = true
+        promoError = nil
+        defer { isApplyingPromo = false }
+        do {
+            let quote: PromotionQuote = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "promotions/quote",
+                body: PromotionQuoteRequest(
+                    code: code,
+                    items: lines.map { PromotionQuoteItem(sku: $0.0.sku, qty: $0.1) }
+                ),
+                token: auth.session?.accessToken
+            )
+            appliedPromoCode = quote.code
+            promoDiscount = quote.discount
+        } catch {
+            appliedPromoCode = nil
+            promoDiscount = 0
+            promoError = error.localizedDescription
+        }
+    }
+
+    private func slotLabel(_ slot: DeliverySlot) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "\(formatter.string(from: slot.startsAt))–\(formatter.string(from: slot.endsAt))"
     }
 
     private func paymentURL(_ intent: PaymentIntent) -> URL? {
