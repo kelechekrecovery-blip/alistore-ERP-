@@ -170,22 +170,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           reviews={reviews}
         />
       </div>
-      <div className="hidden min-h-screen bg-sand text-ink font-sans md:block">
-        <SiteHeader />
+      <div className="hidden min-h-screen bg-[#0b0a08] font-sans text-[#e5dcd3] md:block">
+        <SiteHeader variant="design3" />
         <main className="mx-auto max-w-[1400px] px-5 py-8">
           <nav
-            className="mb-7 flex flex-wrap items-center gap-2 text-xs text-subtle"
+            className="mb-7 flex flex-wrap items-center gap-2 text-xs text-white/40"
             aria-label="Хлебные крошки"
           >
             <Link href="/">Главная</Link>
             <span>/</span>
             <Link href="/catalog">Каталог</Link>
             <span>/</span>
-            <span className="text-faint">{product.name}</span>
+            <span className="text-white/55">{product.name}</span>
           </nav>
           <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
             <div>
-              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-linen bg-gradient-to-br from-white to-sand shadow-soft">
+              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-white/10 bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6] shadow-[0_16px_40px_rgba(0,0,0,.4)]">
                 {productImage(product) ? <Image src={(productImages(product)[activeImage] ?? productImage(product))!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
                 <span className="absolute left-5 top-5 rounded-full border border-coral/25 bg-tint px-3 py-1.5 text-xs font-semibold text-deep">
                   {condition}
@@ -198,7 +198,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     type="button"
                     onClick={() => setActiveImage(index)}
                     aria-pressed={index === activeImage}
-                    className={`relative aspect-square overflow-hidden rounded-[13px] border bg-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 ${index === activeImage ? "border-coral" : "border-linen hover:border-faint"}`}
+                    className={`relative aspect-square overflow-hidden rounded-[13px] border bg-[#201b17] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 ${index === activeImage ? "border-coral" : "border-white/10 hover:border-white/30"}`}
                     aria-label={`Фото товара ${index + 1}`}
                   >
                     <Image
@@ -215,24 +215,24 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
             <div className="pt-1">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-subtle">
+                <span className="font-mono text-xs text-white/40">
                   {product.sku}
                 </span>
               </div>
-              <h1 className="mt-5 font-display text-3xl font-bold leading-tight sm:text-4xl">
+              <h1 className="mt-5 font-display text-3xl font-bold leading-tight text-white sm:text-4xl">
                 {product.name}
               </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-faint">
-                <span className="flex items-center gap-1 text-deep">
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/45">
+                <span className="flex items-center gap-1 text-[#ff9a6e]">
                   <Star size={16} fill="currentColor" /> {reviewLabel}
                 </span>
                 <span>·</span>
                 <span>{product.category}</span>
               </div>
-              <div className="mt-7 font-display text-4xl font-extrabold text-ink">
+              <div className="mt-7 font-display text-4xl font-extrabold text-white">
                 {som(product.price)}
               </div>
-              {typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-deep">{product.attrs.financingText}</div>}
+              {typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-[#c6ff3d]">{product.attrs.financingText}</div>}
               <div
                 className={`mt-5 flex items-center gap-2 text-sm font-semibold ${inStock ? "text-success" : "text-warn"}`}
               >
@@ -257,7 +257,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       <Link
                         key={variant.id}
                         href={`/product/${variant.id}`}
-                        className="rounded-[10px] border border-linen bg-white px-3 py-2 text-sm text-faint hover:border-coral"
+                    className="rounded-[10px] border border-white/10 bg-white/[.05] px-3 py-2 text-sm text-white/55 hover:border-coral"
                       >
                         {variantLabel(variant)} · {som(variant.price)}
                       </Link>
@@ -267,7 +267,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
 
               {Boolean(product.bundleComponents?.length) && (
-                <div className="mt-6 rounded-[12px] border border-linen bg-white p-4">
+                <div className="mt-6 rounded-[16px] border border-white/10 bg-white/[.05] p-4">
                   <div className="text-xs font-semibold uppercase text-subtle">
                     В комплекте
                   </div>
@@ -288,11 +288,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
 
               <div className="mt-7 grid grid-cols-[auto_1fr] gap-3">
-                <div className="flex items-center rounded-[12px] border border-linen bg-white p-1">
+                <div className="flex items-center rounded-[12px] border border-white/10 bg-white/[.05] p-1">
                   <button
                     type="button"
                     onClick={() => setQty((value) => Math.max(1, value - 1))}
-                    className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
+                    className="grid h-11 w-11 place-items-center rounded-btn hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                     aria-label="Уменьшить количество"
                   >
                     −
@@ -304,7 +304,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     type="button"
                     disabled={qty >= product.availableUnits}
                     onClick={() => setQty((value) => Math.min(product.availableUnits, value + 1))}
-                    className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
+                    className="grid h-11 w-11 place-items-center rounded-btn hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                     aria-label="Увеличить количество"
                   >
                     +
@@ -324,7 +324,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => favorites.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-linen bg-white text-faint"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-coral/15 text-[#ff9a6e]" : "border-white/10 bg-white/[.05] text-white/55"}`}
                 >
                   <Heart
                     size={17}
@@ -335,40 +335,40 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => compare.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-linen bg-white text-faint"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-coral/15 text-[#ff9a6e]" : "border-white/10 bg-white/[.05] text-white/55"}`}
                 >
                   <GitCompareArrows size={17} />
                   Сравнить
                 </button>
               </div>
 
-              <Link href="/trade-in" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-linen bg-tint px-4 py-3 text-sm transition hover:border-coral">
-                <span className="flex items-center gap-2 font-semibold text-ink"><RotateCcw size={17} className="text-coral" /> Есть старое устройство? Trade-in со скидкой</span>
+              <Link href="/trade-in" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-[#ff7a4d]/25 bg-coral/10 px-4 py-3 text-sm transition hover:border-coral">
+                <span className="flex items-center gap-2 font-semibold text-white"><RotateCcw size={17} className="text-coral" /> Есть старое устройство? Trade-in со скидкой</span>
                 <ArrowRight size={16} className="text-coral" />
               </Link>
 
-              <div className="mt-7 grid gap-1 border-t border-linen pt-5">
+              <div className="mt-7 grid gap-1 border-t border-white/10 pt-5">
                 {['warranty','deliveryText','pickupText','returnPolicy'].map((key) => typeof product.attrs?.[key] === 'string' ? <div key={key} className="py-2 text-sm text-faint">{String(product.attrs[key])}</div> : null)}
               </div>
             </div>
           </section>
 
           <section className="pt-24">
-            <div className="text-xs uppercase tracking-[0.16em] text-deep">
+            <div className="text-xs uppercase tracking-[0.16em] text-[#ff9a6e]">
               Технические детали
             </div>
-            <h2 className="mt-2 font-display text-3xl font-bold">
+            <h2 className="mt-2 font-display text-3xl font-bold text-white">
               Характеристики
             </h2>
-            <div className="mt-7 overflow-hidden rounded-[18px] border border-linen bg-white shadow-soft">
+            <div className="mt-7 overflow-hidden rounded-[18px] border border-white/10 bg-white/[.04] shadow-[0_12px_30px_rgba(0,0,0,.35)]">
               {specs.length ? (
                 specs.map(([key, value]) => (
                   <div
                     key={key}
-                    className="grid gap-2 border-b border-linen px-5 py-4 text-sm last:border-0 sm:grid-cols-[220px_1fr]"
+                    className="grid gap-2 border-b border-white/[.08] px-5 py-4 text-sm last:border-0 sm:grid-cols-[220px_1fr]"
                   >
                     <span className="text-subtle">{key}</span>
-                    <span className="text-ink">{String(value)}</span>
+                    <span className="text-white/80">{String(value)}</span>
                   </div>
                 ))
               ) : (
@@ -381,16 +381,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
           <section className="grid gap-8 pt-24 lg:grid-cols-[1fr_420px]">
             <div>
-              <div className="text-xs uppercase tracking-[0.16em] text-deep">
+              <div className="text-xs uppercase tracking-[0.16em] text-[#ff9a6e]">
                 Опыт покупателей
               </div>
-              <h2 className="mt-2 font-display text-3xl font-bold">Отзывы</h2>
+              <h2 className="mt-2 font-display text-3xl font-bold text-white">Отзывы</h2>
               <div className="mt-7 grid gap-3">
                 {reviews?.items.length ? (
                   reviews.items.map((review) => (
                     <article
                       key={review.id}
-                      className="rounded-[18px] border border-linen bg-white p-5 shadow-soft"
+                      className="rounded-[18px] border border-white/10 bg-white/[.04] p-5 shadow-[0_12px_30px_rgba(0,0,0,.35)]"
                     >
                       <div className="flex items-center gap-3">
                         <strong>{review.customerName}</strong>
@@ -406,14 +406,14 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     </article>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-linen bg-white p-7 text-faint">
+                  <div className="rounded-[18px] border border-white/10 bg-white/[.04] p-7 text-white/45">
                     Будьте первым, кто оставит отзыв об этом товаре.
                   </div>
                 )}
               </div>
             </div>
-            <div className="h-fit rounded-[18px] border border-linen bg-white p-6 shadow-soft">
-              <h3 className="font-display text-lg font-semibold">
+            <div className="h-fit rounded-[18px] border border-white/10 bg-white/[.04] p-6 shadow-[0_12px_30px_rgba(0,0,0,.35)]">
+              <h3 className="font-display text-lg font-semibold text-white">
                 Оставить отзыв
               </h3>
               {hydrated && user ? (
@@ -426,7 +426,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         rating: Number(event.target.value),
                       }))
                     }
-                    className="rounded-btn border border-linen bg-white px-3 py-3 text-sm outline-none focus:border-coral focus-visible:ring-2 focus-visible:ring-coral/30"
+                    className="rounded-btn border border-white/10 bg-[#201b17] px-3 py-3 text-sm text-white outline-none focus:border-coral focus-visible:ring-2 focus-visible:ring-coral/30"
                   >
                     {[5, 4, 3, 2, 1].map((rating) => (
                       <option key={rating} value={rating}>
@@ -445,7 +445,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     rows={4}
                     maxLength={500}
                     placeholder="Расскажите о покупке"
-                    className="resize-none rounded-[11px] border border-linen bg-white p-3 text-sm outline-none focus:border-coral"
+                    className="resize-none rounded-[11px] border border-white/10 bg-[#201b17] p-3 text-sm text-white outline-none focus:border-coral"
                   />
                   <button className="rounded-[12px] bg-coral py-3 text-sm font-bold text-white">
                     Опубликовать
@@ -469,20 +469,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <section className="pt-24">
               <div className="flex items-end justify-between">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.16em] text-deep">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[#ff9a6e]">
                     Вам может подойти
                   </div>
-                  <h2 className="mt-2 font-display text-3xl font-bold">
+                  <h2 className="mt-2 font-display text-3xl font-bold text-white">
                     Похожие товары
                   </h2>
                 </div>
-                <Link href="/catalog" className="text-sm text-deep">
+                <Link href="/catalog" className="text-sm text-[#ff9a6e]">
                   Весь каталог
                 </Link>
               </div>
               <div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {similar.slice(0, 4).map((item) => (
-                  <ProductCard key={item.id} product={item} />
+                  <ProductCard key={item.id} product={item} variant="design3" />
                 ))}
               </div>
             </section>
