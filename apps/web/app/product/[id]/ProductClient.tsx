@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  ArrowRight,
   GitCompareArrows,
   Heart,
   ImageOff,
+  RotateCcw,
   ShoppingBag,
   Star,
 } from "lucide-react";
@@ -255,7 +257,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       <Link
                         key={variant.id}
                         href={`/product/${variant.id}`}
-                        className="rounded-[10px] border border-bright bg-white px-3 py-2 text-sm text-faint hover:border-coral"
+                        className="rounded-[10px] border border-linen bg-white px-3 py-2 text-sm text-faint hover:border-coral"
                       >
                         {variantLabel(variant)} · {som(variant.price)}
                       </Link>
@@ -265,7 +267,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
 
               {Boolean(product.bundleComponents?.length) && (
-                <div className="mt-6 rounded-[12px] border border-bright bg-white p-4">
+                <div className="mt-6 rounded-[12px] border border-linen bg-white p-4">
                   <div className="text-xs font-semibold uppercase text-subtle">
                     В комплекте
                   </div>
@@ -286,7 +288,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
 
               <div className="mt-7 grid grid-cols-[auto_1fr] gap-3">
-                <div className="flex items-center rounded-[12px] border border-bright bg-white p-1">
+                <div className="flex items-center rounded-[12px] border border-linen bg-white p-1">
                   <button
                     type="button"
                     onClick={() => setQty((value) => Math.max(1, value - 1))}
@@ -322,7 +324,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => favorites.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-bright bg-white text-faint"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-linen bg-white text-faint"}`}
                 >
                   <Heart
                     size={17}
@@ -333,12 +335,17 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => compare.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-bright bg-white text-faint"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-linen bg-white text-faint"}`}
                 >
                   <GitCompareArrows size={17} />
                   Сравнить
                 </button>
               </div>
+
+              <Link href="/trade-in" className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-linen bg-tint px-4 py-3 text-sm transition hover:border-coral">
+                <span className="flex items-center gap-2 font-semibold text-ink"><RotateCcw size={17} className="text-coral" /> Есть старое устройство? Trade-in со скидкой</span>
+                <ArrowRight size={16} className="text-coral" />
+              </Link>
 
               <div className="mt-7 grid gap-1 border-t border-linen pt-5">
                 {['warranty','deliveryText','pickupText','returnPolicy'].map((key) => typeof product.attrs?.[key] === 'string' ? <div key={key} className="py-2 text-sm text-faint">{String(product.attrs[key])}</div> : null)}
@@ -438,7 +445,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     rows={4}
                     maxLength={500}
                     placeholder="Расскажите о покупке"
-                    className="resize-none rounded-[11px] border border-bright bg-white p-3 text-sm outline-none focus:border-coral"
+                    className="resize-none rounded-[11px] border border-linen bg-white p-3 text-sm outline-none focus:border-coral"
                   />
                   <button className="rounded-[12px] bg-coral py-3 text-sm font-bold text-white">
                     Опубликовать
