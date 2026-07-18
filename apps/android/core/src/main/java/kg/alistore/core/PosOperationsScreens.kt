@@ -71,8 +71,8 @@ import kotlinx.coroutines.launch
 private val PosInk = Color(0xFF171411)
 private val PosSurface = Color(0xFF24201C)
 private val PosMuted = Color(0xFFA79C92)
-private val PosCoral = Color(0xFFFF6B57)
-private val PosLime = Color(0xFFC8F04B)
+private val PosCoral = Color(0xFFFF5B2E)
+private val PosLime = Color(0xFFC6FF3D)
 
 sealed interface PosSubmitResult {
   data class Online(val result: PosSaleResult) : PosSubmitResult
@@ -101,7 +101,7 @@ fun PosApp(apiBaseUrl: String) {
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(auth) { state = auth.restore() }
   val logout: () -> Unit = { quickUnlock.clear(); state = auth.logout() }
-  MaterialTheme {
+  Design3Theme {
     when (val current = state) {
       StaffAuthState.Restoring -> PosLoading()
       StaffAuthState.SignedOut -> PosLogin(auth) { state = it }

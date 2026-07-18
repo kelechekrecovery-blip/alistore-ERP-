@@ -53,12 +53,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Ink = Color(0xFF16130F)
-private val Surface = Color(0xFF221E19)
-private val Line = Color(0xFF342E28)
+private val Ink = Color(0xFF201B17)
+private val Surface = Color(0xFF2A231D)
+private val Line = Color(0xFF463C31)
 private val Muted = Color(0xFFA79C92)
-private val Coral = Color(0xFFFF6B57)
-private val Lime = Color(0xFFC8F04B)
+private val Coral = Color(0xFFFF5B2E)
+private val Lime = Color(0xFFC6FF3D)
 
 private data class ClientTab(val label: String, val icon: ImageVector)
 
@@ -171,7 +171,7 @@ private fun ClientApp(
     }
   }
 
-  MaterialTheme {
+  Design3Theme {
     Box(Modifier.fillMaxSize()) {
     Scaffold(
       containerColor = Ink,

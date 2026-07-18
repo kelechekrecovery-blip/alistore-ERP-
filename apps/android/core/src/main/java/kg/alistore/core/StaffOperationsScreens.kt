@@ -77,8 +77,8 @@ internal val StaffInk = Color(0xFF151515)
 internal val StaffSurface = Color(0xFF222222)
 internal val StaffLine = Color(0xFF373737)
 internal val StaffMuted = Color(0xFFA7A7A7)
-internal val StaffCoral = Color(0xFFFF6B57)
-internal val StaffLime = Color(0xFFC8F04B)
+internal val StaffCoral = Color(0xFFFF5B2E)
+internal val StaffLime = Color(0xFFC6FF3D)
 
 private data class StaffTab(val label: String, val icon: ImageVector)
 
@@ -99,7 +99,7 @@ fun StaffApp(
   LaunchedEffect(manager) { state = manager.restore() }
   val logout: () -> Unit = { quickUnlock.clear(); state = manager.logout() }
 
-  MaterialTheme {
+  Design3Theme {
     when (val current = state) {
       StaffAuthState.Restoring -> StaffLoading()
       StaffAuthState.SignedOut -> StaffLoginScreen(manager) { state = it }

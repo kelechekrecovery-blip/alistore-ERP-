@@ -75,8 +75,8 @@ import org.json.JSONObject
 private val CourierInk = Color(0xFF151515)
 private val CourierSurface = Color(0xFF242424)
 private val CourierMuted = Color(0xFFA7A7A7)
-private val CourierCoral = Color(0xFFFF6B57)
-private val CourierLime = Color(0xFFC8F04B)
+private val CourierCoral = Color(0xFFFF5B2E)
+private val CourierLime = Color(0xFFC6FF3D)
 
 sealed interface CourierCommandResult {
   data object Sent : CourierCommandResult
@@ -147,7 +147,7 @@ fun CourierApp(
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
   LaunchedEffect(manager) { state = manager.restore() }
   val logout: () -> Unit = { quickUnlock.clear(); state = manager.logout() }
-  MaterialTheme {
+  Design3Theme {
     when (val current = state) {
       StaffAuthState.Restoring -> CourierLoading()
       StaffAuthState.SignedOut -> CourierLogin(manager) { state = it }

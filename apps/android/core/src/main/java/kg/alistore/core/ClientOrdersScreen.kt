@@ -36,11 +36,11 @@ interface CustomerOrdersGateway {
   suspend fun orders(token: String): List<CustomerOrder>
 }
 
-private val OrdersInk = Color(0xFF16130F)
-private val OrdersSurface = Color(0xFF221E19)
+private val OrdersInk = Color(0xFF201B17)
+private val OrdersSurface = Color(0xFF2A231D)
 private val OrdersMuted = Color(0xFFA79C92)
-private val OrdersCoral = Color(0xFFFF6B57)
-private val OrdersLime = Color(0xFFC8F04B)
+private val OrdersCoral = Color(0xFFFF5B2E)
+private val OrdersLime = Color(0xFFC6FF3D)
 
 @Composable
 internal fun ClientOrdersScreen(

@@ -93,7 +93,7 @@ internal fun CustomerEvidencePicker(
     onClick = { picker.launch("image/*") },
     enabled = !busy,
     modifier = modifier.testTag("$entityType-evidence"),
-    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF342E28), contentColor = Color.White),
+    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF463C31), contentColor = Color.White),
     shape = RoundedCornerShape(8.dp),
   ) { Text(if (busy) "Загружаем фото…" else message ?: "Добавить фото") }
 }

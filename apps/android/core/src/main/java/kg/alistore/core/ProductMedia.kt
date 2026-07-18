@@ -28,7 +28,7 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 
-private val ProductMediaCoral = Color(0xFFFF6B57)
+private val ProductMediaCoral = Color(0xFFFF5B2E)
 
 @Composable
 internal fun ProductMediaImage(

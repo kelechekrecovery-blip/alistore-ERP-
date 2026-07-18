@@ -41,12 +41,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val AuthInk = Color(0xFF16130F)
-private val AuthSurface = Color(0xFF221E19)
-private val AuthLine = Color(0xFF342E28)
+private val AuthInk = Color(0xFF201B17)
+private val AuthSurface = Color(0xFF2A231D)
+private val AuthLine = Color(0xFF463C31)
 private val AuthMuted = Color(0xFFA79C92)
-private val AuthCoral = Color(0xFFFF6B57)
-private val AuthLime = Color(0xFFC8F04B)
+private val AuthCoral = Color(0xFFFF5B2E)
+private val AuthLime = Color(0xFFC6FF3D)
 
 @Composable
 internal fun ClientAccount(

@@ -62,11 +62,11 @@ internal fun filterCatalog(products: List<Product>, filter: CatalogFilter): List
   }
 }
 
-private val CatalogInk = Color(0xFF16130F)
-private val CatalogSurface = Color(0xFF221E19)
-private val CatalogLine = Color(0xFF342E28)
+private val CatalogInk = Color(0xFF201B17)
+private val CatalogSurface = Color(0xFF2A231D)
+private val CatalogLine = Color(0xFF463C31)
 private val CatalogMuted = Color(0xFFA79C92)
-private val CatalogLime = Color(0xFFC8F04B)
+private val CatalogLime = Color(0xFFC6FF3D)
 
 @Composable
 internal fun ClientCatalogScreen(

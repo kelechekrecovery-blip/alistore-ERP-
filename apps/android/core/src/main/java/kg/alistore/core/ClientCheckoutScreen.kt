@@ -42,12 +42,12 @@ import java.util.UUID
 import java.net.URL
 import kotlinx.coroutines.launch
 
-private val CheckoutInk = Color(0xFF16130F)
-private val CheckoutSurface = Color(0xFF221E19)
-private val CheckoutLine = Color(0xFF342E28)
+private val CheckoutInk = Color(0xFF201B17)
+private val CheckoutSurface = Color(0xFF2A231D)
+private val CheckoutLine = Color(0xFF463C31)
 private val CheckoutMuted = Color(0xFFA79C92)
-private val CheckoutCoral = Color(0xFFFF6B57)
-private val CheckoutLime = Color(0xFFC8F04B)
+private val CheckoutCoral = Color(0xFFFF5B2E)
+private val CheckoutLime = Color(0xFFC6FF3D)
 
 @Composable
 internal fun ClientCheckout(
