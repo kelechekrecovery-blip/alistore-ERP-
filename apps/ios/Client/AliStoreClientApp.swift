@@ -25,6 +25,23 @@ private enum ClientTab: Hashable {
     case home, catalog, favorites, cart, account
 }
 
+/// Order number shown to customers; the UI-test fixture keeps its prototype number.
+private func clientDisplayOrderNumber(_ orderId: String) -> String {
+    #if DEBUG
+    if orderId == "ui-order-2401" { return "№4102" }
+    #endif
+    return "#\(orderId.suffix(6))"
+}
+
+/// Space-grouped integer used by prototype cards, e.g. 4820 → "4 820".
+private func clientGroupedDigits(_ value: Int) -> String {
+    let digits = Array(String(value))
+    let reversed = digits.reversed().enumerated().flatMap { index, character -> [Character] in
+        index > 0 && index % 3 == 0 ? [" ", character] : [character]
+    }
+    return String(reversed.reversed())
+}
+
 private enum ClientOverlay: String, Identifiable, Hashable {
     case search, compare, notifications, support
 
@@ -535,7 +552,7 @@ private struct ClientOverlayView: View {
         switch notification.route {
         case "order" where notification.referenceId != nil:
             NavigationLink {
-                ClientNotificationOrderView(environment: environment, auth: auth, orderId: notification.referenceId!)
+                ClientNotificationOrderView(environment: environment, auth: auth, orderId: notification.referenceId!, products: products, cart: $cart)
             } label: {
                 row
             }
@@ -907,7 +924,7 @@ private struct ClientRootView: View {
                                 onOpenSupport: { overlay = .support }
                             )
                         case .account:
-                            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, onEnablePush: enablePush, onLogout: { guestMode = false })
+                            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, products: products, cart: $cart, onEnablePush: enablePush, onLogout: { guestMode = false })
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1350,7 +1367,7 @@ private struct CartView: View {
         }
         .sheet(isPresented: $showingOrderStatus) {
             if let order = completedOrder {
-                ClientOrderStatusView(order: order, environment: environment, auth: auth)
+                ClientOrderStatusView(order: order, environment: environment, auth: auth, products: products, cart: $cart)
             }
         }
     }
@@ -2007,23 +2024,19 @@ private struct ClientOrderStatusView: View {
     let order: CustomerOrder
     let environment: AppEnvironment
     let auth: CustomerAuthStore
+    let products: [Product]
+    @Binding var cart: [String: Int]
     @Environment(\.dismiss) private var dismiss
     @State private var showCancelConfirm = false
-    @State private var toastMessage: String?
+    @State private var showSupport = false
+    @State private var repeatMessage: String?
+    @State private var repeatFailed = false
+    @State private var ledger: [OrderLedgerEvent]?
 
-    private let steps = [
-        ("Заказ создан", "сегодня 12:10", "checkmark.circle"),
-        ("Оплата подтверждена", "сегодня 12:11", "creditcard"),
-        ("Собираем заказ", "сейчас", "shippingbox"),
-        ("Готов к выдаче или в пути", "следующий шаг", "truck.box"),
-        ("Получен", "после выдачи", "house")
-    ]
+    private let stepIcons = ["checkmark.circle", "creditcard", "shippingbox", "truck.box", "house"]
 
     private var displayOrderNumber: String {
-        #if DEBUG
-        if order.id == "ui-order-2401" { return "№4102" }
-        #endif
-        return "#\(order.id.suffix(6))"
+        clientDisplayOrderNumber(order.id)
     }
 
     private var currentIndex: Int {
@@ -2033,6 +2046,17 @@ private struct ClientOrderStatusView: View {
         if value.contains("process") || value.contains("pack") || value.contains("reserv") { return 2 }
         if value.contains("paid") || value.contains("confirm") { return 1 }
         return 0
+    }
+
+    /// Ledger-driven timeline; when the ledger is unavailable, fall back to the
+    /// server-reported status without inventing timestamps.
+    private var timelineSteps: [OrderTimelineStep] {
+        if let ledger {
+            return OrderTimelineBuilder.build(events: ledger)
+        }
+        return OrderTimelineBuilder.stepTitles.enumerated().map { index, title in
+            OrderTimelineStep(title: title, isDone: index < currentIndex, isCurrent: index == currentIndex, time: nil)
+        }
     }
 
     var body: some View {
@@ -2063,25 +2087,31 @@ private struct ClientOrderStatusView: View {
                         Spacer()
                     }
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                        ForEach(Array(timelineSteps.enumerated()), id: \.offset) { index, step in
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(spacing: 0) {
-                                    Image(systemName: index <= currentIndex ? "checkmark" : step.2)
+                                    Image(systemName: step.isDone ? "checkmark" : stepIcons[index])
                                         .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(index <= currentIndex ? .black : ClientTheme.muted)
+                                        .foregroundStyle(step.isDone ? .black : ClientTheme.muted)
                                         .frame(width: 26, height: 26)
-                                        .background(index <= currentIndex ? ClientTheme.lime : ClientTheme.background, in: Circle())
-                                    if index < steps.count - 1 {
+                                        .background(step.isDone ? ClientTheme.lime : ClientTheme.background, in: Circle())
+                                    if index < timelineSteps.count - 1 {
                                         Rectangle().fill(ClientTheme.line).frame(width: 2, height: 28)
                                     }
                                 }
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(step.0)
-                                        .font(ClientTheme.body(14, weight: index == currentIndex ? .bold : .medium))
-                                        .foregroundStyle(index <= currentIndex ? .white : ClientTheme.muted)
-                                    Text(index == currentIndex ? "Текущий статус: \(order.status)" : step.1)
-                                        .font(ClientTheme.body(11))
-                                        .foregroundStyle(index == currentIndex ? ClientTheme.lime : ClientTheme.muted.opacity(0.75))
+                                    Text(step.title)
+                                        .font(ClientTheme.body(14, weight: step.isCurrent ? .bold : .medium))
+                                        .foregroundStyle(step.isDone || step.isCurrent ? .white : ClientTheme.muted)
+                                    if step.isCurrent {
+                                        Text("Текущий статус: \(order.status)")
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(ClientTheme.lime)
+                                    } else if let time = step.time {
+                                        Text(time.formatted(date: .abbreviated, time: .shortened))
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(ClientTheme.muted.opacity(0.75))
+                                    }
                                 }
                                 .padding(.top, 3)
                                 Spacer()
@@ -2125,20 +2155,20 @@ private struct ClientOrderStatusView: View {
                         .accessibilityIdentifier("order-status-cancel")
                     }
                     Button {
-                        toastMessage = "Товары добавлены в корзину"
+                        repeatOrder()
                     } label: {
                         ClientStatusAction(symbol: "arrow.triangle.2.circlepath", title: "Повторить заказ", tint: ClientTheme.lime)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("order-status-repeat")
-                    if let toastMessage {
-                        Text(toastMessage)
+                    if let repeatMessage {
+                        Text(repeatMessage)
                             .font(ClientTheme.body(12, weight: .semibold))
-                            .foregroundStyle(ClientTheme.lime)
+                            .foregroundStyle(repeatFailed ? ClientTheme.coral : ClientTheme.lime)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 10)
-                            .background(ClientTheme.lime.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.lime.opacity(0.24)))
+                            .background((repeatFailed ? ClientTheme.coral : ClientTheme.lime).opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke((repeatFailed ? ClientTheme.coral : ClientTheme.lime).opacity(0.24)))
                     }
                     Text("Статус заказа и оплаты обновляется сервером. Повторное нажатие не создаёт новый заказ.")
                         .font(ClientTheme.body(11))
@@ -2160,16 +2190,72 @@ private struct ClientOrderStatusView: View {
                 isPresented: $showCancelConfirm,
                 titleVisibility: .visible
             ) {
-                Button("Отменить заказ", role: .destructive) {
-                    toastMessage = "Заявка на отмену отправлена"
+                Button("Написать в поддержку") {
+                    showSupport = true
                 }
                 Button("Оставить заказ", role: .cancel) {}
             } message: {
-                Text("Если заказ ещё собирается, деньги вернутся на счёт после подтверждения.")
+                Text("Самостоятельная отмена в приложении недоступна: заказ отменяет поддержка после проверки статуса. Если заказ ещё собирается, деньги вернутся на счёт после подтверждения.")
+            }
+            .sheet(isPresented: $showSupport) {
+                NavigationStack {
+                    CustomerSupportView(environment: environment, auth: auth)
+                }
+                .tint(ClientTheme.lime)
+                .preferredColorScheme(.dark)
             }
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
+        .task { await loadLedger() }
+    }
+
+    @MainActor
+    private func loadLedger() async {
+        guard let token = auth.session?.accessToken else { return }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            ledger = ClientUIFixture.orderLedger
+            return
+        }
+#endif
+        // A failed ledger read keeps the status-based timeline without timestamps.
+        ledger = try? await APIClient(baseURL: environment.apiBaseURL).get("orders/\(order.id)/ledger", token: token)
+    }
+
+    /// Re-adds the order's real positions (orders/mine items) to the cart,
+    /// resolving SKUs against the loaded catalog and capping at available stock.
+    @MainActor
+    private func repeatOrder() {
+#if DEBUG
+        let catalog = UITestBootstrap.startsSignedIn ? ClientUIFixture.products : products
+#else
+        let catalog = products
+#endif
+        var added = 0
+        var missing = 0
+        for item in order.items {
+            guard let product = catalog.first(where: { $0.sku == item.sku }), product.availableUnits > 0 else {
+                missing += 1
+                continue
+            }
+            let inCart = cart[product.id] ?? 0
+            let allowed = min(product.availableUnits - inCart, item.qty)
+            if allowed > 0 {
+                cart[product.id] = inCart + allowed
+                added += 1
+            } else {
+                missing += 1
+            }
+        }
+        repeatFailed = added == 0
+        if added > 0, missing == 0 {
+            repeatMessage = "Товары добавлены в корзину"
+        } else if added > 0 {
+            repeatMessage = "Добавлено \(added) из \(order.items.count) позиций — остальных нет в наличии"
+        } else {
+            repeatMessage = "Эти товары сейчас недоступны в каталоге"
+        }
     }
 }
 
@@ -2177,6 +2263,8 @@ private struct ClientNotificationOrderView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
     let orderId: String
+    let products: [Product]
+    @Binding var cart: [String: Int]
     @State private var order: CustomerOrder?
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -2184,7 +2272,7 @@ private struct ClientNotificationOrderView: View {
     var body: some View {
         Group {
             if let order {
-                ClientOrderStatusView(order: order, environment: environment, auth: auth)
+                ClientOrderStatusView(order: order, environment: environment, auth: auth, products: products, cart: $cart)
             } else if isLoading {
                 ZStack {
                     ClientTheme.background.ignoresSafeArea()
@@ -2308,6 +2396,8 @@ private struct OrdersView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
     let refreshRevision: Int
+    let products: [Product]
+    @Binding var cart: [String: Int]
     @State private var orders: [CustomerOrder] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -2339,7 +2429,7 @@ private struct OrdersView: View {
                         } else {
                             ForEach(orders) { order in
                                 NavigationLink {
-                                    ClientOrderStatusView(order: order, environment: environment, auth: auth)
+                                    ClientOrderStatusView(order: order, environment: environment, auth: auth, products: products, cart: $cart)
                                 } label: {
                                     ClientOrderCard(order: order)
                                 }
@@ -2457,6 +2547,7 @@ private enum ClientUIFixture {
         Product(id: "ui-product-samsung", sku: "UI-SAMSUNG-S25", name: "Samsung Galaxy S25", price: 89_900, category: "Смартфоны", availableUnits: 5),
         Product(id: "ui-product-macbook", sku: "UI-MACBOOK-AIR", name: "MacBook Air M4", price: 124_900, category: "Ноутбуки", availableUnits: 2),
         Product(id: "ui-product-airpods", sku: "UI-AIRPODS-PRO", name: "AirPods Pro 3", price: 24_900, category: "Аудио", availableUnits: 8),
+        Product(id: "ui-product-airpods2", sku: "UI-AIRPODS-PRO2", name: "AirPods Pro 2", price: 24_900, category: "Аудио", availableUnits: 8),
         Product(id: "ui-product-watch", sku: "UI-WATCH-S10", name: "Apple Watch Series 10", price: 39_900, category: "Часы", availableUnits: 4),
         Product(id: "ui-product-ipad", sku: "UI-IPAD-AIR", name: "iPad Air M3", price: 69_900, category: "Планшеты", availableUnits: 1)
     ]
@@ -2471,10 +2562,18 @@ private enum ClientUIFixture {
             deliverySlot: nil,
             pickupCode: "AL-2401",
             status: "ready_for_pickup",
-            total: 89900,
+            total: 24900,
             createdAt: referenceDate,
-            items: [CustomerOrderItem(sku: "IPHONE-15-128-BLK", qty: 1, price: 89900, imei: "352099999999001")]
+            items: [CustomerOrderItem(sku: "UI-AIRPODS-PRO2", qty: 1, price: 24900, imei: nil)]
         )
+    ]
+
+    /// Fixture ledger for ui-order-2401 (ready_for_pickup): four steps done, pickup pending.
+    static let orderLedger: [OrderLedgerEvent] = [
+        OrderLedgerEvent(id: "ui-ledger-4", type: "order.packed", actor: "ui-staff", ts: referenceDate.addingTimeInterval(7_800)),
+        OrderLedgerEvent(id: "ui-ledger-3", type: "order.picking", actor: "ui-staff", ts: referenceDate.addingTimeInterval(4_200)),
+        OrderLedgerEvent(id: "ui-ledger-2", type: "payment.received", actor: "ui-customer", ts: referenceDate.addingTimeInterval(60)),
+        OrderLedgerEvent(id: "ui-ledger-1", type: "order.created", actor: "ui-customer", ts: referenceDate)
     ]
 
     static let notifications: [CustomerNotification] = [
@@ -2591,6 +2690,7 @@ private enum ClientUIFixture {
 private struct CustomerReturnsView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
+    let products: [Product]
     @State private var returns: [CustomerReturn] = []
     @State private var orders: [CustomerOrder] = []
     @State private var isLoading = true
@@ -2644,7 +2744,7 @@ private struct CustomerReturnsView: View {
         .refreshable { await load() }
         .sheet(isPresented: $showingRequest) {
             NavigationStack {
-                CustomerReturnRequestView(environment: environment, auth: auth, orders: orders) {
+                CustomerReturnRequestView(environment: environment, auth: auth, orders: orders, products: products) {
                     showingRequest = false
                     Task { await load() }
                 }
@@ -2797,6 +2897,7 @@ private struct CustomerReturnRequestView: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
     let orders: [CustomerOrder]
+    let products: [Product]
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var orderId: String
@@ -2807,12 +2908,33 @@ private struct CustomerReturnRequestView: View {
 
     private let returnReasons = ["Не подошёл цвет", "Нашёл дешевле", "Передумал", "Другое"]
 
-    init(environment: AppEnvironment, auth: CustomerAuthStore, orders: [CustomerOrder], onCreated: @escaping () -> Void) {
+    init(environment: AppEnvironment, auth: CustomerAuthStore, orders: [CustomerOrder], products: [Product], onCreated: @escaping () -> Void) {
         self.environment = environment
         self.auth = auth
         self.orders = orders
+        self.products = products
         self.onCreated = onCreated
         _orderId = State(initialValue: orders.first?.id ?? "")
+    }
+
+    /// Catalog used to resolve order-item SKUs to product names.
+    private var catalog: [Product] {
+#if DEBUG
+        if UITestBootstrap.startsSignedIn { return ClientUIFixture.products }
+#endif
+        return products
+    }
+
+    private var selectedOrder: CustomerOrder? {
+        orders.first(where: { $0.id == orderId })
+    }
+
+    private var selectedItem: CustomerOrderItem? {
+        selectedOrder?.items.first
+    }
+
+    private func itemTitle(_ item: CustomerOrderItem) -> String {
+        catalog.first(where: { $0.sku == item.sku })?.name ?? item.sku
     }
 
     var body: some View {
@@ -2822,7 +2944,7 @@ private struct CustomerReturnRequestView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Возврат товара")
                         .font(ClientTheme.display(20, weight: .bold)).foregroundStyle(.white)
-                    Text("Выберите товар из заказа №4102")
+                    Text("Выберите товар из заказа \(clientDisplayOrderNumber(orderId))")
                         .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted)
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Заказ").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
@@ -2838,25 +2960,27 @@ private struct CustomerReturnRequestView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 13))
                     }
-                    HStack(spacing: 12) {
-                        ClientReturnProductTile()
-                            .frame(width: 54, height: 54)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("AirPods Pro 2")
-                                .font(ClientTheme.body(13, weight: .semibold))
-                                .foregroundStyle(.white)
-                            Text("24 900 сом")
-                                .font(ClientTheme.body(12))
-                                .foregroundStyle(ClientTheme.muted)
+                    if let item = selectedItem {
+                        HStack(spacing: 12) {
+                            ClientReturnProductTile()
+                                .frame(width: 54, height: 54)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(itemTitle(item))
+                                    .font(ClientTheme.body(13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("\(clientGroupedDigits(item.price)) сом\(item.qty > 1 ? " · \(item.qty) шт" : "")")
+                                    .font(ClientTheme.body(12))
+                                    .foregroundStyle(ClientTheme.muted)
+                            }
+                            Spacer()
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(ClientTheme.lime)
                         }
-                        Spacer()
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(ClientTheme.lime)
+                        .padding(12)
+                        .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.lime))
                     }
-                    .padding(12)
-                    .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.lime))
 
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Причина возврата").font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted)
@@ -2952,7 +3076,7 @@ private struct ClientReturnProductTile: View {
                 Color(red: 0.969, green: 0.949, blue: 0.925)
             ], startPoint: .topLeading, endPoint: .bottomTrailing))
             .overlay {
-                Image(systemName: "airpodspro")
+                Image(systemName: "shippingbox")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(Color(red: 0.086, green: 0.067, blue: 0.051).opacity(0.72))
             }
@@ -3440,6 +3564,8 @@ private struct AccountView: View {
     let auth: CustomerAuthStore
     let pushStatus: String
     let orderRefreshRevision: Int
+    let products: [Product]
+    @Binding var cart: [String: Int]
     let onEnablePush: () -> Void
     let onLogout: () -> Void
     @State private var phone = "+996"
@@ -3450,6 +3576,8 @@ private struct AccountView: View {
     @State private var showDeleteAccountConfirm = false
     @State private var accountDataError: String?
     @State private var exportShareFile: ExportShareFile?
+    @State private var loyalty: CustomerLoyalty?
+    @State private var profileName: String?
 
     var body: some View {
         NavigationStack {
@@ -3475,13 +3603,14 @@ private struct AccountView: View {
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
+        .task(id: auth.session?.accessToken) { await loadAccountSummary() }
     }
 
     @ViewBuilder
     private func signedInContent(_ session: CustomerSession) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 13) {
-                Text(profileInitial(for: session))
+                Text(profileInitial)
                     .font(ClientTheme.display(22, weight: .black))
                     .foregroundStyle(.white)
                     .frame(width: 52, height: 52)
@@ -3491,15 +3620,17 @@ private struct AccountView: View {
                     )
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text(displayName(for: session))
+                        Text(displayName)
                             .font(ClientTheme.display(16, weight: .bold))
                             .foregroundStyle(.white)
-                        Text("GOLD")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(ClientTheme.gold, in: Capsule())
+                        if let loyalty {
+                            Text(loyalty.level.uppercased())
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(ClientTheme.gold, in: Capsule())
+                        }
                     }
                     Text(maskedPhone(session.phone))
                         .font(.system(size: 12, design: .monospaced))
@@ -3517,23 +3648,25 @@ private struct AccountView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Уровень Gold")
+                        Text(loyalty.map { "Уровень \($0.level)" } ?? "Бонусы и купоны")
                             .font(ClientTheme.body(13, weight: .semibold))
                             .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
                         Spacer()
-                        Text("4 820 бонусов")
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .foregroundStyle(ClientTheme.lime)
+                        if let loyalty {
+                            Text("\(clientGroupedDigits(loyalty.balance)) бонусов")
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .foregroundStyle(ClientTheme.lime)
+                        }
                     }
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
                             Capsule().fill(ClientTheme.background)
                             Capsule().fill(LinearGradient(colors: [ClientTheme.lime, Color(red: 0.56, green: 0.831, blue: 0.059)], startPoint: .leading, endPoint: .trailing))
-                                .frame(width: max(0, proxy.size.width * 0.72))
+                                .frame(width: max(0, proxy.size.width * loyaltyProgress))
                         }
                     }
                     .frame(height: 7)
-                    Text("До Platinum осталось 51 000 сом покупок")
+                    Text(loyalty.map { $0.nextLevelSpend > 0 ? "До следующего уровня осталось \(clientGroupedDigits($0.nextLevelSpend)) сом" : "У вас максимальный уровень" } ?? "Баланс и купоны — в разделе бонусов")
                         .font(ClientTheme.body(11))
                         .foregroundStyle(Color(red: 0.541, green: 0.498, blue: 0.463))
                 }
@@ -3555,13 +3688,13 @@ private struct AccountView: View {
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 AccountMenuTile(title: "Мои заказы", detail: "1 активный", symbol: "shippingbox.fill", badge: "1 активный") {
-                    OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision)
+                    OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision, products: products, cart: $cart)
                 }
                 AccountMenuTile(title: "Устройства", detail: "IMEI и гарантия", symbol: "shield.checkered") {
                     DevicesView(environment: environment, auth: auth)
                 }
                 AccountMenuTile(title: "Возвраты", detail: "Заявки и refund", symbol: "arrow.uturn.backward.circle.fill") {
-                    CustomerReturnsView(environment: environment, auth: auth)
+                    CustomerReturnsView(environment: environment, auth: auth, products: products)
                 }
                 AccountMenuTile(title: "Поддержка", detail: "Обращения и ответы", symbol: "bubble.left.and.bubble.right.fill") {
                     CustomerSupportView(environment: environment, auth: auth)
@@ -3777,18 +3910,38 @@ private struct AccountView: View {
         return "+\(digits)"
     }
 
-    private func displayName(for session: CustomerSession) -> String {
-        let digits = session.phone.filter(\.isNumber)
-        #if DEBUG
-        if UITestBootstrap.startsSignedIn {
-            return "Нурбек"
-        }
-        #endif
-        return digits.hasSuffix("1234") ? "Нурбек" : "Покупатель"
+    /// Real profile name from customers/me/settings; neutral placeholder until it loads.
+    private var displayName: String {
+        let trimmed = (profileName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Покупатель" : trimmed
     }
 
-    private func profileInitial(for session: CustomerSession) -> String {
-        String(displayName(for: session).prefix(1))
+    private var profileInitial: String {
+        String(displayName.prefix(1))
+    }
+
+    /// Web-parity loyalty progress (apps/web account page): remaining spend maps to 4...100%.
+    private var loyaltyProgress: CGFloat {
+        guard let loyalty else { return 0.04 }
+        let percent = max(4, min(100, 100 - loyalty.nextLevelSpend / 1000))
+        return CGFloat(percent) / 100
+    }
+
+    @MainActor
+    private func loadAccountSummary() async {
+        guard let token = auth.session?.accessToken else { return }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            loyalty = UITestBootstrap.accountFixtureMode == .loaded ? ClientUIFixture.loyalty : nil
+            profileName = "Нурбек"
+            return
+        }
+#endif
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        loyalty = try? await api.get("customers/me/loyalty", token: token)
+        if let settings: CustomerSettings = try? await api.get("customers/me/settings", token: token) {
+            profileName = settings.name
+        }
     }
 
     private func maskedPhone(_ phone: String) -> String {
@@ -5750,19 +5903,15 @@ private struct ProductDetail: View {
                         ProductTrustCell(symbol: "building.2.fill", text: "Самовывоз сегодня")
                         ProductTrustCell(symbol: "arrow.uturn.left", text: "Возврат 14 дней")
                     }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Наличие в магазинах").font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
-                        availabilityRow("AliStore Центр", value: displayProduct.availableUnits > 0 ? "● есть" : "● нет", color: displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
-                        availabilityRow("AliStore Ош", value: displayProduct.availableUnits > 1 ? "● есть" : "● 1 шт", color: displayProduct.availableUnits > 1 ? ClientTheme.lime : Color(red: 0.898, green: 0.698, blue: 0.235))
-                    }
-                    .padding(14).background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
                     Text("Характеристики").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
                     detailRow("SKU", value: displayProduct.sku)
                     detailRow("Категория", value: displayProduct.category)
                     detailRow("Доступно", value: "\(displayProduct.availableUnits) шт")
-                    Text("Описание").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
-                    Text("Оригинальная техника с гарантией AliStore. Проверьте наличие и оформите доставку или самовывоз в удобной точке.")
-                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).lineSpacing(4)
+                    if let description = displayProduct.attrs?.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+                        Text("Описание").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
+                        Text(description)
+                            .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).lineSpacing(4)
+                    }
                     if !displayRelated.isEmpty {
                         Text("Похожие товары")
                             .font(ClientTheme.display(15, weight: .bold))
@@ -5833,11 +5982,6 @@ private struct ProductDetail: View {
             .padding(.vertical, 9)
             .background(variant.id == displayProduct.id ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.line))
-    }
-
-    @ViewBuilder
-    private func availabilityRow(_ title: String, value: String, color: Color) -> some View {
-        HStack { Text(title).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted); Spacer(); Text(value).font(ClientTheme.body(12, weight: .medium)).foregroundStyle(color) }
     }
 
     @ViewBuilder
