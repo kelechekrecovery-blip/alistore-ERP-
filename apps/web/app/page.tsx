@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Headphones, ImageOff, Laptop, PackagePlus, RotateCcw, Smartphone, Tablet, Tv, Watch } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Headphones, ImageOff, Laptop, PackagePlus, RotateCcw, ShieldCheck, Smartphone, Tablet, Truck, Tv, Watch } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -20,6 +20,8 @@ const QUICK_CATEGORIES: Array<{ name: string; href: string; icon: ReactNode }> =
   { name: 'Аксессуары', href: '/catalog?category=Аксессуары', icon: <PackagePlus /> },
   { name: 'Все категории', href: '/catalog', icon: <ArrowRight /> },
 ];
+
+const BENEFIT_ICONS = [ShieldCheck, Truck, RotateCcw, BadgeCheck];
 
 export default function HomePage() {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
@@ -80,7 +82,7 @@ export default function HomePage() {
             ))}
           </section>
 
-          {Boolean(storefront?.content.benefits.length) && <section className="mt-6 grid grid-cols-2 divide-x divide-linen rounded-[12px] border border-linen bg-white py-5 lg:grid-cols-4">{storefront!.content.benefits.slice(0,4).map((benefit) => <Benefit key={benefit.title} icon={<ArrowRight />} title={benefit.title} text={benefit.body} />)}</section>}
+          {Boolean(storefront?.content.benefits.length) && <section className="mt-6 grid grid-cols-2 divide-x divide-linen rounded-[12px] border border-linen bg-white py-5 lg:grid-cols-4">{storefront!.content.benefits.slice(0,4).map((benefit, index) => { const Icon = BENEFIT_ICONS[index % BENEFIT_ICONS.length]; return <Benefit key={benefit.title} icon={<Icon />} title={benefit.title} text={benefit.body} />; })}</section>}
 
           {!blocks.some((block) => block.type === 'collection') && <section className="pb-10 pt-12">
             <div className="mb-6 flex items-end justify-between">

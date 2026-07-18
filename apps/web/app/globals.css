@@ -61,8 +61,8 @@
     letter-spacing: 0;
   }
   ::selection {
-    background: var(--coral);
-    color: #fff;
+    background: var(--lime);
+    color: var(--lime-ink);
   }
 }
 
@@ -394,6 +394,11 @@
   .checkout-panel .text-subtle,
   .checkout-panel .text-faint {
     color: #6e645c !important;
+  }
+  /* Warning/error text (coral-tint on the dark mobile field) must be legible on the white
+     desktop panel — flip to danger red. */
+  .checkout-panel .text-coral-tint {
+    color: #c6362c !important;
   }
 }
 
