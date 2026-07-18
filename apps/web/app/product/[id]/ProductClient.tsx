@@ -497,7 +497,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 function ProductLoadingSkeleton() {
   return (
     <div className="min-h-screen bg-[#0b0a08] font-sans text-white">
-      <SiteHeader />
+      <SiteHeader variant="design3" />
       <main className="mx-auto max-w-[1400px] px-5 py-8">
         <div className="mb-7 h-4 w-56 animate-pulse rounded-full bg-linen" />
         <div className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
@@ -518,7 +518,7 @@ function ProductLoadingSkeleton() {
 function StoreMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#0b0a08] text-white/45">
-      <SiteHeader />
+      <SiteHeader variant="design3" />
       <div className="grid min-h-[70vh] place-items-center">{children}</div>
     </div>
   );

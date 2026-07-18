@@ -30,7 +30,7 @@ const CATEGORY_NAV = [
   ['Trade-in', '/trade-in'],
 ] as const;
 
-export function SiteHeader({ variant = 'light' }: { variant?: 'light' | 'design3' }) {
+export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'design3' }) {
   const design3 = variant === 'design3';
   const pathname = usePathname();
   const { count, hydrated: cartHydrated } = useCart();

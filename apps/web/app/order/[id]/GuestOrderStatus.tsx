@@ -41,8 +41,8 @@ export default function GuestOrderStatus({ orderId }: { orderId: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-paper text-coal">
-      <SiteHeader />
+    <div className="min-h-screen bg-[#0b0a08] text-[#e5dcd3]">
+      <SiteHeader variant="design3" />
       <main className="mx-auto w-full max-w-[1120px] px-4 py-8 md:px-6 md:py-12">
         {state.kind === 'loading' && <StatusPanel icon={<RefreshCw className="animate-spin" />} title="Загружаем заказ" text="Проверяем защищённую ссылку и актуальный статус." />}
         {state.kind === 'missing' && <StatusPanel icon={<ShieldCheck />} title="Нужна защищённая ссылка" text="Откройте ссылку, которую получили сразу после оформления заказа на этом устройстве." />}
@@ -51,24 +51,24 @@ export default function GuestOrderStatus({ orderId }: { orderId: string }) {
           const order = state.view.order;
           const problem = TERMINAL_BAD[order.status];
           return <>
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-haze pb-5">
-              <div><p className="text-xs font-semibold uppercase text-subtle">Защищённый гостевой доступ</p><h1 className="mt-1 text-2xl font-bold md:text-3xl">Заказ #{order.id.slice(-8)}</h1><p className="mt-2 text-sm text-faint">{new Date(order.createdAt).toLocaleString('ru-RU')} · {som(order.total)}</p></div>
-              <span className="rounded-md bg-ink-dark px-3 py-2 text-xs font-semibold text-white">{order.status}</span>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5">
+              <div><p className="text-xs font-semibold uppercase text-white/45">Защищённый гостевой доступ</p><h1 className="mt-1 text-2xl font-bold text-white md:text-3xl">Заказ #{order.id.slice(-8)}</h1><p className="mt-2 text-sm text-white/55">{new Date(order.createdAt).toLocaleString('ru-RU')} · {som(order.total)}</p></div>
+              <span className="rounded-md bg-white/[.08] px-3 py-2 text-xs font-semibold text-white">{order.status}</span>
             </div>
-            {problem && <div className="mb-5 border border-coral-tint bg-sand p-4 text-sm font-semibold text-[#b52e1a]">{problem}</div>}
+            {problem && <div className="mb-5 rounded-[12px] border border-danger-soft/30 bg-danger/10 p-4 text-sm font-semibold text-danger-soft">{problem}</div>}
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <section className="border border-mist bg-white p-5 md:p-6" aria-label="Статус заказа">
-                <h2 className="flex items-center gap-2 text-base font-bold"><Clock3 size={18} /> Выполнение заказа</h2>
-                <div className="mt-5 space-y-0">{steps.map((step, index) => <div key={step.title} className="flex gap-3"><div className="flex flex-col items-center"><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${step.state === 'done' ? 'bg-ink-dark text-white' : step.state === 'current' ? 'bg-coral text-white' : 'bg-sand text-subtle'}`}>{step.state === 'done' ? '✓' : index + 1}</span>{index < steps.length - 1 && <span className="h-10 w-px bg-haze" />}</div><div><div className="text-sm font-semibold">{step.title}</div><div className="mt-0.5 text-xs text-subtle">{step.time ? new Date(step.time).toLocaleString('ru-RU') : step.state === 'current' ? 'в процессе' : 'ожидает'}</div></div></div>)}</div>
+              <section className="erp3-glass rounded-[14px] p-5 md:p-6" aria-label="Статус заказа">
+                <h2 className="flex items-center gap-2 text-base font-bold text-white"><Clock3 size={18} /> Выполнение заказа</h2>
+                <div className="mt-5 space-y-0">{steps.map((step, index) => <div key={step.title} className="flex gap-3"><div className="flex flex-col items-center"><span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${step.state === 'done' ? 'bg-lime text-lime-ink' : step.state === 'current' ? 'bg-coral text-white' : 'bg-white/10 text-white/50'}`}>{step.state === 'done' ? '✓' : index + 1}</span>{index < steps.length - 1 && <span className="h-10 w-px bg-white/10" />}</div><div><div className="text-sm font-semibold text-white">{step.title}</div><div className="mt-0.5 text-xs text-white/45">{step.time ? new Date(step.time).toLocaleString('ru-RU') : step.state === 'current' ? 'в процессе' : 'ожидает'}</div></div></div>)}</div>
               </section>
               <aside className="space-y-5">
-                <section className="border border-mist bg-white p-5"><h2 className="flex items-center gap-2 text-base font-bold"><MapPin size={18} /> Получение</h2><p className="mt-3 text-sm font-semibold">{order.pickupPoint ?? order.deliveryAddress ?? order.fulfillmentType ?? 'Самовывоз'}</p>{order.deliverySlot && <p className="mt-1 text-xs text-subtle">{order.deliverySlot}</p>}{order.pickupCode && <div className="mt-4 bg-paper p-3"><div className="text-xs text-subtle">Код выдачи</div><strong className="mt-1 block text-xl">{order.pickupCode}</strong></div>}</section>
-                <section className="border border-mist bg-white p-5"><h2 className="flex items-center gap-2 text-base font-bold"><PackageCheck size={18} /> Состав</h2><div className="mt-3 divide-y divide-mist">{order.items.map((item, index) => <div key={`${item.sku}-${index}`} className="flex justify-between gap-3 py-2 text-sm"><span>{item.sku} × {item.qty}</span><strong>{som(item.price * item.qty)}</strong></div>)}</div></section>
-                <button type="button" onClick={openReceipt} className="flex w-full items-center justify-center gap-2 bg-ink-dark px-4 py-3 text-sm font-bold text-white"><FileText size={17} /> Показать чек</button>
-                {receiptMessage && <p role="status" className="text-sm text-[#b52e1a]">{receiptMessage}</p>}
+                <section className="erp3-glass rounded-[14px] p-5"><h2 className="flex items-center gap-2 text-base font-bold text-white"><MapPin size={18} /> Получение</h2><p className="mt-3 text-sm font-semibold text-white">{order.pickupPoint ?? order.deliveryAddress ?? order.fulfillmentType ?? 'Самовывоз'}</p>{order.deliverySlot && <p className="mt-1 text-xs text-white/45">{order.deliverySlot}</p>}{order.pickupCode && <div className="mt-4 rounded-[9px] bg-white/[.05] p-3"><div className="text-xs text-white/45">Код выдачи</div><strong className="mt-1 block text-xl text-white">{order.pickupCode}</strong></div>}</section>
+                <section className="erp3-glass rounded-[14px] p-5"><h2 className="flex items-center gap-2 text-base font-bold text-white"><PackageCheck size={18} /> Состав</h2><div className="mt-3 divide-y divide-white/10">{order.items.map((item, index) => <div key={`${item.sku}-${index}`} className="flex justify-between gap-3 py-2 text-sm"><span className="text-white/75">{item.sku} × {item.qty}</span><strong className="text-white">{som(item.price * item.qty)}</strong></div>)}</div></section>
+                <button type="button" onClick={openReceipt} className="erp3-coral-action flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-3 text-sm font-bold text-white"><FileText size={17} /> Показать чек</button>
+                {receiptMessage && <p role="status" className="text-sm text-danger-soft">{receiptMessage}</p>}
               </aside>
             </div>
-            {receipt && <section className="mt-5 border border-mist bg-white p-5 md:p-6"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-bold">Чек заказа</h2><button type="button" onClick={() => window.print()} className="text-sm font-semibold text-coral">Печать</button></div><pre data-testid="guest-receipt" className="overflow-x-auto whitespace-pre-wrap bg-paper p-4 font-mono text-xs leading-6">{receipt}</pre></section>}
+            {receipt && <section className="erp3-glass mt-5 rounded-[14px] p-5 md:p-6"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-bold text-white">Чек заказа</h2><button type="button" onClick={() => window.print()} className="text-sm font-semibold text-coral-light">Печать</button></div><pre data-testid="guest-receipt" className="overflow-x-auto whitespace-pre-wrap rounded-[9px] bg-white/[.05] p-4 font-mono text-xs leading-6 text-white/75">{receipt}</pre></section>}
           </>;
         })()}
       </main>
@@ -78,5 +78,5 @@ export default function GuestOrderStatus({ orderId }: { orderId: string }) {
 }
 
 function StatusPanel({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return <div className="mx-auto max-w-[560px] border border-mist bg-white p-8 text-center"><div className="mx-auto grid h-11 w-11 place-items-center text-coral">{icon}</div><h1 className="mt-4 text-xl font-bold">{title}</h1><p className="mx-auto mt-2 max-w-[430px] text-sm leading-6 text-faint">{text}</p><Link href="/login" className="mt-5 inline-block bg-ink-dark px-5 py-3 text-sm font-bold text-white">Войти по телефону</Link></div>;
+  return <div className="erp3-glass mx-auto max-w-[560px] rounded-[14px] p-8 text-center"><div className="mx-auto grid h-11 w-11 place-items-center text-coral">{icon}</div><h1 className="mt-4 text-xl font-bold text-white">{title}</h1><p className="mx-auto mt-2 max-w-[430px] text-sm leading-6 text-white/60">{text}</p><Link href="/login" className="erp3-coral-action mt-5 inline-block rounded-[9px] px-5 py-3 text-sm font-bold text-white">Войти по телефону</Link></div>;
 }
