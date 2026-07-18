@@ -2,6 +2,15 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MVP-VERIFY-038`.
+- Task: close the full MVP verification after the fiscal boundary and stabilize the courier fixture teardown.
+- Result: `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` passed Prisma validation and migrations, API `162/162` suites with `735/735` tests, Web production build, mobile typecheck and Playwright `62/62`. The courier deadlock fixture now deletes dependent `TradeInDevice` rows before customers; isolated finance/outbox checks also passed `19/19` after transient full-suite contention.
+- Commit: `88360a5` for the teardown fix. Trusted evidence was then refreshed on source tree `89b69ff4...` in commits `a4aff8e`, `472e58c`, `5d9ce22`, `42110e4`, `248eb82`, `ebdea54`, `831b590`, `57a276e`.
+- Acceptance: the local MVP software gate is green again. Live provider, physical device, staging credential and missing design-reference gates remain open.
+- Next step: run strict audit, then proceed with staging configuration and owner handoff collection.
+
+## 2026-07-18
+
 - Iteration ID: `GAP-FISCAL-001-EVIDENCE-037`.
 - Task: rebind trusted acceptance evidence after adding the informational fiscal receipt boundary.
 - Result: visual `3/3`, iOS `34/34`, Android `30/30`, POS/refund `1/1`, courier/COD `1/1`, service/loaner API `9/9` plus UI `3/3`, procurement API `10/10` plus UI `1/1`, and composite ecosystem reconciliation `4/4` all pass against source tree `fcf29b25...`. The first service/loaner recorder attempt had one transient `socket hang up`; the clean rerun passed `9/9`.
