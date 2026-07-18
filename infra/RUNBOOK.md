@@ -154,6 +154,32 @@ The newest file should match:
 alistore_prod-YYYYMMDD-HHMMSS.dump.gz
 ```
 
+### Dev machine schedule (macOS, user-level, no sudo)
+
+Template: `infra/macos/kg.alistore.backup.plist` — daily 03:17, logs to
+`~/Library/Logs/alistore-backup{,.err}.log`, retention via `BACKUP_KEEP_DAYS=14`.
+
+```bash
+# Install a runnable copy (launchd children are TCC-blocked from ~/Desktop,
+# so point the agent at a path outside Desktop) and refresh it after edits:
+mkdir -p ~/bin && cp infra/backup.sh ~/bin/alistore-backup.sh && chmod 755 ~/bin/alistore-backup.sh
+
+# Load / reload:
+launchctl bootout gui/$(id -u)/kg.alistore.backup 2>/dev/null || true
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/kg.alistore.backup.plist
+
+# Smoke-run now and inspect:
+launchctl kickstart gui/$(id -u)/kg.alistore.backup
+cat ~/Library/Logs/alistore-backup.log
+
+# Unload:
+launchctl bootout gui/$(id -u)/kg.alistore.backup
+```
+
+Adjust `DATABASE_NAME`, `BACKUP_DIR` and the script path in the plist for the
+local checkout. This covers the developer machine only; the staging host still
+needs its own cron/schedule per the gate in `BACKLOG.md` (`GAP-BACKUP-OPS-001`).
+
 ## 7. Restore Drill
 
 Run this on a non-production database at least once before launch and monthly
@@ -171,6 +197,13 @@ Pass criteria:
 - `pg_restore` exits 0.
 - `AuditEvent` query succeeds.
 - A recent order/customer/payment spot-check matches the source database.
+
+Recorded drills:
+
+- 2026-07-18, local dev machine (macOS, PostgreSQL 16.14): PASS — 129/129 table
+  row counts and schema identical after restore; full log in
+  [`docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md`](../docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md).
+  Staging restore is still pending and remains the launch gate.
 
 ## 8. Release Smoke
 

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # AliStore — nightly PostgreSQL backup (pg_dump custom format + gzip + rotation).
 #
-# ⚠️ Authored, NOT run locally. Wire to cron on the DB host, e.g.:
+# Status: run and restore-verified locally on 2026-07-18 — full drill log in
+# docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md (129/129 table row counts and
+# schema match after restore). Scheduled on the dev machine via the user-level
+# LaunchAgent infra/macos/kg.alistore.backup.plist (daily 03:17). Staging schedule
+# + restore on staging remain open in GAP-BACKUP-OPS-001.
+# Server cron example:
 #     0 3 * * *  DATABASE_NAME=alistore_prod /opt/alistore/infra/backup.sh
 # For continuous PITR (point-in-time recovery) use pgBackRest or wal-g instead —
 # this script is the simple daily-snapshot baseline.
