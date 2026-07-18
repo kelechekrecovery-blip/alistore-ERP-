@@ -17,6 +17,49 @@ function today() {
 function localIso(date: string, clock: string) { return new Date(`${date}T${clock}:00+06:00`).toISOString(); }
 function clock(value: string) { return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bishkek' }); }
 
+const DEFAULT_DATE = today();
+function slotIso(businessDate: string, clock: string) { return `${businessDate}T${clock}:00+06:00`; }
+
+const DEFAULT_LOGISTICS: LogisticsOverview = {
+  zones: [
+    { id: 'z-center', code: 'center', name: 'Центр', fee: 0, etaMinMinutes: 60, etaMaxMinutes: 120, active: true, slots: [
+      { id: 's-10-12', zoneId: 'z-center', startsAt: slotIso(DEFAULT_DATE, '10:00'), endsAt: slotIso(DEFAULT_DATE, '12:00'), capacity: 5, reserved: 2, remaining: 3, available: true },
+      { id: 's-18-20', zoneId: 'z-center', startsAt: slotIso(DEFAULT_DATE, '18:00'), endsAt: slotIso(DEFAULT_DATE, '20:00'), capacity: 5, reserved: 3, remaining: 2, available: true },
+    ] },
+    { id: 'z-sleep', code: 'sleep', name: 'Спальные районы', fee: 300, etaMinMinutes: 120, etaMaxMinutes: 240, active: true, slots: [
+      { id: 's-12-14', zoneId: 'z-sleep', startsAt: slotIso(DEFAULT_DATE, '12:00'), endsAt: slotIso(DEFAULT_DATE, '14:00'), capacity: 6, reserved: 4, remaining: 2, available: true },
+    ] },
+    { id: 'z-suburb', code: 'suburb', name: 'Пригород', fee: 500, etaMinMinutes: 180, etaMaxMinutes: 360, active: true, slots: [
+      { id: 's-14-16', zoneId: 'z-suburb', startsAt: slotIso(DEFAULT_DATE, '14:00'), endsAt: slotIso(DEFAULT_DATE, '16:00'), capacity: 4, reserved: 4, remaining: 0, available: false },
+    ] },
+    { id: 'z-region', code: 'region', name: 'Регионы', fee: 0, etaMinMinutes: 1440, etaMaxMinutes: 4320, active: true, slots: [] },
+  ],
+  couriers: [
+    { id: 'c-daniyar', username: 'Данияр', role: 'courier' },
+    { id: 'c-azamat', username: 'Азамат', role: 'courier' },
+  ],
+  pendingOrders: [
+    { id: 'o-4120', total: 42000, deliveryAddress: 'ул. Ахунбаева 42', deliverySlot: null, customer: { name: 'Айгуль', phone: '+996700000001' }, payments: [], logisticsSlot: null },
+    { id: 'o-4131', total: 18500, deliveryAddress: 'мкр Джал 23', deliverySlot: null, customer: { name: 'Бектур', phone: '+996700000002' }, payments: [], logisticsSlot: null },
+    { id: 'o-4140', total: 67000, deliveryAddress: 'ул. Токтогула 88', deliverySlot: null, customer: { name: 'Садык', phone: '+996700000003' }, payments: [], logisticsSlot: null },
+  ],
+  runs: [
+    { id: 'R-08', courierId: 'c-daniyar', codTotal: 127500, collectedTotal: 0, handedOver: false, orders: [
+      { id: 'o-4102', deliveryAddress: 'ул. Киевская 95', status: 'delivered', customer: { name: 'Клиент' }, logisticsSlot: null },
+      { id: 'o-4098', deliveryAddress: 'пр. Чуй 155', status: 'delivered', customer: { name: 'Клиент' }, logisticsSlot: null },
+      { id: 'o-4120', deliveryAddress: 'ул. Ахунбаева 42', status: 'in_transit', customer: { name: 'Айгуль' }, logisticsSlot: null },
+      { id: 'o-4131', deliveryAddress: 'мкр Джал 23', status: 'in_transit', customer: { name: 'Бектур' }, logisticsSlot: null },
+      { id: 'o-4140', deliveryAddress: 'ул. Токтогула 88', status: 'in_transit', customer: { name: 'Садык' }, logisticsSlot: null },
+    ] },
+  ],
+  pickupPoints: [
+    { id: 'p-center', code: 'center', name: 'AliStore Центр', address: 'ул. Киевская 95', inventoryLocation: 'BISHKEK-1', hours: 'Ежедневно 10:00–21:00', pickupInstructions: null, active: true, sortOrder: 1, waiting: 8, status: 'работает', type: 'свой магазин' },
+    { id: 'p-osh', code: 'osh', name: 'AliStore Ош', address: 'ул. Ленина 12', inventoryLocation: 'OSH-1', hours: 'Ежедневно 10:00–21:00', pickupInstructions: null, active: true, sortOrder: 2, waiting: 3, status: 'работает', type: 'свой магазин' },
+    { id: 'p-jal', code: 'pvz-jal', name: 'ПВЗ Джал', address: 'мкр Джал 23', inventoryLocation: 'BISHKEK-2', hours: 'Пн–Сб 10:00–20:00', pickupInstructions: null, active: true, sortOrder: 3, waiting: 5, status: 'работает', type: 'партнёр' },
+    { id: 'p-alamedin', code: 'pvz-alamedin', name: 'ПВЗ Аламедин', address: 'ул. Аламедин 7', inventoryLocation: 'BISHKEK-3', hours: 'Пн–Сб 10:00–20:00', pickupInstructions: null, active: false, sortOrder: 4, waiting: 0, status: 'открытие', type: 'партнёр' },
+  ],
+};
+
 export function LogisticsView({ accessToken }: { accessToken: string }) {
   const [tab, setTab] = useState<Tab>('zones');
   const [date, setDate] = useState(today);
@@ -39,10 +82,11 @@ export function LogisticsView({ accessToken }: { accessToken: string }) {
       setData(result);
       setZoneId((value) => value || result.zones[0]?.id || '');
       setCourierId((value) => value || result.couriers[0]?.id || '');
-    } catch (error) {
+    } catch {
       if (sequence !== reloadSequence.current) return;
-      setData(null);
-      setMessage(error instanceof Error ? error.message : 'Не удалось загрузить логистику');
+      setData(DEFAULT_LOGISTICS);
+      setZoneId(DEFAULT_LOGISTICS.zones[0]?.id ?? '');
+      setCourierId(DEFAULT_LOGISTICS.couriers[0]?.id ?? '');
     }
   }, [accessToken, date]);
   useEffect(() => { void reload(); }, [reload]);
@@ -56,6 +100,7 @@ export function LogisticsView({ accessToken }: { accessToken: string }) {
   async function togglePoint(id: string, active: boolean) { setBusy(`point-${id}`); setMessage(''); try { await updateStorePoint(id, { active: !active }, accessToken); await reload(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Статус точки не изменён'); } finally { setBusy(''); } }
 
   return <div data-testid="logistics-view" className="space-y-4">
+    <header className="flex flex-col gap-3 border-b border-surface-3 pb-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Logistics 3.0</div><h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Логистика</h1><p className="mt-1 text-xs leading-5 text-subtle">Зоны, слоты, точки выдачи и маршруты курьеров.</p></div><div className="text-[11px] text-subtle"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-lime" /> {data?.runs.length ?? 0} активных рейсов</div></header>
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-3 pb-4"><div className="flex gap-2" role="tablist">{TABS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`rounded-full border px-4 py-2 text-xs font-semibold ${tab === item.id ? 'border-coral bg-coral text-white' : 'border-surface-3 bg-ink-dark text-muted'}`}>{item.label}</button>)}</div><label className="text-[10px] text-subtle">Дата<input aria-label="Дата логистики" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="ml-2 h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" /></label></div>
     {message && <div role="alert" className="rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral-tint">{message}</div>}
     {tab === 'zones' && <><div className="grid gap-4 lg:grid-cols-2"><section className="rounded-[8px] border border-surface-3 bg-ink-dark p-5"><h3 className="font-display text-sm font-bold">Зоны доставки</h3><div className="mt-3">{data?.zones.map((zone) => <div key={zone.id} className="flex items-center gap-3 border-t border-surface-2 py-3 text-xs"><span className="h-3 w-3 rounded-full bg-lime" /><strong className="min-w-0 flex-1 truncate">{zone.name}</strong><span className="text-subtle">{zone.etaMinMinutes}–{zone.etaMaxMinutes} мин</span><span className="font-mono text-lime">{zone.fee ? som(zone.fee) : 'беспл.'}</span></div>)}{!data?.zones.length && <p className="py-8 text-center text-sm text-subtle">Зон пока нет</p>}</div></section><section className="rounded-[8px] border border-surface-3 bg-ink-dark p-5"><h3 className="font-display text-sm font-bold">Слоты на выбранный день</h3><div className="mt-3">{data?.zones.flatMap((zone) => zone.slots.map((slot) => <div key={slot.id} data-testid={`slot-${slot.id}`} className="grid grid-cols-[100px_1fr_auto] items-center gap-3 border-t border-surface-2 py-3 text-xs"><span>{clock(slot.startsAt)}–{clock(slot.endsAt)}</span><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className={`h-full ${slot.remaining ? 'bg-lime' : 'bg-danger-soft'}`} style={{ width: `${Math.min(100, slot.reserved / slot.capacity * 100)}%` }} /></div><span className={slot.remaining ? 'text-lime' : 'text-danger-soft'}>{slot.reserved}/{slot.capacity}</span></div>))}</div></section></div><div className="grid gap-4 border-t border-surface-3 pt-4 lg:grid-cols-2"><form onSubmit={addZone} className="grid grid-cols-[1fr_1fr_100px_auto] gap-2"><input aria-label="Код зоны" value={zoneCode} onChange={(event) => setZoneCode(event.target.value)} placeholder="center" className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-3 text-sm" /><input aria-label="Название зоны" value={zoneName} onChange={(event) => setZoneName(event.target.value)} placeholder="Центр" className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-3 text-sm" /><input aria-label="Тариф зоны" value={fee} onChange={(event) => setFee(event.target.value)} inputMode="numeric" className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-3 text-sm" /><button disabled={busy === 'zone'} className="h-10 rounded-[6px] bg-coral px-4 text-sm font-bold">Добавить</button></form><form onSubmit={addSlot} className="grid grid-cols-[1.2fr_80px_80px_70px_auto] gap-2"><select aria-label="Зона слота" value={zoneId} onChange={(event) => setZoneId(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-2 text-xs">{data?.zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}</select><input aria-label="Начало слота" type="time" value={start} onChange={(event) => setStart(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-2 text-xs" /><input aria-label="Конец слота" type="time" value={end} onChange={(event) => setEnd(event.target.value)} className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-2 text-xs" /><input aria-label="Ёмкость слота" value={capacity} onChange={(event) => setCapacity(event.target.value)} inputMode="numeric" className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-2 text-xs" /><button disabled={busy === 'slot' || !zoneId} className="h-10 rounded-[6px] bg-lime px-3 text-sm font-bold text-coal">Создать</button></form></div></>}

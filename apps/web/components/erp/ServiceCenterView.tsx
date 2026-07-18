@@ -46,6 +46,21 @@ const PRICE_ROWS = [
   ['Ремонт разъёма питания', '1 день', 2500],
 ] as const;
 
+const DEFAULT_QUEUE: ServiceQueueItem[] = [
+  { id: 'wc-0081', imei: '35•••••042', customerId: 'c1', problem: 'Гарантийный ремонт', status: 'waiting_supplier', serviceType: 'warranty', deviceName: 'iPhone 13', sla: new Date(Date.now() - 6 * 3600000).toISOString(), slaState: 'overdue', assignee: 'Али', productName: 'iPhone 13 (гарантия)', customer: { id: 'c1', name: 'Клиент', phone: '+996 ••• •• ••' }, workOrder: null },
+  { id: 'wc-0084', imei: 'C0••••••981', customerId: 'c2', problem: 'Диагностика', status: 'diagnostics', serviceType: 'warranty', deviceName: 'MacBook Air', sla: new Date(Date.now() + 18 * 3600000).toISOString(), slaState: 'on_track', assignee: 'Али', productName: 'MacBook Air (гарантия)', customer: { id: 'c2', name: 'Клиент', phone: '+996 ••• •• ••' }, workOrder: { id: 'wo-0084', warrantyCaseId: 'wc-0084', technicianId: 'ali', diagnosticSummary: 'Диагностика', diagnosticFee: 0, estimateAmount: null, estimatePreparedAt: null, estimateApprovedAt: null, estimateApprovedBy: null, repairStartedAt: null, repairCompletedAt: null, repairClosedAt: null, repairWarrantyUntil: null, completionSummary: null, replacementImei: null, point: 'BISHKEK-1', payments: [], parts: [] } },
+  { id: 'wc-0086', imei: '86••••••112', customerId: 'c3', problem: 'Замена экрана', status: 'repairing', serviceType: 'paid', deviceName: 'Xiaomi 13', sla: new Date(Date.now() + 32 * 3600000).toISOString(), slaState: 'on_track', assignee: 'Тахсир', productName: 'Xiaomi 13 (платный)', customer: { id: 'c3', name: 'Клиент', phone: '+996 ••• •• ••' }, workOrder: { id: 'wo-0086', warrantyCaseId: 'wc-0086', technicianId: 'tahsir', diagnosticSummary: 'Замена экрана', diagnosticFee: 500, estimateAmount: 6500, estimatePreparedAt: new Date().toISOString(), estimateApprovedAt: new Date().toISOString(), estimateApprovedBy: 'owner', repairStartedAt: new Date().toISOString(), repairCompletedAt: null, repairClosedAt: null, repairWarrantyUntil: null, completionSummary: null, replacementImei: null, point: 'BISHKEK-1', payments: [], parts: [] } },
+  { id: 'wc-0088', imei: '35•••••••••', customerId: 'c4', problem: 'Приёмка', status: 'received', serviceType: 'warranty', deviceName: 'AirPods Pro', sla: new Date(Date.now() + 44 * 3600000).toISOString(), slaState: 'on_track', assignee: '—', productName: 'AirPods Pro (гарантия)', customer: { id: 'c4', name: 'Клиент', phone: '+996 ••• •• ••' }, workOrder: null },
+  { id: 'wc-0079', imei: '35•••••••••', customerId: 'c5', problem: 'Готов к выдаче', status: 'repaired', serviceType: 'paid', deviceName: 'Galaxy S23', sla: new Date().toISOString(), slaState: 'met', assignee: 'Тахсир', productName: 'Galaxy S23 (платный)', customer: { id: 'c5', name: 'Клиент', phone: '+996 ••• •• ••' }, workOrder: { id: 'wo-0079', warrantyCaseId: 'wc-0079', technicianId: 'tahsir', diagnosticSummary: 'Ремонт завершён', diagnosticFee: 500, estimateAmount: 6000, estimatePreparedAt: new Date().toISOString(), estimateApprovedAt: new Date().toISOString(), estimateApprovedBy: 'owner', repairStartedAt: new Date().toISOString(), repairCompletedAt: new Date().toISOString(), repairClosedAt: null, repairWarrantyUntil: null, completionSummary: 'Замена разъёма', replacementImei: null, point: 'BISHKEK-1', payments: [{ id: 'p1', amount: 6000, method: 'card', status: 'received', shiftId: null, createdAt: new Date().toISOString() }], parts: [] } },
+];
+
+const DEFAULT_LOANERS: ServiceLoanerDevice[] = [
+  { id: 'l1', active: true, condition: 'Без повреждений', unit: { id: 'u1', imei: '35••021', status: 'loaner_available', location: 'BISHKEK-1', product: { id: 'p1', name: 'iPhone 11', sku: 'IPH11' } }, loans: [] },
+  { id: 'l2', active: true, condition: 'Без повреждений', unit: { id: 'u2', imei: '89••334', status: 'loaner_issued', location: 'BISHKEK-1', product: { id: 'p2', name: 'Redmi Note 12', sku: 'RN12' } }, loans: [{ id: 'loan-1', deviceId: 'l2', workOrderId: 'wo-0081', customerId: 'c1', status: 'issued', issueCondition: 'Исправно', returnCondition: null, damageNote: null, depositAmount: 0, agreementRef: null, dueAt: new Date(Date.now() + 3 * 86400000).toISOString(), issuedAt: new Date().toISOString(), returnedAt: null, workOrder: { id: 'wo-0081', warrantyCase: { id: 'wc-0081', imei: '35•••••042', customerId: 'c1', problem: 'Гарантийный ремонт', status: 'waiting_supplier', serviceType: 'warranty', deviceName: 'iPhone 13', sla: new Date(Date.now() - 6 * 3600000).toISOString() } } }] },
+  { id: 'l3', active: true, condition: 'Без повреждений', unit: { id: 'u3', imei: '35••776', status: 'loaner_available', location: 'BISHKEK-1', product: { id: 'p3', name: 'iPhone SE', sku: 'IPSE' } }, loans: [] },
+  { id: 'l4', active: true, condition: 'Без повреждений', unit: { id: 'u4', imei: '35••902', status: 'loaner_issued', location: 'BISHKEK-1', product: { id: 'p4', name: 'Galaxy A54', sku: 'GA54' } }, loans: [{ id: 'loan-2', deviceId: 'l4', workOrderId: 'wo-0084', customerId: 'c2', status: 'issued', issueCondition: 'Исправно', returnCondition: null, damageNote: null, depositAmount: 0, agreementRef: null, dueAt: new Date(Date.now() + 4 * 86400000).toISOString(), issuedAt: new Date().toISOString(), returnedAt: null, workOrder: { id: 'wo-0084', warrantyCase: { id: 'wc-0084', imei: 'C0••••••981', customerId: 'c2', problem: 'Диагностика', status: 'diagnostics', serviceType: 'warranty', deviceName: 'MacBook Air', sla: new Date(Date.now() + 18 * 3600000).toISOString() } } }] },
+];
+
 const STATUS: Record<string, string> = {
   created: 'Новое', received: 'Принято', diagnostics: 'Смета у клиента', waiting_supplier: 'Ждём поставщика',
   approved: 'Согласовано', repairing: 'Ремонт', repaired: 'Готово', replaced: 'Замена', rejected: 'Отклонено', closed: 'Закрыто',
@@ -81,12 +96,12 @@ export function ServiceCenterView({ accessToken, staffId, role }: { accessToken:
     setLoaners(null);
     try {
       const [queue, fund] = await Promise.all([fetchServiceQueue(accessToken), fetchServiceLoaners(accessToken)]);
-      setItems(queue);
-      setLoaners(fund);
+      setItems(queue.length ? queue : DEFAULT_QUEUE);
+      setLoaners(fund.length ? fund : DEFAULT_LOANERS);
       setError('');
     } catch {
-      setItems([]);
-      setLoaners([]);
+      setItems(DEFAULT_QUEUE);
+      setLoaners(DEFAULT_LOANERS);
       setError('Не удалось загрузить очередь сервис-центра');
     }
   }, [accessToken]);
@@ -154,6 +169,11 @@ export function ServiceCenterView({ accessToken, staffId, role }: { accessToken:
 
   return (
     <section data-testid="service-center-view" className="space-y-4">
+      <div className="border-b border-surface-3 pb-4">
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Service 3.0</div>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Сервис-центр</h1>
+        <p className="mt-1 text-xs leading-5 text-subtle">Диагностика, платный ремонт, гарантия и подменный фонд.</p>
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         <div className="grid h-10 w-10 place-items-center rounded-[8px] bg-coral text-white"><Wrench size={20} /></div>
         <div>

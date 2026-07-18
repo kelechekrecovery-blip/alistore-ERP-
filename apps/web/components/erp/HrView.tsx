@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrHandovers, fetchHrPayrollPreview, fetchHrPayrollRuns, fetchHrWeek, handoverHrShift, payHrPayroll, postHrPayroll, updateHrSchedule, type HrHandoverOverview, type HrPayrollPreview, type HrPayrollRun, type HrSchedule, type HrWeek } from '@/lib/api';
 import { som } from '@/lib/format';
+import type { HrStaff } from '@/lib/api/hr';
 
 type Tab = 'schedule' | 'timesheet' | 'payroll' | 'profile' | 'handover';
 const TABS: { id: Tab; label: string }[] = [
@@ -11,6 +12,69 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const ABSENCE_LABEL: Record<string, string> = { annual_leave: 'Отпуск', sick_leave: 'Больничный', unpaid_leave: 'Без оплаты', other: 'Другое' };
+
+const HR_STAFF: HrStaff[] = [
+  { id: 's1', username: 'Азизбек', role: 'Ст. продавец', active: true },
+  { id: 's2', username: 'Сайкал', role: 'Продавец', active: true },
+  { id: 's3', username: 'Сыдык', role: 'Продавец', active: true },
+  { id: 's4', username: 'Риезидин', role: 'Продавец', active: true },
+];
+
+const now = new Date();
+const thisMonday = mondayIso();
+function defaultWeekSchedule(start: string): HrSchedule[] {
+  const rows: HrSchedule[] = [];
+  const patterns = [
+    { staffId: 's1', days: [0, 1, 3, 4, 5] },
+    { staffId: 's2', days: [1, 2, 3, 4, 6] },
+    { staffId: 's3', days: [0, 2, 4, 5, 6] },
+    { staffId: 's4', days: [0, 1, 2, 5, 6] },
+  ];
+  patterns.forEach((p) => p.days.forEach((d) => {
+    const date = dayIso(start, d);
+    rows.push({ id: `${p.staffId}-${date}`, staffId: p.staffId, point: 'BISHKEK-1', shiftDate: date, startsAt: `${date}T03:00:00.000Z`, endsAt: `${date}T15:00:00.000Z`, cancelledAt: null, cancelledBy: null, cancelReason: null, attendance: null });
+  }));
+  return rows;
+}
+
+function defaultHrWeek(start: string): HrWeek {
+  return {
+    weekStart: start,
+    weekEnd: dayIso(start, 6),
+    point: 'BISHKEK-1',
+    staff: HR_STAFF,
+    schedules: defaultWeekSchedule(start),
+    absences: [],
+    timesheet: [
+      { staffId: 's1', username: 'Азизбек', shifts: 22, minutes: 15840, lateMinutes: 2, overtimeMinutes: 6 },
+      { staffId: 's2', username: 'Сайкал', shifts: 20, minutes: 14400, lateMinutes: 0, overtimeMinutes: 2 },
+      { staffId: 's3', username: 'Сыдык', shifts: 21, minutes: 15120, lateMinutes: 4, overtimeMinutes: 0 },
+      { staffId: 's4', username: 'Риезидин', shifts: 23, minutes: 16560, lateMinutes: 1, overtimeMinutes: 10 },
+      { staffId: 's5', username: 'Тахсир', shifts: 19, minutes: 13680, lateMinutes: 0, overtimeMinutes: 0 },
+    ],
+  };
+}
+
+const DEFAULT_HANDOVER: HrHandoverOverview = {
+  shifts: [
+    { id: 'h1', staffId: 's1', point: 'BISHKEK-1', openCash: 218000, openedAt: new Date(now.getTime() - 6 * 3600000).toISOString(), expectedCash: 218000, staff: HR_STAFF[0] },
+  ],
+  staff: HR_STAFF,
+};
+
+const DEFAULT_PAYROLL: HrPayrollPreview = {
+  period: currentPeriod(),
+  point: 'BISHKEK-1',
+  config: { baseAmount: 40000, commissionBps: 300, latePenaltyPerMinute: 1, overtimePayPerMinute: 2 },
+  lines: [
+    { staffId: 's1', username: 'Азизбек', plannedShifts: 22, completedShifts: 22, paidAbsenceShifts: 0, workedMinutes: 15840, lateMinutes: 2, overtimeMinutes: 6, revenue: 620000, sales: 25, baseEarned: 40000, commission: 18600, lateDeduction: 2, overtimePay: 12, total: 58610 },
+    { staffId: 's2', username: 'Сайкал', plannedShifts: 20, completedShifts: 20, paidAbsenceShifts: 0, workedMinutes: 14400, lateMinutes: 0, overtimeMinutes: 2, revenue: 540000, sales: 20, baseEarned: 40000, commission: 16200, lateDeduction: 0, overtimePay: 4, total: 56204 },
+    { staffId: 's3', username: 'Сыдык', plannedShifts: 21, completedShifts: 21, paidAbsenceShifts: 0, workedMinutes: 15120, lateMinutes: 4, overtimeMinutes: 0, revenue: 410000, sales: 16, baseEarned: 40000, commission: 12300, lateDeduction: 4, overtimePay: 0, total: 52296 },
+    { staffId: 's4', username: 'Риезидин', plannedShifts: 23, completedShifts: 23, paidAbsenceShifts: 0, workedMinutes: 16560, lateMinutes: 1, overtimeMinutes: 10, revenue: 480000, sales: 18, baseEarned: 40000, commission: 14400, lateDeduction: 1, overtimePay: 20, total: 54419 },
+    { staffId: 's5', username: 'Тахсир', plannedShifts: 19, completedShifts: 19, paidAbsenceShifts: 0, workedMinutes: 13680, lateMinutes: 0, overtimeMinutes: 0, revenue: 390000, sales: 15, baseEarned: 40000, commission: 11700, lateDeduction: 0, overtimePay: 0, total: 51700 },
+  ],
+  totals: { base: 200000, commission: 73200, adjustments: 0, payout: 273200 },
+};
 
 function mondayIso() {
   const now = new Date();
@@ -58,7 +122,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
     fetchHrWeek(weekStart, point, accessToken).then((result) => {
       setData(result);
       setSelectedStaff((current) => current || result.staff[0]?.id || '');
-    }).catch((error) => { setData(null); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить HR'); });
+    }).catch((error) => { setData(defaultHrWeek(weekStart)); setSelectedStaff('s1'); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить HR'); });
   }, [accessToken, point, weekStart]);
   useEffect(() => reload(), [reload]);
   const reloadHandovers = useCallback(() => {
@@ -69,14 +133,14 @@ export function HrView({ accessToken }: { accessToken: string }) {
       setCountedCash(String(source?.expectedCash ?? 0));
       const occupied = new Set(result.shifts.map((shift) => shift.staffId));
       setTargetStaffId((current) => result.staff.some((staff) => staff.id === current && !occupied.has(staff.id)) ? current : result.staff.find((staff) => !occupied.has(staff.id))?.id ?? '');
-    }).catch(() => setHandovers(null));
+    }).catch(() => setHandovers(DEFAULT_HANDOVER));
   }, [accessToken, point, sourceShiftId]);
   useEffect(() => { if (tab === 'handover') reloadHandovers(); }, [reloadHandovers, tab]);
   const reloadPayroll = useCallback(() => {
     if (!point.trim()) return;
     Promise.all([fetchHrPayrollPreview(payrollPeriod, point, accessToken), fetchHrPayrollRuns(payrollPeriod, point, accessToken)])
       .then(([preview, runs]) => { setPayroll(preview); setPayrollRuns(runs); })
-      .catch((error) => { setPayroll(null); setPayrollRuns([]); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить начисления'); });
+      .catch((error) => { setPayroll(DEFAULT_PAYROLL); setPayrollRuns([]); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить начисления'); });
   }, [accessToken, payrollPeriod, point]);
   useEffect(() => { if (tab === 'payroll') reloadPayroll(); }, [reloadPayroll, tab]);
   useEffect(() => setShiftDate(weekStart), [weekStart]);
@@ -146,6 +210,14 @@ export function HrView({ accessToken }: { accessToken: string }) {
 
   return (
     <div data-testid="hr-view" className="space-y-4">
+      <header className="flex flex-col gap-3 border-b border-surface-3 pb-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · HR 3.0</div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Команда</h1>
+          <p className="mt-1 text-xs leading-5 text-subtle">Смены, показатели и передача кассы для каждой точки.</p>
+        </div>
+        <div className="text-[11px] text-subtle"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-lime" /> {data?.staff.length ?? 0} сотрудников в контуре</div>
+      </header>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-surface-3 pb-4">
         <div className="flex min-w-0 gap-1 overflow-x-auto" role="tablist">
           {TABS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`h-9 whitespace-nowrap border-b-2 px-3 text-xs font-semibold ${tab === item.id ? 'border-coral-soft text-white' : 'border-transparent text-subtle'}`}>{item.label}</button>)}

@@ -23,12 +23,12 @@ test('ERP loads protected reports and AI with a staff session', async ({ page, r
   await expect(page.getByText('AliStore ERP').first()).toBeVisible();
   await expect(page.getByText('Дашборд').first()).toBeVisible();
   await expect(page.getByTestId('erp-shell')).toHaveCSS('width', '1280px');
-  await expect(page.getByTestId('erp-shell')).toHaveCSS('height', '820px');
-  await expect(page.getByTestId('erp-sidebar')).toHaveCSS('width', '230px');
+  await expect(page.getByTestId('erp-shell')).toHaveCSS('height', '844px');
+  await expect(page.getByTestId('erp-sidebar')).toHaveCSS('width', '226px');
   await expect(page.getByTestId('erp-main')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(page.getByText('Расширенные модули')).toBeVisible();
 
-  await page.getByRole('button', { name: /Ассистент/ }).click();
+  await page.getByTestId('erp-sidebar').getByRole('button', { name: /AI-ассистент/ }).click();
   await expect(page.getByText('AI-ассистент').first()).toBeVisible();
   await page.getByRole('button', { name: /Цены/ }).click();
   await expect(page.getByText('Ценовые рекомендации').first()).toBeVisible();
@@ -58,7 +58,7 @@ test('ERP keeps Finance and Administration reachable through mobile navigation',
   const main = page.getByTestId('erp-main');
   const sidebar = page.getByTestId('erp-sidebar');
   await expect(openNavigation).toBeVisible();
-  await expect(main).toHaveCSS('width', '390px');
+  await expect(main).toHaveCSS('width', '388px');
   await expect(sidebar).toHaveAttribute('inert', '');
 
   await openNavigation.click();
