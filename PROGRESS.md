@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-0-TOOLCHAIN-LOCK-001`.
+- Task: restore the trusted ecosystem audit after dependency-tree drift.
+- Files changed: `scripts/ecosystem-toolchain-lock.json`, `BACKLOG.md`, and this progress entry.
+- Result: `npm ci` with lifecycle scripts reproducibly restored the dependency tree; the package-lock digest and runtime hashes remain unchanged. The lock now records the verified installed tree digest `ffcae6956e4aa69d0b0c2f88d56a2b4341a0e60f5f2931bd88369c25998c9351`. Strict audit bootstrap succeeds and reaches the contract checks.
+- Checks run: `npm ci` (938 packages, 0 vulnerabilities); `npm run ecosystem:audit:strict` (expected non-zero contract audit with 10 explicit GAPs); `git diff --check` (pass).
+- Outcome: toolchain reproducibility is accepted locally. Remaining audit gaps are evidence/certification work, not hidden as passes: durable visual baseline, app-specific native UI evidence, four reconciliation artifacts, composite ecosystem evidence and clean source status before this commit.
+- Next step: commit this lock correction, then close the next locally verifiable evidence or reconciliation slice without claiming production readiness.
+
 - Iteration ID: `PHASE-2-ACC-CLOSE-READINESS-001`.
 - Task: add a server-authoritative readiness report and hard-close guard for accounting periods.
 - Files changed: `apps/api/src/finance/finance.service.ts`, `apps/api/src/finance/finance.controller.ts`, `apps/api/test/finance-expenses.e2e-spec.ts`, and `BACKLOG.md`.
