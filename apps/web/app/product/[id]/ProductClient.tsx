@@ -487,20 +487,6 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   );
 }
 
-function Perk({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-3 py-2 text-sm text-faint">
-      <span className="text-deep">{icon}</span>
-      <span>{children}</span>
-    </div>
-  );
-}
 function StoreMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-sand text-faint">
