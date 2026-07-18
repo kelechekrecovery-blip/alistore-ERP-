@@ -2908,7 +2908,7 @@ private struct CustomerReturnsView: View {
                         .foregroundStyle(ClientTheme.muted)
                     Text("Возврат #\(item.id.suffix(6)) · \(item.createdAt.formatted(.dateTime.day().month()))")
                         .font(ClientTheme.body(11))
-                        .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                        .foregroundStyle(Design3.textSubtle)
                 }
                 Spacer()
                 Text(statusLabel(item.status))
@@ -3244,7 +3244,7 @@ private struct CustomerTradeInsView: View {
                             .padding(22)
                             .background(
                                 LinearGradient(
-                                    colors: [Color(red: 0.165, green: 0.165, blue: 0.18), ClientTheme.surface],
+                                    colors: [Design3.surfaceRaised, ClientTheme.surface],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
@@ -3780,7 +3780,7 @@ private struct AccountView: View {
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    LinearGradient(colors: [Color(red: 0.165, green: 0.165, blue: 0.18), ClientTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    LinearGradient(colors: [Design3.surfaceRaised, ClientTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing),
                     in: RoundedRectangle(cornerRadius: 16)
                 )
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
