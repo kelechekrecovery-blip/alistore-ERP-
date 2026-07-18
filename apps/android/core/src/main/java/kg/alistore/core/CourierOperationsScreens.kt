@@ -108,6 +108,13 @@ class CourierCommandManager(
     online = { gateway.failDelivery(orderId, reason, token, key) },
   )
 
+  suspend fun handover(runId: String, amount: Int, reason: String?, token: String, key: String): CourierCommandResult = submit(
+    endpoint = "courier/handover",
+    body = JSONObject().put("runId", runId).put("amount", amount).putOpt("reason", reason),
+    key = key,
+    online = { gateway.handoverCourierRun(runId, amount, reason, token, key) },
+  )
+
   private suspend fun submit(
     endpoint: String,
     body: JSONObject,
@@ -422,12 +429,17 @@ private fun CourierActionButton(label: String, busy: Boolean, action: () -> Unit
   }
 }
 
+// The server reconciles against collectedTotal and demands a reason when the handed
+// amount differs from it or when the run was collected partially (HandoverDto).
+internal fun handoverReasonRequired(run: CourierRunSummary, amount: Int): Boolean =
+  amount != run.collectedTotal || run.collectedTotal < run.codTotal
+
 @Composable
 private fun CourierCod(
   deliveries: List<CourierDelivery>,
   pending: List<PendingMutation>,
   session: StaffSession,
-  api: CourierGateway,
+  commands: CourierCommandManager,
   apiBaseUrl: String,
   onRefresh: () -> Unit,
   modifier: Modifier,
@@ -441,18 +453,52 @@ private fun CourierCod(
       Text("Офлайн-команд: ${pending.size}", color = CourierMuted, modifier = Modifier.padding(bottom = 14.dp))
     }
     items(runs, key = CourierRunSummary::id) { run ->
+      var amountText by rememberSaveable(run.id) { mutableStateOf(run.collectedTotal.toString()) }
+      var reason by rememberSaveable(run.id) { mutableStateOf("") }
+      var busy by remember(run.id) { mutableStateOf(false) }
       var message by remember(run.id) { mutableStateOf<String?>(null) }
+      val amount = amountText.toIntOrNull()
+      val reasonRequired = amount != null && handoverReasonRequired(run, amount)
       Card(colors = CardDefaults.cardColors(containerColor = CourierSurface), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
         Column(Modifier.padding(16.dp)) {
           Text("Рейс ${run.id.takeLast(6)}", color = Color.White, fontWeight = FontWeight.Bold)
           Text("Собрано ${run.collectedTotal} из ${run.codTotal} сом", color = CourierMuted, modifier = Modifier.padding(top = 5.dp))
-          if (!run.handedOver) Button(
-            onClick = { scope.launch { runCatching { api.handoverCourierRun(run.id, run.collectedTotal, session.accessToken, "courier-handover-${run.id}") }.onSuccess { message = "Наличные сданы"; onRefresh() }.onFailure { message = it.message } } },
-            enabled = run.collectedTotal == run.codTotal,
-            colors = ButtonDefaults.buttonColors(containerColor = CourierLime, contentColor = CourierInk),
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-          ) { Text("Сдать ${run.collectedTotal} сом") }
-          else Text("Сверено", color = CourierLime, modifier = Modifier.padding(top = 10.dp))
+          if (!run.handedOver) {
+            OutlinedTextField(
+              amountText,
+              { amountText = it.filter(Char::isDigit) },
+              label = { Text("Сумма сдачи") },
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              singleLine = true,
+              modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("courier-handover-amount"),
+            )
+            if (reasonRequired) {
+              OutlinedTextField(
+                reason,
+                { reason = it },
+                label = { Text("Причина расхождения") },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("courier-handover-reason"),
+              )
+            }
+            Button(
+              onClick = {
+                busy = true
+                scope.launch {
+                  runCatching { commands.handover(run.id, amount ?: 0, reason.trim().ifEmpty { null }, session.accessToken, "courier-handover-${run.id}") }
+                    .onSuccess {
+                      message = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Наличные сданы"
+                      if (it is CourierCommandResult.Queued) scheduleCourierSync(context, apiBaseUrl)
+                      onRefresh()
+                    }
+                    .onFailure { message = it.message }
+                  busy = false
+                }
+              },
+              enabled = !busy && amount != null && (!reasonRequired || reason.isNotBlank()),
+              colors = ButtonDefaults.buttonColors(containerColor = CourierLime, contentColor = CourierInk),
+              modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("courier-handover-submit"),
+            ) { Text("Сдать ${amount ?: run.collectedTotal} сом") }
+          } else Text("Сверено", color = CourierLime, modifier = Modifier.padding(top = 10.dp))
           message?.let { Text(it, color = CourierCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
         }
       }

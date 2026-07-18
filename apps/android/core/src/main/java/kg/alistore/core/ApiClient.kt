@@ -293,8 +293,14 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     )
   }
 
-  override suspend fun handoverCourierRun(runId: String, amount: Int, token: String, idempotencyKey: String): CourierRunSummary =
-    request("courier/handover", "POST", JSONObject().put("runId", runId).put("amount", amount), token, idempotencyKey = idempotencyKey).courierRun()
+  override suspend fun handoverCourierRun(runId: String, amount: Int, reason: String?, token: String, idempotencyKey: String): CourierRunSummary =
+    request(
+      "courier/handover",
+      "POST",
+      JSONObject().put("runId", runId).put("amount", amount).putOpt("reason", reason),
+      token,
+      idempotencyKey = idempotencyKey,
+    ).courierRun()
 
   override suspend fun posSale(request: PosSaleRequest, token: String): PosSaleResult =
     this.request("pos/sale", "POST", request.toJson(), token).posSaleResult()

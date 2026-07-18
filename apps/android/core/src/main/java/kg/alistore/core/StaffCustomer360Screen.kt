@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 private val warrantyRoles = setOf("warehouse", "admin", "owner")
-private val supportRoles = setOf("admin", "owner")
+val supportRoles = setOf("admin", "owner")
 
 internal fun nextWarrantyStatus(status: String): String? = when (status) {
   "created" -> "received"
