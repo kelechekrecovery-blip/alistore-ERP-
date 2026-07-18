@@ -203,8 +203,8 @@
     z-index: auto;
     display: block;
     min-height: 100vh;
-    background: #f7f2ec;
-    color: #201b17;
+    background: #0b0a08;
+    color: #e5dcd3;
   }
 
   .account-detail-header,
@@ -220,7 +220,7 @@
     margin-inline: auto;
     padding-block: 32px 64px;
     background: transparent;
-    color: #201b17;
+    color: #e5dcd3;
   }
 
   .account-detail-panel > .overflow-y-auto {
@@ -230,31 +230,31 @@
 
   .account-detail-panel .bg-\[\#221E19\],
   .account-detail-panel .bg-\[\#16130F\] {
-    background: #fff !important;
+    background: rgba(255,255,255,.04) !important;
   }
 
   .account-detail-panel .border-\[\#2E2822\] {
-    border-color: #e7ddd3 !important;
+    border-color: rgba(255,255,255,.1) !important;
   }
 
   .account-detail-panel .text-white,
   .account-detail-panel .text-\[\#D8CFC6\] {
-    color: #201b17 !important;
+    color: #e5dcd3 !important;
   }
 
   .account-detail-panel .text-\[\#A79C92\],
   .account-detail-panel .text-\[\#8A7F76\],
   .account-detail-panel .text-\[\#6E645C\] {
-    color: #6e645c !important;
+    color: rgba(255,255,255,.45) !important;
   }
 
   .account-detail-panel .bg-lime {
-    background: #201b17 !important;
+    background: #ff5b2e !important;
     color: #fff !important;
   }
 
   .account-detail-panel .text-lime {
-    color: #ff5b2e !important;
+    color: #ff7a4d !important;
   }
 
   .customer-service-shell {

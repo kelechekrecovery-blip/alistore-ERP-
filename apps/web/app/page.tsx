@@ -128,5 +128,5 @@ function Benefit({ icon, title, text, dark = false }: { icon: ReactNode; title: 
 }
 
 function CatalogSkeleton() {
-  return <div className="grid grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[.76] animate-pulse rounded-[12px] border border-linen bg-white" />)}</div>;
+  return <div className="grid grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[.76] animate-pulse rounded-[12px] border border-white/10 bg-white/[.04]" />)}</div>;
 }

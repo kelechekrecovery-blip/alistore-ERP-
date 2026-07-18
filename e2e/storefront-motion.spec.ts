@@ -7,18 +7,18 @@ test('desktop storefront matches the AliStore shop prototype', async ({ page }) 
   await seedProduct('MOTION-E2E');
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Техника из актуального каталога' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Техника с гарантией. Новое и Б/У.' })).toBeVisible();
   await expect(page.getByRole('banner').getByRole('link', { name: 'Каталог', exact: true })).toBeVisible();
-  await expect(page.getByPlaceholder('Поиск по товарам')).toBeVisible();
+  await expect(page.getByPlaceholder('Поиск техники…')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Обменяйте старый смартфон' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Товары в каталоге' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Популярное' })).toBeVisible();
   await expect(page.getByText('4.9', { exact: true })).toHaveCount(0);
   await expect(page.getByText('0 · 0 · 12', { exact: true })).toHaveCount(0);
   await expect(page.locator('article')).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 
   await page.goto('/app');
-  await expect(page.getByText('Техника из актуального каталога', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Техника с гарантией. Новое и Б/У.', { exact: true }).first()).toBeVisible();
 });
 
 test('desktop storefront remains active in a narrow desktop browser window', async ({ page }) => {
@@ -27,7 +27,7 @@ test('desktop storefront remains active in a narrow desktop browser window', asy
   await page.setViewportSize({ width: 863, height: 954 });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Техника из актуального каталога' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Техника с гарантией. Новое и Б/У.' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Категории товаров' })).toBeVisible();
   await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toHaveCount(0);
   const desktopTheme = await page.evaluate(() => {
@@ -38,7 +38,7 @@ test('desktop storefront remains active in a narrow desktop browser window', asy
       heading: heading ? getComputedStyle(heading).color : '',
     };
   });
-  expect(desktopTheme).toEqual({ background: 'rgb(245, 245, 247)', heading: 'rgb(255, 255, 255)' });
+  expect(desktopTheme).toEqual({ background: 'rgb(11, 10, 8)', heading: 'rgb(255, 255, 255)' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(863);
 
   await page.goto('/catalog');
@@ -51,7 +51,7 @@ test('native-style Client App keeps the dark handoff theme on phone viewports', 
   await page.goto('/');
 
   await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toHaveCount(0);
-  await expect(page.locator('.md\\:hidden').getByText('Техника из актуального каталога', { exact: true })).toBeVisible();
+  await expect(page.locator('.md\\:hidden').getByText('Техника с гарантией. Новое и Б/У.', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
 });
 
@@ -97,9 +97,9 @@ test('desktop catalog, product and cart keep the exact shop visual system', asyn
     };
   });
   expect(catalogTheme).toEqual({
-    background: 'rgb(245, 245, 247)',
-    card: 'rgb(255, 255, 255)',
-    border: 'rgb(229, 229, 231)',
+    background: 'rgb(11, 10, 8)',
+    card: 'rgba(0, 0, 0, 0)',
+    border: 'rgba(255, 255, 255, 0.1)',
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
 
@@ -120,11 +120,11 @@ test('remaining desktop customer routes use the shop system through account entr
   await expect(page).toHaveURL(/\/catalog\?q=iphone$/);
 
   await page.goto('/favorites');
-  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
   await page.goto('/compare');
-  expect(await page.locator('main').locator('..').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.locator('main').locator('..').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
   await page.goto('/login?next=/account');
-  expect(await page.locator('.login-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.locator('.login-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
 
   const customer = await prisma.customer.create({ data: { phone: '+996700990021', name: 'Visual Route Customer' } });
@@ -153,12 +153,12 @@ test('remaining desktop customer routes use the shop system through account entr
   }, { accessToken, refreshToken: 'visual-route-test' });
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
-  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
 
   for (const route of ['/account/addresses', '/account/bonuses', '/account/settings', '/support', '/trade-in']) {
     await page.goto(route);
     await expect(page.locator('.customer-service-title')).toBeVisible();
-    expect(await page.locator('.customer-service-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+    expect(await page.locator('.customer-service-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
   }
 
@@ -171,7 +171,7 @@ test('remaining desktop customer routes use the shop system through account entr
   for (const { route, text } of detailRoutes) {
     await page.goto(route);
     await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
-    expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(245, 245, 247)');
+    expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
   }
 

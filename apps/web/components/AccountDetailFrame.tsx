@@ -6,7 +6,7 @@ export function AccountDetailFrame({ children }: { children: ReactNode }) {
   return (
     <div className="account-detail-shell fixed inset-0 z-40 flex justify-center bg-night font-sans">
       <div className="account-detail-header">
-        <SiteHeader />
+        <SiteHeader variant="design3" />
       </div>
       <main className="account-detail-panel flex h-full w-full max-w-[440px] flex-col bg-ink-dark text-white">
         {children}
