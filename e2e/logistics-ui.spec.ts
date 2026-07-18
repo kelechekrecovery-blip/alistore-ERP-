@@ -6,6 +6,10 @@ test.afterEach(async () => resetDb());
 test('ERP point availability immediately controls public checkout options', async ({ page, request }) => {
   await resetDb();
   const { product } = await seedProduct('POINT-AVAILABILITY', 1_000);
+  // The point guard must reject deactivation while it owns stock. Keep the
+  // catalog item for checkout, but place its serialized unit outside the
+  // point so this scenario isolates pickup availability.
+  await prisma.deviceUnit.updateMany({ where: { productId: product.id }, data: { location: 'ARCHIVE-TEST' } });
   const owner = await seedStaffCredentials('owner', 'e2e-store-point-owner');
   await page.addInitScript(() => {
     localStorage.removeItem('alistore.cart.pricing.v1');

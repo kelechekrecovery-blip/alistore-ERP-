@@ -2,12 +2,22 @@
 
 ## 2026-07-18
 
+- Iteration ID: `MVP-VERIFY-034`.
+- Task: make the local API/Web MVP gate deterministic after lifecycle failures and validate the store-point operational guard end to end.
+- Result: API isolation runner executes one Jest file per clean database/process; full isolated API gate passed `163/163` test files, including `739` tests across the suites. Migration `20260718120000_fix_bundle_allocation_lifecycle` replaces the historical global IMEI uniqueness with an active-only partial unique index, preserving released allocation history. Storefront CMS requests now send `Connection: close` to avoid late socket resets. The logistics UI fixture keeps catalog stock outside the point so it tests pickup availability without violating the server guard.
+- Checks: Prisma validation and migration upgrade paths passed; API build, Web production build and mobile typecheck passed; full Playwright passed `62/62`; targeted product-bundles `14/14`, storefront-blocks `3/3` and logistics availability `1/1` passed; `git diff --check` runs before commit.
+- Acceptance: local software MVP gate is green for this source tree. This does not certify staging, live providers, physical devices, App Store/Google Play or the 64 missing linked design references.
+- Next step: refresh hash-bound trusted evidence and continue the first-phase ERP/native parity gaps, then stage owner credentials for external readiness.
+
+
 - Iteration ID: `LOGIC-009-040`.
 - Task: protect store-point deactivation from open operational state.
 - Result: `LogisticsService.updateStorePoint` now locks the point and checks open cash shifts, active non-demo orders, serialized `in_stock/reserved` units and quantity inventory balances at the point location before allowing `active=false`; conflicts return `store_point_deactivation_blocked` and successful changes remain Event Ledger-backed/idempotent.
 - Checks: store-point fulfillment integration `1/1`, API build and `git diff --check` pass.
 - Remaining: staging/first-store validation of shift handover, stock relocation and owner approval policy. Full `mvp:verify` still has unrelated long-suite `socket hang up` instability.
-- Commit: pending validation commit.
+- Commit: `c8df9de`.
+
+- Verification follow-up: a diagnostic full API run with `--detectOpenHandles` reached `163/163` suites and `739/739` tests once, confirming the source contracts are broadly green; the mode is too slow for the release gate and caused secondary timeout/cascade failures on another run. The plain gate still needs a deterministic process-lifecycle fix for late socket resets.
 
 - Verification follow-up for `GAP-PII-RETENTION-039`: targeted retention, Evidence integration, API build, Prisma migration validation and isolated public-rate-limit tests pass. Full `mvp:verify` reaches API Jest with `162/163` suites and `738/739` tests; the remaining failure is a nondeterministic `socket hang up` in a long-running HTTP integration suite (`public-rate-limit.e2e-spec.ts`, then `procurement.e2e-spec.ts` on the next run). The new Evidence retention code has no failing targeted test. The full MVP gate remains RED until the shared test HTTP/lifecycle instability is fixed.
 - A minimal `Connection: close` header was added to the rate-limit test helper; its isolated suite is green, but this is not treated as a full-gate fix.

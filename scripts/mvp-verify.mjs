@@ -30,7 +30,7 @@ const steps = [
   ],
   ['Test database post-deploy indexes', 'node', ['apps/api/scripts/postdeploy-indexes.mjs'], testDatabaseEnv],
   // Integration suites share one test database and must not clean fixtures concurrently.
-  ['API Jest', 'npm', ['run', 'test', '-w', '@alistore/api', '--', '--runInBand'], testDatabaseEnv],
+  ['API Jest batches', 'node', ['scripts/run-api-test-batches.mjs'], testDatabaseEnv],
 ];
 
 if (!skipE2e) {
