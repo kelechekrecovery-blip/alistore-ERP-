@@ -245,13 +245,13 @@ export default function CartPage() {
                   </div>
                   <Link
                     href="/checkout"
-                    className="mt-6 flex w-full items-center justify-center rounded-[9px] bg-coral py-3.5 text-sm font-bold text-white hover:bg-[#e63a1c]"
+                    className="mt-6 flex w-full items-center justify-center rounded-[9px] bg-coral py-3.5 text-sm font-bold text-white hover:bg-deep"
                   >
                     Перейти к оформлению
                   </Link>
                   <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-slate">
                     <ShieldCheck
-                      className="mt-0.5 shrink-0 text-[#00a046]"
+                      className="mt-0.5 shrink-0 text-success"
                       size={16}
                     />
                     Безопасная оплата. Товар резервируется после подтверждения

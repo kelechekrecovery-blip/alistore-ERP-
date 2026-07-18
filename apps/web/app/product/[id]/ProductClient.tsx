@@ -182,7 +182,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           </nav>
           <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
             <div>
-              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-[#E7DDD3] bg-gradient-to-br from-white to-sand shadow-soft">
+              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-linen bg-gradient-to-br from-white to-sand shadow-soft">
                 {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
                 <span className="absolute left-5 top-5 rounded-full border border-coral/25 bg-tint px-3 py-1.5 text-xs font-semibold text-deep">
                   {condition}
@@ -229,10 +229,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </div>
               {typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-deep">{product.attrs.financingText}</div>}
               <div
-                className={`mt-5 flex items-center gap-2 text-sm ${inStock ? "text-[#7ee2a0]" : "text-[#f4c27d]"}`}
+                className={`mt-5 flex items-center gap-2 text-sm ${inStock ? "text-success-soft" : "text-[#f4c27d]"}`}
               >
                 <span
-                  className={`h-2 w-2 rounded-full ${inStock ? "bg-[#22c55e] shadow-[0_0_10px_#22c55e]" : "bg-warn"}`}
+                  className={`h-2 w-2 rounded-full ${inStock ? "bg-success shadow-[0_0_10px_#22c55e]" : "bg-warn"}`}
                 />
                 {inStock
                   ? `В наличии · ${product.availableUnits} шт.`
@@ -309,7 +309,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   type="button"
                   onClick={addToCart}
                   disabled={!inStock}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] px-5 font-semibold transition disabled:bg-[#E7DDD3] disabled:text-subtle ${added ? "bg-success text-white" : "bg-coral text-white hover:bg-deep"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] px-5 font-semibold transition disabled:bg-linen disabled:text-subtle ${added ? "bg-success text-white" : "bg-coral text-white hover:bg-deep"}`}
                 >
                   <ShoppingBag size={18} />
                   {added ? "Добавлено" : "В корзину"}
@@ -337,7 +337,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 </button>
               </div>
 
-              <div className="mt-7 grid gap-1 border-t border-[#E7DDD3] pt-5">
+              <div className="mt-7 grid gap-1 border-t border-linen pt-5">
                 {['warranty','deliveryText','pickupText','returnPolicy'].map((key) => typeof product.attrs?.[key] === 'string' ? <div key={key} className="py-2 text-sm text-faint">{String(product.attrs[key])}</div> : null)}
               </div>
             </div>
@@ -350,12 +350,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             <h2 className="mt-2 font-display text-3xl font-bold">
               Характеристики
             </h2>
-            <div className="mt-7 overflow-hidden rounded-[18px] border border-[#E7DDD3] bg-white shadow-soft">
+            <div className="mt-7 overflow-hidden rounded-[18px] border border-linen bg-white shadow-soft">
               {specs.length ? (
                 specs.map(([key, value]) => (
                   <div
                     key={key}
-                    className="grid gap-2 border-b border-[#E7DDD3] px-5 py-4 text-sm last:border-0 sm:grid-cols-[220px_1fr]"
+                    className="grid gap-2 border-b border-linen px-5 py-4 text-sm last:border-0 sm:grid-cols-[220px_1fr]"
                   >
                     <span className="text-subtle">{key}</span>
                     <span className="text-ink">{String(value)}</span>
@@ -380,7 +380,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   reviews.items.map((review) => (
                     <article
                       key={review.id}
-                      className="rounded-[18px] border border-[#E7DDD3] bg-white p-5 shadow-soft"
+                      className="rounded-[18px] border border-linen bg-white p-5 shadow-soft"
                     >
                       <div className="flex items-center gap-3">
                         <strong>{review.customerName}</strong>
@@ -396,13 +396,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     </article>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-[#E7DDD3] bg-white p-7 text-faint">
+                  <div className="rounded-[18px] border border-linen bg-white p-7 text-faint">
                     Будьте первым, кто оставит отзыв об этом товаре.
                   </div>
                 )}
               </div>
             </div>
-            <div className="h-fit rounded-[18px] border border-[#E7DDD3] bg-white p-6 shadow-soft">
+            <div className="h-fit rounded-[18px] border border-linen bg-white p-6 shadow-soft">
               <h3 className="font-display text-lg font-semibold">
                 Оставить отзыв
               </h3>

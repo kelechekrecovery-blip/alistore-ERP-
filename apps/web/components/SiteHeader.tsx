@@ -65,7 +65,7 @@ export function SiteHeader() {
           <span className="hidden text-[10px] uppercase tracking-[0.15em] text-slate lg:inline">Electronics</span>
         </Link>
 
-        <Link href="/catalog" className="hidden h-11 items-center gap-2.5 rounded-[10px] bg-coral px-[18px] text-sm font-bold text-white transition-colors hover:bg-[#e63a1c] md:flex">
+        <Link href="/catalog" className="hidden h-11 items-center gap-2.5 rounded-[10px] bg-coral px-[18px] text-sm font-bold text-white transition-colors hover:bg-deep md:flex">
           <Menu size={17} /> Каталог
         </Link>
 

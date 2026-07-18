@@ -124,7 +124,7 @@ function LoginForm() {
             </div>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
             {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
-            <button type="submit" disabled={busy} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-[#180f02] disabled:opacity-60">{busy ? 'Отправляем…' : recovery ? 'Получить код восстановления' : 'Получить код по SMS'}</button>
+            <button type="submit" disabled={busy} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Отправляем…' : recovery ? 'Получить код восстановления' : 'Получить код по SMS'}</button>
             <div className="mt-3 flex gap-2.5">
               <button type="button" disabled className="flex-1 rounded-[13px] border border-surface-3 bg-surface-2 p-3 text-center text-sm text-faint opacity-70">Apple</button>
               <button
@@ -143,7 +143,7 @@ function LoginForm() {
             <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-значный код" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
             {devCode && <p className="mt-2 rounded-[10px] bg-surface-2 px-3 py-2 text-center font-mono text-xs text-lime">dev-код: {devCode}</p>}
             {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
-            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-[#180f02] disabled:bg-line disabled:text-faint">{busy ? 'Проверяем…' : recovery ? 'Восстановить доступ' : 'Войти'}</button>
+            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-[#f97316] py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">{busy ? 'Проверяем…' : recovery ? 'Восстановить доступ' : 'Войти'}</button>
             <button type="button" onClick={() => { setStepCode(false); setCode(''); setDevCode(null); }} className="mt-3 w-full text-center text-[13px] text-muted">← Изменить номер</button>
           </form>
         )}

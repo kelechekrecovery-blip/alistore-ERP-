@@ -99,7 +99,7 @@ export default function ComparePage() {
                     {product.name}
                   </Link>
                   {product.price === bestPrice && (
-                    <span className="mt-2 inline-flex rounded-[4px] bg-[#eaf8f0] px-2 py-1 text-[10px] text-[#00a046]">
+                    <span className="mt-2 inline-flex rounded-[4px] bg-[#eaf8f0] px-2 py-1 text-[10px] text-success">
                       Лучшая цена
                     </span>
                   )}

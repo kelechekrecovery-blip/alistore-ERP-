@@ -43,7 +43,8 @@ export default {
         // Light-mode neutral scale (desktop light shells — canon §5 «витрина светлая»)
         paper: '#F5F5F7', // светлейшая панель
         mist: '#E5E5E7', // светлый бордер/дивайдер
-        haze: '#D2D2D7', // светлый хайрлайн
+        haze: '#D2D2D7', // светлый хайрлайн (холодный)
+        linen: '#E7DDD3', // тёплый светлый хайрлайн/бордер
         graphite: '#1D1D1F', // near-black текст (светлые шапки)
         slate: '#8A8A8A', // серый текст на светлом
         steel: '#4A4A4A', // тёмно-серый текст
