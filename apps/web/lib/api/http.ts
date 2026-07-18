@@ -119,3 +119,18 @@ export async function getAuthBlob(path: string, accessToken: string): Promise<Bl
   if (!res.ok) throw await responseError(res);
   return res.blob();
 }
+
+/** Save a Blob as a file in the browser via a temporary object URL. */
+export function saveBlobAs(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Authenticated file download (Bearer): fetches the body and saves it under `filename`. */
+export async function downloadAuthFile(path: string, accessToken: string, filename: string): Promise<void> {
+  saveBlobAs(await getAuthBlob(path, accessToken), filename);
+}

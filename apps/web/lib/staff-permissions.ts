@@ -1,0 +1,98 @@
+/**
+ * Web-side mirror of the API casbin Role Permission Matrix
+ * (apps/api/src/authz/authz.model.ts). Only the grants the web UI gates on are
+ * mirrored; the server RBAC stays the source of truth — this map only keeps
+ * navigation and tabs that would render 403 out of sight. Role inheritance
+ * matches the policy edges: owner → admin → senior_seller.
+ */
+
+export type StaffPermission = { obj: string; act: string };
+
+/** permission "obj:act" → roles with an explicit `p, role, obj, act` policy line. */
+const GRANTS: Record<string, readonly string[]> = {
+  'reports:read': ['admin', 'owner'],
+  'finance:read': ['admin', 'owner'],
+  'hr:read': ['admin', 'owner'],
+  'logistics:read': ['admin', 'owner'],
+  'store_operations:read': ['seller', 'cashier', 'senior_seller', 'franchise', 'warehouse', 'service', 'courier', 'admin', 'owner'],
+  'service_center:read': ['service', 'technician', 'admin', 'owner'],
+  'support:read': ['admin', 'owner'],
+  'ai:read': ['admin', 'owner'],
+  'campaigns:read': ['marketer', 'admin', 'owner'],
+  'storefront:read': ['marketer', 'admin', 'owner'],
+  'inventory:count': ['warehouse', 'admin', 'owner'],
+  'orders:queue': ['warehouse', 'admin', 'owner'],
+  'b2b:read': ['seller', 'senior_seller', 'admin', 'owner'],
+  'protection:read': ['seller', 'senior_seller', 'admin', 'owner'],
+  'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
+  'staff:manage': ['owner'],
+};
+
+/** `g, child, parent` policy edges: a role also holds every grant of its parent. */
+const ROLE_INHERITS: Record<string, string> = { owner: 'admin', admin: 'senior_seller' };
+
+function roleWithAncestors(role: string): string[] {
+  const chain = [role];
+  let current = role;
+  while (ROLE_INHERITS[current]) {
+    current = ROLE_INHERITS[current];
+    chain.push(current);
+  }
+  return chain;
+}
+
+export function staffCan(role: string, obj: string, act: string): boolean {
+  const roles = GRANTS[`${obj}:${act}`];
+  if (!roles) return false;
+  return roleWithAncestors(role).some((candidate) => roles.includes(candidate));
+}
+
+/** ERP shell routes (app/erp/page.tsx). `null` — route is open to every staff role. */
+export type ErpRoute =
+  | 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr'
+  | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns'
+  | 'storefront' | 'risks' | 'readiness' | 'ledger';
+
+export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
+  dash: { obj: 'reports', act: 'read' },
+  admin: null, // module launcher filters its own cards by role
+  ai: { obj: 'ai', act: 'read' },
+  pricing: { obj: 'ai', act: 'read' },
+  reorder: { obj: 'ai', act: 'read' },
+  finance: { obj: 'finance', act: 'read' },
+  stock: { obj: 'inventory', act: 'count' },
+  hr: { obj: 'hr', act: 'read' },
+  logistics: { obj: 'logistics', act: 'read' },
+  operations: { obj: 'store_operations', act: 'read' },
+  service: { obj: 'service_center', act: 'read' },
+  kpi: { obj: 'reports', act: 'read' },
+  crm: { obj: 'support', act: 'read' },
+  campaigns: { obj: 'campaigns', act: 'read' },
+  storefront: { obj: 'storefront', act: 'read' },
+  risks: { obj: 'reports', act: 'read' },
+  readiness: null, // public health endpoint, no staff permission required
+  ledger: { obj: 'reports', act: 'read' },
+};
+
+export function erpRouteAllowed(role: string, route: ErpRoute): boolean {
+  const required = ERP_ROUTE_PERMISSION[route];
+  return !required || staffCan(role, required.obj, required.act);
+}
+
+/** /staff app tabs (app/staff/page.tsx). `null` — tab is open to every staff role. */
+export type StaffAppTab = 'home' | 'orders' | 'b2b' | 'protection' | 'tasks' | 'buyback' | 'hr';
+
+export const STAFF_TAB_PERMISSION: Record<StaffAppTab, StaffPermission | null> = {
+  home: null,
+  orders: { obj: 'orders', act: 'queue' },
+  b2b: { obj: 'b2b', act: 'read' },
+  protection: { obj: 'protection', act: 'read' },
+  tasks: null, // staff-tasks/mine is open to every staff role
+  buyback: { obj: 'tradeins', act: 'intake' },
+  hr: null, // hr/me/* self-service endpoints are open to every staff role
+};
+
+export function staffTabAllowed(role: string, tab: StaffAppTab): boolean {
+  const required = STAFF_TAB_PERMISSION[tab];
+  return !required || staffCan(role, required.obj, required.act);
+}
