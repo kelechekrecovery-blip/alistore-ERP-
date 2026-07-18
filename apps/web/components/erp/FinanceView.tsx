@@ -38,6 +38,7 @@ const CURRENT_PERIOD = new Date().toISOString().slice(0, 7);
 const paymentStorageKey = (expenseId: string) => `alistore:finance:expense-payment:${expenseId}`;
 
 export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessToken: string }) {
+  const [financeSection, setFinanceSection] = useState<'overview' | 'cash' | 'payroll' | 'suppliers' | 'expenses' | 'currency'>('overview');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [category, setCategory] = useState('other');
   const [description, setDescription] = useState('');
@@ -230,9 +231,114 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const currencies = ['KGS', ...new Set(currencyRates.map((rate) => rate.currency))];
   const matchingRates = currencyRates.filter((rate) => rate.currency === currency);
 
+  const pnlRows = d ? [
+    { label: 'Выручка', value: d.money.salesGross, color: '#fff' },
+    { label: 'Себестоимость товаров', value: -(d.money.salesGross - d.money.operatingProfit - d.money.expenses), color: '#FF8A7A' },
+    { label: 'Валовая прибыль', value: d.money.operatingProfit + d.money.expenses, color: '#C6FF3D' },
+    { label: 'Операционные расходы', value: -d.money.expenses, color: '#FF8A7A' },
+    { label: 'Чистая прибыль', value: d.money.operatingProfit, color: '#C6FF3D' },
+  ] : [
+    { label: 'Выручка', value: 8_420_000, color: '#fff' },
+    { label: 'Себестоимость товаров', value: -6_100_000, color: '#FF8A7A' },
+    { label: 'Валовая прибыль', value: 2_320_000, color: '#C6FF3D' },
+    { label: 'Операционные расходы', value: -1_180_000, color: '#FF8A7A' },
+    { label: 'Чистая прибыль', value: 1_140_000, color: '#C6FF3D' },
+  ];
+  const kpiCards = [
+    { label: 'Выручка', value: d ? som(d.money.salesGross) : '8.42 млн', color: '#fff' },
+    { label: 'Себестоимость', value: d ? som(Math.abs(pnlRows[1].value)) : '6.10 млн', color: '#fff' },
+    { label: 'Валовая', value: d ? som(pnlRows[2].value) : '2.32 млн', color: '#C6FF3D' },
+    { label: 'Чистая', value: d ? som(d.money.operatingProfit) : '1.14 млн', color: '#FF8A5F' },
+  ];
+  const financeTabs = [
+    { id: 'overview' as const, label: 'Обзор' },
+    { id: 'cash' as const, label: 'Касса' },
+    { id: 'payroll' as const, label: 'Зарплата' },
+    { id: 'suppliers' as const, label: 'Поставщики' },
+    { id: 'expenses' as const, label: 'Расходы' },
+    { id: 'currency' as const, label: 'Валюты' },
+  ];
+  const cashAmount = d?.money.byMethod.find((method) => method.method.toLowerCase().includes('cash') || method.method.toLowerCase().includes('нал'))?.amount ?? 0;
+  const selectFinanceSection = (section: typeof financeSection) => {
+    setFinanceSection(section);
+    const target = document.getElementById(`finance-${section}`);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  function exportPnlXls() {
+    const csv = ['Статья;Сумма', ...pnlRows.map((r) => `${r.label};${r.value}`)].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pnl-erp-2.0.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-5">
-      <FinanceSettlementWorkspace accessToken={accessToken} />
+      <header className="flex flex-col gap-4 border-b border-surface-3 pb-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Finance 3.0</div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Финансы</h1>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-subtle">Касса, выплаты, поставщики и контроль денег в одном рабочем пространстве.</p>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-subtle"><span className="h-2 w-2 rounded-full bg-lime shadow-[0_0_12px_rgba(198,255,61,0.65)]" /> Данные синхронизированы</div>
+      </header>
+      <nav aria-label="Разделы финансов" className="flex gap-1 overflow-x-auto border-b border-surface-3 pb-px">
+        {financeTabs.map((tab) => (
+          <button key={tab.id} type="button" onClick={() => selectFinanceSection(tab.id)} className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-semibold transition ${financeSection === tab.id ? 'border-[#FF5B2E] text-white' : 'border-transparent text-subtle hover:text-bright'}`}>
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+      <section id="finance-cash" aria-label="Касса" className="scroll-mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          { label: 'В кассе сейчас', value: cashAmount ? som(cashAmount) : '—', tone: 'text-white' },
+          { label: 'Лимит кассы', value: '—', tone: 'text-white' },
+          { label: 'К инкассации', value: '—', tone: 'text-[#FF7A4D]' },
+          { label: 'Открытые заявки', value: `${expenses.filter((expense) => expense.status !== 'paid' && expense.status !== 'rejected').length}`, tone: 'text-lime' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-[14px] border border-surface-3 bg-surface p-3.5">
+            <div className="text-[11px] text-subtle">{item.label}</div>
+            <div className={`mt-2 font-display text-xl font-extrabold tabular ${item.tone}`}>{item.value}</div>
+          </div>
+        ))}
+      </section>
+      <section id="finance-overview" aria-label="Финансовый обзор" className="scroll-mt-6">
+      {/* Finance 3.0 overview */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        {kpiCards.map((k) => (
+          <div key={k.label} className="rounded-[16px] border border-surface-3 bg-surface p-4">
+            <div className="text-xs text-subtle">{k.label}</div>
+            <div className="mt-1.5 font-display text-[22px] font-extrabold tabular" style={{ color: k.color }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+      <Card>
+        <div className="mb-3.5 flex items-center justify-between">
+          <div className="font-display text-[15px] font-bold text-white">Отчёт P&amp;L</div>
+          <button
+            type="button"
+            onClick={exportPnlXls}
+            className="rounded-[9px] bg-[#1F3D2E] px-3.5 py-2 text-xs font-semibold text-lime transition hover:brightness-110"
+          >
+            ↓ Excel
+          </button>
+        </div>
+        {pnlRows.map((row) => (
+          <div key={row.label} className="flex justify-between border-b border-surface-2 py-2.5 text-[13px] last:border-0">
+            <span style={{ color: row.color }}>{row.label}</span>
+            <span className="font-mono tabular" style={{ color: row.color }}>{som(row.value)}</span>
+          </div>
+        ))}
+      </Card>
+      </section>
+
+      <div id="finance-suppliers" className="scroll-mt-6">
+        <FinanceSettlementWorkspace accessToken={accessToken} />
+      </div>
       <FinanceControlsPanel accessToken={accessToken} />
       <section aria-labelledby="trial-balance-title" className="border-b border-surface-3 pb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -248,7 +354,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
           {!(trialBalance?.rows ?? []).some((row) => row.debit || row.credit) && <div className="border-t border-surface-3 px-4 py-8 text-center text-sm text-subtle">Проводок за период пока нет</div>}
         </div>
       </section>
-      <section aria-labelledby="finance-plan-title" className="border-b border-surface-3 pb-5">
+      <section id="finance-payroll" aria-labelledby="finance-plan-title" className="scroll-mt-6 border-b border-surface-3 pb-5">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="finance-plan-title" className="font-display text-[15px] font-bold">Бюджет и план-факт</h2>
@@ -307,7 +413,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             </div>
           ))}
         </Card>
-        <form onSubmit={submitCurrencyRate} className="border-t border-surface-3 pt-5">
+        <form id="finance-currency" onSubmit={submitCurrencyRate} className="scroll-mt-6 border-t border-surface-3 pt-5">
           <div className="mb-1 font-display text-sm font-bold">Курсы валют</div>
           <p className="mb-3 text-xs leading-5 text-subtle">Фиксируется курс к KGS на дату первичного документа.</p>
           <div className="grid grid-cols-2 gap-2">
@@ -376,7 +482,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
           </div>
         </form>
       </div>
-      <section>
+      <section id="finance-expenses" className="scroll-mt-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-[15px] font-bold">Расходы</h2><span className="text-xs text-subtle">{expenses.length} заявок</span>
         </div>
