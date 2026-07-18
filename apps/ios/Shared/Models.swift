@@ -17,6 +17,25 @@ public struct CatalogProductDetail: Decodable, Sendable {
     }
 }
 
+/// Free-form product attributes from the catalog (`attrs` JSON). Only a string
+/// `description` is shown on the PDP; anything else is ignored.
+public struct ProductAttributes: Decodable, Sendable {
+    public let description: String?
+
+    public init(description: String? = nil) {
+        self.description = description
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.description = try? container.decode(String.self, forKey: .description)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case description
+    }
+}
+
 public struct Product: Decodable, Identifiable, Sendable {
     public let id: String
     public let sku: String
@@ -24,14 +43,32 @@ public struct Product: Decodable, Identifiable, Sendable {
     public let price: Int
     public let category: String
     public let availableUnits: Int
+    public let attrs: ProductAttributes?
 
-    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int) {
+    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int, attrs: ProductAttributes? = nil) {
         self.id = id
         self.sku = sku
         self.name = name
         self.price = price
         self.category = category
         self.availableUnits = availableUnits
+        self.attrs = attrs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        sku = try container.decode(String.self, forKey: .sku)
+        name = try container.decode(String.self, forKey: .name)
+        price = try container.decode(Int.self, forKey: .price)
+        category = try container.decode(String.self, forKey: .category)
+        availableUnits = try container.decode(Int.self, forKey: .availableUnits)
+        // attrs is arbitrary JSON on the API; non-object payloads decode as nil.
+        attrs = (try? container.decodeIfPresent(ProductAttributes.self, forKey: .attrs)) ?? nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, sku, name, price, category, availableUnits, attrs
     }
 }
 
@@ -570,6 +607,67 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
 
 public struct CustomerOrderReceipt: Decodable, Sendable {
     public let markup: String
+}
+
+/// One append-only Event Ledger row for an order (`GET orders/:id/ledger`).
+public struct OrderLedgerEvent: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let type: String
+    public let actor: String
+    public let ts: Date
+
+    public init(id: String, type: String, actor: String, ts: Date) {
+        self.id = id
+        self.type = type
+        self.actor = actor
+        self.ts = ts
+    }
+}
+
+public struct OrderTimelineStep: Equatable, Sendable {
+    public let title: String
+    public let isDone: Bool
+    public let isCurrent: Bool
+    public let time: Date?
+
+    public init(title: String, isDone: Bool, isCurrent: Bool, time: Date?) {
+        self.title = title
+        self.isDone = isDone
+        self.isCurrent = isCurrent
+        self.time = time
+    }
+}
+
+/// Customer-facing fulfillment timeline built from the order ledger.
+/// Mirrors apps/web/lib/order-status.ts: a step is done when one of its events
+/// exists (timestamped from that event); the first pending step is current.
+public enum OrderTimelineBuilder {
+    private static let steps: [(title: String, events: [String])] = [
+        ("Заказ создан", ["order.created", "order.confirmed"]),
+        ("Оплата подтверждена", ["order.paid", "payment.received", "payment.reconciled", "debt.settled"]),
+        ("Собираем заказ", ["order.picking", "order.reserved"]),
+        ("Готов к выдаче или в пути", ["order.packed", "order.ready_for_pickup", "delivery.out"]),
+        ("Получен", ["order.completed", "delivery.delivered"])
+    ]
+
+    public static var stepTitles: [String] {
+        steps.map(\.title)
+    }
+
+    public static func build(events: [OrderLedgerEvent]) -> [OrderTimelineStep] {
+        let times: [Date?] = steps.map { step in
+            events.filter { step.events.contains($0.type) }.map(\.ts).min()
+        }
+        let firstPending = times.firstIndex(where: { $0 == nil }) ?? times.count
+        return steps.enumerated().map { index, step in
+            OrderTimelineStep(
+                title: step.title,
+                isDone: index < firstPending,
+                isCurrent: index == firstPending,
+                time: times[index]
+            )
+        }
+    }
 }
 
 public struct OrderStatusMutation: Decodable, Sendable {

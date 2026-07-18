@@ -13,8 +13,10 @@
 		189C03F1DEAE49BBDFDDDA40 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		247D979D2B6ABCFDFDA09A5C /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */; };
+		351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */; };
 		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
+		4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */; };
 		4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */; };
 		563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */; };
 		615203EBFF70A2140FAB6A11 /* AliStoreStaffUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */; };
@@ -178,8 +180,10 @@
 		04AAB6220384C05861A21153 /* NativeShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeShell.swift; sourceTree = "<group>"; };
 		11F23ACBE05CF3A0E1499E0B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		13A9A1766E34065A9DE2EE32 /* Courier.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Courier.entitlements; sourceTree = "<group>"; };
+		13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderTimelineContractTests.swift; sourceTree = "<group>"; };
 		1835E8741DBB19503E6334A1 /* QuickUnlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlock.swift; sourceTree = "<group>"; };
 		1897622CBA172469A7099983 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerMeContractTests.swift; sourceTree = "<group>"; };
 		23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSReturnFlowTests.swift; sourceTree = "<group>"; };
 		2A617D85C85DD435B687E350 /* StaffLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffLoginView.swift; sourceTree = "<group>"; };
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -410,6 +414,8 @@
 			children = (
 				42436819B18857A22AC06504 /* APIClientTests.swift */,
 				C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */,
+				20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */,
+				13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */,
 				23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */,
 			);
 			path = Tests;
@@ -764,6 +770,8 @@
 			files = (
 				FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */,
 				BCA60888879A0F2A828FCBE4 /* CheckoutContractTests.swift in Sources */,
+				351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */,
+				4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */,
 				563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
