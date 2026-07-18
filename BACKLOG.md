@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `GAP-STORE-ASSETS-002` Local release slice accepted: added a validated Android Data Safety worksheet for Client/Staff/Courier/POS with collection, sharing, encryption and deletion-request declarations. It remains explicitly owner/legal-review-required and does not claim Google Play approval.
 - `GAP-E2E-BROWSERS-002` Local software slice accepted: Playwright now accepts `E2E_BROWSERS=chromium,webkit,firefox`; `npm run e2e:cross-browser` passed `27/27` across Chromium, WebKit and Firefox for checkout/consent flows. CI/staging browser execution remains a release-hardening gate.
 - `GAP-OBSERVE-002` Local software slice accepted: API now exposes Prometheus-compatible `/api/metrics` with request totals, 5xx counters and latency histograms; dynamic route labels are normalized and the scrape route is excluded. Production requires a secret `METRICS_TOKEN`; remaining work is private scrape networking, uptime checks, alert delivery, worker/outbox dashboard and staging soak.
 - `MVP-VERIFY-034` Local MVP gate revalidated after two lifecycle fixes: API isolated gate `163/163` test files, full Playwright `62/62`, Web/API builds and mobile typecheck pass. The API gate now starts each Jest file with a clean test database/process; the bundle allocation lifecycle uses an active-only IMEI index; CMS E2E requests explicitly close connections. Remaining gates are strict evidence refresh, staging and external providers.

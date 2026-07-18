@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-STORE-ASSETS-002`.
+- Task: make Android store privacy declarations explicit and machine-validated.
+- Result: added `apps/android/store/data-safety.json` for all four Android applications and a validator that rejects missing apps, incomplete data categories, false encryption claims or accidental approval status.
+- Checks: `npm run android:store-preflight` and `git diff --check` pass.
+- Acceptance: local declaration artifact accepted; Google Play form submission, privacy URL, legal review, signing and store approval remain external gates.
+- Next step: continue ERP/CMS contract coverage and native release hardening.
+
 - Iteration ID: `GAP-E2E-BROWSERS-002`.
 - Task: make the cross-browser checkout gate repeatable.
 - Result: Playwright projects are now selected through `E2E_BROWSERS`; Chromium remains the default local MVP project while WebKit and Firefox can be enabled explicitly. Added `npm run e2e:cross-browser` for checkout and consent flows.

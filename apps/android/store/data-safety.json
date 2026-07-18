@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "reviewStatus": "owner-and-legal-review-required",
+  "apps": [
+    {
+      "applicationId": "kg.alistore.client",
+      "distribution": "public",
+      "dataTypes": [
+        { "type": "phone_number", "purpose": ["app_functionality", "account_management"], "collected": true, "shared": false, "optional": false },
+        { "type": "name", "purpose": ["app_functionality"], "collected": true, "shared": false, "optional": true },
+        { "type": "address", "purpose": ["app_functionality"], "collected": true, "shared": false, "optional": true },
+        { "type": "orders_and_payments", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false },
+        { "type": "device_and_warranty_records", "purpose": ["app_functionality"], "collected": true, "shared": false, "optional": true }
+      ],
+      "security": { "encryptedInTransit": true, "deletionRequestSupported": true }
+    },
+    {
+      "applicationId": "kg.alistore.staff",
+      "distribution": "managed",
+      "dataTypes": [
+        { "type": "account_credentials", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false },
+        { "type": "customer_and_order_records", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false },
+        { "type": "photos_and_evidence", "purpose": ["app_functionality"], "collected": true, "shared": false, "optional": true }
+      ],
+      "security": { "encryptedInTransit": true, "deletionRequestSupported": false }
+    },
+    {
+      "applicationId": "kg.alistore.courier",
+      "distribution": "managed",
+      "dataTypes": [
+        { "type": "account_credentials", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false },
+        { "type": "precise_location", "purpose": ["app_functionality"], "collected": true, "shared": false, "optional": true },
+        { "type": "delivery_and_cod_records", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false },
+        { "type": "photos_and_evidence", "purpose": ["app_functionality"], "collected": true, "shared": false, "optional": true }
+      ],
+      "security": { "encryptedInTransit": true, "deletionRequestSupported": false }
+    },
+    {
+      "applicationId": "kg.alistore.pos",
+      "distribution": "managed",
+      "dataTypes": [
+        { "type": "account_credentials", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false },
+        { "type": "customer_and_order_records", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": true },
+        { "type": "payment_and_receipt_records", "purpose": ["app_functionality", "fraud_prevention_security_compliance"], "collected": true, "shared": false, "optional": false }
+      ],
+      "security": { "encryptedInTransit": true, "deletionRequestSupported": false }
+    }
+  ]
+}
