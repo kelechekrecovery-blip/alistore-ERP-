@@ -102,7 +102,7 @@ private enum ClientTheme {
     static let surface = Design3.surface
     static let line = Design3.hairline
     static let coral = Design3.orange
-    static let lime = Design3.lime
+    static let lime = Design3.orange   // 3.0: primary action is orange (2.0 lime → orange)
     static let muted = Design3.textMuted
     static let gold = Design3.gold
 
@@ -216,17 +216,23 @@ private struct ClientBottomNav: View {
     let onSelect: (ClientTab) -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 4) {
             navButton(.home, title: "Главная", symbol: "house")
             navButton(.catalog, title: "Каталог", symbol: "square.grid.2x2")
             navButton(.favorites, title: "Избранное", symbol: "heart")
             navButton(.cart, title: "Корзина", symbol: "bag")
             navButton(.account, title: "Кабинет", symbol: "person.crop.circle")
         }
-        .padding(.top, 8)
-        .padding(.bottom, 20)
-        .background(Color(red: 0.102, green: 0.086, blue: 0.067))
-        .overlay(alignment: .top) { Rectangle().fill(ClientTheme.line).frame(height: 1) }
+        .padding(6)
+        .background {
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(Color.white.opacity(0.10))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
+        }
+        .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
     private func navButton(_ tab: ClientTab, title: String, symbol: String) -> some View {
@@ -235,10 +241,18 @@ private struct ClientBottomNav: View {
                 VStack(spacing: 3) {
                     Image(systemName: selected == tab ? "\(symbol).fill" : symbol)
                         .font(.system(size: 19, weight: .medium))
-                    Text(title).font(ClientTheme.body(10, weight: selected == tab ? .bold : .medium))
+                    Text(title).font(ClientTheme.body(9.5, weight: selected == tab ? .bold : .medium))
                 }
-                .foregroundStyle(selected == tab ? ClientTheme.lime : ClientTheme.muted)
+                .foregroundStyle(selected == tab ? Design3.orange : ClientTheme.muted)
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background {
+                    if selected == tab {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(LinearGradient(colors: [Design3.orange.opacity(0.24), Design3.orange.opacity(0.07)], startPoint: .top, endPoint: .bottom))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Design3.orange.opacity(0.38), lineWidth: 1))
+                    }
+                }
                 if tab == .cart, cartCount > 0 {
                     Text("\(cartCount)")
                         .font(.system(size: 9, weight: .bold))
