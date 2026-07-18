@@ -383,7 +383,7 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center bg-[#0E0C0A] font-sans sm:items-start sm:bg-[#C9C0B4] sm:p-6">
+    <div className="erp3-stage fixed inset-0 z-50 flex justify-center bg-[#0B0A08] font-sans sm:items-start sm:p-6">
       <main
         data-testid="staff-app"
         className="relative flex h-full w-full max-w-[402px] flex-col overflow-hidden bg-[#16130F] text-white sm:h-[858px] sm:max-h-[calc(100vh-48px)] sm:rounded-[46px] sm:border-[10px] sm:border-[#14110E] sm:shadow-2xl"
@@ -477,7 +477,6 @@ export default function StaffPage() {
                 <ActionLink icon="＋" label="Добавить товар" badge="Каталог" href="/admin/products" />
                 <Action icon="♻️" label="Скупка Б/У" badge="По регламенту" onClick={() => setTab('buyback')} />
                 <Action icon="📊" label="Задачи и KPI" badge="2 активных" onClick={() => setTab('tasks')} />
-                <Action icon="◫" label="Моя неделя" badge="Смены · отгулы" onClick={() => setTab('hr')} />
               </div>
 
               <div className="mb-4 flex gap-2 overflow-x-auto" aria-label="Дополнительные операции">
@@ -489,13 +488,14 @@ export default function StaffPage() {
                 {canIssueGiftCard(session.role) && (
                   <CompactAction label="Карты" onClick={() => setTab('cards')} />
                 )}
+                <CompactAction label="Моя неделя" onClick={() => setTab('hr')} />
                 <Link href="/pos" className="flex-shrink-0 rounded-chip border border-[#2E2822] bg-[#221E19] px-3 py-2 text-xs font-semibold text-[#D8CFC6]">POS · Касса</Link>
               </div>
 
-              <div className="rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
+              <div className="erp3-glass rounded-[16px] p-4">
                 <div className="mb-2 font-mono text-xs text-lime">🤖 ЗАДАЧА ОТ AI</div>
                 <div className="text-[14px] leading-relaxed">Мало продаж аксессуаров сегодня. Предлагай чехол/зарядку к каждому телефону — цель +5 к чеку.</div>
-                <button type="button" onClick={() => setTab('tasks')} className="mt-3 w-full rounded-[10px] bg-lime py-2.5 text-[13px] font-bold text-lime-ink">К задачам</button>
+                <button type="button" onClick={() => setTab('tasks')} className="erp3-coral-action mt-3 w-full rounded-[10px] py-2.5 text-[13px] font-bold text-white">К задачам</button>
               </div>
             </>
           )}
@@ -522,7 +522,7 @@ export default function StaffPage() {
                       {o.pickupCode && <span className="ml-2 font-mono text-lime">{o.pickupCode}</span>}
                     </div>
                   )}
-                  <button type="button" disabled={busy === o.id} onClick={() => orderAction(o)} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
+                  <button type="button" disabled={busy === o.id} onClick={() => orderAction(o)} className="erp3-coral-action mt-2.5 w-full rounded-[9px] py-2 text-center text-xs font-bold text-white disabled:opacity-60">
                     {busy === o.id ? '…' : o.status === 'created' ? 'Собрать · назначить IMEI' : 'В сборку'}
                   </button>
                   <div className="mt-2 grid grid-cols-2 gap-2">
@@ -545,7 +545,7 @@ export default function StaffPage() {
           {tab === 'tasks' && (
             <div className="pt-1">
               <SectionTitle title="Задачи и KPI" onBack={() => setTab('home')} />
-              <div className="mb-3.5 rounded-[16px] border border-[#2E2822] bg-gradient-to-br from-[#2A2A2E] to-[#221E19] p-4">
+              <div className="erp3-glass mb-3.5 rounded-[16px] p-4">
                 <div className="mb-2 flex justify-between text-[13px]"><span className="text-[#D8CFC6]">KPI месяца</span><span className="font-mono text-lime">92%</span></div>
                 <div className="h-2 overflow-hidden rounded-chip bg-[#16130F]"><div className="h-full w-[92%] bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" /></div>
                 <div className="mt-2 text-[11px] text-[#8A7F76]">До бонуса 15 000 сом осталось 8%</div>
@@ -554,7 +554,7 @@ export default function StaffPage() {
               {taskError && (
                 <div className="py-7 text-center">
                   <p className="text-sm text-[#D69A83]">{taskError}</p>
-                  <button type="button" onClick={loadTasks} className="mt-3 rounded-[9px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink">
+                  <button type="button" onClick={loadTasks} className="erp3-coral-action mt-3 rounded-[9px] px-4 py-2 text-xs font-bold text-white">
                     Повторить
                   </button>
                 </div>
@@ -599,14 +599,14 @@ export default function StaffPage() {
                     <div className="mt-1 font-display text-base font-extrabold">{som(quote.listTotal)}</div>
                     {canManage && quote.status === 'requested' && (
                       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-                        <button type="button" disabled={busy === quote.id} onClick={() => quoteAction(quote, 'reviewing')} className="rounded-[9px] bg-lime py-2 text-xs font-bold text-lime-ink">В работу</button>
+                        <button type="button" disabled={busy === quote.id} onClick={() => quoteAction(quote, 'reviewing')} className="erp3-coral-action rounded-[9px] py-2 text-xs font-bold text-white">В работу</button>
                         <button type="button" disabled={busy === quote.id} onClick={() => quoteAction(quote, 'rejected')} className="rounded-[9px] border border-[#49342D] px-3 text-xs text-[#FF8A7A]">Отклонить</button>
                       </div>
                     )}
                     {canManage && quote.status === 'reviewing' && (
                       <div className="mt-3 flex gap-2">
                         <input aria-label="Сумма КП" type="number" value={quoteTotals[quote.id] ?? ''} onChange={(event) => setQuoteTotals((current) => ({ ...current, [quote.id]: event.target.value }))} className="min-w-0 flex-1 rounded-[9px] border border-[#2E2822] bg-[#16130F] px-3 py-2 font-mono text-xs outline-none focus:border-lime" />
-                        <button type="button" disabled={busy === quote.id || !Number(quoteTotals[quote.id])} onClick={() => quoteAction(quote, 'quoted')} className="rounded-[9px] bg-lime px-3 text-xs font-bold text-lime-ink disabled:opacity-50">Отправить КП</button>
+                        <button type="button" disabled={busy === quote.id || !Number(quoteTotals[quote.id])} onClick={() => quoteAction(quote, 'quoted')} className="erp3-coral-action rounded-[9px] px-3 text-xs font-bold text-white disabled:opacity-50">Отправить КП</button>
                       </div>
                     )}
                     {quote.quotedTotal !== null && <div className="mt-2 text-xs text-lime">КП {som(quote.quotedTotal)}</div>}
@@ -633,14 +633,14 @@ export default function StaffPage() {
                     <div className="mt-2 text-[12px] text-[#A79C92]">{policy.planType} · {policy.coverageMonths} мес. · устройство {som(policy.deviceValue)}</div>
                     {canManage && policy.status === 'requested' && (
                       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-                        <button type="button" disabled={busy === policy.id} onClick={() => protectionAction(policy, 'reviewing')} className="rounded-[9px] bg-lime py-2 text-xs font-bold text-lime-ink">В работу</button>
+                        <button type="button" disabled={busy === policy.id} onClick={() => protectionAction(policy, 'reviewing')} className="erp3-coral-action rounded-[9px] py-2 text-xs font-bold text-white">В работу</button>
                         <button type="button" disabled={busy === policy.id} onClick={() => protectionAction(policy, 'rejected')} className="rounded-[9px] border border-[#49342D] px-3 text-xs text-[#FF8A7A]">Отклонить</button>
                       </div>
                     )}
                     {canManage && policy.status === 'reviewing' && (
                       <div className="mt-3 flex gap-2">
                         <input aria-label="Страховая премия" type="number" value={protectionPremiums[policy.id] ?? ''} onChange={(event) => setProtectionPremiums((current) => ({ ...current, [policy.id]: event.target.value }))} className="min-w-0 flex-1 rounded-[9px] border border-[#2E2822] bg-[#16130F] px-3 py-2 font-mono text-xs outline-none focus:border-lime" />
-                        <button type="button" disabled={busy === policy.id || !Number(protectionPremiums[policy.id])} onClick={() => protectionAction(policy, 'offered')} className="rounded-[9px] bg-lime px-3 text-xs font-bold text-lime-ink disabled:opacity-50">Предложить</button>
+                        <button type="button" disabled={busy === policy.id || !Number(protectionPremiums[policy.id])} onClick={() => protectionAction(policy, 'offered')} className="erp3-coral-action rounded-[9px] px-3 text-xs font-bold text-white disabled:opacity-50">Предложить</button>
                       </div>
                     )}
                     {policy.premium !== null && <div className="mt-2 text-xs text-lime">Премия {som(policy.premium)}</div>}
@@ -709,7 +709,7 @@ export default function StaffPage() {
                 <button
                   type="submit"
                   disabled={busy === 'buyback'}
-                  className="mt-2 w-full rounded-[11px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60"
+                  className="erp3-coral-action mt-2 w-full rounded-[11px] py-3 text-center text-sm font-bold text-white disabled:opacity-60"
                 >
                   {busy === 'buyback' ? '…' : 'Оформить договор'}
                 </button>
@@ -759,7 +759,7 @@ export default function StaffPage() {
               {hrError && (
                 <div className="py-7 text-center">
                   <p className="text-sm text-[#D69A83]">{hrError}</p>
-                  <button type="button" onClick={loadHr} className="mt-3 rounded-[9px] bg-lime px-4 py-2 text-xs font-bold text-lime-ink">
+                  <button type="button" onClick={loadHr} className="erp3-coral-action mt-3 rounded-[9px] px-4 py-2 text-xs font-bold text-white">
                     Повторить
                   </button>
                 </div>
@@ -783,12 +783,12 @@ export default function StaffPage() {
                         </div>
                       )}
                       {!schedule.cancelledAt && !schedule.attendance && (
-                        <button type="button" disabled={busy === schedule.id} onClick={() => attendanceAction(schedule, 'open')} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
+                        <button type="button" disabled={busy === schedule.id} onClick={() => attendanceAction(schedule, 'open')} className="erp3-coral-action mt-2.5 w-full rounded-[9px] py-2 text-center text-xs font-bold text-white disabled:opacity-60">
                           {busy === schedule.id ? '…' : 'Отметить приход'}
                         </button>
                       )}
                       {schedule.attendance && !schedule.attendance.checkedOutAt && (
-                        <button type="button" disabled={busy === schedule.id} onClick={() => attendanceAction(schedule, 'close')} className="mt-2.5 w-full rounded-[9px] bg-lime py-2 text-center text-xs font-bold text-lime-ink disabled:opacity-60">
+                        <button type="button" disabled={busy === schedule.id} onClick={() => attendanceAction(schedule, 'close')} className="erp3-coral-action mt-2.5 w-full rounded-[9px] py-2 text-center text-xs font-bold text-white disabled:opacity-60">
                           {busy === schedule.id ? '…' : 'Отметить уход'}
                         </button>
                       )}
@@ -830,7 +830,7 @@ export default function StaffPage() {
                     <button
                       type="submit"
                       disabled={busy === 'absence'}
-                      className="mt-2 w-full rounded-[11px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60"
+                      className="erp3-coral-action mt-2 w-full rounded-[11px] py-3 text-center text-sm font-bold text-white disabled:opacity-60"
                     >
                       {busy === 'absence' ? '…' : 'Отправить запрос'}
                     </button>
@@ -863,7 +863,7 @@ export default function StaffPage() {
 
         {/* bottom nav */}
         <div className="flex flex-shrink-0 border-t border-[#2E2822] bg-[#1A1611] px-1.5 pb-6 pt-2">
-          {NAV.filter((n) => staffTabAllowed(session.role, n.id)).map((n) => (
+          {NAV.filter((n) => n.id !== 'hr' && staffTabAllowed(session.role, n.id)).map((n) => (
             <button key={n.id} type="button" onClick={() => setTab(n.id)} className="flex-1 text-center">
               <div className="text-xl">{n.icon}</div>
               <div className={`mt-0.5 text-[10px] ${tab === n.id ? 'font-bold text-lime' : 'text-[#8A7F76]'}`}>{n.label}</div>
