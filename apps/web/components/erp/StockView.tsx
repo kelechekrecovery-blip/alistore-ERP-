@@ -86,7 +86,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
   }, [accessToken, canManageQuarantine]);
 
   useEffect(() => {
-    fetchCatalog({ limit: 200 })
+    fetchCatalog({ limit: 100 })
       .then((response) => setProducts(response.items))
       .catch(() => setProducts([]));
   }, []);
