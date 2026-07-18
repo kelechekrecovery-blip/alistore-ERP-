@@ -2,6 +2,16 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-PII-RETENTION-039`.
+- Task: implement the first Evidence Vault PII retention/deletion slice from the gap analysis.
+- Result: explicit trade-in identity labels now receive API-owned PII classification and a configurable 30-3650 day deadline; an hourly worker claims expired rows, deletes the object, redacts the stored asset, retries failures with bounded backoff and appends `evidence.purged`. Purged reads fail closed.
+- Files: `apps/api/prisma/schema.prisma`, retention migration, `apps/api/src/evidence/evidence-retention.*`, `apps/api/src/evidence/evidence.service.ts`, `apps/api/src/evidence/evidence.module.ts`, retention tests, production env template and `docs/PII-EVIDENCE-RETENTION.md`.
+- Acceptance: targeted retention tests and API build pass. Full MVP/evidence hash refresh remains required after this source change.
+- Remaining: owner/legal retention and evidence-hold approval, staging object-store deletion and backup/restore certification.
+- Next step: refresh the full trusted software evidence, then take the next unblocked Phase 1 gap.
+
+## 2026-07-18
+
 - Iteration ID: `MVP-VERIFY-038`.
 - Task: close the full MVP verification after the fiscal boundary and stabilize the courier fixture teardown.
 - Result: `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` passed Prisma validation and migrations, API `162/162` suites with `735/735` tests, Web production build, mobile typecheck and Playwright `62/62`. The courier deadlock fixture now deletes dependent `TradeInDevice` rows before customers; isolated finance/outbox checks also passed `19/19` after transient full-suite contention.

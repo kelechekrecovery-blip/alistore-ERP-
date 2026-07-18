@@ -2655,9 +2655,17 @@ model EvidenceUpload {
   label          String?
   fingerprint    String
   asset          Json
+  isPii          Boolean  @default(false)
+  retentionUntil DateTime?
+  purgeRequestedAt DateTime?
+  purgeAttempts  Int      @default(0)
+  nextPurgeAt    DateTime?
+  purgedAt       DateTime?
+  purgeReason    String?
   createdAt      DateTime @default(now())
 
   @@index([entityType, entityId])
+  @@index([isPii, purgedAt, retentionUntil, nextPurgeAt])
 }
 
 model Campaign {

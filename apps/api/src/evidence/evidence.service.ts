@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceEntityType, EvidenceImageDto } from './evidence.dto';
 import { ForbiddenException } from '@nestjs/common';
 import { AuthzService } from '../authz/authz.service';
+import { decideEvidenceRetention } from './evidence-retention.policy';
 
 export interface EvidenceAttachment {
   entityType: EvidenceEntityType;
@@ -41,6 +42,7 @@ export class EvidenceService {
     }
     const label = dto.label?.trim() || null;
     const actor = dto.actor ?? 'system';
+    const retention = decideEvidenceRetention(undefined, dto.entityType, label);
     const fingerprint = JSON.stringify({
       actor,
       entityType: dto.entityType,
@@ -123,6 +125,8 @@ export class EvidenceService {
               label,
               fingerprint,
               asset: asset as unknown as Prisma.InputJsonValue,
+              isPii: retention.isPii,
+              retentionUntil: retention.retentionUntil,
             },
           });
         }
@@ -168,6 +172,9 @@ export class EvidenceService {
 
   async issueRead(idempotencyKey: string, actor: string) {
     const upload = await this.findUpload(idempotencyKey);
+    if (upload.purgedAt) {
+      throw new ValidationError('evidence_purged', 'Срок хранения Evidence истёк');
+    }
     const storedAsset = upload.asset as unknown as IngestedImage;
     const asset = { ...storedAsset, url: await this.media.getReadUrl(storedAsset.key) };
     return this.audit.transaction(async () => ({
