@@ -99,7 +99,7 @@ export default function ExchangePage() {
 
   if (!session) {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-night p-5 font-sans">
+      <div className="erp3-stage fixed inset-0 z-50 grid place-items-center bg-night p-5 font-sans">
         <StaffSessionLogin
           title="Обмен · вход"
           caption="Нужна роль кассира, продавца или администратора."
@@ -110,7 +110,7 @@ export default function ExchangePage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-night font-sans text-white">
+    <div className="erp3-stage fixed inset-0 z-50 flex flex-col bg-night font-sans text-white">
       <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark px-6 py-4">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-coral font-display text-lg font-extrabold text-white">⇄</span>
         <div>

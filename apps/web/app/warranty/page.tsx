@@ -102,7 +102,7 @@ export default function WarrantyConsolePage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-night">
+    <div className="erp3-stage fixed inset-0 z-50 flex flex-col bg-night">
       <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark/90 px-6 py-4 backdrop-blur">
         <span className="grid h-9 w-9 place-items-center rounded-btn bg-info font-display text-lg font-extrabold text-white">
           🛡
