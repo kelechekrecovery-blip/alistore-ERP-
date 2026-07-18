@@ -18,6 +18,14 @@
 - Outcome: local `INV-VAL-001I` performance evidence is refreshed. Production-shaped staging latency, lock-window measurement and GL/accountant acceptance remain open.
 - Next step: prepare the staging-shaped migration/lock-window procedure, or continue the remaining local FX/period-close accounting slice if staging access is unavailable.
 
+- Iteration ID: `PHASE-2-DEPLOY-MIG-001`.
+- Task: make the inventory valuation migration lock-window requirement executable.
+- Files changed: `apps/api/scripts/benchmark-inventory-valuation-migration.mjs`, `apps/api/package.json`, root `package.json`, `BACKLOG.md`, and this progress entry.
+- Result: added a disposable-database preflight for the pre-valuation schema. It holds an application-style `AccessShareLock`, requires the migration to fail closed with PostgreSQL lock timeout, then drains the lock and verifies the migration completes with the expected column and index. The script refuses non-test databases and always drops its temporary database.
+- Checks run: `TEST_DATABASE_URL=postgresql://alistore@127.0.0.1:5432/alistore_test?schema=public npm run inventory:valuation:migration-preflight`; API build passed; result was `1,000` seeded rows, `414ms` blocked rejection, `113ms` drained migration, schema/index verification true; `git diff --check`.
+- Outcome: the local deployment procedure is now machine-checkable. It does not claim production-shaped latency, lock windows or zero-downtime behavior; those require staging with production-like history and drained API instances.
+- Next step: run this preflight in staging deployment approval, then continue local FX/period-close accounting work while waiting for credentials/UAT.
+
 - Iteration ID: `PHASE-1-FIN-003E-VOID-001`.
 - Task: close the remaining Phase 1 contract for cancelling an unfinished payment.
 - Files changed: `apps/api/prisma/schema.prisma`, payment status migration, payment DTO/controller/service, Event Ledger types and `test/payment-void.e2e-spec.ts`.
