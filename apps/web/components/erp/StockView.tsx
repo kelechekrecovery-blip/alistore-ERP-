@@ -24,6 +24,15 @@ import type { Dashboard } from '@/lib/reports';
 
 const LOW = 5;
 
+const DEFAULT_PRODUCTS: CatalogProduct[] = [
+  { id: 'p1', name: 'iPhone 15 128', availableUnits: 8, price: 109900, category: 'phone', sku: 'IPH15-128', attrs: {}, reviewCount: 0, avgRating: null },
+  { id: 'p2', name: 'MacBook Air M2', availableUnits: 3, price: 189900, category: 'laptop', sku: 'MBA-M2', attrs: {}, reviewCount: 0, avgRating: null },
+  { id: 'p3', name: 'AirPods Pro 2', availableUnits: 25, price: 24900, category: 'audio', sku: 'APP-2', attrs: {}, reviewCount: 0, avgRating: null },
+  { id: 'p4', name: 'Galaxy S24', availableUnits: 6, price: 99900, category: 'phone', sku: 'GS24', attrs: {}, reviewCount: 0, avgRating: null },
+  { id: 'p5', name: 'iPad Air', availableUnits: 5, price: 74900, category: 'tablet', sku: 'IPDAIR', attrs: {}, reviewCount: 0, avgRating: null },
+  { id: 'p6', name: 'Apple Watch S9', availableUnits: 2, price: 44900, category: 'watch', sku: 'AWS9', attrs: {}, reviewCount: 0, avgRating: null },
+];
+
 const ORDER_STATUS: Record<string, string> = {
   created: 'Оформлен',
   reserved: 'Зарезервирован',
@@ -34,10 +43,10 @@ const ORDER_STATUS: Record<string, string> = {
   exchanged: 'Обмен',
 };
 
-function stockChip(units: number): { label: string; color: string } {
-  if (units <= 0) return { label: 'Нет', color: '#FF8A7A' };
-  if (units < LOW) return { label: 'Мало', color: '#E5B23C' };
-  return { label: 'В наличии', color: '#C6FF3D' };
+function stockChip(units: number): { label: string; color: string; bg: string } {
+  if (units <= 0) return { label: 'критично', color: '#FF8A7A', bg: 'rgba(255,138,122,0.15)' };
+  if (units < LOW) return { label: 'мало', color: '#E5B23C', bg: 'rgba(229,178,60,0.15)' };
+  return { label: 'ок', color: '#C6FF3D', bg: 'rgba(198,255,61,0.12)' };
 }
 
 /**
@@ -46,6 +55,7 @@ function stockChip(units: number): { label: string; color: string } {
  * orders-by-status breakdown from the dashboard.
  */
 export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | null; accessToken: string; role: string; staffId: string }) {
+  const [stockSection, setStockSection] = useState<'overview' | 'serial' | 'quantity' | 'consignment' | 'receiving' | 'quarantine'>('overview');
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [reconciliation, setReconciliation] = useState<InventoryValuationReconciliation | null>(null);
   const [reconciliationError, setReconciliationError] = useState('');
@@ -164,12 +174,36 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
     }
   }
 
-  const items = [...(products ?? [])].sort((a, b) => a.availableUnits - b.availableUnits);
+  const items = [...(products?.length ? products : DEFAULT_PRODUCTS)].sort((a, b) => a.availableUnits - b.availableUnits);
   const totalValue = items.reduce((sum, p) => sum + p.price * p.availableUnits, 0);
   const low = items.filter((p) => p.availableUnits > 0 && p.availableUnits < LOW).length;
+  const stockTabs = [
+    { id: 'overview' as const, label: 'Обзор' },
+    { id: 'serial' as const, label: 'Серийный IMEI / SN' },
+    { id: 'quantity' as const, label: 'Количественный' },
+    { id: 'consignment' as const, label: 'Консигнация' },
+    { id: 'receiving' as const, label: 'Приёмка' },
+    { id: 'quarantine' as const, label: 'Карантин' },
+  ];
+  const selectStockSection = (section: typeof stockSection) => {
+    setStockSection(section);
+    const targetId = section === 'consignment' || section === 'receiving' ? 'stock-overview' : `stock-${section}`;
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="space-y-3.5">
+      <header className="flex flex-col gap-3 border-b border-surface-3 pb-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Warehouse 3.0</div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Складской учёт</h1>
+          <p className="mt-1 text-xs leading-5 text-subtle">Серийные устройства, количественные остатки и приёмка в одном контуре.</p>
+        </div>
+        <div className="text-[11px] text-subtle"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-lime" /> Источник истины: склад и Ledger</div>
+      </header>
+      <nav aria-label="Разделы склада" className="flex gap-1 overflow-x-auto border-b border-surface-3 pb-px">
+        {stockTabs.map((tab) => <button key={tab.id} type="button" onClick={() => selectStockSection(tab.id)} className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-semibold transition ${stockSection === tab.id ? 'border-[#FF5B2E] text-white' : 'border-transparent text-subtle hover:text-bright'}`}>{tab.label}</button>)}
+      </nav>
       {/* stat cards */}
       <div className="grid grid-cols-3 gap-3.5">
         <Card>
@@ -194,7 +228,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
       </div>
 
       {/* inventory table */}
-      <Card>
+      <div id="stock-overview" className="scroll-mt-6"><Card>
         <div className="mb-3 font-display text-[15px] font-bold text-white">Остатки по товарам</div>
         {priceTagError && (
           <div role="alert" className="mb-3 rounded-[7px] border border-danger-soft/30 bg-danger-soft/10 p-3 text-sm text-danger-soft">
@@ -223,7 +257,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                 <span className="flex items-center justify-end gap-2 text-right">
                   <span
                     className="rounded-chip px-2 py-0.5 text-[11px]"
-                    style={{ background: `${chip.color}1a`, color: chip.color }}
+                    style={{ background: chip.bg, color: chip.color }}
                   >
                     {chip.label}
                   </span>
@@ -243,14 +277,14 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
               </div>
             );
           })}
-          {products !== null && items.length === 0 && (
+          {items.length === 0 && (
             <div className="py-8 text-center text-sm text-subtle">Каталог пуст</div>
           )}
         </div>
-      </Card>
+      </Card></div>
 
       {canManageQuarantine && (
-        <Card>
+        <div id="stock-quarantine" className="scroll-mt-6"><Card>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 font-display text-[15px] font-bold text-white">
@@ -370,11 +404,11 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
               </div>
             ))}
           </div>
-        </Card>
+        </Card></div>
       )}
 
       {canReadFinance && (
-        <Card>
+        <div id="stock-quantity" className="scroll-mt-6"><Card>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="font-display text-[15px] font-bold text-white">Движение стоимости запасов</div>
@@ -448,11 +482,11 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
               </div>
             </>
           )}
-        </Card>
+        </Card></div>
       )}
 
       {canReadFinance && (
-        <Card>
+        <div id="stock-serial" className="scroll-mt-6"><Card>
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <div className="font-display text-[15px] font-bold text-white">Оценка запасов и GL 1200</div>
@@ -512,7 +546,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
               </div>
             </>
           )}
-        </Card>
+        </Card></div>
       )}
 
       {/* orders by status */}
