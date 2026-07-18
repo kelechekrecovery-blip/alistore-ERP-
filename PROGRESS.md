@@ -16,6 +16,14 @@
 - Checks: clean test DB migration reset; courier + payment race suites `19/19`.
 - Outcome: the two review findings are not present in the current dirty source state. Test isolation remains important because append-only exchange fixtures must not be destructively cleaned.
 
+## 2026-07-18 — PHASE-1-NOTIF-ISOLATION-004
+
+- Task: make manager notification assertions order-independent when the shared test database contains retained append-only fixtures.
+- Checks: clean test DB migration reset; notification coverage `15/15`; `git diff --check`.
+- Commit: `dea4d84`.
+- Outcome: notification gate remains green without assuming exactly two historical staff recipients.
+- Blocker: strict ecosystem audit still stops at trusted toolchain/package-lock digest mismatch before contract evaluation.
+
 ## 2026-07-18
 
 - Iteration ID: `GAP-OBSERVE-001` (CEO mission, local slice verification + backlog closure).

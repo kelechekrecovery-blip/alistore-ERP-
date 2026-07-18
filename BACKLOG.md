@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `PHASE-1-NOTIF-ISOLATION-004` Accepted in `dea4d84`: notification staff assertions are robust to retained append-only fixtures; coverage remains `15/15`. Strict audit still needs the trusted toolchain/package-lock digest reconciled.
 - `PHASE-1-COD-RACE-RECHECK` Review recheck passed locally: order transitions use row locking and reservation expiry excludes active fulfillment states; courier/payment race suites passed `19/19` on a clean test DB. Keep append-only exchange fixtures isolated in future test runs.
 - `PHASE-1-NOTIF-003` Accepted locally in `bfbebed`: 15/15 integration scenarios cover transactional customer notices and manager push notices for payment/order/courier/refund/return/service/loaner/exchange/trade-in/support/approval/shift flows. Provider delivery and staging certification remain open. Next gate is clean-HEAD native evidence plus strict audit.
 - `PHASE-1-EXECUTION-023` First Phase 1 execution is partially accepted: Web/ERP operations (`dfc21da`), Android POS/Courier reconciliation (`13219a3`) and Android Staff parity (`23ba312`) are committed; iOS contracts (`6f2263e`) compile but XCTest runner/evidence is still open. Next gate is to reconcile current notification test/API signatures, review parallel native changes, obtain one clean HEAD and rerun native evidence plus strict audit. Detailed order: `docs/PHASE-1-EXECUTION-PLAN.md`.
