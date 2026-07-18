@@ -323,8 +323,8 @@ private struct StaffHomeView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 actionTile("Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders", action: openOrders)
                 actionTile("Добавить товар", subtitle: "сканер", icon: "plus.app.fill", tint: lime, identifier: "staff-home-add-product", action: openAddProduct)
-                actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Color(red: 0.58, green: 0.72, blue: 1), identifier: "staff-home-buyback", action: openBuyback)
-                actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Color(red: 1, green: 0.77, blue: 0.35), identifier: "staff-home-kpi", action: openTasks)
+                actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback", action: openBuyback)
+                actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi", action: openTasks)
             }
         }
     }
@@ -414,14 +414,14 @@ private struct Customer360View: View {
     @State private var busyWarrantyId: String?
     @State private var errorMessage: String?
     private let environment = AppEnvironment.live()
-    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
-    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
-    private let surfaceSoft = Color(red: 0.165, green: 0.145, blue: 0.122)
-    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
-    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
-    private let coral = Color(red: 1, green: 0.357, blue: 0.18)
-    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
-    private let amber = Color(red: 1, green: 0.77, blue: 0.35)
+    private let background = Design3.screen
+    private let surface = Design3.surface
+    private let surfaceSoft = Design3.surfaceRaised
+    private let primaryText = Design3.textBright
+    private let secondaryText = Design3.textMuted
+    private let coral = Design3.orange
+    private let lime = Design3.lime
+    private let amber = Design3.gold
 
     var body: some View {
         ZStack {
@@ -632,7 +632,7 @@ private struct Customer360View: View {
             metricCard("LTV", money(overview.customer.ltv), "за всё время", lime)
             metricCard("Заказы", "\(overview.orders.total)", money(overview.orders.spent), amber)
             metricCard("Долг", money(overview.debts.openBalance), "\(overview.debts.count) активных", coral)
-            metricCard("Сервис", "\(overview.warranties.open)", "\(overview.tickets.open) тикетов", Color(red: 0.58, green: 0.72, blue: 1))
+            metricCard("Сервис", "\(overview.warranties.open)", "\(overview.tickets.open) тикетов", Design3.blue)
         }
     }
 
@@ -905,14 +905,14 @@ struct StaffOrdersView: View {
     @State private var busyOrderId: String?
     @State private var errorMessage: String?
     private let environment = AppEnvironment.live()
-    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
-    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
-    private let surfaceSoft = Color(red: 0.18, green: 0.157, blue: 0.133)
-    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
-    private let secondaryText = Color(red: 0.655, green: 0.612, blue: 0.572)
-    private let mutedText = Color(red: 0.541, green: 0.498, blue: 0.463)
-    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
-    private let amber = Color(red: 0.898, green: 0.698, blue: 0.235)
+    private let background = Design3.screen
+    private let surface = Design3.surface
+    private let surfaceSoft = Design3.surfaceRaised
+    private let primaryText = Design3.textBright
+    private let secondaryText = Design3.textMuted
+    private let mutedText = Design3.textSubtle
+    private let lime = Design3.lime
+    private let amber = Design3.gold
 
     private let statuses = [
         ("created", "Новые"),
