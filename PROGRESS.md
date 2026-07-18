@@ -2,6 +2,9 @@
 
 ## 2026-07-18
 
+- Verification follow-up for `GAP-PII-RETENTION-039`: targeted retention, Evidence integration, API build, Prisma migration validation and isolated public-rate-limit tests pass. Full `mvp:verify` reaches API Jest with `162/163` suites and `738/739` tests; the remaining failure is a nondeterministic `socket hang up` in a long-running HTTP integration suite (`public-rate-limit.e2e-spec.ts`, then `procurement.e2e-spec.ts` on the next run). The new Evidence retention code has no failing targeted test. The full MVP gate remains RED until the shared test HTTP/lifecycle instability is fixed.
+- A minimal `Connection: close` header was added to the rate-limit test helper; its isolated suite is green, but this is not treated as a full-gate fix.
+
 - Iteration ID: `GAP-PII-RETENTION-039`.
 - Task: implement the first Evidence Vault PII retention/deletion slice from the gap analysis.
 - Result: explicit trade-in identity labels now receive API-owned PII classification and a configurable 30-3650 day deadline; an hourly worker claims expired rows, deletes the object, redacts the stored asset, retries failures with bounded backoff and appends `evidence.purged`. Purged reads fail closed.

@@ -55,10 +55,11 @@ describe('public endpoint rate limits', () => {
     headers?: Record<string, string>,
   ) {
     const server = app.getHttpServer();
+    const connectionHeaders = { connection: 'close', ...(headers ?? {}) };
     for (let i = 0; i < allowed; i += 1) {
-      await request(server).post(path).set(headers ?? {}).send(body).expect(okStatus);
+      await request(server).post(path).set(connectionHeaders).send(body).expect(okStatus);
     }
-    await request(server).post(path).set(headers ?? {}).send(body).expect(429);
+    await request(server).post(path).set(connectionHeaders).send(body).expect(429);
   }
 
   it('rate-limits checkout customer creation', async () => {
