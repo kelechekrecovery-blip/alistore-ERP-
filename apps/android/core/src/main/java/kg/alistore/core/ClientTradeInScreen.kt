@@ -54,12 +54,12 @@ interface CustomerTradeInsGateway : CustomerEvidenceGateway {
   suspend fun createTradeIn(request: CreateTradeInRequest, token: String, idempotencyKey: String): CustomerTradeIn
 }
 
-private val TradeInInk = Color(0xFF201B17)
-private val TradeInSurface = Color(0xFF2A231D)
-private val TradeInLine = Color(0xFF463C31)
-private val TradeInMuted = Color(0xFFA79C92)
-private val TradeInCoral = Color(0xFFFF5B2E)
-private val TradeInLime = Color(0xFFC6FF3D)
+private val TradeInInk = Design3.screen
+private val TradeInSurface = Design3.surface
+private val TradeInLine = Design3.hairline
+private val TradeInMuted = Design3.textMuted
+private val TradeInCoral = Design3.orange
+private val TradeInLime = Design3.lime
 private val tradeInGrades = listOf("A", "B", "C")
 private const val CLIENT_QUEUE_DB = "alistore-offline.db"
 

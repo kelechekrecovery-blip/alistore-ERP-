@@ -42,12 +42,12 @@ interface CustomerSupportGateway : CustomerEvidenceGateway {
   suspend fun openTicket(request: OpenSupportTicketRequest, token: String, idempotencyKey: String): SupportTicket
 }
 
-private val SupportInk = Color(0xFF201B17)
-private val SupportSurface = Color(0xFF2A231D)
-private val SupportLine = Color(0xFF463C31)
-private val SupportMuted = Color(0xFFA79C92)
-private val SupportCoral = Color(0xFFFF5B2E)
-private val SupportLime = Color(0xFFC6FF3D)
+private val SupportInk = Design3.screen
+private val SupportSurface = Design3.surface
+private val SupportLine = Design3.hairline
+private val SupportMuted = Design3.textMuted
+private val SupportCoral = Design3.orange
+private val SupportLime = Design3.lime
 
 @Composable
 internal fun ClientSupportScreen(

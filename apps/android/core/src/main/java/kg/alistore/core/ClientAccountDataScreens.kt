@@ -52,12 +52,12 @@ interface CustomerAccountGateway {
   suspend fun deleteAccount(token: String)
 }
 
-private val AccountInk = Color(0xFF201B17)
-private val AccountSurface = Color(0xFF2A231D)
-private val AccountLine = Color(0xFF463C31)
-private val AccountMuted = Color(0xFFA79C92)
-private val AccountCoral = Color(0xFFFF5B2E)
-private val AccountLime = Color(0xFFC6FF3D)
+private val AccountInk = Design3.screen
+private val AccountSurface = Design3.surface
+private val AccountLine = Design3.hairline
+private val AccountMuted = Design3.textMuted
+private val AccountCoral = Design3.orange
+private val AccountLime = Design3.lime
 
 @Composable
 internal fun ClientBonusesScreen(

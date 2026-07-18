@@ -41,12 +41,12 @@ interface CustomerDevicesGateway {
   suspend fun openWarranty(request: OpenWarrantyRequest, token: String, idempotencyKey: String): WarrantyCase
 }
 
-private val DevicesInk = Color(0xFF201B17)
-private val DevicesSurface = Color(0xFF2A231D)
-private val DevicesLine = Color(0xFF463C31)
-private val DevicesMuted = Color(0xFFA79C92)
-private val DevicesCoral = Color(0xFFFF5B2E)
-private val DevicesLime = Color(0xFFC6FF3D)
+private val DevicesInk = Design3.screen
+private val DevicesSurface = Design3.surface
+private val DevicesLine = Design3.hairline
+private val DevicesMuted = Design3.textMuted
+private val DevicesCoral = Design3.orange
+private val DevicesLime = Design3.lime
 
 @Composable
 internal fun ClientDevicesScreen(
