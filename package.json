@@ -12,6 +12,7 @@
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api -- --runInBand",
     "e2e": "playwright test",
+    "e2e:cross-browser": "E2E_BROWSERS=chromium,webkit,firefox playwright test e2e/web-checkout.spec.ts e2e/checkout-consent.spec.ts",
     "visual:e2e": "node scripts/run-visual-acceptance.mjs",
     "mobile": "npm --prefix apps/mobile run start",
     "mobile:typecheck": "npm --prefix apps/mobile run typecheck",

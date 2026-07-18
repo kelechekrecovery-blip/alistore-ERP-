@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-E2E-BROWSERS-002`.
+- Task: make the cross-browser checkout gate repeatable.
+- Result: Playwright projects are now selected through `E2E_BROWSERS`; Chromium remains the default local MVP project while WebKit and Firefox can be enabled explicitly. Added `npm run e2e:cross-browser` for checkout and consent flows.
+- Checks: `npm run e2e:cross-browser` passed `27/27` across Chromium, WebKit and Firefox after installing the pinned Playwright binaries; no browser-specific checkout defects were observed.
+- Acceptance: local cross-browser software gate accepted. CI/staging execution and browser-version pinning remain release hardening work.
+- Next step: move to ERP/CMS contract coverage while staging credentials and missing design references remain external blockers.
+
 - Iteration ID: `GAP-OBSERVE-002`.
 - Task: add the first production observability slice for API traffic.
 - Result: `/api/metrics` now renders Prometheus text with process start time, request/error counters and latency histograms; the global interceptor excludes the scrape endpoint, normalizes numeric/UUID route segments and limits label cardinality. Production access requires `Bearer METRICS_TOKEN`; no secret values are rendered.

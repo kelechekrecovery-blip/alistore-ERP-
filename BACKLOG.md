@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `GAP-E2E-BROWSERS-002` Local software slice accepted: Playwright now accepts `E2E_BROWSERS=chromium,webkit,firefox`; `npm run e2e:cross-browser` passed `27/27` across Chromium, WebKit and Firefox for checkout/consent flows. CI/staging browser execution remains a release-hardening gate.
 - `GAP-OBSERVE-002` Local software slice accepted: API now exposes Prometheus-compatible `/api/metrics` with request totals, 5xx counters and latency histograms; dynamic route labels are normalized and the scrape route is excluded. Production requires a secret `METRICS_TOKEN`; remaining work is private scrape networking, uptime checks, alert delivery, worker/outbox dashboard and staging soak.
 - `MVP-VERIFY-034` Local MVP gate revalidated after two lifecycle fixes: API isolated gate `163/163` test files, full Playwright `62/62`, Web/API builds and mobile typecheck pass. The API gate now starts each Jest file with a clean test database/process; the bundle allocation lifecycle uses an active-only IMEI index; CMS E2E requests explicitly close connections. Remaining gates are strict evidence refresh, staging and external providers.
 - `LOGIC-009-041` Store-point deactivation E2E now reflects the operational guard: catalog stock is kept outside the point for the availability-only scenario. The server still blocks deactivation when the point owns active stock, open shifts or fulfillment state.
@@ -64,7 +65,7 @@ Independent fresh-eyes sweep recorded in `docs/GAP-ANALYSIS-2026-07-17.md`. Thes
 - `GAP-BACKUP-OPS-001` **P1.** `infra/backup.sh` self-declares "Authored, NOT run": not wired to cron, no restore drill, no PITR (wal-g/pgBackRest), no backup of Evidence objects (S3/MinIO). Gate: scheduled backups + a recorded successful restore on staging before first-store launch. (Wave 4)
 - `GAP-JOBS-OBS-001` **P2.** Finish the BullMQ migration (reservation/debt schedulers still on pg-boss) and add DLQ visibility plus job metrics. (Wave 5)
 - `GAP-CSP-001` **P2.** Replace `scriptSrc 'unsafe-inline'` in the CSP (`config/runtime-security.ts`) with a nonce-based policy for the ERP surface. (Wave 5)
-- `GAP-E2E-BROWSERS-001` **P1.** Playwright runs Chromium only; checkout — the most fragile flow — is untested in WebKit/Firefox, while iPhone customers use Safari. Gate: critical checkout/account flows pass on WebKit. (Wave 3)
+- `GAP-E2E-BROWSERS-001` **P1, local software slice accepted.** Critical checkout/consent flows pass in Chromium, WebKit and Firefox (`27/27`); CI/staging browser matrix remains before launch. (Wave 3)
 - `GAP-TEST-RESET-001` **P2.** Build the single generated FK-safe test-DB reset helper (flake vector across ~93 specs, incident `eeb616f`). (Wave 3)
 - `GAP-LOAD-001` **P2.** No load/soak test exists; reports aggregate over unbounded history (G4 HIGH #11). Gate: staging soak with a bounded report window before launch. (Wave 3)
 - `GAP-API-VERSION-001` **P2.** No release changelog and no API-contract versioning for native clients; a deployed app and a moved API can diverge silently. Gate: app sends its version/build, API rejects or warns on unsupported contract versions. (Wave 4)

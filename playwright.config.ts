@@ -26,14 +26,17 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  projects: [
-    {
+  projects: (process.env.E2E_BROWSERS ?? 'chromium').split(',').map((browser) => {
+    const name = browser.trim();
+    if (name === 'webkit') return { name, use: { ...devices['Desktop Safari'] } };
+    if (name === 'firefox') return { name, use: { ...devices['Desktop Firefox'] } };
+    return {
       name: 'chromium',
       use: process.env.CI
         ? { ...devices['Desktop Chrome'] }
         : { ...devices['Desktop Chrome'], channel: 'chrome' },
-    },
-  ],
+    };
+  }),
   webServer: [
     {
       command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" E2E_TEST=true NODE_ENV=test AI_PROVIDER=rules AI_PROVIDER_KEY= OPENROUTER_API_KEY= ANTHROPIC_API_KEY= AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
