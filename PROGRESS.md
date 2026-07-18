@@ -10,6 +10,14 @@
 - Outcome: Phase 1 FIN-003E is accepted for local software behavior. This does not certify live payment execution, SMS/OFD, staging deployment, physical devices, hardware or production readiness.
 - Next step: start the next bounded Phase 2 finance slice, prioritizing inventory valuation/GL certification work that can be verified locally before external UAT.
 
+- Iteration ID: `PHASE-2-INV-VAL-BENCH-001`.
+- Task: rerun the inventory valuation roll-forward performance contract after the clean Phase 1 gate.
+- Files changed: `BACKLOG.md` and this progress entry; no source changes were required.
+- Result: the benchmark created and destroyed its own disposable database, loaded a 36-month synthetic history with 27,648 valuation rows, ran the report twice under repeatable-read, and confirmed identical complete/consistent results.
+- Checks run: `TEST_DATABASE_URL=postgresql://alistore@127.0.0.1:5432/alistore_test?schema=public npm run inventory:valuation:benchmark`; API production build passed; benchmark result was `68ms`, `4MB` RSS delta, `48` report rows.
+- Outcome: local `INV-VAL-001I` performance evidence is refreshed. Production-shaped staging latency, lock-window measurement and GL/accountant acceptance remain open.
+- Next step: prepare the staging-shaped migration/lock-window procedure, or continue the remaining local FX/period-close accounting slice if staging access is unavailable.
+
 - Iteration ID: `PHASE-1-FIN-003E-VOID-001`.
 - Task: close the remaining Phase 1 contract for cancelling an unfinished payment.
 - Files changed: `apps/api/prisma/schema.prisma`, payment status migration, payment DTO/controller/service, Event Ledger types and `test/payment-void.e2e-spec.ts`.
