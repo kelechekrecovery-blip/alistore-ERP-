@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `PHASE-1-DETAILED-PLAN-001` Detailed Phase 1 execution plan is recorded in `docs/PHASE-1-DETAILED-PLAN.md`: ERP/CMS -> storefront contract, catalog/media, publication, pricing/promotions, stock/store points/slots, customer routes, security, evidence and gates. Next implementation lane is to take one uncommitted vertical slice at a time and bind acceptance to one clean SHA.
 - `PHASE-1-NOTIF-ISOLATION-004` Accepted in `dea4d84`: notification staff assertions are robust to retained append-only fixtures; coverage remains `15/15`. Strict audit still needs the trusted toolchain/package-lock digest reconciled.
 - `PHASE-1-COD-RACE-RECHECK` Review recheck passed locally: order transitions use row locking and reservation expiry excludes active fulfillment states; courier/payment race suites passed `19/19` on a clean test DB. Keep append-only exchange fixtures isolated in future test runs.
 - `PHASE-1-NOTIF-003` Accepted locally in `bfbebed`: 15/15 integration scenarios cover transactional customer notices and manager push notices for payment/order/courier/refund/return/service/loaner/exchange/trade-in/support/approval/shift flows. Provider delivery and staging certification remain open. Next gate is clean-HEAD native evidence plus strict audit.

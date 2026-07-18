@@ -4038,3 +4038,11 @@
 - Remaining dirty parallel files: API notification integration changes, Android packaged UI test edits, iOS Client changes and Web Staff changes. They must be reviewed before the next clean-SHA evidence run.
 - Documentation: detailed gate order is recorded in `docs/PHASE-1-EXECUTION-PLAN.md`.
 - Next step: stabilize the remaining parallel API/native changes, repair notification E2E against current constructors, then record fresh iOS/Android evidence on one clean HEAD and rerun strict audit.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-DETAILED-PLAN-001`.
+- Task: split Phase 1 into an executable ERP -> storefront contract plan with explicit ownership, vertical slices, security invariants, test matrix, evidence requirements and release gates.
+- Files changed: `docs/PHASE-1-DETAILED-PLAN.md`, `BACKLOG.md`.
+- Result: the phase boundary is now explicit. Phase 1 covers catalog/media, CMS publication, prices/promotions, stock/store points/delivery slots, storefront routes and their server-authoritative integration. Native parity, live providers, physical devices, staging and missing design references remain separate gates.
+- Checks run: `git diff --check`.
+- Next step: review current parallel worktree changes, select the first accepted vertical slice, then run its disposable-DB API gate before touching shared contracts.
