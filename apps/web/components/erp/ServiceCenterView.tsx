@@ -257,6 +257,14 @@ function LoanerFundPanel({ accessToken, staffId, role, devices, workOrders, onCh
   const available = (devices ?? []).filter((device) => device.unit.status === 'loaner_available' && device.loans.length === 0);
   const selectedLoan = (devices ?? []).flatMap((device) => device.loans).find((loan) => loan.id === returnLoanId);
 
+  useEffect(() => {
+    if (!devices) return;
+    setSelectedDevice((current) => {
+      const currentIsAvailable = available.some((device) => device.id === current);
+      return currentIsAvailable ? current : (available[0]?.id ?? '');
+    });
+  }, [devices]);
+
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalized = imei.trim().toUpperCase();
