@@ -40,6 +40,13 @@
   --coral-soft: #ff6b55;
   --coral-light: #ff8a5f;
   --coral-tint: #ffb5aa;
+  /* Design 3.0 surfaces from the latest desktop handoff. */
+  --erp-bg: #0b0a08;
+  --erp-glass: rgba(255, 255, 255, 0.055);
+  --erp-glass-strong: rgba(255, 255, 255, 0.085);
+  --erp-glass-border: rgba(255, 255, 255, 0.11);
+  --erp-coral-hi: #ff7a4d;
+  --erp-green: #4ed17a;
 }
 
 @layer base {
@@ -69,6 +76,38 @@
 @layer components {
   .input {
     @apply w-full rounded-btn border border-ink/15 bg-white px-4 py-2.5 text-base text-ink outline-none transition placeholder:text-ink/35 focus:border-coral focus:ring-4 focus:ring-coral/15;
+  }
+
+  .erp3-stage {
+    background: linear-gradient(135deg, #17120e 0%, var(--erp-bg) 48%, #11100e 100%);
+  }
+
+  .erp3-shell {
+    background: linear-gradient(135deg, #1b1510 0%, #13100d 42%, var(--erp-bg) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 26px;
+    box-shadow: 0 50px 120px rgba(0, 0, 0, 0.62);
+  }
+
+  .erp3-glass {
+    background: linear-gradient(160deg, var(--erp-glass-strong), rgba(255, 255, 255, 0.018));
+    border: 1px solid var(--erp-glass-border);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+  }
+
+  .erp3-glass-strong {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025));
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  .erp3-coral-action {
+    background: linear-gradient(135deg, var(--erp-coral-hi), var(--deep));
+    box-shadow: 0 6px 18px rgba(255, 91, 46, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.34);
   }
 }
 

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+.sc::-webkit-scrollbar{width:0;}
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+@keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+</style>
+</helmet>
+
+<div style="position: relative; min-height: 100vh; overflow: hidden; background: radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 470px; height: 470px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.5), transparent 68%); filter: blur(24px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(181,122,224,0.3), transparent 68%); filter: blur(28px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+  </div>
+
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 28px 32px 56px;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 25px; color: #fff;">Инбокс задач</span>
+      <span style="margin-left: auto; margin-right: 130px; font-size: 13px; color: #8A7F76;">Всё, что требует действия — по роли</span>
+    </div>
+    <div style="font-size: 13px; color: #8A7F76; margin-bottom: 20px;">Задачи собираются из всех окон: одобрения, закупки, сервис, целостность, клиенты. Приоритет и роль — на каждой.</div>
+
+    <!-- role tabs -->
+    <div class="sc" style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 18px; padding-bottom: 4px;">
+      <sc-for list="{{ roles }}" as="r" hint-placeholder-count="5">
+        <div onClick="{{ r.pick }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px; background: {{ r.bg }}; color: {{ r.fg }}; border: 1px solid {{ r.bd }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: {{ r.sh }};">{{ r.label }}<span style="background: {{ r.badgeBg }}; color: {{ r.badgeFg }}; border-radius: 999px; font-size: 11px; padding: 1px 7px;">{{ r.count }}</span></div>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 18px;">
+      <sc-for list="{{ stats }}" as="s" hint-placeholder-count="3">
+        <div style="padding: 15px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ s.border }}; box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ s.l }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: {{ s.color }}; margin-top: 5px;">{{ s.v }}</div></div>
+      </sc-for>
+    </div>
+
+    <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="6">
+      <div style="display: flex; align-items: center; gap: 14px; padding: 15px 18px; margin-bottom: 10px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); border-left: 3px solid {{ t.pColor }}; box-shadow: 0 8px 22px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.14);">
+        <div style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 19px;">{{ t.icon }}</div>
+        <div style="flex: 1;"><div style="font-size: 13.5px; color: #fff; font-weight: 600;">{{ t.title }}</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 2px;">{{ t.src }} · {{ t.role }} · {{ t.when }}</div></div>
+        <span style="background: {{ t.pBg }}; color: {{ t.pFg }}; border-radius: 6px; padding: 3px 9px; font-size: 10.5px; font-weight: 700;">{{ t.priority }}</span>
+        <a href="{{ t.href }}"><div style="background: rgba(255,91,46,0.14); border: 1px solid rgba(255,91,46,0.28); color: #FF9A6E; border-radius: 10px; padding: 9px 15px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ t.action }} →</div></a>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1120,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  state = { role:"all" };
+  renderVals(){
+    const s=this.state;
+    const P=(p)=>p==="P0"?{pColor:"#FF6B5B",pBg:"rgba(255,107,91,0.16)",pFg:"#FF8A7A"}:p==="P1"?{pColor:"#E5B23C",pBg:"rgba(229,178,60,0.16)",pFg:"#E5B23C"}:{pColor:"#7FB0EC",pBg:"rgba(127,176,236,0.16)",pFg:"#7FB0EC"};
+    const all=[
+      {icon:"💳",title:"Одобрить закупку iPhone 15 ×40 (3.2 млн)",src:"AI-директор",role:"владелец",when:"5 мин",priority:"P0",action:"Открыть",href:"AliStore ERP 3.0.dc.html",r:"owner"},
+      {icon:"🏦",title:"Инкассация кассы Ош — превышен лимит",src:"Финансы",role:"владелец",when:"12 мин",priority:"P0",action:"Сверка",href:"AliStore \u041f\u043b\u0430\u0442\u0451\u0436\u043d\u0430\u044f \u0441\u0432\u0435\u0440\u043a\u0430.dc.html",r:"owner"},
+      {icon:"🩺",title:"Расхождение остатка на складе Центр",src:"Пульт целостности",role:"владелец",when:"18 мин",priority:"P0",action:"Разобрать",href:"AliStore \u0421\u0432\u0435\u0440\u043a\u0430 \u043a\u0430\u0441\u0441\u044b.dc.html",r:"owner"},
+      {icon:"📦",title:"Приёмка PO-1182 — пересортица 2 позиции",src:"Склад",role:"склад",when:"30 мин",priority:"P1",action:"Приёмка",href:"AliStore \u041f\u0440\u0438\u0451\u043c\u043a\u0430 \u043f\u043e PO.dc.html",r:"wh"},
+      {icon:"🔧",title:"Сервис №S-204 — SLA истекает через 2 ч",src:"Сервис-центр",role:"мастер",when:"1 ч",priority:"P1",action:"Открыть",href:"AliStore \u0421\u0435\u0440\u0432\u0438\u0441 \u043a\u0435\u0439\u0441.dc.html",r:"svc"},
+      {icon:"↩️",title:"Возврат iPhone — подтвердить у старшего",src:"POS · Ош",role:"старший",when:"1 ч",priority:"P1",action:"Одобрить",href:"AliStore POS \u0432\u043e\u0437\u0432\u0440\u0430\u0442.dc.html",r:"owner"},
+      {icon:"⭐",title:"3 новых отзыва без ответа",src:"CRM",role:"маркетолог",when:"2 ч",priority:"P2",action:"Ответить",href:"AliStore CRM \u041a\u0430\u043c\u043f\u0430\u043d\u0438\u0438.dc.html",r:"mkt"},
+      {icon:"😴",title:"340 уснувших клиентов — запустить реактивацию",src:"Маркетинг-центр",role:"маркетолог",when:"сегодня",priority:"P2",action:"Кампания",href:"AliStore \u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433-\u0446\u0435\u043d\u0442\u0440.dc.html",r:"mkt"}
+    ].map(t=>({...t,...P(t.priority)}));
+    const roleDef=[["all","Все",all.length],["owner","Владелец",all.filter(t=>t.r==="owner").length],["wh","Склад",all.filter(t=>t.r==="wh").length],["svc","Сервис",all.filter(t=>t.r==="svc").length],["mkt","Маркетинг",all.filter(t=>t.r==="mkt").length]];
+    const roles=roleDef.map(r=>{const on=s.role===r[0];return{label:r[1],count:String(r[2]),pick:()=>this.setState({role:r[0]}),
+      bg:on?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)",fg:on?"#fff":"#B8AEA4",bd:on?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.1)",
+      sh:on?"0 6px 16px rgba(255,91,46,0.36), inset 0 1px 0 rgba(255,255,255,0.3)":"none",
+      badgeBg:on?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.1)",badgeFg:on?"#fff":"#8A7F76"};});
+    const tasks = s.role==="all"?all:all.filter(t=>t.r===s.role);
+    const stats=[
+      {l:"Срочных (P0)",v:String(all.filter(t=>t.priority==="P0").length),color:"#FF8A7A",border:"rgba(255,138,122,0.24)"},
+      {l:"Всего в инбоксе",v:String(all.length),color:"#fff",border:"rgba(255,255,255,0.11)"},
+      {l:"Просрочка SLA",v:"1",color:"#E5B23C",border:"rgba(229,178,60,0.22)"}
+    ];
+    return { roles, stats, tasks };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+@keyframes scanline{0%,100%{top:14%;}50%{top:82%;}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 30px 34px 56px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.5), transparent 68%); filter: blur(24px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(127,176,236,0.32), transparent 68%); filter: blur(28px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+  </div>
+
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; z-index: 1; max-width: 1180px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Инвентаризация — скан</span>
+      <span style="margin-left: auto; font-size: 12.5px; color: #8A7F76;">Склад Центр · {{ dateStr }}</span>
+    </div>
+    <div style="font-size: 13px; color: #8A7F76; margin-bottom: 20px;">Сканируй факт → система сверяет с учётом → расхождения в акт. Сканируй товары кнопкой, смотри как сходится.</div>
+
+    <div style="display: grid; grid-template-columns: 320px 1fr; gap: 18px; align-items: start;">
+      <!-- scanner -->
+      <div style="padding: 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+        <div style="position: relative; height: 180px; border-radius: 14px; background: #0C0A08; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; margin-bottom: 14px;">
+          <div style="position: absolute; left: 10%; right: 10%; height: 2px; background: linear-gradient(90deg,transparent,#FF5B2E,transparent); box-shadow: 0 0 12px #FF5B2E; animation: scanline 2.4s ease-in-out infinite;"></div>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 40px; opacity: 0.5;">📷</div>
+          <div style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 11px; color: #8A7F76;">наведите на штрихкод / IMEI</div>
+        </div>
+        <div onClick="{{ scan }}" style="text-align: center; padding: 13px; border-radius: 12px; background: linear-gradient(135deg,#FF7A4D,#E8410F); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 22px rgba(255,91,46,0.36);">⊹ Сканировать позицию</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
+          <div style="padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);"><div style="font-size: 11px; color: #A79C92;">Отсканировано</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #fff; margin-top: 3px;">{{ scannedCnt }} / {{ totalCnt }}</div></div>
+          <div style="padding: 12px; border-radius: 12px; background: rgba(255,138,122,0.1); border: 1px solid rgba(255,138,122,0.22);"><div style="font-size: 11px; color: #A79C92;">Расхождений</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ diffColor }}; margin-top: 3px;">{{ diffCnt }}</div></div>
+        </div>
+        <div onClick="{{ act }}" style="text-align: center; padding: 12px; border-radius: 12px; background: {{ actBg }}; border: 1px solid {{ actBd }}; color: {{ actFg }}; font-size: 13.5px; font-weight: 700; cursor: pointer; margin-top: 12px;">{{ actLabel }}</div>
+      </div>
+
+      <!-- table -->
+      <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+        <div style="display: grid; grid-template-columns: 1.8fr 1fr 1fr 1.1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Позиция</span><span>Учёт</span><span>Факт</span><span>Расхождение</span></div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 1.8fr 1fr 1fr 1.1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;">
+            <span style="font-size: 13px; color: #fff;">{{ r.name }}</span>
+            <span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #A79C92;">{{ r.book }}</span>
+            <span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ r.factFg }};">{{ r.fact }}</span>
+            <span><span style="background: {{ r.bg }}; color: {{ r.fg }}; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-family: 'JetBrains Mono';">{{ r.diff }}</span></span>
+          </div>
+        </sc-for>
+        <div style="display: flex; align-items: center; padding: 14px 18px; background: rgba(255,255,255,0.03);"><span style="font-size: 12.5px; color: #8A7F76;">{{ note }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:640}}">
+class Component extends DCLogic {
+  state = { scanned: 0 };
+  renderVals(){
+    const data=[
+      {name:"iPhone 15 · 128 ГБ",book:8,fact:8},
+      {name:"MacBook Air M2",book:3,fact:3},
+      {name:"AirPods Pro 2",book:25,fact:24},
+      {name:"Galaxy S24",book:6,fact:6},
+      {name:"iPad Air",book:5,fact:5},
+      {name:"Apple Watch S9",book:2,fact:3}
+    ];
+    const n=this.state.scanned;
+    const rows=data.map((d,i)=>{
+      const done=i<n;
+      const diff=done?(d.fact-d.book):0;
+      const shown=done?d.fact:"—";
+      let bg="rgba(255,255,255,0.05)",fg="#8A7F76",txt=done?"0":"—";
+      if(done&&diff<0){bg="rgba(255,138,122,0.15)";fg="#FF8A7A";txt=diff+" недостача";}
+      else if(done&&diff>0){bg="rgba(229,178,60,0.15)";fg="#E5B23C";txt="+"+diff+" излишек";}
+      else if(done){bg="rgba(198,255,61,0.12)";fg="#C6FF3D";txt="✓ сходится";}
+      return {name:d.name,book:d.book,fact:shown,factFg:done?"#fff":"#6E645C",diff:txt,bg,fg};
+    });
+    const diffCnt=data.slice(0,n).filter(d=>d.fact!==d.book).length;
+    const complete=n>=data.length;
+    return {
+      dateStr:"16 июля 2026",
+      scan:()=>this.setState({scanned:Math.min(this.state.scanned+1,data.length)}),
+      scannedCnt:n, totalCnt:data.length,
+      diffCnt, diffColor:diffCnt>0?"#FF8A7A":"#C6FF3D",
+      rows,
+      note: complete ? (diffCnt>0? "Найдено расхождений: "+diffCnt+". Оформите акт — корректировка учёта и списание/оприходование через Event Ledger." : "Всё сходится — учёт совпал с фактом.") : "Продолжайте сканировать позиции…",
+      actLabel: complete ? (diffCnt>0?"Оформить акт расхождений":"Закрыть инвентаризацию ✓") : "Акт (сначала завершите скан)",
+      actBg: complete?(diffCnt>0?"rgba(255,122,77,0.16)":"rgba(198,255,61,0.14)"):"rgba(255,255,255,0.04)",
+      actBd: complete?(diffCnt>0?"rgba(255,122,77,0.32)":"rgba(198,255,61,0.28)"):"rgba(255,255,255,0.08)",
+      actFg: complete?(diffCnt>0?"#FF9A6E":"#C6FF3D"):"#6E645C",
+      act:()=>{}
+    };
+  }
+}
+</script>
+</body>
+</html>

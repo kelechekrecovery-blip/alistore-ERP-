@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+.sc::-webkit-scrollbar{height:6px;} .sc::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:3px;}
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+</style>
+</helmet>
+
+<div style="position: relative; min-height: 100vh; overflow: hidden; background: radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 470px; height: 470px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.5), transparent 68%); filter: blur(24px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(127,176,236,0.3), transparent 68%); filter: blur(28px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+  </div>
+
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; z-index: 1; max-width: 1160px; margin: 0 auto; padding: 28px 32px 56px;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 25px; color: #fff;">HR · Смены и табель</span>
+      <span style="margin-left: auto; margin-right: 120px; font-size: 13px; color: #8A7F76;">Неделя 15–21 июля · Центр</span>
+    </div>
+    <div style="font-size: 13px; color: #8A7F76; margin-bottom: 20px;">Табель отмечается на кассе (вход/выход), опоздания и часы считаются автоматически и идут в расчёт зарплаты.</div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 18px;">
+      <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+        <div style="padding: 15px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ s.border }}; box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ s.l }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 21px; color: {{ s.color }}; margin-top: 5px;">{{ s.v }}</div></div>
+      </sc-for>
+    </div>
+
+    <!-- schedule grid -->
+    <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16); margin-bottom: 16px;">
+      <div class="sc" style="overflow-x: auto;">
+        <div style="min-width: 780px;">
+          <div style="display: grid; grid-template-columns: 150px repeat(7, 1fr) 90px; padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Сотрудник</span><sc-for list="{{ days }}" as="d" hint-placeholder-count="7"><span style="text-align: center;">{{ d }}</span></sc-for><span style="text-align: right;">Часы</span></div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+            <div style="display: grid; grid-template-columns: 150px repeat(7, 1fr) 90px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;">
+              <span style="font-size: 13px; color: #fff;">{{ r.name }}</span>
+              <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="7">
+                <div style="display: flex; justify-content: center;"><div style="width: 30px; height: 30px; border-radius: 9px; background: {{ c.bg }}; border: 1px solid {{ c.bd }}; display: flex; align-items: center; justify-content: center; font-size: 12px; color: {{ c.fg }};" title="{{ c.title }}">{{ c.mark }}</div></div>
+              </sc-for>
+              <span style="text-align: right; font-family: 'JetBrains Mono'; font-size: 13px; color: #D8CFC6;">{{ r.hours }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 18px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+      <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4"><span style="display: flex; align-items: center; gap: 7px; font-size: 12px; color: #A79C92;"><span style="width: 22px; height: 22px; border-radius: 7px; background: {{ l.bg }}; border: 1px solid {{ l.bd }}; display: flex; align-items: center; justify-content: center; font-size: 11px; color: {{ l.fg }};">{{ l.mark }}</span>{{ l.label }}</span></sc-for>
+    </div>
+
+    <!-- payroll link -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div style="padding: 18px; border-radius: 16px; background: linear-gradient(135deg, rgba(255,138,122,0.11), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,138,122,0.24);">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 10px;">Опоздания и удержания</div>
+        <sc-for list="{{ late }}" as="l" hint-placeholder-count="3"><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 13px; color: #fff; flex: 1;">{{ l.name }}</span><span style="font-size: 12px; color: #E5B23C;">{{ l.mins }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF8A7A;">{{ l.fine }}</span></div></sc-for>
+      </div>
+      <div style="padding: 18px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); display: flex; flex-direction: column;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 6px;">Табель → зарплата</div>
+        <div style="font-size: 12.5px; color: #A79C92; line-height: 1.5; flex: 1;">Часы и удержания автоматически идут в расчёт ЗП: оклад пропорционально отработанному, штрафы за опоздания, бонус за KPI.</div>
+        <a href="AliStore Финансы 3.0.dc.html"><div style="background: linear-gradient(135deg,#FF7A4D,#E8410F); color: #fff; border-radius: 11px; padding: 12px; text-align: center; font-size: 13.5px; font-weight: 700; margin-top: 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.3);">Открыть расчёт ЗП →</div></a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1160,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  renderVals(){
+    const cell=(type)=>{
+      const m={
+        work:{mark:"",bg:"rgba(198,255,61,0.14)",bd:"rgba(198,255,61,0.3)",fg:"#C6FF3D",title:"смена 10:00–20:00"},
+        late:{mark:"!",bg:"rgba(229,178,60,0.16)",bd:"rgba(229,178,60,0.34)",fg:"#E5B23C",title:"опоздание"},
+        off:{mark:"—",bg:"rgba(255,255,255,0.03)",bd:"rgba(255,255,255,0.07)",fg:"#6E645C",title:"выходной"},
+        sick:{mark:"б",bg:"rgba(127,176,236,0.14)",bd:"rgba(127,176,236,0.3)",fg:"#7FB0EC",title:"больничный"}
+      };
+      return m[type];
+    };
+    const rowsDef=[
+      ["Азизбек",["work","work","late","work","work","work","off"],"58 ч"],
+      ["Сайкал",["work","off","work","work","work","work","work"],"60 ч"],
+      ["Сыдык",["late","work","work","off","work","late","work"],"56 ч"],
+      ["Риезидин",["work","work","work","work","off","work","work"],"60 ч"],
+      ["Тахсир",["off","work","sick","sick","work","work","work"],"40 ч"]
+    ];
+    const rows=rowsDef.map(r=>({name:r[0],hours:r[2],cells:r[1].map(cell)}));
+    const stats=[
+      {l:"На смене сейчас",v:"4 / 5",color:"#C6FF3D",border:"rgba(198,255,61,0.22)"},
+      {l:"Опозданий за неделю",v:"3",color:"#E5B23C",border:"rgba(229,178,60,0.22)"},
+      {l:"Больничных",v:"1",color:"#7FB0EC",border:"rgba(127,176,236,0.22)"},
+      {l:"Отработано часов",v:"274",color:"#fff",border:"rgba(255,255,255,0.11)"}
+    ];
+    const legend=[
+      {label:"смена",mark:"",...{bg:"rgba(198,255,61,0.14)",bd:"rgba(198,255,61,0.3)",fg:"#C6FF3D"}},
+      {label:"опоздание",mark:"!",bg:"rgba(229,178,60,0.16)",bd:"rgba(229,178,60,0.34)",fg:"#E5B23C"},
+      {label:"выходной",mark:"—",bg:"rgba(255,255,255,0.03)",bd:"rgba(255,255,255,0.07)",fg:"#6E645C"},
+      {label:"больничный",mark:"б",bg:"rgba(127,176,236,0.14)",bd:"rgba(127,176,236,0.3)",fg:"#7FB0EC"}
+    ];
+    const late=[
+      {name:"Сыдык",mins:"опоздал 2 раза · 35 мин",fine:"−2 000"},
+      {name:"Азизбек",mins:"опоздал 1 раз · 10 мин",fine:"−1 000"}
+    ];
+    return { days:["Пн","Вт","Ср","Чт","Пт","Сб","Вс"], rows, stats, legend, late };
+  }
+}
+</script>
+</body>
+</html>

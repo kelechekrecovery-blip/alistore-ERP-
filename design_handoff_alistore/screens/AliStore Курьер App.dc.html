@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+.sc::-webkit-scrollbar{width:5px;} .sc::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.16);border-radius:3px;} .sc::-webkit-scrollbar-track{background:transparent;}
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(20px,-16px) scale(1.08);}}
+@keyframes moveCar{0%{offset-distance:0%;}100%{offset-distance:100%;}}
+@keyframes pulseR{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.5);opacity:0.35;}}
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; gap: 40px; flex-wrap: wrap; padding: 30px; font-family: 'Manrope', sans-serif; background: radial-gradient(circle at 20% 10%, #201B16, #0B0A08 60%);">
+
+  <div style="width: 390px; height: 810px; border-radius: 46px; padding: 13px; background: linear-gradient(160deg,#3A3A40,#1C1C20); box-shadow: 0 50px 100px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.2);">
+    <div style="position: relative; border-radius: 34px; overflow: hidden; background: #14100C; height: 100%; display: flex; flex-direction: column;">
+      <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;"><div style="position: absolute; top: -120px; right: -80px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.34), transparent 68%); filter: blur(22px); animation: floatBlob 16s ease-in-out infinite;"></div></div>
+
+      <!-- status bar -->
+      <div style="position: relative; z-index: 2; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0;"><span style="font-size: 13px; color: #fff; font-weight: 700;">9:41</span><span style="font-size: 11px; color: #C6FF3D;">● на смене</span></div>
+
+      <!-- header -->
+      <div style="position: relative; z-index: 2; padding: 6px 20px 14px; flex-shrink: 0; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 42px; height: 42px; border-radius: 13px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: #fff; box-shadow: 0 6px 16px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">Д</div>
+        <div style="flex: 1;"><div style="font-size: 16px; font-weight: 800; color: #fff;">Данияр · курьер</div><div style="font-size: 12px; color: #8A7F76;">{{ statLine }}</div></div>
+      </div>
+
+      <div class="sc" style="position: relative; z-index: 2; flex: 1; overflow-y: auto; padding: 0 16px 20px;">
+
+        <!-- earnings strip -->
+        <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+          <sc-for list="{{ shiftStats }}" as="s" hint-placeholder-count="3"><div style="flex: 1; padding: 13px; border-radius: 14px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(18px) saturate(170%); backdrop-filter: blur(18px) saturate(170%); border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);"><div style="font-family: 'Manrope'; font-weight: 800; font-size: 19px; color: {{ s.color }};">{{ s.v }}</div><div style="font-size: 10.5px; color: #8A7F76; margin-top: 2px;">{{ s.l }}</div></div></sc-for>
+        </div>
+
+        <!-- ACTIVE DELIVERY -->
+        <sc-if value="{{ isActive }}" hint-placeholder-val="{{ true }}">
+          <!-- map -->
+          <div style="position: relative; height: 190px; border-radius: 18px; overflow: hidden; background: linear-gradient(160deg,#1E2A24,#141C18); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
+            <svg viewBox="0 0 340 190" style="position: absolute; inset: 0; width: 100%; height: 100%;">
+              <path d="M20 40 L120 40 L120 110 L250 110 L250 150" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="18"/>
+              <path id="rt" d="M40 150 C 100 150, 90 70, 170 70 S 280 60, 300 45" fill="none" stroke="#FF5B2E" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+              <circle cx="40" cy="150" r="7" fill="#7FB0EC"/>
+              <circle cx="300" cy="45" r="7" fill="#C6FF3D"/>
+            </svg>
+            <div style="position: absolute; left: 26px; bottom: 26px; font-size: 10px; color: #7FB0EC; font-weight: 700;">магазин</div>
+            <div style="position: absolute; right: 20px; top: 26px;"><span style="display: block; width: 12px; height: 12px; border-radius: 50%; background: #C6FF3D; animation: pulseR 1.8s ease-in-out infinite;"></span></div>
+            <div style="position: absolute; font-size: 22px; offset-path: path('M40 150 C 100 150, 90 70, 170 70 S 280 60, 300 45'); animation: moveCar 6s linear infinite;">🛵</div>
+            <div style="position: absolute; left: 12px; top: 12px; background: rgba(11,10,8,0.7); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px 11px; font-size: 12px; color: #fff;">→ {{ addr }} · ~{{ eta }}</div>
+          </div>
+
+          <div style="border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); padding: 15px; margin-bottom: 12px; box-shadow: 0 8px 22px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12);">
+            <div style="display: flex; align-items: center; gap: 8px;"><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF9A6E;">Заказ {{ orderNo }}</span><span style="margin-left: auto; background: {{ codBg }}; color: {{ codFg }}; border-radius: 6px; padding: 2px 9px; font-size: 11px; font-weight: 700;">{{ codLabel }}</span></div>
+            <div style="font-size: 15px; color: #fff; font-weight: 700; margin-top: 8px;">{{ addr }}</div>
+            <div style="font-size: 12.5px; color: #8A7F76; margin-top: 2px;">{{ items }}</div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 14px;">👤</div>
+              <div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ client }}</div><div style="font-size: 11px; color: #8A7F76;">{{ phone }}</div></div>
+              <div style="width: 38px; height: 38px; border-radius: 12px; background: rgba(198,255,61,0.14); border: 1px solid rgba(198,255,61,0.28); display: flex; align-items: center; justify-content: center; font-size: 16px;">📞</div>
+              <div style="width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 16px;">💬</div>
+            </div>
+          </div>
+
+          <sc-if value="{{ isCod }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; align-items: center; gap: 10px; border-radius: 14px; background: linear-gradient(160deg, rgba(198,255,61,0.12), rgba(255,255,255,0.02)); border: 1px solid rgba(198,255,61,0.24); padding: 13px 15px; margin-bottom: 12px;"><span style="font-size: 18px;">💵</span><span style="flex: 1; font-size: 13px; color: #EDE6DE;">Принять наличными</span><span style="font-family: 'JetBrains Mono'; font-size: 16px; color: #C6FF3D; font-weight: 700;">{{ codAmount }}</span></div>
+          </sc-if>
+
+          <!-- steps -->
+          <sc-for list="{{ steps }}" as="st" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 9px 0;"><span style="width: 26px; height: 26px; border-radius: 8px; background: {{ st.bg }}; border: 1px solid {{ st.bd }}; display: flex; align-items: center; justify-content: center; font-size: 12px; color: {{ st.fg }};">{{ st.mark }}</span><span style="font-size: 13.5px; color: {{ st.txtColor }};">{{ st.label }}</span></div>
+          </sc-for>
+
+          <div onClick="{{ advance }}" style="background: linear-gradient(135deg,#FF7A4D,#E8410F); color: #fff; border-radius: 14px; padding: 15px; text-align: center; font-weight: 800; font-size: 15px; margin-top: 12px; cursor: pointer; box-shadow: 0 8px 22px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.3);">{{ ctaLabel }}</div>
+          <sc-if value="{{ needPhoto }}" hint-placeholder-val="{{ false }}"><div style="display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed rgba(255,255,255,0.22); border-radius: 12px; padding: 12px; margin-top: 10px; font-size: 12.5px; color: #8A7F76; cursor: pointer;">📷 Фото подтверждения доставки</div></sc-if>
+        </sc-if>
+
+        <!-- DELIVERED / HANDOVER -->
+        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align: center; padding: 26px 0 18px;"><div style="width: 78px; height: 78px; margin: 0 auto; border-radius: 50%; background: rgba(78,209,122,0.14); border: 1px solid rgba(78,209,122,0.3); display: flex; align-items: center; justify-content: center; font-size: 36px;">✓</div><div style="font-family: 'Manrope'; font-weight: 800; font-size: 20px; color: #fff; margin-top: 14px;">Доставлено</div><div style="font-size: 13px; color: #8A7F76; margin-top: 4px;">Заказ {{ orderNo }} · оплата принята</div></div>
+          <div style="border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); padding: 16px; margin-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 12px;">Сдача кассы (handover)</div>
+            <div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 12.5px; color: #8A7F76;">Собрано наличными</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #fff;">156 000</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 12.5px; color: #8A7F76;">Заказов сдано</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #fff;">7</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 7px 0;"><span style="font-size: 12.5px; color: #8A7F76;">К сдаче в кассу</span><span style="font-family: 'JetBrains Mono'; font-size: 14px; color: #C6FF3D; font-weight: 700;">156 000</span></div>
+          </div>
+          <div onClick="{{ reset }}" style="background: linear-gradient(135deg,#8FD40F,#6FA80C); color: #14110E; border-radius: 14px; padding: 15px; text-align: center; font-weight: 800; font-size: 15px; cursor: pointer; box-shadow: 0 8px 22px rgba(143,212,15,0.32);">Сдать кассу и продолжить</div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width: 320px; color: #C9C0B4;">
+    <div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff;">Курьер App</div>
+    <div style="font-size: 13.5px; line-height: 1.6; margin-top: 12px; color: #A79C92;">Часть экосистемы: заказы приходят из ERP-логистики, статусы и COD пишутся в тот же Event Ledger, деньги сходятся при сдаче кассы. Клиент видит движение курьера на карте в своём приложении в реальном времени.</div>
+    <div style="margin-top: 18px; display: flex; flex-direction: column; gap: 8px;">
+      <sc-for list="{{ feats }}" as="f" hint-placeholder-count="5"><div style="display: flex; align-items: center; gap: 9px; font-size: 13px;"><span style="color: #FF9A6E;">▸</span><span>{{ f }}</span></div></sc-for>
+    </div>
+    <a href="AliStore Система.dc.html"><div style="margin-top: 20px; display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 9px 16px; font-size: 13px; color: #fff;">⌂ Система</div></a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:800,&quot;height&quot;:870}}">
+class Component extends DCLogic {
+  state = { step: 0 };
+  renderVals(){
+    const st = this.state.step;
+    const stepDef = ["Забрал со склада","Еду к клиенту","Прибыл на адрес","Передал и принял оплату"];
+    const done = st >= stepDef.length;
+    const steps = stepDef.map((label,i)=>{ const passed = i < st, cur = i === st; return {
+      label, mark: passed ? "✓" : (i+1),
+      bg: passed ? "#4ED17A" : cur ? "rgba(255,91,46,0.18)" : "rgba(255,255,255,0.05)",
+      bd: passed ? "#4ED17A" : cur ? "rgba(255,91,46,0.32)" : "rgba(255,255,255,0.09)",
+      fg: passed ? "#14110E" : cur ? "#FF9A6E" : "#8A7F76",
+      txtColor: passed ? "#8A7F76" : cur ? "#fff" : "#8A7F76" }; });
+    const ctas = ["Подтвердить получение","Начать маршрут","Я на месте","Завершить доставку"];
+    return {
+      statLine: done ? "смена · сдача кассы" : "1 из 8 · маршрут активен",
+      shiftStats:[{v:"7",l:"доставлено",color:"#fff"},{v:"1",l:"в работе",color:"#FF9A6E"},{v:"2 400",l:"заработок",color:"#C6FF3D"}],
+      isActive: !done, isDone: done,
+      addr:"мкр Асанбай 24, кв 12", eta:"14 мин", orderNo:"№4102",
+      items:"iPhone 15 · 128 ГБ · 1 шт", client:"Айбек Н.", phone:"+996 700 ·· 88",
+      isCod:true, codLabel:"НАЛИЧНЫЕ (COD)", codBg:"rgba(198,255,61,0.14)", codFg:"#C6FF3D", codAmount:"156 000", codAmountShort:"156к",
+      steps, ctaLabel: ctas[Math.min(st,ctas.length-1)],
+      needPhoto: st === stepDef.length-1,
+      advance: ()=> this.setState({ step: st + 1 }),
+      reset: ()=> this.setState({ step: 0 }),
+      feats:["Маршрут и навигация","Звонок / чат с клиентом","COD — приём наличных","Фото-подтверждение","Сдача кассы в конце смены"]
+    };
+  }
+}
+</script>
+</body>
+</html>

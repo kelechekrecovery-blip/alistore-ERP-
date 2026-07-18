@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+.sc::-webkit-scrollbar{width:0;}
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(20px,-16px) scale(1.08);}}
+@keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+@keyframes barGrow{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; gap: 40px; padding: 24px; font-family: 'Manrope', sans-serif; background: radial-gradient(circle at 20% 8%, #221C16 0%, #14100C 46%, #080706 100%); flex-wrap: wrap;">
+
+  <div style="position: relative; width: 390px; height: 800px; border-radius: 46px; padding: 13px; background: linear-gradient(160deg,#3A3A40,#1C1C20); box-shadow: 0 44px 100px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.2);">
+    <div style="position: relative; border-radius: 34px; overflow: hidden; background: #14110C; height: 100%; display: flex; flex-direction: column;">
+      <div style="position: absolute; top: -120px; right: -60px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(181,122,224,0.32), transparent 68%); filter: blur(26px); animation: floatBlob 16s ease-in-out infinite; pointer-events: none;"></div>
+
+      <div style="height: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; position: relative; z-index: 2;"><span style="font-size: 13px; color: #fff; font-weight: 700;">9:41</span><span style="font-size: 11px; color: #8A7F76;">ERP</span><span style="font-size: 12px; color: #fff;">▪▪▪ 100%</span></div>
+
+      <div style="flex-shrink: 0; padding: 6px 20px 12px; position: relative; z-index: 2;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 13px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 18px; box-shadow: 0 6px 16px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">Н</div>
+          <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 17px; color: #fff;">Нурбек · владелец</div><div style="font-size: 12px; color: #8A7F76;">Сеть · вторник, 17 июля</div></div>
+          <div style="position: relative;"><span style="font-size: 19px;">🔔</span><span style="position: absolute; top: -5px; right: -6px; background: #FF5B2E; color: #fff; border-radius: 999px; font-size: 9px; font-weight: 700; padding: 1px 5px;">5</span></div>
+        </div>
+      </div>
+
+      <div class="sc" style="flex: 1; overflow-y: auto; padding: 4px 18px 22px; position: relative; z-index: 2;">
+        <!-- live revenue -->
+        <div style="border-radius: 18px; padding: 18px; background: linear-gradient(135deg, rgba(255,122,77,0.2), rgba(255,255,255,0.03)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,122,77,0.28); box-shadow: 0 12px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16); margin-bottom: 12px;">
+          <div style="display: flex; align-items: center;"><span style="font-size: 12px; color: #FFC7B0;">Выручка сегодня</span><span style="margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 11px; color: #C6FF3D;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #C6FF3D; box-shadow: 0 0 8px #C6FF3D; animation: pulseDot 2s infinite;"></span>live</span></div>
+          <div style="font-family: 'Sora'; font-weight: 800; font-size: 33px; color: #fff; margin-top: 5px;">{{ revenue }}</div>
+          <div style="font-size: 12.5px; color: #C6FF3D; margin-top: 2px;">▲ 12% ко вчера · 47 чеков</div>
+        </div>
+
+        <!-- KPI grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 12px;">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="padding: 13px; border-radius: 14px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(18px) saturate(170%); backdrop-filter: blur(18px) saturate(170%); border: 1px solid rgba(255,255,255,0.1);"><div style="font-size: 11px; color: #8A7F76;">{{ k.l }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: {{ k.color }}; margin-top: 4px;">{{ k.v }}</div></div>
+          </sc-for>
+        </div>
+
+        <!-- branches mini -->
+        <div style="border-radius: 16px; padding: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px;">
+          <div style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 12px;">Филиалы сегодня</div>
+          <sc-for list="{{ branches }}" as="b" hint-placeholder-count="3">
+            <div style="margin-bottom: 11px;"><div style="display: flex; justify-content: space-between;"><span style="font-size: 12.5px; color: #fff;">{{ b.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ b.rev }}</span></div><div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;"><div style="flex: 1; height: 6px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden;"><div style="width: {{ b.w }}; height: 100%; background: {{ b.bar }};"></div></div><span style="font-size: 10.5px; color: {{ b.pctFg }}; width: 34px; text-align: right;">{{ b.pct }}</span></div></div>
+          </sc-for>
+        </div>
+
+        <!-- AI approvals -->
+        <div style="border-radius: 16px; padding: 15px; background: linear-gradient(135deg, rgba(181,122,224,0.16), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(181,122,224,0.28); margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;"><span style="font-size: 16px;">🧠</span><span style="font-size: 13px; font-weight: 700; color: #fff;">АЛИ ждёт решения</span><span style="margin-left: auto; background: rgba(255,91,46,0.18); color: #FF9A6E; border-radius: 999px; font-size: 10.5px; font-weight: 700; padding: 2px 8px;">{{ pending }}</span></div>
+          <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="2">
+            <div style="background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
+              <div style="font-size: 12.5px; color: #fff;">{{ d.text }}</div>
+              <div style="display: flex; gap: 7px; margin-top: 10px;"><div onClick="{{ d.ok }}" style="flex: 1; text-align: center; background: linear-gradient(135deg,#8FD40F,#6FA80C); color: #14110E; border-radius: 9px; padding: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">✓ Одобрить</div><div onClick="{{ d.no }}" style="flex: 1; text-align: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #B8AEA4; border-radius: 9px; padding: 8px; font-size: 12px; cursor: pointer;">Позже</div></div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ allDone }}" hint-placeholder-val="{{ false }}"><div style="text-align: center; padding: 8px; font-size: 12px; color: #7EE6A0;">✓ Все решения обработаны</div></sc-if>
+        </div>
+
+        <!-- integrity -->
+        <a href="AliStore Пульт целостности.dc.html"><div style="display: flex; align-items: center; gap: 11px; border-radius: 14px; padding: 14px; background: linear-gradient(160deg, rgba(198,255,61,0.09), rgba(255,255,255,0.02)); border: 1px solid rgba(198,255,61,0.2);"><span style="font-size: 18px;">🩺</span><div style="flex: 1;"><div style="font-size: 13px; color: #fff; font-weight: 600;">Целостность сети</div><div style="font-size: 11px; color: #8A7F76;">8 из 8 инвариантов сходятся</div></div><span style="font-family: 'Sora'; font-weight: 800; font-size: 17px; color: #C6FF3D;">100%</span></div></a>
+      </div>
+
+      <!-- bottom nav -->
+      <div style="flex-shrink: 0; display: flex; padding: 10px 14px 20px; background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border-top: 1px solid rgba(255,255,255,0.08); position: relative; z-index: 2;">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4"><div style="flex: 1; text-align: center; cursor: pointer;"><div style="font-size: 19px; opacity: {{ n.op }};">{{ n.icon }}</div><div style="font-size: 9.5px; color: {{ n.fg }}; margin-top: 3px; font-weight: {{ n.w }};">{{ n.label }}</div></div></sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width: 300px; color: #8A7F76;">
+    <div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #fff; margin-bottom: 10px;">ERP в кармане</div>
+    <div style="font-size: 13px; line-height: 1.6;">Владелец видит всю сеть с телефона: живая выручка, филиалы, решения AI-директора одним тапом, здоровье целостности. Полный ERP — на десктопе, ключевое и срочное — в мобайле.</div>
+    <a href="AliStore ERP 3.0.dc.html"><div style="display: inline-block; margin-top: 16px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 10px; padding: 10px 16px; font-size: 13px;">Открыть полный ERP →</div></a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:800,&quot;height&quot;:840}}">
+class Component extends DCLogic {
+  state = { decided:[] };
+  renderVals(){
+    const s=this.state;
+    const kpis=[{l:"Чеков",v:"47",color:"#fff"},{l:"Средний чек",v:"26 400",color:"#fff"},{l:"В кассах",v:"312к",color:"#fff"},{l:"Маржа",v:"27.4%",color:"#C6FF3D"}];
+    const branches=[
+      {name:"Центр",rev:"620к",w:"100%",pct:"104%",pctFg:"#C6FF3D",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)"},
+      {name:"Ош",rev:"340к",w:"82%",pct:"82%",pctFg:"#E5B23C",bar:"linear-gradient(90deg,#D89A2E,#E5B23C)"},
+      {name:"Джалал-Абад",rev:"280к",w:"96%",pct:"96%",pctFg:"#C6FF3D",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)"}
+    ];
+    const decDef=[
+      {text:"Закупка iPhone 15 ×40 — 3.2 млн (осталось на 2 дня)"},
+      {text:"Инкассация кассы Ош — превышен лимит 300к"}
+    ];
+    const decisions=decDef.map((d,i)=>({...d,ok:()=>this.setState({decided:[...s.decided,i]}),no:()=>this.setState({decided:[...s.decided,i]})})).filter((d,i)=>!s.decided.includes(i));
+    const nav=[["Обзор","▦",1],["Продажи","💰",0],["Склад","📦",0],["АЛИ","🧠",0]].map((n,i)=>({icon:n[1],label:n[0],op:i===0?1:0.55,fg:i===0?"#FF9A6E":"#8A7F76",w:i===0?700:500}));
+    return { revenue:"1.24 млн", kpis, branches, decisions, pending:String(decDef.length-s.decided.length), allDone:decisions.length===0, nav };
+  }
+}
+</script>
+</body>
+</html>

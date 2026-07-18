@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0B0A08; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: radial-gradient(circle at 82% 10%, rgba(255,91,46,0.15), transparent 42%), radial-gradient(circle at 10% 90%, rgba(127,176,236,0.12), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1120px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Закупки</span>
+      <a href="AliStore Supplier Scorecard.dc.html" style="margin-left: auto; text-decoration: none;"><span style="font-size: 13px; color: #7FB0EC;">Рейтинг поставщиков →</span></a>
+    </div>
+    <p style="font-size: 14px; color: #8A7F76; margin: 0 0 20px 46px;">Заявка поставщику (PO) → отправка → приёмка по PO. AI-прогноз спроса подсказывает, что заказать.</p>
+
+    <!-- AI forecast -->
+    <div style="background: linear-gradient(135deg,#2A2A2E,#16130F); border: 1px solid #2E2822; border-radius: 16px; padding: 20px; margin-bottom: 16px;">
+      <div style="font-size: 12px; color: #C6FF3D; font-family: 'JetBrains Mono'; margin-bottom: 10px;">🤖 AI-ПРОГНОЗ СПРОСА · рекомендуется закупить</div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+        <sc-for list="{{ forecast }}" as="f" hint-placeholder-count="4">
+          <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;"><div style="font-size: 13px; color: #fff; font-weight: 600;">{{ f.name }}</div><div style="font-size: 12px; color: #8A7F76; margin-top: 4px;">остаток {{ f.stock }} · спрос {{ f.trend }}</div><div style="font-family: 'JetBrains Mono'; font-size: 15px; color: #C6FF3D; margin-top: 6px;">+{{ f.qty }} шт</div></div>
+        </sc-for>
+      </div>
+      <div style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 14px; display: inline-block;">Создать PO из прогноза</div>
+    </div>
+
+    <!-- PO list -->
+    <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; overflow: hidden;">
+      <div style="display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>PO №</span><span>Поставщик</span><span>Позиции</span><span>Сумма</span><span>Статус</span></div>
+      <sc-for list="{{ pos }}" as="p" hint-placeholder-count="5">
+        <div onClick="{{ p.pick }}" style="display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center; cursor: pointer; background: {{ p.rowBg }};"><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #7FB0EC;">{{ p.no }}</span><span style="font-size: 13px; color: #fff;">{{ p.supplier }}</span><span style="font-size: 12px; color: #A79C92;">{{ p.items }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ p.amount }}</span><span><span style="background: {{ p.stBg }}; color: {{ p.stFg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ p.status }}</span></span></div>
+      </sc-for>
+    </div>
+
+    <!-- selected PO detail -->
+    <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px; margin-top: 16px;">
+      <div style="display: flex; align-items: center; margin-bottom: 14px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff;">{{ cur.no }} · {{ cur.supplier }}</span><span style="margin-left: auto;"><span style="background: {{ cur.stBg }}; color: {{ cur.stFg }}; border-radius: 6px; padding: 4px 11px; font-size: 12px;">{{ cur.status }}</span></span></div>
+      <div style="display: flex; gap: 6px; margin-bottom: 16px;">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+          <div style="flex: 1;"><div style="height: 4px; border-radius: 999px; background: {{ s.bar }};"></div><div style="font-family: 'JetBrains Mono'; font-size: 10px; color: {{ s.color }}; margin-top: 5px;">{{ s.label }}</div></div>
+        </sc-for>
+      </div>
+      <sc-for list="{{ lines }}" as="l" hint-placeholder-count="3">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);"><span style="font-size: 13px; color: #D8CFC6; flex: 1;">{{ l.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #8A7F76;">заказ {{ l.ordered }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ l.recvColor }};">принято {{ l.received }}</span></div>
+      </sc-for>
+      <div style="display: flex; gap: 10px; margin-top: 16px;"><div onClick="{{ receive }}" style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 11px 18px; font-size: 13px; font-weight: 700; cursor: pointer;">{{ receiveLabel }}</div><div style="background: #221E19; color: #D8CFC6; border-radius: 10px; padding: 11px 18px; font-size: 13px; cursor: pointer;">Печать PO</div></div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Приёмка по PO: сверка заказ/факт, расхождение → пересортица/недопоставка, оприходование → остаток + этикетки. Событие <span style="font-family: 'JetBrains Mono'; color: #C6FF3D;">stock.received</span>.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { sel: 0, received: false };
+  renderVals() {
+    const forecast = [
+      { name: "iPhone 15 128", stock: "8", trend: "▲34%", qty: "40" },
+      { name: "Apple Watch S9", stock: "2", trend: "▲12%", qty: "15" },
+      { name: "AirPods Pro 2", stock: "25", trend: "▲8%", qty: "30" },
+      { name: "MacBook Air M2", stock: "3", trend: "▲20%", qty: "10" }
+    ];
+    const st = s => s==="Приёмка"?["Приёмка","rgba(229,178,60,0.15)","#E5B23C"] : s==="Отправлен"?["Отправлен","rgba(127,176,236,0.15)","#7FB0EC"] : s==="Черновик"?["Черновик","#221E19","#A79C92"] : ["Принят","rgba(198,255,61,0.12)","#C6FF3D"];
+    const mk = (no, supplier, items, amount, status) => { const x=st(status); return { no, supplier, items, amount, status:x[0], stBg:x[1], stFg:x[2] }; };
+    const posRaw = [
+      mk("PO-1182","TechnoImport KG","4 поз · 65 шт","2 340 000","Приёмка"),
+      mk("PO-1181","Apple Distributor","2 поз · 18 шт","3 420 000","Отправлен"),
+      mk("PO-1180","China Direct","8 поз · 120 шт","1 180 000","Принят"),
+      mk("PO-1183","Bishkek Gadgets","5 поз · 200 шт","360 000","Черновик"),
+      mk("PO-1179","TechnoImport KG","3 поз · 40 шт","1 560 000","Принят")
+    ];
+    const pos = posRaw.map((p,i)=>({ ...p, pick:()=>this.setState({sel:i,received:false}), rowBg: this.state.sel===i?"#221E19":"transparent" }));
+    const cur = posRaw[this.state.sel];
+    const stageNames = ["Черновик","Отправлен","Приёмка","Принят"];
+    const curStageIdx = stageNames.indexOf(cur.status);
+    const steps = stageNames.map((n,i)=>({ label:n, bar: i<=curStageIdx?"#C6FF3D":"#2E2822", color: i<=curStageIdx?"#C6FF3D":"#6E645C" }));
+    const rec = this.state.received;
+    const lines = [
+      { name:"iPhone 15 128 Black", ordered:"20", received: rec?"20":"—", recvColor: rec?"#C6FF3D":"#6E645C" },
+      { name:"iPhone 15 256 Black", ordered:"15", received: rec?"15":"—", recvColor: rec?"#C6FF3D":"#6E645C" },
+      { name:"AirPods Pro 2", ordered:"30", received: rec?"28":"—", recvColor: rec?"#E5B23C":"#6E645C" }
+    ];
+    return { forecast, pos, cur, steps, lines,
+      receiveLabel: rec?"✓ Оприходовано (расхождение: −2 AirPods)":"Принять по PO (скан)",
+      receive:()=>this.setState({received:true}) };
+  }
+}
+</script>
+</body>
+</html>

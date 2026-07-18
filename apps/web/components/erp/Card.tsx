@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/cn';
 
-/** Shared ERP surface card: the dark rounded panel every ERP view sits on. */
-export function Card({ children }: { children: ReactNode }) {
-  return <div className="rounded-[16px] border border-surface-3 bg-surface p-5">{children}</div>;
+interface CardProps {
+  children: ReactNode;
+  className?: string;
+}
+
+/** Shared ERP 3.0 glass surface used by every module view. */
+export function Card({ children, className }: CardProps) {
+  return <div className={cn('erp3-glass rounded-[18px] p-5', className)}>{children}</div>;
 }

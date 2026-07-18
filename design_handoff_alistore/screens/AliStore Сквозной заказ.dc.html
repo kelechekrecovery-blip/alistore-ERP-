@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,122,77,0.5);}50%{box-shadow:0 0 0 7px rgba(255,122,77,0);}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(circle at 82% 6%, rgba(255,91,46,0.16), transparent 42%), radial-gradient(circle at 12% 92%, rgba(127,176,236,0.12), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 30px 34px 56px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.4), transparent 68%); filter: blur(26px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(127,176,236,0.28), transparent 68%); filter: blur(30px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+  </div>
+
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; z-index: 1; max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 13px; margin-bottom: 6px;">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 21px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff; line-height: 1;">Сквозной заказ #4102 — одна экосистема</div><div style="font-size: 13px; color: #8A7F76; margin-top: 5px;">Один заказ во всех окнах. Деньги = склад = статус всегда сходятся через Event Ledger.</div></div>
+    </div>
+
+    <!-- scenario switch -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 12px;">
+      <sc-for list="{{ scenarios }}" as="sc" hint-placeholder-count="4">
+        <div onClick="{{ sc.pick }}" style="padding: 9px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{ sc.bg }}; color: {{ sc.fg }}; border: 1px solid {{ sc.bd }};">{{ sc.icon }} {{ sc.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- step controls -->
+    <div style="display: flex; align-items: center; gap: 10px; margin: 0 0 16px;">
+      <div onClick="{{ prev }}" style="width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 17px; color: #fff; cursor: pointer;">←</div>
+      <div onClick="{{ next }}" style="flex: 1; text-align: center; background: linear-gradient(135deg,#FF7A4D,#E8410F); color: #fff; border-radius: 11px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.3);">{{ nextLabel }}</div>
+      <div onClick="{{ reset }}" style="padding: 12px 16px; border-radius: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); font-size: 13px; color: #B8AEA4; cursor: pointer;">Сброс</div>
+    </div>
+
+    <!-- pipeline -->
+    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 18px;">
+      <sc-for list="{{ pipeline }}" as="p" hint-placeholder-count="7">
+        <div style="flex: 1; text-align: center; padding: 10px 6px; border-radius: 10px; background: {{ p.bg }}; border: 1px solid {{ p.bd }}; animation: {{ p.anim }};"><div style="font-size: 15px;">{{ p.icon }}</div><div style="font-size: 10.5px; color: {{ p.fg }}; margin-top: 3px; font-weight: 600;">{{ p.label }}</div></div>
+      </sc-for>
+    </div>
+
+    <!-- surfaces grid: each shows the SAME order from its angle -->
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin-bottom: 16px;">
+      <sc-for list="{{ surfaces }}" as="s" hint-placeholder-count="6">
+        <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ s.border }}; box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.15);">
+          <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 11px;"><span style="font-size: 17px;">{{ s.icon }}</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 13.5px; color: #fff; flex: 1;">{{ s.name }}</span><span style="width: 8px; height: 8px; border-radius: 50%; background: {{ s.dot }};"></span></div>
+          <div style="font-size: 13px; color: {{ s.stColor }}; font-weight: 600;">{{ s.status }}</div>
+          <div style="font-size: 11.5px; color: #8A7F76; margin-top: 4px; line-height: 1.4;">{{ s.detail }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- reconciliation bar -->
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin-bottom: 16px;">
+      <div style="padding: 16px; border-radius: 15px; background: linear-gradient(160deg, rgba(198,255,61,0.09), rgba(255,255,255,0.02)); border: 1px solid rgba(198,255,61,0.2); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);"><div style="font-size: 11px; color: #A79C92;">💵 Деньги (Payment Ledger)</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: {{ moneyColor }}; margin-top: 6px;">{{ moneyState }}</div></div>
+      <div style="padding: 16px; border-radius: 15px; background: linear-gradient(160deg, rgba(127,176,236,0.09), rgba(255,255,255,0.02)); border: 1px solid rgba(127,176,236,0.2); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);"><div style="font-size: 11px; color: #A79C92;">📦 Склад (IMEI 35••042)</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: {{ stockColor }}; margin-top: 6px;">{{ stockState }}</div></div>
+      <div style="padding: 16px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,122,77,0.09), rgba(255,255,255,0.02)); border: 1px solid rgba(255,122,77,0.2); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);"><div style="font-size: 11px; color: #A79C92;">🎯 Статус заказа</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: #FF9A6E; margin-top: 6px;">{{ orderState }}</div></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 11px; padding: 13px 16px; border-radius: 13px; background: {{ reconBg }}; border: 1px solid {{ reconBd }}; margin-bottom: 16px;">
+      <span style="font-size: 18px;">{{ reconIcon }}</span>
+      <span style="font-size: 13px; color: {{ reconFg }}; font-weight: 600;">{{ reconText }}</span>
+    </div>
+
+    <!-- event ledger -->
+    <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+      <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">📖 Event Ledger — единый источник правды</span><span style="margin-left: auto; font-family: 'JetBrains Mono'; font-size: 11px; color: #8A7F76;">{{ ledgerCount }} событий · append-only</span></div>
+      <sc-for list="{{ ledger }}" as="l" hint-placeholder-count="4">
+        <a href="{{ l.href }}" style="text-decoration: none;">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;">
+            <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #6E645C; width: 44px; flex-shrink: 0;">{{ l.seq }}</span>
+            <span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D; width: 150px; flex-shrink: 0;">{{ l.event }}</span>
+            <div style="flex: 1;"><div style="font-size: 12.5px; color: #E5DCD3;">{{ l.text }}</div></div>
+            <span style="font-family: 'JetBrains Mono'; font-size: 11.5px; color: {{ l.amtColor }};">{{ l.amt }}</span>
+            <span style="font-size: 13px; color: #5A514A; flex-shrink: 0;">→</span>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  state = { step: 1, scen: "happy" };
+  renderVals(){
+    const s=this.state, step=s.step;
+    const scenDef=[
+      ["happy","✅","Успех",7],
+      ["cancel","✖️","Отмена до оплаты",3],
+      ["refund","↩️","Возврат после доставки",9],
+      ["failed","📵","Недозвон курьера",7]
+    ];
+    const scen=scenDef.find(x=>x[0]===s.scen);
+    const N=scen[3];
+    const scenarios=scenDef.map(x=>{const on=s.scen===x[0];return{icon:x[1],label:x[2],pick:()=>this.setState({scen:x[0],step:1}),
+      bg:on?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)",fg:on?"#fff":"#B8AEA4",bd:on?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.1)"};});
+    // pipeline per scenario
+    const pipeMap={
+      happy:[["🛒","Создан"],["💳","Оплачен"],["📦","Резерв"],["✅","Собран"],["🛵","Доставка"],["🏠","Вручён"],["📖","Закрыт"]],
+      cancel:[["🛒","Создан"],["⏳","Ждёт оплаты"],["✖️","Отменён"]],
+      refund:[["🛒","Создан"],["💳","Оплачен"],["📦","Резерв"],["✅","Собран"],["🛵","Доставка"],["🏠","Вручён"],["↩️","Возврат"],["💸","Деньги назад"],["📖","Склад назад"]],
+      failed:[["🛒","Создан"],["💳","Оплачен"],["📦","Резерв"],["✅","Собран"],["🛵","Доставка"],["📵","Недозвон"],["🔄","Возврат на склад"]]
+    };
+    const stepDef=pipeMap[s.scen];
+    const pipeline=stepDef.map((d,i)=>{const idx=i+1; const done=idx<step,cur=idx===step;return{icon:d[0],label:d[1],
+      bg:done?"rgba(78,209,122,0.14)":cur?"rgba(255,122,77,0.16)":"rgba(255,255,255,0.05)",
+      bd:done?"rgba(78,209,122,0.3)":cur?"rgba(255,122,77,0.4)":"rgba(255,255,255,0.08)",
+      fg:done?"#7EE6A0":cur?"#FF9A6E":"#8A7F76",
+      anim:cur?"glowPulse 2s infinite":"none"};});
+
+    // scenario-aware derived money / stock / order state
+    const sc=s.scen;
+    // money: null=none,'held'=получено,'refunded'=возвращено,'recognized'
+    let money, stock, order, reconText, reconGood=true;
+    const surf=(icon,name,active,status,stColor,detail,dot)=>({icon,name,status,stColor,detail,
+      border:active?"rgba(255,122,77,0.4)":"rgba(255,255,255,0.11)", dot});
+    let cli,pay,wh,pack,cour,own;
+
+    if(sc==="cancel"){
+      const paid=false, cancelled=step>=3;
+      money = cancelled?["Отменён — денег не было","#8A7F76"]:["Ожидает оплаты","#8A7F76"];
+      stock = ["В наличии: 8 (не трогали)","#fff"];
+      order = cancelled?"Отменён":stepDef[step-1][1];
+      reconText = cancelled?"Чисто: оплаты не было, склад не резервировали — отмена ничего не откатывает.":"Заказ ждёт оплаты. Ни деньги, ни склад ещё не задействованы.";
+      cli=surf("📱","Клиент",true,cancelled?"Отменён":"Ждёт оплаты",cancelled?"#FF8A7A":"#fff",cancelled?"Таймер оплаты истёк":"15 мин на оплату","#4ED17A");
+      pay=surf("💳","Оплата",step>=2,cancelled?"Не проведён":"Ожидает","#8A7F76",cancelled?"Платёж не поступил вовремя":"Ждём QR","#5A514A");
+      wh=surf("📦","Склад",false,"В наличии","#fff","Бронь не создавалась","#5A514A");
+      pack=surf("🧑‍💼","Сборка",false,"—","#8A7F76","Не запускалась","#5A514A");
+      cour=surf("🛵","Курьер",false,"—","#8A7F76","Не назначался","#5A514A");
+      own=surf("👑","Владелец",true,cancelled?"Отменён, потерь нет":"Наблюдает",cancelled?"#E5B23C":"#D8CFC6","Мониторинг","#4ED17A");
+    } else if(sc==="failed"){
+      const at=(m)=>step>=m; const returned=step>=7;
+      money = returned?["156 000 держим (перезаказ/возврат)","#E5B23C"]:at(2)?["156 000 получено","#C6FF3D"]:["Ожидает","#8A7F76"];
+      stock = returned?["Вернулся на склад: 8","#7EE6A0"]:at(3)?["Зарезервирован/в пути","#E5B23C"]:["В наличии: 8","#fff"];
+      order = returned?"Возврат на склад":stepDef[step-1][1];
+      reconText = returned?"Синхронно: доставка не удалась → товар вернулся на склад, деньги удержаны до решения клиента. Ничего не потеряно.":at(6)?"Недозвон зафиксирован — товар едет назад, деньги пока держим.":"Заказ в доставке, деньги и бронь согласованы.";
+      cli=surf("📱","Клиент",true,returned?"Не получен":at(6)?"Недозвон":at(5)?"В пути":"Оплачен",at(6)?"#FF8A7A":"#fff",at(6)?"3 попытки дозвона неуспешны":"Отслеживание","#4ED17A");
+      pay=surf("💳","Оплата",at(2),at(2)?"Проведён 156 000":"Ожидает",at(2)?"#C6FF3D":"#8A7F76",returned?"Удержан до перезаказа":"webhook OK","#4ED17A");
+      wh=surf("📦","Склад",at(3),returned?"Принят назад":at(4)?"Выдан":"Резерв",returned?"#7EE6A0":"#E5B23C",returned?"IMEI 35••042 снова в наличии":"IMEI под #4102","#4ED17A");
+      pack=surf("🧑‍💼","Сборка",at(4),at(4)?"Собран":"—",at(4)?"#7EE6A0":"#8A7F76","","#4ED17A");
+      cour=surf("🛵","Курьер",at(5),returned?"Вернул на склад":at(6)?"Недозвон ×3":"В пути",at(6)?"#FF8A7A":"#FF9A6E",at(6)?"Фото подъезда приложено":"Маршрут","#4ED17A");
+      own=surf("👑","Владелец",true,returned?"Решение: перезаказ":"Наблюдает",returned?"#E5B23C":"#D8CFC6","Инцидент в Risk Center","#4ED17A");
+    } else if(sc==="refund"){
+      const at=(m)=>step>=m; const refunded=step>=8, stockBack=step>=9;
+      money = stockBack||refunded?["Возвращено −156 000","#FF8A7A"]:at(7)?["Возврат оформляется","#E5B23C"]:at(2)?["156 000 получено","#C6FF3D"]:["Ожидает","#8A7F76"];
+      stock = stockBack?["Вернулся: 8 (проверка)","#7EE6A0"]:at(6)?["Списан (был продан)","#FF8A7A"]:at(3)?["Зарезервирован","#E5B23C"]:["В наличии: 8","#fff"];
+      order = stockBack?"Возврат закрыт":at(7)?"Возврат":stepDef[Math.min(step,7)-1][1];
+      reconText = stockBack?"Полный откат сошёлся: деньги вернулись −156 000, IMEI снова на складе, выручка сторнирована. Ledger симметричен.":at(7)?"Возврат инициирован после доставки — дальше синхронно откатятся деньги и склад.":at(6)?"Заказ доставлен и продан. Всё сходится.":"Заказ в процессе.";
+      cli=surf("📱","Клиент",true,at(8)?"Деньги вернулись":at(7)?"Возврат принят":at(6)?"Получен":"В пути",at(7)?"#FF9A6E":"#fff",at(7)?"Причина: не подошёл":"Доставлен","#4ED17A");
+      pay=surf("💳","Оплата",at(2),at(8)?"Возврат −156 000":"Проведён 156 000",at(8)?"#FF8A7A":"#C6FF3D",at(8)?"Возврат на карту":"webhook OK","#4ED17A");
+      wh=surf("📦","Склад",at(3),stockBack?"Принят назад":at(6)?"Продан":"Резерв",stockBack?"#7EE6A0":at(6)?"#FF8A7A":"#E5B23C",stockBack?"IMEI снова в наличии":"IMEI 35••042","#4ED17A");
+      pack=surf("🧑‍💼","Сборка",at(4),at(4)?"Собран":"—",at(4)?"#7EE6A0":"#8A7F76","","#4ED17A");
+      cour=surf("🛵","Курьер",at(5),at(6)?"Вручён":at(5)?"В пути":"—",at(6)?"#7EE6A0":"#FF9A6E","","#4ED17A");
+      own=surf("👑","Владелец",true,stockBack?"Возврат согласован":"Наблюдает",stockBack?"#E5B23C":"#D8CFC6","Одобрение возврата","#4ED17A");
+    } else {
+      const at=(m)=>step>=m;
+      money = at(7)?["Выручка признана","#C6FF3D"]:at(2)?["156 000 получено","#C6FF3D"]:["Ожидает оплаты","#8A7F76"];
+      stock = at(6)?["Списан (продан)","#7EE6A0"]:at(3)?["Зарезервирован","#E5B23C"]:["В наличии: 8","#fff"];
+      order = at(7)?"Закрыт":stepDef[step-1][1];
+      reconText = at(6)?"Деньги, склад и статус сошлись: оплата 156 000 = списанный IMEI = доставленный заказ.":at(3)?"Согласовано: оплата держит бронь склада, статус отражает этап.":at(2)?"Оплата зафиксирована, бронь склада последует автоматически.":"Заказ создан. Склад и деньги ещё не тронуты.";
+      cli=surf("📱","Клиент",true,at(6)?"Доставлен ✓":at(5)?"Курьер в пути":at(2)?"Готовим":"Оформлен",at(6)?"#7EE6A0":"#fff",at(5)?"Отслеживание активно":at(2)?"Ждите SMS":"Ждёт оплаты","#4ED17A");
+      pay=surf("💳","Оплата",at(2),at(2)?"Проведён 156 000":"Ожидает",at(2)?"#C6FF3D":"#8A7F76",at(2)?"QR · webhook OK":"Не поступил","#4ED17A");
+      wh=surf("📦","Склад",at(3),at(4)?"Выдан":at(3)?"Резерв":"В наличии",at(4)?"#7EE6A0":at(3)?"#E5B23C":"#fff",at(3)?"IMEI под #4102":"Свободен","#4ED17A");
+      pack=surf("🧑‍💼","Сборка",at(4),at(4)?"Собран":"Ожидает",at(4)?"#7EE6A0":"#8A7F76","","#4ED17A");
+      cour=surf("🛵","Курьер",at(5),at(6)?"Вручён":at(5)?"В пути":"—",at(6)?"#7EE6A0":at(5)?"#FF9A6E":"#8A7F76","","#4ED17A");
+      own=surf("👑","Владелец",true,at(7)?"Закрыта, маржа +18 200":"Наблюдает",at(7)?"#7EE6A0":"#D8CFC6","Мониторинг","#4ED17A");
+    }
+    const surfaces=[cli,pay,wh,pack,cour,own];
+
+    // ledger per scenario — each event links to the window that owns it
+    const evHref={
+      "order.created":"AliStore Order Timeline.dc.html","payment.captured":"AliStore Банковская сверка.dc.html",
+      "payment.timeout":"AliStore Order Timeline.dc.html","order.cancelled":"AliStore Order Timeline.dc.html",
+      "stock.reserved":"AliStore Резервы.dc.html","order.packed":"AliStore Приёмка по PO.dc.html",
+      "courier.assigned":"AliStore Курьер Workflow.dc.html","order.delivered":"AliStore Order Timeline.dc.html",
+      "delivery.failed":"AliStore Failed Delivery.dc.html","stock.returned":"AliStore Приёмка по PO.dc.html",
+      "stock.sold":"AliStore IMEI реестр.dc.html","revenue.recognized":"AliStore Финансы 3.0.dc.html",
+      "refund.requested":"AliStore POS Возврат-Обмен.dc.html","payment.refunded":"AliStore Refund Money Flow.dc.html",
+      "stock.restocked":"AliStore Приёмка по PO.dc.html"};
+    const L=(seq,event,text,amt,amtColor,min)=>({seq,event,text,amt,amtColor,min,href:evHref[event]||"#"});
+    const base=[
+      L("#001","order.created","Заказ #4102 создан клиентом",""," #8A7F76",1)
+    ];
+    let ledgerDef;
+    if(sc==="cancel"){
+      ledgerDef=[base[0],
+        L("#002","payment.timeout","Оплата не поступила за 15 мин","","#8A7F76",2),
+        L("#003","order.cancelled","Заказ отменён, склад не тронут","","#E5B23C",3)];
+    } else if(sc==="failed"){
+      ledgerDef=[base[0],
+        L("#002","payment.captured","Оплата QR подтверждена","+156 000","#C6FF3D",2),
+        L("#003","stock.reserved","IMEI 35••042 зарезервирован","−1 бронь","#E5B23C",3),
+        L("#004","order.packed","Собран и упакован","","#8A7F76",4),
+        L("#005","courier.assigned","Назначен курьеру","","#8A7F76",5),
+        L("#006","delivery.failed","Недозвон ×3, доставка не удалась","","#FF8A7A",6),
+        L("#007","stock.returned","Товар вернулся на склад","+1 шт","#7EE6A0",7)];
+    } else if(sc==="refund"){
+      ledgerDef=[base[0],
+        L("#002","payment.captured","Оплата QR подтверждена","+156 000","#C6FF3D",2),
+        L("#003","stock.reserved","IMEI зарезервирован","−1 бронь","#E5B23C",3),
+        L("#004","order.packed","Собран и упакован","","#8A7F76",4),
+        L("#005","courier.assigned","Назначен курьеру","","#8A7F76",5),
+        L("#006","order.delivered","Вручён + IMEI списан (продан)","−1 шт","#FF8A7A",6),
+        L("#007","refund.requested","Клиент вернул: не подошёл","","#E5B23C",7),
+        L("#008","payment.refunded","Деньги возвращены на карту","−156 000","#FF8A7A",8),
+        L("#009","stock.restocked","IMEI снова на складе, выручка сторно","+1 шт","#7EE6A0",9)];
+    } else {
+      ledgerDef=[base[0],
+        L("#002","payment.captured","Оплата QR подтверждена вебхуком","+156 000","#C6FF3D",2),
+        L("#003","stock.reserved","IMEI 35••042 зарезервирован","−1 бронь","#E5B23C",3),
+        L("#004","order.packed","Собран и упакован, фото","","#8A7F76",4),
+        L("#005","courier.assigned","Назначен курьеру, маршрут","","#8A7F76",5),
+        L("#006","order.delivered","Вручён, подпись и фото","","#8A7F76",6),
+        L("#007","stock.sold","IMEI списан (продан)","−1 шт","#FF8A7A",6),
+        L("#008","revenue.recognized","Выручка и маржа признаны","+18 200 маржа","#C6FF3D",7)];
+    }
+    const ledger=ledgerDef.filter(l=>l.min<=step).reverse();
+
+    const lastStepName = stepDef[Math.min(step,stepDef.length)-1][1];
+    return {
+      scenarios,
+      pipeline, surfaces,
+      moneyState:money[0], moneyColor:money[1],
+      stockState:stock[0], stockColor:stock[1],
+      orderState:order,
+      reconIcon:"🔗", reconBg:"rgba(78,209,122,0.09)", reconBd:"rgba(78,209,122,0.24)", reconFg:"#7EE6A0", reconText,
+      ledger, ledgerCount: ledger.length,
+      nextLabel: step>=N ? "Сценарий завершён ✓" : "Следующий шаг: "+stepDef[step][1]+" →",
+      next: ()=>this.setState({step: Math.min(N, step+1)}),
+      prev: ()=>this.setState({step: Math.max(1, step-1)}),
+      reset: ()=>this.setState({step:1})
+    };
+  }
+}
+</script>
+</body>
+</html>

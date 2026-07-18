@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0B0A08; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: radial-gradient(circle at 82% 10%, rgba(255,91,46,0.15), transparent 42%), radial-gradient(circle at 10% 90%, rgba(127,176,236,0.12), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1080px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Аналитика</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- ABC -->
+    <sc-if value="{{ isAbc }}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;">
+        <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 14px; padding: 18px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #C6FF3D;"></span><span style="font-size: 13px; color: #fff; font-weight: 600;">A — ходовые</span></div><div style="font-size: 12px; color: #8A7F76; margin-top: 8px;">20% товаров = 78% выручки</div></div>
+        <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 14px; padding: 18px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #E5B23C;"></span><span style="font-size: 13px; color: #fff; font-weight: 600;">B — средние</span></div><div style="font-size: 12px; color: #8A7F76; margin-top: 8px;">30% товаров = 17% выручки</div></div>
+        <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 14px; padding: 18px;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #FF8A7A;"></span><span style="font-size: 13px; color: #fff; font-weight: 600;">C — неликвид</span></div><div style="font-size: 12px; color: #8A7F76; margin-top: 8px;">50% товаров = 5% выручки</div></div>
+      </div>
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 40px 1.6fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span></span><span>Товар</span><span>Продаж</span><span>Выручка</span><span>Дней на складе</span></div>
+        <sc-for list="{{ abc }}" as="r" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 40px 1.6fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="width: 22px; height: 22px; border-radius: 6px; background: {{ r.clsBg }}; color: #14110E; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">{{ r.cls }}</span><span style="font-size: 13px; color: #fff;">{{ r.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #A79C92;">{{ r.sales }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ r.rev }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ r.daysColor }};">{{ r.days }}</span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">C-товары >60 дней → уценка/акция. A-товары → не допускать out-of-stock (авто-закупка).</div>
+    </sc-if>
+
+    <!-- COHORTS -->
+    <sc-if value="{{ isCohort }}" hint-placeholder-val="{{ false }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px; overflow-x: auto;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 4px;">Когорты удержания</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 16px;">% клиентов, вернувшихся за повторной покупкой по месяцам.</div>
+        <div style="display: grid; grid-template-columns: 90px repeat(5, 1fr); gap: 6px; min-width: 560px;">
+          <div style="font-size: 11px; color: #8A7F76; padding: 6px;">Когорта</div>
+          <sc-for list="{{ cohMonths }}" as="m" hint-placeholder-count="5"><div style="font-size: 11px; color: #8A7F76; text-align: center; padding: 6px;">{{ m }}</div></sc-for>
+          <sc-for list="{{ cohorts }}" as="row" hint-placeholder-count="4">
+            <div style="font-size: 12px; color: #D8CFC6; padding: 8px 6px; display: flex; align-items: center;">{{ row.name }}</div>
+            <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="5"><div style="background: {{ c.bg }}; border-radius: 6px; padding: 10px 4px; text-align: center; font-family: 'JetBrains Mono'; font-size: 12px; color: {{ c.fg }};">{{ c.v }}</div></sc-for>
+          </sc-for>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Тёмно-зелёный = высокое удержание. Проседание на 2-й месяц → триггер реактивации (CRM).</div>
+    </sc-if>
+
+    <!-- LEADERBOARD -->
+    <sc-if value="{{ isLeader }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <sc-for list="{{ leaders }}" as="l" hint-placeholder-count="6">
+          <div style="background: {{ l.rowBg }}; border: 1px solid {{ l.border }}; border-radius: 14px; padding: 16px; display: flex; align-items: center; gap: 14px;"><span style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ l.rankColor }}; width: 30px;">{{ l.rank }}</span><div style="width: 40px; height: 40px; border-radius: 50%; background: {{ l.av }}; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;">{{ l.i }}</div><div style="flex: 1;"><div style="font-size: 15px; color: #fff; font-weight: 600;">{{ l.name }}</div><div style="font-size: 12px; color: #8A7F76;">{{ l.branch }}</div></div><div style="text-align: right;"><div style="font-family: 'JetBrains Mono'; font-size: 15px; color: #C6FF3D;">{{ l.sales }}</div><div style="font-size: 11px; color: #8A7F76;">KPI {{ l.kpi }}</div></div></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Рейтинг продавцов за месяц — мотивация + прозрачность. Топ-3 получают повышенный бонус.</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "abc" };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["abc","ABC-анализ"],["cohort","Когорты"],["leader","Лидерборд"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.06)", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.1)" }));
+    const clsBg = c => c==="A"?"#C6FF3D":c==="B"?"#E5B23C":"#FF8A7A";
+    const mk = (cls,name,sales,rev,days,dbad) => ({ cls, clsBg:clsBg(cls), name, sales, rev, days:days+" дн", daysColor: dbad?"#FF8A7A":"#A79C92" });
+    const abc = [
+      mk("A","iPhone 15 128","142","15.6 млн","6"),
+      mk("A","AirPods Pro 2","310","7.7 млн","4"),
+      mk("A","Galaxy S24","88","8.8 млн","9"),
+      mk("B","iPad Air","41","3.1 млн","22"),
+      mk("C","MacBook Pro 2019 Б/У","3","0.5 млн","74",true),
+      mk("C","Кабель microUSB","12","0.02 млн","120",true)
+    ];
+    const cohMonths = ["М0","М1","М2","М3","М4"];
+    const cell = v => { const n=parseInt(v); const bg = v==="—"?"#100D0B" : n>=50?"rgba(198,255,61,0.35)" : n>=30?"rgba(198,255,61,0.18)" : n>=15?"rgba(229,178,60,0.18)":"rgba(255,138,122,0.15)";
+      return { v, bg, fg: v==="—"?"#4A4139":"#fff" }; };
+    const cohorts = [
+      { name:"Март", cells:["100%","42%","31%","28%","25%"].map(cell) },
+      { name:"Апрель", cells:["100%","38%","29%","24%","—"].map(cell) },
+      { name:"Май", cells:["100%","45%","33%","—","—"].map(cell) },
+      { name:"Июнь", cells:["100%","40%","—","—","—"].map(cell) }
+    ];
+    const rankColor = r => r===1?"#C6FF3D":r===2?"#D8CFC6":r===3?"#E5B23C":"#8A7F76";
+    const ld = (rank,i,name,branch,sales,kpi,av) => ({ rank, rankColor:rankColor(rank), i, name, branch, sales, kpi, av,
+      rowBg: rank<=3?"#1A1611":"#16130F", border: rank===1?"#C6FF3D":"#2E2822" });
+    const leaders = [
+      ld(1,"А","Азизбек","Центр","620 000","96%","#FF5B2E"),
+      ld(2,"А","Али","Центр","560 000","91%","#3E9B66"),
+      ld(3,"С","Сайкал","Центр","540 000","88%","#4B8FE0"),
+      ld(4,"Р","Риезидин","Ош","480 000","82%","#B07FE0"),
+      ld(5,"С","Сыдык","Ош","410 000","74%","#E0A44B"),
+      ld(6,"Т","Тахсир","Джалал-Абад","390 000","71%","#4BD0E0")
+    ];
+    return { tabs, isAbc:t==="abc", isCohort:t==="cohort", isLeader:t==="leader", abc, cohMonths, cohorts, leaders };
+  }
+}
+</script>
+</body>
+</html>

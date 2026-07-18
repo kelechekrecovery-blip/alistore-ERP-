@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0B0A08; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: radial-gradient(circle at 82% 10%, rgba(255,91,46,0.15), transparent 42%), radial-gradient(circle at 10% 90%, rgba(127,176,236,0.12), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1080px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Маркетинг и CMS</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- BANNERS/CMS -->
+    <sc-if value="{{ isCms }}" hint-placeholder-val="{{ true }}">
+      <div style="font-size: 13px; color: #8A7F76; margin-bottom: 14px;">Управление главной витрины без разработчиков — баннеры, подборки, порядок блоков.</div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{ banners }}" as="b" hint-placeholder-count="4">
+          <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 14px;"><span style="color: #6E645C; cursor: grab;">⠿</span><div style="width: 80px; height: 44px; border-radius: 8px; background: {{ b.thumb }};"></div><div style="flex: 1;"><div style="font-size: 14px; color: #fff;">{{ b.title }}</div><div style="font-size: 12px; color: #8A7F76;">{{ b.type }} · {{ b.period }}</div></div><span onClick="{{ b.toggle }}" style="width: 40px; height: 22px; border-radius: 999px; background: {{ b.on ? '#C6FF3D' : '#3A342E' }}; position: relative; cursor: pointer;"><span style="position: absolute; top: 2px; left: {{ b.knob }}; width: 18px; height: 18px; border-radius: 50%; background: #fff;"></span></span></div>
+        </sc-for>
+        <div style="background: #16130F; border: 1px dashed #3A342E; border-radius: 14px; padding: 14px; text-align: center; color: #8A7F76; font-size: 14px; cursor: pointer;">+ Добавить баннер / подборку</div>
+      </div>
+    </sc-if>
+
+    <!-- PROMOCODES -->
+    <sc-if value="{{ isPromo }}" hint-placeholder-val="{{ false }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Промокод</span><span>Скидка</span><span>Использован</span><span>До</span><span>Статус</span></div>
+        <sc-for list="{{ promos }}" as="p" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">{{ p.code }}</span><span style="font-size: 13px; color: #fff;">{{ p.disc }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #A79C92;">{{ p.used }}</span><span style="font-size: 12px; color: #8A7F76;">{{ p.till }}</span><span><span style="background: {{ p.bg }}; color: {{ p.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ p.status }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 11px 16px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 14px; display: inline-block;">+ Создать промокод</div>
+    </sc-if>
+
+    <!-- REVIEW MODERATION -->
+    <sc-if value="{{ isReviews }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{ reviews }}" as="r" hint-placeholder-count="3">
+          <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 14px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;"><span style="font-size: 14px; color: #fff; font-weight: 600;">{{ r.name }}</span><span style="color: #E5B23C; font-size: 12px;">{{ r.stars }}</span><span style="margin-left: auto; font-size: 12px; color: #8A7F76;">{{ r.product }}</span></div>
+            <div style="font-size: 13px; color: #D8CFC6; line-height: 1.5;">{{ r.text }}</div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;"><span onClick="{{ r.approve }}" style="background: {{ r.aBg }}; color: {{ r.aFg }}; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;">{{ r.aLabel }}</span><span style="background: #3A1F1C; color: #FF8A7A; border-radius: 8px; padding: 7px 14px; font-size: 12px; cursor: pointer;">Отклонить</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Отзывы проходят модерацию перед публикацией (спам, мат, фейк). Одобренные видны на карточке товара.</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "cms", ban: {0:true,1:true,2:false,3:true}, approved: {} };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["cms","Витрина (баннеры)"],["promo","Промокоды"],["reviews","Модерация отзывов"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.06)", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.1)" }));
+    const bDef = [
+      ["iPhone 17 Pro Max — новинка","Главный баннер","весь июль","linear-gradient(135deg,#201B17,#3A322B)"],
+      ["Б/У привозные −40%","Промо-блок","до 31.07","linear-gradient(135deg,#FF5B2E,#E8410F)"],
+      ["Рассрочка 0-0-12","Инфо-блок","постоянно","linear-gradient(135deg,#2A2A2E,#3A3A40)"],
+      ["Хиты продаж","Подборка","авто","linear-gradient(135deg,#1F3D2E,#2E4A38)"]
+    ];
+    const banners = bDef.map((b,i)=>({ title:b[0], type:b[1], period:b[2], thumb:b[3],
+      on:!!this.state.ban[i], knob:this.state.ban[i]?"20px":"2px",
+      toggle:()=>{ const bb={...this.state.ban}; bb[i]=!bb[i]; this.setState({ban:bb}); } }));
+    const ps = (st,ok) => ({ status:st, bg: ok?"rgba(198,255,61,0.12)":"#221E19", fg: ok?"#C6FF3D":"#A79C92" });
+    const promos = [
+      { code:"COMEBACK10", disc:"−10%", used:"41 / 500", till:"31.07", ...ps("активен",true) },
+      { code:"NURBEK500", disc:"500 бонусов", used:"6 / ∞", till:"—", ...ps("активен",true) },
+      { code:"SUMMER15", disc:"−15%", used:"320 / 300", till:"истёк", ...ps("завершён",false) },
+      { code:"FIRSTBUY", disc:"−5%", used:"128 / ∞", till:"постоянно", ...ps("активен",true) }
+    ];
+    const rev = (name,stars,product,text,i) => { const ok=!!this.state.approved[i];
+      return { name,stars,product,text, approve:()=>{ const a={...this.state.approved}; a[i]=true; this.setState({approved:a}); },
+        aLabel: ok?"✓ Опубликован":"Одобрить", aBg: ok?"#1F3D2E":"#C6FF3D", aFg: ok?"#C6FF3D":"#14110E" }; };
+    const reviews = [
+      rev("Азамат","★★★★★","iPhone 15","Отличный магазин, привезли за час, всё оригинал!",0),
+      rev("Аноним","★☆☆☆☆","Galaxy S24","спам-текст с ссылкой на другой сайт...",1),
+      rev("Нургуль","★★★★★","AirPods Pro","Брала Б/У — как новые, гарантия работает.",2)
+    ];
+    return { tabs, isCms:t==="cms", isPromo:t==="promo", isReviews:t==="reviews", banners, promos, reviews };
+  }
+}
+</script>
+</body>
+</html>

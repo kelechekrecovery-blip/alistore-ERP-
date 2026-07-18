@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+.sc::-webkit-scrollbar{width:8px;} .sc::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.13);border-radius:4px;} .sc::-webkit-scrollbar-track{background:transparent;}
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(26px,-22px) scale(1.1);}}
+@keyframes barGrow{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+@keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; font-family: 'Golos Text', sans-serif;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; width: 1280px; height: 844px; border-radius: 26px; overflow: hidden; display: flex; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 50px 120px rgba(0,0,0,0.62); background: radial-gradient(circle at 16% 6%, #2B221B 0%, #14100C 44%, #0B0A08 100%);">
+    <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+      <div style="position: absolute; top: -150px; left: -100px; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.52), transparent 68%); filter: blur(22px); animation: floatBlob 15s ease-in-out infinite;"></div>
+      <div style="position: absolute; bottom: -170px; right: -90px; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(181,122,224,0.4), transparent 68%); filter: blur(26px); animation: floatBlob 19s ease-in-out infinite reverse;"></div>
+      <div style="position: absolute; top: 42%; left: 40%; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(170,220,70,0.22), transparent 66%); filter: blur(28px); animation: floatBlob 17s ease-in-out infinite;"></div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div style="position: relative; z-index: 2; width: 232px; flex-shrink: 0; padding: 18px 12px; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.015)); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); border-right: 1px solid rgba(255,255,255,0.1);">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 18px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+        <div><div style="font-family: 'Sora'; font-weight: 800; font-size: 14px; color: #fff;">Маркетинг-центр</div><div style="font-size: 10px; color: #8A7F76;">Движок роста · вся сеть</div></div>
+      </div>
+      <sc-for list="{{ menu }}" as="m" hint-placeholder-count="7">
+        <div onClick="{{ m.go }}" style="display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 12px; margin-bottom: 3px; cursor: pointer; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; box-shadow: {{ m.sh }};"><span style="font-size: 15px;">{{ m.icon }}</span><span style="font-size: 13px; font-weight: {{ m.weight }}; color: {{ m.color }};">{{ m.label }}</span></div>
+      </sc-for>
+      <div style="margin-top: auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); border-radius: 14px; padding: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
+        <div style="display: flex; align-items: center; gap: 7px;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span><span style="font-size: 11px; color: #B8AEA4;">Движок активен</span></div>
+        <div style="font-size: 11px; color: #8A7F76; margin-top: 8px; line-height: 1.4;">6 автоворонок · 4 210 контактов · WhatsApp основной канал</div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="sc" style="position: relative; z-index: 1; flex: 1; overflow-y: auto;">
+      <div style="position: sticky; top: 0; z-index: 6; padding: 14px 24px; display: flex; align-items: center; gap: 14px; background: linear-gradient(180deg, rgba(18,14,10,0.6), rgba(18,14,10,0.32)); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div><div style="font-family: 'Sora'; font-weight: 700; font-size: 20px; color: #fff;">{{ pageTitle }}</div><div style="font-size: 12px; color: #8A7F76;">{{ pageSub }}</div></div>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #B8AEA4;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span>синхронно с сайтом · приложением · POS</span></div>
+      </div>
+
+      <div style="padding: 20px 24px 30px;">
+
+        <!-- OVERVIEW -->
+        <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 16px; padding: 16px 20px; margin-bottom: 14px; border-radius: 18px; background: linear-gradient(160deg, rgba(198,255,61,0.14), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(198,255,61,0.26); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.18);">
+            <div style="width: 46px; height: 46px; flex-shrink: 0; border-radius: 13px; background: linear-gradient(135deg,#8FD40F,#C6FF3D); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 6px 18px rgba(143,212,15,0.4), inset 0 1px 0 rgba(255,255,255,0.5);">⚡</div>
+            <div style="flex: 1;"><div style="font-size: 11.5px; color: #A79C92;">Возвращено движком за 30 дней · без ручного труда</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 26px; color: #C6FF3D; margin-top: 2px; line-height: 1;">{{ recovered }} млн сом</div></div>
+            <span style="display: flex; align-items: center; gap: 7px; font-size: 12px; color: #B8AEA4;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span>копится в реальном времени</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+              <div style="padding: 15px 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ k.label }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 21px; color: {{ k.color }}; margin-top: 7px; white-space: nowrap;">{{ k.value }}</div><div style="font-size: 10.5px; color: {{ k.deltaColor }}; margin-top: 3px;">{{ k.delta }}</div></div>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px;">
+            <div style="padding: 18px 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 14px;">Net ROAS по каналам</div>
+              <sc-for list="{{ channels }}" as="c" hint-placeholder-count="5">
+                <div style="margin-bottom: 12px;"><div style="display: flex; justify-content: space-between;"><span style="font-size: 13px; color: #fff;">{{ c.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ c.color }};">{{ c.roas }}</span></div><div style="display: flex; gap: 9px; align-items: center; margin-top: 5px;"><div style="flex: 1; height: 7px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden;"><div style="width: {{ c.w }}; height: 100%; background: {{ c.bar }};"></div></div><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #8A7F76; width: 52px; text-align: right;">{{ c.spend }}</span></div></div>
+              </sc-for>
+              <div style="font-size: 11px; color: #8A7F76; margin-top: 4px;">ROAS считается по оплатам за вычетом возвратов, не по показам.</div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Что движок сделал сегодня</span><span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8A7F76;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span>авто</span></div>
+              <sc-for list="{{ feed }}" as="f" hint-placeholder-count="5">
+                <div style="display: flex; gap: 11px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 15px;">{{ f.icon }}</span><div style="flex: 1;"><div style="font-size: 12.5px; color: #EDE6DE; line-height: 1.35;">{{ f.text }}</div><div style="font-size: 10.5px; color: #8A7F76;">{{ f.meta }}</div></div></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- AUTOMATIONS -->
+        <sc-if value="{{ isAuto }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 13px 18px; margin-bottom: 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(198,255,61,0.11), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(198,255,61,0.22);"><span style="font-size: 18px;">⚡</span><span style="flex: 1; font-size: 13px; color: #EDE6DE;">Автоворонки на WhatsApp работают на автопилоте · за 30 дней вернули <b style="color:#C6FF3D;">1.84 млн сом</b> без ручного труда</span></div>
+          <sc-for list="{{ automations }}" as="a" hint-placeholder-count="6">
+            <div style="display: flex; align-items: center; gap: 14px; padding: 15px 18px; margin-bottom: 10px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 26px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.14);">
+              <div onClick="{{ a.toggle }}" style="width: 40px; height: 23px; flex-shrink: 0; border-radius: 999px; background: {{ a.swBg }}; position: relative; cursor: pointer;"><div style="position: absolute; top: 2px; left: {{ a.knob }}; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div>
+              <div style="width: 210px; flex-shrink: 0;"><div style="font-size: 13.5px; font-weight: 600; color: #fff;">{{ a.name }}</div><div style="font-size: 11px; color: #8A7F76; margin-top: 2px;">{{ a.trigger }}</div></div>
+              <div style="flex: 1; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #B8AEA4;"><span style="background: rgba(127,176,236,0.14); color: #7FB0EC; border-radius: 6px; padding: 2px 8px;">{{ a.channel }}</span><span>→ {{ a.action }}</span></div>
+              <div style="text-align: right; width: 130px; flex-shrink: 0;"><div style="font-family: 'JetBrains Mono'; font-size: 12.5px; color: {{ a.resultColor }};">{{ a.result }}</div><div style="font-size: 10px; color: #8A7F76;">за 30 дней</div></div>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <!-- CAMPAIGNS -->
+        <sc-if value="{{ isCampaigns }}" hint-placeholder-val="{{ false }}">
+          <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Кампания</span><span>Канал</span><span>Расход</span><span>Net ROAS</span><span>Статус</span></div>
+            <sc-for list="{{ campaigns }}" as="c" hint-placeholder-count="5">
+              <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ c.name }}</span><span style="font-size: 12px; color: #B8AEA4;">{{ c.channel }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ c.spend }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ c.roasColor }};">{{ c.roas }}</span><span><span style="background: {{ c.stBg }}; color: {{ c.stFg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ c.status }}</span></span></div>
+            </sc-for>
+          </div>
+          <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Бюджет с четырёхглазым одобрением, авто-пауза при ROAS &lt; 1, трекинг-коды и UTM привязаны к оплатам.</div>
+        </sc-if>
+
+        <!-- TRADE-IN -->
+        <sc-if value="{{ isTradein }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ tradeStats }}" as="t" hint-placeholder-count="4">
+              <div style="padding: 15px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 22px;">{{ t.icon }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ t.color }}; margin-top: 7px;">{{ t.value }}</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 2px;">{{ t.label }}</div></div>
+            </sc-for>
+          </div>
+          <div style="padding: 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 6px;">Цикл апгрейда — мотор возврата клиента</div>
+            <div style="font-size: 12px; color: #8A7F76; margin-bottom: 18px;">Сдал старое → скидка на новое → через 18 мес WhatsApp зовёт снова</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <sc-for list="{{ tradeFlow }}" as="s" hint-placeholder-count="5">
+                <div style="flex: 1; text-align: center; padding: 14px 8px; border-radius: 13px; background: {{ s.bg }}; border: 1px solid {{ s.bd }};"><div style="font-size: 20px;">{{ s.icon }}</div><div style="font-size: 12px; color: #fff; margin-top: 6px; font-weight: 600;">{{ s.step }}</div><div style="font-size: 10.5px; color: #A79C92; margin-top: 2px; line-height: 1.3;">{{ s.detail }}</div></div>
+                <sc-if value="{{ s.arrow }}" hint-placeholder-val="{{ true }}"><span style="color: #FF9A6E; font-size: 18px; flex-shrink: 0;">→</span></sc-if>
+              </sc-for>
+            </div>
+            <div style="margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(198,255,61,0.08); border: 1px solid rgba(198,255,61,0.2); font-size: 12px; color: #C6FF3D; line-height: 1.45;">Прогноз: 340 клиентов с телефоном 18+ мес → потенциал 12.6 млн сом на апгрейдах. WhatsApp-волна запланирована.</div>
+          </div>
+        </sc-if>
+
+        <!-- REFERRAL -->
+        <sc-if value="{{ isReferral }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ refStats }}" as="r" hint-placeholder-count="4">
+              <div style="padding: 15px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-family: 'Sora'; font-weight: 800; font-size: 21px; color: {{ r.color }};">{{ r.value }}</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 3px;">{{ r.label }}</div></div>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Топ рефереров</div>
+              <sc-for list="{{ referrers }}" as="p" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div style="width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#B57AE0,#8A4FC0); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700;">{{ p.av }}</div><span style="flex: 1; font-size: 13px; color: #fff;">{{ p.name }}</span><span style="font-size: 12px; color: #B8AEA4;">{{ p.count }} привёл</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">{{ p.earned }}</span></div>
+              </sc-for>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(135deg, rgba(181,122,224,0.14), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Механика</div>
+              <div style="font-size: 13px; color: #EDE6DE; line-height: 1.6;">Привёл друга → другу <b style="color:#C6FF3D;">−500 сом</b> на первую покупку, тебе <b style="color:#C6FF3D;">300 бонусов</b> после его оплаты. Промокод в приложении и QR в чеке.</div>
+              <div style="margin-top: 14px; padding: 11px 13px; border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); font-size: 12px; color: #B8AEA4;">k-фактор <b style="color:#B57AE0;">0.34</b> → цель 0.5. Каждые +0.1 удешевляют привлечение на ~18%.</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ATTACH -->
+        <sc-if value="{{ isAttach }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 13px 18px; margin-bottom: 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,122,77,0.13), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,122,77,0.26);"><span style="font-size: 18px;">🎁</span><span style="flex: 1; font-size: 13px; color: #EDE6DE;">Аксессуары к устройству — чистая маржа. POS подсказывает кассиру комплект при каждой продаже телефона.</span><span style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #FF9A6E;">1.8</span><span style="font-size: 11px; color: #8A7F76;">поз./чек</span></div>
+          <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Кассир</span><span>Attach-rate</span><span>Цель 2.0</span><span>Доп. маржа</span></div>
+            <sc-for list="{{ attach }}" as="a" hint-placeholder-count="5">
+              <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ a.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ a.color }};">{{ a.rate }}</span><span><div style="height: 6px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; width: 90px;"><div style="width: {{ a.w }}; height: 100%; background: {{ a.bar }};"></div></div></span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">{{ a.margin }}</span></div>
+            </sc-for>
+          </div>
+          <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Рекомендованные комплекты (чехол + стекло + зарядка) настраиваются на товар и всплывают в POS и в корзине приложения.</div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:884}}">
+class Component extends DCLogic {
+  state = { route:"overview", autoOn:[true,true,true,false,true,true], recovered:1.84,
+    feedLive:[
+      {icon:"💬",text:"Отправлено 38 напоминаний «пора менять батарею» (телефон 24+ мес)",meta:"WhatsApp · 6 записались на сервис"},
+      {icon:"🛒",text:"Догнали 52 брошенные корзины push-скидкой −5%",meta:"вернулись 11 · +624к"},
+      {icon:"🎂",text:"12 клиентов с ДР на неделе получили промокод",meta:"3 уже купили"},
+      {icon:"♻️",text:"Trade-in волна: 40 клиентов с телефоном 18+ мес приглашены",meta:"WhatsApp · открыли 71%"},
+      {icon:"⭐",text:"Собрано 9 новых отзывов QR-опросом после покупки",meta:"средний 4.8"}
+    ] };
+  go(r){ this.setState({route:r}); }
+  componentDidMount(){ this._t=setInterval(()=>this.tick(), 2800); }
+  componentWillUnmount(){ clearInterval(this._t); }
+  clock(){ const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+  tick(){
+    const s=this.state; if(s.route!=="overview") return;
+    const pool=[
+      {icon:"💬",text:"Ещё 5 клиентам «конец гарантии» → апселл сервиса",meta:"WhatsApp",add:0.02},
+      {icon:"🛒",text:"Догнали 3 брошенные корзины push-скидкой",meta:"push · вернулся 1 · +58к",add:0.03},
+      {icon:"🤝",text:"2 реферала оплатили первый заказ",meta:"бонус начислен обоим",add:0.02},
+      {icon:"♻️",text:"Trade-in оценка отправлена 4 клиентам (18+ мес)",meta:"WhatsApp",add:0.04},
+      {icon:"⭐",text:"Собрано 2 отзыва QR-опросом после покупки",meta:"средний 4.9",add:0.01},
+      {icon:"🎁",text:"POS предложил комплект аксессуаров на 3 продажах",meta:"attach +2 поз.",add:0.02}
+    ];
+    const ev=pool[Math.floor(Math.random()*pool.length)];
+    const feedLive=[{icon:ev.icon,text:ev.text,meta:this.clock()+" · "+ev.meta},...s.feedLive].slice(0,6);
+    this.setState({feedLive, recovered:Math.round((s.recovered+ev.add)*100)/100});
+  }
+  renderVals(){
+    const s=this.state, r=s.route, R=x=>r===x;
+    const menuDef=[["overview","Обзор роста","📈"],["auto","Автоворонки","⚡"],["campaigns","Кампании","📢"],["tradein","Trade-in цикл","♻️"],["referral","Рефералы","🤝"],["attach","Attach у кассы","🎁"]];
+    const menu=menuDef.map(m=>{const on=r===m[0];return{icon:m[2],label:m[1],go:()=>this.go(m[0]),
+      bg:on?"linear-gradient(180deg, rgba(255,91,46,0.28), rgba(255,91,46,0.08))":"transparent",
+      bd:on?"rgba(255,91,46,0.4)":"transparent",
+      sh:on?"inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(255,91,46,0.22)":"none",
+      color:on?"#fff":"#B8AEA4",weight:on?700:500};});
+    const titles={overview:["Обзор роста","Петля работает на всю сеть"],auto:["Автоворонки","WhatsApp lifecycle на автопилоте"],campaigns:["Кампании","Расход → net ROAS по оплатам"],tradein:["Trade-in цикл","Мотор возврата клиента"],referral:["Рефералы","Сарафан дешевле рекламы"],attach:["Attach у кассы","Аксессуары = чистая маржа"]};
+
+    const kpis=[
+      {label:"LTV / CAC",value:"3.4",color:"#C6FF3D",delta:"цель ≥ 3 ✓",deltaColor:"#C6FF3D"},
+      {label:"Net ROAS",value:"4.1×",color:"#fff",delta:"▲ после возвратов",deltaColor:"#C6FF3D"},
+      {label:"Повторные 90д",value:"41%",color:"#fff",delta:"▲ 3 пп",deltaColor:"#C6FF3D"},
+      {label:"Attach / чек",value:"1.8",color:"#FF9A6E",delta:"цель 2.0",deltaColor:"#8A7F76"},
+      {label:"k-фактор",value:"0.34",color:"#B57AE0",delta:"цель 0.5",deltaColor:"#E5B23C"},
+      {label:"Удержание",value:"72",color:"#C6FF3D",delta:"NPS ▲",deltaColor:"#C6FF3D"}
+    ];
+    const channels=[
+      {name:"Реферальная петля",roas:"7.8×",w:"100%",spend:"42к",color:"#B57AE0",bar:"linear-gradient(90deg,#B57AE0,#8A4FC0)"},
+      {name:"WhatsApp lifecycle",roas:"6.2×",w:"84%",spend:"18к",color:"#C6FF3D",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)"},
+      {name:"Instagram / таргет",roas:"3.4×",w:"52%",spend:"120к",color:"#FF9A6E",bar:"linear-gradient(90deg,#FF7A4D,#FF5B2E)"},
+      {name:"Маркетплейсы",roas:"2.6×",w:"40%",spend:"85к",color:"#7FB0EC",bar:"#7FB0EC"},
+      {name:"Google / поиск",roas:"2.1×",w:"32%",spend:"64к",color:"#E5B23C",bar:"#E5B23C"}
+    ];
+    const feed=s.feedLive;
+
+    const autoDef=[
+      {name:"Брошенная корзина",trigger:"нет оплаты 2 часа",channel:"WhatsApp",action:"скидка −5%",result:"+624к"},
+      {name:"Конец гарантии",trigger:"за 30 дней до окончания",channel:"WhatsApp",action:"апселл защиты/сервиса",result:"+180к"},
+      {name:"Пора менять батарею",trigger:"телефон 24+ мес",channel:"WhatsApp",action:"запись в сервис",result:"+96к"},
+      {name:"День рождения",trigger:"−3 дня до ДР",channel:"SMS + push",action:"промокод",result:"off"},
+      {name:"Реактивация",trigger:"нет покупок 60 дней",channel:"WhatsApp",action:"−10% возврат",result:"+310к"},
+      {name:"Trade-in апгрейд",trigger:"телефон 18+ мес",channel:"WhatsApp",action:"оценка старого",result:"+530к"}
+    ];
+    const automations=autoDef.map((a,i)=>({...a, on:s.autoOn[i],
+      toggle:()=>{const x=[...s.autoOn];x[i]=!x[i];this.setState({autoOn:x});},
+      swBg:s.autoOn[i]?"#4ED17A":"rgba(255,255,255,0.15)", knob:s.autoOn[i]?"19px":"2px",
+      resultColor:s.autoOn[i]?"#C6FF3D":"#8A7F76",
+      result:s.autoOn[i]?a.result:"выключено"}));
+    const activeAuto=s.autoOn.filter(Boolean).length;
+
+    const campaigns=[
+      {name:"iPhone 15 — рассрочка 0%",channel:"Instagram",spend:"120к",roas:"3.4×",roasColor:"#C6FF3D",status:"активна",stBg:"rgba(198,255,61,0.12)",stFg:"#C6FF3D"},
+      {name:"Trade-in месяц",channel:"WhatsApp",spend:"18к",roas:"6.2×",roasColor:"#C6FF3D",status:"активна",stBg:"rgba(198,255,61,0.12)",stFg:"#C6FF3D"},
+      {name:"Назад в школу — ноутбуки",channel:"Google",spend:"64к",roas:"2.1×",roasColor:"#E5B23C",status:"активна",stBg:"rgba(198,255,61,0.12)",stFg:"#C6FF3D"},
+      {name:"Аксессуары −20%",channel:"Маркетплейс",spend:"38к",roas:"0.9×",roasColor:"#FF8A7A",status:"авто-пауза",stBg:"rgba(255,138,122,0.15)",stFg:"#FF8A7A"},
+      {name:"Реферальная программа",channel:"Приложение",spend:"42к",roas:"7.8×",roasColor:"#C6FF3D",status:"активна",stBg:"rgba(198,255,61,0.12)",stFg:"#C6FF3D"}
+    ];
+
+    const tradeStats=[
+      {icon:"♻️",value:"64",color:"#fff",label:"сдано за месяц"},
+      {icon:"📱",value:"51",color:"#C6FF3D",label:"→ купили новое"},
+      {icon:"💰",value:"5.6 млн",color:"#fff",label:"оборот с апгрейдов"},
+      {icon:"🔮",value:"340",color:"#FF9A6E",label:"готовы к апгрейду (18+ мес)"}
+    ];
+    const tradeFlow=[
+      {icon:"📥",step:"Приём старого",detail:"оценка за 2 мин",bg:"rgba(127,176,236,0.12)",bd:"rgba(127,176,236,0.24)",arrow:true},
+      {icon:"🏷️",step:"Скидка на новое",detail:"trade-in бонус",bg:"rgba(255,122,77,0.14)",bd:"rgba(255,122,77,0.28)",arrow:true},
+      {icon:"📇",step:"Данные в CRM",detail:"модель + дата",bg:"rgba(198,255,61,0.1)",bd:"rgba(198,255,61,0.22)",arrow:true},
+      {icon:"⏰",step:"18 мес ждём",detail:"износ устройства",bg:"rgba(229,178,60,0.12)",bd:"rgba(229,178,60,0.24)",arrow:true},
+      {icon:"💬",step:"WhatsApp зовёт",detail:"снова в цикл",bg:"rgba(181,122,224,0.14)",bd:"rgba(181,122,224,0.28)",arrow:false}
+    ];
+
+    const refStats=[
+      {value:"0.34",color:"#B57AE0",label:"k-фактор"},
+      {value:"186",color:"#fff",label:"приведено за месяц"},
+      {value:"7.8×",color:"#C6FF3D",label:"ROAS канала"},
+      {value:"42к",color:"#fff",label:"выплачено бонусов"}
+    ];
+    const referrers=[
+      {av:"Н",name:"Нурлан Т.",count:"9",earned:"+2 700"},
+      {av:"А",name:"Айгуль С.",count:"7",earned:"+2 100"},
+      {av:"Б",name:"Бек М.",count:"5",earned:"+1 500"},
+      {av:"Д",name:"Дана К.",count:"4",earned:"+1 200"}
+    ];
+
+    const attach=[
+      {name:"Азизбек",rate:"2.3",color:"#C6FF3D",w:"100%",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)",margin:"+38к"},
+      {name:"Али",rate:"2.1",color:"#C6FF3D",w:"100%",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)",margin:"+31к"},
+      {name:"Сайкал",rate:"1.8",color:"#E5B23C",w:"90%",bar:"#E5B23C",margin:"+24к"},
+      {name:"Риезидин",rate:"1.5",color:"#E5B23C",w:"75%",bar:"#E5B23C",margin:"+18к"},
+      {name:"Сыдык",rate:"1.1",color:"#FF8A7A",w:"55%",bar:"#FF8A7A",margin:"+9к"}
+    ];
+
+    return {
+      menu, pageTitle:titles[r][0], pageSub:titles[r][1],
+      isOverview:R("overview"), isAuto:R("auto"), isCampaigns:R("campaigns"), isTradein:R("tradein"), isReferral:R("referral"), isAttach:R("attach"),
+      kpis, channels, feed, automations, activeAuto, campaigns, tradeStats, tradeFlow, refStats, referrers, attach,
+      recovered:s.recovered.toFixed(2)
+    };
+  }
+}
+</script>
+</body>
+</html>

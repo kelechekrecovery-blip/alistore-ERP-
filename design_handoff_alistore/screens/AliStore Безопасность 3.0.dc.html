@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0B0A08; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: radial-gradient(circle at 82% 10%, rgba(255,91,46,0.15), transparent 42%), radial-gradient(circle at 10% 90%, rgba(127,176,236,0.12), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1120px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Безопасность</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- ACCESS / BLOCK -->
+    <sc-if value="{{ isAccess }}" hint-placeholder-val="{{ true }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 120px; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Сотрудник</span><span>Роль</span><span>2FA</span><span>Статус</span><span></span></div>
+        <sc-for list="{{ staff }}" as="s" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 120px; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ s.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ s.role }}</span><span style="font-size: 13px; color: {{ s.tfaColor }};">{{ s.tfa }}</span><span><span style="background: {{ s.stBg }}; color: {{ s.stFg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ s.status }}</span></span><span><span onClick="{{ s.toggle }}" style="background: {{ s.btnBg }}; color: {{ s.btnFg }}; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">{{ s.btn }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Блокировка мгновенно отзывает все сессии и доступ на всех устройствах. Действие требует роль владельца/админа и пишется в аудит.</div>
+    </sc-if>
+
+    <!-- 2FA -->
+    <sc-if value="{{ isTfa }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 480px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 24px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">Двухфакторная аутентификация</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">Обязательна для опасных действий (возврат, списание, изменение цены, доступ к перс. данным).</div>
+        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 16px;">
+          <div style="width: 120px; height: 120px; margin: 0 auto; background: repeating-conic-gradient(#fff 0deg 6deg, #100D0B 6deg 12deg); border-radius: 8px; border: 6px solid #fff;"></div>
+          <div style="font-size: 12px; color: #8A7F76; margin-top: 12px;">Отсканируйте в Google Authenticator</div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <sc-for list="{{ code }}" as="d" hint-placeholder-count="6"><div style="flex: 1; background: #100D0B; border: 1px solid {{ d.border }}; border-radius: 8px; padding: 12px; text-align: center; font-family: 'JetBrains Mono'; font-size: 18px; color: #fff;">{{ d.v }}</div></sc-for>
+        </div>
+        <div onClick="{{ enable }}" style="background: {{ enabled ? '#7FD3A0' : '#C6FF3D' }}; color: #14110E; border-radius: 11px; padding: 13px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">{{ enableLabel }}</div>
+      </div>
+    </sc-if>
+
+    <!-- SESSIONS -->
+    <sc-if value="{{ isSessions }}" hint-placeholder-val="{{ false }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 8px; margin-bottom: 14px;">
+        <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-bottom: 1px solid rgba(255,255,255,0.05);"><span style="font-size: 22px;">{{ s.icon }}</span><div style="flex: 1;"><div style="font-size: 14px; color: #fff;">{{ s.device }} <sc-if value="{{ s.current }}" hint-placeholder-val="{{ false }}"><span style="color: #C6FF3D; font-size: 11px;">· текущая</span></sc-if></div><div style="font-size: 12px; color: #8A7F76;">{{ s.where }} · {{ s.time }}</div></div><sc-if value="{{ s.canKill }}" hint-placeholder-val="{{ true }}"><span style="color: #FF8A7A; font-size: 12px; cursor: pointer;">Выйти</span></sc-if></div>
+        </sc-for>
+      </div>
+      <div style="background: #3A1F1C; color: #FF8A7A; border-radius: 11px; padding: 13px 18px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-block;">Выйти со всех устройств</div>
+    </sc-if>
+
+    <!-- LOGIN LOG -->
+    <sc-if value="{{ isLog }}" hint-placeholder-val="{{ false }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1fr 1.2fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Кто</span><span>Устройство/IP</span><span>Время</span><span>Результат</span></div>
+        <sc-for list="{{ logins }}" as="l" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 1fr 1.2fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ l.who }}</span><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #A79C92;">{{ l.device }}</span><span style="font-size: 12px; color: #8A7F76;">{{ l.time }}</span><span><span style="background: {{ l.bg }}; color: {{ l.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ l.result }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Подозрительные входы (новый регион, много попыток) → тревога в Risk Center + запрос 2FA.</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "access", blocked: {}, enabled: false };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["access","Доступ и блокировка"],["tfa","2FA"],["sessions","Сессии"],["log","Лог входов"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.06)", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.1)" }));
+    const base = [
+      ["Азизбек","Ст. продавец",true],["Сайкал","Продавец",true],["Сыдык","Продавец",false],
+      ["Риезидин","Кладовщик",true],["Данияр","Курьер",false],["Тахсир","Кассир",true]
+    ];
+    const staff = base.map((s,i) => { const blk = !!this.state.blocked[i];
+      return { name:s[0], role:s[1],
+        tfa: s[2]?"✓ вкл":"✕ выкл", tfaColor: s[2]?"#C6FF3D":"#8A7F76",
+        status: blk?"Заблокирован":"Активен", stBg: blk?"rgba(255,138,122,0.15)":"rgba(198,255,61,0.12)", stFg: blk?"#FF8A7A":"#C6FF3D",
+        btn: blk?"Разблокир.":"Заблокир.", btnBg: blk?"#221E19":"#3A1F1C", btnFg: blk?"#C6FF3D":"#FF8A7A",
+        toggle:()=>{ const b={...this.state.blocked}; b[i]=!b[i]; this.setState({blocked:b}); } }; });
+    const code = "428…".split("").concat(["",""]).slice(0,6).map((v,i)=>({ v: i<3?["4","2","8"][i]:"", border: i<3?"#C6FF3D":"#2E2822" }));
+    const sessions = [
+      { icon:"📱", device:"iPhone 14 · приложение", where:"Бишкек", time:"сейчас", current:true, canKill:false },
+      { icon:"💻", device:"Chrome · Windows (ERP)", where:"Бишкек", time:"2 ч назад", current:false, canKill:true },
+      { icon:"🖥️", device:"POS-планшет · Центр", where:"Бишкек", time:"сегодня 09:58", current:false, canKill:true },
+      { icon:"📱", device:"Android · неизвестно", where:"Алматы (?)", time:"вчера", current:false, canKill:true }
+    ];
+    const lg = (who, device, time, result, ok) => ({ who, device, time, result, bg: ok?"rgba(198,255,61,0.12)":"rgba(255,138,122,0.15)", fg: ok?"#C6FF3D":"#FF8A7A" });
+    const logins = [
+      lg("Азизбек","iPhone · 178.20..","09:58","успех",true),
+      lg("Сыдык","POS · Центр","10:04","успех",true),
+      lg("неизвестно","Android · Алматы","03:12","отклонён (2FA)",false),
+      lg("Владелец","Chrome · Бишкек","08:30","успех",true),
+      lg("Сайкал","iPhone · 5 попыток","14:20","заблокирован",false),
+      lg("Данияр","Android · курьер","11:00","успех",true)
+    ];
+    return { tabs, isAccess:t==="access", isTfa:t==="tfa", isSessions:t==="sessions", isLog:t==="log",
+      staff, code, sessions, logins,
+      enabled: this.state.enabled, enableLabel: this.state.enabled?"✓ 2FA включена":"Включить 2FA",
+      enable:()=>this.setState({enabled:true}) };
+  }
+}
+</script>
+</body>
+</html>

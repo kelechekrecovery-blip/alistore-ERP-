@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; width: 1320px; min-height: 1180px; background: radial-gradient(circle at 15% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 38px 42px 50px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 470px; height: 470px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.5), transparent 68%); filter: blur(24px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(127,176,236,0.32), transparent 68%); filter: blur(28px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+    <div style="position: absolute; top: 42%; left: 46%; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(170,220,70,0.16), transparent 66%); filter: blur(30px); animation: floatBlob 18s ease-in-out infinite;"></div>
+  </div>
+
+  <div style="position: relative; z-index: 1;">
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 22px;">
+      <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 22px; box-shadow: 0 8px 22px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 27px; color: #fff; line-height: 1;">Генплан развития экосистемы</div><div style="font-size: 13px; color: #8A7F76; margin-top: 5px;">Приложение · сайт · POS · ERP — единый организм на одном ядре. От «работает» к «умный, связанный, растущий».</div></div>
+      <a href="AliStore Система.dc.html"><div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 9px 16px; font-size: 13px; color: #fff;">⌂ Система</div></a>
+    </div>
+
+    <!-- north star -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+      <sc-for list="{{ north }}" as="n" hint-placeholder-count="4">
+        <div style="flex: 1; padding: 15px 18px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.15);"><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: {{ n.color }};">{{ n.v }}</div><div style="font-size: 11.5px; color: #A79C92; margin-top: 3px;">{{ n.l }}</div></div>
+      </sc-for>
+    </div>
+
+    <!-- phases -->
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin-bottom: 22px;">
+      <sc-for list="{{ phases }}" as="p" hint-placeholder-count="4">
+        <div style="padding: 18px; border-radius: 17px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ p.border }}; box-shadow: 0 12px 30px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.16);">
+          <div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ p.tagFg }};">{{ p.tag }}</span><span style="font-size: 11px; color: #8A7F76;">{{ p.time }}</span></div>
+          <div style="font-family: 'Sora'; font-weight: 800; font-size: 16px; color: #fff; margin: 5px 0 4px;">{{ p.name }}</div>
+          <div style="font-size: 11.5px; color: #A79C92; margin-bottom: 12px; line-height: 1.4; min-height: 46px;">{{ p.goal }}</div>
+          <sc-for list="{{ p.items }}" as="it" hint-placeholder-count="4"><div style="display: flex; gap: 8px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.06);"><span style="color: {{ p.tagFg }}; font-size: 12px;">▸</span><span style="font-size: 12px; color: #E5DCD3; line-height: 1.35;">{{ it }}</span></div></sc-for>
+          <div style="margin-top: 11px; padding: 8px 10px; border-radius: 9px; background: rgba(198,255,61,0.07); border: 1px solid rgba(198,255,61,0.16);"><div style="font-size: 10px; color: #8A7F76;">РЕЗУЛЬТАТ</div><div style="font-size: 11.5px; color: #C6FF3D; margin-top: 2px; line-height: 1.3;">{{ p.done }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <!-- per surface -->
+      <div>
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 12px;">По поверхностям — что улучшаем</div>
+        <sc-for list="{{ surfaces }}" as="s" hint-placeholder-count="4">
+          <div style="display: flex; gap: 13px; padding: 13px 15px; margin-bottom: 10px; border-radius: 14px; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 22px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.14);">
+            <div style="width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; background: {{ s.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 18px;">{{ s.icon }}</div>
+            <div style="flex: 1;"><div style="font-size: 13.5px; font-weight: 700; color: #fff;">{{ s.name }}</div><div style="font-size: 11.5px; color: #A79C92; margin-top: 3px; line-height: 1.4;">{{ s.txt }}</div></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- integration backbone -->
+      <div>
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 12px;">Связка экосистемы — общий хребет</div>
+        <div style="padding: 18px; border-radius: 16px; background: linear-gradient(160deg, rgba(198,255,61,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(198,255,61,0.2); box-shadow: 0 12px 30px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.14);">
+          <sc-for list="{{ backbone }}" as="b" hint-placeholder-count="6">
+            <div style="display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 15px;">{{ b.icon }}</span><div style="flex: 1;"><div style="font-size: 13px; color: #fff; font-weight: 600;">{{ b.name }}</div><div style="font-size: 11.5px; color: #A79C92; margin-top: 1px; line-height: 1.4;">{{ b.txt }}</div></div></div>
+          </sc-for>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 13px 16px; border-radius: 14px; background: linear-gradient(160deg, rgba(255,122,77,0.13), rgba(255,255,255,0.02)); border: 1px solid rgba(255,122,77,0.26);">
+          <span style="font-size: 16px;">🔒</span><span style="font-size: 12px; color: #EDE6DE; line-height: 1.45;">Единое ядро: клиенты только <b style="color:#FF9A6E;">читают</b> статусы, деньги/склад/статус меняет только сервер в одной транзакции с Event Ledger. Всё сходится по инвариантам.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:1180}}">
+class Component extends DCLogic {
+  renderVals(){
+    return {
+      north:[
+        {v:"×3",l:"LTV / CAC — цель юнит-экономики",color:"#C6FF3D"},
+        {v:"40%",l:"онлайн-доля продаж",color:"#fff"},
+        {v:"100%",l:"целостность (инварианты Ledger)",color:"#C6FF3D"},
+        {v:"1 → N",l:"магазинов на одной системе",color:"#FF9A6E"}
+      ],
+      phases:[
+        {tag:"ФАЗА 1",time:"нед. 1–4",name:"Фундамент",goal:"Один магазин полностью на системе: продажа→склад→деньги→сверка.",items:["POS + касса + смена","Живые остатки и статусы","Сверка кассы и банка","Приёмка по PO"],done:"Магазин live, деньги сходятся",border:"rgba(255,122,77,0.3)",tag_:"",tagFg:"#FF9A6E"},
+        {tag:"ФАЗА 2",time:"нед. 5–8",name:"Умный клиент",goal:"Приложение реагирует на контекст: остаток, история, статус, долг.",items:["Живой статус + карта курьера","Рассрочка-график и оплата","Waitlist «снова в наличии»","Бонусы как валюта"],done:"Повторные покупки ↑, отток ↓",border:"rgba(229,178,60,0.28)",tag_:"",tagFg:"#E5B23C"},
+        {tag:"ФАЗА 3",time:"нед. 9–12",name:"Движок роста",goal:"Маркетинг встроен в цикл: привлечение дешевеет с каждым оборотом.",items:["WhatsApp автоворонки","Trade-in цикл апгрейда","Рефералы (k-фактор)","Атрибуция по оплатам"],done:"CAC ↓, LTV ↑, k-фактор → 0.5",border:"rgba(127,176,236,0.28)",tag_:"",tagFg:"#7FB0EC"},
+        {tag:"ФАЗА 4",time:"кв. 2+",name:"Масштаб",goal:"Тиражирование сети + автономия AI-директора и открытость.",items:["2-й, 3-й филиалы","AI-директор на автопилоте","Открытое API (1С, банки, МП)","Мобильный ERP владельца"],done:"Сеть на одной ОС, рост управляем",border:"rgba(181,122,224,0.3)",tag_:"",tagFg:"#B57AE0"}
+      ],
+      surfaces:[
+        {icon:"📱",name:"Клиентское приложение",txt:"Персонализация по сегменту, deep-link из пуша, оффлайн-состояния, чат с историей, мультиязык рус/кыр.",iconBg:"linear-gradient(135deg,#FF7A4D,#E8410F)"},
+        {icon:"🌐",name:"Сайт / веб-витрина",txt:"SEO, тот же каталог и остаток, checkout идентичен приложению, единый профиль и корзина между устройствами.",iconBg:"rgba(255,255,255,0.06)"},
+        {icon:"🧾",name:"POS / касса",txt:"Скан IMEI, сплит-оплата, настройка рассрочки, attach-подсказка, оффлайн-восстановление, горячие клавиши.",iconBg:"rgba(255,255,255,0.06)"},
+        {icon:"🖥️",name:"ERP / владелец",txt:"Режим бога над приложением (push, флаги), AI-директор, пульт целостности виджетом, инбокс задач на роль.",iconBg:"linear-gradient(135deg,#B57AE0,#8A4FC0)"}
+      ],
+      backbone:[
+        {icon:"🧾",name:"Единый Event Ledger",txt:"Все поверхности пишут/читают одну правду. Статусы приходят живыми."},
+        {icon:"👤",name:"Один профиль клиента",txt:"Телефон, устройства, история, сегмент → общий для сайта, приложения, кассы."},
+        {icon:"🛰️",name:"Remote-config и флаги",txt:"Функции вкл/выкл удалённо из ERP — без релиза."},
+        {icon:"🔔",name:"Единый слой уведомлений",txt:"Push / WhatsApp / SMS из одного Outbox, с сегментами и триггерами."},
+        {icon:"🔗",name:"Deep-link и QR",txt:"Пуш/чек/QR открывает нужный экран приложения или сайта."},
+        {icon:"🔌",name:"Открытое API / вебхуки",txt:"1С, банки-эквайеры, маркетплейсы, фискализация — через контракты."}
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
