@@ -125,7 +125,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       <div className="mb-2 font-display text-base font-bold">Состав</div>
       {order.items.map((i, idx) => (
         <div key={idx} className="mb-2 flex items-center gap-3 rounded-[14px] border border-surface-3 bg-surface-2 p-3">
-          <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark font-display font-extrabold text-white/15">{(bySku.get(i.sku)?.name ?? i.sku).slice(0, 1)}</div>
+          <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-surface-3 to-ink-dark font-display font-extrabold text-white/15">{(bySku.get(i.sku)?.name ?? i.sku).slice(0, 1)}</div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold">{bySku.get(i.sku)?.name ?? i.sku}</div>
             {i.imei && <div className="font-mono text-[11px] text-subtle">IMEI {i.imei}</div>}

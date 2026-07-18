@@ -154,7 +154,7 @@ function ReadinessRow({
   const status = {
     missing: ['missing', 'bg-coral text-white'],
     manual_required: ['manual', 'bg-warn text-[#18110A]'],
-    optional: ['optional', 'bg-[#2A241F] text-bright'],
+    optional: ['optional', 'bg-surface-3 text-bright'],
     ready: ['ready', 'bg-[#18210F] text-lime'],
   }[check.status];
 

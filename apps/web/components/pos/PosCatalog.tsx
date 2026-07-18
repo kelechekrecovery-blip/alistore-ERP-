@@ -140,7 +140,7 @@ export function PosCatalog({
           )}
         </div>
         {queue.length > 0 && (
-          <div className="max-h-[78px] overflow-y-auto rounded-[10px] border border-surface-3 bg-[#120F0C]">
+          <div className="max-h-[78px] overflow-y-auto rounded-[10px] border border-surface-3 bg-lime-ink">
             {queue.slice(0, 4).map((item) => (
               <div key={item.id} className="flex items-center gap-2 border-b border-surface-2 px-3 py-2 text-xs last:border-0">
                 <span className={`h-2 w-2 rounded-full ${item.status === 'synced' ? 'bg-lime' : item.status === 'failed' ? 'bg-danger' : item.status === 'approval_required' ? 'bg-warn' : 'bg-subtle'}`} />
@@ -179,8 +179,8 @@ export function PosCatalog({
               onClick={() => onAdd(p)}
               className="min-w-0 rounded-[14px] border border-surface-3 bg-surface-2 p-3 text-left transition hover:border-lime/40 focus-visible:border-lime focus-visible:outline-none"
             >
-              <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark">
-                {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-xl font-bold text-[#8a8a8a]">{p.name.slice(0,1)}</span>}
+              <div className="relative mb-2.5 h-20 overflow-hidden rounded-[10px] bg-gradient-to-br from-surface-3 to-ink-dark">
+                {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-xl font-bold text-slate">{p.name.slice(0,1)}</span>}
                 {p.availableUnits < 5 && (
                   <span className="absolute right-1.5 top-1.5 rounded bg-warn px-1.5 py-0.5 text-[9px] font-bold text-lime-ink">
                     {p.availableUnits} шт

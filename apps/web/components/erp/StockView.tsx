@@ -287,7 +287,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-muted">
                     <span>{item.unit.imei}</span><span>{item.unit.location}</span><span>{som(item.unit.acquisitionCost ?? 0)}</span>
                   </div>
-                  <div className="mt-1 text-xs text-[#6F665E]">{item.sourceType === 'exchange' ? 'Обмен' : 'Возврат'} · {item.reason}</div>
+                  <div className="mt-1 text-xs text-faint">{item.sourceType === 'exchange' ? 'Обмен' : 'Возврат'} · {item.reason}</div>
                 </div>
 
                 {item.status === 'pending_diagnosis' && (
@@ -296,7 +296,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                       aria-label={`Диагноз ${item.unit.imei}`}
                       value={diagnosis[item.id] ?? 'resellable'}
                       onChange={(event) => setDiagnosis((current) => ({ ...current, [item.id]: event.target.value as QuarantineDiagnosis }))}
-                      className="h-9 rounded-[6px] border border-line bg-[#171411] px-2 text-xs text-white"
+                      className="h-9 rounded-[6px] border border-line bg-ink-dark px-2 text-xs text-white"
                     >
                       <option value="resellable">Можно вернуть в продажу</option>
                       <option value="repair">Нужен ремонт</option>
@@ -307,9 +307,9 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                       placeholder="Комментарий"
                       value={notes[item.id] ?? ''}
                       onChange={(event) => setNotes((current) => ({ ...current, [item.id]: event.target.value }))}
-                      className="h-9 min-w-0 rounded-[6px] border border-line bg-[#171411] px-2 text-xs text-white placeholder:text-[#6F665E]"
+                      className="h-9 min-w-0 rounded-[6px] border border-line bg-ink-dark px-2 text-xs text-white placeholder:text-faint"
                     />
-                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[6px] border border-dashed border-[#4A423A] px-2 text-xs text-muted hover:border-[#6A6056] hover:text-white">
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[6px] border border-dashed border-[#4A423A] px-2 text-xs text-muted hover:border-faint hover:text-white">
                       <Camera size={14} />
                       <span className="truncate">{evidence[item.id]?.name ?? 'Фото диагностики'}</span>
                       <input
@@ -393,7 +393,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                   value={period.from}
                   max={period.to}
                   onChange={(event) => setPeriod((current) => ({ ...current, from: event.target.value }))}
-                  className="h-9 rounded-[6px] border border-line bg-[#171411] px-2 text-xs text-white"
+                  className="h-9 rounded-[6px] border border-line bg-ink-dark px-2 text-xs text-white"
                 />
               </label>
               <label className="grid gap-1 text-[11px] text-subtle">
@@ -403,7 +403,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                   value={period.to}
                   min={period.from}
                   onChange={(event) => setPeriod((current) => ({ ...current, to: event.target.value }))}
-                  className="h-9 rounded-[6px] border border-line bg-[#171411] px-2 text-xs text-white"
+                  className="h-9 rounded-[6px] border border-line bg-ink-dark px-2 text-xs text-white"
                 />
               </label>
             </div>
@@ -432,7 +432,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                   </div>
                   {rollForward.rows.map((row) => (
                     <div key={`${row.productId}:${row.location}`} className="grid grid-cols-[1.7fr_0.9fr_repeat(7,0.75fr)] items-center border-b border-surface-2 py-2.5 text-xs last:border-0">
-                      <span className="truncate pr-2 text-white">{row.name}<span className="ml-1 text-[#6F665E]">{row.sku}</span></span>
+                      <span className="truncate pr-2 text-white">{row.name}<span className="ml-1 text-faint">{row.sku}</span></span>
                       <span className="truncate text-muted">{row.location}</span>
                       <RollForwardAmount value={row.opening.value} quantity={row.opening.quantity} />
                       <RollForwardAmount value={row.receipts.value + row.adjustmentsIn.value} quantity={row.receipts.quantity + row.adjustmentsIn.quantity} />
@@ -496,7 +496,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
                   </div>
                   {reconciliation.quantity.map((row) => (
                     <div key={`${row.productId}:${row.location}`} className="grid grid-cols-[1.8fr_1fr_repeat(5,0.75fr)] items-center border-b border-surface-2 py-2.5 text-xs last:border-0">
-                      <span className="truncate pr-2 text-white">{row.name}<span className="ml-1 text-[#6F665E]">{row.sku}</span></span>
+                      <span className="truncate pr-2 text-white">{row.name}<span className="ml-1 text-faint">{row.sku}</span></span>
                       <span className="truncate text-muted">{row.location}</span>
                       <span className="text-right font-mono">{row.ownedPhysicalQty}</span>
                       <span className="text-right font-mono">{row.layerQty}</span>
@@ -550,7 +550,7 @@ function bishkekDayBoundary(date: string) {
 function RollForwardAmount({ value, quantity, strong = false }: { value: number; quantity: number; strong?: boolean }) {
   return (
     <span className={`text-right font-mono ${strong ? 'font-semibold text-white' : 'text-bright'}`} title={`${quantity} ед.`}>
-      {som(value)}<span className="ml-1 text-[10px] text-[#6F665E]">{quantity}</span>
+      {som(value)}<span className="ml-1 text-[10px] text-faint">{quantity}</span>
     </span>
   );
 }

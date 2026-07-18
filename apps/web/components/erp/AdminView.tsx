@@ -47,7 +47,7 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
         {visible.map((module) => (
           <Link key={module.href} href={module.href} className="group rounded-[8px] border border-surface-3 bg-surface p-4 transition hover:border-lime/60 hover:bg-surface-2">
             <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-lime">{module.icon}</span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-surface-3 text-lg text-lime">{module.icon}</span>
               <span className="min-w-0">
                 <strong className="block text-sm text-white group-hover:text-lime">{module.title}</strong>
                 <span className="mt-1 block text-xs leading-5 text-subtle">{module.description}</span>
@@ -64,7 +64,7 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
             className="group rounded-[8px] border border-surface-3 bg-surface p-4 text-left transition hover:border-lime/60 hover:bg-surface-2"
           >
             <span className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-[#29231E] text-lg text-lime">{module.icon}</span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] bg-surface-3 text-lg text-lime">{module.icon}</span>
               <span className="min-w-0">
                 <strong className="block text-sm text-white group-hover:text-lime">{module.title}</strong>
                 <span className="mt-1 block text-xs leading-5 text-subtle">{module.description}</span>
@@ -75,7 +75,7 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
         ))}
       </div>
 
-      {!visible.length && <Card><p className="text-sm text-[#FFB5AA]">Для роли {role} нет административных разделов.</p></Card>}
+      {!visible.length && <Card><p className="text-sm text-coral-tint">Для роли {role} нет административных разделов.</p></Card>}
 
       {staffCan(role, 'staff', 'manage') && <StaffAdminView accessToken={accessToken} />}
 

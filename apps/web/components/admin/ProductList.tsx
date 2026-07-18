@@ -36,7 +36,7 @@ export function ProductList({
   onStartCreate,
 }: ProductListProps) {
   return (
-    <section className="min-h-0 border-b border-surface-3 bg-[#12100D] lg:border-b-0 lg:border-r">
+    <section className="min-h-0 border-b border-surface-3 bg-lime-ink lg:border-b-0 lg:border-r">
       <div className="flex items-center gap-2 border-b border-surface-3 p-4">
         <input
           value={query}
@@ -95,7 +95,7 @@ export function ProductList({
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <span className="font-mono text-[11px] text-subtle">{product.sku}</span>
                     {product.variantGroup && (
-                      <span className="rounded-chip bg-[#2B271D] px-2 py-0.5 text-[11px] font-semibold text-warn">
+                      <span className="rounded-chip bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-warn">
                         {product.variantGroup}
                       </span>
                     )}

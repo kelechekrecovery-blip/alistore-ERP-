@@ -44,7 +44,7 @@ export default function MobileFavorites() {
               <div key={p.id} className="mb-2.5 flex gap-3 rounded-[14px] border border-surface-3 bg-surface-2 p-3">
                 <Link
                   href={`/product/${p.id}`}
-                  className="relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark"
+                  className="relative h-[74px] w-[74px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-surface-3 to-ink-dark"
                 >
                   {productImage(p) ? <Image src={productImage(p)!} alt={p.name} fill sizes="74px" className="object-contain p-1.5" /> : <span className="grid h-full place-items-center text-lg font-bold text-subtle">{p.name.slice(0,1)}</span>}
                 </Link>

@@ -24,7 +24,7 @@ export function SiteFooter() {
           <h3 className="text-sm font-semibold text-white">Контакты</h3>
           {point && <><p className="mt-4 text-sm text-bright">{point.address}</p><p className="mt-2 text-sm text-bright">{point.hours}</p></>}
           {storefront?.content.contactPhone && <a href={`tel:${storefront.content.contactPhone.replace(/\s/g, '')}`} className="mt-2 block text-sm text-bright">{storefront.content.contactPhone}</a>}
-          <Link href="/support" className="mt-4 inline-block text-sm text-[#FF8A5F]">Написать в поддержку</Link>
+          <Link href="/support" className="mt-4 inline-block text-sm text-coral-light">Написать в поддержку</Link>
         </div>
       </div>
       <div className="border-t border-surface-3 py-5 text-center text-xs text-subtle">© 2026 AliStore · Электроника · Кыргызстан</div>
@@ -33,5 +33,5 @@ export function SiteFooter() {
 }
 
 function FooterColumn({ title, links }: { title: string; links: Array<[string, string]> }) {
-  return <div><h3 className="text-sm font-semibold text-white">{title}</h3><div className="mt-4 grid gap-2.5">{links.map(([label, href]) => <Link key={href + label} href={href} className="text-sm text-bright transition hover:text-[#FF8A5F]">{label}</Link>)}</div></div>;
+  return <div><h3 className="text-sm font-semibold text-white">{title}</h3><div className="mt-4 grid gap-2.5">{links.map(([label, href]) => <Link key={href + label} href={href} className="text-sm text-bright transition hover:text-coral-light">{label}</Link>)}</div></div>;
 }

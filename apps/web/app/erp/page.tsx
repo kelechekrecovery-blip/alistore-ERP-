@@ -353,7 +353,7 @@ export default function ErpPage() {
             >
               <LogOut size={16} /><span className="hidden lg:inline">Выйти staff</span>
             </button>
-            <span className="hidden h-9 w-9 place-items-center rounded-full bg-[#2A241F] text-sm md:grid">В</span>
+            <span className="hidden h-9 w-9 place-items-center rounded-full bg-surface-3 text-sm md:grid">В</span>
           </div>
         </div>
 

@@ -174,7 +174,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
           <button type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))} className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-surface-3 px-3 text-xs font-semibold text-bright">
             <Plus size={14} /> Строка
           </button>
-          <button type="button" disabled={busy === 'create'} onClick={submitOrder} className="ml-auto inline-flex h-9 items-center gap-2 rounded-[8px] bg-lime px-4 text-xs font-bold text-[#111] disabled:opacity-50">
+          <button type="button" disabled={busy === 'create'} onClick={submitOrder} className="ml-auto inline-flex h-9 items-center gap-2 rounded-[8px] bg-lime px-4 text-xs font-bold text-coal disabled:opacity-50">
             <Check size={14} /> Создать PO
           </button>
         </div>
@@ -222,7 +222,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
           </select>
         </div>
         <textarea aria-label="IMEI для приёмки" value={receive.imeis} onChange={(event) => setReceive((current) => ({ ...current, imeis: event.target.value }))} rows={4} className="mt-3 w-full resize-y rounded-[8px] border border-surface-3 bg-ink-dark p-3 font-mono text-xs text-white outline-none focus:border-faint" placeholder="Сканируйте IMEI/SN — по одному в строке" />
-        <button type="button" disabled={busy === 'receive' || !selectedItem} onClick={submitReceipt} className="mt-3 inline-flex h-9 items-center gap-2 rounded-[8px] bg-white px-4 text-xs font-bold text-[#111] disabled:opacity-40">
+        <button type="button" disabled={busy === 'receive' || !selectedItem} onClick={submitReceipt} className="mt-3 inline-flex h-9 items-center gap-2 rounded-[8px] bg-white px-4 text-xs font-bold text-coal disabled:opacity-40">
           <PackageCheck size={14} /> Принять на склад
         </button>
       </section>

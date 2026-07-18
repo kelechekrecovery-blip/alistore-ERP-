@@ -153,7 +153,7 @@ export default function ExchangePage() {
                     placeholder="IMEI проданного устройства"
                     className="flex-1 rounded-[10px] border border-surface-3 bg-surface-2 px-3 py-2.5 text-sm outline-none focus:border-coral"
                   />
-                  <button type="button" disabled={busy} onClick={lookup} className="rounded-[10px] bg-surface-2 px-4 py-2.5 text-sm font-semibold text-bright hover:bg-[#2A241F] disabled:opacity-40">Найти</button>
+                  <button type="button" disabled={busy} onClick={lookup} className="rounded-[10px] bg-surface-2 px-4 py-2.5 text-sm font-semibold text-bright hover:bg-surface-3 disabled:opacity-40">Найти</button>
                 </div>
                 <label className="mt-3 block rounded-[10px] border border-dashed border-[#4A4139] bg-surface-2 p-3 text-sm text-bright">
                   <span className="block text-xs font-semibold uppercase text-subtle">Фото состояния до обмена</span>
@@ -161,7 +161,7 @@ export default function ExchangePage() {
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)}
-                    className="mt-2 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-[#342D27] file:px-3 file:py-2 file:font-semibold file:text-white"
+                    className="mt-2 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-surface-3 file:px-3 file:py-2 file:font-semibold file:text-white"
                   />
                 </label>
                 {unit && (

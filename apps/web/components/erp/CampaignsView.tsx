@@ -297,7 +297,7 @@ function CampaignList({ campaigns, busy, onAction }: {
                 <div className="mt-1 text-xs text-subtle">{item.description}</div>
               </div>
               <span className="rounded-chip bg-surface px-2.5 py-1 text-[11px] font-bold text-lime">{item.campaign.channel}</span>
-              <span className="rounded-chip border border-[#41382F] px-2.5 py-1 text-[11px] font-bold text-warn">{statusLabel(item.campaign.status)}</span>
+              <span className="rounded-chip border border-line px-2.5 py-1 text-[11px] font-bold text-warn">{statusLabel(item.campaign.status)}</span>
             </div>
             <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] bg-surface px-3 py-2 font-mono text-[11px] text-muted" data-testid={`campaign-link-${item.campaign.id}`}>
               /?utm_source={item.campaign.source}&amp;utm_medium={item.campaign.medium}&amp;utm_campaign={item.campaign.trackingCode}
@@ -338,7 +338,7 @@ function CampaignList({ campaigns, busy, onAction }: {
 }
 
 function ActionButton({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
-  return <button type="button" disabled={busy} onClick={onClick} className="rounded-btn border border-[#41382F] px-3 py-2 text-xs font-bold text-white hover:border-lime disabled:opacity-50">{label}</button>;
+  return <button type="button" disabled={busy} onClick={onClick} className="rounded-btn border border-line px-3 py-2 text-xs font-bold text-white hover:border-lime disabled:opacity-50">{label}</button>;
 }
 
 function statusLabel(status: CampaignRoi['campaign']['status']) {

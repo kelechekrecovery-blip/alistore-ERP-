@@ -16,7 +16,7 @@ export function DemoModeBanner() {
   return (
     <aside
       aria-label="Демонстрационный режим"
-      className="fixed inset-x-0 bottom-0 z-[200] border-t border-[#FF8A5F] bg-ink px-4 py-2 text-center text-xs font-bold text-white shadow-[0_-8px_28px_rgba(0,0,0,.28)]"
+      className="fixed inset-x-0 bottom-0 z-[200] border-t border-coral-light bg-ink px-4 py-2 text-center text-xs font-bold text-white shadow-[0_-8px_28px_rgba(0,0,0,.28)]"
     >
       Демо-режим: списание, резерв товара и фискализация не производятся
     </aside>

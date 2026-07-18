@@ -21,7 +21,7 @@ export function WarrantyCertificate({ device, customerId }: { device: MyDevice; 
   const active = (device.daysLeft ?? 0) > 0;
   return (
     <div>
-      <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-[#2A2A2E] to-surface-2 p-5">
+      <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-5">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <span className="grid h-6 w-6 place-items-center rounded-[7px] bg-coral font-display text-[13px] font-extrabold text-white">A</span>

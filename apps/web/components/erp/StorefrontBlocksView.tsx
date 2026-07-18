@@ -126,7 +126,7 @@ export function StorefrontBlocksView({ accessToken }: { accessToken: string }) {
         {blocks.map((block) => {
           const active = blocks.filter((item) => item.status !== 'archived');
           const index = active.findIndex((item) => item.id === block.id);
-          return <article key={block.id} className={`flex items-center gap-3 rounded-[8px] border p-3 ${block.status === 'archived' ? 'border-[#24201C] opacity-55' : 'border-surface-3 bg-surface-2'}`}>
+          return <article key={block.id} className={`flex items-center gap-3 rounded-[8px] border p-3 ${block.status === 'archived' ? 'border-surface-2 opacity-55' : 'border-surface-3 bg-surface-2'}`}>
             <div className={`grid h-11 w-20 shrink-0 place-items-center rounded-[7px] ${tone(block.tone)}`}>{block.imageUrl ? <ImageIcon size={17} /> : labelType(block.type).slice(0, 1)}</div>
             <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-white">{block.title}</div><div className="mt-0.5 text-[11px] text-subtle">{labelType(block.type)} · {labelDevice(block.device)} · {labelStatus(block)}</div>{block.type === 'collection' && <div className="mt-0.5 truncate text-[11px] text-muted">{block.productIds.map((id) => byId.get(id)?.name ?? id).join(', ')}</div>}</div>
             {block.status !== 'archived' && <div className="flex shrink-0 gap-1"><Icon title="Выше" disabled={index <= 0 || busy} onClick={() => move(index, -1)}><ArrowUp size={14} /></Icon><Icon title="Ниже" disabled={index < 0 || index === active.length - 1 || busy} onClick={() => move(index, 1)}><ArrowDown size={14} /></Icon></div>}

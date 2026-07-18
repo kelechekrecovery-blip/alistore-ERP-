@@ -156,7 +156,7 @@ export default function B2BPage() {
                   </select>
                 </label>
                 {lines.length > 1 && (
-                  <button type="button" aria-label={`Удалить товар ${index + 1}`} onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-11 w-11 place-items-center rounded-[10px] border border-[#49342D] text-lg text-danger-soft">×</button>
+                  <button type="button" aria-label={`Удалить товар ${index + 1}`} onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="grid h-11 w-11 place-items-center rounded-[10px] border border-line text-lg text-danger-soft">×</button>
                 )}
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">

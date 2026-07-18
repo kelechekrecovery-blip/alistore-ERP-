@@ -237,11 +237,11 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
       <section aria-labelledby="trial-balance-title" className="border-b border-surface-3 pb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div><h2 id="trial-balance-title" className="font-display text-[15px] font-bold">Оборотно-сальдовая ведомость</h2><p className="mt-1 text-xs text-subtle">{trialBalance?.coverage.note ?? 'Загружаем проводки расходов, продаж и возвратов'}</p></div>
-          <span data-testid="trial-balance-status" className={`rounded-[5px] px-2.5 py-1 text-xs font-semibold ${accountingState === 'ready' && trialBalance?.balanced ? 'bg-[#26351B] text-lime' : accountingState === 'error' || accountingState === 'ready' ? 'bg-[#593127] text-[#FFB5AA]' : 'bg-[#29231E] text-[#B9ADA2]'}`}>{accountingState === 'loading' ? 'Загрузка' : accountingState === 'error' ? 'Данные недоступны' : trialBalance?.balanced ? 'Дебет = кредит' : 'Баланс не сошёлся'}</span>
+          <span data-testid="trial-balance-status" className={`rounded-[5px] px-2.5 py-1 text-xs font-semibold ${accountingState === 'ready' && trialBalance?.balanced ? 'bg-[#26351B] text-lime' : accountingState === 'error' || accountingState === 'ready' ? 'bg-[#593127] text-coral-tint' : 'bg-surface-3 text-[#B9ADA2]'}`}>{accountingState === 'loading' ? 'Загрузка' : accountingState === 'error' ? 'Данные недоступны' : trialBalance?.balanced ? 'Дебет = кредит' : 'Баланс не сошёлся'}</span>
         </div>
         <div className="overflow-x-auto rounded-[7px] border border-surface-3 bg-ink-dark">
           <table className="w-full min-w-[620px] text-left text-xs">
-            <thead className="bg-[#1D1915] text-subtle"><tr><th className="px-4 py-2.5">Счёт</th><th className="px-4 py-2.5">Наименование</th><th className="px-4 py-2.5 text-right">Дебет</th><th className="px-4 py-2.5 text-right">Кредит</th><th className="px-4 py-2.5 text-right">Сальдо</th></tr></thead>
+            <thead className="bg-ink text-subtle"><tr><th className="px-4 py-2.5">Счёт</th><th className="px-4 py-2.5">Наименование</th><th className="px-4 py-2.5 text-right">Дебет</th><th className="px-4 py-2.5 text-right">Кредит</th><th className="px-4 py-2.5 text-right">Сальдо</th></tr></thead>
             <tbody>{(trialBalance?.rows ?? []).filter((row) => row.debit || row.credit).map((row) => <tr key={row.code} className="border-t border-surface-3"><td className="px-4 py-2.5 font-mono text-lime">{row.code}</td><td className="px-4 py-2.5 text-bright">{row.name}</td><td className="px-4 py-2.5 text-right font-mono">{som(row.debit)}</td><td className="px-4 py-2.5 text-right font-mono">{som(row.credit)}</td><td className="px-4 py-2.5 text-right font-mono">{som(row.balance)}</td></tr>)}</tbody>
             <tfoot><tr className="border-t border-line font-bold"><td className="px-4 py-3" colSpan={2}>Обороты</td><td className="px-4 py-3 text-right font-mono">{som(trialBalance?.totalDebit ?? 0)}</td><td className="px-4 py-3 text-right font-mono">{som(trialBalance?.totalCredit ?? 0)}</td><td /></tr></tfoot>
           </table>
@@ -263,7 +263,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             </label>
           </div>
         </div>
-        {planningMessage && <div className="mb-3 rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-[#FFB5AA]">{planningMessage}</div>}
+        {planningMessage && <div className="mb-3 rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral-tint">{planningMessage}</div>}
         <div className="grid gap-3 md:grid-cols-3">
           <div data-testid="finance-plan" className="rounded-[7px] border border-surface-3 bg-ink-dark p-4"><div className="text-xs text-subtle">План</div><strong className="mt-1 block font-mono text-xl text-white">{som(planFact?.plan ?? 0)}</strong></div>
           <div data-testid="finance-actual" className="rounded-[7px] border border-surface-3 bg-ink-dark p-4"><div className="text-xs text-subtle">Факт</div><strong className="mt-1 block font-mono text-xl text-[#FFB86B]">{som(planFact?.actual ?? 0)}</strong></div>
@@ -287,7 +287,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
             {Object.entries(CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <input aria-label="Сумма бюджета" value={budgetAmount} onChange={(event) => setBudgetAmount(event.target.value)} inputMode="numeric" placeholder="Бюджет, сом" className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-3 text-sm" />
-          <button disabled={planningBusy} className="h-10 rounded-[6px] bg-lime px-4 text-sm font-bold text-[#111] disabled:opacity-50">{planningBusy ? 'Сохраняем...' : 'Установить бюджет'}</button>
+          <button disabled={planningBusy} className="h-10 rounded-[6px] bg-lime px-4 text-sm font-bold text-coal disabled:opacity-50">{planningBusy ? 'Сохраняем...' : 'Установить бюджет'}</button>
         </form>
       </section>
       <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.75fr)_minmax(560px,1.65fr)]">
@@ -335,7 +335,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
                 <div className="mt-2 flex justify-between text-[11px] text-subtle"><span>По документам</span><span className="font-mono text-bright">{som(total.originalBaseAmount)}</span></div>
                 <div className="mt-1 flex justify-between text-[11px] text-subtle"><span>По текущему курсу</span><span className="font-mono text-[#FFB86B]">{total.missingRateDocuments || total.overflowDocuments ? 'нет полной оценки' : som(total.currentBaseAmount)}</span></div>
                 {!total.missingRateDocuments && !total.overflowDocuments && <div className={`mt-1 flex justify-between text-[11px] ${total.valuationDelta > 0 ? 'text-danger-soft' : 'text-success-soft'}`}><span>Расчётная разница</span><span className="font-mono">{total.valuationDelta > 0 ? '+' : ''}{som(total.valuationDelta)}</span></div>}
-                {(total.missingRateDocuments > 0 || total.overflowDocuments > 0) && <div className="mt-2 text-[10px] text-[#FFB5AA]">{total.missingRateDocuments ? `${total.missingRateDocuments} без курса` : ''}{total.missingRateDocuments && total.overflowDocuments ? ' · ' : ''}{total.overflowDocuments ? `${total.overflowDocuments} вне диапазона` : ''}</div>}
+                {(total.missingRateDocuments > 0 || total.overflowDocuments > 0) && <div className="mt-2 text-[10px] text-coral-tint">{total.missingRateDocuments ? `${total.missingRateDocuments} без курса` : ''}{total.missingRateDocuments && total.overflowDocuments ? ' · ' : ''}{total.overflowDocuments ? `${total.overflowDocuments} вне диапазона` : ''}</div>}
               </div>
             ))}
             {!fxExposure?.totals.length && <span className="text-[11px] text-faint">Открытых расходов в иностранной валюте нет</span>}
@@ -370,7 +370,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
               <input value={point} onChange={(e) => setPoint(e.target.value)} maxLength={100} placeholder="Точка" className="h-10 min-w-0 rounded-[6px] border border-line bg-surface px-3 text-sm" />
               <div className="flex h-10 items-center rounded-[6px] border border-surface-3 bg-ink-dark px-3 text-xs text-subtle">Проводка в KGS</div>
             </div>
-            <button disabled={busy === 'create'} className="h-10 rounded-[6px] bg-lime px-4 text-sm font-bold text-[#111] disabled:opacity-50">
+            <button disabled={busy === 'create'} className="h-10 rounded-[6px] bg-lime px-4 text-sm font-bold text-coal disabled:opacity-50">
               {busy === 'create' ? 'Создаём...' : 'Отправить на согласование'}
             </button>
           </div>
@@ -380,12 +380,12 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-[15px] font-bold">Расходы</h2><span className="text-xs text-subtle">{expenses.length} заявок</span>
         </div>
-        {message && <div className="mb-3 rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-[#FFB5AA]">{message}</div>}
+        {message && <div className="mb-3 rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral-tint">{message}</div>}
         <div className="grid gap-2">
           {expenses.map((expense) => (
             <article key={expense.id} className="grid min-h-24 grid-cols-[1fr_auto] gap-4 rounded-[6px] border border-surface-3 bg-ink-dark p-4">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{expense.description}</strong><span className="rounded bg-[#29231E] px-2 py-0.5 text-[10px] text-[#B9ADA2]">{CATEGORIES[expense.category] ?? expense.category}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{expense.description}</strong><span className="rounded bg-surface-3 px-2 py-0.5 text-[10px] text-[#B9ADA2]">{CATEGORIES[expense.category] ?? expense.category}</span></div>
                 <div className="mt-2 text-xs text-subtle">{STATUS[expense.status]}{expense.point ? ` · ${expense.point}` : ''}{expense.supplier ? ` · ${expense.supplier.name}` : ''}</div>
                 <div className="mt-1 text-[11px] text-faint">Документ: {expense.documentAmount.toLocaleString('ru-RU')} {expense.currency}{expense.currency !== 'KGS' ? ` · курс ${(expense.exchangeRateMicros / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 6 })}` : ''}{expense.taxAmount > 0 ? ` · налог ${som(expense.taxAmount)} (${expense.taxRateBps / 100}%)` : ' · без налога'}</div>
                 {expense.rejectionNote && <div className="mt-2 text-xs text-danger-soft">{expense.rejectionNote}</div>}
@@ -394,7 +394,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
                 <span className="font-mono text-sm font-bold tabular">{som(expense.amount)}</span>
                 {expense.status === 'submitted' && <div className="flex gap-2">
                   <button disabled={busy === expense.id} onClick={() => run(expense.id, () => rejectExpense(expense.id, 'Отклонено владельцем', accessToken))} className="text-xs text-danger-soft disabled:opacity-50">Отклонить</button>
-                  <button disabled={busy === expense.id} onClick={() => run(expense.id, () => approveExpense(expense.id, accessToken))} className="rounded-[5px] bg-[#29231E] px-3 py-1.5 text-xs font-semibold text-lime disabled:opacity-50">Согласовать</button>
+                  <button disabled={busy === expense.id} onClick={() => run(expense.id, () => approveExpense(expense.id, accessToken))} className="rounded-[5px] bg-surface-3 px-3 py-1.5 text-xs font-semibold text-lime disabled:opacity-50">Согласовать</button>
                 </div>}
                 {expense.status === 'approved' && <div className="grid w-52 gap-2">
                   <select aria-label={`Источник выплаты ${expense.description}`} value={fundingByExpense[expense.id] ?? '1000'} onChange={(event) => setFundingByExpense((current) => ({ ...current, [expense.id]: event.target.value }))} className="h-8 rounded-[5px] border border-line bg-surface px-2 text-xs">
@@ -416,7 +416,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
                       });
                       return result;
                     });
-                  }} className="rounded-[5px] bg-lime px-3 py-1.5 text-xs font-bold text-[#111] disabled:opacity-50">Провести выплату</button>
+                  }} className="rounded-[5px] bg-lime px-3 py-1.5 text-xs font-bold text-coal disabled:opacity-50">Провести выплату</button>
                 </div>}
                 {expense.status === 'paid' && <div className="text-right text-[11px] text-subtle"><span className="font-mono text-lime">{expense.paymentAccountCode}</span>{expense.paymentReference ? <span className="mt-1 block">{expense.paymentReference}</span> : null}</div>}
               </div>

@@ -86,7 +86,7 @@ export default function DevicesPage() {
             return (
               <div key={d.imei} className="mb-3 rounded-[16px] border border-surface-3 bg-surface-2 p-4">
                 <div className="flex gap-3">
-                  <div className="grid h-[54px] w-[54px] flex-shrink-0 place-items-center rounded-[12px] bg-gradient-to-br from-[#2A2620] to-ink-dark font-display text-xl font-extrabold text-white/15">{d.product.slice(0, 1)}</div>
+                  <div className="grid h-[54px] w-[54px] flex-shrink-0 place-items-center rounded-[12px] bg-gradient-to-br from-surface-3 to-ink-dark font-display text-xl font-extrabold text-white/15">{d.product.slice(0, 1)}</div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[15px] font-bold">{d.product}</div>
                     <div className="mt-0.5 font-mono text-[11px] text-subtle">IMEI {d.imei}</div>
@@ -103,7 +103,7 @@ export default function DevicesPage() {
                   )}
                 </div>
                 {workOrder?.estimatePreparedAt && (
-                  <div data-testid={`service-estimate-${workOrder.id}`} className="mt-3 rounded-[8px] border border-[#3B342D] bg-ink-dark p-3">
+                  <div data-testid={`service-estimate-${workOrder.id}`} className="mt-3 rounded-[8px] border border-line bg-ink-dark p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[12px] font-semibold text-bright">Смета сервис-центра</div>
@@ -137,7 +137,7 @@ export default function DevicesPage() {
               <div><div className="text-[15px] font-bold">{workOrder.warrantyCase.deviceName ?? 'Устройство'}</div><div className="mt-0.5 font-mono text-[11px] text-subtle">SN {workOrder.warrantyCase.imei}</div><div className="mt-2 text-[12px] text-muted">{workOrder.warrantyCase.problem}</div></div>
               <span className="h-fit rounded-md bg-info/15 px-2 py-0.5 text-[11px] text-info">{WSTATUS[workOrder.warrantyCase.status] ?? workOrder.warrantyCase.status}</span>
             </div>
-            {workOrder.estimatePreparedAt ? <div data-testid={`service-estimate-${workOrder.id}`} className="mt-3 rounded-[8px] border border-[#3B342D] bg-ink-dark p-3">
+            {workOrder.estimatePreparedAt ? <div data-testid={`service-estimate-${workOrder.id}`} className="mt-3 rounded-[8px] border border-line bg-ink-dark p-3">
               <div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-semibold text-bright">Смета сервис-центра</div><div className="mt-1 text-[12px] text-subtle">{workOrder.diagnosticSummary}</div></div><div className="whitespace-nowrap font-mono text-[13px] font-bold text-lime">{workOrder.estimateAmount?.toLocaleString('ru-RU')} с</div></div>
               {workOrder.estimateApprovedAt ? <ServicePaymentState workOrder={workOrder} /> : <button type="button" disabled={approving === workOrder.id} onClick={() => void approveEstimate(workOrder)} className="mt-3 w-full rounded-[8px] bg-coral px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-50">{approving === workOrder.id ? 'Подтверждаем…' : 'Подтвердить смету'}</button>}
             </div> : <div className="mt-3 text-[12px] text-subtle">Устройство принято, ожидается диагностика</div>}

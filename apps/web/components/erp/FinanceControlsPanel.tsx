@@ -80,10 +80,10 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
           <label className="text-[11px] text-subtle">AR на дату<input aria-label="Дата AR" type="date" value={arDate} onChange={(event) => setArDate(event.target.value)} className="mt-1 block h-9 rounded-[6px] border border-line bg-surface px-3 text-xs text-white" /></label>
           <label className="text-[11px] text-subtle">Точка<input aria-label="Точка отчетов" value={point} onChange={(event) => setPoint(event.target.value)} placeholder="Все точки" className="mt-1 block h-9 w-32 rounded-[6px] border border-line bg-surface px-3 text-xs text-white" /></label>
           <button type="button" onClick={reload} className="h-9 self-end rounded-[6px] border border-line px-3 text-xs text-bright hover:border-lime hover:text-lime">Обновить</button>
-          <button type="button" onClick={exportJournal} disabled={exporting} className="h-9 self-end rounded-[6px] bg-lime px-3 text-xs font-bold text-[#111] disabled:opacity-40">{exporting ? 'Готовим CSV…' : 'Скачать журнал CSV'}</button>
+          <button type="button" onClick={exportJournal} disabled={exporting} className="h-9 self-end rounded-[6px] bg-lime px-3 text-xs font-bold text-coal disabled:opacity-40">{exporting ? 'Готовим CSV…' : 'Скачать журнал CSV'}</button>
         </div>
       </div>
-      {state === 'error' && <div className="mb-3 rounded-[6px] border border-[#6B3B32] bg-[#321F1A] px-3 py-2 text-xs text-[#FFB5AA]">Часть учетных данных недоступна для этой роли или сервиса.</div>}
+      {state === 'error' && <div className="mb-3 rounded-[6px] border border-[#6B3B32] bg-surface-3 px-3 py-2 text-xs text-coral-tint">Часть учетных данных недоступна для этой роли или сервиса.</div>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
         <Metric label="Прибыль периода" value={som(statements?.profitAndLoss.netProfit ?? 0)} tone="text-lime" />
         <Metric label="Движение денег" value={som(statements?.cashFlow.cashMovement ?? 0)} />
@@ -95,7 +95,7 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
         <Metric label="НДС к уплате" value={som(tax?.payableAmount ?? 0)} tone={(tax?.payableAmount ?? 0) > 0 ? 'text-danger-soft' : 'text-lime'} />
       </div>
       <div className="mt-3 grid gap-3 lg:grid-cols-5">
-        <ControlList title="Периоды" empty="Периоды еще не открывались">{periods.slice(0, 4).map((row) => <Row key={row.id} label={row.period} value={row.status === 'hard_closed' ? 'закрыт' : row.status === 'soft_closed' ? 'мягко закрыт' : 'открыт'} tone={row.status === 'hard_closed' ? 'text-[#FFB5AA]' : 'text-lime'} />)}</ControlList>
+        <ControlList title="Периоды" empty="Периоды еще не открывались">{periods.slice(0, 4).map((row) => <Row key={row.id} label={row.period} value={row.status === 'hard_closed' ? 'закрыт' : row.status === 'soft_closed' ? 'мягко закрыт' : 'открыт'} tone={row.status === 'hard_closed' ? 'text-coral-tint' : 'text-lime'} />)}</ControlList>
         <ControlList title="Банковские выписки" empty="Выписок еще нет">{banks.slice(0, 4).map((row) => <Row key={row.id} label={row.statementNumber} value={`${row.status} · ${som(row.closingBalance)}`} tone={row.status === 'reconciled' ? 'text-lime' : 'text-[#FFB86B]'} />)}</ControlList>
         <ControlList title="Инкассация" empty="Инкассаций еще нет">{incassations.slice(0, 4).map((row) => <Row key={row.id} label={row.point} value={`${row.status} · ${som(row.amount)}`} tone={row.status === 'reconciled' ? 'text-lime' : 'text-[#FFB86B]'} />)}</ControlList>
         <ControlList title={`Дебиторка · ${arDate}`} empty="Открытых долгов нет">
@@ -118,8 +118,8 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-surface-3 pt-3">
         {(tax?.status ?? 'open') === 'open' && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('soft')} className="h-9 rounded-[6px] border border-[#5B5148] px-3 text-xs text-bright disabled:opacity-40">Мягко закрыть период</button>}
-        {tax?.status === 'soft_closed' && !tax.settlement && !point.trim() && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('tax')} className="h-9 rounded-[6px] bg-lime px-3 text-xs font-bold text-[#111] disabled:opacity-40">Зафиксировать НДС</button>}
-        {tax?.status === 'soft_closed' && tax.settlement && !point.trim() && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('hard')} className="h-9 rounded-[6px] border border-danger-soft px-3 text-xs text-[#FFB5AA] disabled:opacity-40">Закрыть период окончательно</button>}
+        {tax?.status === 'soft_closed' && !tax.settlement && !point.trim() && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('tax')} className="h-9 rounded-[6px] bg-lime px-3 text-xs font-bold text-coal disabled:opacity-40">Зафиксировать НДС</button>}
+        {tax?.status === 'soft_closed' && tax.settlement && !point.trim() && <button type="button" disabled={action !== 'idle'} onClick={() => runAction('hard')} className="h-9 rounded-[6px] border border-danger-soft px-3 text-xs text-coral-tint disabled:opacity-40">Закрыть период окончательно</button>}
         {point.trim() && <span className="text-[11px] text-subtle">Окончательное закрытие доступно в отчёте «Все точки».</span>}
         {notice && <span role="status" className="text-xs text-bright">{notice}</span>}
       </div>

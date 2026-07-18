@@ -85,7 +85,7 @@ export default function TradeInPage() {
   if (done) {
     return (
       <MobileAppFrame title="Trade-in оценка" subtitle="Заявка создана, договор доступен сотруднику." active="home" backHref="/account">
-        <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-[#2A2A2E] to-surface-2 p-5 text-center">
+        <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-5 text-center">
           <div className="text-[13px] text-muted">Предварительная оценка</div>
           <div className="mt-2 font-display text-[34px] font-extrabold leading-none text-lime">{som(done.tradeIn.price)}</div>
           <div className="mt-2 font-mono text-[12px] text-subtle">{done.tradeIn.contractId}</div>
@@ -101,7 +101,7 @@ export default function TradeInPage() {
 
   return (
     <MobileAppFrame title="Trade-in оценка" subtitle="Оцените старое устройство за 30 секунд и зачтите сумму в новую покупку." active="home" backHref="/account">
-      <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-[#2A2A2E] to-surface-2 p-5 text-center">
+      <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-5 text-center">
         <div className="text-[13px] text-muted">Ориентир по текущим данным</div>
         <div className="mt-2 font-display text-[30px] font-extrabold leading-none text-lime">{range}</div>
         <div className="mt-2 text-[12px] leading-relaxed text-subtle">Точная цена после диагностики. Можно получить выплату или скидку на новый товар.</div>

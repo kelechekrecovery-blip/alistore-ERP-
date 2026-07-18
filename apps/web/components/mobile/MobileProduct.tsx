@@ -74,7 +74,7 @@ export default function MobileProduct({
     <MobileFrame active="catalog">
       <div className="pb-6">
         {/* hero */}
-        <div className="relative h-[260px] bg-gradient-to-br from-[#2A2620] to-ink-dark">
+        <div className="relative h-[260px] bg-gradient-to-br from-surface-3 to-ink-dark">
           {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="440px" priority className="object-contain p-8" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-subtle"><ImageOff size={38} /><span>Фото готовится</span></span>}
           <button
             type="button"
@@ -296,7 +296,7 @@ export default function MobileProduct({
                     href={`/product/${s.id}`}
                     className="w-[120px] flex-shrink-0"
                   >
-                    <div className="relative h-[92px] overflow-hidden rounded-[12px] bg-gradient-to-br from-[#2A2620] to-ink-dark">
+                    <div className="relative h-[92px] overflow-hidden rounded-[12px] bg-gradient-to-br from-surface-3 to-ink-dark">
                       {productImage(s) ? <Image src={productImage(s)!} alt={s.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-subtle"><ImageOff size={20} /></span>}
                     </div>
                     <div className="mt-1.5 line-clamp-2 text-[11px] leading-[1.3] text-bright">

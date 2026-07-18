@@ -73,17 +73,17 @@ const SECTIONS: Array<{ title: string; body: string[] }> = [
 
 export default function OfertaPage() {
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#0f0f0f]">
+    <div className="min-h-screen bg-paper text-coal">
       <SiteHeader />
       <div className="border-b border-[#e8c547] bg-[#fff3cd] px-5 py-3 text-center text-sm font-bold text-[#7a5c00]">
         ЧЕРНОВИК — текст требует проверки юристом
       </div>
       <main className="mx-auto max-w-[1100px] px-5 py-12">
-        <div className="text-xs text-[#8a8a8a]">
+        <div className="text-xs text-slate">
           <Link href="/">Главная</Link> / Публичная оферта
         </div>
         <h1 className="mt-5 text-[38px] font-extrabold">Публичная оферта</h1>
-        <p className="mt-3 max-w-[75ch] text-sm text-[#8a8a8a]">
+        <p className="mt-3 max-w-[75ch] text-sm text-slate">
           Редакция от [Дата]. Настоящий документ размещён в ознакомительных целях и не является
           окончательной версией.
         </p>
@@ -91,7 +91,7 @@ export default function OfertaPage() {
           <section key={section.title} className="mt-10">
             <h2 className="text-xl font-bold">{section.title}</h2>
             {section.body.map((paragraph) => (
-              <p key={paragraph} className="mt-3 max-w-[75ch] text-base leading-7 text-[#4a4a4a]">
+              <p key={paragraph} className="mt-3 max-w-[75ch] text-base leading-7 text-steel">
                 {paragraph}
               </p>
             ))}

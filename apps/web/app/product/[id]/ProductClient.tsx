@@ -167,7 +167,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           reviews={reviews}
         />
       </div>
-      <div className="hidden min-h-screen bg-[#f5f5f7] text-[#0f0f0f] [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
+      <div className="hidden min-h-screen bg-paper text-coal [font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif] md:block">
         <SiteHeader />
         <main className="mx-auto max-w-[1400px] px-5 py-8">
           <nav
@@ -182,7 +182,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           </nav>
           <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
             <div>
-              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-[#E7DDD3] bg-gradient-to-br from-white to-[#F2ECE5] shadow-soft">
+              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-[#E7DDD3] bg-gradient-to-br from-white to-sand shadow-soft">
                 {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
                 <span className="absolute left-5 top-5 rounded-full border border-coral/25 bg-tint px-3 py-1.5 text-xs font-semibold text-deep">
                   {condition}
@@ -193,7 +193,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   <button
                     key={`${src}-${index}`}
                     type="button"
-                    className={`relative aspect-square overflow-hidden rounded-[13px] border bg-white ${index === 0 ? "border-coral" : "border-[#DED3C8]"}`}
+                    className={`relative aspect-square overflow-hidden rounded-[13px] border bg-white ${index === 0 ? "border-coral" : "border-bright"}`}
                     aria-label={`Фото товара ${index + 1}`}
                   >
                     <Image
@@ -252,7 +252,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       <Link
                         key={variant.id}
                         href={`/product/${variant.id}`}
-                        className="rounded-[10px] border border-[#DED3C8] bg-white px-3 py-2 text-sm text-faint hover:border-coral"
+                        className="rounded-[10px] border border-bright bg-white px-3 py-2 text-sm text-faint hover:border-coral"
                       >
                         {variantLabel(variant)} · {som(variant.price)}
                       </Link>
@@ -262,7 +262,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
 
               {Boolean(product.bundleComponents?.length) && (
-                <div className="mt-6 rounded-[12px] border border-[#DED3C8] bg-white p-4">
+                <div className="mt-6 rounded-[12px] border border-bright bg-white p-4">
                   <div className="text-xs font-semibold uppercase text-subtle">
                     В комплекте
                   </div>
@@ -283,7 +283,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
 
               <div className="mt-7 grid grid-cols-[auto_1fr] gap-3">
-                <div className="flex items-center rounded-[12px] border border-[#DED3C8] bg-white p-1">
+                <div className="flex items-center rounded-[12px] border border-bright bg-white p-1">
                   <button
                     type="button"
                     onClick={() => setQty((value) => Math.max(1, value - 1))}
@@ -319,7 +319,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => favorites.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-[#DED3C8] bg-white text-faint"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${favorites.has(product.id) ? "border-coral bg-tint text-deep" : "border-bright bg-white text-faint"}`}
                 >
                   <Heart
                     size={17}
@@ -330,7 +330,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => compare.toggle(product.id)}
-                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-[#DED3C8] bg-white text-faint"}`}
+                  className={`flex items-center justify-center gap-2 rounded-[12px] border py-3 text-sm ${compare.has(product.id) ? "border-coral bg-tint text-deep" : "border-bright bg-white text-faint"}`}
                 >
                   <GitCompareArrows size={17} />
                   Сравнить
@@ -416,7 +416,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         rating: Number(event.target.value),
                       }))
                     }
-                    className="rounded-[11px] border border-[#DED3C8] bg-white px-3 py-3 text-sm outline-none"
+                    className="rounded-[11px] border border-bright bg-white px-3 py-3 text-sm outline-none"
                   >
                     {[5, 4, 3, 2, 1].map((rating) => (
                       <option key={rating} value={rating}>
@@ -435,7 +435,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     rows={4}
                     maxLength={500}
                     placeholder="Расскажите о покупке"
-                    className="resize-none rounded-[11px] border border-[#DED3C8] bg-white p-3 text-sm outline-none focus:border-coral"
+                    className="resize-none rounded-[11px] border border-bright bg-white p-3 text-sm outline-none focus:border-coral"
                   />
                   <button className="rounded-[12px] bg-coral py-3 text-sm font-bold text-white">
                     Опубликовать

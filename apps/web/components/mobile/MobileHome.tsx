@@ -49,7 +49,7 @@ export default function MobileHome() {
             <div className="rounded-[15px] bg-gradient-to-br from-coral to-deep p-3.5">
               <div className="text-xl">✓</div>
               <div className="mt-1.5 text-[13px] font-bold text-white">{storefront?.content.benefits[0]?.title ?? 'Актуальное наличие'}</div>
-              <div className="text-[11px] text-[#FFE0D5]">{storefront?.content.benefits[0]?.body ?? 'из складской системы'}</div>
+              <div className="text-[11px] text-tint">{storefront?.content.benefits[0]?.body ?? 'из складской системы'}</div>
             </div>
           </Pressable>
           <Pressable className="flex-1" hover={false}>
@@ -88,7 +88,7 @@ export default function MobileHome() {
           <Pressable hover={false}>
             <Link
               href={storefront?.content.heroCtaHref ?? '/catalog'}
-              className="relative block overflow-hidden rounded-[20px] border border-surface-3 bg-gradient-to-br from-[#2A2A2E] to-ink-dark p-[22px]"
+              className="relative block overflow-hidden rounded-[20px] border border-surface-3 bg-gradient-to-br from-surface-3 to-ink-dark p-[22px]"
             >
               <div className="font-mono text-[11px] text-lime">{storefront?.content.heroEyebrow ?? 'ALISTORE'}</div>
               <div className="mt-2 font-display text-[24px] font-extrabold leading-[1.05] text-white">{storefront?.content.heroTitle ?? 'Техника из актуального каталога'}</div>

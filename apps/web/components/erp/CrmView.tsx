@@ -127,7 +127,7 @@ export function CrmView() {
             <li
               key={t.id}
               className={`rounded-[14px] border bg-surface p-4 transition ${
-                selected?.id === t.id ? 'border-coral' : 'border-surface-3 hover:border-[#3A332B]'
+                selected?.id === t.id ? 'border-coral' : 'border-surface-3 hover:border-line'
               }`}
             >
               <button type="button" onClick={() => setSelected(t)} className="block w-full text-left">
@@ -157,7 +157,7 @@ export function CrmView() {
                       type="button"
                       disabled={busy === t.id}
                       onClick={() => act(t, () => transitionTicket(t.id, to, session.accessToken))}
-                      className="rounded-btn bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-bright transition hover:bg-[#2A241F] disabled:opacity-40"
+                      className="rounded-btn bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-bright transition hover:bg-surface-3 disabled:opacity-40"
                     >
                       → {STATUS_RU[to]}
                     </button>
@@ -167,7 +167,7 @@ export function CrmView() {
                       type="button"
                       disabled={busy === t.id}
                       onClick={() => act(t, () => escalateTicket(t.id, session.accessToken))}
-                      className="rounded-btn bg-[#3A2016] px-2.5 py-1 text-[11px] font-semibold text-danger-soft transition hover:bg-[#4A281C] disabled:opacity-40"
+                      className="rounded-btn bg-surface-3 px-2.5 py-1 text-[11px] font-semibold text-danger-soft transition hover:bg-[#4A281C] disabled:opacity-40"
                     >
                       ↑ Эскалировать
                     </button>

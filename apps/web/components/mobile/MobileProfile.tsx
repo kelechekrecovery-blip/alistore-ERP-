@@ -56,7 +56,7 @@ export default function MobileProfile({
         </div>
 
         {/* level */}
-        <div className="mb-3.5 rounded-[16px] border border-surface-3 bg-gradient-to-br from-[#2A2A2E] to-surface-2 p-4">
+        <div className="mb-3.5 rounded-[16px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-4">
           <div className="mb-2 flex justify-between text-[13px]">
             <span className="text-bright">Уровень {loyalty?.level ?? '...'}</span>
             <span className="font-mono text-lime">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : 'Загрузка...'}</span>

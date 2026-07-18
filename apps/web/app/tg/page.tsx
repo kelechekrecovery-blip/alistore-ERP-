@@ -282,7 +282,7 @@ export default function TelegramMiniAppPage() {
                   const used = conditionLabel(product.attrs) === 'Б/У';
                   return (
                     <article key={product.id} className="overflow-hidden rounded-[16px] border border-surface-3 bg-surface-2">
-                      <div className="grid h-[104px] place-items-center bg-gradient-to-br from-[#2A2620] to-ink-dark">
+                      <div className="grid h-[104px] place-items-center bg-gradient-to-br from-surface-3 to-ink-dark">
                         <span className="text-4xl">{productIcon(product.category)}</span>
                       </div>
                       <div className="p-3">

@@ -23,9 +23,9 @@ export default function BonusesPage() {
       {user && !data && !error && <div className="py-16 text-center text-sm text-muted">Загружаем бонусы…</div>}
       {data && <>
         <div className="rounded-[18px] bg-coral p-5 text-center">
-          <div className="text-[13px] text-[#FFE0D5]">Доступно бонусов</div>
+          <div className="text-[13px] text-tint">Доступно бонусов</div>
           <div className="mt-1 font-display text-[40px] font-extrabold leading-none">{data.balance.toLocaleString('ru-RU')}</div>
-          <div className="mt-2 text-[12px] text-[#FFE0D5]">1 бонус = {data.conversion} сом · {data.level}-уровень</div>
+          <div className="mt-2 text-[12px] text-tint">1 бонус = {data.conversion} сом · {data.level}-уровень</div>
         </div>
 
         <div className="mb-2 mt-4 text-[13px] text-muted">Мои купоны</div>

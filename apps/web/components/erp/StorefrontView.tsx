@@ -265,7 +265,7 @@ function SiteAdministrationOverview({
           const Icon = module.icon;
           return (
             <button key={module.id} type="button" onClick={() => onOpen(module.id)} className="group min-h-32 rounded-[8px] border border-surface-3 bg-surface p-4 text-left transition hover:border-lime/60 hover:bg-surface-2">
-              <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-[#29231E] text-lime"><Icon size={18} /></span>
+              <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-surface-3 text-lime"><Icon size={18} /></span>
               <strong className="mt-4 block text-sm text-white group-hover:text-lime">{module.title}</strong>
               <span className="mt-1 block text-xs leading-5 text-subtle">{module.body}</span>
             </button>

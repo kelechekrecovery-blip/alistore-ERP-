@@ -67,8 +67,8 @@ export function PosTicket({
         ) : (
           lines.map((l) => (
             <div key={l.product.id} className="flex gap-3 border-b border-surface-2 py-3">
-              <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-[9px] bg-[#2A2620]">
-                {productImage(l.product) ? <Image src={productImage(l.product)!} alt={l.product.name} fill sizes="44px" className="object-contain p-1" /> : <span className="grid h-full place-items-center font-bold text-[#8a8a8a]">{l.product.name.slice(0,1)}</span>}
+              <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-[9px] bg-surface-3">
+                {productImage(l.product) ? <Image src={productImage(l.product)!} alt={l.product.name} fill sizes="44px" className="object-contain p-1" /> : <span className="grid h-full place-items-center font-bold text-slate">{l.product.name.slice(0,1)}</span>}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold text-white">{l.product.name}</div>

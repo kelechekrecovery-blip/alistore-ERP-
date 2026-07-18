@@ -59,7 +59,7 @@ export function ServicePosPayment({ workOrderId, session, onBack }: { workOrderI
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4 font-sans text-white">
     <main data-testid="service-payment-ticket" className="relative h-[720px] max-h-[94vh] w-full max-w-[920px] overflow-hidden rounded-[24px] border-8 border-ink bg-ink-dark shadow-2xl">
       <header className="flex items-center gap-3 border-b border-surface-3 px-6 py-4">
-        <button type="button" onClick={onBack} aria-label="Назад к продаже" className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#3B342D] text-bright"><ArrowLeft size={18} /></button>
+        <button type="button" onClick={onBack} aria-label="Назад к продаже" className="grid h-9 w-9 place-items-center rounded-[8px] border border-line text-bright"><ArrowLeft size={18} /></button>
         <div><div className="font-display text-lg font-bold">Оплата ремонта</div><div className="font-mono text-[11px] text-subtle">POS · {session.username}</div></div>
       </header>
       {loading && <div className="grid h-[600px] place-items-center font-mono text-sm text-subtle">Загрузка заказ-наряда…</div>}

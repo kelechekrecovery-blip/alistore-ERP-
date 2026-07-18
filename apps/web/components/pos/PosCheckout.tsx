@@ -122,7 +122,7 @@ export function PosCheckout(props: PosCheckoutProps) {
               <span className="font-display text-xl font-bold text-white">{props.title ?? 'Оплата'}</span>
               <span className="ml-auto font-display text-2xl font-extrabold text-lime tabular">{som(total)}</span>
             </div>
-            <div className="mb-4 flex rounded-[12px] border border-surface-3 bg-[#120F0C] p-1">
+            <div className="mb-4 flex rounded-[12px] border border-surface-3 bg-lime-ink p-1">
               <button
                 type="button"
                 onClick={() => setSplit(false)}
@@ -200,7 +200,7 @@ export function PosCheckout(props: PosCheckoutProps) {
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center gap-3 rounded-[10px] border border-surface-3 bg-[#120F0C] px-3 py-2 text-xs">
+                <div className="flex items-center gap-3 rounded-[10px] border border-surface-3 bg-lime-ink px-3 py-2 text-xs">
                   <span className="text-subtle">Распределено</span>
                   <span className="font-mono text-bright">{som(splitTotal)}</span>
                   <span className={splitRemainder === 0 ? 'text-lime' : 'text-warn'}>

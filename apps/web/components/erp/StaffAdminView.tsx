@@ -98,7 +98,7 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
         <button type="button" onClick={reload} className="rounded-[6px] border border-line px-3 py-2 text-xs text-bright hover:border-lime hover:text-lime">Обновить</button>
       </div>
 
-      {message && <div role="alert" className="mt-3 rounded-[6px] border border-[#FF6B55]/40 bg-[#FF6B55]/10 px-3 py-2 text-xs text-[#FFB5AA]">{message}</div>}
+      {message && <div role="alert" className="mt-3 rounded-[6px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2 text-xs text-coral-tint">{message}</div>}
       {notice && <div role="status" className="mt-3 rounded-[6px] border border-lime/30 bg-lime/10 px-3 py-2 text-xs text-lime">{notice}</div>}
 
       <form onSubmit={submitCreate} className="mt-4 grid gap-2 rounded-[10px] border border-surface-3 bg-ink-dark p-3 sm:grid-cols-[1fr_1fr_160px_140px_auto]">
@@ -130,25 +130,25 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
                   type="button"
                   disabled={busy === person.id}
                   onClick={() => setPending({ kind: 'deactivate', staff: person })}
-                  className="rounded-[6px] border border-[#49342D] px-2.5 py-1.5 text-[11px] text-danger-soft hover:border-[#FF6B55] disabled:opacity-50"
+                  className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-danger-soft hover:border-coral-soft disabled:opacity-50"
                 >Деактивировать</button>
               </span>
             </div>
             {pending?.staff.id === person.id && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[8px] border border-[#FF6B55]/40 bg-[#FF6B55]/10 px-3 py-2">
-                <span className="text-xs text-[#FFB5AA]">
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[8px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2">
+                <span className="text-xs text-coral-tint">
                   {pending.kind === 'deactivate'
                     ? `Деактивировать ${person.username}? Доступ отключится сразу.`
                     : `Сбросить 2FA для ${person.username}? Текущий authenticator перестанет работать.`}
                 </span>
-                <button type="button" disabled={busy === person.id} onClick={confirmPending} className="ml-auto rounded-[6px] bg-[#FF6B55] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
+                <button type="button" disabled={busy === person.id} onClick={confirmPending} className="ml-auto rounded-[6px] bg-coral-soft px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
                   {busy === person.id ? '…' : 'Подтвердить'}
                 </button>
                 <button type="button" onClick={() => setPending(null)} className="rounded-[6px] border border-line px-3 py-1.5 text-[11px] text-bright">Отмена</button>
               </div>
             )}
             {rowError[person.id] && (
-              <div role="alert" className="mt-2 rounded-[8px] border border-[#FF6B55]/40 bg-[#FF6B55]/10 px-3 py-2 text-xs text-[#FFB5AA]">{rowError[person.id]}</div>
+              <div role="alert" className="mt-2 rounded-[8px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2 text-xs text-coral-tint">{rowError[person.id]}</div>
             )}
           </li>
         ))}

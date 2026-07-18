@@ -59,7 +59,7 @@ export function KpiView({ kpi, accessToken }: { kpi: Kpi | null; accessToken: st
           {kpi.sellers.length === 0 && <p className="text-sm text-subtle">Нет продаж по сменам.</p>}
           {kpi.sellers.map((s, i) => (
             <div key={s.staffId} className="flex items-center gap-3 border-b border-surface-2 py-2.5 text-[13px] last:border-0">
-              <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-[#2A241F] font-mono text-[11px] text-subtle">{i + 1}</span>
+              <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-surface-3 font-mono text-[11px] text-subtle">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate text-bright">{s.staffId}</span>
               <span className="text-subtle">{s.sales} продаж</span>
               <span className="font-mono tabular font-semibold text-white">{som(s.revenue)}</span>

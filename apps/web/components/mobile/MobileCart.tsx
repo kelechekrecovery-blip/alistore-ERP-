@@ -74,7 +74,7 @@ export default function MobileCart() {
               >
                 <Link
                   href={`/product/${item.id}`}
-                  className="relative h-[70px] w-[70px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2A2620] to-ink-dark"
+                  className="relative h-[70px] w-[70px] flex-shrink-0 overflow-hidden rounded-[10px] bg-gradient-to-br from-surface-3 to-ink-dark"
                 >
                   <span className="grid h-full place-items-center text-xl font-bold text-subtle">{item.name.slice(0, 1)}</span>
                 </Link>

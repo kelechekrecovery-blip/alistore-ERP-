@@ -40,6 +40,18 @@ export default {
         muted: '#A79C92', // приглушённый
         subtle: '#8A7F76', // вторичный
         faint: '#6E645C', // третичный/подписи
+        // Light-mode neutral scale (desktop light shells — canon §5 «витрина светлая»)
+        paper: '#F5F5F7', // светлейшая панель
+        mist: '#E5E5E7', // светлый бордер/дивайдер
+        haze: '#D2D2D7', // светлый хайрлайн
+        graphite: '#1D1D1F', // near-black текст (светлые шапки)
+        slate: '#8A8A8A', // серый текст на светлом
+        steel: '#4A4A4A', // тёмно-серый текст
+        coal: '#0F0F0F', // near-black фон
+        // Coral family (тинты/оттенки)
+        'coral-soft': '#FF6B55', // светлее coral (градиенты/hover)
+        'coral-light': '#FF8A5F', // coral-текст на тёмном
+        'coral-tint': '#FFB5AA', // мягкий coral (бейдж/фон)
       },
       fontFamily: {
         // next/font CSS vars (see app/fonts.ts). Display falls back to Golos

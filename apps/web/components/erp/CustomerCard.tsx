@@ -37,7 +37,7 @@ export function CustomerCard({ customerId, accessToken }: { customerId: string; 
   return (
     <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
       <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#2A241F] font-display text-lg font-bold">
+        <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-surface-3 font-display text-lg font-bold">
           {c.name.slice(0, 1)}
         </span>
         <div className="min-w-0">

@@ -24,7 +24,7 @@ export function MobileAppFrame({
   const router = useRouter();
 
   return (
-    <div className="customer-service-shell min-h-screen bg-[#0c0c17] font-sans text-white">
+    <div className="customer-service-shell min-h-screen bg-coal font-sans text-white">
       <SiteHeader />
       <main className="customer-service-main mx-auto w-[min(980px,92vw)] py-10 sm:py-14">
         <div className="mb-7 flex items-start gap-4">
