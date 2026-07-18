@@ -231,6 +231,45 @@ struct GlassTabBar: View {
     }
 }
 
+// MARK: - Stories rail
+
+struct StoryItem: Identifiable {
+    let id: Int
+    let emoji: String
+    let label: String
+}
+
+/// Horizontal stories rail (canon 3.0 home): 62px circular avatars, orange ring, emoji, label.
+struct StoriesRail: View {
+    let items: [StoryItem]
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                ForEach(items) { item in
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .strokeBorder(
+                                    LinearGradient(colors: [Design3.orangeSoft, Design3.orangePressed],
+                                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                                    lineWidth: 2.5
+                                )
+                                .frame(width: 62, height: 62)
+                            Circle().fill(Color.white.opacity(0.04)).frame(width: 54, height: 54)
+                            Text(item.emoji).font(.system(size: 26))
+                        }
+                        Text(item.label)
+                            .font(Design3.body(11, .medium))
+                            .foregroundStyle(Design3.textMuted)
+                    }
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
+        }
+    }
+}
+
 // MARK: - Section header
 
 struct SectionHeader: View {

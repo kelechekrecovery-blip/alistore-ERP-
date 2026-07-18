@@ -5790,6 +5790,13 @@ private struct ClientHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    StoriesRail(items: [
+                        .init(id: 0, emoji: "🔥", label: "Хиты"),
+                        .init(id: 1, emoji: "🎁", label: "Акции"),
+                        .init(id: 2, emoji: "♻️", label: "Trade-in"),
+                        .init(id: 3, emoji: "🆕", label: "Новинки"),
+                        .init(id: 4, emoji: "⚡️", label: "1–2 ч"),
+                    ])
                     HStack(spacing: 10) {
                         ServiceCard(title: "Доставка 1–2 ч", detail: "по Бишкеку", symbol: "bolt.fill", highlighted: true)
                         ServiceCard(title: "Самовывоз", detail: "бесплатно", symbol: "building.2")
