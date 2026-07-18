@@ -4065,3 +4065,13 @@
 - Checks run: fresh Playwright API/Web servers on ports `4270/3270`, `admin-products.spec.ts` + `storefront-cms-ui.spec.ts` `7/7`; prior Web production build and targeted API gates remain green.
 - Outcome: local ERP → storefront contract slice accepted. Full MVP, strict evidence audit, owner handoff corpus, staging, live providers and physical device gates remain separate.
 - Next step: run the complete local MVP and strict audit on a clean source boundary, then resolve each reported blocker with evidence or owner action.
+
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-TRUSTED-EVIDENCE-004`.
+- Task: refresh the current Phase 1 acceptance boundary and remove stale evidence drift from the strict ecosystem audit.
+- Changes: pinned the generated Prisma dependency tree; recorded committed visual, iOS app UI, four reconciliation and composite artifacts under `docs/acceptance`.
+- Checks run: visual `3/3`; iOS app UI `34/34`; POS refund `1/1`; courier COD `1/1`; service/loaner API `9/9` plus browser `3/3`; procurement-sale API `10/10` plus browser `1/1`; composite reconciliation `4/4`; strict audit passes all recorded evidence checks.
+- Commits: `b2b53cd`, `0a29ce7`, `ab839ce`, `b956121`, `b18160e`, `b8b8d1d`, `0d71414`, `f13c449`, `7db7104`.
+- Outcome: strict audit is reduced to two blockers: Android packaged connected evidence and 64 missing linked design references. The `savio_api36_arm64` AVD existed but exited before ADB registration; no false evidence was recorded. Physical devices, live providers and staging remain external release gates.
+- Next step: repair/boot Android API 36 emulator or use an owner device; recover or owner-retire the 64 missing handoffs.
