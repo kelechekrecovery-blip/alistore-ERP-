@@ -89,7 +89,7 @@ function LoginForm() {
 
   return (
     <div className="login-shell min-h-screen bg-ink-dark font-sans text-white">
-      <SiteHeader />
+      <SiteHeader variant="design3" />
       <main className="mx-auto grid min-h-[680px] w-[min(1200px,92vw)] place-items-center py-12">
       <div className="login-panel w-full max-w-[560px] rounded-[24px] border border-white/[0.11] bg-[radial-gradient(circle_at_100%_0%,rgba(249,115,22,.15),transparent_45%),rgba(255,255,255,.035)] px-7 py-9 shadow-[0_30px_90px_-60px_rgba(249,115,22,.7)] sm:px-10 sm:py-11">
         <div className="grid h-[60px] w-[60px] place-items-center rounded-[17px] bg-coral font-display text-3xl font-extrabold">A</div>
