@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `LOGIC-009-040`.
+- Task: protect store-point deactivation from open operational state.
+- Result: `LogisticsService.updateStorePoint` now locks the point and checks open cash shifts, active non-demo orders, serialized `in_stock/reserved` units and quantity inventory balances at the point location before allowing `active=false`; conflicts return `store_point_deactivation_blocked` and successful changes remain Event Ledger-backed/idempotent.
+- Checks: store-point fulfillment integration `1/1`, API build and `git diff --check` pass.
+- Remaining: staging/first-store validation of shift handover, stock relocation and owner approval policy. Full `mvp:verify` still has unrelated long-suite `socket hang up` instability.
+- Commit: pending validation commit.
+
 - Verification follow-up for `GAP-PII-RETENTION-039`: targeted retention, Evidence integration, API build, Prisma migration validation and isolated public-rate-limit tests pass. Full `mvp:verify` reaches API Jest with `162/163` suites and `738/739` tests; the remaining failure is a nondeterministic `socket hang up` in a long-running HTTP integration suite (`public-rate-limit.e2e-spec.ts`, then `procurement.e2e-spec.ts` on the next run). The new Evidence retention code has no failing targeted test. The full MVP gate remains RED until the shared test HTTP/lifecycle instability is fixed.
 - A minimal `Connection: close` header was added to the rate-limit test helper; its isolated suite is green, but this is not treated as a full-gate fix.
 

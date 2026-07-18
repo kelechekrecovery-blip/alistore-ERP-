@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeliverySlotDto, CreateDeliveryZoneDto, CreateStorePointDto, UpdateStorePointDto } from './logistics.dto';
 
 const ACTIVE_SLOT_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'courier_assigned', 'out_for_delivery'] as const;
+const STORE_POINT_OPEN_ORDER_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'ready_for_pickup', 'courier_assigned', 'out_for_delivery', 'delivered'] as const;
 const BUSINESS_TIME_ZONE = 'Asia/Bishkek';
 const BUSINESS_UTC_OFFSET = '+06:00';
 
@@ -183,6 +184,43 @@ export class LogisticsService {
       await tx.$queryRaw`SELECT id FROM "StorePoint" WHERE id = ${id} FOR UPDATE`;
       const current = await tx.storePoint.findUnique({ where: { id } });
       if (!current) throw new ValidationError('store_point_not_found', 'Точка не найдена');
+      if (current.active && normalized.active === false) {
+        const [openShift, openOrders, serializedStock, quantityStock] = await Promise.all([
+          tx.cashShift.findFirst({
+            where: { point: current.inventoryLocation, closedAt: null },
+            select: { id: true },
+          }),
+          tx.order.findMany({
+            where: { storePointId: id, isDemo: false, status: { in: [...STORE_POINT_OPEN_ORDER_STATUSES] } },
+            select: { id: true, status: true },
+            take: 10,
+          }),
+          tx.deviceUnit.findMany({
+            where: { location: current.inventoryLocation, status: { in: ['in_stock', 'reserved'] } },
+            select: { id: true, status: true },
+            take: 10,
+          }),
+          tx.inventoryBalance.findMany({
+            where: {
+              location: current.inventoryLocation,
+              OR: [{ onHand: { gt: 0 } }, { reserved: { gt: 0 } }],
+            },
+            select: { id: true, onHand: true, reserved: true },
+            take: 10,
+          }),
+        ]);
+        const blockers: string[] = [];
+        if (openShift) blockers.push(`открытая кассовая смена ${openShift.id}`);
+        if (openOrders.length > 0) blockers.push(`активные заказы: ${openOrders.map((order) => `${order.id} (${order.status})`).join(', ')}`);
+        if (serializedStock.length > 0) blockers.push(`серийный остаток: ${serializedStock.length}${serializedStock.length === 10 ? '+' : ''} единиц`);
+        if (quantityStock.length > 0) blockers.push(`количественный остаток: ${quantityStock.length}${quantityStock.length === 10 ? '+' : ''} позиций`);
+        if (blockers.length > 0) {
+          throw new ConflictError(
+            'store_point_deactivation_blocked',
+            `Деактивация точки заблокирована: ${blockers.join('; ')}`,
+          );
+        }
+      }
       const point = await tx.storePoint.update({
         where: { id },
         data: {

@@ -101,6 +101,18 @@ describe('Store point fulfillment contract', () => {
     await request(app.getHttpServer())
       .patch(`/logistics/store-points/${pointId}`)
       .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `disable-blocked-${run}`)
+      .send({ active: false })
+      .expect(409)
+      .expect(({ body }) => expect(body.code).toBe('store_point_deactivation_blocked'));
+
+    await prisma.reservation.deleteMany({ where: { orderId: orderResponse.body.id } });
+    await prisma.order.update({ where: { id: orderResponse.body.id }, data: { status: 'cancelled' } });
+    await prisma.deviceUnit.update({ where: { id: localUnit.id }, data: { location: 'ARCHIVE-TEST' } });
+
+    await request(app.getHttpServer())
+      .patch(`/logistics/store-points/${pointId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
       .set('Idempotency-Key', `disable-${run}`)
       .send({ name: 'Renamed point', address: 'Новый адрес', active: false })
       .expect(200);
