@@ -113,6 +113,7 @@ export default function AiToolsPage() {
       <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark px-6 py-4">
         <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-lime font-display text-lg font-extrabold text-lime-ink">✦</span>
         <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · AI Tools 3.0</div>
           <div className="font-display text-lg font-bold">AI-инструменты</div>
           <div className="text-xs text-subtle">Категоризация и описание карточки · правила без ключа, LLM при ключе</div>
         </div>

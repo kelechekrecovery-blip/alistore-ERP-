@@ -121,6 +121,7 @@ export default function WarehousePage() {
           W
         </span>
         <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Warehouse 3.0</div>
           <div className="font-display text-lg font-bold text-white">Склад · Сборка заказов</div>
           <div className="text-xs text-subtle">Назначение IMEI и движение по статусам · {session.username}</div>
         </div>

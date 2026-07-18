@@ -150,14 +150,13 @@ export default function RefundsPage() {
   const refundsWithReturn = (returns ?? []).filter((ret) => ret.refund);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-sand bg-grain">
-      <header className="flex items-center gap-4 border-b border-ink/10 bg-white/80 px-6 py-4 backdrop-blur">
-        <span className="grid h-9 w-9 place-items-center rounded-btn bg-warn font-display text-lg font-extrabold text-lime-ink">
-          ₸
-        </span>
+    <div className="erp3-stage fixed inset-0 z-50 flex flex-col bg-night bg-grain text-white">
+      <header className="flex items-center gap-4 border-b border-surface-3 bg-ink-dark/90 px-6 py-4 backdrop-blur">
+        <span className="grid h-9 w-9 place-items-center rounded-btn bg-coral font-display text-lg font-extrabold text-white">R</span>
         <div>
-          <div className="font-display text-lg font-bold text-ink">Возвраты денег</div>
-          <div className="text-xs text-ink/50">Операции с refund · {session ? session.role : 'требуется вход'}</div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Refunds 3.0</div>
+          <div className="font-display text-lg font-bold text-white">Возвраты денег</div>
+          <div className="text-xs text-subtle">Операции с refund · {session ? session.role : 'требуется вход'}</div>
         </div>
         {session && (
           <button

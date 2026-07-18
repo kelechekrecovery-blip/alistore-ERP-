@@ -115,6 +115,35 @@
     background: linear-gradient(135deg, var(--erp-coral-hi), var(--deep));
     box-shadow: 0 6px 18px rgba(255, 91, 46, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.34);
   }
+
+  /* Legacy operations pages keep their business markup but inherit the 3.0 glass shell. */
+  .erp3-stage .bg-white,
+  .erp3-stage .bg-white\/50,
+  .erp3-stage .bg-sand\/50,
+  .erp3-stage .bg-sand\/60,
+  .erp3-stage .bg-sand\/70 {
+    background-color: rgba(255, 255, 255, 0.055) !important;
+    background-image: none !important;
+  }
+
+  .erp3-stage .text-ink,
+  .erp3-stage .text-ink\/70,
+  .erp3-stage .text-ink\/65,
+  .erp3-stage .text-ink\/60,
+  .erp3-stage .text-ink\/55,
+  .erp3-stage .text-ink\/50,
+  .erp3-stage .text-ink\/45,
+  .erp3-stage .text-ink\/40 {
+    color: var(--bright) !important;
+  }
+
+  .erp3-stage [class*="border-ink/"] {
+    border-color: var(--erp-glass-border) !important;
+  }
+
+  .erp3-stage .shadow-soft {
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.36) !important;
+  }
 }
 
 @layer utilities {

@@ -108,6 +108,7 @@ export default function WarrantyConsolePage() {
           🛡
         </span>
         <div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Service 3.0</div>
           <div className="font-display text-lg font-bold text-white">Гарантия · Обращения</div>
           <div className="text-xs text-subtle">
             {session.username} · {session.role} · SLA 14 дней
