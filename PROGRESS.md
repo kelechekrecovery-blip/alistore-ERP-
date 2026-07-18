@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-OBSERVE-001` (CEO mission, local slice verification + backlog closure).
+- Task: verify the `/metrics` + alert channel + minimal dashboard gate end-to-end on a disposable database and close the `GAP-OBSERVE-001` backlog line for the local slice.
+- Files changed: `BACKLOG.md` (entry updated with evidence and honest remaining), `PROGRESS.md` (this entry). Implementation landed earlier in `e159973` (AlerterService, exception-filter/relay hooks, protected status endpoint, `WorkerHeartbeat` schema+migration, env examples), `5e4eda9` and `ad6f31c` (tests + UTC heartbeat default).
+- Checks run (all exit 0): `psql` CREATE `alistore_observe_test`; `DATABASE_URL=postgresql://alistore@localhost:5432/alistore_observe_test npx prisma migrate deploy` (all migrations applied incl. `20260718130000_worker_heartbeats` + `20260718131000_worker_heartbeat_utc_default`); `TEST_DATABASE_URL=... npx jest test/alerter.spec.ts test/observability-alerts.spec.ts test/critical-alert.e2e-spec.ts test/observability-status.e2e-spec.ts test/metrics.e2e-spec.ts src/outbox/outbox.relay.spec.ts --runInBand` → `23/23` pass (mocked Telegram delivery, dedup, rate cap, fail-silent without config, 401 anonymous / 403 seller / 200 owner, outbox depth, stale heartbeat); `npx tsc --noEmit` (api) exit 0; `npm run build` (api) exit 0; AppModule boot smoke via ts-node (no DI cycles); DROP `alistore_observe_test`.
+- Outcome: local software slice **accepted** — gate items `/metrics` (already in `5121d8e`), alert channel and minimal dashboard are implemented and verified locally. NOT claimed: production readiness. Remaining: uptime monitor, log aggregation, owner alert credentials + live delivery proof, private metrics networking, jobs/DLQ dashboard (`GAP-JOBS-OBS-001`), staging soak.
+- Next backlog ID: `GAP-OBSERVE-003` follow-ups (production alert credentials, private monitoring) / `GAP-JOBS-OBS-001`.
+
 - Iteration ID: `GAP-OBSERVE-004`.
 - Task: close the WorkerHeartbeat deployment and timezone regression found by the protected status E2E.
 - Files changed: `apps/api/prisma/migrations/20260718131000_worker_heartbeat_utc_default/migration.sql` and `apps/api/test/observability-status.e2e-spec.ts`.
