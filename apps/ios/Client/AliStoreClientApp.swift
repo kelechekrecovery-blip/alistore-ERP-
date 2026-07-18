@@ -1067,6 +1067,11 @@ private struct ClientRootView: View {
         catalogLoading = true
         defer { catalogLoading = false }
 #if DEBUG
+        if UITestBootstrap.startsAsGuest {
+            products = ClientUIFixture.products
+            catalogError = nil
+            return
+        }
         if UITestBootstrap.startsAtVisualEvidence {
             products = ClientUIFixture.products
             if !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart {
@@ -2960,6 +2965,7 @@ private struct CustomerReturnRequestView: View {
     @State private var selectedReason = "Не подошёл цвет"
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var selectedPhoto: PhotosPickerItem?
 
     private let returnReasons = ["Не подошёл цвет", "Нашёл дешевле", "Передумал", "Другое"]
 
@@ -3074,13 +3080,19 @@ private struct CustomerReturnRequestView: View {
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             .accessibilityIdentifier("return-reason-details")
                     }
-                    Text("📷 Добавить фото")
-                        .font(ClientTheme.body(12))
-                        .foregroundStyle(Color(red: 0.431, green: 0.392, blue: 0.361))
+                    PhotosPicker(selection: $selectedPhoto, matching: .images, photoLibrary: .shared()) {
+                        Label(
+                            selectedPhoto == nil ? "Добавить фото состояния" : "Фото выбрано",
+                            systemImage: selectedPhoto == nil ? "camera.fill" : "checkmark.circle.fill"
+                        )
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(selectedPhoto == nil ? ClientTheme.muted : ClientTheme.lime)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .background(ClientTheme.surface, in: RoundedRectangle(cornerRadius: 11))
-                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(red: 0.227, green: 0.204, blue: 0.180), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
-                        .accessibilityIdentifier("return-photo-placeholder")
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedPhoto == nil ? ClientTheme.line : ClientTheme.lime, style: StrokeStyle(lineWidth: 1, dash: selectedPhoto == nil ? [5, 4] : [])))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("return-photo-picker")
                     if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
                     Button { Task { await submit() } } label: {
                         HStack { Spacer(); if isSubmitting { ProgressView().tint(.black) } else { Text("Отправить заявку") }; Spacer() }
@@ -3108,12 +3120,22 @@ private struct CustomerReturnRequestView: View {
         errorMessage = nil
         defer { isSubmitting = false }
         do {
-            let _: CustomerReturn = try await APIClient(baseURL: environment.apiBaseURL).post(
+            let created: CustomerReturn = try await APIClient(baseURL: environment.apiBaseURL).post(
                 "returns/mine",
                 body: CreateCustomerReturnRequest(orderId: orderId, reason: cleanReason),
                 token: token,
                 idempotencyKey: UUID().uuidString
             )
+            if let selectedPhoto, let imageData = try await selectedPhoto.loadTransferable(type: Data.self) {
+                _ = try await APIClient(baseURL: environment.apiBaseURL).uploadEvidence(
+                    imageData: imageData,
+                    entityType: "return",
+                    entityId: created.id,
+                    label: "return_condition",
+                    token: token,
+                    idempotencyKey: "return-evidence-\(created.id)"
+                )
+            }
             onCreated()
             dismiss()
         } catch is CancellationError {
