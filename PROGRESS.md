@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-OBSERVE-004`.
+- Task: close the WorkerHeartbeat deployment and timezone regression found by the protected status E2E.
+- Files changed: `apps/api/prisma/migrations/20260718131000_worker_heartbeat_utc_default/migration.sql` and `apps/api/test/observability-status.e2e-spec.ts`.
+- Result: heartbeat defaults are normalized to UTC for the PostgreSQL timestamp contract; the status endpoint correctly distinguishes fresh and one-hour-stale workers after migration deployment.
+- Checks run: local `prisma migrate deploy` (119 migrations, pass); observability status E2E `5/5` (pass); `git diff --check` (pass).
+- Outcome: local protected operations status slice is accepted with migration coverage. Staging soak, real alert channel, private monitoring and production backup remain open.
+
 - Iteration ID: `GAP-OBSERVE-003`.
 - Task: complete the local operations alert/status slice while preserving fail-safe behavior.
 - Files changed: observability module/filter/metrics/status/alerter, outbox/refund relay hooks, authz permissions, WorkerHeartbeat schema/migration, env examples, and targeted tests.
