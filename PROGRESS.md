@@ -3965,3 +3965,15 @@
 - Outcome: LOGIC-007 accepted in tested API code. Defects: one self-inflicted test fixture asserted shift close with the pre-refund cash amount — fixed by closing with the drawer total after the executed cash refund; no production defects found.
 - Commit association: `9df8777` (source), `3700a0f` (dedicated E2E), docs commit on top. Remaining gaps: a provider callback arriving after an operator cancel gets 409 by design and requires finance reconciliation against provider statements; the resolve action is API-only, no ERP control yet.
 - Next step: `LOGIC-013` courier COD/outbox slice, then refresh hash-bound evidence on a clean SHA and rerun strict audit.
+
+## 2026-07-18
+
+- Iteration ID: `GAP-BACKUP-OPS-001-LOCAL-022`.
+- Backlog/journey: `GAP-BACKUP-OPS-001`; branch `codex/open-source-integrations`, base `af3a639^` (parallel swarm commits interleaved).
+- Task: turn `infra/backup.sh` from "authored, not run" into locally verified + scheduled, with a recorded restore drill; local slice only (staging/prod need the owner).
+- Files changed: `infra/backup.sh` (header status only — dump/rotation logic untouched), `infra/RUNBOOK.md` (macOS schedule + drill record), `infra/macos/kg.alistore.backup.plist` (new template), `docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md` (new drill log), `BACKLOG.md`, this entry.
+- Result: seeded throwaway DB (`prisma migrate deploy` + repo seed + money/ledger drill rows) backed up with the committed script and restored into a separate throwaway DB — `pg_restore` exit 0, row counts identical across all 129 public tables, schema identical, money/ledger spot checks (Order/Payment/AuditEvent/OutboxMessage hashes) match; the real `alistore_dev` dump also restores (129 tables, 117 migrations). User-level LaunchAgent `gui/501/kg.alistore.backup` loaded and kickstart-verified (`last exit code = 0`), daily 03:17, logs `~/Library/Logs/alistore-backup{,.err}.log`, 14-day rotation. Throwaway DBs and drill dump dropped.
+- Checks run: `bash infra/backup.sh` ×2 (exit 0); `pg_restore` ×2 (exit 0); per-table count diff (empty); schema diff (empty modulo pg_dump restrict tokens); `plutil -lint` (OK); `launchctl bootstrap/kickstart` (exit 0 / last exit 0); `bash -n infra/backup.sh` (exit 0); `git diff --check`.
+- Outcome: local slice `accepted` with durable drill evidence; commit `af3a639`. Defects found: launchd children are TCC-blocked from `~/Desktop` (exit 126) — mitigated by the installed copy at `~/bin/alistore-backup.sh`, documented in RUNBOOK §6.
+- Remaining gaps: staging schedule + recorded staging restore (owner server access — launch gate stays open); PITR via wal-g/pgBackRest (RPO ≤ 24 h today); Evidence-object backup (S3/MinIO); no off-machine copy of local dumps.
+- Next step: per backlog order — `GAP-OBSERVE-001` metrics/alerting (partially landed in parallel `e159973`) or next unblocked P1.
