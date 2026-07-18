@@ -51,4 +51,16 @@ final class AliStorePOSUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Печать"].exists)
         XCTAssertTrue(app.staticTexts["ESC/POS сформирован; устройство требует отдельной сертификации"].exists)
     }
+
+    func testSignedInPOSShiftExposesPushControl() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-role=cashier"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Смена"].tap()
+        XCTAssertTrue(app.navigationBars["Смена"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Push"].exists)
+        XCTAssertTrue(app.buttons["Включить уведомления"].exists)
+    }
 }
