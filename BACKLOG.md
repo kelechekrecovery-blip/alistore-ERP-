@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `PHASE-1-WEB-ERP-OPERATIONS-002` Accepted locally across `a9a3b09`, `055fc5b`: Staff/ERP permissions, HR week, document downloads, server-rendered receipts, QR price tags, IMEI intake labels and approval write-off acts are wired and covered by Web Vitest/build, API documents `14/14`, and Playwright print journeys `4/4`. Next: catalog/price/promotion/checkout revalidation contract.
 - `PHASE-1-DETAILED-PLAN-001` Detailed Phase 1 execution plan is recorded in `docs/PHASE-1-DETAILED-PLAN.md`: ERP/CMS -> storefront contract, catalog/media, publication, pricing/promotions, stock/store points/slots, customer routes, security, evidence and gates. Next implementation lane is to take one uncommitted vertical slice at a time and bind acceptance to one clean SHA.
 - `PHASE-1-NOTIF-ISOLATION-004` Accepted in `dea4d84`: notification staff assertions are robust to retained append-only fixtures; coverage remains `15/15`. Strict audit still needs the trusted toolchain/package-lock digest reconciled.
 - `PHASE-1-COD-RACE-RECHECK` Review recheck passed locally: order transitions use row locking and reservation expiry excludes active fulfillment states; courier/payment race suites passed `19/19` on a clean test DB. Keep append-only exchange fixtures isolated in future test runs.

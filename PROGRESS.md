@@ -4046,3 +4046,13 @@
 - Result: the phase boundary is now explicit. Phase 1 covers catalog/media, CMS publication, prices/promotions, stock/store points/delivery slots, storefront routes and their server-authoritative integration. Native parity, live providers, physical devices, staging and missing design references remain separate gates.
 - Checks run: `git diff --check`.
 - Next step: review current parallel worktree changes, select the first accepted vertical slice, then run its disposable-DB API gate before touching shared contracts.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-WEB-ERP-OPERATIONS-002`.
+- Task: complete and verify the first Phase 1 Web/ERP operations slice.
+- Files changed: Staff/Approvals/Warehouse/Stock ERP surfaces, document and print adapters, API document resolution, `e2e/print-ui.spec.ts`.
+- Result: server-authorized document printing is available for invoices, receipts, QR price tags, IMEI intake labels and approval-linked write-off acts. Staff navigation and HR week actions respect the UI permission mirror; the server remains authoritative for the underlying operation.
+- Checks run: Web Vitest `66/66`; Web production build; API documents `14/14` on disposable PostgreSQL; API production build; Playwright print cluster `4/4` on fresh API/Web ports; Android core `test`/`assembleDebug`; iOS all-target build and XCTest `53/53`; `git diff --check`.
+- Commits: `a9a3b09`, `055fc5b`; supporting native commits `80c9276`, `1015aa2`.
+- Outcome: local software slice accepted. Physical printers/scanners, native UI/device evidence, staging credentials and production certification remain open.
+- Next step: verify catalog, price/promotion, CMS publication and checkout revalidation as one server-authoritative ERP → storefront contract.
