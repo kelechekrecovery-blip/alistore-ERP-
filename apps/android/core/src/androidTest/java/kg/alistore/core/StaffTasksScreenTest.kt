@@ -127,6 +127,7 @@ private object NoopStaffEvidence : StaffEvidenceGateway {
 private object NoopStaffCustomer : StaffCustomerGateway {
   override suspend fun customerOverview(customerId: String, token: String) = error("unused")
   override suspend fun transitionWarranty(caseId: String, to: String, token: String) = error("unused")
+  override suspend fun supportTickets(status: String, token: String) = error("unused")
   override suspend fun transitionSupport(ticketId: String, to: String, token: String) = error("unused")
   override suspend fun escalateSupport(ticketId: String, token: String) = error("unused")
 }

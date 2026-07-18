@@ -92,6 +92,8 @@ private class UiCustomerGateway : StaffCustomerGateway {
     return WarrantyCase(caseId, "123", "customer-1", "Экран", to, "2026-07-20T00:00:00Z")
   }
 
+  override suspend fun supportTickets(status: String, token: String): List<SupportTicket> = emptyList()
+
   override suspend fun transitionSupport(ticketId: String, to: String, token: String): SupportTicket {
     supportTransitions += Triple(ticketId, to, token)
     ticketStatus = to

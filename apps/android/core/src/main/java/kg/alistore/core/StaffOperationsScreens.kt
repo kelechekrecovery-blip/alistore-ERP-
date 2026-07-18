@@ -296,16 +296,6 @@ private fun CustomerOrder.action(): OrderAction? = when (status) {
   else -> null
 }
 
-internal val staffOrderStatuses = listOf("created", "reserved", "paid", "picking", "packed", "ready_for_pickup")
-internal val staffOrderStatusLabels = mapOf(
-  "created" to "Новые",
-  "reserved" to "Резерв",
-  "paid" to "Оплачены",
-  "picking" to "Сборка",
-  "packed" to "Упакованы",
-  "ready_for_pickup" to "К выдаче",
-)
-
 @Composable
 fun StaffOrdersScreen(session: StaffSession, gateway: StaffOperationsGateway, modifier: Modifier = Modifier) {
   val statuses = staffOrderStatuses
@@ -377,21 +367,6 @@ fun StaffOrdersScreen(session: StaffSession, gateway: StaffOperationsGateway, mo
     }
   }
 }
-
-internal val staffSupportStatuses = listOf("new" to "Новые", "in_progress" to "В работе", "waiting" to "Ожидание", "resolved" to "Решены")
-
-internal fun supportTransitionLabel(to: String): String = when (to) {
-  "in_progress" -> "В работу"
-  "waiting" -> "Ждём клиента"
-  "resolved" -> "Решено"
-  "closed" -> "Закрыть"
-  else -> to
-}
-
-// Mirrors the iOS StaffSupportView rules; the server also rejects escalation of
-// resolved/closed tickets and of tickets already at urgent priority.
-internal fun canEscalateSupportTicket(status: String, priority: String): Boolean =
-  priority != "urgent" && status != "resolved" && status != "closed"
 
 @Composable
 fun StaffSupportScreen(session: StaffSession, gateway: StaffCustomerGateway, modifier: Modifier = Modifier) {

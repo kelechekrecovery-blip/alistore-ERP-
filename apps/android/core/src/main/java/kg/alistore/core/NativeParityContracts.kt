@@ -12,7 +12,14 @@ val posTenderOptions = listOf(
 )
 
 val staffOrderStatuses = listOf("created", "reserved", "paid", "picking", "packed", "ready_for_pickup")
-val staffOrderStatusLabels = mapOf("reserved" to "Резерв")
+val staffOrderStatusLabels = mapOf(
+  "created" to "Новые",
+  "reserved" to "Резерв",
+  "paid" to "Оплачены",
+  "picking" to "Сборка",
+  "packed" to "Упакованы",
+  "ready_for_pickup" to "К выдаче",
+)
 val staffSupportStatuses = listOf(
   "new" to "Новая",
   "in_progress" to "В работе",
