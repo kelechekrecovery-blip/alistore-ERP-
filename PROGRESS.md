@@ -4104,3 +4104,13 @@
 - Outcome: local storefront visual evidence is current. iOS/Android/reconciliation trusted artifacts must still be refreshed after this source boundary; strict audit remains non-green until then. The 64 missing linked design references and owner credentials/physical-device gates remain external blockers.
 - Commit: pending in this iteration.
 - Next step: refresh Android/iOS/reconciliation evidence on the same clean SHA, then run strict audit.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-EVIDENCE-010`.
+- Task: refresh trusted Android packaged UI evidence after AliStore app branding and toolchain lock repair.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/android-app-ui-5a8a3634605b1f92ecb7c058efeeba380633294d95323f2f78b963d26d6cbef6.json`, `BACKLOG.md`.
+- Result: trusted `npm run android:ui` passed `30 + 1 + 1 + 1 + 1` connected tests on `savio_api36_arm64`; the tested packages remain `kg.alistore.client`, `kg.alistore.staff`, `kg.alistore.courier` and `kg.alistore.pos`, with AliStore labels in packaged UI tests.
+- Checks run: AVD boot completed; Gradle connected Android test gate; trusted evidence recorder exit `0`; `git diff --check` pending documentation commit.
+- Outcome: Android local packaged UI evidence is current for source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`. This does not certify physical Android hardware, push/camera/maps/scanner, signing or store release.
+- Commit: pending in this iteration.
+- Next step: commit Android evidence and attempt the iOS UI evidence refresh on the same clean boundary.
