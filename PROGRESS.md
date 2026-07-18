@@ -4114,3 +4114,13 @@
 - Outcome: Android local packaged UI evidence is current for source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`. This does not certify physical Android hardware, push/camera/maps/scanner, signing or store release.
 - Commit: pending in this iteration.
 - Next step: commit Android evidence and attempt the iOS UI evidence refresh on the same clean boundary.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-EVIDENCE-011`.
+- Task: refresh trusted iOS native UI evidence after AliStore AppIcon branding and toolchain lock repair.
+- Files changed: `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/ios-app-ui-d6642ef74fe78fee2ea1073ca7e453a5b703cc7745679766634b89359dba01d3.json`, `BACKLOG.md`.
+- Result: trusted `npm run ios:ui` passed Client `21/21`, Staff `9/9`, Courier `2/2` and POS `2/2`; Xcode reported `TEST SUCCEEDED`, and the recorder stored source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`.
+- Checks run: iPhone 17 Pro simulator UI gate; all four app target suites; trusted evidence recorder exit `0`; `git diff --check` pending documentation commit.
+- Outcome: iOS simulator UI evidence is current and locally accepted. This is not physical iPhone Face ID/APNs/camera/offline certification, signing, TestFlight or App Store approval.
+- Commit: pending in this iteration.
+- Next step: commit iOS evidence, then run trusted strict audit and refresh reconciliation gates if it reports source-hash drift.
