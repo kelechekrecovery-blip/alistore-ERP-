@@ -120,8 +120,8 @@ internal fun ClientProductDetailContent(
     item {
       Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).aspectRatio(1.05f)) {
         ProductMediaImage(product, apiBaseUrl, Modifier.fillMaxSize(), 0.dp)
-        IconButton(onClick = { onFavorite(product.id) }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape)) {
-          Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (favorite) DetailCoral else DetailInk)
+        IconButton(onClick = { onFavorite(product.id) }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(DetailSurface, androidx.compose.foundation.shape.CircleShape)) {
+          Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (favorite) DetailCoral else DetailMuted)
         }
       }
     }
