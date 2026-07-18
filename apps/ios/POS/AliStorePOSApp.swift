@@ -216,11 +216,11 @@ private struct POSRootView: View {
 }
 
 enum POSPalette {
-    static let ink = Color(red: 0.09, green: 0.08, blue: 0.07)
-    static let surface = Color(red: 0.14, green: 0.13, blue: 0.11)
-    static let muted = Color(red: 0.65, green: 0.61, blue: 0.57)
-    static let coral = Color(red: 1, green: 0.42, blue: 0.34)
-    static let lime = Color(red: 0.78, green: 0.94, blue: 0.29)
+    static let ink = Design3.screen
+    static let surface = Design3.surface
+    static let muted = Design3.textMuted
+    static let coral = Design3.orange
+    static let lime = Design3.lime
 }
 
 extension View {

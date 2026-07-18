@@ -225,13 +225,13 @@ private struct StaffHomeView: View {
     let openCustomer360: () -> Void
     let openShift: () -> Void
 
-    private let background = Color(red: 0.078, green: 0.067, blue: 0.055)
-    private let surface = Color(red: 0.133, green: 0.118, blue: 0.098)
-    private let surfaceSoft = Color(red: 0.165, green: 0.145, blue: 0.122)
-    private let primaryText = Color(red: 0.847, green: 0.812, blue: 0.776)
-    private let secondaryText = Color(red: 0.541, green: 0.498, blue: 0.463)
-    private let coral = Color(red: 1, green: 0.357, blue: 0.18)
-    private let lime = Color(red: 0.776, green: 1, blue: 0.239)
+    private let background = Design3.screen
+    private let surface = Design3.surface
+    private let surfaceSoft = Design3.surfaceRaised
+    private let primaryText = Design3.textBright
+    private let secondaryText = Design3.textMuted
+    private let coral = Design3.orange
+    private let lime = Design3.lime
 
     var body: some View {
         ScrollView {

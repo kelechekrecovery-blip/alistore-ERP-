@@ -5,11 +5,11 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
-private let courierInk = Color(red: 0.08, green: 0.08, blue: 0.08)
-private let courierSurface = Color(red: 0.14, green: 0.14, blue: 0.14)
-private let courierMuted = Color(red: 0.66, green: 0.66, blue: 0.66)
-private let courierCoral = Color(red: 1.0, green: 0.42, blue: 0.34)
-private let courierLime = Color(red: 0.78, green: 0.94, blue: 0.29)
+private let courierInk = Design3.screen
+private let courierSurface = Design3.surface
+private let courierMuted = Design3.textMuted
+private let courierCoral = Design3.orange
+private let courierLime = Design3.lime
 
 private enum CourierTab: Hashable { case route, cod, profile }
 
