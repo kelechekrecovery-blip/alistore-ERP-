@@ -466,6 +466,30 @@ describe('Finance expenses (integration + RBAC)', () => {
 
   });
 
+  it('exposes close-readiness blockers before a period is hard-closed', async () => {
+    const period = '2099-01';
+    const openedAt = new Date('2099-01-15T10:00:00.000Z');
+    const shift = await prisma.cashShift.create({
+      data: { staffId: ownerId, point: 'BISHKEK-1', openCash: 1_000, openedAt },
+    });
+
+    const blocked = await request(app.getHttpServer())
+      .get(`/finance/periods/${period}/readiness`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(blocked.body).toMatchObject({ period, ready: false, counts: { openCashShifts: 1 } });
+    expect(blocked.body.blockers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'cash_shift_open' }),
+    ]));
+
+    await prisma.cashShift.update({ where: { id: shift.id }, data: { closeCash: 1_000, closedAt: new Date('2099-01-31T18:00:00.000Z') } });
+    const clear = await request(app.getHttpServer())
+      .get(`/finance/periods/${period}/readiness`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(clear.body).toMatchObject({ period, ready: true, blockers: [], counts: { openCashShifts: 0 } });
+  });
+
   it('records cash incassation as an idempotent 1010/1000 journal movement', async () => {
     const now = new Date();
     const shift = await prisma.cashShift.create({

@@ -98,6 +98,12 @@ export class FinancePlanningController {
     return this.finance.listAccountingPeriods();
   }
 
+  @Get('periods/:period/readiness')
+  @RequirePermission('finance', 'read')
+  periodReadiness(@Param('period') period: string) {
+    return this.finance.accountingPeriodReadiness(period);
+  }
+
   @Get('opening-balances')
   @RequirePermission('finance', 'read')
   openingBalances() {

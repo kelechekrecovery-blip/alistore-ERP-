@@ -77,6 +77,11 @@ export class FinanceService {
     return this.prisma.accountingPeriod.findMany({ orderBy: { period: 'desc' }, take: 120 });
   }
 
+  async accountingPeriodReadiness(rawPeriod: string) {
+    const period = validateMonth(rawPeriod);
+    return this.prisma.$transaction((tx) => accountingPeriodReadinessOnTx(tx, period));
+  }
+
   listOpeningBalances() {
     return this.prisma.accountingOpeningBalance.findMany({
       include: { accountingEntry: { include: { lines: { orderBy: { accountCode: 'asc' } } } }, lines: { orderBy: { accountCode: 'asc' } } },
@@ -763,6 +768,11 @@ export class FinanceService {
         return { result: { ...existing, idempotent: true }, events: [] };
       }
       if (dto.status === 'hard_closed') {
+        const readiness = await accountingPeriodReadinessOnTx(tx, period);
+        if (!readiness.ready) {
+          const first = readiness.blockers[0];
+          throw new ConflictError(first.code, first.message);
+        }
         const taxSettlement = await tx.accountingTaxSettlement.findUnique({
           where: { period_point: { period, point: '' } },
         });
@@ -2170,6 +2180,79 @@ function replayBudgetCommand(
 function periodBounds(period: string): [Date, Date] {
   const [year, month] = period.split('-').map(Number);
   return [new Date(Date.UTC(year, month - 1, 1)), new Date(Date.UTC(year, month, 1))];
+}
+
+async function accountingPeriodReadinessOnTx(
+  tx: Prisma.TransactionClient,
+  period: string,
+) {
+  const [from, to] = periodBounds(period);
+  const [openSettlements, openCashShifts, openRefunds, openSupplierInvoices, openBankStatements, openPayrollRuns, openAdvances] = await Promise.all([
+    tx.financeSettlementRun.count({
+      where: {
+        periodStart: { lt: to },
+        periodEnd: { gt: from },
+        OR: [
+          { status: { not: 'closed' } },
+          { lines: { some: { status: 'disputed' } } },
+        ],
+      },
+    }),
+    tx.cashShift.count({
+      where: {
+        openedAt: { lt: to },
+        OR: [{ closedAt: null }, { closedAt: { gte: to } }],
+      },
+    }),
+    tx.refund.count({
+      where: {
+        createdAt: { gte: from, lt: to },
+        OR: [
+          { status: { in: ['requested', 'approved', 'processing', 'partially_succeeded'] } },
+          { allocations: { some: { status: { not: 'succeeded' } } } },
+        ],
+      },
+    }),
+    tx.supplierInvoice.count({
+      where: {
+        createdAt: { gte: from, lt: to },
+        status: { in: ['draft', 'approved', 'partially_paid'] },
+      },
+    }),
+    tx.bankStatement.count({
+      where: {
+        periodStart: { lt: to },
+        periodEnd: { gt: from },
+        status: { not: 'reconciled' },
+      },
+    }),
+    tx.hrPayrollRun.count({ where: { period, status: 'posted' } }),
+    tx.accountableAdvance.count({
+      where: {
+        issuedAt: { gte: from, lt: to },
+        status: { in: ['open', 'partially_settled'] },
+      },
+    }),
+  ]);
+
+  const blockers = [
+    openSettlements > 0 && { code: 'finance_settlement_open', message: `В периоде остались незакрытые финансовые сверки: ${openSettlements}` },
+    openCashShifts > 0 && { code: 'cash_shift_open', message: `В периоде остались открытые кассовые смены: ${openCashShifts}` },
+    openRefunds > 0 && { code: 'refund_execution_open', message: `В периоде остались незавершённые возвраты: ${openRefunds}` },
+    openSupplierInvoices > 0 && { code: 'supplier_invoice_open', message: `В периоде остались незакрытые счета поставщиков: ${openSupplierInvoices}` },
+    openBankStatements > 0 && { code: 'bank_statement_open', message: `В периоде остались несверенные банковские выписки: ${openBankStatements}` },
+    openPayrollRuns > 0 && { code: 'payroll_open', message: `В периоде остались ненаправленные в выплату payroll-запуски: ${openPayrollRuns}` },
+    openAdvances > 0 && { code: 'accountable_advance_open', message: `В периоде остались незакрытые подотчётные авансы: ${openAdvances}` },
+  ].filter((blocker): blocker is { code: string; message: string } => Boolean(blocker));
+
+  return {
+    period,
+    from,
+    to,
+    ready: blockers.length === 0,
+    blockers,
+    counts: { openSettlements, openCashShifts, openRefunds, openSupplierInvoices, openBankStatements, openPayrollRuns, openAdvances },
+  };
 }
 
 function validateMonth(period: string) {

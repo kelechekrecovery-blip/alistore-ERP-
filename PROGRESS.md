@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-2-ACC-CLOSE-READINESS-001`.
+- Task: add a server-authoritative readiness report and hard-close guard for accounting periods.
+- Files changed: `apps/api/src/finance/finance.service.ts`, `apps/api/src/finance/finance.controller.ts`, `apps/api/test/finance-expenses.e2e-spec.ts`, and `BACKLOG.md`.
+- Result: `GET /finance/periods/:period/readiness` now reports concrete counts and blocker codes for open finance settlements, cash shifts, refund executions, supplier invoices, bank statements, posted payroll runs and accountable advances. Hard close uses the same transaction-scoped check and fails closed instead of allowing an operationally incomplete period. The existing FX exposure remains explicitly read-only until an accrual/revaluation aggregate is designed.
+- Checks run: `npm run test --workspace @alistore/api -- --runInBand apps/api/test/finance-expenses.e2e-spec.ts` (`16/16`); `npm run build --workspace @alistore/api` (pass); `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e` reached API batch `112/165` before one existing `public-rate-limit.e2e-spec.ts` webhook case returned a transient `socket hang up`; the isolated rerun passed `4/4`; `git diff --check` (pass).
+- Outcome: local period-close control is accepted. Staging-shaped close-window/load evidence, accountant/tax validation and live provider reconciliation remain open.
+- Next step: run the full API/build gate, then choose the next bounded accounting slice: posted FX revaluation requires a new accrual/revaluation aggregate, not a reinterpretation of open expense documents.
+
 - Iteration ID: `PHASE-1-FIN-003E-GATE-002`.
 - Task: close the full local Phase 1 finance gate after adding the explicit pending-payment void contract.
 - Files changed: `apps/api/src/promotions/promotions.dto.ts`, `BACKLOG.md`, and this progress entry.
