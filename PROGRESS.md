@@ -4094,3 +4094,13 @@
 - Commits: `6b008f4`, `ad0ae87`.
 - Outcome: Android packaged connected evidence is accepted locally. The AVD name is a technical emulator name only; the installed applications are AliStore-branded. Physical Android device, provider credentials, store signing and the 64 missing handoff references remain open.
 - Next step: rerun strict audit, then resolve the design corpus blocker through recovered references or owner-approved retirement records.
+## 2026-07-18
+
+- Iteration ID: `PHASE-1-EVIDENCE-009`.
+- Task: restore reproducible local evidence execution after the AliStore iOS AppIcon branding change and refresh the storefront visual acceptance artifact.
+- Files changed: `scripts/ecosystem-toolchain-lock.json`, `docs/acceptance/ecosystem-evidence.json`, `docs/acceptance/artifacts/visual-971c25567729e821bdd3d05ab913976e0a29c539a2337b6dc132836902f7394f.json`, `BACKLOG.md`.
+- Result: `npm ci --ignore-scripts --no-audit --no-fund` and `npm run prisma:generate -w @alistore/api` restored the trusted runnable tree; the trusted visual gate passed exactly `3/3` on isolated ports and recorded source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`.
+- Checks run: `git diff --check`; API start smoke on port `4292`; Playwright visual acceptance `3/3`; trusted evidence recorder exit `0`.
+- Outcome: local storefront visual evidence is current. iOS/Android/reconciliation trusted artifacts must still be refreshed after this source boundary; strict audit remains non-green until then. The 64 missing linked design references and owner credentials/physical-device gates remain external blockers.
+- Commit: pending in this iteration.
+- Next step: refresh Android/iOS/reconciliation evidence on the same clean SHA, then run strict audit.
