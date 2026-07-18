@@ -239,6 +239,11 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun transitionWarranty(caseId: String, to: String, token: String): WarrantyCase =
     request("warranty/$caseId", "PATCH", JSONObject().put("status", to), token).warrantyCase()
 
+  override suspend fun supportTickets(status: String, token: String): List<SupportTicket> =
+    requestArray("support/tickets?status=$status", token).let { array ->
+      buildList { for (index in 0 until array.length()) add(array.getJSONObject(index).supportTicket()) }
+    }
+
   override suspend fun transitionSupport(ticketId: String, to: String, token: String): SupportTicket =
     request("support/tickets/$ticketId/transition", "PATCH", JSONObject().put("to", to), token).supportTicket()
 

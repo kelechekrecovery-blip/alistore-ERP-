@@ -217,7 +217,8 @@ fun StaffSignedInScreen(
       2 -> StaffTasksScreen(session, taskGateway, Modifier.padding(padding))
       3 -> StaffScannerScreen(session, evidenceGateway, Modifier.padding(padding))
       4 -> StaffShiftScreen(session, gateway, onLogout, Modifier.padding(padding), apiBaseUrl = apiBaseUrl)
-      else -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding), routedCustomerId)
+      5 -> StaffCustomer360Screen(session, customerGateway, Modifier.padding(padding), routedCustomerId)
+      else -> StaffSupportScreen(session, customerGateway, Modifier.padding(padding))
     }
   }
 }
@@ -245,6 +246,7 @@ private fun StaffHome(session: StaffSession, modifier: Modifier, onTab: (Int) ->
     item { StaffShortcut("Очередь заказов", "Комплектация и выдача", StaffCoral) { onTab(1) } }
     item { StaffShortcut("Задачи и KPI", "Назначения на сегодня", StaffLime, StaffInk) { onTab(2) } }
     item { StaffShortcut("Customer 360", "Покупки, гарантия и поддержка", Color(0xFF82B1FF)) { onTab(5) } }
+    if (session.role in supportRoles) item { StaffShortcut("Поддержка", "Очередь обращений и SLA", Color(0xFFFFB26B)) { onTab(6) } }
     item { StaffShortcut("Сканер", "EAN, QR и IMEI", StaffCoral) { onTab(3) } }
     item { StaffShortcut("Кассовая смена", "Открытие и сверка", Color(0xFFFFD166), StaffInk) { onTab(4) } }
     item {
@@ -294,10 +296,20 @@ private fun CustomerOrder.action(): OrderAction? = when (status) {
   else -> null
 }
 
+internal val staffOrderStatuses = listOf("created", "reserved", "paid", "picking", "packed", "ready_for_pickup")
+internal val staffOrderStatusLabels = mapOf(
+  "created" to "Новые",
+  "reserved" to "Резерв",
+  "paid" to "Оплачены",
+  "picking" to "Сборка",
+  "packed" to "Упакованы",
+  "ready_for_pickup" to "К выдаче",
+)
+
 @Composable
 fun StaffOrdersScreen(session: StaffSession, gateway: StaffOperationsGateway, modifier: Modifier = Modifier) {
-  val statuses = listOf("created", "paid", "picking", "packed", "ready_for_pickup")
-  val labels = mapOf("created" to "Новые", "paid" to "Оплачены", "picking" to "Сборка", "packed" to "Упакованы", "ready_for_pickup" to "К выдаче")
+  val statuses = staffOrderStatuses
+  val labels = staffOrderStatusLabels
   var status by rememberSaveable { mutableStateOf("created") }
   var orders by remember { mutableStateOf<List<CustomerOrder>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }
@@ -357,6 +369,113 @@ fun StaffOrdersScreen(session: StaffSession, gateway: StaffOperationsGateway, mo
                   colors = ButtonDefaults.buttonColors(containerColor = StaffCoral),
                   modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("staff-order-action-${order.id}"),
                 ) { Text(if (busyId == order.id) "Выполняется..." else it.label) }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+internal val staffSupportStatuses = listOf("new" to "Новые", "in_progress" to "В работе", "waiting" to "Ожидание", "resolved" to "Решены")
+
+internal fun supportTransitionLabel(to: String): String = when (to) {
+  "in_progress" -> "В работу"
+  "waiting" -> "Ждём клиента"
+  "resolved" -> "Решено"
+  "closed" -> "Закрыть"
+  else -> to
+}
+
+// Mirrors the iOS StaffSupportView rules; the server also rejects escalation of
+// resolved/closed tickets and of tickets already at urgent priority.
+internal fun canEscalateSupportTicket(status: String, priority: String): Boolean =
+  priority != "urgent" && status != "resolved" && status != "closed"
+
+@Composable
+fun StaffSupportScreen(session: StaffSession, gateway: StaffCustomerGateway, modifier: Modifier = Modifier) {
+  var status by rememberSaveable { mutableStateOf("new") }
+  var tickets by remember { mutableStateOf<List<SupportTicket>>(emptyList()) }
+  var loading by remember { mutableStateOf(true) }
+  var error by remember { mutableStateOf<String?>(null) }
+  var busyId by remember { mutableStateOf<String?>(null) }
+  var revision by remember { mutableStateOf(0) }
+  val scope = rememberCoroutineScope()
+  val canAct = session.role in supportRoles
+
+  LaunchedEffect(status, revision) {
+    loading = true
+    runCatching { gateway.supportTickets(status, session.accessToken) }
+      .onSuccess { tickets = it; error = null }
+      .onFailure { error = it.message ?: "Не удалось загрузить обращения" }
+    loading = false
+  }
+
+  fun act(ticketId: String, block: suspend () -> SupportTicket) {
+    busyId = ticketId
+    error = null
+    scope.launch {
+      runCatching { block() }
+        .onSuccess { revision += 1 }
+        .onFailure { failure -> error = failure.message }
+      busyId = null
+    }
+  }
+
+  Column(modifier.fillMaxSize().background(StaffInk).statusBarsPadding()) {
+    Text("Поддержка", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(18.dp, 18.dp, 18.dp, 10.dp).testTag("staff-support-title"))
+    LazyRow(contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      items(staffSupportStatuses) { (wire, label) ->
+        if (wire == status) Button(onClick = {}, colors = ButtonDefaults.buttonColors(containerColor = StaffCoral), shape = RoundedCornerShape(6.dp)) { Text(label) }
+        else OutlinedButton(onClick = { status = wire }, shape = RoundedCornerShape(6.dp), modifier = Modifier.testTag("staff-support-status-$wire")) { Text(label) }
+      }
+    }
+    when {
+      loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StaffLime) }
+      error != null -> StaffError(error.orEmpty()) { revision += 1 }
+      tickets.isEmpty() -> StaffEmpty("Нет обращений", "В выбранной очереди сейчас пусто")
+      else -> LazyColumn(contentPadding = PaddingValues(14.dp, 14.dp, 14.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(tickets, key = SupportTicket::id) { ticket ->
+          Card(
+            colors = CardDefaults.cardColors(containerColor = StaffSurface),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth().testTag("staff-support-${ticket.id}"),
+          ) {
+            Column(Modifier.padding(16.dp)) {
+              Row {
+                Text(ticket.subject, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(
+                  ticket.priority,
+                  color = if (ticket.priority == "urgent") StaffCoral else if (ticket.priority == "high") Color(0xFFFFD166) else StaffMuted,
+                  fontSize = 11.sp,
+                )
+              }
+              Text("Клиент ${ticket.customerId} · ${ticket.channel}", color = StaffMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+              ticket.body?.takeIf(String::isNotBlank)?.let { Text(it, color = StaffMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) }
+              Text("SLA ${ticket.sla.take(10)}", color = StaffMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+              if (canAct) {
+                val transitions = nextSupportStatuses(ticket.status)
+                if (transitions.isNotEmpty()) {
+                  Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    transitions.forEach { to ->
+                      OutlinedButton(
+                        onClick = { act(ticket.id) { gateway.transitionSupport(ticket.id, to, session.accessToken) } },
+                        enabled = busyId == null,
+                        modifier = Modifier.weight(1f).testTag("staff-support-transition-${ticket.id}-$to"),
+                      ) { Text(supportTransitionLabel(to), fontSize = 11.sp) }
+                    }
+                  }
+                }
+                if (canEscalateSupportTicket(ticket.status, ticket.priority)) {
+                  OutlinedButton(
+                    onClick = { act(ticket.id) { gateway.escalateSupport(ticket.id, session.accessToken) } },
+                    enabled = busyId == null,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("staff-support-escalate-${ticket.id}"),
+                  ) { Text(if (busyId == ticket.id) "Выполняется..." else "Эскалировать") }
+                }
+              } else {
+                Text("Действия поддержки доступны администратору", color = StaffMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 12.dp))
               }
             }
           }
