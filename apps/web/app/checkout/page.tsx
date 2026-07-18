@@ -357,7 +357,7 @@ export default function CheckoutPage() {
   return wrap(
     <>
       <div className="flex items-center gap-3 px-5 pb-3 pt-5 sm:px-7 sm:pt-7">
-        <button type="button" onClick={() => (step > 0 ? setStep(step - 1) : router.back())} className="text-xl">←</button>
+        <button type="button" onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="Назад" className="grid h-11 w-11 place-items-center rounded-btn text-xl transition hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40">←</button>
         <span className="font-display text-xl font-bold">Оформление</span>
       </div>
       <div className="flex gap-1.5 px-5 pb-5 sm:px-7">

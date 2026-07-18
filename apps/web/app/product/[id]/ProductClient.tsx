@@ -290,7 +290,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   <button
                     type="button"
                     onClick={() => setQty((value) => Math.max(1, value - 1))}
-                    className="grid h-10 w-10 place-items-center rounded-[9px] hover:bg-sand"
+                    className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                     aria-label="Уменьшить количество"
                   >
                     −
@@ -302,7 +302,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     type="button"
                     disabled={qty >= product.availableUnits}
                     onClick={() => setQty((value) => Math.min(product.availableUnits, value + 1))}
-                    className="grid h-10 w-10 place-items-center rounded-[9px] hover:bg-sand"
+                    className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                     aria-label="Увеличить количество"
                   >
                     +
@@ -419,7 +419,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         rating: Number(event.target.value),
                       }))
                     }
-                    className="rounded-[11px] border border-bright bg-white px-3 py-3 text-sm outline-none"
+                    className="rounded-btn border border-linen bg-white px-3 py-3 text-sm outline-none focus:border-coral focus-visible:ring-2 focus-visible:ring-coral/30"
                   >
                     {[5, 4, 3, 2, 1].map((rating) => (
                       <option key={rating} value={rating}>

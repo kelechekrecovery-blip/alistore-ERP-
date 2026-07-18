@@ -61,7 +61,7 @@ export function SiteHeader() {
 
       <div className="mx-auto grid h-[76px] max-w-[1400px] grid-cols-[auto_1fr_auto] items-center gap-3 px-4 md:h-[88px] md:grid-cols-[auto_auto_1fr_auto] md:gap-6 md:px-5">
         <Link href="/" className="flex shrink-0 items-baseline gap-1.5" aria-label="AliStore Electronics">
-          <strong className="text-[22px] font-extrabold leading-none md:text-2xl">AliStore</strong>
+          <strong className="font-display text-[22px] font-extrabold leading-none md:text-2xl">AliStore</strong>
           <span className="hidden text-[10px] uppercase tracking-[0.15em] text-faint lg:inline">Electronics</span>
         </Link>
 
@@ -72,7 +72,7 @@ export function SiteHeader() {
         <form action="/catalog" className="relative hidden h-11 min-w-0 md:block">
           <label htmlFor="header-search" className="sr-only">Поиск по каталогу</label>
           <input id="header-search" name="q" placeholder="Поиск по товарам" className="h-full w-full rounded-[10px] border border-linen bg-sand px-[18px] pr-14 text-sm outline-none transition focus:border-coal focus:bg-white" />
-          <button type="submit" aria-label="Найти" className="absolute bottom-1 right-1 top-1 grid w-10 place-items-center rounded-lg bg-ink-dark text-white"><Search size={17} /></button>
+          <button type="submit" aria-label="Найти" className="absolute bottom-1 right-1 top-1 grid w-11 place-items-center rounded-lg bg-ink-dark text-white transition hover:bg-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"><Search size={17} /></button>
         </form>
 
         <div className="ml-auto flex items-center gap-0.5 md:gap-1">
@@ -107,7 +107,7 @@ export function SiteHeader() {
 
 function HeaderTool({ href, label, icon, count = 0, hideLabel = false }: { href: string; label: string; icon: ReactNode; count?: number; hideLabel?: boolean }) {
   return (
-    <Link href={href} aria-label={label} className="relative flex min-w-11 flex-col items-center gap-1 rounded-lg px-2 py-2 text-faint transition-colors hover:bg-sand hover:text-ink lg:min-w-[66px]">
+    <Link href={href} aria-label={label} className="relative flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-faint transition-colors hover:bg-sand hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 lg:min-w-[66px]">
       {icon}
       <span className={`${hideLabel ? 'hidden lg:block' : 'hidden sm:block'} text-[10px] font-medium`}>{label}</span>
       {count > 0 && <span className="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[9px] font-bold text-white">{count}</span>}

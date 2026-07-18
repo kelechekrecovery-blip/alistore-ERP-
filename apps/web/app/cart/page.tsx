@@ -117,7 +117,7 @@ export default function CartPage() {
                           <button
                             type="button"
                             onClick={() => setQty(item.id, item.qty - 1)}
-                            className="grid h-8 w-8 place-items-center rounded-[7px] hover:bg-sand"
+                            className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                             aria-label="Уменьшить"
                           >
                             <Minus size={14} />
@@ -129,7 +129,7 @@ export default function CartPage() {
                           type="button"
                           disabled={item.qty >= item.stockLimit}
                           onClick={() => setQty(item.id, item.qty + 1)}
-                          className="grid h-8 w-8 place-items-center rounded-[7px] hover:bg-sand disabled:cursor-not-allowed disabled:opacity-30"
+                          className="grid h-11 w-11 place-items-center rounded-btn hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 disabled:cursor-not-allowed disabled:opacity-30"
                             aria-label="Увеличить"
                           >
                             <Plus size={14} />
