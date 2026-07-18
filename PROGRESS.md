@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-FIN-003E-GATE-002`.
+- Task: close the full local Phase 1 finance gate after adding the explicit pending-payment void contract.
+- Files changed: `apps/api/src/promotions/promotions.dto.ts`, `BACKLOG.md`, and this progress entry.
+- Result: the promotion admin patch DTO now validates partial updates at runtime, restoring the documented `409 promotion_active_edit_forbidden` contract. The full local MVP gate then passed schema validation, all migration upgrade checks, API and Web production builds, mobile typecheck, fresh test database deployment, and `165/165` isolated API Jest suites.
+- Checks run: `npm run test --workspace @alistore/api -- --runInBand apps/api/test/promotions.e2e-spec.ts` (`2/2`); `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e` (pass); `git diff --check` (pass).
+- Outcome: Phase 1 FIN-003E is accepted for local software behavior. This does not certify live payment execution, SMS/OFD, staging deployment, physical devices, hardware or production readiness.
+- Next step: start the next bounded Phase 2 finance slice, prioritizing inventory valuation/GL certification work that can be verified locally before external UAT.
+
 - Iteration ID: `PHASE-1-FIN-003E-VOID-001`.
 - Task: close the remaining Phase 1 contract for cancelling an unfinished payment.
 - Files changed: `apps/api/prisma/schema.prisma`, payment status migration, payment DTO/controller/service, Event Ledger types and `test/payment-void.e2e-spec.ts`.
