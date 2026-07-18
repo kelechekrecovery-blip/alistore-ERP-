@@ -58,6 +58,7 @@ class ClientCatalogFilterTest {
   @Test
   fun paymentReturnRouteRejectsUntrustedSchemesAndParsesFailure() {
     assertEquals(null, parsePaymentReturnRoute("https://example.com/payment-return?orderId=order-1"))
+    assertEquals("order-1", parsePaymentReturnRoute("https://alistore.kg/payment-return?orderId=order-1")?.orderId)
     val route = parsePaymentReturnRoute("alistore://payment-return?orderId=order-1&status=failed&method=card")
     assertEquals("order-1", route?.orderId)
     assertEquals("failed", route?.status)

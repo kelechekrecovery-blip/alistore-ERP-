@@ -43,7 +43,14 @@ export class SandboxPaymentsController {
 
 function safeReturnUrl(value: string | undefined): string | null {
   if (!value) return null;
-  return value.startsWith('alistore://payment-return') ? value : null;
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'alistore:' && url.hostname === 'payment-return' && !url.pathname) return value;
+    if (url.protocol === 'https:' && ['alistore.kg', 'www.alistore.kg'].includes(url.hostname) && url.pathname === '/payment-return') return value;
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function escapeHtml(value: string): string {

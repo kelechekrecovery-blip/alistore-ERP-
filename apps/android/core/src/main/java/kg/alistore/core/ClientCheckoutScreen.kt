@@ -61,6 +61,7 @@ internal fun ClientCheckout(
   modifier: Modifier = Modifier,
   authManager: AuthSessionManager? = null,
   onAuthState: (AuthState) -> Unit = {},
+  paymentReturnBaseUrl: String = "alistore://payment-return",
 ) {
   val context = LocalContext.current.applicationContext
   val scope = rememberCoroutineScope()
@@ -207,6 +208,7 @@ internal fun ClientCheckout(
                   idempotencyKey,
                   onlineMethod,
                   if (onlineMethod == null) null else paymentIdempotencyKey,
+                  paymentReturnBaseUrl,
                 )
                 var attempt = runCatching {
                   submit(authState.tokens.accessToken)

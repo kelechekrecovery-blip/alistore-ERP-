@@ -2,6 +2,13 @@
 
 ## 2026-07-18
 
+- Iteration ID: `GAP-DEEPLINK-002`.
+- Task: connect production payment returns and account/order links to native HTTPS deep links.
+- Result: API accepts only `alistore://payment-return` or exact `https://alistore.kg|www.alistore.kg/payment-return`; iOS Client has associated domains and Release HTTPS return URL; Android Client has verified app-link filters and release HTTPS return URL; Web serves AASA and assetlinks from environment-backed routes and fails closed until signing values exist; native parsers accept HTTPS links while retaining local custom-scheme fallback.
+- Checks: sandbox handoff `4/4`, API build, Web production build, Android unit/Lint and iOS all-target build pass.
+- Acceptance: local software deep-link slice accepted. Domain association, real signing fingerprints and physical-device verification remain external release gates.
+- Next step: add CI contract checks for association files, then continue ERP/CMS contract E2E and staging readiness.
+
 - Iteration ID: `GAP-STORE-ASSETS-002`.
 - Task: make Android store privacy declarations explicit and machine-validated.
 - Result: added `apps/android/store/data-safety.json` for all four Android applications and a validator that rejects missing apps, incomplete data categories, false encryption claims or accidental approval status.

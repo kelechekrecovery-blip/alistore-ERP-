@@ -891,6 +891,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PAYMENT_RETURN_URL = "https://alistore.kg/payment-return";
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.client;
 				PRODUCT_NAME = AliStore;
 				SDKROOT = iphoneos;
@@ -1334,6 +1335,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PAYMENT_RETURN_URL = "alistore://payment-return";
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.client;
 				PRODUCT_NAME = AliStore;
 				SDKROOT = iphoneos;

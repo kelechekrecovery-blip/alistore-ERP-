@@ -39,6 +39,7 @@ class MainActivity : FragmentActivity() {
         deepLinkUrl = deepLinkUrl,
         deepLinkRevision = deepLinkRevision,
         clientPushRegistrar = if (BuildConfig.FCM_CONFIGURED) FirebaseClientPushRegistrar(applicationContext, BuildConfig.API_BASE_URL) else null,
+        paymentReturnBaseUrl = BuildConfig.PAYMENT_RETURN_URL,
       )
     }
   }

@@ -40,6 +40,8 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Быстрый и защищённый вход в AliStore</string>
+	<key>PAYMENT_RETURN_URL</key>
+	<string>$(PAYMENT_RETURN_URL)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

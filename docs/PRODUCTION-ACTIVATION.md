@@ -40,6 +40,7 @@ Required for a production-ready report:
 - Media: S3/MinIO values for production Evidence Vault storage.
 - Observability: `SENTRY_DSN` or compatible GlitchTip/Sentry DSN.
 - Metrics: a random high-entropy `METRICS_TOKEN`; scrape `/api/metrics` only through a private monitoring path.
+- Native HTTPS links: `APPLE_TEAM_ID` for `/.well-known/apple-app-site-association` and comma-separated `ANDROID_APP_LINK_SHA256` release certificate fingerprints for `/.well-known/assetlinks.json`. Both endpoints fail closed with `503` until signing values are supplied.
 - `POS_HARDWARE_CERTIFIED=true` only after the on-site hardware checks below pass.
 
 ## 3. Check external readiness

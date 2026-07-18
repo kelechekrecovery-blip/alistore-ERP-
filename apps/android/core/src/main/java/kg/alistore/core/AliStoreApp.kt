@@ -70,9 +70,10 @@ fun AliStoreApp(
   deepLinkRevision: Long = 0,
   staffPushRegistrar: StaffPushRegistrar? = null,
   clientPushRegistrar: ClientPushRegistrar? = null,
+  paymentReturnBaseUrl: String = "alistore://payment-return",
 ) {
   if (role == AppRole.CLIENT) {
-    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, clientPushRegistrar)
+    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, clientPushRegistrar, paymentReturnBaseUrl)
     return
   }
   if (role == AppRole.STAFF) {
@@ -96,6 +97,7 @@ private fun ClientApp(
   deepLinkUrl: String?,
   deepLinkRevision: Long,
   clientPushRegistrar: ClientPushRegistrar?,
+  paymentReturnBaseUrl: String,
 ) {
   val context = LocalContext.current.applicationContext
   val localStateStore = remember { ClientLocalStateStore(context, "client") }
@@ -234,6 +236,7 @@ private fun ClientApp(
           modifier = Modifier.padding(padding),
           authManager = authManager,
           onAuthState = { authState = it },
+          paymentReturnBaseUrl = paymentReturnBaseUrl,
         )
         else -> ClientAccount(
           authState,
@@ -247,6 +250,7 @@ private fun ClientApp(
           onRoute = { accountRoute = it },
           orderRefreshRevision = orderRefreshRevision,
           paymentReturn = paymentReturn,
+          paymentReturnBaseUrl = paymentReturnBaseUrl,
         )
       }
     }

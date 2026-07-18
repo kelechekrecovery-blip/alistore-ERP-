@@ -953,7 +953,11 @@ private struct ClientRootView: View {
             _ = await (restore, catalog)
         }
         .onOpenURL { url in
-            guard url.scheme == "alistore", url.host == "payment-return" else { return }
+            let customScheme = url.scheme == "alistore" && url.host == "payment-return"
+            let httpsLink = url.scheme == "https" &&
+                (url.host == "alistore.kg" || url.host == "www.alistore.kg") &&
+                url.path == "/payment-return"
+            guard customScheme || httpsLink else { return }
             selectedTab = .account
             orderRefreshRevision += 1
         }
@@ -1628,7 +1632,7 @@ private struct CartView: View {
                         orderId: order.id,
                         method: onlineMethod,
                         amount: order.total,
-                        returnUrl: "alistore://payment-return?orderId=\(order.id)"
+                        returnUrl: paymentReturnURL(for: order.id)
                     ),
                     token: session.accessToken,
                     idempotencyKey: UUID().uuidString
@@ -1668,7 +1672,7 @@ private struct CartView: View {
                     orderId: order.id,
                     method: method,
                     amount: order.total,
-                    returnUrl: "alistore://payment-return?orderId=\(order.id)"
+                    returnUrl: paymentReturnURL(for: order.id)
                 ),
                 token: session.accessToken,
                 idempotencyKey: UUID().uuidString
@@ -1697,6 +1701,13 @@ private struct CartView: View {
 
     private func paymentURL(_ intent: PaymentIntent) -> URL? {
         URL(string: intent.paymentUrl, relativeTo: environment.apiBaseURL)?.absoluteURL
+    }
+
+    private func paymentReturnURL(for orderId: String) -> String {
+        let base = (Bundle.main.object(forInfoDictionaryKey: "PAYMENT_RETURN_URL") as? String)
+            ?? "alistore://payment-return"
+        let separator = base.contains("?") ? "&" : "?"
+        return "\(base)\(separator)orderId=\(orderId)"
     }
 }
 

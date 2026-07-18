@@ -33,6 +33,16 @@ describe('Sandbox payment handoff', () => {
     expect(response.redirect).not.toHaveBeenCalled();
     expect(response.body()).toContain('Тестовая оплата подтверждена');
   });
+
+  it('accepts the production HTTPS payment return host', async () => {
+    const response = fakeResponse();
+    await controller.confirm('PI-1', { returnUrl: 'https://alistore.kg/payment-return?orderId=o1' }, response.value);
+    expect(response.redirect).toHaveBeenCalledWith(303, 'https://alistore.kg/payment-return?orderId=o1');
+
+    const rejected = fakeResponse();
+    await controller.confirm('PI-1', { returnUrl: 'https://alistore.kg.evil/payment-return?orderId=o1' }, rejected.value);
+    expect(rejected.redirect).not.toHaveBeenCalled();
+  });
 });
 
 function fakeResponse() {

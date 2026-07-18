@@ -22,6 +22,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["usesCleartextTraffic"] = "true"
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api\"")
+        buildConfigField("String", "PAYMENT_RETURN_URL", "\"alistore://payment-return\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
     }
 
@@ -30,6 +31,7 @@ android {
             isMinifyEnabled = false
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
+            buildConfigField("String", "PAYMENT_RETURN_URL", "\"https://alistore.kg/payment-return\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

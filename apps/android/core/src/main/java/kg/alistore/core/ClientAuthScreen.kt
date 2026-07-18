@@ -61,13 +61,14 @@ internal fun ClientAccount(
   onRoute: (String?) -> Unit = {},
   orderRefreshRevision: Int = 0,
   paymentReturn: PaymentReturnRoute? = null,
+  paymentReturnBaseUrl: String = "alistore://payment-return",
 ) {
   when (state) {
     AuthState.Restoring -> Column(modifier.fillMaxSize().background(AuthInk), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
       CircularProgressIndicator(color = AuthLime)
       Text("Восстанавливаем сессию", color = AuthMuted, modifier = Modifier.padding(top = 12.dp))
     }
-    is AuthState.SignedIn -> SignedInAccount(state, manager, onState, favoriteCount, cartCount, modifier, apiBaseUrl, route, onRoute, orderRefreshRevision, paymentReturn)
+    is AuthState.SignedIn -> SignedInAccount(state, manager, onState, favoriteCount, cartCount, modifier, apiBaseUrl, route, onRoute, orderRefreshRevision, paymentReturn, paymentReturnBaseUrl)
     else -> OtpLogin(state, manager, onState, modifier)
   }
 }
@@ -156,9 +157,10 @@ private fun SignedInAccount(
   onRoute: (String?) -> Unit,
   orderRefreshRevision: Int,
   paymentReturn: PaymentReturnRoute?,
+  paymentReturnBaseUrl: String,
 ) {
   if (route == "orders") {
-    ClientOrdersScreen(apiBaseUrl, state, orderRefreshRevision, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState, paymentReturn = paymentReturn)
+    ClientOrdersScreen(apiBaseUrl, state, orderRefreshRevision, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState, paymentReturn = paymentReturn, paymentReturnBaseUrl = paymentReturnBaseUrl)
     return
   }
   if (route == "devices") {

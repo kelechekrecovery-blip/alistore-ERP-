@@ -32,6 +32,7 @@ targets:
         CFBundleDisplayName: AliStore
         UILaunchScreen: {}
         API_BASE_URL: $(API_BASE_URL)
+        PAYMENT_RETURN_URL: $(PAYMENT_RETURN_URL)
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.client
             CFBundleURLSchemes: [alistore]
@@ -44,12 +45,14 @@ targets:
         PRODUCT_NAME: AliStore
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Client/Client.entitlements
+        PAYMENT_RETURN_URL: alistore://payment-return
         API_BASE_URL: http://127.0.0.1:4000/api
         APS_ENVIRONMENT: development
       configs:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
           APS_ENVIRONMENT: production
+          PAYMENT_RETURN_URL: https://alistore.kg/payment-return
   AliStoreStaff:
     type: application
     platform: iOS

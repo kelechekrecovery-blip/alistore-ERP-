@@ -53,6 +53,7 @@ internal fun ClientOrdersScreen(
   authManager: AuthSessionManager? = null,
   onAuthState: (AuthState) -> Unit = {},
   paymentReturn: PaymentReturnRoute? = null,
+  paymentReturnBaseUrl: String = "alistore://payment-return",
 ) {
   val gateway = remember(apiBaseUrl, providedGateway) { providedGateway ?: ApiClient(apiBaseUrl) }
   val paymentApi = paymentGateway(gateway)
@@ -115,7 +116,7 @@ internal fun ClientOrdersScreen(
                     orderId = retryOrder.id,
                     method = retryMethod,
                     amount = retryOrder.total,
-                    returnUrl = "alistore://payment-return?orderId=${retryOrder.id}&method=${retryMethod.wireValue}",
+                    returnUrl = paymentReturnBaseUrl.withPaymentQuery(retryOrder.id, retryMethod.wireValue),
                   ),
                   session.tokens.accessToken,
                   retryKey,
@@ -132,7 +133,7 @@ internal fun ClientOrdersScreen(
                         orderId = retryOrder.id,
                         method = retryMethod,
                         amount = retryOrder.total,
-                        returnUrl = "alistore://payment-return?orderId=${retryOrder.id}&method=${retryMethod.wireValue}",
+                        returnUrl = paymentReturnBaseUrl.withPaymentQuery(retryOrder.id, retryMethod.wireValue),
                       ),
                       refreshed.tokens.accessToken,
                       retryKey,
@@ -178,6 +179,11 @@ internal fun ClientOrdersScreen(
       }
     }
   }
+}
+
+private fun String.withPaymentQuery(orderId: String, method: String): String {
+  val separator = if (contains('?')) '&' else '?'
+  return "$this${separator}orderId=$orderId&method=$method"
 }
 
 private fun paymentGateway(gateway: CustomerOrdersGateway): PaymentGateway? = gateway as? PaymentGateway

@@ -32,6 +32,18 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="alistore" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="alistore.kg" android:pathPrefix="/payment-return" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="www.alistore.kg" android:pathPrefix="/payment-return" />
+            </intent-filter>
         </activity>
     </application>
 
