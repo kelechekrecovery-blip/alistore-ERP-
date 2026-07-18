@@ -33,7 +33,7 @@ export class PaymentIntentsService {
       throw new ConflictError('order_already_paid', `Заказ ${order.id} уже оплачен`);
     }
     const received = await this.prisma.payment.aggregate({
-      where: { orderId: order.id, amount: { gt: 0 } },
+      where: { orderId: order.id, amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
       _sum: { amount: true },
     });
     const due = order.total - (received._sum.amount ?? 0);

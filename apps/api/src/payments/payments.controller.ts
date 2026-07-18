@@ -27,7 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { PaymentsService } from './payments.service';
-import { PayDto, RefundDto } from './payments.dto';
+import { PayDto, RefundDto, VoidPaymentDto } from './payments.dto';
 import { PaymentIntentsService } from './payment-intents.service';
 import { CreatePaymentIntentDto, PaymentWebhookDto } from './payment-intents.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -175,6 +175,22 @@ export class PaymentsController {
     }
     if (!this.refunds) throw new BadRequestException('Refund aggregate service unavailable');
     return this.refunds.request(dto.returnId, { reason: dto.reason, shiftId: dto.shiftId }, actor, requireRefundIdempotencyKey(idempotencyKey));
+  }
+
+  @ApiOperation({ summary: 'Void an unfinished pending payment without creating a refund' })
+  @ApiBearerAuth()
+  @Post(':id/void')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'refund')
+  async voidPayment(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: VoidPaymentDto,
+  ) {
+    const actor = await requireActiveStaff(user, this.staffAuth);
+    return this.payments.voidPending(id, dto.reason, actor, requireRefundIdempotencyKey(idempotencyKey));
   }
 }
 

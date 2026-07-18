@@ -70,6 +70,7 @@ enum PaymentStatus {
   reconciled
   disputed
   refunded
+  voided
 }
 
 enum RefundStatus {

@@ -9,7 +9,7 @@ import { assertTransition } from '../orders/order-state-machine';
 import { OrdersService } from '../orders/orders.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
-import { PayDto } from './payments.dto';
+import { PayDto, VoidPaymentDto } from './payments.dto';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
@@ -50,6 +50,46 @@ export class PaymentsService {
 
   get(id: string) {
     return this.prisma.payment.findUnique({ where: { id } });
+  }
+
+  async voidPending(paymentId: string, reason: VoidPaymentDto['reason'], actor: string, idempotencyKey: string) {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) throw new ValidationError('void_reason_required', 'Причина отмены платежа обязательна');
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${paymentId} FOR UPDATE`;
+      const payment = await tx.payment.findUnique({ where: { id: paymentId } });
+      if (!payment) throw new ValidationError('payment_not_found', `Платёж ${paymentId} не найден`);
+      const keyOwner = await tx.payment.findUnique({ where: { idempotencyKey } });
+      if (keyOwner && keyOwner.id !== paymentId) {
+        throw new ConflictError('idempotency_key_reused', 'Ключ уже использован для другого платежа');
+      }
+      if (payment.idempotencyKey && payment.idempotencyKey === idempotencyKey && payment.status === 'voided') {
+        return { result: payment, events: [] };
+      }
+      if (payment.status !== 'pending') {
+        throw new ConflictError('payment_not_voidable', 'Отменить можно только незавершённый pending-платёж');
+      }
+      if (payment.amount <= 0 || payment.originalPaymentId || payment.accountingEntryId) {
+        throw new ConflictError('payment_not_voidable', 'Платёж уже имеет финансовое проведение и не может быть voided');
+      }
+      const existing = await tx.auditEvent.findFirst({
+        where: { type: EventType.PaymentVoided, refs: { has: paymentId }, payload: { path: ['idempotencyKey'], equals: idempotencyKey } },
+      });
+      if (existing) return { result: payment, events: [] };
+      const voided = await tx.payment.update({
+        where: { id: paymentId },
+        data: { status: 'voided', idempotencyKey },
+      });
+      return {
+        result: voided,
+        events: [{
+          type: EventType.PaymentVoided,
+          actor,
+          payload: { paymentId, orderId: payment.orderId, amount: payment.amount, reason: normalizedReason, idempotencyKey },
+          refs: [paymentId, payment.orderId].filter((ref): ref is string => Boolean(ref)),
+        }],
+      };
+    });
   }
 
   /**
@@ -330,7 +370,7 @@ export class PaymentsService {
         throw new ValidationError('payment_point_required', 'У заказа должна быть определена точка исполнения');
       }
       const received = await tx.payment.aggregate({
-        where: { orderId: order.id, amount: { gt: 0 } },
+        where: { orderId: order.id, amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
         _sum: { amount: true },
       });
       const alreadyReceived = received._sum.amount ?? 0;

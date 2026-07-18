@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `PHASE-1-FIN-003E-VOID-001` Accepted locally: `POST /payments/:id/void` now cancels only unposted `pending` payments into explicit `voided` status, requires staff RBAC and `Idempotency-Key`, rejects cross-payment key reuse, and appends one `payment.voided` Ledger event. Targeted FIN-003E regression is `35/35`; live provider certification remains external.
 - `PHASE-1-ERP-CMS-CONTRACT-002` Local acceptance renewed: `npm run ecosystem:erp-cms:e2e` passed `5/5` for ERP publication → desktop/mobile storefront, draft/version workflow, review moderation and promo → checkout redemption. Staging data, owner RBAC policy and live provider certification remain separate gates.
 - `GAP-DEEPLINK-003` Structural gate accepted: `npm run native:deeplink-preflight` is wired into `.github/workflows/ci.yml` and verifies the API/Web/iOS/Android HTTPS deep-link contract without reading secrets. Real domain association and physical-device verification remain external.
 - `GAP-DEEPLINK-002` Local software slice accepted: production Client release builds now use HTTPS payment return URLs, iOS associated-domains and Android verified app-link intent filters; web serves AASA/assetlinks only when real signing identifiers are configured, and API/native parsers reject untrusted hosts. Remaining gate is domain deployment with real Apple team ID, Android release fingerprints and physical-device verification.

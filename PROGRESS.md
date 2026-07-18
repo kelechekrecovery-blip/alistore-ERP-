@@ -2,6 +2,14 @@
 
 ## 2026-07-18
 
+- Iteration ID: `PHASE-1-FIN-003E-VOID-001`.
+- Task: close the remaining Phase 1 contract for cancelling an unfinished payment.
+- Files changed: `apps/api/prisma/schema.prisma`, payment status migration, payment DTO/controller/service, Event Ledger types and `test/payment-void.e2e-spec.ts`.
+- Result: added explicit `PaymentStatus.voided` and `POST /payments/:id/void`; only unposted `pending` payments can be voided, the operation is staff/RBAC protected, idempotent, rejects cross-payment key reuse and writes one `payment.voided` Ledger event. Received/refunded/financially posted payments remain non-voidable.
+- Checks: Prisma validate/generate, migration deploy on dev/test DBs, API TypeScript, `git diff --check`, FIN-003E regression `4/4 suites / 35/35 tests`.
+- Acceptance: Phase 1 local software contract accepted. Live provider refund/void, fiscal and first-store UAT remain external.
+- Next step: run the broader MVP gate and continue the next finance/release blocker without claiming production readiness.
+
 - Iteration ID: `PHASE-1-ERP-CMS-CONTRACT-002`.
 - Task: verify the ERP/CMS to customer storefront contract on the current source tree.
 - Result: added `npm run ecosystem:erp-cms:e2e`; it passed `5/5` for ordered product collections, desktop/mobile storefront blocks, draft editing, review moderation and promotion redemption through checkout.
