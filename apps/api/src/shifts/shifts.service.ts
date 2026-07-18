@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueStaffNotice } from '../outbox/customer-notifications';
 import { CloseShiftDto, HandoverShiftDto, OpenShiftDto } from './shifts.dto';
 
 /**
@@ -22,6 +24,7 @@ export class ShiftsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -73,6 +76,14 @@ export class ShiftsService {
       const shift = await tx.cashShift.create({
         data: { staffId: dto.staffId, point: dto.point, openCash: dto.openCash, openIdempotencyKey: idempotencyKey },
       });
+      if (this.outbox) {
+        await enqueueStaffNotice(tx, this.outbox, {
+          template: 'shift_opened',
+          title: 'Смена открыта',
+          body: `${dto.point} · размен ${dto.openCash} сом`,
+          payload: { shiftId: shift.id, staffId: dto.staffId, point: dto.point, openCash: dto.openCash, deepLink: `alistore-admin://shifts/${shift.id}` },
+        });
+      }
       return {
         result: shift,
         events: [
@@ -216,6 +227,22 @@ export class ShiftsService {
           payload: { shiftId, diff, reason: dto.reason },
           refs: [shiftId],
         });
+      }
+      if (this.outbox) {
+        await enqueueStaffNotice(tx, this.outbox, {
+          template: 'shift_closed',
+          title: 'Смена закрыта',
+          body: diff === 0 ? `Касса сошлась: ${dto.closeCash} сом` : `Расхождение кассы ${diff} сом`,
+          payload: { shiftId, expected, closeCash: dto.closeCash, diff, deepLink: `alistore-admin://shifts/${shiftId}` },
+        });
+        if (diff !== 0) {
+          await enqueueStaffNotice(tx, this.outbox, {
+            template: 'cash_shortage',
+            title: 'Недостача кассы',
+            body: `${diff} сом · ${dto.reason?.trim()}`,
+            payload: { shiftId, diff, deepLink: `alistore-admin://shifts/${shiftId}` },
+          });
+        }
       }
       return { result: { ...closed, expected }, events };
     });

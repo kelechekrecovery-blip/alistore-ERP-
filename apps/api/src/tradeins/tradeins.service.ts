@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { Prisma, TradeInDevice } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
 
@@ -14,6 +16,7 @@ export class TradeInsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   async get(id: string): Promise<TradeInViewDto | null> {
@@ -75,6 +78,14 @@ export class TradeInsService {
             idempotencyKey: key,
           },
         });
+        if (this.outbox) {
+          await enqueueConsentedCustomerNotice(tx, this.outbox, {
+            customerId: input.customerId,
+            template: 'tradein_decision',
+            payload: { tradeInId: tradeIn.id, contractId: tradeIn.contractId, price: tradeIn.price, model: tradeIn.model },
+            transactional: true,
+          });
+        }
 
         return {
           result: this.view(tradeIn),

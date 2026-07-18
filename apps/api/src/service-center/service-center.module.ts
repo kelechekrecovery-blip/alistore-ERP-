@@ -7,9 +7,10 @@ import { ServiceExecutionService } from './service-execution.service';
 import { ServiceSlaScheduler } from './service-sla.scheduler';
 import { ServiceSlaService } from './service-sla.service';
 import { ServiceLoanerService } from './service-loaner.service';
+import { OutboxModule } from '../outbox/outbox.module';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule],
+  imports: [StaffAuthModule, AuthzModule, OutboxModule],
   controllers: [ServiceCenterController],
   providers: [ServiceCenterService, ServiceExecutionService, ServiceLoanerService, ServiceSlaService, ServiceSlaScheduler],
   exports: [ServiceCenterService, ServiceExecutionService, ServiceLoanerService, ServiceSlaService],

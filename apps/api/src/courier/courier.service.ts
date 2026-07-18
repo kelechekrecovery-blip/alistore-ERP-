@@ -6,6 +6,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { CompleteDeliveryDto, CreateRunDto, FailDeliveryDto, HandoverDto, RemoveFromRunDto } from './courier.dto';
 import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
 import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/accounting-journal';
 import { UnitsService } from '../units/units.service';
@@ -213,6 +214,12 @@ export class CourierService {
         })
         : null;
       const result = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+      await enqueueConsentedCustomerNotice(tx, this.outbox, {
+        customerId: order.customerId,
+        template: 'order_delivered',
+        payload: { orderId, codAmount: dto.codAmount, remainingReceivable: expectedCod - dto.codAmount },
+        transactional: true,
+      });
       return { result, events: [
         {
           type: EventType.DeliveryDelivered,
@@ -249,10 +256,16 @@ export class CourierService {
   failDelivery(orderId: string, dto: FailDeliveryDto, courierId: string, idempotencyKey: string) {
     const payload = { reason: dto.reason.trim(), evidence: dto.evidence ?? null };
     if (!payload.reason) throw new ValidationError('failure_reason_required', 'Укажите причину неуспешной доставки');
-    return this.executeCommand(orderId, courierId, idempotencyKey, 'fail', payload, async (_tx, order) => {
+    return this.executeCommand(orderId, courierId, idempotencyKey, 'fail', payload, async (tx, order) => {
       if (order.status !== 'out_for_delivery') {
         throw new ConflictError('delivery_not_out', `Заказ ${orderId} имеет статус ${order.status}`);
       }
+      await enqueueConsentedCustomerNotice(tx, this.outbox, {
+        customerId: order.customerId,
+        template: 'delivery_failed',
+        payload: { orderId, reason: payload.reason },
+        transactional: true,
+      });
       const result = { orderId, recorded: true, status: order.status };
       return { result, events: [{
         type: EventType.DeliveryFailed,

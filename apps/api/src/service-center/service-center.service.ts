@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PaymentMethod, Prisma, WarrantyStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertWarrantyTransition } from '../warranty/warranty-state';
 import { AssignServiceTechnicianDto, CreatePaidRepairDto, CreateServiceWorkOrderDto, DiagnoseServiceWorkOrderDto, PayServiceWorkOrderDto } from './service-center.dto';
@@ -22,7 +24,11 @@ const SERVICE_PAYMENT_METHODS = new Set<PaymentMethod>(['cash', 'card', 'qr_mban
 
 @Injectable()
 export class ServiceCenterService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
+  ) {}
 
   async queue(actor: string) {
     const staff = await this.prisma.staffUser.findUnique({
@@ -475,6 +481,14 @@ export class ServiceCenterService {
         await tx.serviceWorkOrderCommand.create({
           data: { idempotencyKey: key, workOrderId: id, action: 'diagnose', request, response: serviceJson(updated) },
         });
+        if (this.outbox) {
+          await enqueueConsentedCustomerNotice(tx, this.outbox, {
+            customerId: workOrder.warrantyCase.customerId,
+            template: 'service_estimate_ready',
+            payload: { workOrderId: id, warrantyId: workOrder.warrantyCaseId, imei: workOrder.warrantyCase.imei, estimateAmount: dto.estimateAmount },
+            transactional: true,
+          });
+        }
         return {
           result: updated,
           events: [

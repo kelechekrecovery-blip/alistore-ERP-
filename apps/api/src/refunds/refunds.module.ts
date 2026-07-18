@@ -5,6 +5,7 @@ import { ObservabilityModule } from '../observability/observability.module';
 import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from '../payments/payment-gateway-provider';
 import { selectPaymentGatewayProvider } from '../payments/payment-gateway-selector';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { OutboxModule } from '../outbox/outbox.module';
 import { RefundsController } from './refunds.controller';
 import { RefundProcessor } from './refunds.processor';
 import { RefundsService } from './refunds.service';
@@ -12,7 +13,7 @@ import { RefundRelay } from './refunds.relay';
 import { RefundWebhooksController } from './refund-webhooks.controller';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule, ObservabilityModule],
+  imports: [StaffAuthModule, AuthzModule, ObservabilityModule, OutboxModule],
   providers: [
     RefundsService,
     RefundProcessor,

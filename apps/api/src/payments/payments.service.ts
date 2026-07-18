@@ -11,6 +11,8 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
 import { PayDto, VoidPaymentDto } from './payments.dto';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import {
@@ -46,6 +48,7 @@ export class PaymentsService {
     @Optional() private readonly giftcards?: GiftcardsService,
     @Optional() private readonly orders?: OrdersService,
     @Optional() private readonly campaignAttribution?: CampaignAttributionService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -490,6 +493,14 @@ export class PaymentsService {
         refs: [order.id],
       });
       await this.campaignAttribution?.convertPaidOrderOnTx(tx, order.id, actor, events);
+      if (this.outbox) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: order.customerId,
+          template: 'payment_received',
+          payload: { orderId: order.id, amount: batchTotal, total: order.total },
+          transactional: true,
+        });
+      }
 
       return { result: { order: paid, payment: payments[0], payments, idempotent: false }, events };
     });

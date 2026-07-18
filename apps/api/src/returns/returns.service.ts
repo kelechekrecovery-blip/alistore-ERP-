@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma, Return as ReturnRecord, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import type { ReturnSelectionDto } from './returns.dto';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { reverseInventoryCostOnTx, reverseQuantityCostOnTx } from '../inventory/inventory-valuation';
 import { postConsignmentReturnAccountingOnTx } from '../inventory/consignment-accounting';
 import { createQuarantineCaseOnTx } from '../inventory/inventory-quarantine';
@@ -22,6 +24,7 @@ export class ReturnsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -691,6 +694,14 @@ export class ReturnsService {
       },
       refs: [ret.id, order.id],
     });
+    if (this.outbox) {
+      await enqueueConsentedCustomerNotice(tx, this.outbox, {
+        customerId: order.customerId,
+        template: 'return_reconciled',
+        payload: { returnId: ret.id, orderId: order.id, location },
+        transactional: true,
+      });
+    }
     return { result: updated, events };
   }
 }

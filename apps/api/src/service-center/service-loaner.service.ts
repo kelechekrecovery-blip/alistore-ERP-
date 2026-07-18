@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { LoanerLoanStatus, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrepareLoanerLoanDto, RegisterLoanerDeviceDto, ReturnLoanerLoanDto } from './service-center.dto';
 import { isServiceCommandUniqueViolation, replayServiceCommand, requiredServiceKey, serviceJson, ServiceCommandInput } from './service-command';
@@ -16,7 +18,11 @@ const loanInclude = {
 
 @Injectable()
 export class ServiceLoanerService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
+  ) {}
 
   async list(actor: string) {
     const staff = await this.activeStaff(this.prisma, actor);
@@ -105,6 +111,14 @@ export class ServiceLoanerService {
       await this.requireEvidence(tx, loan.id, 'loaner_issue');
       await tx.deviceUnit.update({ where: { id: loan.device.unitId }, data: { status: 'loaner_issued' } });
       const result = await tx.loanerLoan.update({ where: { id: loan.id }, data: { status: 'issued', issuedBy: actor, issuedAt: new Date() }, include: loanInclude });
+      if (this.outbox) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: loan.customerId,
+          template: 'service_loaner_issued',
+          payload: { loanId, workOrderId: loan.workOrderId, dueAt: loan.dueAt.toISOString() },
+          transactional: true,
+        });
+      }
       return { result, type: EventType.ServiceLoanerIssued, payload: { loanId, workOrderId: loan.workOrderId, deviceId: loan.deviceId, dueAt: loan.dueAt.toISOString() } };
     });
   }

@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PaymentMethod, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice, enqueueStaffNotice } from '../outbox/customer-notifications';
 import { assertTransition } from '../orders/order-state-machine';
 import { ExchangeDto } from './exchanges.dto';
 import { UnitsService } from '../units/units.service';
@@ -36,6 +38,7 @@ export class ExchangesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly units: UnitsService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   async request(dto: ExchangeDto, actor: string, idempotencyKey: string) {
@@ -102,6 +105,14 @@ export class ExchangesService {
       });
       if (held.count !== 1) {
         throw new ConflictError('exchange_replacement_race', 'Выбранный IMEI уже занят другой операцией');
+      }
+      if (this.outbox) {
+        await enqueueStaffNotice(tx, this.outbox, {
+          template: 'approval_requested',
+          title: 'Нужно согласование',
+          body: `exchange · ${request.oldImei} → ${request.newImei}`,
+          payload: { approvalId: approval.id, action: 'exchange', exchangeRequestId: request.id, deepLink: `alistore-admin://approvals/${approval.id}` },
+        });
       }
       return {
         result: this.requestResult(request, false),
@@ -609,6 +620,14 @@ export class ExchangesService {
         payload: { orderId: order.id, into: newOrder.id, returnId: ret.id, oldImei: dto.oldImei, newImei: newUnit.imei, creditAmount, surcharge: exactSurcharge, method: dto.method, fullOrderExchange },
         refs: [order.id, newOrder.id],
       });
+      if (this.outbox) {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: order.customerId,
+          template: 'exchange_completed',
+          payload: { orderId: order.id, exchangeOrderId: newOrder.id, returnId: ret.id },
+          transactional: true,
+        });
+      }
 
       return {
         result: {

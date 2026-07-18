@@ -818,6 +818,14 @@ export class OrdersService {
           payload: { orderId, from: order.status, to },
         });
       }
+      if (this.outbox && to === 'completed') {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: order.customerId,
+          template: 'order_completed',
+          payload: { orderId, from: order.status, to, total: order.total },
+          transactional: true,
+        });
+      }
       return {
         result: updated,
         events,

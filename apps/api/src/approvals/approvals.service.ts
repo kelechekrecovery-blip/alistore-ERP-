@@ -4,6 +4,8 @@ import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice, enqueueStaffNotice } from '../outbox/customer-notifications';
 import { canApprove, Role } from '../rbac/permissions';
 import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors';
 import { ExchangesService } from '../exchanges/exchanges.service';
@@ -40,6 +42,7 @@ export class ApprovalsService {
     private readonly audit: AuditService,
     @Optional() private readonly exchanges?: ExchangesService,
     @Optional() private readonly staffAuth?: StaffAuthService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -70,6 +73,14 @@ export class ApprovalsService {
           } as Prisma.InputJsonValue,
         },
       });
+      if (this.outbox) {
+        await enqueueStaffNotice(tx, this.outbox, {
+          template: 'approval_requested',
+          title: 'Нужно согласование',
+          body: `${req.action} · ${req.reason}`,
+          payload: { approvalId: approval.id, action: req.action, deepLink: `alistore-admin://approvals/${approval.id}` },
+        });
+      }
       return {
         result: { approvalId: approval.id, status: 'requested' as const },
         events: [
@@ -219,6 +230,22 @@ export class ApprovalsService {
           id,
         );
         events.push(...exchange.events);
+      }
+      // The FIN-003E refund aggregate only flips to approved here; the saga executes
+      // out-of-band — tell the customer the money is on its way.
+      if (this.outbox && approval.action === 'refund' && typeof payload?.refundId === 'string') {
+        const approvedRefund = await tx.refund.findUnique({
+          where: { id: payload.refundId },
+          include: { order: { select: { customerId: true } } },
+        });
+        if (approvedRefund) {
+          await enqueueConsentedCustomerNotice(tx, this.outbox, {
+            customerId: approvedRefund.order.customerId,
+            template: 'refund_approved',
+            payload: { refundId: approvedRefund.id, returnId: approvedRefund.returnId, orderId: approvedRefund.orderId, amount: approvedRefund.amount },
+            transactional: true,
+          });
+        }
       }
 
       return { result: updated, events };

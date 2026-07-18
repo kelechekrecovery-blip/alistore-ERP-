@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma, Role, WarrantyStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
 import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 import { assertWarrantyTransition } from '../warranty/warranty-state';
@@ -28,7 +30,11 @@ const workOrderInclude = {
 
 @Injectable()
 export class ServiceExecutionService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
+  ) {}
 
   async reservePart(id: string, dto: ReserveServicePartDto, actor: string, rawKey?: string) {
     const key = requiredServiceKey(rawKey);
@@ -253,6 +259,14 @@ export class ServiceExecutionService {
         });
         const result = await tx.serviceWorkOrder.findUniqueOrThrow({ where: { id }, include: workOrderInclude });
         await recordCommand(tx, key, id, 'complete_repair', request, result);
+        if (this.outbox) {
+          await enqueueConsentedCustomerNotice(tx, this.outbox, {
+            customerId: workOrder.warrantyCase.customerId,
+            template: 'service_repair_completed',
+            payload: { workOrderId: id, warrantyId: workOrder.warrantyCaseId, imei: workOrder.warrantyCase.imei },
+            transactional: true,
+          });
+        }
         return {
           result,
           events: [{

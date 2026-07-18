@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Payment, PaymentMethod, Prisma, RefundStatus } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { cumulativeTaxDelta } from '../finance/sales-tax';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueStaffNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
 import { CancelRefundDto, CreateRefundDto } from './refunds.dto';
 
@@ -14,7 +16,11 @@ const ACTIVE_RESERVATION_STATUSES: RefundStatus[] = [
 
 @Injectable()
 export class RefundsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
+  ) {}
 
   get(id: string) {
     return this.prisma.refund.findUnique({
@@ -142,6 +148,14 @@ export class RefundsService {
           },
         },
       });
+      if (this.outbox) {
+        await enqueueStaffNotice(tx, this.outbox, {
+          template: 'approval_requested',
+          title: 'Нужно согласование',
+          body: `refund · ${dto.reason.trim()}`,
+          payload: { approvalId: approval.id, action: 'refund', refundId, deepLink: `alistore-admin://approvals/${approval.id}` },
+        });
+      }
       return {
         result: refund,
         events: [

@@ -7,6 +7,11 @@ export interface CustomerNoticeInput {
   template: string;
   payload?: Record<string, unknown>;
   channel?: OutboxChannel;
+  /**
+   * Transactional lifecycle notices (payment/delivery/refund/service status)
+   * always reach the customer; marketing consent gates only promo-class traffic.
+   */
+  transactional?: boolean;
 }
 
 /**
@@ -22,7 +27,7 @@ export async function enqueueConsentedCustomerNotice(
     where: { id: input.customerId },
     select: { phone: true, consent: true },
   });
-  if (!customer?.phone || !customer.consent) return false;
+  if (!customer?.phone || (!input.transactional && !customer.consent)) return false;
 
   const projection = customerNotificationProjection(input);
   await tx.customerNotification.create({
@@ -46,11 +51,51 @@ export async function enqueueConsentedCustomerNotice(
   return true;
 }
 
+export interface StaffNoticeInput {
+  template: string;
+  title: string;
+  body: string;
+  payload?: Record<string, unknown>;
+}
+
+const MANAGER_ROLES = ['owner', 'admin'] as const;
+
+/**
+ * Push an operational alert to every active manager (owner/admin), following the
+ * courier_run_assigned shape: one push outbox message per staff recipient,
+ * enqueued in the same transaction as the domain mutation.
+ */
+export async function enqueueStaffNotice(
+  tx: Prisma.TransactionClient,
+  outbox: OutboxService,
+  input: StaffNoticeInput,
+): Promise<number> {
+  const recipients = await tx.staffUser.findMany({
+    where: { active: true, role: { in: [...MANAGER_ROLES] } },
+    select: { id: true },
+  });
+  for (const recipient of recipients) {
+    await outbox.enqueueOnTx(tx, {
+      channel: 'push',
+      recipient: recipient.id,
+      template: input.template,
+      payload: { title: input.title, body: input.body, ...(input.payload ?? {}) },
+    });
+  }
+  return recipients.length;
+}
+
 function customerNotificationProjection(input: CustomerNoticeInput) {
   const payload = input.payload ?? {};
   const referenceId = stringValue(payload.orderId)
     ?? stringValue(payload.warrantyId)
-    ?? stringValue(payload.debtId);
+    ?? stringValue(payload.debtId)
+    ?? stringValue(payload.refundId)
+    ?? stringValue(payload.returnId)
+    ?? stringValue(payload.workOrderId)
+    ?? stringValue(payload.loanId)
+    ?? stringValue(payload.tradeInId)
+    ?? stringValue(payload.ticketId);
 
   switch (input.template) {
     case 'order_confirmed':
@@ -106,6 +151,118 @@ function customerNotificationProjection(input: CustomerNoticeInput) {
         title: 'Есть просроченный платёж',
         detail: `Остаток к оплате: ${numberValue(payload.balance)} сом`,
         symbol: 'exclamationmark.triangle.fill',
+        route: 'account',
+        referenceId,
+      };
+    case 'payment_received':
+      return {
+        title: 'Оплата получена',
+        detail: `Заказ №${shortReference(payload.orderId)} оплачен на ${numberValue(payload.total)} сом`,
+        symbol: 'creditcard.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'order_delivered':
+      return {
+        title: 'Заказ доставлен',
+        detail: `Заказ №${shortReference(payload.orderId)} передан вам курьером`,
+        symbol: 'checkmark.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'delivery_failed':
+      return {
+        title: 'Не удалось доставить заказ',
+        detail: `Заказ №${shortReference(payload.orderId)}: ${stringValue(payload.reason) ?? 'доставка не состоялась'}`,
+        symbol: 'exclamationmark.triangle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'order_completed':
+      return {
+        title: 'Заказ завершён',
+        detail: `Заказ №${shortReference(payload.orderId)} закрыт — спасибо за покупку`,
+        symbol: 'flag.checkered',
+        route: 'order',
+        referenceId,
+      };
+    case 'refund_approved':
+      return {
+        title: 'Возврат согласован',
+        detail: `Возврат ${numberValue(payload.amount)} сом одобрен и передан в исполнение`,
+        symbol: 'checkmark.circle.fill',
+        route: 'account',
+        referenceId,
+      };
+    case 'refund_succeeded':
+      return {
+        title: 'Деньги возвращены',
+        detail: `Возврат ${numberValue(payload.amount)} сом выполнен`,
+        symbol: 'creditcard.fill',
+        route: 'account',
+        referenceId,
+      };
+    case 'refund_failed':
+      return {
+        title: 'Возврат не выполнен',
+        detail: `Возврат ${numberValue(payload.amount)} сом требует проверки — свяжитесь с поддержкой`,
+        symbol: 'exclamationmark.triangle.fill',
+        route: 'account',
+        referenceId,
+      };
+    case 'return_reconciled':
+      return {
+        title: 'Возврат завершён',
+        detail: `Товар по заказу №${shortReference(payload.orderId)} принят на склад`,
+        symbol: 'checkmark.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'service_estimate_ready':
+      return {
+        title: 'Смета ремонта готова',
+        detail: `Смета на ${numberValue(payload.estimateAmount)} сом ждёт вашего подтверждения`,
+        symbol: 'doc.text.fill',
+        route: 'warranty',
+        referenceId,
+      };
+    case 'service_repair_completed':
+      return {
+        title: 'Ремонт завершён',
+        detail: `Устройство ${shortReference(payload.imei)} готово к выдаче`,
+        symbol: 'checkmark.shield.fill',
+        route: 'warranty',
+        referenceId,
+      };
+    case 'service_loaner_issued':
+      return {
+        title: 'Подменное устройство выдано',
+        detail: `Верните подменное устройство после ремонта`,
+        symbol: 'iphone',
+        route: 'warranty',
+        referenceId,
+      };
+    case 'exchange_completed':
+      return {
+        title: 'Обмен завершён',
+        detail: `Обмен оформлен, новый заказ №${shortReference(payload.exchangeOrderId)}`,
+        symbol: 'arrow.triangle.2.circlepath',
+        route: 'order',
+        referenceId,
+      };
+    case 'tradein_decision':
+      return {
+        title: 'Оценка trade-in готова',
+        detail: `${stringValue(payload.model) ?? 'Устройство'}: ${numberValue(payload.price)} сом · договор ${stringValue(payload.contractId) ?? '—'}`,
+        symbol: 'tag.fill',
+        route: 'account',
+        referenceId,
+      };
+    case 'ticket_resolved':
+      return {
+        title: 'Ответ поддержки',
+        detail: `Обращение «${stringValue(payload.subject) ?? 'без темы'}» решено`,
+        symbol: 'bubble.left.fill',
         route: 'account',
         referenceId,
       };

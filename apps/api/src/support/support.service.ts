@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { SupportTicket, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { OpenTicketDto, TicketTransitionDto } from './support.dto';
 import {
   assertTicketTransition,
@@ -23,6 +25,7 @@ export class SupportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   get(id: string) {
@@ -97,6 +100,14 @@ export class SupportService {
         where: { id },
         data: { status: to, ...(dto.assignee ? { assignee: dto.assignee } : {}) },
       });
+      if (this.outbox && to === 'resolved') {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: ticket.customerId,
+          template: 'ticket_resolved',
+          payload: { ticketId: id, subject: ticket.subject },
+          transactional: true,
+        });
+      }
       return {
         result: updated,
         events: [

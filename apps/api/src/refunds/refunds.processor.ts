@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PaymentMethod, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuditInput, AuditService } from '../audit/audit.service';
@@ -9,6 +9,8 @@ import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
 import { postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { canTransition } from '../orders/order-state-machine';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import {
   GatewayRefundWebhookPayload,
   PAYMENT_GATEWAY_PROVIDER,
@@ -50,6 +52,7 @@ export class RefundProcessor {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(PAYMENT_GATEWAY_PROVIDER) private readonly gateway: PaymentGatewayProvider,
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   async processRefund(refundId: string, actor = 'system:refund-worker') {
@@ -309,6 +312,7 @@ export class RefundProcessor {
           where: { id: allocation.refundId },
           data: { status: succeeded > 0 ? 'partially_succeeded' : 'failed' },
         });
+        if (succeeded === 0) await this.notifyRefundFailedOnTx(tx, allocation.refundId);
         return {
           result: current,
           events: [{
@@ -664,6 +668,14 @@ export class RefundProcessor {
       events.push({ type: 'order.refunded', actor, payload: { orderId: refund.orderId, refundId: refund.id }, refs: [refund.orderId, refund.id] });
     }
     events.push({ type: 'refund.succeeded', actor, payload: { refundId: refund.id, returnId: refund.returnId, amount: refund.amount }, refs: [refund.id, refund.returnId, refund.orderId] });
+    if (this.outbox) {
+      await enqueueConsentedCustomerNotice(tx, this.outbox, {
+        customerId: refund.order.customerId,
+        template: 'refund_succeeded',
+        payload: { refundId: refund.id, returnId: refund.returnId, orderId: refund.orderId, amount: refund.amount },
+        transactional: true,
+      });
+    }
   }
 
   private async completeIfReady(refundId: string, actor: string) {
@@ -736,6 +748,22 @@ export class RefundProcessor {
     });
   }
 
+  /** Customer-facing failure notice for a refund that flipped to terminal `failed`. */
+  private async notifyRefundFailedOnTx(tx: Prisma.TransactionClient, refundId: string) {
+    if (!this.outbox) return;
+    const refund = await tx.refund.findUnique({
+      where: { id: refundId },
+      include: { order: { select: { customerId: true } } },
+    });
+    if (!refund) return;
+    await enqueueConsentedCustomerNotice(tx, this.outbox, {
+      customerId: refund.order.customerId,
+      template: 'refund_failed',
+      payload: { refundId, returnId: refund.returnId, orderId: refund.orderId, amount: refund.amount },
+      transactional: true,
+    });
+  }
+
   private async recordFailure(allocationId: string, refundId: string, message: string, actor: string, attempts: number) {
     await this.audit.transaction(async (tx) => {
       const changed = await tx.refundAllocation.updateMany({
@@ -749,6 +777,7 @@ export class RefundProcessor {
       const succeeded = await tx.refundAllocation.count({ where: { refundId, status: 'succeeded' } });
       const status = succeeded > 0 ? 'partially_succeeded' as const : 'failed' as const;
       const refund = await tx.refund.update({ where: { id: refundId }, data: { status } });
+      if (status === 'failed') await this.notifyRefundFailedOnTx(tx, refundId);
       return {
         result: refund,
         events: [{
