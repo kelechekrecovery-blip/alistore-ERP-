@@ -4676,5 +4676,5 @@
 - Date: 2026-07-20
 - Scope: refresh procurement and composite reconciliation evidence and complete the strict local ecosystem audit.
 - Checks: procurement API `10/10` plus browser reconciliation passed; composite ecosystem matrix passed `4/4`; `npm run ecosystem:audit:strict` passed with no local GAPs; Cloudflare `alistore-erp` tunnel reported `healthy` with four active connections; public ali.kg/www/admin/API live/API ready smoke remained HTTP `200`.
-- Commit: `1a733bf` (pushed to `origin/main`).
-- Release boundary: the software evidence gate is green, but this is not production readiness. Public traffic still terminates at a workstation-backed tunnel. Render staging/production deployment, live payment/SMS/OFD/push credentials, restore/rollback drill, and physical iPhone/Android hardware certification remain external gates.
+- Commits: `26e08ce`, `1a733bf` (pushed to `origin/main`).
+- Release boundary: `npm run ecosystem:audit:strict` is green with no local GAPs, but this is not production readiness. Public traffic still terminates at a workstation-backed tunnel. Render staging/production deployment, live payment/SMS/OFD/push credentials, restore/rollback drill, and physical iPhone/Android hardware certification remain external gates.
