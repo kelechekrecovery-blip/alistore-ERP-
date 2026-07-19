@@ -4579,3 +4579,11 @@
 - Changes: created `alistore-media-prod` and `alistore-backups-prod` in Cloudflare R2 with EEUR location hint; attached `media.ali.kg` to the media bucket with TLS 1.2; configured read-only CORS for production web/admin origins; restored the Next.js web process on local port 3000.
 - Checks: `ali.kg`, `admin.ali.kg` and `api.ali.kg/api/health/live` return `200`; `media.ali.kg` returns `404` as expected until product objects are uploaded; GitHub repository remains empty and SSH push remains unauthorized.
 - Remaining: R2 jurisdiction is currently `default` (the available API path did not permit the EU jurisdiction header), and Render/Sentry/live provider credentials are still not connected.
+
+## RELEASE-CLOUD-042
+
+- Date: 2026-07-19
+- Scope: unblock the Render Blueprint and verify the publishable baseline.
+- Changes: changed `renderSubdomainPolicy` from `disabled` to `allowed` for the production API and Web services so Render can create the services before custom domains are attached; published as commit `aa7ac01` on `main`.
+- Checks: `render.yaml` and `infra/render.staging.yaml` parse successfully; API production build passed; Web production build passed with 43 routes; strict production preflight correctly stopped because local `apps/api/.env.production` is absent.
+- Next step: refresh Render Blueprint on branch `main` with path `render.yaml`, then fill only the requested secret values in Render Environment Groups.
