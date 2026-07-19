@@ -353,11 +353,6 @@ private struct ClientLoginView: View {
                     }
                     .padding(.top, 10)
                     .accessibilityIdentifier("client-faceid")
-                    HStack(spacing: 10) {
-                        loginProvider("Apple", symbol: "applelogo")
-                        loginProvider("Telegram", symbol: "paperplane.fill")
-                    }
-                    .padding(.top, 12)
                     Button("Продолжить как гость →", action: onGuest)
                         .font(ClientTheme.body(13))
                         .foregroundStyle(ClientTheme.muted)
@@ -372,22 +367,6 @@ private struct ClientLoginView: View {
                 .frame(minHeight: 700)
             }
         }
-    }
-
-    private func loginProvider(_ title: String, symbol: String) -> some View {
-        Button {
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                Text(title)
-            }
-        }
-            .font(ClientTheme.body(14, weight: .medium))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 46)
-            .glass(radius: 13)
-            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
-            .accessibilityLabel("Войти через \(title)")
     }
 
     private var normalizedPhone: String {
