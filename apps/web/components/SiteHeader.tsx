@@ -60,7 +60,7 @@ export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'desig
         </div>
       </div>
 
-      <div className="mx-auto grid h-[76px] max-w-[1400px] grid-cols-[auto_1fr_auto] items-center gap-3 px-4 md:h-[82px] md:grid-cols-[auto_auto_1fr_auto] md:gap-6 md:px-5">
+      <div className="mx-auto grid h-[76px] max-w-[1400px] grid-cols-[auto_1fr_auto] items-center gap-3 px-3 md:h-[82px] md:grid-cols-[auto_auto_1fr_auto] md:gap-6 md:px-5">
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="AliStore Electronics">
           {design3 && <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-gradient-to-br from-[#ff7a4d] to-[#e8410f] text-sm font-extrabold text-white shadow-[0_5px_14px_rgba(255,91,46,.35)]">A</span>}
           <strong className="font-display text-[22px] font-extrabold leading-none md:text-2xl">AliStore</strong>
@@ -78,8 +78,8 @@ export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'desig
         </form>
 
         <div className="ml-auto flex items-center gap-0.5 md:gap-1">
-          <HeaderTool dark={design3} href="/favorites" label="Избранное" icon={<Heart size={22} />} count={favoritesCount} hideLabel />
-          <HeaderTool dark={design3} href="/compare" label="Сравнить" icon={<Scale size={22} />} count={compareCount} hideLabel />
+          <HeaderTool dark={design3} href="/favorites" label="Избранное" icon={<Heart size={22} />} count={favoritesCount} hideLabel className="max-[389px]:hidden" />
+          <HeaderTool dark={design3} href="/compare" label="Сравнить" icon={<Scale size={22} />} count={compareCount} hideLabel className="max-[389px]:hidden" />
           <HeaderTool dark={design3} href={user ? '/account' : '/login'} label={user ? 'Профиль' : 'Войти'} icon={<User size={22} />} hideLabel />
           <HeaderTool dark={design3} href="/cart" label="Корзина" icon={<ShoppingBag size={22} />} count={cartHydrated ? count : 0} />
           <button type="button" onClick={() => setOpen((value) => !value)} className={`grid h-11 w-11 place-items-center rounded-lg md:hidden ${design3 ? 'text-white/70 hover:bg-white/[.08] hover:text-white' : 'text-faint hover:bg-sand'}`} aria-label={open ? 'Закрыть меню' : 'Открыть меню'}>
@@ -107,9 +107,9 @@ export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'desig
   );
 }
 
-function HeaderTool({ href, label, icon, count = 0, hideLabel = false, dark = false }: { href: string; label: string; icon: ReactNode; count?: number; hideLabel?: boolean; dark?: boolean }) {
+function HeaderTool({ href, label, icon, count = 0, hideLabel = false, dark = false, className = '' }: { href: string; label: string; icon: ReactNode; count?: number; hideLabel?: boolean; dark?: boolean; className?: string }) {
   return (
-    <Link href={href} aria-label={label} className={`relative flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 lg:min-w-[66px] ${dark ? 'text-white/70 hover:bg-white/[.08] hover:text-white' : 'text-faint hover:bg-sand hover:text-ink'}`}>
+    <Link href={href} aria-label={label} className={`relative flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 lg:min-w-[66px] ${dark ? 'text-white/70 hover:bg-white/[.08] hover:text-white' : 'text-faint hover:bg-sand hover:text-ink'} ${className}`}>
       {icon}
       <span className={`${hideLabel ? 'hidden lg:block' : 'hidden sm:block'} text-[10px] font-medium`}>{label}</span>
       {count > 0 && <span className="absolute right-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[9px] font-bold text-white">{count}</span>}
