@@ -50,6 +50,7 @@
 		8EB1B61A796F080906F9324C /* OFL-GolosText.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2DB79FB18FA1D1C4C93EED5C /* OFL-GolosText.txt */; };
 		95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04AAB6220384C05861A21153 /* NativeShell.swift */; };
 		973D1A2779C11D55E3836920 /* GolosText-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 739B68D254BC1DE9AB4F5022 /* GolosText-Bold.ttf */; };
+		98235E7E7D8DF4F3815F95C0 /* SystemStatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383E95E61180D3B14C31526 /* SystemStatesView.swift */; };
 		A032872D6346B1EC5ED635BF /* Manrope-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1F688B97A87EDB7D63096C5 /* Manrope-Bold.ttf */; };
 		A2EEF23C6113ACFAA8CAEDEE /* GolosText-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2962E44FB9BB3C792A4757AC /* GolosText-Regular.ttf */; };
 		A562636391B66F2B1BED55CA /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
@@ -241,6 +242,7 @@
 		599A4AFDBA80DE5C617B96C9 /* AliStoreCourierUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreCourierUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5C0BEDD4335D0148387D8CCA /* Manrope-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-Medium.ttf"; sourceTree = "<group>"; };
 		6361088297362FC977D53407 /* Design3Primitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design3Primitives.swift; sourceTree = "<group>"; };
+		6383E95E61180D3B14C31526 /* SystemStatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStatesView.swift; sourceTree = "<group>"; };
 		6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */ = {isa = PBXFileReference; path = "alistore-icon.svg"; sourceTree = "<group>"; };
 		7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerAuthStore.swift; sourceTree = "<group>"; };
 		71A1CBC09633E9E221DC03E3 /* InstallmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallmentView.swift; sourceTree = "<group>"; };
@@ -498,6 +500,7 @@
 				8F3970931F4839B3C2A168BE /* OrderTrackingView.swift */,
 				14D9ECDFDBC25D5BACF48D03 /* ReferralView.swift */,
 				98164133D41CBD85293AD716 /* SupportChatView.swift */,
+				6383E95E61180D3B14C31526 /* SystemStatesView.swift */,
 				4996F20715B374377C19415D /* WaitlistView.swift */,
 			);
 			path = Features;
@@ -904,6 +907,7 @@
 				03E06D3A831510A208B2CA6E /* OrderTrackingView.swift in Sources */,
 				492FE010C8F04B72F808B040 /* ReferralView.swift in Sources */,
 				2935B3E1DC695ADF56DEAF82 /* SupportChatView.swift in Sources */,
+				98235E7E7D8DF4F3815F95C0 /* SystemStatesView.swift in Sources */,
 				F7A028D6B8F54E1E0D6756EF /* WaitlistView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

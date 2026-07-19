@@ -9,6 +9,7 @@ enum ClientDebugFeature: String, Identifiable {
     case waitlist
     case supportChat
     case orderTracking
+    case systemStates
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum ClientDebugFeature: String, Identifiable {
             case .waitlist: WaitlistView()
             case .supportChat: SupportChatView()
             case .orderTracking: OrderTrackingView()
+            case .systemStates: SystemStatesView()
             }
         }
         .preferredColorScheme(.dark)
