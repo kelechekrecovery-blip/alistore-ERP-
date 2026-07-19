@@ -1,5 +1,34 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000/api';
+/**
+ * Resolve the API base URL.
+ *
+ * Preference order:
+ *  1. `NEXT_PUBLIC_API_BASE` when configured at build time (the intended path).
+ *  2. Browser self-heal: if the bundle was deployed WITHOUT that env var to a
+ *     real (non-localhost) host, derive `https://api.<apex>/api` from the current
+ *     origin instead of silently falling back to the dev localhost API. This
+ *     prevents a prod deploy that forgot the env var from calling
+ *     `http://localhost:4000` (which is CORS-blocked from an https origin and
+ *     leaves the storefront with no data).
+ *  3. Local dev default.
+ */
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_BASE;
+  if (configured && configured.trim().length > 0) return configured;
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    const isLocalHost =
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+    if (!isLocalHost) {
+      const apex = hostname.replace(/^www\./, '');
+      return `${protocol}//api.${apex}/api`;
+    }
+  }
+
+  return 'http://localhost:4000/api';
+}
+
+export const API_BASE = resolveApiBase();
 
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {
