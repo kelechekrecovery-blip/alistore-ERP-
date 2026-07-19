@@ -4631,3 +4631,13 @@
 - Checks: isolated visual acceptance with fresh API/Web ports passed `3/3`; no screenshot threshold was relaxed.
 - Commit: pending in this iteration.
 - Remaining: cross-browser, strict ecosystem, durable Render deployment, native physical-device and live-provider gates remain separate.
+
+## MVP-GATE-047
+
+- Date: 2026-07-19
+- Scope: rerun the complete non-E2E MVP gate after making Web typecheck independent of generated E2E cache directories.
+- Change: excluded `.next-e2e-*` and `build-output` from the Web TypeScript project so stale generated validators cannot break a production build.
+- Checks: `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e` passed Prisma validation, migration upgrade/reset paths, API build, Web build with 43 routes, mobile typecheck, and all 172 API Jest batches.
+- Public smoke: `https://ali.kg/`, `/catalog`, `/erp`, `https://admin.ali.kg/`, `https://api.ali.kg/api/health/live` and `/api/health/ready` returned HTTP 200 during the same iteration.
+- Result: local Web/API MVP gate is green; this does not certify Render deployment, native physical devices, live providers or production credentials.
+- Remaining: keep the public tunnel under managed service or deploy Render, then run staging restore/rollback and the strict ecosystem audit.
