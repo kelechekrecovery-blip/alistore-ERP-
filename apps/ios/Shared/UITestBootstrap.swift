@@ -110,4 +110,17 @@ public enum UITestBootstrap {
         false
         #endif
     }
+
+    /// Deep-links straight to a named account subscreen (`--ui-testing-feature=installment`).
+    /// Used by the visual gate to capture 3.0 feature screens without manual navigation.
+    public static var featureRoute: String? {
+        #if DEBUG
+        let prefix = "--ui-testing-feature="
+        return ProcessInfo.processInfo.arguments
+            .first(where: { $0.hasPrefix(prefix) })
+            .map { String($0.dropFirst(prefix.count)) }
+        #else
+        return nil
+        #endif
+    }
 }

@@ -959,6 +959,7 @@ private struct ClientRootView: View {
     @State private var compared: Set<String> = []
     @State private var orderRefreshRevision = 0
     @State private var pushStatus = "Push не настроен"
+    @State private var debugFeature: ClientDebugFeature?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
@@ -970,6 +971,7 @@ private struct ClientRootView: View {
             environment: environment,
             restoresStoredSession: !UITestBootstrap.disablesSessionRestore && !UITestBootstrap.startsSignedIn
         ))
+        _debugFeature = State(initialValue: ClientDebugFeature.fromLaunch)
     }
 
     var body: some View {
@@ -1013,6 +1015,9 @@ private struct ClientRootView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        .fullScreenCover(item: $debugFeature) { feature in
+            feature.screen
+        }
         .overlay {
             if auth.requiresQuickUnlock, let session = auth.session {
                 QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout(); guestMode = false } })
@@ -3811,6 +3816,18 @@ private struct AccountView: View {
                 }
                 AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath", badge: "оценка") {
                     CustomerTradeInsView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Моя рассрочка", detail: "График и платежи", symbol: "creditcard.fill", badge: "1 активна") {
+                    InstallmentView()
+                }
+                AccountMenuTile(title: "Живой чат", detail: "Поддержка ~2 мин", symbol: "bubble.left.and.text.bubble.right.fill") {
+                    SupportChatView()
+                }
+                AccountMenuTile(title: "Снова в наличии", detail: "Списки ожидания", symbol: "bell.badge.fill") {
+                    WaitlistView()
+                }
+                AccountMenuTile(title: "Пригласи друга", detail: "+500 бонусов", symbol: "gift.fill", badge: "+500") {
+                    ReferralView()
                 }
                 AccountMenuTile(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3") {
                     CustomerSettingsView(environment: environment, auth: auth)
