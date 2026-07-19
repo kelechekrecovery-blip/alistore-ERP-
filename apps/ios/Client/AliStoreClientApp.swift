@@ -5814,6 +5814,9 @@ private struct ClientHomeView: View {
     @Binding var favorites: Set<String>
     let openCatalog: () -> Void
 
+    @State private var showStories = false
+    @State private var storyStart = 0
+
     private let categories = [("Смартфоны", "iphone"), ("Ноутбуки", "laptopcomputer"), ("Аудио", "airpodsmax"), ("Часы", "applewatch"), ("Планшеты", "ipad")]
 
     var body: some View {
@@ -5826,7 +5829,7 @@ private struct ClientHomeView: View {
                         .init(id: 2, emoji: "♻️", label: "Trade-in"),
                         .init(id: 3, emoji: "🆕", label: "Новинки"),
                         .init(id: 4, emoji: "⚡️", label: "1–2 ч"),
-                    ])
+                    ], onSelect: { storyStart = $0; showStories = true })
                     HStack(spacing: 10) {
                         ServiceCard(title: "Доставка 1–2 ч", detail: "по Бишкеку", symbol: "bolt.fill", highlighted: true)
                         ServiceCard(title: "Самовывоз", detail: "бесплатно", symbol: "building.2")
@@ -5897,6 +5900,9 @@ private struct ClientHomeView: View {
             }
             .background(ClientTheme.background)
             .navigationTitle("AliStore")
+            .fullScreenCover(isPresented: $showStories) {
+                StoriesViewer(startIndex: storyStart)
+            }
         }
     }
 }
