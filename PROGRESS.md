@@ -4641,3 +4641,12 @@
 - Public smoke: `https://ali.kg/`, `/catalog`, `/erp`, `https://admin.ali.kg/`, `https://api.ali.kg/api/health/live` and `/api/health/ready` returned HTTP 200 during the same iteration.
 - Result: local Web/API MVP gate is green; this does not certify Render deployment, native physical devices, live providers or production credentials.
 - Remaining: keep the public tunnel under managed service or deploy Render, then run staging restore/rollback and the strict ecosystem audit.
+
+## WEB-AUDIT-048
+
+- Date: 2026-07-19
+- Scope: bind the visual acceptance result to the current main worktree and re-run the ecosystem contract audit after public recovery.
+- Changes: stabilized the Playwright visual server on webpack with a fixed `.next-e2e` directory; recorded the current local visual result as a committed, source-tree-hashed artifact in `ac3d3a4`.
+- Checks: visual acceptance `3/3`; `npm run ecosystem:audit` passes all available local contract checks; `npm run ecosystem:audit:strict` fails closed with 7 explicit blockers: iOS UI evidence, Android connected UI evidence, POS/refund reconciliation, courier/COD reconciliation, service/loaner reconciliation, procurement/sale reconciliation and the composite ecosystem matrix.
+- Public smoke: `ali.kg`, `www.ali.kg`, `admin.ali.kg`, API live and API ready returned HTTP 200 after restarting the workstation-backed tunnel.
+- Limitation: the public route is still a local Cloudflare tunnel, not durable Render infrastructure; live providers, physical-device certification and staging restore/rollback remain open.

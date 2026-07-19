@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `WEB-AUDIT-048` Accepted locally: visual evidence is now committed from the current main worktree (`ac3d3a4`), `npm run ecosystem:audit` is green, and public smoke is HTTP 200. Strict audit remains intentionally red on seven native/reconciliation evidence gates; ali.kg still depends on the workstation-backed tunnel until Render staging/production is deployed.
 - `WEB-AUDIT-001` Accepted locally: Web route audit `46/46`, ERP secure/CMS regression `7/7`, and ERP product administration `2/2` pass on isolated API/Web servers. The audit report is `docs/acceptance/WEB-AUDIT-2026-07-19.md`; full cross-browser/accessibility/performance evidence, staging/providers and external design references remain open.
 - `ERP-DESIGN-PHASE-0-FOUNDATION-START` Started: `::selection` fixed to lime-on-ink. Remaining: token consistency, radius scale, ERP shell final polish (topbar, sidebar collapsible, AI button, logout placement).
 - `ERP-DESIGN-PHASE-1-TESTING` Functional E2E is green (13/13). Visual acceptance is green (3/3) after masking dynamic dashboard KPIs/decisions and allowing 5% pixel variance on storefront baselines. Snapshot files updated. Next: run full 66-test suite on a dedicated longer pass when time allows.
