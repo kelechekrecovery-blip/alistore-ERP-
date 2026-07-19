@@ -7,7 +7,7 @@ services:
     dockerfilePath: ./docker/api.Dockerfile
     dockerContext: .
     autoDeployTrigger: off
-    renderSubdomainPolicy: disabled
+    renderSubdomainPolicy: allowed
     healthCheckPath: /api/health/live
     preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
@@ -49,7 +49,7 @@ services:
     dockerfilePath: ./docker/web.Dockerfile
     dockerContext: .
     autoDeployTrigger: off
-    renderSubdomainPolicy: disabled
+    renderSubdomainPolicy: allowed
     healthCheckPath: /healthz
     envVars:
       - key: ALLOWED_HOSTS
