@@ -93,12 +93,12 @@ export default function SupportPage() {
         <div className="mb-3 text-sm font-semibold">Создать обращение</div>
         {!user && (
           <div className="mb-2 grid grid-cols-1 gap-2">
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="rounded-[12px] border border-surface-3 bg-ink-dark p-3 font-mono text-sm outline-none placeholder:text-faint focus:border-lime" />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="rounded-[12px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
+            <input aria-label="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="rounded-[12px] border border-surface-3 bg-ink-dark p-3 font-mono text-sm outline-none placeholder:text-faint focus:border-lime" />
+            <input aria-label="Имя" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="rounded-[12px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
           </div>
         )}
-        <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Тема" className="mb-2 w-full rounded-[12px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Опишите ситуацию: заказ, IMEI, что произошло" className="min-h-[96px] w-full rounded-[12px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
+        <input aria-label="Тема обращения" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Тема" className="mb-2 w-full rounded-[12px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
+        <textarea aria-label="Описание ситуации" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Опишите ситуацию: заказ, IMEI, что произошло" className="min-h-[96px] w-full rounded-[12px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
         <div className="mt-2">
           <EvidencePicker files={files} onChange={setFiles} label="Фото к обращению" hint="Чек, дефект, скрин ошибки" max={4} />
         </div>
