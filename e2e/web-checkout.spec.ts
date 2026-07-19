@@ -135,14 +135,20 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
 test('web checkout uses ERP delivery zone fee and reserves an available slot', async ({ page }) => {
   await resetDb();
   const { product } = await seedProduct('DELIVERY-E2E');
-  const startsAt = new Date(Date.now() + 60 * 60 * 1000);
-  const endsAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
-  const deliveryDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bishkek',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(startsAt);
+  const bishkekDay = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bishkek',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  const now = new Date();
+  // Keep the slot on the same Bishkek day the checkout queries (logisticsDate = today).
+  // Near midnight, now+1h rolls to the next day and the slot would not show for today.
+  let startsAt = new Date(now.getTime() + 60 * 60 * 1000);
+  if (bishkekDay(startsAt) !== bishkekDay(now)) startsAt = new Date(now.getTime() + 2 * 60 * 1000);
+  const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
+  const deliveryDate = bishkekDay(startsAt);
   const zone = await prisma.deliveryZone.create({
     data: {
       code: `web-center-${Date.now().toString(36)}`,
