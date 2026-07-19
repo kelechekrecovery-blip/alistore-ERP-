@@ -4613,3 +4613,12 @@
 - Change: replaced `next/font/google` imports with the existing CSS-variable type contract and system fallback stacks; no runtime or build-time request to Google Fonts is required.
 - Checks: Web production build generated 43 routes; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e` passed Prisma validation, all migration upgrade paths, API build, Web build, mobile typecheck and `172/172` API Jest files. External readiness remains a report-only block for owner credentials and physical hardware.
 - Next: deploy the pushed `main` SHA through Render and run staging smoke/restore/rollback; do not enable live providers before their certification gates.
+
+## WEB-AUDIT-045
+
+- Date: 2026-07-19
+- Scope: keep the production Web build offline-safe without changing visual typography.
+- Changes: vendored the exact Sora, Golos Text and JetBrains Mono WOFF2 assets used by the previous Next font build and declared their Cyrillic/Latin unicode ranges in `apps/web/app/globals.css`.
+- Checks: `NEXT_DIST_DIR=build-output npm run build -w @alistore/web` passed with 43 routes; targeted visual suite passed mobile storefront and reported only existing desktop snapshot drift (storefront height/content and 1,984 ERP pixels); `https://ali.kg/` returned 200 and `https://api.ali.kg/api/health/live` returned `{"status":"ok"}`.
+- Commit: `0ca7632`.
+- Remaining: refresh or owner-accept the two desktop visual baselines after confirming their intended reference; strict ecosystem audit, Render deployment, native physical-device and live-provider gates remain open.
