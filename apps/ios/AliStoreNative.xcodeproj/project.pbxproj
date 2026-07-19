@@ -278,6 +278,7 @@
 		A1F688B97A87EDB7D63096C5 /* Manrope-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-Bold.ttf"; sourceTree = "<group>"; };
 		A7DA82D99B1EEA4943E5783E /* AliStorePOSUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStorePOSUITests.swift; sourceTree = "<group>"; };
 		A9EBC4D5C06A5630E3B7D69D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AAB7EC94315C8CB6A45D9EDF /* POS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = POS.entitlements; sourceTree = "<group>"; };
 		AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Staff.entitlements; sourceTree = "<group>"; };
 		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
@@ -418,6 +419,7 @@
 				9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */,
 				2CD07CA19B272D575A7C4E3D /* Assets.xcassets */,
 				2BEAEC396827506007C9829E /* Info.plist */,
+				AAB7EC94315C8CB6A45D9EDF /* POS.entitlements */,
 				72CCB230F61743790D08A7C6 /* POSOperationsView.swift */,
 				82C7F7335AA46910CF656B72 /* POSSaleView.swift */,
 			);
@@ -775,7 +777,6 @@
 					};
 					2443E875BF45E22BBB848960 = {
 						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
 					};
 					6D43053968F49FEF0FAC8594 = {
 						DevelopmentTeam = "";
@@ -784,11 +785,9 @@
 					};
 					72054852527678365D2752CC = {
 						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
 					};
 					A363FAEC848E9A2E1504F4F1 = {
 						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
 					};
 					BD21F76168637D79959BA6FB = {
 						DevelopmentTeam = "";
@@ -805,7 +804,6 @@
 					};
 					DC8CC0056CE6295039B84B22 = {
 						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -1073,7 +1071,8 @@
 				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Courier/Courier.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
 				INFOPLIST_FILE = Courier/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1081,6 +1080,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.courier;
 				PRODUCT_NAME = AliStoreCourier;
+				PROVISIONING_PROFILE_SPECIFIER = "AliStore Courier App Store";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1093,7 +1093,8 @@
 				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Client/Client.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
 				INFOPLIST_FILE = Client/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1102,6 +1103,7 @@
 				PAYMENT_RETURN_URL = "https://ali.kg/payment-return";
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.client;
 				PRODUCT_NAME = AliStore;
+				PROVISIONING_PROFILE_SPECIFIER = "AliStore Client App Store";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1379,7 +1381,8 @@
 				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Staff/Staff.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
 				INFOPLIST_FILE = Staff/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1387,6 +1390,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.staff;
 				PRODUCT_NAME = AliStoreStaff;
+				PROVISIONING_PROFILE_SPECIFIER = "AliStore Staff App Store";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1396,7 +1400,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				API_BASE_URL = "http://127.0.0.1:4000/api";
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = POS/POS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = POS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1414,8 +1420,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				API_BASE_URL = "$(ALISTORE_API_BASE_URL)";
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_ENTITLEMENTS = POS/POS.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
 				INFOPLIST_FILE = POS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1423,6 +1432,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.pos;
 				PRODUCT_NAME = AliStorePOS;
+				PROVISIONING_PROFILE_SPECIFIER = "AliStore POS App Store";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

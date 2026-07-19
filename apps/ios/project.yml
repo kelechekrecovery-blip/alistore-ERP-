@@ -73,7 +73,10 @@ targets:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
           APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
           PAYMENT_RETURN_URL: https://ali.kg/payment-return
+          PROVISIONING_PROFILE_SPECIFIER: AliStore Client App Store
   AliStoreStaff:
     type: application
     platform: iOS
@@ -88,6 +91,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование IMEI и фото для подтверждения операций
         NSPhotoLibraryUsageDescription: Выбор фото для Evidence Vault
@@ -110,6 +118,9 @@ targets:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
           APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: AliStore Staff App Store
   AliStoreCourier:
     type: application
     platform: iOS
@@ -124,6 +135,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Фото подтверждения доставки для Evidence Vault
         NSPhotoLibraryUsageDescription: Выбор фото подтверждения доставки
@@ -146,6 +162,9 @@ targets:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
           APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: AliStore Courier App Store
   AliStorePOS:
     type: application
     platform: iOS
@@ -160,6 +179,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование штрихкодов и IMEI на кассе
         NSPhotoLibraryUsageDescription: Выбор фото состояния устройства для согласования обмена
@@ -175,10 +199,16 @@ targets:
         PRODUCT_NAME: AliStorePOS
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: POS/POS.entitlements
         API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
       configs:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: AliStore POS App Store
   AliStoreCoreTests:
     type: bundle.unit-test
     platform: iOS
