@@ -98,24 +98,23 @@ case "$api_base" in
     ;;
 esac
 
-[[ -n "$team_id" ]] || fail 'DEVELOPMENT_TEAM or APPLE_DEVELOPMENT_TEAM is required'
-[[ "$team_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'Apple team id must be a 10-character identifier'
-[[ -n "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH is required for App Store Connect submission'
-[[ -f "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH does not point to a file'
-if [[ -z "$asc_key_id" && "$asc_key_path" =~ AuthKey_([A-Z0-9]{10})\.p8$ ]]; then
-  asc_key_id="${BASH_REMATCH[1]}"
-fi
-[[ -n "$asc_key_id" ]] || fail 'ASC_KEY_ID is required or ASC_API_KEY_PATH must be named AuthKey_<KEYID>.p8'
-[[ "$asc_key_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'ASC_KEY_ID must be a 10-character identifier'
-[[ -n "$issuer_id" ]] || fail 'ASC_ISSUER_ID is required for App Store Connect submission'
-[[ "$issuer_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] || fail 'ASC_ISSUER_ID must be a UUID'
-
 if [[ "$strict_asc" == "1" ]]; then
+  [[ -n "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH is required for App Store Connect submission'
+  [[ -f "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH does not point to a file'
+  if [[ -z "$asc_key_id" && "$asc_key_path" =~ AuthKey_([A-Z0-9]{10})\.p8$ ]]; then
+    asc_key_id="${BASH_REMATCH[1]}"
+  fi
+  [[ -n "$asc_key_id" ]] || fail 'ASC_KEY_ID is required or ASC_API_KEY_PATH must be named AuthKey_<KEYID>.p8'
+  [[ "$asc_key_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'ASC_KEY_ID must be a 10-character identifier'
+  [[ -n "$issuer_id" ]] || fail 'ASC_ISSUER_ID is required for App Store Connect submission'
+  [[ "$issuer_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] || fail 'ASC_ISSUER_ID must be a UUID'
   node "$repo_root/scripts/verify-app-store-connect.mjs" "$asc_key_path" "$asc_key_id" "$issuer_id" \
     || fail 'App Store Connect API verification failed'
 fi
 
 if [[ "$strict_signing" == "1" ]]; then
+  [[ -n "$team_id" ]] || fail 'DEVELOPMENT_TEAM or APPLE_DEVELOPMENT_TEAM is required'
+  [[ "$team_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'Apple team id must be a 10-character identifier'
   signing_identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
   if ! printf '%s\n' "$signing_identities" | grep -Eq "Apple Distribution: .+\\($team_id\\)"; then
     fail "Apple Distribution signing identity for team $team_id is required"
@@ -173,11 +172,13 @@ printf 'store-preflight: Release API URL resolved to HTTPS\n'
 printf 'store-preflight: Release bundle id and AppIcon are configured\n'
 printf 'store-preflight: Release APNs environment resolved to production\n'
 printf 'store-preflight: Release version resolved to 1.0.0 (1)\n'
-printf 'store-preflight: Apple team and App Store Connect credentials are present\n'
 if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'
 fi
 if [[ "$strict_signing" == "1" ]]; then
   printf 'store-preflight: Apple Distribution signing material verified\n'
+fi
+if [[ "$strict_asc" != "1" && "$strict_signing" != "1" ]]; then
+  printf 'store-preflight: Apple credentials skipped in non-strict mode\n'
 fi
 printf 'store-preflight: native Client configuration passed\n'
