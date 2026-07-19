@@ -236,6 +236,9 @@ const productDetailCache = new Map<string, { expiresAt: number; promise: Promise
  * MVP scale and derives same-category recommendations locally.
  */
 export async function fetchProductWithRelated(id: string, relatedLimit = 6): Promise<ProductWithRelated> {
+  // Product ids are CUIDs. Avoid a predictable validation request for malformed
+  // deep links so the not-found screen stays a clean, client-visible state.
+  if (!/^c[a-z0-9]{24}$/.test(id)) return { product: null, variants: [], related: [] };
   const cacheKey = `${id}:${relatedLimit}`;
   const now = Date.now();
   const cached = productDetailCache.get(cacheKey);

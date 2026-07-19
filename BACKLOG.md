@@ -1,6 +1,7 @@
 # BACKLOG
 
 ## Next
+- `WEB-AUDIT-001` Accepted locally: Web route audit `46/46`, ERP secure/CMS regression `7/7`, and ERP product administration `2/2` pass on isolated API/Web servers. The audit report is `docs/acceptance/WEB-AUDIT-2026-07-19.md`; full cross-browser/accessibility/performance evidence, staging/providers and external design references remain open.
 - `ERP-DESIGN-PHASE-0-FOUNDATION-START` Started: `::selection` fixed to lime-on-ink. Remaining: token consistency, radius scale, ERP shell final polish (topbar, sidebar collapsible, AI button, logout placement).
 - `ERP-DESIGN-PHASE-1-TESTING` Functional E2E is green (13/13). Visual acceptance is green (3/3) after masking dynamic dashboard KPIs/decisions and allowing 5% pixel variance on storefront baselines. Snapshot files updated. Next: run full 66-test suite on a dedicated longer pass when time allows.
 - `ERP-DESIGN-PHASE-1-AI-CRM` Accepted locally: AI Assistant and CRM match `AliStore ERP 2.0.dc.html` screenshots; legacy ticket/inbox code is no longer used in ERP CRM but preserved for re-homing. Next: continue Phase 1 modules (Dashboard, Stock, Finance, KPI) or Phase 0 foundation.

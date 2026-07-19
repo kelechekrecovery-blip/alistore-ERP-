@@ -49,16 +49,18 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      fetchProductWithRelated(params.id),
-      fetchProductReviews(params.id).catch(() => null),
-    ])
-      .then(([detail, nextReviews]) => {
+    fetchProductWithRelated(params.id)
+      .then(async (detail) => {
         if (!active) return;
         setProduct(detail.product ?? "missing");
         setSimilar(detail.related);
         setVariants(detail.variants);
-        setReviews(nextReviews);
+        if (!detail.product) {
+          setReviews(null);
+          return;
+        }
+        const nextReviews = await fetchProductReviews(detail.product.id).catch(() => null);
+        if (active) setReviews(nextReviews);
       })
       .catch(() => active && setProduct("missing"));
     return () => {

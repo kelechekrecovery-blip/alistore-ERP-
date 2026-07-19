@@ -41,11 +41,11 @@ export default defineConfig({
     {
       command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" E2E_TEST=true NODE_ENV=test AI_PROVIDER=rules AI_PROVIDER_KEY= OPENROUTER_API_KEY= ANTHROPIC_API_KEY= AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
       url: `http://127.0.0.1:${apiPort}/api/health/live`,
-      reuseExistingServer: false,
+      reuseExistingServer,
       timeout: 120_000,
     },
     {
-      command: `NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" npm exec -w @alistore/web -- next dev -p ${webPort}`,
+      command: `NEXT_DIST_DIR=.next-e2e-${webPort} NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" npm exec -w @alistore/web -- next dev -p ${webPort}`,
       url: `http://127.0.0.1:${webPort}/checkout`,
       reuseExistingServer,
       timeout: 120_000,

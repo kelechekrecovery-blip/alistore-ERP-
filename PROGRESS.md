@@ -4587,3 +4587,12 @@
 - Changes: changed `renderSubdomainPolicy` from `disabled` to `allowed` for the production API and Web services so Render can create the services before custom domains are attached; published as commit `aa7ac01` on `main`.
 - Checks: `render.yaml` and `infra/render.staging.yaml` parse successfully; API production build passed; Web production build passed with 43 routes; strict production preflight correctly stopped because local `apps/api/.env.production` is absent.
 - Next step: refresh Render Blueprint on branch `main` with path `render.yaml`, then fill only the requested secret values in Render Environment Groups.
+
+## WEB-AUDIT-001
+
+- Date: 2026-07-19
+- Scope: complete local Web/ERP route inventory and ERP-to-storefront browser audit.
+- Changes: added `e2e/web-route-audit.spec.ts` and `web:route-audit`; isolated Playwright Next build directories per port; hardened invalid product deep links; stabilized the ERP CMS accessible-name contract; recorded `docs/acceptance/WEB-AUDIT-2026-07-19.md`.
+- Checks: API build PASS; isolated Web route audit `46/46`; isolated ERP secure plus CMS regression `7/7`; ERP product administration `2/2`; API gate `172/172`; corrected full browser suite `112/112`.
+- Result: Web sandbox flows covered by this audit are accepted locally. Full release evidence, strict audit, staging, live providers, physical devices and missing design references remain open.
+- Next: perform cross-browser/accessibility/performance and staging release checks.

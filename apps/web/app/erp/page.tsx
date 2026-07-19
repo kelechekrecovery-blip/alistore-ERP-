@@ -67,7 +67,7 @@ const EXTENDED_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'pricing', icon: '🏷️', label: 'Цены' },
   { id: 'reorder', icon: '🛒', label: 'Закупки' },
   { id: 'campaigns', icon: '◌', label: 'Кампании' },
-  { id: 'storefront', icon: '▤', label: 'Сайт · CMS витрины' },
+  { id: 'storefront', icon: '▤', label: 'Управление сайтом' },
   { id: 'risks', icon: '⚠', label: 'Риски' },
   { id: 'readiness', icon: '✓', label: 'Готовность' },
   { id: 'ledger', icon: '📜', label: 'Event Ledger' },
@@ -308,6 +308,7 @@ export default function ErpPage() {
               key={m.id}
               type="button"
               onClick={() => navigate(m.id)}
+              aria-label={m.id === 'storefront' && ['owner', 'admin'].includes(session.role) ? 'Сайт · CMS витрины' : undefined}
               className={`flex items-center gap-2.5 rounded-[12px] border px-3 py-2 text-left text-[13px] transition ${
                 activeRoute === m.id ? 'erp3-glass-strong font-bold text-white' : 'border-transparent font-medium text-muted hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`}

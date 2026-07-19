@@ -61,6 +61,7 @@ export function AdminView({ role, username, accessToken, onNavigate }: AdminView
             key={module.route}
             type="button"
             onClick={() => onNavigate(module.route)}
+            aria-label={module.route === 'storefront' ? 'Админка сайта · Сайт · CMS витрины' : module.title}
             className="group rounded-[8px] border border-surface-3 bg-surface p-4 text-left transition hover:border-lime/60 hover:bg-surface-2"
           >
             <span className="flex items-start gap-3">
