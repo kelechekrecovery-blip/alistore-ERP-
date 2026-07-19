@@ -4596,3 +4596,12 @@
 - Checks: API build PASS; isolated Web route audit `46/46`; isolated ERP secure plus CMS regression `7/7`; ERP product administration `2/2`; API gate `172/172`; corrected full browser suite `112/112`.
 - Result: Web sandbox flows covered by this audit are accepted locally. Full release evidence, strict audit, staging, live providers, physical devices and missing design references remain open.
 - Next: perform cross-browser/accessibility/performance and staging release checks.
+
+## RELEASE-CLOUD-043
+
+- Date: 2026-07-19
+- Scope: restore the public AliStore sandbox after `ali.kg` returned Cloudflare 530/1033.
+- Finding: Cloudflare API showed the named `alistore-erp` tunnel was `down` with zero connector connections; the Web/API processes were healthy locally.
+- Recovery: started the existing tunnel connector with its local secret token and verified the configured routes without changing DNS or exposing the token.
+- Checks: `ali.kg`, `www.ali.kg`, `admin.ali.kg`, `/catalog`, `/erp`, `api.ali.kg/api/health/live`, `api.ali.kg/api/health/ready` and the public catalog endpoint all returned `200`; catalog data came from PostgreSQL.
+- Hardening: added `npm run public:up` and the workstation-demo runbook. This remains a temporary workstation-backed sandbox until Render is deployed; a machine shutdown will stop public traffic again.

@@ -85,6 +85,23 @@ For Next.js:
 NEXT_PUBLIC_API_BASE=https://api.ali.kg/api npm run start -w @alistore/web
 ```
 
+### Workstation-backed public demo tunnel
+
+The public demo uses the named Cloudflare tunnel `alistore-erp` and routes
+`ali.kg` to the local Web service on port `3000` and `api.ali.kg` to the API on
+port `4000`. Start it only for sandbox/demo traffic:
+
+```bash
+export CLOUDFLARE_TUNNEL_TOKEN='paste-locally-from-Cloudflare'
+npm run public:up
+```
+
+The token is read only from the shell environment. Do not put it in Git,
+`.env.example`, process logs, screenshots, or chat. This is not a durable
+production deployment: a workstation shutdown stops the public site until the
+services and tunnel are started again. The production path is the Render
+Blueprint and should replace this tunnel before real sales.
+
 ## 4. Self-Hosted Services
 
 Copy `apps/api/.env.example` to a host-local `.env`, fill MinIO and Metabase
