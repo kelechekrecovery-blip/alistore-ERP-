@@ -29,12 +29,6 @@ const assertSafeRelativePath = (value, label) => {
   return value;
 };
 
-const slug = (value) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/gu, '-')
-    .replace(/^-+|-+$/gu, '');
-
 const parsePng = (filePath) => {
   const buffer = fs.readFileSync(filePath);
   const signature = buffer.subarray(0, 8).toString('hex');
@@ -66,10 +60,8 @@ const stateFromAttachment = (attachment) => {
 
 const metadata = readJson(metadataPath, 'App Store metadata');
 const screenshots = metadata.screenshots ?? {};
-const source = assertSafeRelativePath(screenshots.source, 'screenshots.source');
-const sourceDir = path.join(repoRoot, source);
-const sourceManifestPath = path.join(sourceDir, 'manifest.json');
 const requiredStates = screenshots.requiredStates;
+const devices = screenshots.devices;
 
 if (!Array.isArray(requiredStates) || requiredStates.length === 0) {
   fail('screenshots.requiredStates must list the App Store screenshot states');
@@ -77,97 +69,113 @@ if (!Array.isArray(requiredStates) || requiredStates.length === 0) {
 if (screenshots.requiredPngCount !== requiredStates.length) {
   fail('screenshots.requiredPngCount must match screenshots.requiredStates.length');
 }
-if (!fs.existsSync(sourceDir)) {
-  fail(`source directory does not exist: ${source}`);
-}
-if (!fs.existsSync(sourceManifestPath)) {
-  fail(`Xcode attachment manifest is missing: ${path.relative(repoRoot, sourceManifestPath)}`);
-}
-
-const sourceManifest = readJson(sourceManifestPath, 'Xcode attachment manifest');
-const attachments = sourceManifest.flatMap((entry) => entry?.attachments ?? []);
-const byState = new Map();
-
-for (const attachment of attachments) {
-  const state = stateFromAttachment(attachment);
-  if (!state) continue;
-  const fileName = attachment.exportedFileName;
-  if (typeof fileName !== 'string' || path.basename(fileName) !== fileName) {
-    fail(`attachment for ${state} has an unsafe exported filename`);
-  }
-  if (byState.has(state)) {
-    fail(`duplicate screenshot attachment for ${state}`);
-  }
-  byState.set(state, attachment);
-}
-
-const missing = requiredStates.filter((state) => !byState.has(state));
-if (missing.length > 0) {
-  fail(`missing required screenshot state(s): ${missing.join(', ')}`);
-}
-
-const unexpected = [...byState.keys()].filter((state) => !requiredStates.includes(state));
-if (unexpected.length > 0) {
-  fail(`unexpected screenshot state(s): ${unexpected.join(', ')}`);
-}
-
 const outputRoot = path.join(repoRoot, 'apps/ios/build/AppStoreScreenshots');
 const locale = metadata.app?.primaryLocale ?? 'ru-KG';
-const device = slug(screenshots.requiredSimulator ?? 'iphone');
-const outputDir = path.join(outputRoot, locale, device);
 
-fs.rmSync(outputDir, { recursive: true, force: true });
-fs.mkdirSync(outputDir, { recursive: true });
+if (!devices || typeof devices !== 'object' || Array.isArray(devices)) {
+  fail('screenshots.devices must define screenshot sources');
+}
 
-const files = requiredStates.map((state, index) => {
-  const attachment = byState.get(state);
-  const sourcePath = path.join(sourceDir, attachment.exportedFileName);
-  if (!fs.existsSync(sourcePath)) {
-    fail(`screenshot file for ${state} is missing: ${path.relative(repoRoot, sourcePath)}`);
+for (const [deviceKey, device] of Object.entries(devices)) {
+  const source = assertSafeRelativePath(device?.source, `screenshots.devices.${deviceKey}.source`);
+  const outputSlug = assertSafeRelativePath(
+    device?.outputSlug,
+    `screenshots.devices.${deviceKey}.outputSlug`,
+  );
+  if (outputSlug.includes('/') || outputSlug.includes('\\')) {
+    fail(`screenshots.devices.${deviceKey}.outputSlug must be a single directory name`);
   }
-  const png = parsePng(sourcePath);
-  const fileName = `${String(index + 1).padStart(2, '0')}-${state}.png`;
-  const outputPath = path.join(outputDir, fileName);
-  fs.copyFileSync(sourcePath, outputPath);
-  return {
-    order: index + 1,
-    state,
-    file: path.relative(repoRoot, outputPath),
-    sourceFile: path.relative(repoRoot, sourcePath),
-    suggestedHumanReadableName: attachment.suggestedHumanReadableName,
-    width: png.width,
-    height: png.height,
-    bytes: png.bytes,
-    sha256: png.sha256,
+
+  const sourceDir = path.join(repoRoot, source);
+  const sourceManifestPath = path.join(sourceDir, 'manifest.json');
+  if (!fs.existsSync(sourceDir)) {
+    fail(`source directory does not exist: ${source}`);
+  }
+  if (!fs.existsSync(sourceManifestPath)) {
+    fail(`Xcode attachment manifest is missing: ${path.relative(repoRoot, sourceManifestPath)}`);
+  }
+
+  const sourceManifest = readJson(sourceManifestPath, `${deviceKey} Xcode attachment manifest`);
+  const attachments = sourceManifest.flatMap((entry) => entry?.attachments ?? []);
+  const byState = new Map();
+
+  for (const attachment of attachments) {
+    const state = stateFromAttachment(attachment);
+    if (!state) continue;
+    const fileName = attachment.exportedFileName;
+    if (typeof fileName !== 'string' || path.basename(fileName) !== fileName) {
+      fail(`attachment for ${state} has an unsafe exported filename`);
+    }
+    if (byState.has(state)) {
+      fail(`duplicate ${deviceKey} screenshot attachment for ${state}`);
+    }
+    byState.set(state, attachment);
+  }
+
+  const missing = requiredStates.filter((state) => !byState.has(state));
+  if (missing.length > 0) {
+    fail(`missing required ${deviceKey} screenshot state(s): ${missing.join(', ')}`);
+  }
+
+  const unexpected = [...byState.keys()].filter((state) => !requiredStates.includes(state));
+  if (unexpected.length > 0) {
+    fail(`unexpected ${deviceKey} screenshot state(s): ${unexpected.join(', ')}`);
+  }
+
+  const outputDir = path.join(outputRoot, locale, outputSlug);
+  fs.rmSync(outputDir, { recursive: true, force: true });
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  const files = requiredStates.map((state, index) => {
+    const attachment = byState.get(state);
+    const sourcePath = path.join(sourceDir, attachment.exportedFileName);
+    if (!fs.existsSync(sourcePath)) {
+      fail(`screenshot file for ${state} is missing: ${path.relative(repoRoot, sourcePath)}`);
+    }
+    const png = parsePng(sourcePath);
+    const fileName = `${String(index + 1).padStart(2, '0')}-${state}.png`;
+    const outputPath = path.join(outputDir, fileName);
+    fs.copyFileSync(sourcePath, outputPath);
+    return {
+      order: index + 1,
+      state,
+      file: path.relative(repoRoot, outputPath),
+      sourceFile: path.relative(repoRoot, sourcePath),
+      suggestedHumanReadableName: attachment.suggestedHumanReadableName,
+      width: png.width,
+      height: png.height,
+      bytes: png.bytes,
+      sha256: png.sha256,
+    };
+  });
+
+  const manifest = {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    app: {
+      name: metadata.app?.name,
+      bundleId: metadata.app?.bundleId,
+      primaryLocale: locale,
+    },
+    source: {
+      directory: source,
+      manifest: path.relative(repoRoot, sourceManifestPath),
+      simulator: device.simulator,
+    },
+    output: {
+      directory: path.relative(repoRoot, outputDir),
+      count: files.length,
+    },
+    files,
   };
-});
 
-const manifest = {
-  schemaVersion: 1,
-  generatedAt: new Date().toISOString(),
-  app: {
-    name: metadata.app?.name,
-    bundleId: metadata.app?.bundleId,
-    primaryLocale: locale,
-  },
-  source: {
-    directory: source,
-    manifest: path.relative(repoRoot, sourceManifestPath),
-    simulator: screenshots.requiredSimulator,
-  },
-  output: {
-    directory: path.relative(repoRoot, outputDir),
-    count: files.length,
-  },
-  files,
-};
+  const manifestPath = path.join(outputDir, 'manifest.json');
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-const manifestPath = path.join(outputDir, 'manifest.json');
-fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-
-console.log(
-  `ios store screenshots: packaged ${files.length} screenshots into ${path.relative(
-    repoRoot,
-    outputDir,
-  )}`,
-);
+  console.log(
+    `ios store screenshots (${deviceKey}): packaged ${files.length} screenshots into ${path.relative(
+      repoRoot,
+      outputDir,
+    )}`,
+  );
+}

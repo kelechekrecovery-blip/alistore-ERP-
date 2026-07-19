@@ -72,10 +72,26 @@ if (/password|парол|token|secret|sk-|cfat_/iu.test(metadata.review.notes)) 
   fail('review.notes must not contain secrets or credentials');
 }
 
-if (metadata.screenshots?.requiredSimulator !== 'iPhone 17 Pro') {
-  fail('screenshots.requiredSimulator must be iPhone 17 Pro');
-}
 if (metadata.screenshots?.requiredPngCount !== 17) fail('screenshots.requiredPngCount must be 17');
+const screenshotDevices = metadata.screenshots?.devices;
+if (!screenshotDevices || typeof screenshotDevices !== 'object') {
+  fail('screenshots.devices must define iPhone and iPad screenshot sets');
+}
+const requiredScreenshotDevices = {
+  iphone: { simulator: 'iPhone 17 Pro', outputSlug: 'iphone-17-pro' },
+  ipad: { simulator: 'iPad Pro 11-inch (M5)', outputSlug: 'ipad-pro-11' },
+};
+for (const [device, expected] of Object.entries(requiredScreenshotDevices)) {
+  const config = screenshotDevices[device];
+  if (!config || typeof config !== 'object') fail(`screenshots.devices.${device} is required`);
+  assertString(config.source, `screenshots.devices.${device}.source`, { min: 10, max: 200 });
+  if (config.simulator !== expected.simulator) {
+    fail(`screenshots.devices.${device}.simulator must be ${expected.simulator}`);
+  }
+  if (config.outputSlug !== expected.outputSlug) {
+    fail(`screenshots.devices.${device}.outputSlug must be ${expected.outputSlug}`);
+  }
+}
 const requiredStates = metadata.screenshots?.requiredStates;
 if (!Array.isArray(requiredStates) || requiredStates.length !== 17) {
   fail('screenshots.requiredStates must contain exactly 17 states');

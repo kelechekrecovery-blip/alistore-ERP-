@@ -337,7 +337,7 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
     }
 
-    func testClientPrototypeVisualEvidence() {
+    func testClientPrototypeVisualEvidencePart1() {
         let home = launchGuest()
         capture(home, named: "client-home")
 
@@ -374,7 +374,9 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(search.buttons["iPhone 15"].exists)
         XCTAssertTrue(search.staticTexts["Осталось 3 шт"].exists)
         capture(search, named: "client-search")
+    }
 
+    func testClientPrototypeVisualEvidencePart2() {
         let cart = XCUIApplication()
         cart.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-cart", "--ui-testing-visual-evidence"]
         cart.launch()
@@ -414,7 +416,9 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(loyalty.navigationBars["Бонусы"].waitForExistence(timeout: 5))
         XCTAssertTrue(loyalty.staticTexts["Бонусы и купоны"].waitForExistence(timeout: 5))
         capture(loyalty, named: "client-loyalty")
+    }
 
+    func testClientPrototypeVisualEvidencePart3() {
         let returns = launchSignedInAccount()
         returns.staticTexts["Возвраты"].tap()
         XCTAssertTrue(returns.navigationBars["Возвраты"].waitForExistence(timeout: 5))

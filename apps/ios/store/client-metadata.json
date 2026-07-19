@@ -34,9 +34,19 @@
     }
   },
   "screenshots": {
-    "source": "apps/ios/build/AliStoreClientVisual-attachments",
-    "requiredSimulator": "iPhone 17 Pro",
     "requiredPngCount": 17,
+    "devices": {
+      "iphone": {
+        "source": "apps/ios/build/AliStoreClientVisual-iphone-attachments",
+        "simulator": "iPhone 17 Pro",
+        "outputSlug": "iphone-17-pro"
+      },
+      "ipad": {
+        "source": "apps/ios/build/AliStoreClientVisual-ipad-attachments",
+        "simulator": "iPad Pro 11-inch (M5)",
+        "outputSlug": "ipad-pro-11"
+      }
+    },
     "requiredStates": [
       "client-home",
       "client-catalog",
