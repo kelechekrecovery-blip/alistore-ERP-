@@ -440,8 +440,10 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - `E2E-AUDIT-004` INFO — local suite green modulo concurrent-Codex churn: chromium
   107/112 (the 5 `storefront-cms-ui` failures were a transient state of Codex's mid-edit
   `app/erp/page.tsx` re-gating the `CMS витрины` label → "Управление сайтом"; they PASS
-  in the later webkit/firefox run). webkit+firefox 222/224 (2 webkit-only ERP-UI flakes).
-  Not fixed here — Codex's active web/ERP lane. Codex to reconcile the stale spec labels.
+  in the later webkit/firefox run). webkit+firefox 222/224 (2 webkit-only ERP-UI failures,
+  `erp-secure` + `store-operations` — re-verified **3/3 PASS in isolation**, confirmed
+  flaky/concurrency, not product bugs; both also passed under chromium). Net: suite green
+  across all 3 browsers modulo concurrency. Codex to reconcile the stale CMS spec labels.
 - `E2E-AUDIT-005` INFO — API gate: `mvp:verify --skip-e2e` hit one HTTP-transport flake
   (`Parse Error: Expected HTTP/`) in `finance-expenses.e2e-spec.ts` batch 55/172 from
   shared-resource contention with the parallel Codex; re-verified **17/17 PASS in
