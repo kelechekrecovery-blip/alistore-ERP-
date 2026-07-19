@@ -4650,3 +4650,14 @@
 - Checks: visual acceptance `3/3`; `npm run ecosystem:audit` passes all available local contract checks; `npm run ecosystem:audit:strict` fails closed with 7 explicit blockers: iOS UI evidence, Android connected UI evidence, POS/refund reconciliation, courier/COD reconciliation, service/loaner reconciliation, procurement/sale reconciliation and the composite ecosystem matrix.
 - Public smoke: `ali.kg`, `www.ali.kg`, `admin.ali.kg`, API live and API ready returned HTTP 200 after restarting the workstation-backed tunnel.
 - Limitation: the public route is still a local Cloudflare tunnel, not durable Render infrastructure; live providers, physical-device certification and staging restore/rollback remain open.
+
+## E2E-GATE-049
+
+- Date: 2026-07-19
+- Scope: stabilize and re-run the full software reconciliation matrix after the public recovery work.
+- Changes: Playwright global teardown now removes the isolated Next dev lock between sequential profiles; the courier COD fixture freezes the browser business date and waits for the selected delivery mode, preventing midnight and hydration flakes.
+- Checks: composite reconciliation passed `4/4`; refreshed visual `3/3`, POS refund, courier COD, service/loaner, procurement/sale and composite evidence against the current source tree; `npm run ecosystem:audit` passes all local checks.
+- Strict result: only `ios-app-ui-gate` and `android-app-ui-gate` remain. These require accepted native UI evidence; they are not Web failures.
+- Public smoke: `https://ali.kg/`, `https://www.ali.kg/`, `https://admin.ali.kg/`, API live and API ready all returned HTTP 200.
+- Commits: `ad51033`, `7d59058`, `ec11d24`, `bca15c6`, `38fe61b`, `ffd7017`, `7243ea3` (all pushed to `origin/main`).
+- Remaining: durable Render deployment, native UI/physical-device certification, live providers, staging restore/rollback, and owner-approved handling of any external release gates.
