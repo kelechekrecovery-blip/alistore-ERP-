@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packageLockSha256": "c3dc499209f49db6a92d512c695c2cec09d32109e17879908ec8b83d7ae55d40",
-  "nodeModulesTreeSha256": "9e8a314c6435ac6806b36b9befe8c62adcdc0789d0581502d9aa2d8d11f0a372",
+  "nodeModulesTreeSha256": "6f96359a930471ff57e3a45029ad68b3c63fca07697b5686dee22e6f82063314",
   "runtime": {
     "platform": "darwin",
     "architecture": "arm64",
