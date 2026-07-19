@@ -430,13 +430,17 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
   prod web build shipped without `NEXT_PUBLIC_API_BASE`. api.ali.kg is healthy and
   CORS-correct. FIXED in code (`apps/web/lib/api/http.ts` self-heals to
   `https://api.<apex>/api`, commits `8a4fc1a`+`1cfbc1c`). **OPEN (owner/deploy):**
-  redeploy `apps/web` — live storefront stays data-empty until then.
+  redeploy `apps/web` — live storefront stays data-empty until then. A ready minimal-risk
+  branch `claude/prod-web-hotfix` (local, unpushed) has just the 3 web fixes cherry-picked
+  onto `origin/main`, tsc-clean, no Codex WIP — push + deploy it, or merge the full
+  integration branch.
 - `E2E-AUDIT-002` MEDIUM — `SiteHeader` horizontal overflow at ≤389px (320/375). FIXED
   (`8a4fc1a`+`1cfbc1c`): collapse Favorites/Compare header icons <390px + add them to
   the mobile menu + trim padding. Verified 320/375/390 fit. Reaches prod on redeploy.
-- `E2E-AUDIT-003` LOW — a11y (apps/web): `/checkout` lacks an `<h1>`; `/catalog` has 1
-  unlabeled input (search); `/support` has 4 unlabeled form inputs. Re-check image alt
-  coverage after E2E-AUDIT-001 redeploy (products currently don't render).
+- `E2E-AUDIT-003` LOW — a11y (apps/web): **FIXED** (`7c9570c`) — `<h1>` added to the
+  `/checkout` form; `aria-label` added to the `/catalog` search input and the 4 `/support`
+  form inputs (verified `input(nolabel)=0` locally). Re-check image alt coverage after
+  E2E-AUDIT-001 redeploy (products currently don't render).
 - `E2E-AUDIT-004` INFO — local suite green modulo concurrent-Codex churn: chromium
   107/112 (the 5 `storefront-cms-ui` failures were a transient state of Codex's mid-edit
   `app/erp/page.tsx` re-gating the `CMS витрины` label → "Управление сайтом"; they PASS
