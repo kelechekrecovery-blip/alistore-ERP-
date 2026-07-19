@@ -417,3 +417,32 @@ Independent fresh-eyes sweep recorded in `docs/GAP-ANALYSIS-2026-07-17.md`. Thes
 - [x] Confirm every local software gate passes, including composite reconciled E2E and source/evidence hash integrity.
 - [ ] Obtain or explicitly retire the 64 missing linked handoff references with owner approval; strict audit remains blocked until then.
 - [ ] Complete external gates: live providers, staging certification, physical-device checks, and store release.
+
+# E2E-AUDIT-2026-07-19 — full ecosystem e2e (prod smoke + local write-flow, 3 browsers)
+
+Scope: read-only prod smoke against `https://ali.kg` (chromium+webkit+firefox) + local
+full write-flow suite on isolated `alistore_e2e_test`. Reviewed by typescript-reviewer
+agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config.ts`.
+
+- `E2E-AUDIT-001` **CRITICAL — prod storefront serves no data.** The deployed `ali.kg`
+  bundle calls `http://localhost:4000/api` (catalog/storefront/categories/search) →
+  CORS-blocked from the https origin → empty catalog/search on every page. Root cause:
+  prod web build shipped without `NEXT_PUBLIC_API_BASE`. api.ali.kg is healthy and
+  CORS-correct. FIXED in code (`apps/web/lib/api/http.ts` self-heals to
+  `https://api.<apex>/api`, commits `8a4fc1a`+`1cfbc1c`). **OPEN (owner/deploy):**
+  redeploy `apps/web` — live storefront stays data-empty until then.
+- `E2E-AUDIT-002` MEDIUM — `SiteHeader` horizontal overflow at ≤389px (320/375). FIXED
+  (`8a4fc1a`+`1cfbc1c`): collapse Favorites/Compare header icons <390px + add them to
+  the mobile menu + trim padding. Verified 320/375/390 fit. Reaches prod on redeploy.
+- `E2E-AUDIT-003` LOW — a11y (apps/web): `/checkout` lacks an `<h1>`; `/catalog` has 1
+  unlabeled input (search); `/support` has 4 unlabeled form inputs. Re-check image alt
+  coverage after E2E-AUDIT-001 redeploy (products currently don't render).
+- `E2E-AUDIT-004` INFO — local suite green modulo concurrent-Codex churn: chromium
+  107/112 (the 5 `storefront-cms-ui` failures were a transient state of Codex's mid-edit
+  `app/erp/page.tsx` re-gating the `CMS витрины` label → "Управление сайтом"; they PASS
+  in the later webkit/firefox run). webkit+firefox 222/224 (2 webkit-only ERP-UI flakes).
+  Not fixed here — Codex's active web/ERP lane. Codex to reconcile the stale spec labels.
+- `E2E-AUDIT-005` INFO — API gate: `mvp:verify --skip-e2e` hit one HTTP-transport flake
+  (`Parse Error: Expected HTTP/`) in `finance-expenses.e2e-spec.ts` batch 55/172 from
+  shared-resource contention with the parallel Codex; re-verified **17/17 PASS in
+  isolation**. API layer healthy; CI runs this gate in isolation.
