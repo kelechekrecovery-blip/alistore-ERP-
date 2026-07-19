@@ -14,6 +14,10 @@ import { fetchStorefrontContent, type StorefrontPayload } from '@/lib/api';
 const MOBILE_NAV = [
   { href: '/', label: 'Магазин' },
   { href: '/catalog', label: 'Каталог' },
+  // Favorites/Compare are hidden from the header icon row below 390px; keep them
+  // reachable here so narrow phones don't lose access to those features.
+  { href: '/favorites', label: 'Избранное' },
+  { href: '/compare', label: 'Сравнить' },
   { href: '/trade-in', label: 'Trade-in' },
   { href: '/support', label: 'Поддержка' },
   { href: '/b2b', label: 'Для бизнеса' },

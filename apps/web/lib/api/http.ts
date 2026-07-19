@@ -20,7 +20,11 @@ function resolveApiBase(): string {
     const isLocalHost =
       hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
     if (!isLocalHost) {
-      const apex = hostname.replace(/^www\./, '');
+      // Derive the registrable apex from the last two labels so ANY subdomain
+      // (www.ali.kg, admin.ali.kg, …) resolves to the single provisioned API host
+      // api.ali.kg — not api.<subdomain>.ali.kg, which isn't a real DNS record.
+      const labels = hostname.split('.');
+      const apex = labels.length > 2 ? labels.slice(-2).join('.') : hostname;
       return `${protocol}//api.${apex}/api`;
     }
   }
