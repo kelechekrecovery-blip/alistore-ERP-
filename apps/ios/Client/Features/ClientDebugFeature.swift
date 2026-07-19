@@ -8,6 +8,7 @@ enum ClientDebugFeature: String, Identifiable {
     case referral
     case waitlist
     case supportChat
+    case orderTracking
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum ClientDebugFeature: String, Identifiable {
             case .referral: ReferralView()
             case .waitlist: WaitlistView()
             case .supportChat: SupportChatView()
+            case .orderTracking: OrderTrackingView()
             }
         }
         .preferredColorScheme(.dark)

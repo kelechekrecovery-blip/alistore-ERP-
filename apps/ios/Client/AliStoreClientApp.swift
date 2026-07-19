@@ -3817,6 +3817,9 @@ private struct AccountView: View {
                 AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath", badge: "оценка") {
                     CustomerTradeInsView(environment: environment, auth: auth)
                 }
+                AccountMenuTile(title: "Отследить заказ", detail: "Курьер и самовывоз", symbol: "location.fill", badge: "в пути") {
+                    OrderTrackingView()
+                }
                 AccountMenuTile(title: "Моя рассрочка", detail: "График и платежи", symbol: "creditcard.fill", badge: "1 активна") {
                     InstallmentView()
                 }
