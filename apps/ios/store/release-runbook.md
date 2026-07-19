@@ -9,7 +9,7 @@ certification.
 Set these in the shell or CI protected environment. Never commit them:
 
 ```bash
-export ALISTORE_API_BASE_URL="https://api.alistore.kg/api"
+export ALISTORE_API_BASE_URL="https://api.ali.kg/api"
 export DEVELOPMENT_TEAM="XXXXXXXXXX"
 export ASC_API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_KEYID.p8"
 export ASC_KEY_ID="KEYID_FROM_AUTHKEY_FILENAME"

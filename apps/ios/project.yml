@@ -65,7 +65,7 @@ targets:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)
           APS_ENVIRONMENT: production
-          PAYMENT_RETURN_URL: https://alistore.kg/payment-return
+          PAYMENT_RETURN_URL: https://ali.kg/payment-return
   AliStoreStaff:
     type: application
     platform: iOS
