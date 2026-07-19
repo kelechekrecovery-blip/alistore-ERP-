@@ -198,23 +198,22 @@ test.describe('prod · authenticated routes are gated', () => {
       expect(response!.status(), `${route} returned a server error`).toBeLessThan(500);
       await page.waitForLoadState('domcontentloaded', { timeout: 20_000 }).catch(() => undefined);
 
-      const gatedByUrl = /\/login|\/erp|\/pos|\/staff|\/warehouse|\/approvals|\/account|\/admin|\/ai-tools|\/refunds/.test(
-        new URL(page.url()).pathname,
-      );
+      // Real gate signal only: either the app redirected to /login, or it renders a
+      // login affordance in place (client-gated pages keep their own URL). We must NOT
+      // treat the route's own path as "gated" — that would be tautological and could
+      // mask a regression that leaks protected content to an unauthenticated visitor.
+      const redirectedToLogin = /\/login(\/|\?|$)/.test(new URL(page.url()).pathname);
+      if (redirectedToLogin) return;
+
       const cssGate = page.locator(
         'input[type="tel"], input[type="password"], input[name*="phone" i], input[name*="otp" i], button:has-text("Войти"), button:has-text("Вход")',
       );
       const textGate = page.getByText(/войти|вход|log ?in|sign ?in/i);
-      const loginAffordance = await cssGate
-        .or(textGate)
-        .first()
-        .isVisible()
-        .catch(() => false);
-
-      expect(
-        gatedByUrl || loginAffordance,
-        `${route} did not gate: url=${page.url()} and no login affordance found (possible access-control issue)`,
-      ).toBeTruthy();
+      // Poll (absorbs client hydration + async auth redirect) instead of a one-shot read.
+      await expect(
+        cssGate.or(textGate).first(),
+        `${route} did not gate: stayed on ${new URL(page.url()).pathname} with no login affordance (possible access-control issue)`,
+      ).toBeVisible({ timeout: 10_000 });
     });
   }
 });

@@ -24,7 +24,9 @@ export default defineConfig({
   use: {
     baseURL,
     trace: 'on',
-    screenshot: 'on',
+    // Intentional 375/1440 captures are taken explicitly via testInfo.attach in the
+    // spec; auto-capture only on failure to avoid doubling artifact volume.
+    screenshot: 'only-on-failure',
     video: 'off',
   },
   projects: browsers.map((browser) => {
