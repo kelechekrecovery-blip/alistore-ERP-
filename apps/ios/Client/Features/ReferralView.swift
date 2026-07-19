@@ -13,7 +13,7 @@ struct ReferralView: View {
     @State private var copied = false
 
     private var shareURL: URL? {
-        URL(string: "https://alistore.kg/ref/\(code)")
+        URL(string: "https://ali.kg/ref/\(code)")
     }
 
     var body: some View {

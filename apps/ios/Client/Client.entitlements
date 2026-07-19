@@ -4,8 +4,8 @@
 <dict>
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <string>applinks:alistore.kg</string>
-        <string>applinks:www.alistore.kg</string>
+        <string>applinks:ali.kg</string>
+        <string>applinks:www.ali.kg</string>
     </array>
     <key>aps-environment</key>
     <string>$(APS_ENVIRONMENT)</string>
