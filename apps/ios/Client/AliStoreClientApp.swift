@@ -1053,7 +1053,7 @@ private struct ClientRootView: View {
         .onOpenURL { url in
             let customScheme = url.scheme == "alistore" && url.host == "payment-return"
             let httpsLink = url.scheme == "https" &&
-                (url.host == "alistore.kg" || url.host == "www.alistore.kg") &&
+                (url.host == "ali.kg" || url.host == "www.ali.kg") &&
                 url.path == "/payment-return"
             guard customScheme || httpsLink else { return }
             selectedTab = .account
@@ -5639,10 +5639,7 @@ private struct CatalogView: View {
     private var localFallbackProducts: [Product] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         var result = products.filter { product in
-            let matchesQuery = query.isEmpty ||
-                product.name.localizedCaseInsensitiveContains(query) ||
-                product.category.localizedCaseInsensitiveContains(query) ||
-                product.sku.localizedCaseInsensitiveContains(query)
+            let matchesQuery = SmartSearch.matches(query, fields: [product.name, product.category, product.sku])
             let matchesCategory = selectedCategory.isEmpty || product.category == selectedCategory
             let matchesStock = !stockOnly || product.availableUnits > 0
             return matchesQuery && matchesCategory && matchesStock

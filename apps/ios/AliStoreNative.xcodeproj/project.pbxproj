@@ -69,6 +69,7 @@
 		D1F1BA53DC9B26473B962F02 /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2D17FA3900F6A16DD7BA9C62 /* JetBrainsMono-Regular.ttf */; };
 		D41D08C37ADC9A026A6A1BD9 /* OFL-JetBrainsMono.txt in Resources */ = {isa = PBXBuildFile; fileRef = 242B1D211D250E4D9D64635B /* OFL-JetBrainsMono.txt */; };
 		D8540E88D9B3581F66746FF8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */; };
+		DAF231BFB615CD79C0300ADF /* SmartSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = C348479F602D4264A6697DC8 /* SmartSearch.swift */; };
 		DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */; };
 		E3B3670272FF6B5A0E381FFE /* CourierOperationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */; };
 		E4AFBA9E7AA4F56F3FB28A7E /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -274,6 +275,7 @@
 		AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Staff.entitlements; sourceTree = "<group>"; };
 		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
+		C348479F602D4264A6697DC8 /* SmartSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSearch.swift; sourceTree = "<group>"; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutContractTests.swift; sourceTree = "<group>"; };
 		CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientUITests.swift; sourceTree = "<group>"; };
@@ -501,6 +503,7 @@
 				71A1CBC09633E9E221DC03E3 /* InstallmentView.swift */,
 				8F3970931F4839B3C2A168BE /* OrderTrackingView.swift */,
 				14D9ECDFDBC25D5BACF48D03 /* ReferralView.swift */,
+				C348479F602D4264A6697DC8 /* SmartSearch.swift */,
 				5D95C4B497368547545CF2AB /* StoriesViewer.swift */,
 				98164133D41CBD85293AD716 /* SupportChatView.swift */,
 				6383E95E61180D3B14C31526 /* SystemStatesView.swift */,
@@ -909,6 +912,7 @@
 				B7D091E62045AE7C5ED634F9 /* InstallmentView.swift in Sources */,
 				03E06D3A831510A208B2CA6E /* OrderTrackingView.swift in Sources */,
 				492FE010C8F04B72F808B040 /* ReferralView.swift in Sources */,
+				DAF231BFB615CD79C0300ADF /* SmartSearch.swift in Sources */,
 				6671744F29AD025FF2589365 /* StoriesViewer.swift in Sources */,
 				2935B3E1DC695ADF56DEAF82 /* SupportChatView.swift in Sources */,
 				98235E7E7D8DF4F3815F95C0 /* SystemStatesView.swift in Sources */,
@@ -1083,7 +1087,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PAYMENT_RETURN_URL = "https://alistore.kg/payment-return";
+				PAYMENT_RETURN_URL = "https://ali.kg/payment-return";
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.client;
 				PRODUCT_NAME = AliStore;
 				SDKROOT = iphoneos;
