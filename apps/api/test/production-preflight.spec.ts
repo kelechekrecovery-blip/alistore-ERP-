@@ -59,8 +59,8 @@ describe('Production preflight report', () => {
       ({
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://alistore-prod.internal:5432/alistore',
-        CORS_ORIGINS: 'https://alistore.kg,https://admin.alistore.kg',
-        ALLOWED_HOSTS: 'api.alistore.kg',
+        CORS_ORIGINS: 'https://ali.kg,https://admin.ali.kg',
+        ALLOWED_HOSTS: 'api.ali.kg',
         JWT_SECRET: strongSecret,
         AUTH_OTP_DEV_ECHO: 'false',
         RESERVATION_SWEEP_ENABLED: 'true',
@@ -84,8 +84,8 @@ describe('Production preflight report', () => {
     const base = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://alistore.internal:5432/alistore_demo',
-      CORS_ORIGINS: 'https://staging.alistore.kg,https://admin-staging.alistore.kg',
-      ALLOWED_HOSTS: 'api-staging.alistore.kg',
+      CORS_ORIGINS: 'https://staging.ali.kg,https://admin-staging.ali.kg',
+      ALLOWED_HOSTS: 'api-staging.ali.kg',
       JWT_SECRET: '0123456789abcdef0123456789abcdef',
       AUTH_OTP_DEV_ECHO: 'false',
       RESERVATION_SWEEP_ENABLED: 'true',

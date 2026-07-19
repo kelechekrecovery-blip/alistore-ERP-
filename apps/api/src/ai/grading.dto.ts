@@ -11,7 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DeviceGrade } from './valuation';
 
 export class PhotoEvidenceDto {
-  @ApiPropertyOptional({ example: 'https://cdn.alistore.kg/evidence/front.webp' })
+  @ApiPropertyOptional({ example: 'https://cdn.ali.kg/evidence/front.webp' })
   @IsOptional()
   @IsString()
   url?: string;

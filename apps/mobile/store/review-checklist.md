@@ -15,8 +15,8 @@
 - `EXPO_PUBLIC_EAS_PROJECT_ID` from the linked EAS project.
 - Production API must pass `npm run launch:check` at the repository root.
 - Demo customer account and staff account for reviewers.
-- Published privacy policy: `https://alistore.kg/privacy`.
-- Published support URL: `https://alistore.kg/support`.
+- Published privacy policy: `https://ali.kg/privacy`.
+- Published support URL: `https://ali.kg/support`.
 
 ## TestFlight First
 

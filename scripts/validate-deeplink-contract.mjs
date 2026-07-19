@@ -23,7 +23,7 @@ for (const packageName of ['kg.alistore.client', 'kg.alistore.staff', 'kg.alisto
   requireText('apps/web/app/.well-known/assetlinks.json/route.ts', packageName);
 }
 
-for (const host of ['alistore.kg', 'www.alistore.kg']) {
+for (const host of ['ali.kg', 'www.ali.kg']) {
   requireText('apps/api/src/payments/sandbox-payments.controller.ts', host);
   requireText('apps/ios/Client/Client.entitlements', `applinks:${host}`);
   requireText('apps/android/app/src/main/AndroidManifest.xml', `android:host="${host}"`);
@@ -32,7 +32,7 @@ requireText('apps/api/src/payments/sandbox-payments.controller.ts', "url.pathnam
 requireText('apps/android/app/src/main/AndroidManifest.xml', 'android:autoVerify="true"');
 requireText('apps/android/core/src/main/java/kg/alistore/core/ClientPaymentReturn.kt', 'isHttpsAppLink');
 requireText('apps/ios/Client/AliStoreClientApp.swift', 'httpsLink');
-requireText('apps/ios/project.yml', 'PAYMENT_RETURN_URL: https://alistore.kg/payment-return');
+requireText('apps/ios/project.yml', 'PAYMENT_RETURN_URL: https://ali.kg/payment-return');
 requireText('apps/android/app/build.gradle.kts', 'PAYMENT_RETURN_URL');
 
 if (failures.length) {

@@ -6,9 +6,9 @@
 - Default language: Russian
 - Category: Shopping
 - Tags: electronics, retail, POS, orders
-- Contact email: support@alistore.kg
-- Website: https://alistore.kg
-- Privacy policy: https://alistore.kg/privacy
+- Contact email: support@ali.kg
+- Website: https://ali.kg
+- Privacy policy: https://ali.kg/privacy
 
 ## Short Description
 

@@ -46,7 +46,7 @@ function safeReturnUrl(value: string | undefined): string | null {
   try {
     const url = new URL(value);
     if (url.protocol === 'alistore:' && url.hostname === 'payment-return' && !url.pathname) return value;
-    if (url.protocol === 'https:' && ['alistore.kg', 'www.alistore.kg'].includes(url.hostname) && url.pathname === '/payment-return') return value;
+    if (url.protocol === 'https:' && ['ali.kg', 'www.ali.kg'].includes(url.hostname) && url.pathname === '/payment-return') return value;
   } catch {
     return null;
   }

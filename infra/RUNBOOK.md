@@ -40,7 +40,7 @@ SERVICE_SLA_SWEEP_ENABLED=true
 DEBT_REMINDERS_ENABLED=true
 NOTIFICATION_TRANSPORT=log
 MEDIA_STORAGE=s3
-MEDIA_PUBLIC_BASE=https://api.alistore.kg/uploads
+MEDIA_PUBLIC_BASE=https://api.ali.kg/uploads
 S3_ENDPOINT=http://127.0.0.1:9000
 S3_REGION=us-east-1
 MINIO_BUCKET=alistore
@@ -82,7 +82,7 @@ ExecStart=/usr/bin/npm run start:prod -w @alistore/api
 For Next.js:
 
 ```bash
-NEXT_PUBLIC_API_BASE=https://api.alistore.kg/api npm run start -w @alistore/web
+NEXT_PUBLIC_API_BASE=https://api.ali.kg/api npm run start -w @alistore/web
 ```
 
 ## 4. Self-Hosted Services
@@ -117,8 +117,8 @@ sudo caddy reload --config infra/Caddyfile
 Smoke checks:
 
 ```bash
-curl -fsS https://api.alistore.kg/api/health
-curl -I https://alistore.kg
+curl -fsS https://api.ali.kg/api/health
+curl -I https://ali.kg
 ```
 
 Expected:
@@ -210,8 +210,8 @@ Recorded drills:
 After every deploy:
 
 ```bash
-curl -fsS https://api.alistore.kg/api/health
-curl -fsS https://api.alistore.kg/api/reports/dashboard >/tmp/alistore-dashboard.json
+curl -fsS https://api.ali.kg/api/health
+curl -fsS https://api.ali.kg/api/reports/dashboard >/tmp/alistore-dashboard.json
 ```
 
 Manual smoke:

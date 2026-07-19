@@ -19,7 +19,7 @@ describe('LabelsService (bwip-js)', () => {
   });
 
   it('generates a QR SVG for a product URL', () => {
-    const svg = labels.qrLabel('https://alistore.kg/p/123');
+    const svg = labels.qrLabel('https://ali.kg/p/123');
     expect(svg.startsWith('<svg')).toBe(true);
     expect(svg.length).toBeGreaterThan(200);
   });

@@ -2,7 +2,7 @@
 
 This file is the source checklist for App Store privacy labels and Google Play
 Data safety. It is not a legal policy; publish the final policy at
-`https://alistore.kg/privacy` before submission.
+`https://ali.kg/privacy` before submission.
 
 ## Data Collected
 

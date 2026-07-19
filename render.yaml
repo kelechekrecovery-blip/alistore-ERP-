@@ -7,7 +7,7 @@ services:
     dockerfilePath: ./docker/api.Dockerfile
     dockerContext: .
     autoDeployTrigger: off
-    renderSubdomainPolicy: disabled
+    renderSubdomainPolicy: allowed
     healthCheckPath: /api/health/live
     preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
@@ -49,11 +49,11 @@ services:
     dockerfilePath: ./docker/web.Dockerfile
     dockerContext: .
     autoDeployTrigger: off
-    renderSubdomainPolicy: disabled
+    renderSubdomainPolicy: allowed
     healthCheckPath: /healthz
     envVars:
       - key: ALLOWED_HOSTS
-        value: alistore.kg,www.alistore.kg,admin.alistore.kg
+        value: ali.kg,www.ali.kg,admin.ali.kg
       - key: PUBLIC_DEMO_MODE
         value: "true"
       - key: NEXT_PUBLIC_DEMO_MODE
@@ -172,9 +172,9 @@ envVarGroups:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://alistore.kg,https://www.alistore.kg,https://admin.alistore.kg
+        value: https://ali.kg,https://www.ali.kg,https://admin.ali.kg
       - key: ALLOWED_HOSTS
-        value: api.alistore.kg
+        value: api.ali.kg
       - key: PUBLIC_DEMO_MODE
         value: "true"
       - key: AUTH_OTP_DEV_ECHO
@@ -210,7 +210,7 @@ envVarGroups:
       - key: EVIDENCE_SIGNED_URL_TTL_SECONDS
         value: "300"
       - key: S3_PUBLIC_BASE
-        value: https://media.alistore.kg
+        value: https://media.ali.kg
       - key: MINIO_BUCKET
         value: alistore-media-prod
       - key: S3_BACKUP_BUCKET

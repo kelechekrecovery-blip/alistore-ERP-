@@ -149,9 +149,9 @@ describe('labels API mapping (UI-PRINT)', () => {
 
   it('renderQrLabel POSTs { text } to /labels/qr', async () => {
     const calls = stubFetch({ svg: '<svg/>' });
-    await renderQrLabel('https://alistore.kg/product/ip15', 'token-9');
+    await renderQrLabel('https://ali.kg/product/ip15', 'token-9');
     expect(calls[0].url).toMatch(/\/labels\/qr$/);
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ text: 'https://alistore.kg/product/ip15' });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ text: 'https://ali.kg/product/ip15' });
   });
 });
 

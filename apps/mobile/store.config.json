@@ -16,9 +16,9 @@
         ],
         "releaseNotes": "Первый нативный релиз AliStore: клиентский каталог, корзина, checkout, staff login, очередь заказов и POS-продажа поверх единого API.",
         "promoText": "Нативное приложение AliStore для покупок, заказов и POS-работы магазина.",
-        "privacyPolicyUrl": "https://alistore.kg/privacy",
-        "supportUrl": "https://alistore.kg/support",
-        "marketingUrl": "https://alistore.kg"
+        "privacyPolicyUrl": "https://ali.kg/privacy",
+        "supportUrl": "https://ali.kg/support",
+        "marketingUrl": "https://ali.kg"
       },
       "en-US": {
         "title": "AliStore",
@@ -29,9 +29,9 @@
         ],
         "releaseNotes": "First native AliStore release with customer catalog, cart, checkout, staff login, order queue, and POS sale flow over the shared API.",
         "promoText": "Native AliStore app for electronics shopping, orders, and POS operations.",
-        "privacyPolicyUrl": "https://alistore.kg/privacy",
-        "supportUrl": "https://alistore.kg/support",
-        "marketingUrl": "https://alistore.kg"
+        "privacyPolicyUrl": "https://ali.kg/privacy",
+        "supportUrl": "https://ali.kg/support",
+        "marketingUrl": "https://ali.kg"
       }
     },
     "advisory": {
@@ -58,7 +58,7 @@
     "review": {
       "firstName": "AliStore",
       "lastName": "Review",
-      "email": "review@alistore.kg",
+      "email": "review@ali.kg",
       "phone": "+996700000000",
       "notes": "Demo credentials must be provisioned in the production API before App Review. The app needs network access to the AliStore API. Staff/POS features are role-gated; customer catalog and checkout can be reviewed without staff permissions."
     }

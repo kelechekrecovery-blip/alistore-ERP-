@@ -15,7 +15,7 @@ export class EmailNotificationTransport implements NotificationTransport {
 
   constructor(config: ConfigService) {
     this.from =
-      config.get<string>('SMTP_FROM') ?? 'AliStore <no-reply@alistore.kg>';
+      config.get<string>('SMTP_FROM') ?? 'AliStore <no-reply@ali.kg>';
     const host = config.get<string>('SMTP_HOST');
     this.transporter = host
       ? createTransport({

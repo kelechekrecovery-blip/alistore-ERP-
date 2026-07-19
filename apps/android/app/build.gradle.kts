@@ -31,7 +31,7 @@ android {
             isMinifyEnabled = false
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
-            buildConfigField("String", "PAYMENT_RETURN_URL", "\"https://alistore.kg/payment-return\"")
+            buildConfigField("String", "PAYMENT_RETURN_URL", "\"https://ali.kg/payment-return\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

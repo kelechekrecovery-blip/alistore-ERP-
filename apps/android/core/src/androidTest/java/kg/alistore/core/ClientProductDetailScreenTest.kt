@@ -32,7 +32,7 @@ class ClientProductDetailScreenTest {
           onCart = { cartId = it },
           onBack = {},
           onOpenProduct = { opened = it },
-          apiBaseUrl = "https://api.alistore.kg/api",
+          apiBaseUrl = "https://api.ali.kg/api",
         )
       }
     }

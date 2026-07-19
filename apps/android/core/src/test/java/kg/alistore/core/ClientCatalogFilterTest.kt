@@ -37,7 +37,7 @@ class ClientCatalogFilterTest {
 
   @Test
   fun productMediaAcceptsHttpSourcesAndRelativePathsOnly() {
-    assertTrue(isAllowedMediaUrl("https://cdn.alistore.kg/products/phone.webp"))
+    assertTrue(isAllowedMediaUrl("https://cdn.ali.kg/products/phone.webp"))
     assertTrue(isAllowedMediaUrl("/media/products/phone.webp"))
     assertFalse(isAllowedMediaUrl("file:///etc/passwd"))
     assertFalse(isAllowedMediaUrl("javascript:alert(1)"))
@@ -46,19 +46,19 @@ class ClientCatalogFilterTest {
   @Test
   fun productMediaResolvesRelativePathAgainstConfiguredApiOrigin() {
     assertEquals(
-      "https://api.alistore.kg/media/products/phone.webp",
-      resolveMediaUrl("https://api.alistore.kg/api", "/media/products/phone.webp"),
+      "https://api.ali.kg/media/products/phone.webp",
+      resolveMediaUrl("https://api.ali.kg/api", "/media/products/phone.webp"),
     )
     assertEquals(
-      "https://cdn.alistore.kg/products/phone.webp",
-      resolveMediaUrl("https://api.alistore.kg/api", "https://cdn.alistore.kg/products/phone.webp"),
+      "https://cdn.ali.kg/products/phone.webp",
+      resolveMediaUrl("https://api.ali.kg/api", "https://cdn.ali.kg/products/phone.webp"),
     )
   }
 
   @Test
   fun paymentReturnRouteRejectsUntrustedSchemesAndParsesFailure() {
     assertEquals(null, parsePaymentReturnRoute("https://example.com/payment-return?orderId=order-1"))
-    assertEquals("order-1", parsePaymentReturnRoute("https://alistore.kg/payment-return?orderId=order-1")?.orderId)
+    assertEquals("order-1", parsePaymentReturnRoute("https://ali.kg/payment-return?orderId=order-1")?.orderId)
     val route = parsePaymentReturnRoute("alistore://payment-return?orderId=order-1&status=failed&method=card")
     assertEquals("order-1", route?.orderId)
     assertEquals("failed", route?.status)

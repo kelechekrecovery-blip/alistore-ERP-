@@ -23,7 +23,7 @@ export class CreatePaymentIntentDto {
   @Min(1)
   amount!: number;
 
-  @ApiPropertyOptional({ example: 'https://alistore.kg/account/orders/clx_order_001' })
+  @ApiPropertyOptional({ example: 'https://ali.kg/account/orders/clx_order_001' })
   @IsOptional()
   @IsString()
   returnUrl?: string;

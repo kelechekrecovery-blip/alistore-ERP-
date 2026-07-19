@@ -36,11 +36,11 @@ describe('Sandbox payment handoff', () => {
 
   it('accepts the production HTTPS payment return host', async () => {
     const response = fakeResponse();
-    await controller.confirm('PI-1', { returnUrl: 'https://alistore.kg/payment-return?orderId=o1' }, response.value);
-    expect(response.redirect).toHaveBeenCalledWith(303, 'https://alistore.kg/payment-return?orderId=o1');
+    await controller.confirm('PI-1', { returnUrl: 'https://ali.kg/payment-return?orderId=o1' }, response.value);
+    expect(response.redirect).toHaveBeenCalledWith(303, 'https://ali.kg/payment-return?orderId=o1');
 
     const rejected = fakeResponse();
-    await controller.confirm('PI-1', { returnUrl: 'https://alistore.kg.evil/payment-return?orderId=o1' }, rejected.value);
+    await controller.confirm('PI-1', { returnUrl: 'https://ali.kg.evil/payment-return?orderId=o1' }, rejected.value);
     expect(rejected.redirect).not.toHaveBeenCalled();
   });
 });

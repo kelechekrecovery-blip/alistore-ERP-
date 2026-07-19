@@ -22,6 +22,7 @@ const GRANTS: Record<string, readonly string[]> = {
   'storefront:read': ['marketer', 'admin', 'owner'],
   'inventory:count': ['warehouse', 'admin', 'owner'],
   'orders:queue': ['warehouse', 'admin', 'owner'],
+  'procurement:read': ['warehouse', 'admin', 'owner'],
   'b2b:read': ['seller', 'senior_seller', 'admin', 'owner'],
   'protection:read': ['seller', 'senior_seller', 'admin', 'owner'],
   'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
@@ -72,14 +73,14 @@ export const canPrintReceipts = (role: string) => staffCan(role, 'receipts', 'pr
 export type ErpRoute =
   | 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr'
   | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns'
-  | 'storefront' | 'risks' | 'readiness' | 'ledger';
+  | 'storefront' | 'risks' | 'readiness' | 'ledger' | 'tasks';
 
 export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   dash: { obj: 'reports', act: 'read' },
   admin: null, // module launcher filters its own cards by role
   ai: { obj: 'ai', act: 'read' },
   pricing: { obj: 'ai', act: 'read' },
-  reorder: { obj: 'ai', act: 'read' },
+  reorder: { obj: 'procurement', act: 'read' },
   finance: { obj: 'finance', act: 'read' },
   stock: { obj: 'inventory', act: 'count' },
   hr: { obj: 'hr', act: 'read' },
@@ -93,6 +94,7 @@ export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   risks: { obj: 'reports', act: 'read' },
   readiness: null, // public health endpoint, no staff permission required
   ledger: { obj: 'reports', act: 'read' },
+  tasks: null,
 };
 
 export function erpRouteAllowed(role: string, route: ErpRoute): boolean {

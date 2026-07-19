@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { API_BASE, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+import { API_BASE, postJson, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
 test.afterEach(async () => resetDb());
 
@@ -11,6 +11,13 @@ test('ERP point availability immediately controls public checkout options', asyn
   // point so this scenario isolates pickup availability.
   await prisma.deviceUnit.updateMany({ where: { productId: product.id }, data: { location: 'ARCHIVE-TEST' } });
   const owner = await seedStaffCredentials('owner', 'e2e-store-point-owner');
+  const secondPoint = await postJson<{ id: string }>(request, '/logistics/store-points', {
+    code: `e2e-point-${Date.now().toString(36)}`,
+    name: 'AliStore Asia Mall',
+    address: 'Бишкек, проспект Манаса 1',
+    inventoryLocation: 'E2E-POINT-2',
+    hours: 'Ежедневно 10:00–21:00',
+  }, owner.accessToken, { 'Idempotency-Key': `e2e-logistics-point-${Date.now()}` });
   await page.addInitScript(() => {
     localStorage.removeItem('alistore.cart.pricing.v1');
   });
@@ -33,11 +40,14 @@ test('ERP point availability immediately controls public checkout options', asyn
 
   let response = await request.get(`${API_BASE}/logistics/checkout-options`);
   expect(response.ok()).toBeTruthy();
-  expect((await response.json()).pickupPoints).toEqual([]);
+  expect((await response.json()).pickupPoints).toEqual([
+    expect.objectContaining({ id: secondPoint.id, inventoryLocation: 'E2E-POINT-2' }),
+  ]);
 
   await page.goto('/checkout');
-  await expect(page.getByText('Сейчас нет доступных точек самовывоза.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeDisabled();
+  await expect(page.getByRole('button', { name: /AliStore Asia Mall/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /AliStore Центр Бишкек/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeEnabled();
 
   await page.goto('/erp');
   await page.getByRole('button', { name: /Логистика/ }).click();
@@ -47,12 +57,13 @@ test('ERP point availability immediately controls public checkout options', asyn
   await expect(disabledPoint.getByRole('button', { name: 'Активна' })).toBeVisible();
   response = await request.get(`${API_BASE}/logistics/checkout-options`);
   expect(response.ok()).toBeTruthy();
-  expect((await response.json()).pickupPoints).toEqual(
-    expect.arrayContaining([expect.objectContaining({ id: 'alistore-bishkek-1', inventoryLocation: 'BISHKEK-1' })]),
-  );
+  expect((await response.json()).pickupPoints).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'alistore-bishkek-1', inventoryLocation: 'BISHKEK-1' }),
+    expect.objectContaining({ id: secondPoint.id, inventoryLocation: 'E2E-POINT-2' }),
+  ]));
 
   await page.goto('/checkout');
-  await expect(page.getByRole('button', { name: /^AliStore Центр Бишкек,/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /AliStore Центр Бишкек/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeEnabled();
 });
 

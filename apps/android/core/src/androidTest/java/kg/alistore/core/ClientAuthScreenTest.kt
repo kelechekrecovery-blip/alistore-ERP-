@@ -88,7 +88,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientOrdersScreen(
-          "https://api.alistore.kg/api", state, 1, {}, providedGateway = UiOrdersGateway(listOf(order)),
+          "https://api.ali.kg/api", state, 1, {}, providedGateway = UiOrdersGateway(listOf(order)),
         )
       }
     }
@@ -112,7 +112,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientOrdersScreen(
-          "https://api.alistore.kg/api",
+          "https://api.ali.kg/api",
           state,
           1,
           {},
@@ -139,7 +139,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientDevicesScreen(
-          "https://api.alistore.kg/api",
+          "https://api.ali.kg/api",
           state,
           {},
           providedGateway = gateway,
@@ -170,7 +170,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientSupportScreen(
-          "https://api.alistore.kg/api", state, {}, providedGateway = gateway,
+          "https://api.ali.kg/api", state, {}, providedGateway = gateway,
           authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
         )
       }
@@ -212,7 +212,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientReturnsScreen(
-          "https://api.alistore.kg/api", state, {}, providedGateway = gateway,
+          "https://api.ali.kg/api", state, {}, providedGateway = gateway,
           authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
         )
       }
@@ -236,7 +236,7 @@ class ClientAuthScreenTest {
     val tokens = AuthTokens("access", "refresh")
     val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
     val gateway = UiCustomerAccountGateway()
-    compose.setContent { MaterialTheme { ClientBonusesScreen("https://api.alistore.kg/api", state, {}, providedGateway = gateway) } }
+    compose.setContent { MaterialTheme { ClientBonusesScreen("https://api.ali.kg/api", state, {}, providedGateway = gateway) } }
 
     compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("bonus-balance").fetchSemanticsNode() }.isSuccess }
     compose.onNodeWithText("4820").assertIsDisplayed()
@@ -260,7 +260,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientAddressesScreen(
-          "https://api.alistore.kg/api", state, {}, providedGateway = gateway,
+          "https://api.ali.kg/api", state, {}, providedGateway = gateway,
           authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
         )
       }
@@ -283,7 +283,7 @@ class ClientAuthScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientSettingsScreen(
-          "https://api.alistore.kg/api", state, {}, providedGateway = gateway,
+          "https://api.ali.kg/api", state, {}, providedGateway = gateway,
           authManager = AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)),
         )
       }
@@ -340,7 +340,7 @@ private class UiSupportGateway(private val failFirstOpen: Boolean = false) : Cus
     return SupportTicket("support-1", "customer-1", request.channel, request.subject, request.body, request.priority, "new", "2026-07-14T00:00:00.000Z", "2026-07-13T00:00:00.000Z")
   }
   override suspend fun uploadEvidence(entityType: String, entityId: String, fileName: String, mimeType: String, bytes: ByteArray, token: String) =
-    EvidenceAttachment("evidence/key.webp", "https://media.alistore.kg/key.webp")
+    EvidenceAttachment("evidence/key.webp", "https://media.ali.kg/key.webp")
 }
 
 private class UiReturnsGateway(
@@ -356,7 +356,7 @@ private class UiReturnsGateway(
     return CustomerReturn("return-1", request.orderId, request.reason, "requested", "2026-07-13T00:00:00.000Z", null)
   }
   override suspend fun uploadEvidence(entityType: String, entityId: String, fileName: String, mimeType: String, bytes: ByteArray, token: String) =
-    EvidenceAttachment("evidence/key.webp", "https://media.alistore.kg/key.webp")
+    EvidenceAttachment("evidence/key.webp", "https://media.ali.kg/key.webp")
 }
 
 private class UiCustomerAccountGateway(

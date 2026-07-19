@@ -7,7 +7,7 @@ not certify real payments, SMS, fiscal receipts, POS hardware or native stores.
 
 Create two owner/admin identities and enable 2FA plus recovery codes for:
 
-- domain registrar for `alistore.kg`;
+- domain registrar for `ali.kg`;
 - Cloudflare and Cloudflare Zero Trust;
 - GitHub organization;
 - Render Pro workspace;
@@ -18,7 +18,7 @@ Never send recovery codes or production secrets through Git, issues or chat.
 ## 2. Cloudflare R2 EU
 
 Create `alistore-media-prod` and `alistore-backups-prod` with EU jurisdiction.
-Keep both private. Attach `media.alistore.kg` only to the approved public product
+Keep both private. Attach `media.ali.kg` only to the approved public product
 asset path; Evidence Vault and backups must never have anonymous access. Create an
 S3 token scoped only to those buckets and enter its endpoint/access key/secret in
 the Render environment group.
@@ -37,7 +37,7 @@ lifecycle cleanup for temporary uploads and the agreed backup retention period.
    Enable Internal Authentication on each Render Key Value instance, then resync
    the Blueprint so `REDIS_URL` contains credentials required by production preflight.
 4. Import `render.yaml` into a separate protected production environment.
-5. Attach `alistore.kg`, `www.alistore.kg`, `admin.alistore.kg` and `api.alistore.kg`.
+5. Attach `ali.kg`, `www.ali.kg`, `admin.ali.kg` and `api.ali.kg`.
 6. Confirm the API/web Render subdomains are disabled and cannot serve application content.
 7. Send a controlled Sentry error and verify environment/release tagging plus PII scrubbing.
 
@@ -52,7 +52,7 @@ image rollback; use a forward migration.
 - Cache only Next static assets and public catalog media. Bypass account, ERP and API mutations.
 - Apply managed WAF rules and bot protection.
 - Rate-limit OTP, checkout, payment intent/webhook and upload paths.
-- Create a self-hosted Access application for `admin.alistore.kg/*` and protected
+- Create a self-hosted Access application for `admin.ali.kg/*` and protected
   internal paths on the apex domain. Allow named employee emails only; never use
   `Everyone` or `All valid emails`. Require MFA and short sessions.
 - Retain application staff JWT, RBAC and 2FA behind Access.
@@ -60,8 +60,8 @@ image rollback; use a forward migration.
 ## 5. Verification and rollback
 
 ```bash
-WEB_BASE_URL=https://alistore.kg \
-API_BASE_URL=https://api.alistore.kg \
+WEB_BASE_URL=https://ali.kg \
+API_BASE_URL=https://api.ali.kg \
 node scripts/deployment-smoke.mjs
 
 npm run launch:preflight:strict

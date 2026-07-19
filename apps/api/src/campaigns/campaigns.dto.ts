@@ -61,7 +61,7 @@ export class CreateCampaignDto extends SegmentRulesDto {
   @ApiPropertyOptional({ example: 'Скидка 10% на аксессуары до воскресенья' })
   @IsOptional() @IsString() @MaxLength(1000) creativeBody?: string;
 
-  @ApiPropertyOptional({ example: 'https://media.alistore.kg/campaigns/vip.jpg' })
+  @ApiPropertyOptional({ example: 'https://media.ali.kg/campaigns/vip.jpg' })
   @IsOptional() @IsString() @MaxLength(500) creativeAssetUrl?: string;
 
   @ApiPropertyOptional({ example: 'Смотреть предложение' })

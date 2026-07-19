@@ -12,9 +12,9 @@ describe('Runtime security configuration', () => {
     expect(() => resolveCorsOptions(env({ NODE_ENV: 'production', CORS_ORIGINS: '*' }))).toThrow('Invalid CORS origin');
     expect(resolveCorsOptions(env({
       NODE_ENV: 'production',
-      CORS_ORIGINS: 'https://alistore.kg,https://admin.alistore.kg',
+      CORS_ORIGINS: 'https://ali.kg,https://admin.ali.kg',
     }))).toEqual({
-      origin: ['https://alistore.kg', 'https://admin.alistore.kg'],
+      origin: ['https://ali.kg', 'https://admin.ali.kg'],
       credentials: true,
     });
   });
@@ -28,12 +28,12 @@ describe('Runtime security configuration', () => {
 
   it('requires exact hostnames and rejects unsafe production values', () => {
     expect(() => resolveAllowedHosts(env({ NODE_ENV: 'production' }))).toThrow('ALLOWED_HOSTS is required');
-    expect(() => resolveAllowedHosts(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'https://api.alistore.kg' }))).toThrow('Invalid allowed host');
-    expect(resolveAllowedHosts(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'api.alistore.kg,API.ALISTORE.KG' }))).toEqual(['api.alistore.kg']);
+    expect(() => resolveAllowedHosts(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'https://api.ali.kg' }))).toThrow('Invalid allowed host');
+    expect(resolveAllowedHosts(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'api.ali.kg,API.ALI.KG' }))).toEqual(['api.ali.kg']);
   });
 
   it('allows health probes but rejects unknown production hosts', () => {
-    const middleware = allowedHostsMiddleware(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'api.alistore.kg' }));
+    const middleware = allowedHostsMiddleware(env({ NODE_ENV: 'production', ALLOWED_HOSTS: 'api.ali.kg' }));
     const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
     middleware({ path: '/api/orders', headers: { host: 'service.onrender.com' } } as never, response as never, next);

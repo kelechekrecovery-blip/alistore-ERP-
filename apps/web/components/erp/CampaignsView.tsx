@@ -212,7 +212,7 @@ export function CampaignsView() {
             />
           </Field>
           <Field label="Медиа (HTTPS, необязательно)">
-            <input value={form.assetUrl} onChange={(e) => setFormValue(setForm, 'assetUrl', e.target.value)} className={FIELD_CLASS} placeholder="https://media.alistore.kg/campaign.jpg" />
+            <input value={form.assetUrl} onChange={(e) => setFormValue(setForm, 'assetUrl', e.target.value)} className={FIELD_CLASS} placeholder="https://media.ali.kg/campaign.jpg" />
           </Field>
           <Field label="Куда ведёт кампания">
             <input value={form.destinationUrl} onChange={(e) => setFormValue(setForm, 'destinationUrl', e.target.value)} className={FIELD_CLASS} placeholder="/catalog" />

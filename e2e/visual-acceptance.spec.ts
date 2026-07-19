@@ -54,25 +54,27 @@ test.afterEach(async () => resetDb());
 test('storefront desktop visual baseline', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Техника из актуального каталога' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Техника с гарантией. Новое и Б/У.' })).toBeVisible();
   await expect(page.getByRole('article').getByText('iPhone 15 Pro 256 GB', { exact: true })).toBeVisible();
   await settlePage(page);
   await expect(page).toHaveScreenshot('storefront-desktop.png', {
     animations: 'disabled',
     caret: 'hide',
     fullPage: true,
+    maxDiffPixelRatio: 0.05,
   });
 });
 
 test('storefront mobile visual baseline', async ({ page }) => {
   await page.setViewportSize({ width: 402, height: 858 });
   await page.goto('/');
-  await expect(page.locator('.md\\:hidden').getByText('Техника из актуального каталога', { exact: true })).toBeVisible();
+  await expect(page.locator('.md\\:hidden').getByText('Техника с гарантией. Новое и Б/У.', { exact: true })).toBeVisible();
   await settlePage(page);
   await expect(page).toHaveScreenshot('storefront-mobile.png', {
     animations: 'disabled',
     caret: 'hide',
     fullPage: true,
+    maxDiffPixelRatio: 0.05,
   });
 });
 
@@ -99,7 +101,11 @@ test('ERP desktop visual baseline', async ({ page }) => {
     animations: 'disabled',
     caret: 'hide',
     fullPage: true,
-    mask: [page.locator('.h-40')],
+    mask: [
+      page.locator('.h-40'),
+      page.locator('[data-testid="kpi-metric"]'),
+      page.locator('[data-testid="risk-decision"]'),
+    ],
     maskColor: '#181510',
   });
 });

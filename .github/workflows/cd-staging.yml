@@ -34,8 +34,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  STAGING_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL || 'https://api-staging.alistore.kg' }}
-  STAGING_WEB_BASE_URL: ${{ vars.STAGING_WEB_BASE_URL || 'https://staging.alistore.kg' }}
+  STAGING_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL || 'https://api-staging.ali.kg' }}
+  STAGING_WEB_BASE_URL: ${{ vars.STAGING_WEB_BASE_URL || 'https://staging.ali.kg' }}
 
 jobs:
   migration-rehearsal:

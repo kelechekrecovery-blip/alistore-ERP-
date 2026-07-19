@@ -26,7 +26,7 @@ class ClientTradeInScreenTest {
     compose.setContent {
       MaterialTheme {
         ClientTradeInsScreen(
-          "https://api.alistore.kg/api",
+          "https://api.ali.kg/api",
           state,
           {},
           providedGateway = gateway,
@@ -64,7 +64,7 @@ private class UiTradeInsGateway(
   override suspend fun tradeIns(token: String) = emptyList<CustomerTradeIn>()
 
   override suspend fun uploadEvidence(entityType: String, entityId: String, fileName: String, mimeType: String, bytes: ByteArray, token: String) =
-    EvidenceAttachment("evidence/tradein/$entityId/photo.webp", "https://media.alistore.kg/evidence.webp")
+    EvidenceAttachment("evidence/tradein/$entityId/photo.webp", "https://media.ali.kg/evidence.webp")
 
   override suspend fun createTradeIn(request: CreateTradeInRequest, token: String, idempotencyKey: String): CustomerTradeIn {
     openKeys += idempotencyKey

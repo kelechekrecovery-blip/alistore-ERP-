@@ -8,11 +8,11 @@
 # without touching the app's main.ts (closes the helmet/CSP gap).
 
 {
-	email admin@alistore.kg
+	email admin@ali.kg
 }
 
 # --- API (NestJS) ---
-api.alistore.kg {
+api.ali.kg {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -26,7 +26,7 @@ api.alistore.kg {
 }
 
 # --- Storefront (Next.js) ---
-alistore.kg, www.alistore.kg {
+ali.kg, www.ali.kg {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -34,7 +34,7 @@ alistore.kg, www.alistore.kg {
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		# A storefront CSP; tighten script-src to your real origins/nonce.
-		Content-Security-Policy "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.alistore.kg; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.ali.kg; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 		-Server
 	}
 	reverse_proxy 127.0.0.1:3000

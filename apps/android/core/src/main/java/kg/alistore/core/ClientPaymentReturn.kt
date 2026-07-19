@@ -14,7 +14,7 @@ internal fun parsePaymentReturnRoute(raw: String?): PaymentReturnRoute? {
   val uri = runCatching { URI(raw) }.getOrNull() ?: return null
   val isCustomScheme = uri.scheme == "alistore" && uri.host == "payment-return"
   val isHttpsAppLink = uri.scheme == "https" &&
-    (uri.host == "alistore.kg" || uri.host == "www.alistore.kg") &&
+    (uri.host == "ali.kg" || uri.host == "www.ali.kg") &&
     uri.path == "/payment-return"
   if (!isCustomScheme && !isHttpsAppLink) return null
   val query = uri.rawQuery.orEmpty().split('&').mapNotNull { pair ->

@@ -92,12 +92,12 @@ class CheckoutManagerTest {
   @Test
   fun resolvesRelativeAndAbsolutePaymentUrls() {
     assertEquals(
-      "https://api.alistore.kg/sandbox/payments/card/intent-1",
-      resolvePaymentUrl("https://api.alistore.kg/api", "/sandbox/payments/card/intent-1"),
+      "https://api.ali.kg/sandbox/payments/card/intent-1",
+      resolvePaymentUrl("https://api.ali.kg/api", "/sandbox/payments/card/intent-1"),
     )
     assertEquals(
       "https://bank.example/pay/1",
-      resolvePaymentUrl("https://api.alistore.kg/api", "https://bank.example/pay/1"),
+      resolvePaymentUrl("https://api.ali.kg/api", "https://bank.example/pay/1"),
     )
   }
 }
