@@ -74,9 +74,9 @@ client_entitlements="$ios_root/Client/Client.entitlements"
 display_name="$("$plist_buddy" -c 'Print :CFBundleDisplayName' "$client_plist" 2>/dev/null || true)"
 [[ "$display_name" == "AliStore" ]] || fail 'Client display name must be AliStore'
 short_version="$("$plist_buddy" -c 'Print :CFBundleShortVersionString' "$client_plist" 2>/dev/null || true)"
-[[ "$short_version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || fail 'CFBundleShortVersionString must be a semantic version'
+[[ "$short_version" == '$(MARKETING_VERSION)' ]] || fail 'CFBundleShortVersionString must resolve from MARKETING_VERSION'
 build_number="$("$plist_buddy" -c 'Print :CFBundleVersion' "$client_plist" 2>/dev/null || true)"
-[[ "$build_number" =~ ^[0-9]+$ ]] || fail 'CFBundleVersion must be numeric'
+[[ "$build_number" == '$(CURRENT_PROJECT_VERSION)' ]] || fail 'CFBundleVersion must resolve from CURRENT_PROJECT_VERSION'
 face_id_description="$("$plist_buddy" -c 'Print :NSFaceIDUsageDescription' "$client_plist" 2>/dev/null || true)"
 [[ "$face_id_description" == "Быстрый и защищённый вход в AliStore" ]] || fail 'NSFaceIDUsageDescription must match the review metadata purpose'
 tracking="$("$plist_buddy" -c 'Print :NSPrivacyTracking' "$client_privacy" 2>/dev/null || true)"
@@ -163,11 +163,16 @@ resolved_icon="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*ASS
 [[ "$resolved_icon" == "AppIcon" ]] || fail 'Release AppIcon asset catalog must be configured'
 resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*APS_ENVIRONMENT$/ {print $2; exit}')"
 [[ "$resolved_aps" == "production" ]] || fail 'Release APS_ENVIRONMENT must resolve to production'
+resolved_marketing_version="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ {print $2; exit}')"
+[[ "$resolved_marketing_version" == "1.0.0" ]] || fail 'Release MARKETING_VERSION must resolve to 1.0.0'
+resolved_build_number="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*CURRENT_PROJECT_VERSION$/ {print $2; exit}')"
+[[ "$resolved_build_number" == "1" ]] || fail 'Release CURRENT_PROJECT_VERSION must resolve to 1'
 
 printf 'store-preflight: App Store metadata and privacy manifest are present\n'
 printf 'store-preflight: Release API URL resolved to HTTPS\n'
 printf 'store-preflight: Release bundle id and AppIcon are configured\n'
 printf 'store-preflight: Release APNs environment resolved to production\n'
+printf 'store-preflight: Release version resolved to 1.0.0 (1)\n'
 printf 'store-preflight: Apple team and App Store Connect credentials are present\n'
 if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'
