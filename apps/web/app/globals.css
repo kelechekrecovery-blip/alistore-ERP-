@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 :root {
+  --font-display: "Trebuchet MS", Arial, sans-serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root {
   /* Canonical palette — design_handoff_alistore/docs/Native Design System.md §1.
      Mirrors tailwind.config.ts so non-Tailwind CSS + desktop overrides stay 1:1. */
   --coral: #ff5b2e;

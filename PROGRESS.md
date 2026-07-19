@@ -4605,3 +4605,11 @@
 - Recovery: started the existing tunnel connector with its local secret token and verified the configured routes without changing DNS or exposing the token.
 - Checks: `ali.kg`, `www.ali.kg`, `admin.ali.kg`, `/catalog`, `/erp`, `api.ali.kg/api/health/live`, `api.ali.kg/api/health/ready` and the public catalog endpoint all returned `200`; catalog data came from PostgreSQL.
 - Hardening: added `npm run public:up` and the workstation-demo runbook. This remains a temporary workstation-backed sandbox until Render is deployed; a machine shutdown will stop public traffic again.
+
+## MVP-GATE-044
+
+- Date: 2026-07-19
+- Scope: make the Web production build independent of external Google Fonts fetches and rerun the local MVP gate.
+- Change: replaced `next/font/google` imports with the existing CSS-variable type contract and system fallback stacks; no runtime or build-time request to Google Fonts is required.
+- Checks: Web production build generated 43 routes; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify -- --skip-e2e` passed Prisma validation, all migration upgrade paths, API build, Web build, mobile typecheck and `172/172` API Jest files. External readiness remains a report-only block for owner credentials and physical hardware.
+- Next: deploy the pushed `main` SHA through Render and run staging smoke/restore/rollback; do not enable live providers before their certification gates.

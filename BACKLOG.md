@@ -413,6 +413,7 @@ Independent fresh-eyes sweep recorded in `docs/GAP-ANALYSIS-2026-07-17.md`. Thes
 - `PHASE-1-EVIDENCE-011` Refresh trusted iOS UI evidence on source tree `5ee2a48af2171cedd076e657f2f28735a5ff2999bb35d4ee401d62c8d588c55d`. The four native targets pass `21 + 9 + 2 + 2 = 34/34` simulator UI tests, including AliStore labels and Staff Quick Unlock shell. Physical devices, signing, push/camera/offline certification and owner pixel approval remain open.
 
 - `RELEASE-CLOUD-043` **P0 operational follow-up.** On 2026-07-19 the public `alistore-erp` Cloudflare tunnel was down, causing Cloudflare 530/1033 for every AliStore hostname. The connector was restarted and public Web/API smoke is green. `scripts/public-demo-up.sh` now provides a token-safe restart path. Remaining P0 follow-up: deploy the Render Web/API/worker Blueprint or install the connector under a managed service so the public site does not depend on this workstation.
+- `MVP-GATE-044` **Accepted locally 2026-07-19.** Web production builds no longer depend on Google Fonts network access; the full non-E2E MVP gate passed with `172/172` API Jest files and all migration upgrade checks. External readiness is intentionally still blocked by missing owner/provider credentials, physical POS certification, Sentry and durable Render deployment.
 # PHASE-1-EVIDENCE-013 — Strict ecosystem audit
 
 - [x] Run the strict contract audit after refreshing all local reconciliation evidence.
