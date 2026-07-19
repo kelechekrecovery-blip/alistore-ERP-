@@ -3,6 +3,8 @@ node_modules/
 # build
 dist/
 build/
+apps/web/build-output/
+apps/web/tsconfig.tsbuildinfo
 .next/
 .next-*/
 out/
