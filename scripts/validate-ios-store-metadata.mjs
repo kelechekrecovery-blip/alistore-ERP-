@@ -44,7 +44,7 @@ const assertHttpsUrl = (value, path) => {
 
 if (metadata.schemaVersion !== 1) fail('schemaVersion must be 1');
 if (metadata.app?.bundleId !== 'kg.alistore.client') fail('app.bundleId must be kg.alistore.client');
-if (metadata.app?.name !== 'AliStore') fail('app.name must be AliStore');
+if (metadata.app?.name !== 'AliStore KG') fail('app.name must be AliStore KG');
 assertString(metadata.app?.primaryLocale, 'app.primaryLocale', { min: 2, max: 10 });
 assertString(metadata.app?.category, 'app.category', { min: 2, max: 40 });
 

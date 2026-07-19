@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "app": {
-    "name": "AliStore",
+    "name": "AliStore KG",
     "bundleId": "kg.alistore.client",
     "primaryLocale": "ru-KG",
     "category": "SHOPPING",
@@ -19,7 +19,7 @@
   },
   "localizations": {
     "ru-KG": {
-      "name": "AliStore",
+      "name": "AliStore KG",
       "subtitle": "Техника, гарантия и доставка",
       "promotionalText": "Покупайте технику, отслеживайте заказы, гарантию и возвраты в одном приложении.",
       "description": "AliStore помогает выбрать технику, оформить заказ, выбрать самовывоз или доставку, пройти оплату, отслеживать статус, хранить гарантийные устройства, обращаться в поддержку и пользоваться бонусами.",
