@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AliStore Staff",
+    "bundleId": "kg.alistore.staff",
+    "primaryLocale": "ru-KG",
+    "category": "BUSINESS",
+    "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+  },
+  "urls": {
+    "marketing": "https://ali.kg",
+    "support": "https://ali.kg/support",
+    "privacy": "https://ali.kg/privacy"
+  },
+  "review": {
+    "demoAccountRequired": true,
+    "demoAccountReference": "Provide a production review employee account in App Store Connect notes. Do not commit credentials.",
+    "notes": "AliStore Staff is a role-restricted workplace app for authorized AliStore employees. It provides order processing, store tasks and KPI, customer service, product intake and buyback workflows. App Review must receive an active demo employee account with access to representative non-production review data."
+  },
+  "localizations": {
+    "ru-KG": {
+      "name": "AliStore Staff",
+      "subtitle": "Рабочее место сотрудника",
+      "promotionalText": "Заказы, задачи, KPI и обслуживание клиентов AliStore в одном рабочем приложении.",
+      "description": "AliStore Staff — рабочее приложение для авторизованных сотрудников AliStore. Оно помогает обрабатывать заказы, выполнять задачи магазина, отслеживать KPI, обслуживать клиентов, принимать товары и вести операции скупки по установленным регламентам.",
+      "keywords": [
+        "сотрудники",
+        "заказы",
+        "магазин",
+        "задачи",
+        "продажи",
+        "AliStore"
+      ]
+    }
+  },
+  "screenshots": {
+    "requiredPngCount": 4,
+    "devices": {
+      "iphone": {
+        "source": "apps/ios/build/AliStoreStaffVisual-iphone-attachments",
+        "simulator": "iPhone 17 Pro",
+        "outputSlug": "iphone-17-pro"
+      },
+      "ipad": {
+        "source": "apps/ios/build/AliStoreStaffVisual-ipad-attachments",
+        "simulator": "iPad Pro 11-inch (M5)",
+        "outputSlug": "ipad-pro-11"
+      }
+    },
+    "requiredStates": [
+      "staff-home",
+      "staff-orders",
+      "staff-kpi",
+      "staff-customer"
+    ]
+  },
+  "privacy": {
+    "tracking": false,
+    "dataSafetyReviewRequired": true,
+    "faceIdPurpose": "Быстрый и защищённый вход сотрудника в AliStore Staff"
+  }
+}

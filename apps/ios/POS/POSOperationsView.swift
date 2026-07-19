@@ -129,6 +129,12 @@ struct POSShiftView: View {
     }
 
     @MainActor private func load() async {
+        #if DEBUG
+        if UITestBootstrap.startsAtVisualEvidence {
+            errorMessage = nil
+            return
+        }
+        #endif
         do { shift = try await api.get("shifts/current", token: session.accessToken) }
         catch { errorMessage = error.localizedDescription }
     }
@@ -256,6 +262,12 @@ struct POSOperationsView: View {
     }
 
     @MainActor private func refresh() async {
+        #if DEBUG
+        if UITestBootstrap.startsAtVisualEvidence {
+            errorMessage = nil
+            return
+        }
+        #endif
         do {
             async let catalog: CatalogResponse = api.get("catalog/products")
             async let loadedReturns: [POSReturn] = api.get("returns", token: session.accessToken)

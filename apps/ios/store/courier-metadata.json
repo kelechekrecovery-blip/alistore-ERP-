@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AliStore Courier",
+    "bundleId": "kg.alistore.courier",
+    "primaryLocale": "ru-KG",
+    "category": "BUSINESS",
+    "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+  },
+  "urls": {
+    "marketing": "https://ali.kg",
+    "support": "https://ali.kg/support",
+    "privacy": "https://ali.kg/privacy"
+  },
+  "review": {
+    "demoAccountRequired": true,
+    "demoAccountReference": "Provide a production review courier account in App Store Connect notes. Do not commit credentials.",
+    "notes": "AliStore Courier is a role-restricted delivery app for authorized AliStore couriers. It provides assigned delivery routes, delivery evidence, cash-on-delivery reconciliation and courier profile functions. App Review must receive an active demo courier account with representative non-production review data."
+  },
+  "localizations": {
+    "ru-KG": {
+      "name": "AliStore Courier",
+      "subtitle": "Доставка заказов AliStore",
+      "promotionalText": "Маршруты, подтверждение доставки и сверка наложенных платежей для курьеров AliStore.",
+      "description": "AliStore Courier — рабочее приложение для авторизованных курьеров AliStore. Оно показывает назначенные доставки и маршрут, помогает зафиксировать результат вручения заказа, вести операции с наложенными платежами и сверять завершённый рейс.",
+      "keywords": [
+        "курьер",
+        "доставка",
+        "маршрут",
+        "заказы",
+        "логистика",
+        "AliStore"
+      ]
+    }
+  },
+  "screenshots": {
+    "requiredPngCount": 3,
+    "devices": {
+      "iphone": {
+        "source": "apps/ios/build/AliStoreCourierVisual-iphone-attachments",
+        "simulator": "iPhone 17 Pro",
+        "outputSlug": "iphone-17-pro"
+      },
+      "ipad": {
+        "source": "apps/ios/build/AliStoreCourierVisual-ipad-attachments",
+        "simulator": "iPad Pro 11-inch (M5)",
+        "outputSlug": "ipad-pro-11"
+      }
+    },
+    "requiredStates": [
+      "courier-route",
+      "courier-cod",
+      "courier-profile"
+    ]
+  },
+  "privacy": {
+    "tracking": false,
+    "dataSafetyReviewRequired": true,
+    "faceIdPurpose": "Быстрый и защищённый вход курьера в AliStore Courier"
+  }
+}

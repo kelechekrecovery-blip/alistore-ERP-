@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AliStore POS",
+    "bundleId": "kg.alistore.pos",
+    "primaryLocale": "ru-KG",
+    "category": "BUSINESS",
+    "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+  },
+  "urls": {
+    "marketing": "https://ali.kg",
+    "support": "https://ali.kg/support",
+    "privacy": "https://ali.kg/privacy"
+  },
+  "review": {
+    "demoAccountRequired": true,
+    "demoAccountReference": "Provide a production review cashier account in App Store Connect notes. Do not commit credentials.",
+    "notes": "AliStore POS is a role-restricted point-of-sale app for authorized AliStore cashiers. It supports catalog lookup, cart and split tender preparation, server-issued receipts, shift status and operation history. External receipt printers or payment hardware require separately certified compatible equipment and are not required to review the software workflow. App Review must receive an active demo cashier account with representative non-production review data."
+  },
+  "localizations": {
+    "ru-KG": {
+      "name": "AliStore POS",
+      "subtitle": "Касса и смена AliStore",
+      "promotionalText": "Продажи, чеки, состояние смены и история кассовых операций для сотрудников AliStore.",
+      "description": "AliStore POS — рабочее кассовое приложение для авторизованных сотрудников AliStore. Оно помогает находить товары, формировать продажу, подготавливать раздельную оплату, получать чек с сервера, контролировать состояние смены и просматривать историю операций.",
+      "keywords": [
+        "касса",
+        "продажи",
+        "чеки",
+        "смена",
+        "магазин",
+        "AliStore"
+      ]
+    }
+  },
+  "screenshots": {
+    "requiredPngCount": 3,
+    "devices": {
+      "iphone": {
+        "source": "apps/ios/build/AliStorePOSVisual-iphone-attachments",
+        "simulator": "iPhone 17 Pro",
+        "outputSlug": "iphone-17-pro"
+      },
+      "ipad": {
+        "source": "apps/ios/build/AliStorePOSVisual-ipad-attachments",
+        "simulator": "iPad Pro 11-inch (M5)",
+        "outputSlug": "ipad-pro-11"
+      }
+    },
+    "requiredStates": [
+      "pos-sale",
+      "pos-shift",
+      "pos-operations"
+    ]
+  },
+  "privacy": {
+    "tracking": false,
+    "dataSafetyReviewRequired": true,
+    "faceIdPurpose": "Быстрый и защищённый вход кассира в AliStore POS"
+  }
+}

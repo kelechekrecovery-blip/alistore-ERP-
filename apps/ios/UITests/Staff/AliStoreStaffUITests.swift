@@ -187,4 +187,39 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Где мой заказ №4102?"].exists)
         XCTAssertTrue(app.staticTexts["Нужна гарантия по AirPods"].exists)
     }
+
+    func testPublicStoreVisualEvidence() {
+        let home = launchSignedInStaff()
+        capture(home, named: "staff-home")
+
+        let orders = launchSignedInStaff()
+        orders.buttons["staff-home-orders"].tap()
+        XCTAssertTrue(orders.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        capture(orders, named: "staff-orders")
+
+        let kpi = launchSignedInStaff()
+        kpi.buttons["staff-home-kpi"].tap()
+        XCTAssertTrue(kpi.staticTexts["Задачи и KPI"].waitForExistence(timeout: 5))
+        capture(kpi, named: "staff-kpi")
+
+        let customer = launchSignedInStaff()
+        customer.buttons["staff-home-customer360"].tap()
+        XCTAssertTrue(customer.staticTexts["Customer 360"].waitForExistence(timeout: 5))
+        capture(customer, named: "staff-customer")
+    }
+
+    private func launchSignedInStaff() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-visual-evidence"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
 }

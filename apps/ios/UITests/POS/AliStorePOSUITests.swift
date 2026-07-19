@@ -58,9 +58,37 @@ final class AliStorePOSUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Смена"].tap()
+        app.buttons["Смена"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Смена"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Push"].exists)
         XCTAssertTrue(app.buttons["Включить уведомления"].exists)
+    }
+
+    func testPublicStoreVisualEvidence() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing-signed-in",
+            "--ui-testing-role=cashier",
+            "--ui-testing-visual-evidence",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        capture(app, named: "pos-sale")
+
+        app.buttons["Смена"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Смена"].waitForExistence(timeout: 5))
+        capture(app, named: "pos-shift")
+
+        app.buttons["Операции"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Операции"].waitForExistence(timeout: 5))
+        capture(app, named: "pos-operations")
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

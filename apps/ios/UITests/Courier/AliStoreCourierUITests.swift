@@ -29,11 +29,39 @@ final class AliStoreCourierUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Evidence доставки"].exists)
         XCTAssertTrue(app.buttons["Доставлено · 45900 сом"].exists)
 
-        app.tabBars.buttons["COD"].tap()
+        app.buttons["COD"].firstMatch.tap()
 
         XCTAssertTrue(app.staticTexts["Сверка COD"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Офлайн-команд: 0"].exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Рейс")).firstMatch.exists)
         XCTAssertTrue(app.buttons["Сдать COD"].exists)
+    }
+
+    func testPublicStoreVisualEvidence() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing-signed-in",
+            "--ui-testing-role=courier",
+            "--ui-testing-visual-evidence",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Мой маршрут"].waitForExistence(timeout: 10))
+        capture(app, named: "courier-route")
+
+        app.buttons["COD"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Сверка COD"].waitForExistence(timeout: 5))
+        capture(app, named: "courier-cod")
+
+        app.buttons["Профиль"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Профиль"].waitForExistence(timeout: 5))
+        capture(app, named: "courier-profile")
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }
