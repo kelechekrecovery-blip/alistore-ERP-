@@ -5819,6 +5819,19 @@ private struct ClientHomeView: View {
 
     private let categories = [("Смартфоны", "iphone"), ("Ноутбуки", "laptopcomputer"), ("Аудио", "airpodsmax"), ("Часы", "applewatch"), ("Планшеты", "ipad")]
 
+    // «Для вас» — client-side ranking by favourite-category affinity, then availability.
+    private var personalizedProducts: [Product] {
+        guard !favorites.isEmpty else { return Array(products.prefix(6)) }
+        let favoriteCategories = Set(products.filter { favorites.contains($0.id) }.map(\.category))
+        let ranked = products.sorted { lhs, rhs in
+            let lhsAffinity = favoriteCategories.contains(lhs.category) ? 1 : 0
+            let rhsAffinity = favoriteCategories.contains(rhs.category) ? 1 : 0
+            if lhsAffinity != rhsAffinity { return lhsAffinity > rhsAffinity }
+            return lhs.availableUnits > rhs.availableUnits
+        }
+        return Array(ranked.prefix(6))
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -5877,6 +5890,23 @@ private struct ClientHomeView: View {
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(ClientTheme.line))
                     }
                     .buttonStyle(.plain)
+                    if !products.isEmpty {
+                        HStack {
+                            Text("✨ Для вас").font(ClientTheme.display(18, weight: .bold))
+                            Spacer()
+                            Text("подобрано").font(ClientTheme.body(11, weight: .semibold)).foregroundStyle(Design3.orange)
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(personalizedProducts) { product in
+                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                        .frame(width: 168)
+                                }
+                            }
+                            .padding(.horizontal, 2)
+                        }
+                        .accessibilityIdentifier("home-for-you")
+                    }
                     HStack {
                     Text("🔥 Хиты продаж").font(ClientTheme.display(18, weight: .bold))
                         Spacer()
