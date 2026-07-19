@@ -72,6 +72,10 @@ export default function SupportPage() {
 
   return (
     <MobileAppFrame title="Поддержка" subtitle="Создаём тикет в Support Inbox и сохраняем историю в CRM." active="account" backHref="/account">
+      <div className="mb-4 rounded-[14px] border border-lime/30 bg-lime/10 p-4 text-sm leading-6 text-bright">
+        Связаться с AliStore можно через форму ниже. Укажите телефон, тему и описание —
+        обращение будет зарегистрировано, а ответ появится в истории обращений после входа.
+      </div>
       <div className="mb-4 grid grid-cols-3 gap-2">
         {channels.map((c) => (
           <button key={c.id} type="button" onClick={() => setChannel(c.id)} className={`rounded-[13px] p-3.5 text-center ${c.cls} ${channel === c.id ? 'ring-2 ring-lime' : ''}`}>
