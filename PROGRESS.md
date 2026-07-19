@@ -4661,3 +4661,12 @@
 - Public smoke: `https://ali.kg/`, `https://www.ali.kg/`, `https://admin.ali.kg/`, API live and API ready all returned HTTP 200.
 - Commits: `ad51033`, `7d59058`, `ec11d24`, `bca15c6`, `38fe61b`, `ffd7017`, `7243ea3` (all pushed to `origin/main`).
 - Remaining: durable Render deployment, native UI/physical-device certification, live providers, staging restore/rollback, and owner-approved handling of any external release gates.
+
+## NATIVE-GATE-050
+
+- Date: 2026-07-20
+- Scope: refresh native UI evidence and revalidate the public runtime after the ali.kg outage.
+- Checks: iOS UI `40/40` passed (Client `23/23`, Staff `10/10`, Courier `3/3`, POS `4/4`); Android packaged connected tests passed (core `30/30`, app/staff/courier/pos `1/1` each); visual acceptance `3/3`; POS refund, courier COD and service/loaner reconciliation each passed; public smoke for ali.kg, www, admin, API live and API ready returned HTTP `200`.
+- Commits: `e274906`, `d499615`, `d5503fa`, `7c60d12`, `266f99a`, `6e4a2f0` (pushed to `origin/main`).
+- Current strict audit: native UI evidence is accepted. Procurement/sale and composite reconciliation artifacts still reference the previous source hash and must be refreshed before the strict audit can be green.
+- Remaining: durable Render deployment, native physical-device certification, live providers, staging restore/rollback, and owner-controlled production credentials.
