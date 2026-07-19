@@ -4670,3 +4670,11 @@
 - Commits: `e274906`, `d499615`, `d5503fa`, `7c60d12`, `266f99a`, `6e4a2f0` (pushed to `origin/main`).
 - Current strict audit: native UI evidence is accepted. Procurement/sale and composite reconciliation artifacts still reference the previous source hash and must be refreshed before the strict audit can be green.
 - Remaining: durable Render deployment, native physical-device certification, live providers, staging restore/rollback, and owner-controlled production credentials.
+
+## STRICT-GATE-051
+
+- Date: 2026-07-20
+- Scope: refresh procurement and composite reconciliation evidence and complete the strict local ecosystem audit.
+- Checks: procurement API `10/10` plus browser reconciliation passed; composite ecosystem matrix passed `4/4`; `npm run ecosystem:audit:strict` passed with no local GAPs; Cloudflare `alistore-erp` tunnel reported `healthy` with four active connections; public ali.kg/www/admin/API live/API ready smoke remained HTTP `200`.
+- Commit: `1a733bf` (pushed to `origin/main`).
+- Release boundary: the software evidence gate is green, but this is not production readiness. Public traffic still terminates at a workstation-backed tunnel. Render staging/production deployment, live payment/SMS/OFD/push credentials, restore/rollback drill, and physical iPhone/Android hardware certification remain external gates.
