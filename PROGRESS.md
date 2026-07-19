@@ -4622,3 +4622,12 @@
 - Checks: `NEXT_DIST_DIR=build-output npm run build -w @alistore/web` passed with 43 routes; targeted visual suite passed mobile storefront and reported only existing desktop snapshot drift (storefront height/content and 1,984 ERP pixels); `https://ali.kg/` returned 200 and `https://api.ali.kg/api/health/live` returned `{"status":"ok"}`.
 - Commit: `0ca7632`.
 - Remaining: refresh or owner-accept the two desktop visual baselines after confirming their intended reference; strict ecosystem audit, Render deployment, native physical-device and live-provider gates remain open.
+
+## WEB-AUDIT-046
+
+- Date: 2026-07-19
+- Scope: accept the current Web/ERP 3.0 visual output against deterministic local fixtures.
+- Changes: refreshed only the stale desktop storefront and ERP Playwright snapshots; mobile storefront remained unchanged.
+- Checks: isolated visual acceptance with fresh API/Web ports passed `3/3`; no screenshot threshold was relaxed.
+- Commit: pending in this iteration.
+- Remaining: cross-browser, strict ecosystem, durable Render deployment, native physical-device and live-provider gates remain separate.
