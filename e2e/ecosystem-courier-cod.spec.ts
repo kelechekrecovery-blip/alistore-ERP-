@@ -15,15 +15,11 @@ test('web COD checkout, warehouse, courier and cash handover reconcile exactly o
   const courier = await seedStaffCredentials('courier', 'ecosystem-cod-courier');
   const cashier = await seedStaffCredentials('cashier', 'ecosystem-cod-cashier');
   const now = new Date();
-  const localDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const localDayStart = new Date(`${localDay}T00:00:00.000Z`);
-  const startsAt = now.toISOString().slice(0, 10) === localDay
-    ? new Date(now.getTime() + 10 * 60_000)
-    : localDayStart;
-  const endsAt = new Date(Math.min(
-    startsAt.getTime() + 2 * 60 * 60_000,
-    localDayStart.getTime() + 24 * 60 * 60_000 - 1,
-  ));
+  // Keep the slot future-facing while making the browser's business date match
+  // it. This prevents a run near midnight in Bishkek from querying yesterday
+  // after the fixture has already crossed into tomorrow.
+  const startsAt = new Date(now.getTime() + 15 * 60_000);
+  const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60_000);
   const zone = await prisma.deliveryZone.create({
     data: {
       code: `ecosystem-cod-${Date.now().toString(36)}`,
@@ -45,13 +41,27 @@ test('web COD checkout, warehouse, courier and cash handover reconcile exactly o
     },
     include: { slots: true },
   });
+  await page.addInitScript((timestamp) => {
+    const NativeDate = Date;
+    class FrozenDate extends NativeDate {
+      constructor(...args: ConstructorParameters<typeof Date>) {
+        super(args.length === 0 ? timestamp : args[0] as string | number | Date);
+      }
+      static now() { return timestamp; }
+    }
+    window.Date = FrozenDate as DateConstructor;
+  }, startsAt.getTime());
   await page.addInitScript((item) => {
     localStorage.setItem('alistore.cart.v1', JSON.stringify([{ ...item, qty: 1 }]));
     localStorage.removeItem('alistore.cart.pricing.v1');
   }, { id: product.id, sku: product.sku, name: product.name, price: product.price });
 
   await page.goto('/checkout');
-  await page.getByRole('button', { name: /Курьер/ }).click();
+  await page.waitForLoadState('networkidle');
+  const courierOption = page.getByRole('button', { name: /Курьер/ });
+  await expect(courierOption).toBeVisible();
+  await courierOption.click();
+  await expect(courierOption).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Зона доставки')).toHaveValue(zone.id);
   await page.getByRole('textbox', { name: 'Точный адрес доставки' }).fill('Бишкек, ул. Токтогула 125/1, кв. 42');
   await page.getByRole('button', { name: 'Далее' }).last().click();
