@@ -3,12 +3,8 @@
     {
       "filename" : "AppIcon-1024.png",
       "idiom" : "universal",
-      "platform" : "ios",
       "size" : "1024x1024"
     }
   ],
-  "info" : {
-    "author" : "AliStore",
-    "version" : 1
-  }
+  "info" : { "author" : "AliStore", "version" : 1 }
 }

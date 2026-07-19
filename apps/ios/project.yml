@@ -31,6 +31,7 @@ targets:
       properties:
         CFBundleDisplayName: AliStore
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
         API_BASE_URL: $(API_BASE_URL)
         PAYMENT_RETURN_URL: $(PAYMENT_RETURN_URL)
         CFBundleURLTypes:
@@ -77,6 +78,7 @@ targets:
       properties:
         CFBundleDisplayName: AliStore Staff
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование IMEI и фото для подтверждения операций
         NSPhotoLibraryUsageDescription: Выбор фото для Evidence Vault
@@ -110,6 +112,7 @@ targets:
       properties:
         CFBundleDisplayName: AliStore Courier
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Фото подтверждения доставки для Evidence Vault
         NSPhotoLibraryUsageDescription: Выбор фото подтверждения доставки
@@ -143,6 +146,7 @@ targets:
       properties:
         CFBundleDisplayName: AliStore POS
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
         API_BASE_URL: $(API_BASE_URL)
         NSCameraUsageDescription: Сканирование штрихкодов и IMEI на кассе
         NSPhotoLibraryUsageDescription: Выбор фото состояния устройства для согласования обмена
