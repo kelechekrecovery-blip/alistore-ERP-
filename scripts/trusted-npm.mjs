@@ -280,6 +280,12 @@ export const trustedNpmEnvironment = (npm) => {
     'TMPDIR',
     'TEMP',
     'TZ',
+    // Reproducible isolated browser runs may need alternate ports when a
+    // developer's long-running local stack occupies the defaults. Database
+    // identity remains fixed below and is never accepted from the caller.
+    'E2E_API_PORT',
+    'E2E_WEB_PORT',
+    'E2E_REUSE_EXISTING_SERVER',
   ]);
   for (const [key, value] of Object.entries(process.env)) {
     if (allowedKeys.has(key) && value !== undefined) environment[key] = value;
