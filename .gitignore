@@ -40,6 +40,7 @@ playwright-report-prod/
 test-results-prod/
 playwright-web.png
 .playwright-mcp/
+.claude/autonomous/
 .artifacts/
 apps/api/uploads/
 # editor
