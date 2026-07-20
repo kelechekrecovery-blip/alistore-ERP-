@@ -1,5 +1,16 @@
 # PROGRESS
 
+## 2026-07-20 — PHASE-1-RECONCILIATION-RECHECK
+
+- Task: re-run the remaining first-store reconciliation verticals after the trusted runner port-isolation changes.
+- Checks:
+  - `ecosystem:courier-cod:e2e` — `1/1` passed on isolated API/Web ports `4300/3300`.
+  - `ecosystem:service-loaner:e2e` — API `9/9` and browser `3/3` passed.
+  - `ecosystem:procurement-sale:e2e` — API `10/10` and browser `1/1` passed.
+  - `ecosystem:e2e` — composite reconciliation matrix `4/4` passed.
+- Outcome: software reconciliation behavior is green locally. Trusted evidence recording is currently blocked by unrelated uncommitted changes in `apps/web`; no user changes were reverted or committed. The strict audit therefore remains red until evidence is refreshed from one clean source SHA.
+- Next: preserve the user-owned staff permission changes, obtain a clean source boundary, refresh hash-bound evidence, then rerun `ecosystem:audit:strict` and the full Web/MVP gates.
+
 ## 2026-07-18 — ERP-DESIGN-PHASE-0-FOUNDATION-START
 
 - Task: begin Phase 0 Foundation fixes per `docs/ERP-DESIGN-IMPLEMENTATION-MASTER-PLAN.md`.
