@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
@@ -36,6 +37,7 @@ describe('POST /payments guest guard (GAP-PAY-GUARD-001)', () => {
       providers: [
         { provide: PaymentsService, useValue: paymentsService },
         { provide: PaymentIntentsService, useValue: {} },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: StaffAuthService, useValue: {} },
         // PermissionGuard (on the staff-only routes) is instantiated by DI even
         // though these tests only exercise the anonymous path.
