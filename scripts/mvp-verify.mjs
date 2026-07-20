@@ -21,7 +21,12 @@ const steps = [
   ['Order payment-mode migration upgrade path', 'npm', ['run', 'test:order-payment-mode-migration-upgrade', '-w', '@alistore/api'], testDatabaseEnv],
   ['API build', 'npm', ['run', 'api:build']],
   ['Web build', 'npm', ['run', 'build', '-w', '@alistore/web']],
-  ['Mobile typecheck', 'npm', ['--prefix', 'apps/mobile', 'run', 'typecheck']],
+  // NOTE: there is deliberately no mobile step here. The gate used to typecheck
+  // apps/mobile — the DEPRECATED Expo monolith — which is not a release artifact,
+  // while the four iOS and four Android release targets went unchecked. A green
+  // gate therefore proved nothing about anything that actually ships. Native
+  // builds belong in their own workflow (macOS runner for xcodebuild, Android SDK
+  // for gradlew), not in this Postgres-bound release gate.
   [
     'Test database reset',
     'npx',
