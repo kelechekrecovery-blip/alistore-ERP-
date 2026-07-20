@@ -4923,3 +4923,11 @@
   remains blocked by the current strict-audit/native/reconciliation/platform/provider gates.
 - Next: continue from the current `BACKLOG.md` highest-impact unblocked P0/P1 item on a clean
   committed source boundary; do not touch unrelated parallel changes.
+## RECONCILIATION-071
+
+- Date: 2026-07-20
+- Scope: refresh all reconciliation evidence from a clean clone of the current committed source.
+- Source: `ad39ab928f10ab231f18be543a587dc6d595bd0f5aa68f90aea8b7dfdc663350`.
+- Checks: POS/refund `1/1`; courier/COD `1/1`; service/loaner API `9/9` plus UI `3/3`; procurement/sale API `10/10` plus UI `1/1`; composite reconciled ecosystem matrix `4/4`.
+- Result: generated artifacts and `docs/acceptance/ecosystem-evidence.json` are hash-bound to the current source tree. This closes stale-evidence blockers for the four reconciliation verticals, but does not close visual/native UI, clean-source, missing-handoff, staging, provider, device, legal or store gates.
+- Next: refresh visual and app-specific native evidence from the same committed source boundary, then rerun strict audit without touching unrelated `apps/web/tsconfig.json`.
