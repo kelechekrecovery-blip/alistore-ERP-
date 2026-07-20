@@ -54,6 +54,13 @@ services:
     envVars:
       - key: ALLOWED_HOSTS
         value: ali.kg,www.ali.kg,admin.ali.kg
+      # Без этой переменной сборка витрины не знает адреса API. В коде есть
+      # аварийный вывод адреса из origin (apps/web/lib/api/http.ts), но он —
+      # страховка от забытой переменной, а не способ её не задавать: адрес
+      # должен быть объявлен там же, где объявлен сам сервис.
+      # Значение совпадает с CORS_ORIGINS и ALLOWED_HOSTS сервиса API ниже.
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://api.ali.kg/api
       - key: PUBLIC_DEMO_MODE
         value: "true"
       - key: NEXT_PUBLIC_DEMO_MODE
