@@ -4678,3 +4678,13 @@
 - Checks: procurement API `10/10` plus browser reconciliation passed; composite ecosystem matrix passed `4/4`; `npm run ecosystem:audit:strict` passed with no local GAPs; Cloudflare `alistore-erp` tunnel reported `healthy` with four active connections; public ali.kg/www/admin/API live/API ready smoke remained HTTP `200`.
 - Commits: `26e08ce`, `1a733bf` (pushed to `origin/main`).
 - Release boundary: `npm run ecosystem:audit:strict` is green with no local GAPs, but this is not production readiness. Public traffic still terminates at a workstation-backed tunnel. Render staging/production deployment, live payment/SMS/OFD/push credentials, restore/rollback drill, and physical iPhone/Android hardware certification remain external gates.
+
+## IOS-STORE-052
+
+- Date: 2026-07-20
+- Scope: upload and prepare the four AliStore iOS apps in App Store Connect.
+- Changes: corrected App Store Connect JWT signing to IEEE-P1363 ES256, raised the release build from `1` to `2`, regenerated Xcode project settings, and verified strict store preflight.
+- Checks: four Release archives and IPAs signed with Apple Distribution; Client, Staff, Courier and POS build `1.0.0 (2)` uploaded, processed as `VALID`, and attached to their App Store versions.
+- App Store Connect metadata: Russian app-info/version localizations, support/marketing URLs and App Review detail records populated. Screenshot assets are `COMPLETE`: Client 10+10, Staff 4+4, Courier 3+3, POS 3+3 for iPhone/iPad. Apple limits each screenshot set to 10 images.
+- Result: upload gate is green. App Review submission is not claimed: all four login-gated apps still require owner-provided review accounts and review contact details; the public `ali.kg` URLs must remain reachable.
+- Next: owner supplies protected demo accounts/contact data, then create unified `reviewSubmissions`, add version items and set `submitted=true`; verify status becomes `WAITING_FOR_REVIEW`.

@@ -35,7 +35,12 @@ const payload = {
 const unsignedToken = `${base64url(header)}.${base64url(payload)}`;
 let signature;
 try {
-  signature = crypto.sign('sha256', Buffer.from(unsignedToken), privateKey).toString('base64url');
+  // JWT ES256 signatures are the raw 64-byte R||S form, not OpenSSL's DER form.
+  signature = crypto.sign(
+    'sha256',
+    Buffer.from(unsignedToken),
+    { key: privateKey, dsaEncoding: 'ieee-p1363' },
+  ).toString('base64url');
 } catch {
   fail('Could not sign App Store Connect JWT with the provided key');
 }

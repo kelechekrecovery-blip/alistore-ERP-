@@ -166,13 +166,13 @@ resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*APS_
 resolved_marketing_version="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ {print $2; exit}')"
 [[ "$resolved_marketing_version" == "1.0.0" ]] || fail 'Release MARKETING_VERSION must resolve to 1.0.0'
 resolved_build_number="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*CURRENT_PROJECT_VERSION$/ {print $2; exit}')"
-[[ "$resolved_build_number" == "1" ]] || fail 'Release CURRENT_PROJECT_VERSION must resolve to 1'
+[[ "$resolved_build_number" == "2" ]] || fail 'Release CURRENT_PROJECT_VERSION must resolve to 2'
 
 printf 'store-preflight: App Store metadata and privacy manifest are present\n'
 printf 'store-preflight: Release API URL resolved to HTTPS\n'
 printf 'store-preflight: Release bundle id and AppIcon are configured\n'
 printf 'store-preflight: Release APNs environment resolved to production\n'
-printf 'store-preflight: Release version resolved to 1.0.0 (1)\n'
+printf 'store-preflight: Release version resolved to 1.0.0 (2)\n'
 if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'
 fi
