@@ -25,6 +25,7 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import { TasksView } from '@/components/erp/TasksView';
+import { fetchStaffTaskBoard } from '@/lib/api/staff-tasks';
 import { CrmView } from '@/components/erp/CrmView';
 import { AiView } from '@/components/erp/AiView';
 import { PricingView } from '@/components/erp/PricingView';
@@ -126,6 +127,7 @@ export default function ErpPage() {
   const [revenue, setRevenue] = useState<{ day: string; amount: number }[]>([]);
   const [trend, setTrend] = useState<RevenueTrend | null>(null);
   const [insights, setInsights] = useState<Insight[] | null>(null);
+  const [openTasks, setOpenTasks] = useState<number | null>(null);
   const [insightsSource, setInsightsSource] = useState('');
   const [insightsError, setInsightsError] = useState('');
   const [session, setSession] = useState<StaffSession | null>(null);
@@ -179,6 +181,11 @@ export default function ErpPage() {
     });
     fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks([]));
     fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
+    // Право staff_tasks:manage есть не у всех, кто открывает ERP: без него
+    // счётчика просто не будет — как у бейджа готовности ниже.
+    fetchStaffTaskBoard({ status: ['open'] }, session.accessToken)
+      .then((list) => setOpenTasks(list.length))
+      .catch(() => setOpenTasks(null));
     setInsightsError('');
     fetchInsights(session.accessToken)
       .then((r) => { setInsights(r.insights); setInsightsSource(r.source); })
@@ -319,9 +326,9 @@ export default function ErpPage() {
             >
               <span className="text-base">{m.icon}</span>
               <span>{m.label}</span>
-              {m.id === 'tasks' && (
-                <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">3</span>
-              )}
+              {m.id === 'tasks' && openTasks ? (
+                <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{openTasks}</span>
+              ) : null}
             </button>
           ))}
           {extendedNav.length > 0 && (
@@ -348,7 +355,6 @@ export default function ErpPage() {
         </nav>
         <div className="erp3-glass mt-auto rounded-[14px] p-3">
           <div className="flex items-center gap-2 text-[11px] text-muted"><span className="h-1.5 w-1.5 rounded-full bg-[#4ED17A] shadow-[0_0_8px_#4ED17A]" />Сеть · онлайн</div>
-          <div className="mt-0.5 text-[13px] font-semibold">3 филиала · онлайн</div>
         </div>
         <button
           type="button"
@@ -378,7 +384,7 @@ export default function ErpPage() {
               <Search size={15} />
               <input aria-label="Поиск по ERP" placeholder="Поиск товара, чека, клиента..." className="w-[190px] bg-transparent text-xs text-white outline-none placeholder:text-white/35" />
             </label>
-            <button type="button" aria-label="Уведомления" className="relative hidden h-9 w-9 place-items-center rounded-[10px] border border-white/10 bg-white/[.05] text-white/65 hover:text-white sm:grid"><Bell size={16} /><span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[9px] font-bold text-white">5</span></button>
+            <button type="button" aria-label="Уведомления" className="relative hidden h-9 w-9 place-items-center rounded-[10px] border border-white/10 bg-white/[.05] text-white/65 hover:text-white sm:grid"><Bell size={16} /></button>
             <button
               type="button"
               onClick={() => navigate('ai')}
