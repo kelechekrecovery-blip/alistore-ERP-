@@ -4870,3 +4870,14 @@
 - Result: Android packaged software evidence is refreshed and hash-bound. This remains emulator
   evidence only; physical-device biometrics, push, camera, maps, scanner, printer/terminal and
   store certification are still open.
+
+## TOOLCHAIN-066
+
+- Date: 2026-07-20
+- Scope: make the API production build reproducible after a clean `npm ci`.
+- Change: `apps/api/package.json` adds a `prebuild` hook that runs the existing
+  `prisma:generate` script before TypeScript compilation.
+- Checks: `npm run api:build`; `apps/api/test/media.spec.ts` `4/4`;
+  `apps/api/test/media-payments-rbac.e2e-spec.ts` `5/5`.
+- Result: a clean generated Prisma Client is now part of the API build contract; media upload
+  transformation and upload/payments RBAC remain green.
