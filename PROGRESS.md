@@ -4856,3 +4856,17 @@
   durable visual acceptance and the dirty source tree caused by the unrelated `apps/web/tsconfig.json`.
 - Next: do not claim release readiness; finish trusted evidence only after the parallel source
   change is resolved, then proceed to staging, physical-device and provider certification.
+
+## NATIVE-EVIDENCE-065
+
+- Date: 2026-07-20
+- Scope: refresh the trusted Android packaged UI acceptance artifact against the current
+  committed source tree without touching concurrent Web/ERP work.
+- Checks: trusted recorder ran `npm run android:ui` in a clean clone with the real Android SDK;
+  Core connected tests passed `30/30`, Client/Staff/Courier/POS packaged tests passed `1/1`
+  each on `savio_api36_arm64(AVD) - 16`.
+- Evidence: source tree hash `728e2e88ec82dbc65f71a655e801c0af7d5a8cd5206d67f80f26783016aac402`;
+  artifact `docs/acceptance/artifacts/android-app-ui-e2002286830e67fd709184fbbe74b8277d73eb8a2251b077f8aa44864c899382.json`.
+- Result: Android packaged software evidence is refreshed and hash-bound. This remains emulator
+  evidence only; physical-device biometrics, push, camera, maps, scanner, printer/terminal and
+  store certification are still open.
