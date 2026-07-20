@@ -4733,3 +4733,20 @@
   - Changes: auth integration suite now proves that `AUTH_OTP_DEV_ECHO=true` cannot expose `devCode` when `NODE_ENV=production`.
   - Checks: isolated auth suite `9/9`; `git diff --check`.
   - Result: OTP security slice remains locally accepted; SMS provider and staging delivery remain external gates.
+
+## AUTONOMOUS-PROMPT-057
+
+- Date: 2026-07-20
+- Scope: add a reusable autonomous execution contract for the complete AliStore ecosystem.
+- Change: added `docs/MASTER-AUTONOMOUS-EXECUTION-PROMPT-2.md` with accountable agent roles,
+  ownership boundaries, P0-P3 sequencing, security/ledger/idempotency invariants, Web/ERP,
+  native, infrastructure, provider and store gates, and a strict status protocol.
+- Checks: `git diff --check`; full `mvp:verify` reached API batch 56/173 and stopped on a
+  transient `422` in the finance concurrency scenario; isolated
+  `finance-settlements.e2e-spec.ts` passed `5/5`; API build, media/payments RBAC `5/5`,
+  and Web staff permissions `18/18` passed.
+- Result: prompt committed as `60c7e2b`. Full MVP gate remains unaccepted until rerun on
+  an isolated/stable worktree and process set. Current unrelated parallel changes remain
+  uncommitted and were not included.
+- Next: rerun the full MVP gate without parallel source churn, then refresh strict
+  evidence and proceed to external Render/provider/device gates.
