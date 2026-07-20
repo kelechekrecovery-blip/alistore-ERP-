@@ -59,21 +59,53 @@ export const COD_STALE_MS = 24 * 60 * 60 * 1000;
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Sales per day for the last 7 days (revenue chart). UTC-consistent bucketing. */
+  /**
+   * COD revenue never becomes a `Payment`: the courier recognises it as a
+   * receivable at delivery (Dr 1100 / Cr 4000, `cod.receivable`) and the later
+   * handover only moves cash against that receivable. Reports that count
+   * payments alone therefore miss the whole courier channel while
+   * `/finance/statements` sees it — two revenue numbers that disagree.
+   *
+   * Store credit is deliberately NOT included here: `debt.origination` also
+   * recognises revenue, but each repayment writes a real `Payment`
+   * (`debts.service` → method `installment`), so adding it would double count.
+   */
+  private codRecognisedRevenue(from?: Date, to?: Date) {
+    return this.prisma.accountingJournalEntry.findMany({
+      where: {
+        sourceType: 'cod.receivable',
+        ...(from || to ? { occurredAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } } : {}),
+      },
+      select: { documentAmount: true, occurredAt: true },
+    });
+  }
+
+  /** Journal rows shaped like payments so revenue bucketing can merge them. */
+  private static asRevenueRows(
+    entries: { documentAmount: number | null; occurredAt: Date }[],
+  ): { amount: number; createdAt: Date }[] {
+    return entries
+      .filter((entry) => (entry.documentAmount ?? 0) > 0)
+      .map((entry) => ({ amount: entry.documentAmount as number, createdAt: entry.occurredAt }));
+  }
+
   /** Daily revenue buckets for the last N days (UTC-consistent). Powers the dashboard chart. */
   async revenue(days = 7): Promise<{ day: string; amount: number }[]> {
     const span = clampDays(days);
     const now = new Date();
     const startMs = revenueWindowStartMs(span, now);
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        amount: { gt: 0 },
-        status: { in: ['received', 'reconciled'] },
-        createdAt: { gte: new Date(startMs) },
-      },
-      select: { amount: true, createdAt: true },
-    });
-    return buildRevenueBuckets(payments, span, now);
+    const [payments, cod] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: {
+          amount: { gt: 0 },
+          status: { in: ['received', 'reconciled'] },
+          createdAt: { gte: new Date(startMs) },
+        },
+        select: { amount: true, createdAt: true },
+      }),
+      this.codRecognisedRevenue(new Date(startMs)),
+    ]);
+    return buildRevenueBuckets([...payments, ...ReportsService.asRevenueRows(cod)], span, now);
   }
 
   /** Period-over-period revenue trend: last N days vs the N days before them. */
@@ -82,7 +114,7 @@ export class ReportsService {
     const now = new Date();
     const currentStart = new Date(revenueWindowStartMs(span, now));
     const prevStart = new Date(previousWindowStartMs(span, now));
-    const [cur, prev] = await Promise.all([
+    const [cur, prev, codCur, codPrev] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
         where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, createdAt: { gte: currentStart } },
@@ -95,8 +127,19 @@ export class ReportsService {
           createdAt: { gte: prevStart, lt: currentStart },
         },
       }),
+      this.prisma.accountingJournalEntry.aggregate({
+        _sum: { documentAmount: true },
+        where: { sourceType: 'cod.receivable', occurredAt: { gte: currentStart } },
+      }),
+      this.prisma.accountingJournalEntry.aggregate({
+        _sum: { documentAmount: true },
+        where: { sourceType: 'cod.receivable', occurredAt: { gte: prevStart, lt: currentStart } },
+      }),
     ]);
-    return buildRevenueTrend(cur._sum.amount ?? 0, prev._sum.amount ?? 0);
+    return buildRevenueTrend(
+      (cur._sum.amount ?? 0) + (codCur._sum.documentAmount ?? 0),
+      (prev._sum.amount ?? 0) + (codPrev._sum.documentAmount ?? 0),
+    );
   }
 
   /** Daily revenue buckets for an arbitrary [from, to] date range (YYYY-MM-DD, inclusive). */
@@ -115,7 +158,7 @@ export class ReportsService {
     }
     const endExclusive = new Date(toMs + DAY_MS); // include the whole «to» day
     const prevFromMs = fromMs - spanDays * DAY_MS; // equal-length window immediately before
-    const [payments, prevAgg] = await Promise.all([
+    const [payments, prevAgg, cod, prevCod] = await Promise.all([
       this.prisma.payment.findMany({
         where: {
           amount: { gt: 0 },
@@ -132,10 +175,18 @@ export class ReportsService {
           createdAt: { gte: new Date(prevFromMs), lt: new Date(fromMs) },
         },
       }),
+      this.codRecognisedRevenue(new Date(fromMs), endExclusive),
+      this.prisma.accountingJournalEntry.aggregate({
+        _sum: { documentAmount: true },
+        where: { sourceType: 'cod.receivable', occurredAt: { gte: new Date(prevFromMs), lt: new Date(fromMs) } },
+      }),
     ]);
-    const buckets = buildRangeBuckets(payments, fromMs, toMs);
+    const buckets = buildRangeBuckets([...payments, ...ReportsService.asRevenueRows(cod)], fromMs, toMs);
     const total = buckets.reduce((sum, b) => sum + b.amount, 0);
-    const trend = buildRevenueTrend(total, prevAgg._sum.amount ?? 0);
+    const trend = buildRevenueTrend(
+      total,
+      (prevAgg._sum.amount ?? 0) + (prevCod._sum.documentAmount ?? 0),
+    );
     return { from: fromIso, to: toIso, days: spanDays, total, buckets, trend };
   }
 
@@ -161,6 +212,8 @@ export class ReportsService {
       openShiftRows,
       debtAggregate,
       overdueDebts,
+      codAll,
+      codToday,
     ] = await Promise.all([
         this.prisma.payment.aggregate({
           _sum: { amount: true },
@@ -199,9 +252,20 @@ export class ReportsService {
         }),
         this.prisma.debtPlan.aggregate({ _sum: { balance: true }, where: { status: 'open' } }),
         this.prisma.debtPlan.count({ where: { status: 'open', dueDate: { lt: now } } }),
+        this.prisma.accountingJournalEntry.aggregate({
+          _sum: { documentAmount: true },
+          where: { sourceType: 'cod.receivable' },
+        }),
+        this.prisma.accountingJournalEntry.aggregate({
+          _sum: { documentAmount: true },
+          where: { sourceType: 'cod.receivable', occurredAt: { gte: todayStart } },
+        }),
       ]);
 
-    const salesGross = sales._sum.amount ?? 0;
+    // Payments + COD recognised at delivery (see codRecognisedRevenue) — without
+    // the second term the courier channel is invisible here while it is present
+    // in /finance/statements.
+    const salesGross = (sales._sum.amount ?? 0) + (codAll._sum.documentAmount ?? 0);
     const refunded = Math.abs(refunds._sum.amount ?? 0);
     const operatingExpenses = expenses._sum.amount ?? 0;
     const cashInDrawers = openShiftRows.reduce(
@@ -220,7 +284,7 @@ export class ReportsService {
       },
       /** Today only (UTC day, matching the revenue chart's last bucket). */
       today: {
-        salesGross: todaySales._sum.amount ?? 0,
+        salesGross: (todaySales._sum.amount ?? 0) + (codToday._sum.documentAmount ?? 0),
         orders: todayOrders,
       },
       cash: { inDrawers: cashInDrawers, openShifts },

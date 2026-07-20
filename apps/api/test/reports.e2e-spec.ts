@@ -35,6 +35,13 @@ describe('Reports (integration)', () => {
     await prisma.approval.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.debtPlan.deleteMany();
+    await prisma.$transaction(async (tx) => {
+      // Journal-line balance is a deferred constraint: remove dependent lines
+      // and entries in one transaction so the deleted entries are absent when
+      // the deferred trigger validates its candidate ids.
+      await tx.accountingJournalLine.deleteMany();
+      await tx.accountingJournalEntry.deleteMany();
+    });
     await prisma.customer.deleteMany();
   });
 
@@ -108,6 +115,46 @@ describe('Reports (integration)', () => {
     expect(d.cash.openShifts).toBe(1);
     expect(d.debts.openBalance).toBe(30000);
     expect(d.debts.overdue).toBe(1);
+  });
+
+  it('counts COD revenue recognised at delivery, which never becomes a Payment', async () => {
+    const customer = await prisma.customer.create({ data: { phone: '+996700900005', name: 'COD' } });
+    const order = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'web', total: 70000, status: 'delivered' },
+    });
+    // A courier delivery posts Dr 1100 / Cr 4000 and creates no Payment row.
+    await prisma.accountingJournalEntry.create({
+      data: {
+        idempotencyKey: `accounting:cod.receivable:${order.id}`,
+        sourceType: 'cod.receivable',
+        sourceRef: order.id,
+        description: `COD к получению по заказу ${order.id}`,
+        documentAmount: 70000,
+        baseAmount: 70000,
+        occurredAt: new Date(),
+        createdBy: 'courier-1',
+      },
+    });
+    // Plus an older COD delivery that must stay out of «today».
+    await prisma.accountingJournalEntry.create({
+      data: {
+        idempotencyKey: `accounting:cod.receivable:old-${order.id}`,
+        sourceType: 'cod.receivable',
+        sourceRef: `old-${order.id}`,
+        description: 'COD десятидневной давности',
+        documentAmount: 500000,
+        baseAmount: 500000,
+        occurredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        createdBy: 'courier-1',
+      },
+    });
+
+    const d = await reports.dashboard();
+    expect(d.money.salesGross).toBe(570000); // no payments exist — this is pure COD
+    expect(d.today.salesGross).toBe(70000);
+
+    const buckets = await reports.revenue(7);
+    expect(buckets.reduce((sum, b) => sum + b.amount, 0)).toBe(70000);
   });
 
   it('surfaces cash discrepancy, outstanding COD and stale reservation as risks', async () => {
