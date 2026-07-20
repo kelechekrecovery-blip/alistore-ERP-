@@ -21,8 +21,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/ios-app-ui-9c9e73af4e82fe5f4193a1aae533be0f5f2904214083aa74b67b399e2ce2582f.json",
-          "sha256": "9c9e73af4e82fe5f4193a1aae533be0f5f2904214083aa74b67b399e2ce2582f"
+          "path": "docs/acceptance/artifacts/ios-app-ui-3046eb3f3be3479ddafd55bda7844ce90c8165d4d2e8a814a7d6ed5838b9905d.json",
+          "sha256": "3046eb3f3be3479ddafd55bda7844ce90c8165d4d2e8a814a7d6ed5838b9905d"
         }
       ]
     },
@@ -45,8 +45,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/android-app-ui-52dbe2f94d911366d17960235d915ba8d9afeabdfd63f32b4117f718043d8fd4.json",
-          "sha256": "52dbe2f94d911366d17960235d915ba8d9afeabdfd63f32b4117f718043d8fd4"
+          "path": "docs/acceptance/artifacts/android-app-ui-55483ae40f79278cf49a39f84fafb90ccef02a6027cab64e61a58c1782fed1ad.json",
+          "sha256": "55483ae40f79278cf49a39f84fafb90ccef02a6027cab64e61a58c1782fed1ad"
         }
       ]
     },

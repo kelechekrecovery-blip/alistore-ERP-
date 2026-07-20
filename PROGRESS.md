@@ -4959,3 +4959,16 @@
   stable. No production-readiness claim is made.
 - Next: owner must finish or checkpoint the concurrent Web changes; then run `npm ci` in the same
   clean boundary, verify the tracked ecosystem lock, refresh evidence and rerun the strict audit.
+
+## NATIVE-UI-074
+
+- Date: 2026-07-20
+- Scope: rerun native UI acceptance after the iOS repeat-order UX fix.
+- Checks: iOS `npm run ios:ui` passed `40/40` tests across Client, Staff, Courier and POS;
+  Android `npm run android:ui` passed core `30/30` plus all four packaged app connected tests;
+  Gradle reported `BUILD SUCCESSFUL`.
+- Evidence: `docs/acceptance/artifacts/ios-app-ui-3046eb3f3be3479ddafd55bda7844ce90c8165d4d2e8a814a7d6ed5838b9905d.json`;
+  `docs/acceptance/artifacts/android-app-ui-55483ae40f79278cf49a39f84fafb90ccef02a6027cab64e61a58c1782fed1ad.json`.
+- Result: native software UI gates are green for source boundary `8696eb6`. Physical-device,
+  provider, store and production certification remain open; main acceptance also waits for the
+  concurrent untracked `e2e/erp-no-fixtures.spec.ts` to be checkpointed.
