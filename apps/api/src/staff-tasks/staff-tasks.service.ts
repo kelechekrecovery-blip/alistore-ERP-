@@ -5,7 +5,10 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
-import { CreateStaffTaskDto } from './staff-tasks.dto';
+import { CreateStaffTaskDto, ListStaffTasksDto } from './staff-tasks.dto';
+
+/** Доска читается целиком; предел держит запрос ограниченным на любой базе. */
+const BOARD_LIMIT = 200;
 
 const SELF_TRANSITIONS: Record<StaffTaskStatus, StaffTaskStatus[]> = {
   open: ['in_progress', 'completed'],
@@ -26,6 +29,24 @@ export class StaffTasksService {
     return this.prisma.staffTask.findMany({
       where: { assigneeId: staffId, status: { not: 'cancelled' } },
       orderBy: [{ status: 'asc' }, { priority: 'desc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /**
+   * Доска команды: задачи всех исполнителей. `mine()` для этого не годится —
+   * он жёстко фильтрует по assigneeId и не отдаёт имя исполнителя, так что
+   * экран мог показать только UUID или выдуманного сотрудника.
+   */
+  list(dto: ListStaffTasksDto) {
+    return this.prisma.staffTask.findMany({
+      where: {
+        ...(dto.assigneeId ? { assigneeId: dto.assigneeId } : {}),
+        // Без явного фильтра отменённые не показываем — как и в mine().
+        status: dto.status?.length ? { in: dto.status } : { not: 'cancelled' },
+      },
+      include: { assignee: { select: { id: true, username: true, role: true } } },
+      orderBy: [{ status: 'asc' }, { priority: 'desc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+      take: BOARD_LIMIT,
     });
   }
 

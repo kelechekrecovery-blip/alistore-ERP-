@@ -401,7 +401,7 @@ export default function ErpPage() {
           {activeRoute === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
-          {activeRoute === 'tasks' && <TasksView />}
+          {activeRoute === 'tasks' && <TasksView accessToken={session.accessToken} />}
           {activeRoute === 'admin' && <AdminView role={session.role} username={session.username} accessToken={session.accessToken} onNavigate={setRoute} />}
           {activeRoute === 'ai' && (
             <AiView insights={insights} source={insightsSource} error={insightsError} onRetry={() => setReloadToken((value) => value + 1)} />

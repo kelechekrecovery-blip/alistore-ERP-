@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { CreateStaffTaskDto, UpdateMyStaffTaskDto } from './staff-tasks.dto';
+import { CreateStaffTaskDto, ListStaffTasksDto, UpdateMyStaffTaskDto } from './staff-tasks.dto';
 import { StaffTasksService } from './staff-tasks.service';
 
 @ApiTags('staff-tasks')
@@ -15,6 +15,11 @@ import { StaffTasksService } from './staff-tasks.service';
 @UseGuards(JwtAuthGuard, ActiveStaffGuard)
 export class StaffTasksController {
   constructor(private readonly tasks: StaffTasksService) {}
+
+  @Get()
+  @UseGuards(PermissionGuard)
+  @RequirePermission('staff_tasks', 'manage')
+  list(@Query() dto: ListStaffTasksDto) { return this.tasks.list(dto); }
 
   @Get('mine')
   mine(@CurrentUser() user: AuthPrincipal) { return this.tasks.mine(user.customerId); }

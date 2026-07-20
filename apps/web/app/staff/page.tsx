@@ -476,7 +476,9 @@ export default function StaffPage() {
                 )}
                 <ActionLink icon="＋" label="Добавить товар" badge="Каталог" href="/admin/products" />
                 <Action icon="♻️" label="Скупка Б/У" badge="По регламенту" onClick={() => setTab('buyback')} />
-                <Action icon="📊" label="Задачи и KPI" badge="2 активных" onClick={() => setTab('tasks')} />
+                {/* Соседние бейджи — подписи, а не счётчики. Здесь стояло «2 активных»:
+                    число не считалось ниоткуда и не менялось никогда. */}
+                <Action icon="📊" label="Задачи и KPI" badge="Мои задачи" onClick={() => setTab('tasks')} />
               </div>
 
               <div className="mb-4 flex gap-2 overflow-x-auto" aria-label="Дополнительные операции">
