@@ -4972,3 +4972,16 @@
 - Result: native software UI gates are green for source boundary `8696eb6`. Physical-device,
   provider, store and production certification remain open; main acceptance also waits for the
   concurrent untracked `e2e/erp-no-fixtures.spec.ts` to be checkpointed.
+
+## AUDIT-075
+
+- Date: 2026-07-20
+- Scope: strict audit after the native evidence transfer.
+- Current source boundary: `ac60f2e` (new ERP commits landed after the recorded runs).
+- Result: the worktree is clean, but the strict contract rejects evidence recorded for earlier
+  source boundaries (`63681bb`, `8696eb6`) until the latest ERP source is frozen and all affected
+  gates are rerun. This is intentional hash-bound acceptance behavior, not a hidden pass.
+- Remaining before acceptance: freeze the parallel branch, rerun visual, four reconciliation
+  verticals, composite E2E and native UI recorders on the same HEAD, then rerun
+  `npm run ecosystem:audit:strict`. Production providers, physical-device certification and
+  store submission remain separate external gates.
