@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { HrAbsenceStatus, Prisma } from '@prisma/client';
+import { SettingsService } from '../settings/settings.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
@@ -9,7 +10,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateHrScheduleDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 
 const DAY_MS = 86_400_000;
-const PAYROLL_CONFIG = { baseAmount: 15_000, commissionBps: 150, latePenaltyPerMinute: 2, overtimePayPerMinute: 3 } as const;
+/**
+ * Payroll parameters. These were `as const` for every employee of the company,
+ * so a salary review meant a code change and a deploy. They now come from the
+ * Setting table, which falls back to exactly these numbers until the owner
+ * changes one — behaviour is identical until somebody decides otherwise.
+ */
+// (значения по умолчанию живут в settings.registry.ts — здесь они больше не дублируются)
 
 function dateOnly(value: string, field: string) {
   const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
@@ -64,9 +71,22 @@ export class HrService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
 
+  /** Effective payroll parameters — owner-set values, or the historical defaults. */
+  private async payrollConfig() {
+    const [baseAmount, commissionBps, latePenaltyPerMinute, overtimePayPerMinute] = await Promise.all([
+      this.settings.value('payroll.base_amount_som'),
+      this.settings.value('payroll.commission_bps'),
+      this.settings.value('payroll.late_penalty_per_minute_som'),
+      this.settings.value('payroll.overtime_per_minute_som'),
+    ]);
+    return { baseAmount, commissionBps, latePenaltyPerMinute, overtimePayPerMinute };
+  }
+
   private async calculatePayroll(tx: Prisma.TransactionClient, period: string, rawPoint: string) {
+    const PAYROLL_CONFIG = await this.payrollConfig();
     const point = payrollPoint(rawPoint);
     const { start, end } = payrollBounds(period);
     const [schedules, absences, payments] = await Promise.all([
@@ -160,7 +180,7 @@ export class HrService {
       const run = await tx.hrPayrollRun.create({
         data: {
           id: runId,
-          period, point, ...PAYROLL_CONFIG, totalBase: preview.totals.base, totalCommission: preview.totals.commission,
+          period, point, ...(await this.payrollConfig()), totalBase: preview.totals.base, totalCommission: preview.totals.commission,
           totalAdjustments: preview.totals.adjustments, totalPayout: preview.totals.payout, createdBy: actor, accrualAccountingEntryId: accrual.id,
           lines: { create: preview.lines },
         },
