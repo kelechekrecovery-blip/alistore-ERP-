@@ -283,20 +283,42 @@ export class ProductsService {
         data,
         include: this.stockCountInclude(),
       });
+      const events: AuditInput[] = [
+        {
+          type: EventType.ProductUpdated,
+          actor: requester,
+          payload: {
+            productId,
+            sku: product.sku,
+            changes: Object.keys(data),
+          },
+          refs: [productId, product.sku],
+        },
+      ];
+      // Cost is the denominator of the POS margin floor (pos.service margin control),
+      // so a silent drop weakens that guard for every unit without its own
+      // acquisitionCost. ProductUpdated only records which keys changed — record the
+      // actual movement so a cost cut is investigable in the ledger.
+      if (dto.cost !== undefined && dto.cost !== product.cost) {
+        events.push({
+          type: EventType.ProductCostChanged,
+          actor: requester,
+          payload: {
+            productId,
+            sku: product.sku,
+            from: product.cost,
+            to: dto.cost,
+            deltaPct:
+              product.cost === 0
+                ? null
+                : Math.round(((dto.cost - product.cost) / product.cost) * 1000) / 10,
+          },
+          refs: [productId, product.sku],
+        });
+      }
       return {
         result: this.toAdminProduct(updated),
-        events: [
-          {
-            type: EventType.ProductUpdated,
-            actor: requester,
-            payload: {
-              productId,
-              sku: product.sku,
-              changes: Object.keys(data),
-            },
-            refs: [productId, product.sku],
-          },
-        ],
+        events,
       };
     });
   }

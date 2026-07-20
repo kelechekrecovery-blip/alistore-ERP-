@@ -172,8 +172,40 @@ describe('Product management API', () => {
       .expect(403);
 
     const events = await prisma.auditEvent.findMany({ orderBy: { ts: 'asc' } });
-    expect(events.map((event) => event.type)).toEqual(['product.created', 'product.updated']);
+    expect(events.map((event) => event.type)).toEqual([
+      'product.created',
+      'product.updated',
+      'product.cost_changed',
+    ]);
     expect(events.every((event) => event.actor === adminId)).toBe(true);
+
+    // Cost feeds the POS margin floor, so the ledger must carry the movement
+    // itself — «product.updated» only lists which keys changed.
+    const costEvent = events.find((event) => event.type === 'product.cost_changed');
+    expect(costEvent?.payload).toMatchObject({ from: 90000, to: 88000 });
+  });
+
+  it('does not emit a cost event when the cost is unchanged', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        sku: `SKU-COST-STABLE-${RUN}`,
+        name: 'Stable cost phone',
+        price: 100000,
+        cost: 70000,
+        category: 'phones',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/products/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Renamed only', cost: 70000 })
+      .expect(200);
+
+    const types = (await prisma.auditEvent.findMany({ orderBy: { ts: 'asc' } })).map((e) => e.type);
+    expect(types).not.toContain('product.cost_changed');
   });
 
   it('keeps dangerous price and archive actions in the approval flow', async () => {

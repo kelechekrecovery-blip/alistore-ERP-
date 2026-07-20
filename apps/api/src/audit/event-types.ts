@@ -140,6 +140,7 @@ export const EventType = {
   ProductCreated: 'product.created',
   ProductUpdated: 'product.updated',
   PriceChanged: 'price.changed',
+  ProductCostChanged: 'product.cost_changed',
   ProductArchived: 'product.archived',
   ProductReviewSubmitted: 'product_review.submitted',
   ProductReviewApproved: 'product_review.approved',
