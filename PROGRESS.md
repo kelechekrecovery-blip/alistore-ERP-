@@ -4750,3 +4750,17 @@
   uncommitted and were not included.
 - Next: rerun the full MVP gate without parallel source churn, then refresh strict
   evidence and proceed to external Render/provider/device gates.
+
+## REPORTS-058
+
+- Date: 2026-07-20
+- Scope: close the ERP reporting gap where delivered COD revenue was absent because
+  it is recognised through the accounting Ledger, not a Payment row.
+- Changes: dashboard, revenue buckets/range and period trend now include
+  `cod.receivable` Ledger entries; report integration coverage adds today/range and
+  operational risk cases. Cleanup removes journal lines and entries atomically so
+  the deferred balance trigger remains valid.
+- Checks: `reports.e2e-spec.ts` `6/6`; `npm run api:build`; `git diff --check`.
+- Commit: `25288ec`.
+- Remaining: full MVP rerun still needs a stable isolated process/worktree; current
+  unrelated `apps/web/tsconfig.json` change remains uncommitted.
