@@ -27,6 +27,7 @@ const GRANTS: Record<string, readonly string[]> = {
   'protection:read': ['seller', 'senior_seller', 'admin', 'owner'],
   'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'staff:manage': ['owner'],
+  'settings:manage': ['owner'],
   'debts:read': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'debts:create': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'debts:pay': ['cashier', 'senior_seller', 'admin', 'owner'],
@@ -73,7 +74,7 @@ export const canPrintReceipts = (role: string) => staffCan(role, 'receipts', 'pr
 export type ErpRoute =
   | 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr'
   | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns'
-  | 'storefront' | 'risks' | 'readiness' | 'ledger' | 'tasks';
+  | 'storefront' | 'risks' | 'readiness' | 'settings' | 'ledger' | 'tasks';
 
 export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   dash: { obj: 'reports', act: 'read' },
@@ -93,6 +94,7 @@ export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   storefront: { obj: 'storefront', act: 'read' },
   risks: { obj: 'reports', act: 'read' },
   readiness: { obj: 'reports', act: 'read' }, // lists unconfigured integrations — owner/admin only
+  settings: { obj: 'reports', act: 'read' }, // read for owner/admin; writing needs settings:manage (owner)
   ledger: { obj: 'reports', act: 'read' },
   tasks: null,
 };

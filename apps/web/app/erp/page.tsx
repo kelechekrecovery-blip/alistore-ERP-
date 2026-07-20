@@ -33,6 +33,7 @@ import { KpiView } from '@/components/erp/KpiView';
 import { DashboardView } from '@/components/erp/DashboardView';
 import { CampaignsView } from '@/components/erp/CampaignsView';
 import { Card } from '@/components/erp/Card';
+import { SettingsView } from '@/components/erp/SettingsView';
 import { ReadinessView } from '@/components/erp/ReadinessView';
 import { RiskCenterView } from '@/components/erp/RiskCenterView';
 import { StockView } from '@/components/erp/StockView';
@@ -45,7 +46,7 @@ import { StorefrontView } from '@/components/erp/StorefrontView';
 import { AdminView } from '@/components/erp/AdminView';
 import { StoreOperationsView } from '@/components/erp/StoreOperationsView';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
-import { erpRouteAllowed, type ErpRoute } from '@/lib/staff-permissions';
+import { erpRouteAllowed, staffCan, type ErpRoute } from '@/lib/staff-permissions';
 
 type Route = ErpRoute;
 
@@ -70,10 +71,12 @@ const EXTENDED_NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'storefront', icon: '▤', label: 'Управление сайтом' },
   { id: 'risks', icon: '⚠', label: 'Риски' },
   { id: 'readiness', icon: '✓', label: 'Готовность' },
+  { id: 'settings', icon: '🎛', label: 'Параметры' },
   { id: 'ledger', icon: '📜', label: 'Event Ledger' },
 ];
 const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор сети · сегодня'],
+  settings: ['Параметры бизнеса', 'Скидки · зарплата · гарантия · выкуп · бонусы'],
   admin: ['Администрирование', 'Сайт · операции · доступы'],
   ai: ['AI-ассистент', 'Знает всю систему'],
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
@@ -386,6 +389,7 @@ export default function ErpPage() {
           {activeRoute === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}
           {activeRoute === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
           {activeRoute === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}
+          {activeRoute === 'settings' && <SettingsView accessToken={session.accessToken} canEdit={staffCan(session.role, 'settings', 'manage')} />}
           {activeRoute === 'ledger' && <LedgerView ledger={ledger} />}
         </div>
       </main>
