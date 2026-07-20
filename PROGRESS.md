@@ -4839,3 +4839,20 @@
   the clean source boundary, physical-device smoke and complete rerun of the iOS suite.
 - Next: commit this bounded fix, rerun the strongest available clean-source gates, and keep
   external provider, staging, device and store-review blockers explicit.
+
+## BUILD-SMOKE-064
+
+- Date: 2026-07-20
+- Scope: verify the committed source boundary after the native Client fix and clean dependency
+  install.
+- Finding: a direct API build initially failed because the generated Prisma Client was stale;
+  this is a local generated-toolchain state, not a source regression.
+- Recovery: `npm run prisma:generate -w @alistore/api` restored the client, after which
+  `npm run api:build` and `git diff --check` passed.
+- Public smoke: `https://ali.kg/`, `https://admin.ali.kg/`,
+  `https://api.ali.kg/api/health/live` and `https://api.ali.kg/api/health/ready` returned
+  HTTP 200.
+- Strict audit: still reports 9 blockers, including hash-bound native/reconciliation evidence,
+  durable visual acceptance and the dirty source tree caused by the unrelated `apps/web/tsconfig.json`.
+- Next: do not claim release readiness; finish trusted evidence only after the parallel source
+  change is resolved, then proceed to staging, physical-device and provider certification.
