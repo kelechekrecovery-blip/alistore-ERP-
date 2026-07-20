@@ -4793,3 +4793,17 @@
   no readiness claim made.
 - Next: rerun the complete gate with API/database processes isolated, then refresh
   hash-bound evidence against the committed source boundary.
+
+## MVP-VERIFY-061
+
+- Date: 2026-07-20
+- Scope: independently verify the remaining API suites after the orchestrated transport flake.
+- Checks: all 16 suites in the final sorted tail passed one at a time with a test-database
+  reset before each suite; no assertion or authorization failures observed.
+- Result: isolated API remainder is green, but the overall `mvp:verify` gate remains red because
+  the exact orchestrated command previously exited nonzero under a parallel API process.
+- Note: the current worktree also contains unrelated parallel edits in `apps/mobile/package.json`,
+  `apps/web/tsconfig.json`, `package.json`, `scripts/mvp-verify.mjs`, and
+  `scripts/legacy-expo-retired.mjs`; these were not altered or committed.
+- Next: rerun the exact full gate only after the competing test API process is no longer active,
+  then regenerate strict audit evidence from the same clean source boundary.
