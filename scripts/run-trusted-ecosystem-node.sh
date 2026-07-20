@@ -56,10 +56,29 @@ fi
 script=$1
 shift
 exec 3<"$MANIFEST"
-exec /usr/bin/env -i \
-  ALISTORE_TRUSTED_BOOTSTRAP_FD=3 \
-  HOME="${HOME:-$ROOT}" \
-  LANG=C \
-  PATH='/opt/homebrew/Cellar/node/25.9.0_3/bin:/usr/bin:/bin:/usr/sbin:/sbin' \
-  TMPDIR="${TMPDIR:-/tmp}" \
-  "$NODE" "$ROOT/$script" "$@"
+env_args="ALISTORE_TRUSTED_BOOTSTRAP_FD=3 HOME=${HOME:-$ROOT} LANG=C PATH=/opt/homebrew/Cellar/node/25.9.0_3/bin:/usr/bin:/bin:/usr/sbin:/sbin TMPDIR=${TMPDIR:-/tmp}"
+
+for port_name in E2E_API_PORT E2E_WEB_PORT; do
+  port_value=$(eval "printf '%s' \"\${$port_name:-}\"")
+  if [ -n "$port_value" ]; then
+    case "$port_value" in
+      *[!0-9]*) echo "$port_name must be a numeric port." >&2; exit 2 ;;
+    esac
+    if [ "$port_value" -lt 1 ] || [ "$port_value" -gt 65535 ]; then
+      echo "$port_name is outside the valid port range." >&2
+      exit 2
+    fi
+    env_args="$env_args $port_name=$port_value"
+  fi
+done
+
+if [ -n "${E2E_REUSE_EXISTING_SERVER:-}" ]; then
+  case "$E2E_REUSE_EXISTING_SERVER" in
+    true|false) env_args="$env_args E2E_REUSE_EXISTING_SERVER=$E2E_REUSE_EXISTING_SERVER" ;;
+    *) echo 'E2E_REUSE_EXISTING_SERVER must be true or false.' >&2; exit 2 ;;
+  esac
+fi
+
+# The optional values above are validated as digits/booleans before word splitting.
+# shellcheck disable=SC2086
+exec /usr/bin/env -i $env_args "$NODE" "$ROOT/$script" "$@"
