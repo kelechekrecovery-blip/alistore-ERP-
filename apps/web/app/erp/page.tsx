@@ -129,6 +129,11 @@ export default function ErpPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [readiness, setReadiness] = useState<ExternalReadinessReport | null>(null);
   const [readinessError, setReadinessError] = useState('');
+  // Cockpit loads used to swallow their failures (`.catch(() => setD(null))`),
+  // so a dead endpoint was indistinguishable from a slow one: the screen sat on
+  // «Загрузка…» forever with no error and no way to retry.
+  const [cockpitError, setCockpitError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [mobileNavigation, setMobileNavigation] = useState(false);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
@@ -161,8 +166,15 @@ export default function ErpPage() {
 
   useEffect(() => {
     if (!session) return;
-    fetchDashboard(session.accessToken).then(setD).catch(() => setD(null));
-    fetchKpi(session.accessToken).then(setKpi).catch(() => setKpi(null));
+    setCockpitError('');
+    fetchDashboard(session.accessToken).then(setD).catch((cause) => {
+      setD(null);
+      setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить показатели');
+    });
+    fetchKpi(session.accessToken).then(setKpi).catch((cause) => {
+      setKpi(null);
+      setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить показатели');
+    });
     fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks([]));
     fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
     fetchInsights(session.accessToken).then((r) => setInsights(r.insights)).catch(() => setInsights([]));
@@ -175,7 +187,7 @@ export default function ErpPage() {
         setReadiness(null);
         setReadinessError('Не удалось загрузить readiness report');
       });
-  }, [session]);
+  }, [session, reloadToken]);
 
   useEffect(() => {
     if (!session) return;
@@ -369,6 +381,12 @@ export default function ErpPage() {
         </div>
 
         <div className="min-w-0 px-3 py-4 sm:px-[26px] sm:py-[22px]">
+          {cockpitError && (
+            <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 rounded-[8px] border border-danger-soft/40 bg-danger-soft/10 px-3 py-2 text-xs text-danger-soft">
+              <span>Не удалось загрузить данные кокпита: {cockpitError}</span>
+              <button type="button" onClick={() => setReloadToken((value) => value + 1)} className="rounded-[6px] border border-danger-soft/50 px-2.5 py-1 font-semibold">Повторить</button>
+            </div>
+          )}
           {activeRoute === 'dash' && (
             <DashboardView d={d} risks={risks} revenue={revenue} trend={trend} period={period} accessToken={session.accessToken} onPeriod={setPeriod} onSignal={actOnSignal} />
           )}
