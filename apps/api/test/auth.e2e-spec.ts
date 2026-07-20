@@ -59,6 +59,21 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     expect(customer).not.toBeNull();
   });
 
+  it('never echoes an OTP when production mode is misconfigured', async () => {
+    const productionConfig = {
+      get: (key: string) => ({ AUTH_OTP_DEV_ECHO: 'true', NODE_ENV: 'production' }[key]),
+    } as unknown as ConfigService;
+    const productionAuth = new AuthService(
+      prisma,
+      new JwtService({ secret: 'test-secret', signOptions: { expiresIn: '15m' } }),
+      productionConfig,
+    );
+
+    const result = await productionAuth.requestOtp(nextPhone());
+    expect(result).toEqual({ challengeId: expect.any(String) });
+    expect(result).not.toHaveProperty('devCode');
+  });
+
   it('rejects a wrong code and counts the attempt', async () => {
     const phone = nextPhone();
     const { devCode } = await auth.requestOtp(phone);

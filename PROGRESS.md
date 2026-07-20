@@ -4708,3 +4708,8 @@
   - Change: `scripts/mvp-verify.mjs` now applies `connection_limit=5` to the isolated test database URL passed to migrations, API suites and Playwright.
   - Checks: `node --check scripts/mvp-verify.mjs`; `git diff --check`. Full rerun remains pending a free PostgreSQL pool; no product readiness claim made.
   - Next: rerun `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` with the long-running local API stopped or isolated from the test database.
+- `SEC-AUDIT-056` - 2026-07-20
+  - Scope: regression coverage for production OTP fail-closed behavior.
+  - Changes: auth integration suite now proves that `AUTH_OTP_DEV_ECHO=true` cannot expose `devCode` when `NODE_ENV=production`.
+  - Checks: isolated auth suite `9/9`; `git diff --check`.
+  - Result: OTP security slice remains locally accepted; SMS provider and staging delivery remain external gates.
