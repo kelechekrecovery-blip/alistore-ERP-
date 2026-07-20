@@ -1,5 +1,14 @@
 # PROGRESS
 
+## 2026-07-20 — MVP-VERIFY-SECURITY-HARNESS-REPAIR
+
+- Task: repair two stale API regression harnesses found by `mvp:verify`.
+- Fixes:
+  - `apps/api/src/payments/payments-auth-regression.spec.ts` now provides the real guard's `ConfigService`; targeted security suite passes `5/5`.
+  - `apps/api/test/dangerous-endpoint-rbac.e2e-spec.ts` explicitly enables sandbox confirmation only inside the test lifecycle and restores the prior environment; targeted RBAC suite passes `4/4`.
+- Gate result: the first full `mvp:verify` reached API batch `42/173`; after these fixes the two failing suites pass independently. Full gate must be rerun from the current source boundary.
+- Note: parallel user changes are present in health/ERP/staff/web files and remain uncommitted; they were not modified or included.
+
 ## 2026-07-20 — PHASE-1-RECONCILIATION-RECHECK
 
 - Task: re-run the remaining first-store reconciliation verticals after the trusted runner port-isolation changes.
