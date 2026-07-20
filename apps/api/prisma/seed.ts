@@ -191,6 +191,83 @@ async function main(): Promise<void> {
     },
   });
 
+  // Approved reviews so every product carries real social proof (stars + count).
+  const REVIEWERS = [
+    { phone: '+996700200001', name: 'Азамат Т.' },
+    { phone: '+996700200002', name: 'Айгуль К.' },
+    { phone: '+996700200003', name: 'Данияр С.' },
+    { phone: '+996700200004', name: 'Нурлан А.' },
+    { phone: '+996700200005', name: 'Аида М.' },
+    { phone: '+996700200006', name: 'Тимур Ж.' },
+  ];
+  const REVIEW_TEXT: Record<string, string[]> = {
+    'Смартфоны': [
+      'Телефон оригинальный, IMEI пробили при мне. Батарея спокойно держит весь день.',
+      'Заказал вечером — привезли на следующее утро. Упаковка целая, всё как в описании.',
+      'Оформил в рассрочку без переплаты. Камера отличная, вышло выгоднее, чем в других магазинах.',
+    ],
+    'Ноутбуки': [
+      'Ноутбук шустрый и тихий, почти не греется. Для работы и монтажа хватает с запасом.',
+      'Проверили всё при получении, гарантию оформили сразу. Претензий нет.',
+      'Сборка отличная, автономности реально хватает на полный рабочий день.',
+    ],
+    'Планшеты': [
+      'Экран сочный, для заметок и рисования то что нужно. Перо докупил отдельно.',
+      'Пришёл запечатанный, активировался без проблем. Доставка быстрая.',
+      'Беру здесь уже второй раз — всё честно, без скрытых доплат.',
+    ],
+    'Аудио': [
+      'Шумоподавление работает отлично, в маршрутке музыку слушать одно удовольствие.',
+      'Звук чистый, заряд держат как заявлено. Кейс удобно ложится в карман.',
+      'Оригинал, проверял по серийному номеру. Привезли за пару часов.',
+    ],
+    'Часы': [
+      'Часы супер, автономности хватает на пару дней при активном использовании.',
+      'Экран яркий даже на солнце, ремешок удобный. Спасибо за быструю доставку.',
+      'Брал в подарок — упаковали аккуратно, всё работает из коробки.',
+    ],
+  };
+  const RATING_SETS = [[5, 5, 5], [5, 5, 4], [5, 4, 5], [4, 5, 5], [5, 5, 4], [5, 4, 4]];
+  const reviewers = [];
+  for (const r of REVIEWERS) {
+    reviewers.push(
+      await prisma.customer.upsert({
+        where: { phone: r.phone },
+        update: { name: r.name },
+        create: { phone: r.phone, name: r.name, consent: true },
+      }),
+    );
+  }
+  for (const [index, p] of CATALOGUE.entries()) {
+    const product = await prisma.product.findUnique({ where: { sku: p.sku } });
+    if (!product) continue;
+    const texts = REVIEW_TEXT[p.category] ?? [];
+    const ratings = RATING_SETS[index % RATING_SETS.length];
+    for (let n = 0; n < ratings.length; n += 1) {
+      const reviewer = reviewers[(index + n) % reviewers.length];
+      const orderId = `seed-order-${p.sku}-${n}`;
+      const review = {
+        status: 'approved',
+        rating: ratings[n],
+        text: texts[n % Math.max(texts.length, 1)] ?? null,
+        moderatedBy: 'seed',
+        moderatedAt: new Date(),
+      };
+      await prisma.productReview.upsert({
+        where: { productId_customerId_orderId: { productId: product.id, customerId: reviewer.id, orderId } },
+        update: review,
+        create: {
+          productId: product.id,
+          sku: p.sku,
+          customerId: reviewer.id,
+          customerName: reviewer.name ?? 'Клиент',
+          orderId,
+          ...review,
+        },
+      });
+    }
+  }
+
   // Published storefront blocks — the designed banner stack on the homepage.
   const BLOCKS = [
     { id: 'seed-block-hero', type: 'hero' as const, position: 1, tone: 'dark',
