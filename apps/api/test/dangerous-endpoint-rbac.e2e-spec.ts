@@ -23,8 +23,10 @@ describe('Dangerous product/refund endpoint RBAC', () => {
   let ownerToken: string;
   let ownerId: string;
   const RUN = Math.floor(Math.random() * 1_000_000);
+  const previousSandboxConfirm = process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED;
 
   beforeAll(async () => {
+    process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED = 'true';
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
@@ -68,6 +70,8 @@ describe('Dangerous product/refund endpoint RBAC', () => {
 
   afterAll(async () => {
     await app.close();
+    if (previousSandboxConfirm === undefined) delete process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED;
+    else process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED = previousSandboxConfirm;
   });
 
   beforeEach(async () => {
