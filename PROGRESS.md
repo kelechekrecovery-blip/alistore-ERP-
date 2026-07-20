@@ -4688,3 +4688,11 @@
 - App Store Connect metadata: Russian app-info/version localizations, support/marketing URLs and App Review detail records populated. Screenshot assets are `COMPLETE`: Client 10+10, Staff 4+4, Courier 3+3, POS 3+3 for iPhone/iPad. Apple limits each screenshot set to 10 images.
 - Result: upload gate is green. App Review submission is not claimed: all four login-gated apps still require owner-provided review accounts and review contact details; the public `ali.kg` URLs must remain reachable.
 - Next: owner supplies protected demo accounts/contact data, then create unified `reviewSubmissions`, add version items and set `submitted=true`; verify status becomes `WAITING_FOR_REVIEW`.
+
+## IOS-STORE-053
+
+- Date: 2026-07-20
+- Scope: close App Store Connect metadata blockers that can be resolved without owner secrets or legal guesses.
+- Checks: age-rating declarations, privacy-policy URLs and copyright were accepted for all four apps; required iPad Pro 12.9 screenshot sets were uploaded and processed `COMPLETE`; unified review-submission drafts were created for Client, Staff, Courier and POS.
+- Apple validation result: version items are still not eligible for submission until each app has demo account name/password, published App Privacy data-usage answers and an app price schedule. These are owner-controlled values; no fabricated credentials or declarations were entered.
+- Next: owner confirms free pricing, completes App Privacy answers, provides protected review accounts and review contact details; then add four version items and set each review submission `submitted=true`.

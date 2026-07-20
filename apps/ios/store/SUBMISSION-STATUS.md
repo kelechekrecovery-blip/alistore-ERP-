@@ -24,8 +24,8 @@ _Last updated: 2026-07-20 by automated App Store Connect release prep._
 | Provisioning | Four App Store profiles are active; Client includes Associated Domains, In-App Purchase and Push Notifications |
 | Production API | Release resolves to `https://api.ali.kg/api` |
 | Universal layout | All four apps support iPhone and iPad with the complete iPad orientation set |
-| Client screenshots | 10 iPhone + 10 iPad screenshots uploaded and `COMPLETE` in App Store Connect; Apple limits each device set to 10 |
-| Ecosystem screenshots | Staff 4+4, Courier 3+3 and POS 3+3 iPhone/iPad screenshots packaged in separate app folders |
+| Client screenshots | 10 iPhone + 10 iPad Pro 11 + 10 iPad Pro 12.9 screenshots uploaded and `COMPLETE` in App Store Connect; Apple limits each device set to 10 |
+| Ecosystem screenshots | Staff 4+4+4, Courier 3+3+3 and POS 3+3+3 iPhone/iPad Pro 11/iPad Pro 12.9 screenshots uploaded and `COMPLETE` |
 | iPad visual QA | Client, Staff, Courier and POS were rendered natively on iPad Pro 11-inch Simulator; no clipping or stretched phone-only layout was found |
 | POS visual QA | Screenshot mode no longer displays the transient `Unauthorized` error |
 | Metadata | Client metadata and all three separate ecosystem metadata files pass validation |
@@ -49,7 +49,10 @@ _Last updated: 2026-07-20 by automated App Store Connect release prep._
 - App Review detail records exist for all four versions and correctly declare
   that a demo account is required.
 - Screenshot sets are uploaded and `COMPLETE`: Client 10+10, Staff 4+4,
-  Courier 3+3 and POS 3+3 for iPhone/iPad.
+  Courier 3+3 and POS 3+3 for iPhone/iPad, plus the required iPad Pro 12.9
+  sets for all four apps.
+- Unified review-submission drafts exist for all four apps and are currently
+  `READY_FOR_REVIEW`; no item is submitted yet.
 
 ## Blocked before App Review submission
 
@@ -59,6 +62,11 @@ App Review:
 - Real App Review demo credentials are still required for every login-gated
   app. Do not place them in the repository. The App Review API records are
   intentionally marked `demoAccountRequired=true` without fabricated values.
+- App Store Connect requires published App Privacy data-usage answers for each
+  app; these must be completed by the owner based on the actual provider and
+  retention configuration.
+- App pricing must be set in App Store Connect. The apps are intended to be
+  free downloads, but the owner must confirm and save that commercial choice.
 - App Store Connect's current unified `reviewSubmissions` workflow must be
   completed after the demo accounts and review contact details are supplied.
 - The public `ali.kg` origin must remain reachable from outside the development
