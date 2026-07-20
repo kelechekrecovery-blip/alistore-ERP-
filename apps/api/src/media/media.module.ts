@@ -6,6 +6,9 @@ import { LocalDiskStorage } from './storage/local-disk.storage';
 import { S3Storage } from './storage/s3.storage';
 import { MEDIA_STORAGE, MediaStorage } from './media-storage';
 import { MediaCleanupService } from './media-cleanup.service';
+import { AuthzModule } from '../authz/authz.module';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 
 /**
  * Image ingestion: sharp compression → pluggable storage. S3/MinIO when
@@ -13,6 +16,9 @@ import { MediaCleanupService } from './media-cleanup.service';
  * MediaService.
  */
 @Module({
+  // Upload is staff-only, so the controller's guards need staff auth,
+  // the permission engine and the throttler wired in.
+  imports: [StaffAuthModule, AuthzModule, RateLimitModule],
   providers: [
     MediaService,
     MediaCleanupService,

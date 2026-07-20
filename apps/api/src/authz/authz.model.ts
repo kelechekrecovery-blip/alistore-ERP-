@@ -164,6 +164,8 @@ p, cashier, payments, refund
 p, senior_seller, payments, refund
 p, admin, payments, refund
 p, owner, payments, refund
+p, admin, payments, read
+p, owner, payments, read
 p, admin, refunds, read
 p, owner, refunds, read
 p, admin, refunds, retry
@@ -351,6 +353,9 @@ p, admin, storefront, publish
 p, owner, storefront, read
 p, owner, storefront, update
 p, owner, storefront, publish
+p, marketer, media, upload
+p, admin, media, upload
+p, owner, media, upload
 p, seller, b2b, read
 p, senior_seller, b2b, read
 p, admin, b2b, read
