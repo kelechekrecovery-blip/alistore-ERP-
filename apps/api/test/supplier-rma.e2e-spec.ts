@@ -1,6 +1,7 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { SupplierRmaService } from '../src/suppliers/supplier-rma.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { ReportsService } from '../src/reports/reports.service';
 import { ValidationError } from '../src/common/errors';
 
@@ -19,7 +20,7 @@ describe('Supplier RMA (integration)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     rma = new SupplierRmaService(prisma, new AuditService(prisma));
-    reports = new ReportsService(prisma);
+    reports = new ReportsService(prisma, new SettingsService(prisma, new AuditService(prisma)));
   });
 
   afterAll(async () => {

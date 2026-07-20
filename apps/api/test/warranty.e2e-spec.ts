@@ -1,6 +1,7 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { WarrantyService } from '../src/warranty/warranty.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { ReportsService } from '../src/reports/reports.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
 
@@ -18,7 +19,7 @@ describe('Warranty (integration)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     warranty = new WarrantyService(prisma, new AuditService(prisma));
-    reports = new ReportsService(prisma);
+    reports = new ReportsService(prisma, new SettingsService(prisma, new AuditService(prisma)));
   });
 
   afterAll(async () => {
