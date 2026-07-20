@@ -1,4 +1,5 @@
 import { API_BASE } from './api';
+import { ApiError } from './api/http';
 
 // ---------- Support Inbox ----------
 
@@ -61,7 +62,9 @@ export async function fetchCustomerOverview(id: string, accessToken: string): Pr
     cache: 'no-store',
     headers: { authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`overview ${res.status}`);
+  // Статус нужен вызывающему: 403 «нет прав» и 404 «клиента нет» — разные
+  // сообщения для владельца, а строка «overview 403» не сообщает ничего.
+  if (!res.ok) throw new ApiError(res.status, `overview ${res.status}`);
   return (await res.json()) as CustomerOverview;
 }
 

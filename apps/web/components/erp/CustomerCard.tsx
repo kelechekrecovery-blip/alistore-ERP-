@@ -2,17 +2,34 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { fetchCustomerOverview, setConsent, type CustomerOverview } from '@/lib/crm';
+import { ApiError } from '@/lib/api/http';
 import { som } from '@/lib/format';
 
 const PRIORITY_COLOR: Record<string, string> = { urgent: '#FF5B2E', high: '#E5B23C', normal: '#8A7F76' };
 
+function describeLoadFailure(cause: unknown): string {
+  if (cause instanceof ApiError) {
+    if (cause.status === 403) return 'Нет прав на карточку клиента.';
+    if (cause.status === 404) return 'Клиент не найден.';
+    return `Карточка не загрузилась (код ${cause.status}).`;
+  }
+  return cause instanceof Error && cause.message ? `Карточка не загрузилась: ${cause.message}` : 'Карточка не загрузилась.';
+}
+
 /** Customer 360 — folds orders, spend, debts, warranties and tickets for one customer. */
 export function CustomerCard({ customerId, accessToken }: { customerId: string; accessToken: string }) {
   const [ov, setOv] = useState<CustomerOverview | null>(null);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
-    fetchCustomerOverview(customerId, accessToken).then(setOv).catch(() => setOv(null));
+    setError('');
+    fetchCustomerOverview(customerId, accessToken).then(setOv).catch((cause: unknown) => {
+      // Раньше любой сбой сводился к `setOv(null)` — и «нет прав», «клиента
+      // нет» и «сервер лежит» выглядели одинаково: вечная «Загрузка клиента…».
+      setOv(null);
+      setError(describeLoadFailure(cause));
+    });
   }, [customerId, accessToken]);
 
   useEffect(() => {
@@ -29,6 +46,15 @@ export function CustomerCard({ customerId, accessToken }: { customerId: string; 
     } finally {
       setBusy(false);
     }
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
+        <p role="alert" className="text-sm text-danger-soft">{error}</p>
+        <button type="button" onClick={load} className="mt-3 rounded-[8px] border border-surface-3 px-3 py-1.5 text-xs font-semibold text-white transition hover:border-coral">Повторить</button>
+      </div>
+    );
   }
 
   if (!ov) return <div className="rounded-[16px] border border-surface-3 bg-surface p-5 text-sm text-subtle">Загрузка клиента…</div>;

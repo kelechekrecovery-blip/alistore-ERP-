@@ -415,7 +415,9 @@ export default function ErpPage() {
           {activeRoute === 'service' && <ServiceCenterView accessToken={session.accessToken} staffId={session.staffId} role={session.role} />}
           {activeRoute === 'kpi' && <KpiView kpi={kpi} accessToken={session.accessToken} />}
           {activeRoute === 'stock' && <StockView d={d} accessToken={session.accessToken} role={session.role} staffId={session.staffId} />}
-          {activeRoute === 'crm' && <CrmView onOpenCampaigns={() => navigate('campaigns')} />}
+          {activeRoute === 'crm' && (
+            <CrmView accessToken={session.accessToken} risks={risks} onOpenCampaigns={() => navigate('campaigns')} />
+          )}
           {activeRoute === 'campaigns' && <CampaignsView />}
           {activeRoute === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}
           {activeRoute === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
