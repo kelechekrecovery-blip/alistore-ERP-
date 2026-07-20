@@ -2253,6 +2253,7 @@ private struct ClientOrderStatusView: View {
                             .padding(.vertical, 10)
                             .background((repeatFailed ? ClientTheme.coral : ClientTheme.lime).opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke((repeatFailed ? ClientTheme.coral : ClientTheme.lime).opacity(0.24)))
+                            .accessibilityIdentifier("order-status-repeat-message")
                     }
                     Text("Статус заказа и оплаты обновляется сервером. Повторное нажатие не создаёт новый заказ.")
                         .font(ClientTheme.body(11))
@@ -2318,6 +2319,7 @@ private struct ClientOrderStatusView: View {
 #endif
         var added = 0
         var missing = 0
+        var alreadyInCart = 0
         for item in order.items {
             guard let product = catalog.first(where: { $0.sku == item.sku }), product.availableUnits > 0 else {
                 missing += 1
@@ -2329,7 +2331,11 @@ private struct ClientOrderStatusView: View {
                 cart[product.id] = inCart + allowed
                 added += 1
             } else {
-                missing += 1
+                if inCart > 0 {
+                    alreadyInCart += 1
+                } else {
+                    missing += 1
+                }
             }
         }
         repeatFailed = added == 0
@@ -2337,6 +2343,8 @@ private struct ClientOrderStatusView: View {
             repeatMessage = "Товары добавлены в корзину"
         } else if added > 0 {
             repeatMessage = "Добавлено \(added) из \(order.items.count) позиций — остальных нет в наличии"
+        } else if alreadyInCart > 0, missing == 0 {
+            repeatMessage = "Товары уже в корзине"
         } else {
             repeatMessage = "Эти товары сейчас недоступны в каталоге"
         }

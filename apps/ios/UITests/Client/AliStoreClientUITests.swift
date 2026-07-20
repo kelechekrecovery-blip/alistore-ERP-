@@ -127,7 +127,9 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["order-status-repeat"].exists)
 
         app.buttons["order-status-repeat"].tap()
-        XCTAssertTrue(app.staticTexts["Товары добавлены в корзину"].waitForExistence(timeout: 5))
+        let repeatMessage = app.staticTexts["order-status-repeat-message"]
+        XCTAssertTrue(repeatMessage.waitForExistence(timeout: 5))
+        XCTAssertFalse(repeatMessage.label.contains("недоступны"))
     }
 
     func testSignedInAccountFixturesRenderLoyaltyAndReturns() {
