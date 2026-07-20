@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PosSaleDto } from './pos.dto';
 import { evaluateMarginControl, MarginControlResult, saleTotal } from './margin-control';
+import { issuePosCustomerBinding, requirePosCustomerBinding } from './pos-customer-binding';
 
 /** Walk-in retail customer — POS sales without a named buyer attach here. */
 const WALKIN_PHONE = '+000000000000';
@@ -64,6 +65,83 @@ export class PosService {
     private readonly approvals: ApprovalsService,
   ) {}
 
+  async findCustomer(rawPhone: string | undefined, staffId: string, point: string, clientSaleId: string) {
+    const requestedPoint = point.trim();
+    const knownCode = requestedPoint === 'alistore-center' || requestedPoint === 'AliStore Центр'
+      ? 'center'
+      : requestedPoint.toLowerCase();
+    const storePoint = await this.prisma.storePoint.findFirst({
+      where: {
+        active: true,
+        OR: [
+          { id: requestedPoint },
+          { code: knownCode },
+          { inventoryLocation: requestedPoint.toUpperCase() },
+        ],
+      },
+      select: { id: true, inventoryLocation: true },
+    });
+    if (!storePoint) {
+      throw new ValidationError('store_point_unavailable', 'Точка кассы недоступна или отключена');
+    }
+    const staff = await this.prisma.staffUser.findUnique({
+      where: { id: staffId },
+      select: { point: true },
+    });
+    if (staff) {
+      const staffPointAlias = staff.point.trim();
+      const staffPointCode = staffPointAlias === 'alistore-center' || staffPointAlias === 'AliStore Центр'
+        ? 'center'
+        : staffPointAlias.toLowerCase();
+      const assignedPoint = await this.prisma.storePoint.findFirst({
+        where: {
+          active: true,
+          OR: [
+            { id: staffPointAlias },
+            { code: staffPointCode },
+            { inventoryLocation: staffPointAlias.toUpperCase() },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!assignedPoint || assignedPoint.id !== storePoint.id) {
+        throw new ForbiddenError('staff_point_mismatch', 'Кассир не назначен на выбранную точку');
+      }
+    }
+    const phone = normalizeCustomerPhone(rawPhone);
+    const alternatePhone = phone.startsWith('+') ? phone.slice(1) : `+${phone}`;
+    const select = { id: true, name: true, phone: true } as const;
+    const customer = await this.prisma.customer.findUnique({
+      where: { phone },
+      select,
+    }) ?? await this.prisma.customer.findUnique({
+      where: { phone: alternatePhone },
+      select,
+    });
+    await this.prisma.auditEvent.create({
+      data: {
+        type: 'pos.customer_lookup',
+        actor: staffId,
+        payload: { point: storePoint.inventoryLocation, found: Boolean(customer) },
+        refs: customer ? [customer.id] : [],
+      },
+    });
+    if (!customer) return null;
+    const entries = await this.prisma.loyaltyEntry.findMany({
+      where: {
+        customerId: customer.id,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { amount: true },
+    });
+    return {
+      name: customer.name || 'Клиент AliStore',
+      phone: maskPhone(customer.phone),
+      loyaltyBalance: Math.max(0, entries.reduce((sum, entry) => sum + entry.amount, 0)),
+      binding: issuePosCustomerBinding(customer.id, staffId, storePoint.inventoryLocation, clientSaleId),
+    };
+  }
+
   async sale(dto: PosSaleDto) {
     const actor = dto.staffId;
     const requestedPoint = dto.point.trim();
@@ -81,6 +159,22 @@ export class PosService {
     if (!storePoint) {
       throw new ValidationError('store_point_unavailable', 'Точка кассы недоступна или отключена');
     }
+    const explicitTxnId = dto.clientSaleId ? `pos:${dto.clientSaleId}` : undefined;
+    const existingPayment = explicitTxnId
+      ? await this.payments.findByTxnId(explicitTxnId)
+      : null;
+    const existingExplicitSale = Boolean(
+      existingPayment?.orderId
+      || (explicitTxnId && await this.prisma.order.findUnique({
+        where: { idempotencyKey: explicitTxnId },
+        select: { id: true },
+      })),
+    );
+    const boundCustomerId = dto.customerBinding
+      ? requirePosCustomerBinding(dto.customerBinding, actor, storePoint.inventoryLocation, dto.clientSaleId, {
+          allowExpiredReplay: existingExplicitSale,
+        }).sub
+      : undefined;
     const staff = await this.prisma.staffUser.findUnique({
       where: { id: actor },
       select: { active: true, point: true },
@@ -107,7 +201,7 @@ export class PosService {
       }
     }
     const pct = dto.discountPct ?? 0;
-    const txnId = this.deriveTxnId(dto);
+    const txnId = this.deriveTxnId(dto, boundCustomerId);
 
     if (txnId) {
       const existing = await this.payments.findByTxnId(txnId);
@@ -116,14 +210,14 @@ export class PosService {
         // so a legitimate retry still replays after a later price change (LOGIC-006).
         const expectedTotal = saleTotal(dto.lines, pct);
         const expectedPayments = this.normalizePayments(dto, expectedTotal);
-        return this.replaySale(existing, dto, storePoint.inventoryLocation, expectedTotal, expectedPayments);
+        return this.replaySale(existing, dto, boundCustomerId, storePoint.inventoryLocation, expectedTotal, expectedPayments);
       }
       const existingOrder = await this.prisma.order.findUnique({
         where: { idempotencyKey: txnId },
         select: { id: true, status: true, total: true, posShiftId: true },
       });
       if (existingOrder) {
-        await this.assertReplayCompatible(existingOrder.id, dto);
+        await this.assertReplayCompatible(existingOrder.id, dto, boundCustomerId);
         if (existingOrder.status === 'paid') {
           // Zero-total sales never create a Payment row, so the tender lookup above
           // misses them; a paid order whose lookup missed is still the same sale.
@@ -191,10 +285,15 @@ export class PosService {
       await this.assertDiscountApproved(dto.approvalId, pct, margin.fingerprint, marginApprovalNeeded);
     }
 
-    const customer = await this.customers.upsert({
-      phone: WALKIN_PHONE,
-      name: 'Розничный покупатель',
-    });
+    const customer = boundCustomerId
+      ? await this.prisma.customer.findUnique({ where: { id: boundCustomerId } })
+      : await this.customers.upsert({
+          phone: WALKIN_PHONE,
+          name: 'Розничный покупатель',
+        });
+    if (!customer) {
+      throw new ValidationError('pos_customer_not_found', 'Выбранный клиент не найден');
+    }
 
     let shift = await this.shifts.currentOpen(dto.staffId);
     if (!shift) {
@@ -284,9 +383,9 @@ export class PosService {
    * precise key; when absent, fall back to a windowed cart fingerprint so a retried
    * submission does not create a second order. Always returns a key so dedup never no-ops.
    */
-  private deriveTxnId(dto: PosSaleDto): string {
+  private deriveTxnId(dto: PosSaleDto, customerId?: string): string {
     if (dto.clientSaleId) return `pos:${dto.clientSaleId}`;
-    return `pos:auto:${this.saleFingerprint(dto)}`;
+    return `pos:auto:${this.saleFingerprint(dto, customerId)}`;
   }
 
   /**
@@ -294,7 +393,7 @@ export class PosService {
    * normalized lines/tenders/discount, bucketed into a time window. Lines and tenders are
    * sorted so field order never changes the hash.
    */
-  private saleFingerprint(dto: PosSaleDto): string {
+  private saleFingerprint(dto: PosSaleDto, customerId?: string): string {
     const bucket = Math.floor(Date.now() / POS_AUTO_DEDUP_WINDOW_MS);
     const lines = dto.lines
       .map((line) => `${line.sku}:${line.qty}:${line.price}`)
@@ -304,7 +403,7 @@ export class PosService {
       .map((payment) => `${payment.method}:${payment.amount}`)
       .sort()
       .join('|');
-    const material = [dto.staffId, dto.point, dto.discountPct ?? 0, lines, tenders, bucket].join('#');
+    const material = [dto.staffId, dto.point, customerId ?? WALKIN_PHONE, dto.discountPct ?? 0, lines, tenders, bucket].join('#');
     return createHash('sha256').update(material).digest('hex').slice(0, 32);
   }
 
@@ -318,6 +417,7 @@ export class PosService {
   private async replaySale(
     existing: Payment,
     dto: PosSaleDto,
+    customerId: string | undefined,
     point: string,
     total: number,
     payments: NormalizedPosPayment[],
@@ -329,6 +429,7 @@ export class PosService {
     const storedHash = this.saleRequestHash({
       staffId: existing.receivedBy ?? '',
       point: existing.point ?? '',
+      customerId: order.customerId,
       total: order.total,
       lines: order.items,
       tenders: order.payments.filter((payment) => payment.amount > 0),
@@ -336,6 +437,10 @@ export class PosService {
     const requestHash = this.saleRequestHash({
       staffId: dto.staffId ?? '',
       point,
+      customerId: customerId ?? (await this.prisma.customer.findUnique({
+        where: { phone: WALKIN_PHONE },
+        select: { id: true },
+      }))?.id ?? WALKIN_PHONE,
       total,
       lines: dto.lines,
       tenders: payments,
@@ -359,6 +464,7 @@ export class PosService {
   private saleRequestHash(composition: {
     staffId: string;
     point: string;
+    customerId: string;
     total: number;
     lines: Array<{ sku: string; qty: number; price: number }>;
     tenders: Array<{ method: string; amount: number }>;
@@ -373,6 +479,7 @@ export class PosService {
     const canonical = {
       staffId: composition.staffId,
       point: composition.point,
+      customerId: composition.customerId,
       total: composition.total,
       lines: [...aggregated.values()].map((line) => `${line.sku}:${line.qty}:${line.price}`).sort(),
       tenders: composition.tenders.map((tender) => `${tender.method}:${tender.amount}`).sort(),
@@ -631,16 +738,24 @@ export class PosService {
   }
 
   /** Never return a receipt for a different cart or another cashier's key. */
-  private async assertReplayCompatible(orderId: string, dto: PosSaleDto) {
+  private async assertReplayCompatible(orderId: string, dto: PosSaleDto, customerId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
+        customerId: true,
         total: true,
         items: { select: { sku: true, qty: true, price: true }, orderBy: { lineNumber: 'asc' } },
         posShift: { select: { staffId: true } },
       },
     });
     if (!order) throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+    const requestedCustomerId = customerId ?? (await this.prisma.customer.findUnique({
+      where: { phone: WALKIN_PHONE },
+      select: { id: true },
+    }))?.id;
+    if (!requestedCustomerId || order.customerId !== requestedCustomerId) {
+      throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже связан с другим клиентом');
+    }
     if (order.posShift?.staffId && order.posShift.staffId !== dto.staffId) {
       throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже принадлежит другому кассиру');
     }
@@ -668,6 +783,20 @@ export class PosService {
       throw new ConflictError('idempotency_key_reused', 'Ключ продажи уже связан с другой суммой');
     }
   }
+}
+
+function normalizeCustomerPhone(rawPhone: string | undefined): string {
+  const phone = rawPhone?.trim() ?? '';
+  if (!/^\+?[0-9]{9,15}$/.test(phone)) {
+    throw new ValidationError('pos_customer_phone_invalid', 'Введите телефон клиента в международном формате');
+  }
+  return phone;
+}
+
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length <= 4) return '***';
+  return `+${digits.slice(0, 3)}******${digits.slice(-2)}`;
 }
 
 function bundleImeis(costRef?: string): string[] {

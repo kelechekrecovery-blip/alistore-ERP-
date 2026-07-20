@@ -5011,3 +5011,22 @@
 - Remaining owner/App Store UI gates: protected review account credentials and contact details,
   free price schedule, distribution availability, and published App Privacy answers. No account
   mutation or submission was performed, so App Review is not claimed.
+
+## POS-CUSTOMER-078
+
+- Date: 2026-07-20
+- Scope: close the owner-audit gap where a cashier could not find and bind an existing customer
+  to a counter sale.
+- Changes: added throttled authenticated `POST /pos/customers/lookup`, deterministic exact-phone
+  lookup, masked response data, PII-safe lookup audit and an expiring signed customer binding
+  scoped to staff, canonical point and one `clientSaleId`. POS sale and offline replay now carry that binding instead of a naked
+  customer ID; customer identity participates in both explicit and fallback idempotency, and
+  queued sales refuse cross-cashier replay. The POS ticket now exposes lookup, selected customer,
+  loyalty balance and clear-state UI.
+- Checks: POS API integration `18/18`; Chromium customer lookup → cart → cash sale → paid
+  customer-owned order `1/1` against a dedicated migrated database; API production build; Web
+  production build; staff auth/session regression `15/15`; `git diff --check`. Code, TypeScript
+  and security reviews were rerun after the initial findings were fixed.
+- Result: the bounded POS customer-binding software vertical is accepted locally. This does not
+  certify physical POS hardware, live payments, production deployment or the full ecosystem gate.
+- Next: commit this isolated slice, then continue the next unblocked `OWNER-AUDIT-001` operation.

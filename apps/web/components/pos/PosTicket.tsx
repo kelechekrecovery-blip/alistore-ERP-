@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { som } from '@/lib/format';
 import { productImage } from '@/components/ProductCard';
-import type { CatalogProduct } from '@/lib/api';
+import type { CatalogProduct, PosCustomer } from '@/lib/api';
 
 export interface PosTicketLine {
   product: CatalogProduct;
@@ -22,6 +22,12 @@ interface PosTicketProps {
   onSetQty: (id: string, qty: number) => void;
   onSetDiscount: (idx: number) => void;
   onCheckout: () => void;
+  customerQuery: string;
+  customer: PosCustomer | null;
+  customerBusy: boolean;
+  onCustomerQueryChange: (value: string) => void;
+  onFindCustomer: () => void;
+  onClearCustomer: () => void;
 }
 
 /**
@@ -41,6 +47,12 @@ export function PosTicket({
   onSetQty,
   onSetDiscount,
   onCheckout,
+  customerQuery,
+  customer,
+  customerBusy,
+  onCustomerQueryChange,
+  onFindCustomer,
+  onClearCustomer,
 }: PosTicketProps) {
   return (
     <aside data-testid="pos-ticket" className="flex w-[420px] flex-shrink-0 flex-col bg-surface">
@@ -95,6 +107,40 @@ export function PosTicket({
 
       {count > 0 && (
         <div className="flex-shrink-0 border-t border-surface-3 px-5 py-4">
+          <div className="mb-3 rounded-[9px] bg-surface-2 p-2.5">
+            {customer ? (
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-semibold text-white">{customer.name}</div>
+                  <div className="text-[11px] text-subtle">
+                    {customer.phone} · {customer.loyaltyBalance} бонусов
+                  </div>
+                </div>
+                <button type="button" onClick={onClearCustomer} className="text-xs text-danger-soft">
+                  Сбросить
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  aria-label="Телефон клиента"
+                  value={customerQuery}
+                  disabled={customerBusy}
+                  onChange={(event) => onCustomerQueryChange(event.target.value)}
+                  placeholder="+996700123456"
+                  className="min-w-0 flex-1 rounded-[7px] border border-surface-3 bg-surface px-2.5 py-2 text-xs text-white outline-none focus:border-lime disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={onFindCustomer}
+                  disabled={customerBusy || !customerQuery.trim()}
+                  className="rounded-[7px] bg-surface-3 px-3 text-xs font-semibold text-bright disabled:opacity-50"
+                >
+                  {customerBusy ? '…' : 'Найти'}
+                </button>
+              </div>
+            )}
+          </div>
           <div className="mb-3 flex gap-2">
             {discounts.map((d, i) => (
               <button

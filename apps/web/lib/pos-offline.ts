@@ -11,6 +11,7 @@ export interface OfflinePosPayload {
   payments?: PosPayment[];
   discountPct?: number;
   approvalId?: string;
+  customerBinding?: string;
   clientSaleId?: string;
   lines: PosLine[];
 }

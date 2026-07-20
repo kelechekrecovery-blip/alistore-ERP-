@@ -175,6 +175,7 @@ export function PosCatalog({
           {grid.map((p) => (
             <button
               key={p.id}
+              data-testid={`pos-product-${p.id}`}
               type="button"
               onClick={() => onAdd(p)}
               className="min-w-0 rounded-[14px] border border-surface-3 bg-surface-2 p-3 text-left transition hover:border-lime/40 focus-visible:border-lime focus-visible:outline-none"

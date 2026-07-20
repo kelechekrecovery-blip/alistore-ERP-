@@ -11,6 +11,7 @@ import {
   createScannerKeyHandler,
   enqueueOfflinePosSale,
   findProductByScan,
+  findPosCustomer,
   isLikelyNetworkError,
   loadOfflinePosQueue,
   offlineQueueStats,
@@ -23,6 +24,7 @@ import {
   type CatalogProduct,
   type OfflinePosPayload,
   type PosPayment,
+  type PosCustomer,
   type OfflinePosQueueItem,
   type PosPendingApproval,
   type PosReceiptSnapshot,
@@ -66,6 +68,9 @@ export default function PosPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [serviceWorkOrderId, setServiceWorkOrderId] = useState('');
   const [serverPrintBusy, setServerPrintBusy] = useState(false);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [customer, setCustomer] = useState<PosCustomer | null>(null);
+  const [customerBusy, setCustomerBusy] = useState(false);
 
   useEffect(() => {
     setSession(loadStaffSession());
@@ -170,6 +175,7 @@ export default function PosPage() {
       payments: salePayments.length > 1 ? salePayments : undefined,
       discountPct: discPct,
       approvalId: pending?.approvalId,
+      customerBinding: customer?.binding,
       clientSaleId,
       lines: lines.map((l) => ({
         productId: l.product.id,
@@ -249,6 +255,29 @@ export default function PosPage() {
     }
   }
 
+  async function lookupCustomer() {
+    if (!session) return;
+    const query = customerQuery.trim();
+    const clientSaleId = activeClientSaleId || createPosClientSaleId();
+    setActiveClientSaleId(clientSaleId);
+    setCustomerBusy(true);
+    try {
+      const found = await findPosCustomer(query, POINT, clientSaleId, session.accessToken);
+      if (!found) {
+        setCustomer(null);
+        flash('Клиент не найден');
+        return;
+      }
+      setCustomer(found);
+      flash(`Клиент: ${found.name}`);
+    } catch (error) {
+      setCustomer(null);
+      flash(error instanceof Error ? error.message : 'Ошибка поиска клиента');
+    } finally {
+      setCustomerBusy(false);
+    }
+  }
+
   function normalizeSalePayments(checkoutPayments?: PosPayment[]): PosPayment[] {
     if (checkoutPayments?.length) {
       return checkoutPayments
@@ -266,7 +295,12 @@ export default function PosPage() {
     setSyncing(true);
     try {
       const next = await syncOfflinePosQueue(
-        (payload) => posSale({ ...payload, staffId: session.staffId }, session.accessToken),
+        (payload) => {
+          if (payload.staffId !== session.staffId) {
+            throw new Error('Offline продажа принадлежит другому кассиру');
+          }
+          return posSale(payload, session.accessToken);
+        },
         setQueue,
       );
       setQueue(next);
@@ -291,6 +325,8 @@ export default function PosPage() {
     setOfflineResult(null);
     setReceiptSnapshot(null);
     setActiveClientSaleId('');
+    setCustomer(null);
+    setCustomerQuery('');
     setRoute('sell');
     void refreshCatalog();
   }
@@ -386,8 +422,17 @@ export default function PosPage() {
           onSetDiscount={setDiscIdx}
           onCheckout={() => {
             setMethod(null);
-            setActiveClientSaleId(createPosClientSaleId());
+            setActiveClientSaleId((current) => current || createPosClientSaleId());
             setRoute('pay');
+          }}
+          customerQuery={customerQuery}
+          customer={customer}
+          customerBusy={customerBusy}
+          onCustomerQueryChange={setCustomerQuery}
+          onFindCustomer={lookupCustomer}
+          onClearCustomer={() => {
+            setCustomer(null);
+            setCustomerQuery('');
           }}
         />
 

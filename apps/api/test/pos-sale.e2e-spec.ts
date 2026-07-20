@@ -8,6 +8,7 @@ import { CustomersService } from '../src/customers/customers.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../src/common/errors';
+import { issuePosCustomerBinding } from '../src/pos/pos-customer-binding';
 
 const RUN = `${process.pid}-${Date.now()}`;
 
@@ -108,6 +109,145 @@ describe('POS sale (integration)', () => {
     expect(types).toEqual(
       expect.arrayContaining(['shift.opened', 'order.created', 'order.reserved', 'payment.received', 'unit.sold', 'order.paid']),
     );
+  });
+
+  it('binds a counter sale to a selected existing customer and rejects a missing customer', async () => {
+    const product = await seedProduct(2);
+    const customer = await prisma.customer.create({
+      data: { phone: `+996700${String(seq).padStart(6, '0')}`, name: 'POS постоянный клиент' },
+    });
+    const anotherCustomer = await prisma.customer.create({
+      data: { phone: `+996701${String(seq).padStart(6, '0')}`, name: 'Другой клиент' },
+    });
+    const clientSaleId = `pos-customer-${RUN}`;
+    const customerBinding = issuePosCustomerBinding(customer.id, 'staff_pos_customer', 'BISHKEK-1', clientSaleId);
+
+    const result = expectCompleted(await pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding,
+      method: 'cash',
+      clientSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    }));
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: result.orderId } }))
+      .toMatchObject({ customerId: customer.id });
+
+    for (const replayBinding of [
+      undefined,
+      issuePosCustomerBinding(anotherCustomer.id, 'staff_pos_customer', 'BISHKEK-1', clientSaleId),
+    ]) {
+      const replayError = await pos.sale({
+        staffId: 'staff_pos_customer',
+        point: 'BISHKEK-1',
+        customerBinding: replayBinding,
+        method: 'cash',
+        clientSaleId,
+        lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+      }).catch((caught) => caught);
+      expect(replayError).toBeInstanceOf(ConflictError);
+      expect(replayError.code).toBe('idempotency_key_reused');
+    }
+
+    const expiredReplay = expectCompleted(await pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding: issuePosCustomerBinding(customer.id, 'staff_pos_customer', 'BISHKEK-1', clientSaleId, -1),
+      method: 'cash',
+      clientSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    }));
+    expect(expiredReplay.orderId).toBe(result.orderId);
+
+    const expiredNewSaleId = `pos-customer-expired-new-${RUN}`;
+    await expect(pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding: issuePosCustomerBinding(customer.id, 'staff_pos_customer', 'BISHKEK-1', expiredNewSaleId, -1),
+      method: 'cash',
+      clientSaleId: expiredNewSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    })).rejects.toMatchObject({ message: 'pos_customer_binding_invalid' });
+
+    const orderlessPaymentSaleId = `pos-customer-orderless-payment-${RUN}`;
+    await prisma.payment.create({
+      data: {
+        amount: 1,
+        method: 'card',
+        status: 'pending',
+        txnId: `pos:${orderlessPaymentSaleId}`,
+      },
+    });
+    await expect(pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding: issuePosCustomerBinding(
+        customer.id,
+        'staff_pos_customer',
+        'BISHKEK-1',
+        orderlessPaymentSaleId,
+        -1,
+      ),
+      method: 'cash',
+      clientSaleId: orderlessPaymentSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    })).rejects.toMatchObject({ message: 'pos_customer_binding_invalid' });
+
+    const missingSaleId = `pos-customer-missing-${RUN}`;
+    const error = await pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding: issuePosCustomerBinding('missing-customer', 'staff_pos_customer', 'BISHKEK-1', missingSaleId),
+      method: 'cash',
+      clientSaleId: missingSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.code).toBe('pos_customer_not_found');
+
+    const wrongStaffSaleId = `pos-customer-wrong-staff-${RUN}`;
+    await expect(pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding: issuePosCustomerBinding(customer.id, 'another_cashier', 'BISHKEK-1', wrongStaffSaleId),
+      method: 'cash',
+      clientSaleId: wrongStaffSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    })).rejects.toMatchObject({ message: 'pos_customer_binding_staff_mismatch' });
+
+    const wrongPointSaleId = `pos-customer-wrong-point-${RUN}`;
+    await expect(pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding: issuePosCustomerBinding(customer.id, 'staff_pos_customer', 'OSH-1', wrongPointSaleId),
+      method: 'cash',
+      clientSaleId: wrongPointSaleId,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    })).rejects.toMatchObject({ message: 'pos_customer_binding_point_mismatch' });
+
+    await expect(pos.sale({
+      staffId: 'staff_pos_customer',
+      point: 'BISHKEK-1',
+      customerBinding,
+      method: 'cash',
+      clientSaleId: `pos-customer-other-sale-${RUN}`,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    })).rejects.toMatchObject({ message: 'pos_customer_binding_sale_mismatch' });
+  });
+
+  it('prefers an exact phone match when both plus-prefixed variants exist', async () => {
+    const digits = `996702${String(seq += 1).padStart(6, '0')}`;
+    const withoutPlus = await prisma.customer.create({
+      data: { phone: digits, name: 'Без плюса' },
+    });
+    const withPlus = await prisma.customer.create({
+      data: { phone: `+${digits}`, name: 'С плюсом' },
+    });
+
+    await expect(pos.findCustomer(digits, 'staff_phone_lookup', 'BISHKEK-1', `lookup-no-plus-${RUN}`))
+      .resolves.toMatchObject({ name: withoutPlus.name });
+    await expect(pos.findCustomer(`+${digits}`, 'staff_phone_lookup', 'BISHKEK-1', `lookup-plus-${RUN}`))
+      .resolves.toMatchObject({ name: withPlus.name });
   });
 
   it('completes a split payment sale and records each tender separately', async () => {

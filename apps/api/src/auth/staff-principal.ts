@@ -10,6 +10,9 @@ export async function requireActiveStaff(
   if (user.typ !== 'staff' || !user.role) {
     throw new ForbiddenException('Требуется staff JWT');
   }
-  await staffAuth.me(user.customerId);
+  const current = await staffAuth.me(user.customerId);
+  if (current.role !== user.role) {
+    throw new ForbiddenException('Роль сотрудника изменилась — войдите снова');
+  }
   return user.customerId;
 }

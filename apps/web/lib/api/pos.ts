@@ -12,6 +12,22 @@ export interface PosPayment {
   amount: number;
 }
 
+export interface PosCustomer {
+  name: string;
+  phone: string;
+  loyaltyBalance: number;
+  binding: string;
+}
+
+export function findPosCustomer(
+  phone: string,
+  point: string,
+  clientSaleId: string,
+  accessToken: string,
+): Promise<PosCustomer | null> {
+  return postAuthJson('/pos/customers/lookup', { phone, point, clientSaleId }, accessToken);
+}
+
 export interface PosSaleResult {
   pendingApproval?: false;
   orderId: string;
@@ -45,6 +61,7 @@ export function posSale(input: {
   payments?: PosPayment[];
   discountPct?: number;
   approvalId?: string;
+  customerBinding?: string;
   clientSaleId?: string;
   lines: PosLine[];
 }, accessToken: string): Promise<PosSaleOutcome> {

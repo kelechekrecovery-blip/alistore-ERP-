@@ -3,8 +3,10 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
   Max,
   Min,
   ValidateNested,
@@ -28,6 +30,17 @@ export class PosLineDto {
 
   @ApiPropertyOptional({ example: '356789012345678', description: 'Exact serialized unit selected by scanner.' })
   @IsOptional() @IsString() imei?: string;
+}
+
+export class PosCustomerLookupDto {
+  @ApiProperty({ example: '+996700123456' })
+  @IsString() @IsNotEmpty() @MaxLength(16) phone!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @IsNotEmpty() @MaxLength(100) point!: string;
+
+  @ApiProperty({ example: 'pos_20260720_0001' })
+  @IsString() @IsNotEmpty() @MaxLength(200) clientSaleId!: string;
 }
 
 export class PosPaymentDto {
@@ -74,6 +87,11 @@ export class PosSaleDto {
 
   @ApiPropertyOptional({ example: 'постоянный клиент, акция' })
   @IsOptional() @IsString() reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'Short-lived signed binding returned by the authenticated POS customer lookup.',
+  })
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(4096) customerBinding?: string;
 
   @ApiPropertyOptional({
     description:
