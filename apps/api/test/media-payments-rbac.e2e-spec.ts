@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuditModule } from '../src/audit/audit.module';
+import { HealthModule } from '../src/health/health.module';
 import { MediaModule } from '../src/media/media.module';
 import { PaymentsModule } from '../src/payments/payments.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
@@ -35,6 +36,7 @@ describe('Media upload / payments read RBAC', () => {
         StaffAuthModule,
         MediaModule,
         PaymentsModule,
+        HealthModule,
       ],
     }).compile();
 
@@ -76,6 +78,26 @@ describe('Media upload / payments read RBAC', () => {
   it('rejects an unauthenticated media upload', async () => {
     const res = await request(app.getHttpServer()).post('/media');
     expect(res.status).toBe(401);
+  });
+
+  it('keeps liveness public but closes the integrations readiness report', async () => {
+    // Load balancers must still reach liveness without a token.
+    await request(app.getHttpServer()).get('/health/live').expect(200);
+
+    // The report enumerates every required env name and which ones are unset —
+    // a checklist of what is not yet hardened, so it must not be anonymous.
+    await request(app.getHttpServer()).get('/health/integrations').expect(401);
+
+    const denied = await request(app.getHttpServer())
+      .get('/health/integrations')
+      .set('Authorization', `Bearer ${tokens.cashier}`);
+    expect(denied.status).toBe(403);
+
+    const allowed = await request(app.getHttpServer())
+      .get('/health/integrations')
+      .set('Authorization', `Bearer ${tokens.owner}`);
+    expect(allowed.status).toBe(200);
+    expect(allowed.body).toHaveProperty('checks');
   });
 
   it('allows the owner to list payments and denies a seller', async () => {

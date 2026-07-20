@@ -30,8 +30,12 @@ export interface ExternalReadinessReport {
   nextActions: string[];
 }
 
-export async function fetchExternalReadiness(): Promise<ExternalReadinessReport> {
-  const res = await fetch(`${API_BASE}/health/integrations`, { cache: 'no-store' });
+/** Staff-only: the report lists which integrations are still unconfigured. */
+export async function fetchExternalReadiness(accessToken: string): Promise<ExternalReadinessReport> {
+  const res = await fetch(`${API_BASE}/health/integrations`, {
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error(`readiness -> ${res.status}`);
   return (await res.json()) as ExternalReadinessReport;
 }

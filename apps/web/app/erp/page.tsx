@@ -163,7 +163,7 @@ export default function ErpPage() {
     fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks([]));
     fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
     fetchInsights(session.accessToken).then((r) => setInsights(r.insights)).catch(() => setInsights([]));
-    fetchExternalReadiness()
+    fetchExternalReadiness(session.accessToken)
       .then((report) => {
         setReadiness(report);
         setReadinessError('');

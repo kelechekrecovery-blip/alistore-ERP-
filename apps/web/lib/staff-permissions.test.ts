@@ -89,7 +89,7 @@ describe('erpRouteAllowed (sidebar filter)', () => {
   });
 
   it('warehouse keeps stock and operations but loses owner screens', () => {
-    for (const route of ['stock', 'operations', 'readiness', 'admin'] as const) {
+    for (const route of ['stock', 'operations', 'admin'] as const) {
       expect(erpRouteAllowed('warehouse', route)).toBe(true);
     }
     for (const route of ['dash', 'finance', 'hr', 'ai', 'crm', 'ledger', 'campaigns', 'service'] as const) {
@@ -98,11 +98,21 @@ describe('erpRouteAllowed (sidebar filter)', () => {
   });
 
   it('marketer keeps campaigns and storefront only', () => {
-    for (const route of ['campaigns', 'storefront', 'readiness', 'admin'] as const) {
+    for (const route of ['campaigns', 'storefront', 'admin'] as const) {
       expect(erpRouteAllowed('marketer', route)).toBe(true);
     }
     for (const route of ['dash', 'finance', 'hr', 'stock', 'service', 'ai'] as const) {
       expect(erpRouteAllowed('marketer', route)).toBe(false);
+    }
+  });
+
+  // «Готовность запуска» enumerates which integrations are still unconfigured —
+  // an attacker's checklist, so it follows reports:read like the other owner screens.
+  it('readiness is owner/admin only', () => {
+    expect(erpRouteAllowed('owner', 'readiness')).toBe(true);
+    expect(erpRouteAllowed('admin', 'readiness')).toBe(true);
+    for (const role of ['warehouse', 'marketer', 'cashier', 'seller', 'courier', 'service'] as const) {
+      expect(erpRouteAllowed(role, 'readiness')).toBe(false);
     }
   });
 

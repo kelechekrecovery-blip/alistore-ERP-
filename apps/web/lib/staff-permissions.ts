@@ -92,7 +92,7 @@ export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   campaigns: { obj: 'campaigns', act: 'read' },
   storefront: { obj: 'storefront', act: 'read' },
   risks: { obj: 'reports', act: 'read' },
-  readiness: null, // public health endpoint, no staff permission required
+  readiness: { obj: 'reports', act: 'read' }, // lists unconfigured integrations — owner/admin only
   ledger: { obj: 'reports', act: 'read' },
   tasks: null,
 };

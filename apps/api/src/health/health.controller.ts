@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   HealthCheck,
@@ -8,6 +8,10 @@ import {
 } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildExternalReadinessReport } from './external-readiness';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 
 const READINESS_HEAP_LIMIT_BYTES = 1536 * 1024 * 1024;
 
@@ -44,8 +48,16 @@ export class HealthController {
     return { status: 'ok' };
   }
 
-  /** External integrations readiness — no secret values, only configured/missing status. */
+  /**
+   * External integrations readiness — no secret values, only configured/missing
+   * status. Still owner-facing intelligence: it enumerates every required env
+   * name and exactly which ones are unset, i.e. a checklist of what is not yet
+   * hardened. Kept behind staff auth; `/health`, `/health/ready` and
+   * `/health/live` stay public for load balancers.
+   */
   @Get('integrations')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('reports', 'read')
   integrations() {
     return buildExternalReadinessReport((name) => this.config.get<string>(name));
   }

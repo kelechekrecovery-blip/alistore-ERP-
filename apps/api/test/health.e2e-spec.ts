@@ -1,9 +1,14 @@
 import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { MemoryHealthIndicator, TerminusModule } from '@nestjs/terminus';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { PrismaModule } from '../src/prisma/prisma.module';
+import { AuditModule } from '../src/audit/audit.module';
+import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
+import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { AuthzModule } from '../src/authz/authz.module';
 import { HealthController } from '../src/health/health.controller';
 
 /**
@@ -21,12 +26,18 @@ describe('Health (terminus)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     const moduleRef = await Test.createTestingModule({
-      imports: [TerminusModule],
-      controllers: [HealthController],
-      providers: [
-        { provide: PrismaService, useValue: prisma },
-        { provide: ConfigService, useValue: { get: (name: string) => process.env[name] } },
+      // `/health/integrations` is staff-gated, so the controller's guards need
+      // staff auth and the permission engine even in this focused suite.
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        TerminusModule,
+        PrismaModule,
+        AuditModule,
+        StaffAuthModule,
+        AuthzModule,
       ],
+      controllers: [HealthController],
+      providers: [{ provide: PrismaService, useValue: prisma }],
     })
       .overrideProvider(MemoryHealthIndicator)
       .useValue(memory)
@@ -59,9 +70,18 @@ describe('Health (terminus)', () => {
     expect(memory.checkHeap).toHaveBeenCalledWith('memory_heap', 1536 * 1024 * 1024);
   });
 
-  it('GET /health/integrations → external readiness without secret values', async () => {
+  it('GET /health/integrations → staff-only, no secret values', async () => {
+    // Anonymous callers must not get the list of unconfigured integrations.
+    await request(app.getHttpServer()).get('/health/integrations').expect(401);
+
+    const staffAuth = app.get(StaffAuthService);
+    const username = `owner-health-${Math.floor(Math.random() * 1_000_000)}`;
+    await staffAuth.createStaff(username, 'pass', 'owner');
+    const { accessToken } = await staffAuth.login(username, 'pass');
+
     const res = await request(app.getHttpServer())
       .get('/health/integrations')
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(res.body).toHaveProperty('status');
     expect(res.body.checks).toEqual(expect.any(Array));
