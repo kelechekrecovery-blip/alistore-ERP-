@@ -108,6 +108,7 @@ if [[ "$strict_asc" == "1" ]]; then
   [[ "$asc_key_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'ASC_KEY_ID must be a 10-character identifier'
   [[ -n "$issuer_id" ]] || fail 'ASC_ISSUER_ID is required for App Store Connect submission'
   [[ "$issuer_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] || fail 'ASC_ISSUER_ID must be a UUID'
+  [[ "$issuer_id" != '00000000-0000-0000-0000-000000000000' ]] || fail 'ASC_ISSUER_ID is still the placeholder; copy the real Issuer ID from App Store Connect'
   node "$repo_root/scripts/verify-app-store-connect.mjs" "$asc_key_path" "$asc_key_id" "$issuer_id" \
     || fail 'App Store Connect API verification failed'
 fi
