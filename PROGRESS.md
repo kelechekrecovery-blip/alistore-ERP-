@@ -4985,3 +4985,29 @@
   verticals, composite E2E and native UI recorders on the same HEAD, then rerun
   `npm run ecosystem:audit:strict`. Production providers, physical-device certification and
   store submission remain separate external gates.
+
+## ORDER-COMPLETION-076
+
+- Date: 2026-07-20
+- Scope: close the owner-audit gap where delivered courier orders never reached the
+  server-authoritative `completed` transition and therefore never posted loyalty or customer LTV.
+- Changes: added a `Доставлено` warehouse queue stage that sends `delivered → completed`; added a
+  disposable-database browser regression covering the UI action, rejected replay, completed
+  status, `1,000` loyalty points, `100,000` customer LTV, one loyalty journal entry and exactly
+  one `loyalty.earned` plus one `order.completed` audit event.
+- Checks: targeted Chromium Playwright `1/1` passed against isolated API/Web servers; Web
+  production build passed TypeScript and generated all 43 pages; scoped `git diff --check` passed.
+- Result: the software P1 is accepted locally. Financial/COD reconciliation remains enforced by
+  the existing API transition and no client-authored payment, delivery or loyalty state was added.
+- Next: review and commit this isolated slice without staging concurrent Staff/ERP task-board work,
+  then select the next unblocked `OWNER-AUDIT-001` vertical.
+
+## IOS-STORE-STATUS-077
+
+- Date: 2026-07-20
+- Scope: read-only App Store Connect status check for Client, Staff, Courier and POS.
+- Result: all four build `1.0.0 (2)` artifacts are `VALID` and attached, but every version remains
+  `PREPARE_FOR_SUBMISSION`; draft submissions have zero items and no submitted date.
+- Remaining owner/App Store UI gates: protected review account credentials and contact details,
+  free price schedule, distribution availability, and published App Privacy answers. No account
+  mutation or submission was performed, so App Review is not claimed.

@@ -34,6 +34,7 @@ const STAGES: Stage[] = [
   { status: 'picking', label: 'В сборке', action: 'Упаковано', kind: 'transition', to: 'packed' },
   { status: 'packed', label: 'Упаковано', action: 'Готов к выдаче', kind: 'transition', to: 'ready_for_pickup' },
   { status: 'ready_for_pickup', label: 'К выдаче', action: 'Завершить', kind: 'transition', to: 'completed' },
+  { status: 'delivered', label: 'Доставлено', action: 'Завершить', kind: 'transition', to: 'completed' },
 ];
 
 export default function WarehousePage() {
