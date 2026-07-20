@@ -111,9 +111,16 @@ function ManagedDesktopBlocks({ blocks }: { blocks: StorefrontBlock[] }) {
 function ManagedBanner({ block }: { block: StorefrontBlock }) {
   const Heading = block.type === 'hero' ? 'h1' : 'h2';
   return <Link href={block.ctaHref ?? '/catalog'} data-storefront-block={block.id} className={`group relative flex overflow-hidden rounded-[20px] border border-white/10 p-10 shadow-[0_16px_40px_rgba(0,0,0,.4)] ${block.type === 'hero' ? 'min-h-[320px]' : 'min-h-[180px]'} ${desktopTone(block.tone)}`}>
-    <div className="relative z-10 flex max-w-[640px] flex-col justify-center">{block.eyebrow && <span className="mb-4 w-fit rounded-full border border-[#ff7a4d]/30 bg-[#ff7a4d]/15 px-3 py-1.5 text-[11px] font-bold uppercase text-[#ff9a6e]">{block.eyebrow}</span>}<Heading className={`${block.type === 'hero' ? 'text-[44px]' : 'text-[30px]'} font-extrabold leading-[1.05]`}>{block.title}</Heading>{block.body && <p className="mt-3 max-w-[58ch] text-[15px] opacity-70">{block.body}</p>}{block.ctaLabel && <span className="erp3-coral-action mt-6 flex w-fit items-center gap-2 rounded-[12px] px-5 py-3 text-sm font-bold">{block.ctaLabel} <ArrowRight size={17} /></span>}</div>
+    <div className="relative z-10 flex max-w-[640px] flex-col justify-center">{block.eyebrow && <span className={`mb-4 w-fit rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase ${bannerEyebrow(block.tone)}`}>{block.eyebrow}</span>}<Heading className={`${block.type === 'hero' ? 'text-[44px]' : 'text-[30px]'} font-extrabold leading-[1.05]`}>{block.title}</Heading>{block.body && <p className="mt-3 max-w-[58ch] text-[15px] opacity-70">{block.body}</p>}{block.ctaLabel && <span className="erp3-coral-action mt-6 flex w-fit items-center gap-2 rounded-[12px] px-5 py-3 text-sm font-bold">{block.ctaLabel} <ArrowRight size={17} /></span>}</div>
     {block.imageUrl && <Image src={block.imageUrl} alt="" width={420} height={320} unoptimized className="absolute bottom-0 right-6 h-[90%] w-[38%] object-contain" />}
   </Link>;
+}
+
+/** Eyebrow chip must stay legible on every banner ground (coral/lime are light). */
+function bannerEyebrow(tone: StorefrontBlock['tone']) {
+  if (tone === 'coral') return 'border-white/45 bg-white/20 text-white';
+  if (tone === 'lime') return 'border-black/25 bg-black/10 text-[#14110e]';
+  return 'border-[#ff7a4d]/30 bg-[#ff7a4d]/15 text-[#ff9a6e]';
 }
 
 function desktopTone(tone: StorefrontBlock['tone']) {
