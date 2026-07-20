@@ -4764,3 +4764,17 @@
 - Commit: `25288ec`.
 - Remaining: full MVP rerun still needs a stable isolated process/worktree; current
   unrelated `apps/web/tsconfig.json` change remains uncommitted.
+
+## TOOLCHAIN-059
+
+- Date: 2026-07-20
+- Scope: restore the trusted ecosystem audit after a clean dependency install.
+- Finding: `package-lock.json` was unchanged, but the tracked `nodeModulesTreeSha256`
+  no longer matched a clean `npm ci` tree; the strict audit could not start.
+- Change: refreshed only `scripts/ecosystem-toolchain-lock.json`'s dependency-tree digest
+  using the clean ordinary `npm ci` result. No package versions or lockfile entries changed.
+- Checks: `npm ci` completed with 0 reported vulnerabilities; `npm run ecosystem:audit:strict`
+  now runs and reports 9 explicit blockers (clean source, visual/native/reconciliation
+  evidence), rather than failing at bootstrap validation.
+- Next: refresh evidence from a stable committed source boundary; do not fabricate native
+  or reconciliation artifacts and do not include the unrelated `apps/web/tsconfig.json` edit.
