@@ -3,11 +3,17 @@ export interface PayrollConfig {
   commissionPct: number; // % of attributed revenue (оборот)
 }
 
-/** Default comp model — a fixed base plus a commission on turnover. Configurable. */
+/**
+ * Fallback comp model. The effective values come from the Setting table
+ * (`payroll.base_amount_som`, `payroll.commission_bps`) — these are only used
+ * when a caller supplies no config, e.g. in pure unit tests.
+ */
 export const DEFAULT_PAYROLL: PayrollConfig = { base: 15000, commissionPct: 1.5 };
 
 export interface SellerInput {
   staffId: string;
+  /** Resolved at the call site — the report used to expose raw ids to the UI. */
+  username?: string;
   revenue: number; // received payments taken by this seller (via shift)
   sales: number; // number of payments taken
 }

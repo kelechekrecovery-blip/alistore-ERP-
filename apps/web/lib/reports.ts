@@ -54,6 +54,8 @@ export interface Kpi {
 
 export interface PayrollRow {
   staffId: string;
+  /** Resolved server-side — the report used to expose raw staff ids. */
+  username: string;
   revenue: number;
   sales: number;
   base: number;

@@ -20,6 +20,7 @@ import {
   revenueWindowStartMs,
 } from './revenue-buckets';
 import { ValidationError } from '../common/errors';
+import { SettingsService } from '../settings/settings.service';
 
 /** Widest custom revenue window a single query will bucket. */
 const MAX_RANGE_DAYS = 366;
@@ -57,7 +58,10 @@ export const COD_STALE_MS = 24 * 60 * 60 * 1000;
  */
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
 
   /**
    * COD revenue never becomes a `Payment`: the courier recognises it as a
@@ -330,7 +334,14 @@ export class ReportsService {
     return buildKpi({ revenue, cogs, paidOrders, items, names, sellerRows });
   }
 
-  /** Seller payroll: base + commission on turnover, per seller (via shift.staffId). */
+  /**
+   * Seller payroll: base + commission on turnover, per seller (via shift.staffId).
+   *
+   * The comp model used to come from `DEFAULT_PAYROLL` here while HR read its own
+   * `PAYROLL_CONFIG` constant — two hardcoded sources for the same numbers. Both
+   * now read the Setting table, so the KPI screen and the HR payroll run cannot
+   * quote different salaries.
+   */
   async payroll() {
     const sellerPayments = await this.prisma.payment.findMany({
       where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, shiftId: { not: null } },
@@ -344,8 +355,21 @@ export class ReportsService {
       cur.sales += 1;
       bySeller.set(p.shift.staffId, cur);
     }
-    const sellers = [...bySeller.entries()].map(([staffId, v]) => ({ staffId, ...v }));
-    return buildPayroll(sellers);
+    const staff = await this.prisma.staffUser.findMany({
+      where: { id: { in: [...bySeller.keys()] } },
+      select: { id: true, username: true },
+    });
+    const names = new Map(staff.map((row) => [row.id, row.username]));
+    const sellers = [...bySeller.entries()].map(([staffId, v]) => ({
+      staffId,
+      username: names.get(staffId) ?? staffId,
+      ...v,
+    }));
+    const [base, commissionBps] = await Promise.all([
+      this.settings.value('payroll.base_amount_som'),
+      this.settings.value('payroll.commission_bps'),
+    ]);
+    return buildPayroll(sellers, { base, commissionPct: commissionBps / 100 });
   }
 
   /** Risk Center: discrepancies, outstanding COD, stale reservations, pending approvals. */

@@ -2,6 +2,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { SupportService } from '../src/support/support.service';
 import { ReportsService } from '../src/reports/reports.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
 
 /**
@@ -19,7 +20,7 @@ describe('Support tickets (integration)', () => {
     prisma = new PrismaService();
     await prisma.$connect();
     support = new SupportService(prisma, new AuditService(prisma));
-    reports = new ReportsService(prisma);
+    reports = new ReportsService(prisma, new SettingsService(prisma, new AuditService(prisma)));
   });
 
   afterAll(async () => {

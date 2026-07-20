@@ -1,5 +1,7 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReportsService } from '../src/reports/reports.service';
+import { SettingsService } from '../src/settings/settings.service';
+import { AuditService } from '../src/audit/audit.service';
 
 /**
  * ERP dashboard + Risk Center read straight from the Event Ledger tables:
@@ -13,7 +15,7 @@ describe('Reports (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    reports = new ReportsService(prisma);
+    reports = new ReportsService(prisma, new SettingsService(prisma, new AuditService(prisma)));
   });
 
   afterAll(async () => {

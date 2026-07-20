@@ -4,6 +4,7 @@ import { AuditService } from '../src/audit/audit.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { DebtsService, DEBT_LIMIT } from '../src/debts/debts.service';
 import { ReportsService } from '../src/reports/reports.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
 import { OutboxService } from '../src/outbox/outbox.service';
 import { LogNotificationTransport } from '../src/outbox/transports/log.transport';
@@ -27,7 +28,7 @@ describe('Debts (integration)', () => {
     approvals = new ApprovalsService(prisma, audit);
     const outbox = new OutboxService(prisma, new LogNotificationTransport());
     debts = new DebtsService(prisma, audit, approvals, outbox);
-    reports = new ReportsService(prisma);
+    reports = new ReportsService(prisma, new SettingsService(prisma, new AuditService(prisma)));
   });
 
   afterAll(async () => {
