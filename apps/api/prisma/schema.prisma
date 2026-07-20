@@ -3226,3 +3226,23 @@ model StaffTask {
   @@index([assigneeId, status])
   @@index([dueAt])
 }
+
+/// Owner-editable business parameters.
+///
+/// Commercial rules — discount ceilings, payroll base and commission, warranty
+/// term, buyback spread, loyalty rate, risk thresholds — lived as `as const`
+/// literals in TypeScript, so changing an employee's pay or loosening a discount
+/// for a clearance week meant a code change, a review and a deploy. Roughly 70%
+/// of the rule set was unreachable to the person who owns the business.
+///
+/// Values are stored as text and parsed by the reader, so one table serves
+/// numbers, flags and strings without a migration per parameter. Every write
+/// lands in the Event Ledger (`settings.changed`) with the previous value.
+model Setting {
+  key       String   @id
+  value     String
+  updatedBy String
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}

@@ -45,6 +45,7 @@ import { ProtectionModule } from './protection/protection.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { FinanceModule } from './finance/finance.module';
 import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
+import { SettingsModule } from './settings/settings.module';
 import { HrModule } from './hr/hr.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { ServiceCenterModule } from './service-center/service-center.module';
@@ -102,6 +103,7 @@ import { StoreOperationsModule } from './store-operations/store-operations.modul
     ProcurementModule,
     FinanceModule,
     StaffTasksModule,
+    SettingsModule,
     HrModule,
     LogisticsModule,
     ServiceCenterModule,
