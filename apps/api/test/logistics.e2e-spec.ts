@@ -16,7 +16,11 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
   let app: INestApplication; let prisma: PrismaService; let orders: OrdersService;
   let ownerToken: string; let sellerToken: string; let courierToken: string; let courierId: string;
-  const run = Math.floor(Math.random() * 1_000_000); const date = '2026-07-20';
+  const run = Math.floor(Math.random() * 1_000_000);
+  // Tomorrow (UTC): the slot window below must stay in the future, otherwise
+  // checkout rejects it as a past slot. A hardcoded date made this spec pass only
+  // before 06:00 UTC on one specific day and fail on every day after it.
+  const date = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuditModule, StaffAuthModule, LogisticsModule, OrdersModule, CourierModule] }).compile();
     app = moduleRef.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true })); await app.init();
