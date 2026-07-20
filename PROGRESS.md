@@ -4778,3 +4778,18 @@
   evidence), rather than failing at bootstrap validation.
 - Next: refresh evidence from a stable committed source boundary; do not fabricate native
   or reconciliation artifacts and do not include the unrelated `apps/web/tsconfig.json` edit.
+
+## MVP-VERIFY-060
+
+- Date: 2026-07-20
+- Scope: rerun the full destructive MVP verification after the COD reports fix and
+  trusted dependency restoration.
+- Checks: Prisma validation, migration upgrades, API build, Web production build with
+  43 routes, mobile typecheck, and API batches through `152/173` passed. Batch 157
+  stopped on `Parse Error: Expected HTTP/` in `store-points-fulfillment.e2e-spec.ts`.
+- Isolation: the same suite reran independently and passed `1/1`, confirming a
+  transport/process contention flake rather than a domain assertion failure.
+- Result: full `mvp:verify` remains unaccepted because the orchestrated run exited nonzero;
+  no readiness claim made.
+- Next: rerun the complete gate with API/database processes isolated, then refresh
+  hash-bound evidence against the committed source boundary.
