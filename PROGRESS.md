@@ -4892,3 +4892,13 @@
   `docs/acceptance/artifacts/ios-app-ui-f01b047cf51c56d48971407597cb425b754793a5717aa795435aaa9198620021.json`.
 - Result: iOS simulator software evidence is refreshed and hash-bound. Physical-device Face ID,
   push, camera, maps, offline behavior and store certification remain open.
+
+## ERP-SETTINGS-068
+
+- Date: 2026-07-20
+- Scope: verify the concurrent owner-editable business settings vertical slice.
+- Checks: `npm run api:build`; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run test -w @alistore/api -- --runInBand test/settings.e2e-spec.ts` (`5/5`).
+- Result: settings validation, owner-only writes, admin read access, corrupt-value fallback and
+  Ledger recording are green. Concurrent Web settings client changes remain outside this commit.
+- Next: resolve the trusted npm toolchain lock mismatch and rerun the strict ecosystem audit on
+  one clean source boundary.
