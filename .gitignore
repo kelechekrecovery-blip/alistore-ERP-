@@ -36,6 +36,10 @@ apps/api/prisma/*.db
 coverage/
 playwright-report/
 test-results/
+playwright-report-prod/
+test-results-prod/
+playwright-web.png
+.playwright-mcp/
 .artifacts/
 apps/api/uploads/
 # editor
