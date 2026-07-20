@@ -1104,8 +1104,15 @@ private struct ClientRootView: View {
 #endif
         do {
             let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
-            products = response.items
-            if (UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart), let product = response.items.first {
+            let requiresPurchaseFixture = UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart
+            if requiresPurchaseFixture, response.items.isEmpty {
+                let fixture = Product(id: "ui-product", sku: "UI-IPHONE", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3)
+                products = [fixture]
+                cart[fixture.id] = 1
+            } else {
+                products = response.items
+            }
+            if requiresPurchaseFixture, let product = response.items.first {
                 cart[product.id] = 1
             }
             catalogError = nil

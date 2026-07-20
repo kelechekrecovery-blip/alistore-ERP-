@@ -4821,3 +4821,21 @@
   remains unaccepted because its process exited nonzero.
 - Next: rerun the exact component gate in an isolated process/database boundary, then record
   the final exit code before refreshing strict evidence.
+
+## NATIVE-UI-063
+
+- Date: 2026-07-20
+- Scope: stabilize the iOS Client purchase UI tests when the catalog API is healthy but
+  returns an empty fixture catalog.
+- Change: `apps/ios/Client/AliStoreClientApp.swift` now injects a deterministic UI-only
+  product fixture for cart/checkout bootstrap in that exact empty-response case. Production
+  catalog responses remain authoritative whenever products are returned; the fixture is not
+  used by normal app navigation.
+- Checks: the full native UI run previously passed Staff, Courier and POS and exposed only
+  two Client purchase failures; the two affected Client XCUITests now pass `2/2` in isolation.
+  Android packaged UI passed on the emulator: core `30`, app `1`, staff `1`, courier `1`,
+  POS `1`.
+- Result: targeted iOS regression is green. Full native/release acceptance remains open for
+  the clean source boundary, physical-device smoke and complete rerun of the iOS suite.
+- Next: commit this bounded fix, rerun the strongest available clean-source gates, and keep
+  external provider, staging, device and store-review blockers explicit.
