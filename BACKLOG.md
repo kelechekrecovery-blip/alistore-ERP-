@@ -418,6 +418,7 @@ Independent fresh-eyes sweep recorded in `docs/GAP-ANALYSIS-2026-07-17.md`. Thes
 - `WEB-AUDIT-045` **In progress 2026-07-19.** Exact font assets are vendored for offline-safe Web builds (`0ca7632`); mobile storefront visual passes, while desktop storefront and ERP snapshot drift still require intentional baseline review. Do not weaken screenshot thresholds to hide the drift.
 - `WEB-AUDIT-046` **Accepted locally 2026-07-19.** Refreshed the two stale desktop snapshots after confirming the current Web/ERP 3.0 output; isolated visual acceptance passes `3/3`. Remaining work is cross-browser/release and external deployment certification.
 - `MVP-GATE-047` **Accepted locally 2026-07-19.** Full non-E2E MVP verification passed after excluding generated `.next-e2e-*` and `build-output` caches from Web typecheck: migrations, API/Web builds, mobile typecheck and `172/172` API Jest batches. Public `ali.kg` Web/API smoke is green. Remaining blockers are durable Render deployment, strict native/reconciliation evidence, live provider credentials and physical-device certification.
+- `E2E-GATE-049` **Accepted locally 2026-07-19.** Sequential reconciliation E2E is stable after fixing stale Next lock cleanup and courier COD midnight/hydration timing. Composite software reconciliation passed `4/4`; visual and all four vertical evidence artifacts were refreshed and pushed. Strict audit now has only the native iOS UI evidence and Android packaged connected-test evidence blockers. Public `ali.kg` smoke is green, but the current connector is still workstation-backed until Render deployment is completed.
 # PHASE-1-EVIDENCE-013 — Strict ecosystem audit
 
 - [x] Run the strict contract audit after refreshing all local reconciliation evidence.
@@ -455,6 +456,16 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
   `erp-secure` + `store-operations` — re-verified **3/3 PASS in isolation**, confirmed
   flaky/concurrency, not product bugs; both also passed under chromium). Net: suite green
   across all 3 browsers modulo concurrency. Codex to reconcile the stale CMS spec labels.
+- `E2E-AUDIT-006` INFO — post-implementation e2e verification (storefront upgrade): against
+  **stable self-managed servers**, `web-route-audit` (all 40 routes) + storefront + 6/7
+  web-checkout + compare + account-data = **62/63 PASS**. The Playwright-managed webServer
+  is unreliable here (killed mid-run twice → mass `ERR_CONNECTION_REFUSED`, 0 with stable
+  servers) — run e2e with `E2E_REUSE_EXISTING_SERVER=true` against a pre-started api/web, or
+  in CI (isolated). The 1 failure `web-checkout.spec.ts:135` (delivery zone fee + slot) is a
+  **near-midnight boundary flake in the test**: it creates a slot at `now+1h` (line 138) and
+  derives `deliveryDate` from it, so after ~23:00 local the slot lands on the next day while
+  checkout queries today → `осталось 1` missing. Passed earlier same day; unrelated to the
+  storefront changes. Fix: make the slot window day-boundary-safe (Codex/e2e lane).
 - `E2E-AUDIT-005` INFO — API gate: `mvp:verify --skip-e2e` hit one HTTP-transport flake
   (`Parse Error: Expected HTTP/`) in `finance-expenses.e2e-spec.ts` batch 55/172 from
   shared-resource contention with the parallel Codex; re-verified **17/17 PASS in
