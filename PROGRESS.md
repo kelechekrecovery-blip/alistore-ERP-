@@ -4946,3 +4946,16 @@
   strict acceptance remains blocked by the unrelated dirty `apps/web/tsconfig.json` change.
 - Next: rerun strict audit, then resolve the source-tree boundary with the owner of the parallel
   change before accepting the final evidence on the main worktree.
+
+## AUDIT-073
+
+- Date: 2026-07-20
+- Scope: rerun strict ecosystem acceptance after native evidence refresh.
+- Result: acceptance remains blocked because the main worktree has concurrent uncommitted
+  changes in `apps/web/components/erp/HrView.tsx` and `apps/web/components/erp/LogisticsView.tsx`,
+  and the shared `node_modules` tree is being changed outside the committed toolchain lock.
+- Evidence: clean-clone iOS and Android UI gates passed, but the strict contract correctly rejects
+  their source/toolchain-bound artifacts until the exact source boundary and dependency tree are
+  stable. No production-readiness claim is made.
+- Next: owner must finish or checkpoint the concurrent Web changes; then run `npm ci` in the same
+  clean boundary, verify the tracked ecosystem lock, refresh evidence and rerun the strict audit.
