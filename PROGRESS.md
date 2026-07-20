@@ -4912,3 +4912,14 @@
 - Evidence: `docs/acceptance/artifacts/pos-refund-reconciliation-9152f7f1501a755c71cf2d82a867ad964d3c87191d81daa9754a4580e5b54dc4.json`, source commit `40455f4`.
 - Result: POS/refund software evidence is refreshed. Courier/COD, service/loaner, procurement/sale,
   composite E2E and clean-source acceptance remain open.
+## MASTER-PROMPT-070
+
+- Date: 2026-07-20
+- Scope: publish the autonomous execution contract for completing AliStore end to end.
+- Change: added `docs/MASTER-AUTONOMOUS-EXECUTION-PROMPT-3.md` with explicit Agent 0-9
+  ownership, P0/P1-first sequencing, secret-rotation rules, financial/security invariants,
+  evidence requirements, Web/ERP/native/platform/provider/store gates and first-store rollout.
+- Result: documentation is ready for autonomous execution; project readiness is unchanged and
+  remains blocked by the current strict-audit/native/reconciliation/platform/provider gates.
+- Next: continue from the current `BACKLOG.md` highest-impact unblocked P0/P1 item on a clean
+  committed source boundary; do not touch unrelated parallel changes.

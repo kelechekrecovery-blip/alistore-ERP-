@@ -1,5 +1,8 @@
 # AliStore autonomous engineering contract
 
+> Расширенный канонический контракт автономной команды: [`docs/MASTER-AUTONOMOUS-EXECUTION-PROMPT-3.md`](docs/MASTER-AUTONOMOUS-EXECUTION-PROMPT-3.md).
+> Этот файл сохраняется как короткая точка входа и не должен противоречить версии 3.0.
+
 Use this file as the first instruction for every autonomous Codex engineering session in
 `/Users/alistore/Desktop/alistore-erp`. It is an execution contract, not a readiness claim.
 
