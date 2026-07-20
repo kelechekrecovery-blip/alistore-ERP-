@@ -32,7 +32,7 @@ const SCREENS: Screen[] = [
   { nav: /KPI и ЗП/, route: '**/api/reports/kpi*', cleaned: true },
   { nav: /Логистика/, route: '**/api/logistics/overview*', cleaned: true },
   { nav: /HR · Смены/, route: '**/api/hr/week*', cleaned: true },
-  { nav: /Операции точки/, route: '**/api/store-operations/overview*', cleaned: false },
+  { nav: /Операции точки/, route: '**/api/store-operations/overview*', cleaned: true },
   { nav: /Сервис-центр/, route: '**/api/service-center/**', cleaned: false },
   { nav: /Склад/, route: '**/api/catalog/products*', cleaned: false },
 ];
@@ -60,10 +60,11 @@ for (const screen of SCREENS) {
     );
 
     await page.getByTestId('erp-sidebar').getByRole('button', { name: screen.nav }).click();
-    // Give the screen a moment to settle into its failure state.
+    // Generous: this asserts *what* the screen shows, not how fast. On a shared
+    // stand a cold route compile alone can eat ten seconds.
     await expect
       .poll(async () => /Не удалось|не загрузились|Ошибка/.test(await page.locator('main').innerText()), {
-        timeout: 10_000,
+        timeout: 25_000,
       })
       .toBe(true);
 

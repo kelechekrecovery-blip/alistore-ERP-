@@ -2,10 +2,5 @@
   "apps/web/components/erp/ServiceCenterView.tsx::catch подставляет фикстуру вместо ошибки",
   "apps/web/components/erp/ServiceCenterView.tsx::константа DEFAULT_LOANERS содержит бизнес-данные",
   "apps/web/components/erp/ServiceCenterView.tsx::константа DEFAULT_QUEUE содержит бизнес-данные",
-  "apps/web/components/erp/StockView.tsx::константа DEFAULT_PRODUCTS содержит бизнес-данные",
-  "apps/web/components/erp/StoreOperationsView.tsx::catch подставляет фикстуру вместо ошибки",
-  "apps/web/components/erp/StoreOperationsView.tsx::константа DEFAULT_DEFECTS содержит бизнес-данные",
-  "apps/web/components/erp/StoreOperationsView.tsx::константа DEFAULT_INCIDENTS содержит бизнес-данные",
-  "apps/web/components/erp/StoreOperationsView.tsx::константа DEFAULT_RESERVES содержит бизнес-данные",
-  "apps/web/components/erp/StoreOperationsView.tsx::константа DEFAULT_WAITLIST содержит бизнес-данные"
+  "apps/web/components/erp/StockView.tsx::константа DEFAULT_PRODUCTS содержит бизнес-данные"
 ]
