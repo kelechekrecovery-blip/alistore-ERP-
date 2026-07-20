@@ -2,6 +2,14 @@ import { API_BASE } from './api';
 
 export interface Dashboard {
   money: { salesGross: number; refunds: number; net: number; expenses: number; operatingProfit: number; byMethod: { method: string; amount: number }[] };
+  /**
+   * Today only (UTC day), so the tile labelled «сегодня» is actually today.
+   * Optional: during a rolling deploy the web bundle can be newer than the API,
+   * and the dashboard must degrade to «—» rather than crash.
+   */
+  today?: { salesGross: number; orders: number };
+  cash?: { inDrawers: number; openShifts: number };
+  debts?: { openBalance: number; overdue: number };
   orders: { total: number; byStatus: { status: string; count: number }[] };
   stock: { byStatus: { status: string; count: number }[] };
   ops: { openShifts: number; pendingApprovals: number };

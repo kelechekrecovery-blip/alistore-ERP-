@@ -13,24 +13,23 @@ interface KpiItem {
   deltaColor: string;
 }
 
-const DEFAULT_KPIS: KpiItem[] = [
-  { label: 'Выручка сегодня', value: '1.24 млн', color: '#fff', delta: '▲ 12% ко вчера', deltaColor: '#C6FF3D' },
-  { label: 'Чеков', value: '47', color: '#fff', delta: 'средний 26 400', deltaColor: '#8A7F76' },
-  { label: 'Наличные в кассе', value: '312к', color: '#fff', delta: '3 филиала', deltaColor: '#8A7F76' },
-  { label: 'Долги/рассрочка', value: '1.8 млн', color: '#E5B23C', delta: '6 просрочек', deltaColor: '#FF8A7A' },
-  { label: 'Маржа', value: '27.4%', color: '#C6FF3D', delta: '▲ 1.2 п.п.', deltaColor: '#C6FF3D' },
-  { label: 'Возвраты', value: '2.1%', color: '#FF8A7A', delta: '−0.4 п.п.', deltaColor: '#C6FF3D' },
+/** Placeholders shown only while the dashboard is loading — never fabricated figures. */
+const LOADING_KPIS: KpiItem[] = [
+  { label: 'Выручка сегодня', value: '—', color: '#fff', delta: 'загрузка…', deltaColor: '#8A7F76' },
+  { label: 'Чеков сегодня', value: '—', color: '#fff', delta: 'загрузка…', deltaColor: '#8A7F76' },
+  { label: 'Наличные в кассах', value: '—', color: '#fff', delta: 'загрузка…', deltaColor: '#8A7F76' },
+  { label: 'Долги/рассрочка', value: '—', color: '#E5B23C', delta: 'загрузка…', deltaColor: '#8A7F76' },
+  { label: 'Возвраты', value: '—', color: '#FF8A7A', delta: 'загрузка…', deltaColor: '#8A7F76' },
+  { label: 'На согласовании', value: '—', color: '#fff', delta: 'загрузка…', deltaColor: '#8A7F76' },
 ];
 
-const DEFAULT_BARS = [
-  { day: 'Пн', h: 60 },
-  { day: 'Вт', h: 80 },
-  { day: 'Ср', h: 55 },
-  { day: 'Чт', h: 95 },
-  { day: 'Пт', h: 120 },
-  { day: 'Сб', h: 140 },
-  { day: 'Вс', h: 100 },
-];
+const WEEKDAY_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+/** Short weekday label for a YYYY-MM-DD bucket key. */
+function dayLabel(iso: string): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? iso.slice(5) : WEEKDAY_RU[date.getUTCDay()];
+}
 
 interface Decision {
   text: string;
@@ -39,11 +38,6 @@ interface Decision {
   tab?: string;
 }
 
-const DEFAULT_DECISIONS: Decision[] = [
-  { text: 'iPhone 15 осталось на 2 дня', action: 'Оформить закупку 40 шт', color: '#FF5B2E' },
-  { text: 'Филиал Ош отстаёт по KPI −18%', action: 'Открыть KPI', color: '#E5B23C' },
-  { text: '340 уснувших клиентов', action: 'Запустить реактивацию', color: '#7FB0EC' },
-];
 
 function Metric({ label, value, color = '#fff', delta, deltaColor }: KpiItem) {
   return (
@@ -59,16 +53,29 @@ function Metric({ label, value, color = '#fff', delta, deltaColor }: KpiItem) {
   );
 }
 
-const SECONDARY_KPIS = [
-  ['Конверсия', '34%', '#C6FF3D'],
-  ['Возвраты', '2.1%', '#FF8A7A'],
-  ['Новые клиенты', '12', '#C6FF3D'],
-  ['Онлайн-доля', '28%', '#C6FF3D'],
-  ['Ср. время сделки', '7 мин', '#E5DCD3'],
-  ['Позиций в чеке', '1.8', '#C6FF3D'],
-  ['Отмены', '3', '#FF8A7A'],
-  ['NPS', '72', '#C6FF3D'],
-] as const;
+/**
+ * Operational counters derived from the dashboard payload. Everything here is
+ * real — metrics the API does not compute (конверсия, NPS, ср. чек по времени)
+ * are deliberately absent rather than invented.
+ */
+function buildSecondaryKpis(d: Dashboard | null): { label: string; value: string; color: string }[] {
+  if (!d) return [];
+  const countOf = (rows: { status: string; count: number }[], status: string) =>
+    rows.find((r) => r.status === status)?.count ?? 0;
+  const inStock = countOf(d.stock.byStatus, 'in_stock');
+  const sold = countOf(d.stock.byStatus, 'sold');
+  const avgCheck = d.orders.total > 0 ? Math.round(d.money.salesGross / d.orders.total) : 0;
+  return [
+    { label: 'Смен открыто', value: String(d.cash?.openShifts ?? d.ops.openShifts), color: '#E5DCD3' },
+    { label: 'На согласовании', value: String(d.ops.pendingApprovals), color: d.ops.pendingApprovals > 0 ? '#E5B23C' : '#C6FF3D' },
+    { label: 'Просрочено долгов', value: d.debts ? String(d.debts.overdue) : '—', color: d.debts && d.debts.overdue > 0 ? '#FF8A7A' : '#C6FF3D' },
+    { label: 'Средний чек', value: som(avgCheck), color: '#E5DCD3' },
+    { label: 'Заказов всего', value: String(d.orders.total), color: '#E5DCD3' },
+    { label: 'Единиц в наличии', value: String(inStock), color: '#C6FF3D' },
+    { label: 'Продано единиц', value: String(sold), color: '#E5DCD3' },
+    { label: 'Расходы', value: som(d.money.expenses), color: '#E5DCD3' },
+  ];
+}
 
 interface DashboardViewProps {
   d: Dashboard | null;
@@ -82,33 +89,86 @@ interface DashboardViewProps {
 }
 
 /** Owner overview matching the latest AliStore ERP 3.0 handoff. */
-export function DashboardView({ d, risks, onSignal }: DashboardViewProps) {
+export function DashboardView({ d, risks, revenue, trend, onSignal }: DashboardViewProps) {
   const kpis = useMemo<KpiItem[]>(() => {
-    if (!d) return DEFAULT_KPIS;
+    if (!d) return LOADING_KPIS;
+    const refundPct = d.money.salesGross > 0 ? (d.money.refunds / d.money.salesGross) * 100 : 0;
+    const trendDelta =
+      trend?.deltaPct == null
+        ? 'нет базы для сравнения'
+        : `${trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '='} ${Math.abs(trend.deltaPct)}% к прошлому периоду`;
+    const trendColor = trend?.direction === 'down' ? '#FF8A7A' : trend?.direction === 'up' ? '#C6FF3D' : '#8A7F76';
+    const { today, cash, debts } = d;
     return [
-      { label: 'Выручка сегодня', value: som(d.money.salesGross), color: '#fff', delta: '▲ 12% ко вчера', deltaColor: '#C6FF3D' },
-      { label: 'Чеков', value: String(d.orders.total), color: '#fff', delta: 'средний 26 400', deltaColor: '#8A7F76' },
-      { label: 'Наличные в кассе', value: '312к', color: '#fff', delta: '3 филиала', deltaColor: '#8A7F76' },
-      { label: 'Долги/рассрочка', value: '1.8 млн', color: '#E5B23C', delta: '6 просрочек', deltaColor: '#FF8A7A' },
+      { label: 'Выручка сегодня', value: today ? som(today.salesGross) : '—', color: '#fff', delta: today ? trendDelta : 'нет данных', deltaColor: trendColor },
+      { label: 'Заказов сегодня', value: today ? String(today.orders) : '—', color: '#fff', delta: `всего ${d.orders.total}`, deltaColor: '#8A7F76' },
+      {
+        label: 'Наличные в кассах',
+        value: cash ? som(cash.inDrawers) : '—',
+        color: '#fff',
+        delta: cash ? (cash.openShifts === 1 ? '1 открытая смена' : `${cash.openShifts} открытых смен`) : 'нет данных',
+        deltaColor: '#8A7F76',
+      },
+      {
+        label: 'Долги/рассрочка',
+        value: debts ? som(debts.openBalance) : '—',
+        color: '#E5B23C',
+        delta: debts ? (debts.overdue > 0 ? `${debts.overdue} просрочено` : 'без просрочек') : 'нет данных',
+        deltaColor: debts && debts.overdue > 0 ? '#FF8A7A' : '#C6FF3D',
+      },
+      {
+        label: 'Возвраты',
+        value: `${refundPct.toFixed(1)}%`,
+        color: '#FF8A7A',
+        delta: som(d.money.refunds),
+        deltaColor: '#8A7F76',
+      },
+      {
+        label: 'На согласовании',
+        value: String(d.ops.pendingApprovals),
+        color: d.ops.pendingApprovals > 0 ? '#E5B23C' : '#C6FF3D',
+        delta: d.ops.pendingApprovals > 0 ? 'ждут решения' : 'очередь пуста',
+        deltaColor: '#8A7F76',
+      },
     ];
-  }, [d]);
+  }, [d, trend]);
 
-  const decisions = useMemo<Decision[]>(() => {
-    if (risks.length === 0) return DEFAULT_DECISIONS;
-    return risks.slice(0, 5).map((r) => ({
-      text: r.detail,
-      action: 'перейти →',
-      color: SEV_COLOR[r.severity] ?? '#8A7F76',
+  const secondary = useMemo(() => buildSecondaryKpis(d), [d]);
+
+  /** Bars scaled to the tallest day; empty week renders a flat honest baseline. */
+  const bars = useMemo(() => {
+    const max = revenue.reduce((peak, point) => Math.max(peak, point.amount), 0);
+    return revenue.map((point) => ({
+      day: dayLabel(point.day),
+      amount: point.amount,
+      height: max > 0 ? Math.max(4, Math.round((point.amount / max) * 150)) : 4,
     }));
-  }, [risks]);
+  }, [revenue]);
+
+  const decisions = useMemo<Decision[]>(
+    () =>
+      risks.slice(0, 5).map((r) => ({
+        text: r.detail,
+        action: 'перейти',
+        color: SEV_COLOR[r.severity] ?? '#8A7F76',
+        tab: r.kind,
+      })),
+    [risks],
+  );
 
   return (
     <>
       <div className="mb-[14px] rounded-[16px] border border-[#ff5b2e]/25 bg-[radial-gradient(circle_at_0%_0%,rgba(255,91,46,.22),transparent_42%),linear-gradient(120deg,rgba(255,255,255,.08),rgba(255,255,255,.025))] p-4 shadow-[0_16px_40px_rgba(0,0,0,.3)] sm:flex sm:items-center sm:gap-4">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-coral text-xl shadow-[0_0_20px_rgba(255,91,46,.35)]">🤖</span>
         <div className="mt-3 min-w-0 sm:mt-0 sm:flex-1">
-          <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[#ff9a6e]">AI-сводка · сейчас</div>
-          <p className="mt-1 text-[13px] leading-5 text-white/80">Выручка на <strong className="text-[#c6ff3d]">12% выше</strong> среднего вторника. В кассе Ош 340к — нормальный лимит, рекомендую инкассацию. iPhone 15 хватит на <strong className="text-[#ff9a6e]">2 дня</strong>.</p>
+          <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[#ff9a6e]">AI-ассистент</div>
+          <p className="mt-1 text-[13px] leading-5 text-white/80">
+            {d
+              ? risks.length > 0
+                ? <>Открытых сигналов: <strong className="text-[#ff9a6e]">{risks.length}</strong>. Спросите ассистента о выручке, остатках или рисках.</>
+                : <>Открытых сигналов нет. Спросите ассистента о выручке, остатках или закупках.</>
+              : 'Загрузка данных…'}
+          </p>
         </div>
         <button type="button" onClick={() => onSignal('ai')} className="mt-3 shrink-0 rounded-[10px] border border-white/15 bg-white/[.07] px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-[#ff7a4d] hover:text-white sm:mt-0">Спросить AI →</button>
       </div>
@@ -117,26 +177,43 @@ export function DashboardView({ d, risks, onSignal }: DashboardViewProps) {
           <Metric key={k.label} {...k} />
         ))}
       </div>
-      <div className="mb-[18px] grid grid-cols-2 overflow-hidden rounded-[14px] border border-white/10 bg-white/[.035] sm:grid-cols-4 lg:grid-cols-8">
-        {SECONDARY_KPIS.map(([label, value, color]) => <div key={label} className="border-b border-r border-white/[.08] px-3 py-3 last:border-r-0 sm:border-b-0"><div className="text-[10px] leading-4 text-muted">{label}</div><div className="mt-1 font-mono text-[15px] font-bold" style={{ color }}>{value}</div></div>)}
-      </div>
+      {secondary.length > 0 && (
+        <div className="mb-[18px] grid grid-cols-2 overflow-hidden rounded-[14px] border border-white/10 bg-white/[.035] sm:grid-cols-4 lg:grid-cols-8">
+          {secondary.map(({ label, value, color }) => (
+            <div key={label} className="border-b border-r border-white/[.08] px-3 py-3 last:border-r-0 sm:border-b-0">
+              <div className="text-[10px] leading-4 text-muted">{label}</div>
+              <div className="mt-1 font-mono text-[15px] font-bold" style={{ color }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="grid gap-3.5 lg:grid-cols-[2fr_1fr]">
         <Card className="p-5">
           <div className="mb-4 font-display text-[15px] font-bold text-white">Выручка · 7 дней</div>
-          <div className="flex h-[160px] items-end gap-2.5">
-            {DEFAULT_BARS.map((b) => (
-              <div key={b.day} className="flex flex-1 flex-col items-center gap-1.5">
-                <div
-                  className="w-full rounded-t-[6px] bg-gradient-to-b from-[#FF9A6E] to-coral shadow-[0_0_14px_rgba(255,91,46,0.38)]"
-                  style={{ height: `${b.h}px` }}
-                />
-                <span className="text-[10px] text-subtle">{b.day}</span>
-              </div>
-            ))}
-          </div>
+          {bars.length === 0 ? (
+            <div className="flex h-[160px] items-center justify-center text-[12px] text-muted">Нет данных о выручке за период</div>
+          ) : (
+            <div className="flex h-[160px] items-end gap-2.5">
+              {bars.map((b, index) => (
+                <div key={`${b.day}-${index}`} className="flex flex-1 flex-col items-center gap-1.5">
+                  <div
+                    className="w-full rounded-t-[6px] bg-gradient-to-b from-[#FF9A6E] to-coral shadow-[0_0_14px_rgba(255,91,46,0.38)]"
+                    style={{ height: `${b.height}px` }}
+                    title={som(b.amount)}
+                  />
+                  <span className="text-[10px] text-subtle">{b.day}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
         <Card className="p-5">
           <div className="mb-3.5 font-display text-[15px] font-bold text-white">Требуют решения</div>
+          {decisions.length === 0 && (
+            <p className="text-[12px] leading-5 text-muted">
+              {d ? 'Открытых сигналов нет.' : 'Загрузка…'}
+            </p>
+          )}
           <div className="flex flex-col gap-3">
             {decisions.map((decision, index) => (
               <button

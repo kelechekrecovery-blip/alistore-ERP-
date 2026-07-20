@@ -34,6 +34,7 @@ describe('Reports (integration)', () => {
     await prisma.courierRun.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.tradeInDevice.deleteMany();
+    await prisma.debtPlan.deleteMany();
     await prisma.customer.deleteMany();
   });
 
@@ -65,6 +66,48 @@ describe('Reports (integration)', () => {
     expect(d.orders.byStatus.find((s) => s.status === 'paid')?.count).toBe(1);
     expect(d.stock.byStatus.find((s) => s.status === 'sold')?.count).toBe(1);
     expect(d.stock.byStatus.find((s) => s.status === 'in_stock')?.count).toBe(1);
+  });
+
+  it('scopes «today» to the current day and reports live cash and debt balances', async () => {
+    const customer = await prisma.customer.create({ data: { phone: '+996700900004', name: 'Today' } });
+    const order = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'pos', total: 50000, status: 'paid' },
+    });
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'staff-today', point: 'BISHKEK-1', openCash: 5000 },
+    });
+    await prisma.payment.create({
+      data: { orderId: order.id, amount: 50000, method: 'cash', status: 'received', shiftId: shift.id },
+    });
+    // A payment from a previous day must NOT count towards «today».
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        amount: 900000,
+        method: 'cash',
+        status: 'received',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.debtPlan.create({
+      data: {
+        orderId: order.id,
+        customerId: customer.id,
+        principal: 40000,
+        balance: 30000,
+        dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // already overdue
+      },
+    });
+
+    const d = await reports.dashboard();
+    // All-time still sees both payments; «today» sees only the recent one.
+    expect(d.money.salesGross).toBe(950000);
+    expect(d.today.salesGross).toBe(50000);
+    // Drawer = opening float + cash taken on the open shift.
+    expect(d.cash.inDrawers).toBe(55000);
+    expect(d.cash.openShifts).toBe(1);
+    expect(d.debts.openBalance).toBe(30000);
+    expect(d.debts.overdue).toBe(1);
   });
 
   it('surfaces cash discrepancy, outstanding COD and stale reservation as risks', async () => {

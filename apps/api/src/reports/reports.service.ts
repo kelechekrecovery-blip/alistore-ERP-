@@ -141,8 +141,27 @@ export class ReportsService {
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
   async dashboard() {
-    const [sales, refunds, expenses, ordersByStatus, unitsByStatus, byMethod, orderCount, openShifts, pendingApprovals, revenue7d] =
-      await Promise.all([
+    const now = new Date();
+    // Same UTC day boundary the revenue chart buckets on, so «сегодня» and the
+    // chart's last bar always agree.
+    const todayStart = new Date(revenueWindowStartMs(1, now));
+    const [
+      sales,
+      refunds,
+      expenses,
+      ordersByStatus,
+      unitsByStatus,
+      byMethod,
+      orderCount,
+      openShifts,
+      pendingApprovals,
+      revenue7d,
+      todaySales,
+      todayOrders,
+      openShiftRows,
+      debtAggregate,
+      overdueDebts,
+    ] = await Promise.all([
         this.prisma.payment.aggregate({
           _sum: { amount: true },
           where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
@@ -160,11 +179,35 @@ export class ReportsService {
         this.prisma.cashShift.count({ where: { closedAt: null } }),
         this.prisma.approval.count({ where: { status: 'requested' } }),
         this.revenue(7),
+        this.prisma.payment.aggregate({
+          _sum: { amount: true },
+          where: {
+            amount: { gt: 0 },
+            status: { in: ['received', 'reconciled'] },
+            createdAt: { gte: todayStart },
+          },
+        }),
+        this.prisma.order.count({ where: { createdAt: { gte: todayStart } } }),
+        // Cash currently in drawers = opening float + cash taken, per open shift
+        // (the same arithmetic ShiftsService.list uses for expectedCash).
+        this.prisma.cashShift.findMany({
+          where: { closedAt: null },
+          select: {
+            openCash: true,
+            payments: { where: { method: 'cash' }, select: { amount: true } },
+          },
+        }),
+        this.prisma.debtPlan.aggregate({ _sum: { balance: true }, where: { status: 'open' } }),
+        this.prisma.debtPlan.count({ where: { status: 'open', dueDate: { lt: now } } }),
       ]);
 
     const salesGross = sales._sum.amount ?? 0;
     const refunded = Math.abs(refunds._sum.amount ?? 0);
     const operatingExpenses = expenses._sum.amount ?? 0;
+    const cashInDrawers = openShiftRows.reduce(
+      (sum, shift) => sum + shift.openCash + shift.payments.reduce((acc, p) => acc + p.amount, 0),
+      0,
+    );
 
     return {
       money: {
@@ -175,6 +218,13 @@ export class ReportsService {
         operatingProfit: salesGross - refunded - operatingExpenses,
         byMethod: byMethod.map((m) => ({ method: m.method, amount: m._sum.amount ?? 0 })),
       },
+      /** Today only (UTC day, matching the revenue chart's last bucket). */
+      today: {
+        salesGross: todaySales._sum.amount ?? 0,
+        orders: todayOrders,
+      },
+      cash: { inDrawers: cashInDrawers, openShifts },
+      debts: { openBalance: debtAggregate._sum.balance ?? 0, overdue: overdueDebts },
       orders: {
         total: orderCount,
         byStatus: ordersByStatus.map((o) => ({ status: o.status, count: o._count._all })),
