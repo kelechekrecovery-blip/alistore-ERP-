@@ -13,7 +13,7 @@
     "gitSha256": "a961f78075d8e7621ef4f5d764c64ef8a41bf66c0a98ab5cb6ca39b85ce31c93",
     "npmCliPath": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
     "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
-    "npmTreeSha256": "8004a8e2cafd22716164a6e20be777107966f09baa26fc14851bb78bb6f57b01",
+    "npmTreeSha256": "e67a8e00660f73aa621c1ddada5d5d28972e5118c50835b29d2731ce5b37a2e2",
     "browserPath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "browserSha256": "5acd03e7ff56ad32bc99f27b258b75393795463b53c66dd531c4432e8d0a5a3e",
     "browserAppTreeSha256": "9543a7ec4ded3d016c8bc3e737faa83a6ddeb1ee0ce14e52a0dc6488f44fc72c"
