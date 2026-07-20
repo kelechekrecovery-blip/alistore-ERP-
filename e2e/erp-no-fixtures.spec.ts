@@ -33,6 +33,7 @@ const SCREENS: Screen[] = [
   { nav: /Логистика/, route: '**/api/logistics/overview*', cleaned: true },
   { nav: /HR · Смены/, route: '**/api/hr/week*', cleaned: true },
   { nav: /Операции точки/, route: '**/api/store-operations/overview*', cleaned: true },
+  { nav: /AI-ассистент/, route: '**/api/ai/insights*', cleaned: true },
   { nav: /Сервис-центр/, route: '**/api/service-center/**', cleaned: false },
   { nav: /Склад/, route: '**/api/catalog/products*', cleaned: false },
 ];

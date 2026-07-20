@@ -78,7 +78,7 @@ const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор сети · сегодня'],
   settings: ['Параметры бизнеса', 'Скидки · зарплата · гарантия · выкуп · бонусы'],
   admin: ['Администрирование', 'Сайт · операции · доступы'],
-  ai: ['AI-ассистент', 'Знает всю систему'],
+  ai: ['AI-ассистент', 'Сводка по данным сети'],
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
   reorder: ['Закупки', 'Что дозаказать по спросу/остатку'],
   finance: ['Финансы', 'Июнь 2026'],
@@ -126,6 +126,8 @@ export default function ErpPage() {
   const [revenue, setRevenue] = useState<{ day: string; amount: number }[]>([]);
   const [trend, setTrend] = useState<RevenueTrend | null>(null);
   const [insights, setInsights] = useState<Insight[] | null>(null);
+  const [insightsSource, setInsightsSource] = useState('');
+  const [insightsError, setInsightsError] = useState('');
   const [session, setSession] = useState<StaffSession | null>(null);
   const [readiness, setReadiness] = useState<ExternalReadinessReport | null>(null);
   const [readinessError, setReadinessError] = useState('');
@@ -177,7 +179,16 @@ export default function ErpPage() {
     });
     fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks([]));
     fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
-    fetchInsights(session.accessToken).then((r) => setInsights(r.insights)).catch(() => setInsights([]));
+    setInsightsError('');
+    fetchInsights(session.accessToken)
+      .then((r) => { setInsights(r.insights); setInsightsSource(r.source); })
+      .catch((cause) => {
+        // `setInsights([])` превращало сбой в «сигналов нет» — это разные вещи:
+        // одно означает «сеть работает штатно», другое «мы ничего не знаем».
+        setInsights(null);
+        const detail = cause instanceof Error ? cause.message : '';
+        setInsightsError(detail ? `Не удалось получить сводку: ${detail}` : 'Не удалось получить сводку');
+      });
     fetchExternalReadiness(session.accessToken)
       .then((report) => {
         setReadiness(report);
@@ -392,7 +403,9 @@ export default function ErpPage() {
           )}
           {activeRoute === 'tasks' && <TasksView />}
           {activeRoute === 'admin' && <AdminView role={session.role} username={session.username} accessToken={session.accessToken} onNavigate={setRoute} />}
-          {activeRoute === 'ai' && <AiView insights={insights} />}
+          {activeRoute === 'ai' && (
+            <AiView insights={insights} source={insightsSource} error={insightsError} onRetry={() => setReloadToken((value) => value + 1)} />
+          )}
           {activeRoute === 'pricing' && <PricingView accessToken={session.accessToken} />}
           {activeRoute === 'reorder' && <ReorderView accessToken={session.accessToken} />}
           {activeRoute === 'finance' && <FinanceView d={d} accessToken={session.accessToken} />}
