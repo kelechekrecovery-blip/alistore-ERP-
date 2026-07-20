@@ -157,6 +157,7 @@ describe('SEC-011 sandbox payment confirm guard', () => {
   let app: INestApplication;
   const confirmSandboxIntent = jest.fn().mockResolvedValue({ idempotent: false });
   const savedFlag = process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED;
+  const savedProvider = process.env.PAYMENT_PROVIDER;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -172,12 +173,15 @@ describe('SEC-011 sandbox payment confirm guard', () => {
   afterAll(async () => {
     if (savedFlag === undefined) delete process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED;
     else process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED = savedFlag;
+    if (savedProvider === undefined) delete process.env.PAYMENT_PROVIDER;
+    else process.env.PAYMENT_PROVIDER = savedProvider;
     await app.close();
   });
 
   beforeEach(() => {
     confirmSandboxIntent.mockClear();
     delete process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED;
+    delete process.env.PAYMENT_PROVIDER;
   });
 
   it('returns 404 and never confirms while the flag is disabled', async () => {
@@ -209,5 +213,27 @@ describe('SEC-011 sandbox payment confirm guard', () => {
       .send({});
     expect(res.status).toBe(201); // Nest default for POST; the handler sends HTML via @Res
     expect(res.text).toContain('Тестовая оплата подтверждена');
+  });
+
+  it('returns JSON only for the server-bound intent and provider', async () => {
+    process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED = 'true';
+
+    await request(app.getHttpServer())
+      .post('/sandbox/payments/card/PI-SEC011/confirm-json')
+      .send({ orderId: 'attacker-order', amount: 1, status: 'succeeded' })
+      .expect(201, { idempotent: false });
+
+    expect(confirmSandboxIntent).toHaveBeenCalledWith('PI-SEC011', 'card');
+  });
+
+  it('does not enable sandbox confirmation alongside a production provider', async () => {
+    process.env.PAYMENTS_SANDBOX_CONFIRM_ENABLED = 'true';
+    process.env.PAYMENT_PROVIDER = 'production';
+
+    await request(app.getHttpServer())
+      .post('/sandbox/payments/card/PI-SEC011/confirm-json')
+      .send({})
+      .expect(404);
+    expect(confirmSandboxIntent).not.toHaveBeenCalled();
   });
 });

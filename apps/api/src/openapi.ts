@@ -7,7 +7,8 @@ const description = [
   'or money must write audit events atomically in the same transaction.',
 ].join(' ');
 
-export function setupOpenApi(app: INestApplication): void {
+export function setupOpenApi(app: INestApplication, enabled = process.env.NODE_ENV !== 'production' || process.env.API_DOCS_ENABLED === 'true'): void {
+  if (!enabled) return;
   const config = new DocumentBuilder()
     .setTitle('AliStore API')
     .setDescription(description)

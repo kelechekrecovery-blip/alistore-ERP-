@@ -157,7 +157,7 @@ export class PaymentIntentsService {
     return command.response as unknown as PaymentIntentView;
   }
 
-  async confirmSandboxIntent(intentId: string) {
+  async confirmSandboxIntent(intentId: string, expectedProvider?: string) {
     if (this.gateway.name !== 'sandbox') {
       throw new ValidationError('sandbox_payment_disabled', 'Sandbox payment отключён');
     }
@@ -166,6 +166,9 @@ export class PaymentIntentsService {
     });
     if (!command?.response) throw new ValidationError('payment_intent_not_found', 'Платёжный intent не найден');
     const intent = command.response as unknown as PaymentIntentView;
+    if (expectedProvider && intent.provider !== expectedProvider) {
+      throw new ValidationError('payment_intent_provider_mismatch', 'Провайдер платежа не совпадает с intent');
+    }
     return this.webhook({
       orderId: intent.orderId,
       method: intent.method,

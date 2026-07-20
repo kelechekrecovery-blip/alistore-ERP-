@@ -4696,3 +4696,9 @@
 - Checks: age-rating declarations, privacy-policy URLs and copyright were accepted for all four apps; required iPad Pro 12.9 screenshot sets were uploaded and processed `COMPLETE`; unified review-submission drafts were created for Client, Staff, Courier and POS.
 - Apple validation result: version items are still not eligible for submission until each app has demo account name/password, published App Privacy data-usage answers and an app price schedule. These are owner-controlled values; no fabricated credentials or declarations were entered.
 - Next: owner confirms free pricing, completes App Privacy answers, provides protected review accounts and review contact details; then add four version items and set each review submission `submitted=true`.
+- `SEC-AUDIT-054` - 2026-07-20
+  - Scope: close confirmed P0 payment/OTP/API exposure from the external audit.
+  - Changes: direct sandbox/provider webhook is now guarded and fails closed unless sandbox confirmation is explicitly enabled with a sandbox provider; checkout confirms only a server-created payment intent through a provider-bound JSON route; production OTP echo is hard-disabled even if the environment flag is accidentally true; Swagger is disabled in production unless `API_DOCS_ENABLED=true` is explicitly set.
+  - Checks: `npm run api:build`; targeted API security suites `13/13`; `git diff --check`.
+  - Result: local security slice accepted. Live deployment and production configuration still require external staging verification.
+  - Next: run the full MVP/Web gate, then audit trust/legal/catalog claims with owner-provided data.

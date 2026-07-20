@@ -21,7 +21,7 @@ async function bootstrap(): Promise<void> {
   );
   app.enableCors(resolveCorsOptions(env));
   app.use(helmet(resolveHelmetOptions(env)));
-  setupOpenApi(app);
+  setupOpenApi(app, process.env.NODE_ENV !== 'production' || process.env.API_DOCS_ENABLED === 'true');
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
   // eslint-disable-next-line no-console

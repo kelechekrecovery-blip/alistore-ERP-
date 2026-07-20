@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
 import request from 'supertest';
 import { CustomersController } from '../src/customers/customers.controller';
 import { CustomersService } from '../src/customers/customers.service';
@@ -17,15 +18,15 @@ import { AuthzService } from '../src/authz/authz.service';
 import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
 
 /**
- * Abuse guardrails for public write endpoints: checkout path, support tickets,
- * and provider webhooks must degrade with 429 instead of unlimited writes.
+ * Abuse guardrails for public write endpoints: checkout path and support tickets
+ * are rate-limited; provider webhooks must reject arbitrary public writes.
  */
 describe('public endpoint rate limits', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [RateLimitModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true }), RateLimitModule],
       controllers: [CustomersController, OrdersController, PaymentsController, SupportController],
       providers: [
         { provide: CustomersService, useValue: { upsert: async () => ({ id: 'customer-1' }) } },
@@ -86,12 +87,10 @@ describe('public endpoint rate limits', () => {
     );
   });
 
-  it('rate-limits sandbox/provider payment webhooks', async () => {
-    await exhaust(
-      '/payments/webhooks/sandbox',
-      { orderId: 'order-1', method: 'card', amount: 1000, txnId: 'txn-1', status: 'succeeded' },
-      60,
-      200,
-    );
+  it('does not accept direct sandbox/provider payment webhooks by default', async () => {
+    await request(app.getHttpServer())
+      .post('/payments/webhooks/sandbox')
+      .send({ orderId: 'order-1', method: 'card', amount: 1000, txnId: 'txn-1', status: 'succeeded' })
+      .expect(404);
   });
 });

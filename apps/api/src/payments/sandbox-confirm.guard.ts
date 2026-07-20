@@ -11,7 +11,9 @@ export class SandboxConfirmGuard implements CanActivate {
   constructor(private readonly config: ConfigService) {}
 
   canActivate(): boolean {
-    if (this.config.get<string>('PAYMENTS_SANDBOX_CONFIRM_ENABLED') === 'true') return true;
+    const provider = this.config.get<string>('PAYMENT_PROVIDER')?.trim().toLowerCase();
+    const sandboxProvider = !provider || provider === 'sandbox';
+    if (sandboxProvider && this.config.get<string>('PAYMENTS_SANDBOX_CONFIRM_ENABLED') === 'true') return true;
     throw new NotFoundException('Sandbox confirm отключён');
   }
 }

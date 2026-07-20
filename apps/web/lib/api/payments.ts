@@ -79,12 +79,13 @@ export function createMyPaymentIntent(input: {
 }
 
 export function confirmSandboxPayment(input: {
-  orderId: string;
-  method: OnlinePaymentMethod;
-  amount: number;
-  txnId: string;
+  provider: PaymentIntent['provider'];
+  intentId: string;
 }): Promise<PaymentConfirmResult> {
-  return postJson('/payments/webhooks/sandbox', { ...input, status: 'succeeded', actor: 'sandbox' });
+  return postJson(
+    `/sandbox/payments/${encodeURIComponent(input.provider)}/${encodeURIComponent(input.intentId)}/confirm-json`,
+    {},
+  );
 }
 
 export function payOrder(input: {

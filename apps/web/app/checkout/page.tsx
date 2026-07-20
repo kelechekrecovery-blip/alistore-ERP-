@@ -296,10 +296,8 @@ export default function CheckoutPage() {
     setBusy(true); setError(null);
     try {
       const res = await confirmSandboxPayment({
-        orderId: done.intent.orderId,
-        method: done.intent.method,
-        amount: done.intent.amount,
-        txnId: done.intent.txnId,
+        provider: done.intent.provider,
+        intentId: done.intent.intentId,
       });
       setDone({ ...done, order: { ...done.order, status: res.order?.status ?? 'paid' }, paid: true });
       clear();

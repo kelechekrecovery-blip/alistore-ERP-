@@ -34,6 +34,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
+import { SandboxConfirmGuard } from './sandbox-confirm.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -136,7 +137,7 @@ export class PaymentsController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
   @Post('webhooks/sandbox')
   @HttpCode(200)
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(SandboxConfirmGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   webhook(
     @Req() request: { rawBody?: Buffer; headers: Record<string, string | string[] | undefined> },

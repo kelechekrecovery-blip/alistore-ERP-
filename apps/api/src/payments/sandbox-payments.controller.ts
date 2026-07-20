@@ -39,6 +39,16 @@ export class SandboxPaymentsController {
     if (returnUrl) return response.redirect(303, returnUrl);
     return response.type('html').send('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Оплачено</title><body><h1>Тестовая оплата подтверждена</h1><p>Вернитесь в AliStore.</p></body></html>');
   }
+
+  @Post(':provider/:intentId/confirm-json')
+  @UseGuards(SandboxConfirmGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  confirmJson(
+    @Param('provider') provider: string,
+    @Param('intentId') intentId: string,
+  ) {
+    return this.intents.confirmSandboxIntent(intentId, provider);
+  }
 }
 
 function safeReturnUrl(value: string | undefined): string | null {

@@ -79,7 +79,9 @@ export class AuthService {
       await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
       throw error;
     }
-    const echo = this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true';
+    // A bad production env must never turn OTP into an account-takeover API.
+    const echo = this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
+      && this.config.get<string>('NODE_ENV') !== 'production';
     return echo
       ? { challengeId: challenge.id, devCode: code }
       : { challengeId: challenge.id };
