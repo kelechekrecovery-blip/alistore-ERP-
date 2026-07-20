@@ -115,12 +115,22 @@ function testDatabaseOverride(runtimeEnv) {
   if (runtimeEnv.ALISTORE_TEST_DATABASE_CONFIRMED !== '1') {
     throw new Error('Set ALISTORE_TEST_DATABASE_CONFIRMED=1 to confirm the destructive test database reset');
   }
+  // Each isolated Jest process owns one suite, but Prisma's default pool can
+  // still reserve many idle connections. Keep the destructive verification
+  // gate bounded and prevent a developer's long-running API from starving it.
+  const boundedTestUrl = withConnectionLimit(testUrl, 5);
   return {
-    DATABASE_URL: testUrl,
-    TEST_DATABASE_URL: testUrl,
-    E2E_DATABASE_URL: testUrl,
+    DATABASE_URL: boundedTestUrl,
+    TEST_DATABASE_URL: boundedTestUrl,
+    E2E_DATABASE_URL: boundedTestUrl,
     ALISTORE_TEST_DATABASE_CONFIRMED: runtimeEnv.ALISTORE_TEST_DATABASE_CONFIRMED,
   };
+}
+
+function withConnectionLimit(value, limit) {
+  const url = new URL(value);
+  url.searchParams.set('connection_limit', String(limit));
+  return url.toString();
 }
 
 function normalizedDatabase(value) {

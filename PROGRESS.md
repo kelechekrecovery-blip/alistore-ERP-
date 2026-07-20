@@ -4702,3 +4702,9 @@
   - Checks: `npm run api:build`; targeted API security suites `13/13`; `git diff --check`.
   - Result: local security slice accepted. Live deployment and production configuration still require external staging verification.
   - Next: run the full MVP/Web gate, then audit trust/legal/catalog claims with owner-provided data.
+- `VERIFY-055` - 2026-07-20
+  - Scope: make the destructive MVP verification gate resilient to long-running local API processes.
+  - Finding: the gate reached API Jest but the host PostgreSQL was at its 100-connection ceiling because an existing `ts-node` API held about 50 connections and other local runtimes held the remainder; the first suite failed with Prisma `P2037`, not a product assertion.
+  - Change: `scripts/mvp-verify.mjs` now applies `connection_limit=5` to the isolated test database URL passed to migrations, API suites and Playwright.
+  - Checks: `node --check scripts/mvp-verify.mjs`; `git diff --check`. Full rerun remains pending a free PostgreSQL pool; no product readiness claim made.
+  - Next: rerun `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` with the long-running local API stopped or isolated from the test database.

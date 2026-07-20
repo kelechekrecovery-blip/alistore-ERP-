@@ -2,6 +2,7 @@
 
 ## Confirmed Audit P0
 - `SEC-AUDIT-054` Accepted locally: direct sandbox webhook no longer accepts arbitrary client payment payloads; web checkout is server-intent-bound; production OTP echo and production Swagger default are fail-closed. Remaining: staging-origin verification, live provider certification, legal/content review, and commercial catalog validation.
+- `VERIFY-055` Runner hardening added: `mvp:verify` bounds isolated test pools to five PostgreSQL connections so local API runtimes cannot starve the verification gate. A clean rerun still requires a free test database/pool.
 
 ## iOS Store Release
 - `IOS-STORE-052` Upload gate accepted: all four AliStore iOS build `1.0.0 (2)` artifacts are `VALID` and attached in App Store Connect; localizations, review-detail records and complete screenshot sets are populated. App Review submission remains blocked on owner-provided protected demo accounts/contact details and durable public `ali.kg` review URLs.
