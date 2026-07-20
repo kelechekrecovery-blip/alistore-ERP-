@@ -4931,3 +4931,18 @@
 - Checks: POS/refund `1/1`; courier/COD `1/1`; service/loaner API `9/9` plus UI `3/3`; procurement/sale API `10/10` plus UI `1/1`; composite reconciled ecosystem matrix `4/4`.
 - Result: generated artifacts and `docs/acceptance/ecosystem-evidence.json` are hash-bound to the current source tree. This closes stale-evidence blockers for the four reconciliation verticals, but does not close visual/native UI, clean-source, missing-handoff, staging, provider, device, legal or store gates.
 - Next: refresh visual and app-specific native evidence from the same committed source boundary, then rerun strict audit without touching unrelated `apps/web/tsconfig.json`.
+
+## NATIVE-UI-072
+
+- Date: 2026-07-20
+- Scope: refresh native UI acceptance evidence from the clean current source boundary.
+- Checks: iOS `npm run ios:ui` passed all Client, Staff, Courier and POS UI suites; Android
+  `npm run android:ui` passed core `30/30` plus Client/Staff/Courier/POS connected tests with
+  `BUILD SUCCESSFUL` on the `savio_api36_arm64` emulator.
+- Evidence: `docs/acceptance/artifacts/ios-app-ui-9c9e73af4e82fe5f4193a1aae533be0f5f2904214083aa74b67b399e2ce2582f.json`;
+  `docs/acceptance/artifacts/android-app-ui-52dbe2f94d911366d17960235d915ba8d9afeabdfd63f32b4117f718043d8fd4.json`.
+- Result: native UI software gates are green for the committed source boundary. This does not
+  certify physical devices, live providers, store review or production readiness; main-tree
+  strict acceptance remains blocked by the unrelated dirty `apps/web/tsconfig.json` change.
+- Next: rerun strict audit, then resolve the source-tree boundary with the owner of the parallel
+  change before accepting the final evidence on the main worktree.
