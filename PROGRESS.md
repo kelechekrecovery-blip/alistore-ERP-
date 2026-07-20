@@ -4807,3 +4807,17 @@
   `scripts/legacy-expo-retired.mjs`; these were not altered or committed.
 - Next: rerun the exact full gate only after the competing test API process is no longer active,
   then regenerate strict audit evidence from the same clean source boundary.
+
+## MVP-VERIFY-062
+
+- Date: 2026-07-20
+- Scope: rerun the component ecosystem gate with the explicit destructive-test confirmation.
+- Result: schema/migration checks, API build, Web build and the API sequence passed through
+  batch 54. Batch 55 (`finance-expenses.e2e-spec.ts`) reported one 400 response in the
+  period-budget report after concurrent database resets; the same suite was immediately
+  reset and rerun in isolation and passed `17/17`.
+- Classification: reproducible only under the shared test-process/database contention already
+  documented; no domain assertion failure reproduced in isolation. The exact component gate
+  remains unaccepted because its process exited nonzero.
+- Next: rerun the exact component gate in an isolated process/database boundary, then record
+  the final exit code before refreshing strict evidence.
