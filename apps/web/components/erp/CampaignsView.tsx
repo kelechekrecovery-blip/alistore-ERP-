@@ -16,6 +16,7 @@ import {
   type SegmentRules,
 } from '@/lib/api/campaigns';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { ImageField } from './ImageField';
 
 const CHANNELS = ['sms', 'push', 'telegram', 'whatsapp'] as const;
 const FIELD_CLASS = 'w-full rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none transition placeholder:text-faint focus:border-coral focus:ring-2 focus:ring-coral/20';
@@ -211,9 +212,13 @@ export function CampaignsView() {
               className={`${FIELD_CLASS} min-h-24 resize-none`}
             />
           </Field>
-          <Field label="Медиа (HTTPS, необязательно)">
-            <input value={form.assetUrl} onChange={(e) => setFormValue(setForm, 'assetUrl', e.target.value)} className={FIELD_CLASS} placeholder="https://media.ali.kg/campaign.jpg" />
-          </Field>
+          <ImageField
+            label="Медиа (необязательно)"
+            value={form.assetUrl}
+            onChange={(assetUrl) => setFormValue(setForm, 'assetUrl', assetUrl)}
+            accessToken={session.accessToken}
+            hint="креатив кампании"
+          />
           <Field label="Куда ведёт кампания">
             <input value={form.destinationUrl} onChange={(e) => setFormValue(setForm, 'destinationUrl', e.target.value)} className={FIELD_CLASS} placeholder="/catalog" />
           </Field>

@@ -17,6 +17,7 @@ import {
   type StorefrontBlockDevice,
   type StorefrontBlockType,
 } from '@/lib/api';
+import { ImageField } from './ImageField';
 
 const FIELD = 'w-full rounded-[8px] border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral';
 
@@ -98,14 +99,14 @@ export function StorefrontBlocksView({ accessToken }: { accessToken: string }) {
   return <div className="grid gap-4 xl:grid-cols-[.85fr_1.15fr]">
     <section className="rounded-[8px] border border-surface-3 bg-surface p-5">
       <div className="flex items-center gap-2"><Plus size={17} className="text-lime" /><h2 className="font-bold">{editingId ? 'Редактирование блока' : 'Новый блок витрины'}</h2></div>
-      <p className="mt-1 text-xs text-subtle">Черновик не виден клиентам. Изображения принимаются только по HTTPS.</p>
+      <p className="mt-1 text-xs text-subtle">Черновик не виден клиентам. Изображение можно загрузить файлом или вставить ссылкой.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <Field label="Тип"><select className={FIELD} value={form.type} onChange={(event) => { setForm({ ...form, type: event.target.value as StorefrontBlockType }); setSelected([]); }}><option value="hero">Главный баннер</option><option value="promo">Промо-блок</option><option value="info">Инфо-блок</option><option value="collection">Подборка</option></select></Field>
         <Field label="Устройства"><select className={FIELD} value={form.device} onChange={(event) => setForm({ ...form, device: event.target.value as StorefrontBlockDevice })}><option value="all">Все</option><option value="desktop">Только desktop</option><option value="mobile">Только mobile</option></select></Field>
         <Field label="Заголовок"><input className={FIELD} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
         <Field label="Метка"><input className={FIELD} value={form.eyebrow} onChange={(event) => setForm({ ...form, eyebrow: event.target.value })} /></Field>
         <Field label="Описание"><textarea className={`${FIELD} min-h-20`} value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} /></Field>
-        <Field label="HTTPS изображение"><input className={FIELD} value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} placeholder="https://media..." /></Field>
+        <ImageField label="Изображение" value={form.imageUrl} onChange={(imageUrl) => setForm({ ...form, imageUrl })} accessToken={accessToken} hint="баннер витрины" />
         <Field label="Текст кнопки"><input className={FIELD} value={form.ctaLabel} onChange={(event) => setForm({ ...form, ctaLabel: event.target.value })} /></Field>
         <Field label="Ссылка"><input className={FIELD} value={form.ctaHref} onChange={(event) => setForm({ ...form, ctaHref: event.target.value })} /></Field>
         <Field label="Оформление"><select className={FIELD} value={form.tone} onChange={(event) => setForm({ ...form, tone: event.target.value as typeof form.tone })}><option value="dark">Тёмное</option><option value="coral">Коралловое</option><option value="light">Светлое</option><option value="lime">Лаймовое</option></select></Field>

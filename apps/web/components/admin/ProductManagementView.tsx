@@ -238,6 +238,7 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
         selected={selected}
         form={form}
         busy={busy}
+        accessToken={accessToken}
         onUpdateForm={updateForm}
         onSave={() => void saveProduct()}
         onStartCreate={startCreate}

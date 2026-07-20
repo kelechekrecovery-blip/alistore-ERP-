@@ -9,11 +9,40 @@ import {
   type ProductForm,
 } from '@/lib/admin-product-form';
 import type { AdminProduct } from '@/lib/api';
+import { ImageField } from '@/components/erp/ImageField';
+
+/**
+ * Read the main photo out of the raw attrs JSON the operator is editing.
+ * Returns '' when the text is not valid JSON yet — the field then degrades to
+ * read-only rather than fighting a half-typed document.
+ */
+function readAttrsImage(attrsText: string): { url: string; parsable: boolean } {
+  try {
+    const parsed = JSON.parse(attrsText || '{}') as Record<string, unknown>;
+    const value = parsed.imageUrl ?? parsed.image;
+    return { url: typeof value === 'string' ? value : '', parsable: true };
+  } catch {
+    return { url: '', parsable: false };
+  }
+}
+
+/** Write the main photo back, preserving key order and every other attribute. */
+function writeAttrsImage(attrsText: string, url: string): string | null {
+  try {
+    const parsed = JSON.parse(attrsText || '{}') as Record<string, unknown>;
+    if (url) parsed.imageUrl = url;
+    else delete parsed.imageUrl;
+    return `${JSON.stringify(parsed, null, 2)}\n`;
+  } catch {
+    return null;
+  }
+}
 
 interface ProductEditorProps {
   selected: AdminProduct | null;
   form: ProductForm;
   busy: string;
+  accessToken: string;
   onUpdateForm: (patch: Partial<ProductForm>) => void;
   onSave: () => void;
   onStartCreate: () => void;
@@ -38,6 +67,7 @@ export function ProductEditor({
   selected,
   form,
   busy,
+  accessToken,
   onUpdateForm,
   onSave,
   onStartCreate,
@@ -52,6 +82,7 @@ export function ProductEditor({
   onArchiveReasonChange,
   onRequestArchive,
 }: ProductEditorProps) {
+  const attrsImage = readAttrsImage(form.attrsText);
   return (
     <section className="min-h-0 overflow-y-auto px-4 py-5 md:px-6">
       <div className="mx-auto grid max-w-[1120px] gap-4 xl:grid-cols-[1fr_340px]">
@@ -213,7 +244,29 @@ export function ProductEditor({
               <p className="mt-1.5 text-xs text-faint">Пусто для обычного товара. Вложенные наборы запрещены.</p>
             </div>
             <div className="md:col-span-2">
-              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              {/*
+                The photo lives in attrs.imageUrl. It used to be reachable only by
+                hand-editing the JSON below, where a typo silently drops the image
+                from the storefront — so it gets a real field that reads and writes
+                that key while leaving every other attribute untouched.
+              */}
+              {attrsImage.parsable ? (
+                <ImageField
+                  label="Фото товара"
+                  value={attrsImage.url}
+                  onChange={(url) => {
+                    const next = writeAttrsImage(form.attrsText, url);
+                    if (next !== null) onUpdateForm({ attrsText: next });
+                  }}
+                  accessToken={accessToken}
+                  hint="attrs.imageUrl"
+                />
+              ) : (
+                <p className="mb-1.5 text-xs text-warn">
+                  Фото товара редактируется полем, но сейчас Attrs JSON ниже невалиден — исправьте его.
+                </p>
+              )}
+              <div className="mb-1.5 mt-3 flex flex-wrap items-center gap-2">
                 <label htmlFor="product-attrs" className={`${labelCls} mb-0`}>Attrs JSON</label>
                 <button
                   type="button"
