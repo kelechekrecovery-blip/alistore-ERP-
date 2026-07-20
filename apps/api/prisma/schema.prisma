@@ -28,6 +28,11 @@ enum Role {
   marketer
   admin
   owner
+  // Retired 2026-07-20 by owner decision: the role had no UI, no tests and no
+  // per-point data isolation, so `store_operations:read` exposed the whole
+  // network. All grants are removed and it is no longer offered when creating an
+  // account. The enum value stays because Postgres cannot drop one in place —
+  // dropping it needs a type recreation, and no row has ever used it.
   franchise
 }
 

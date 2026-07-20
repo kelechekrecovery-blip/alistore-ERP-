@@ -56,7 +56,6 @@ export const STAFF_ROLES = [
   'marketer',
   'admin',
   'owner',
-  'franchise',
 ] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 

@@ -14,7 +14,7 @@ const GRANTS: Record<string, readonly string[]> = {
   'finance:read': ['admin', 'owner'],
   'hr:read': ['admin', 'owner'],
   'logistics:read': ['admin', 'owner'],
-  'store_operations:read': ['seller', 'cashier', 'senior_seller', 'franchise', 'warehouse', 'service', 'courier', 'admin', 'owner'],
+  'store_operations:read': ['seller', 'cashier', 'senior_seller', 'warehouse', 'service', 'courier', 'admin', 'owner'],
   'service_center:read': ['service', 'technician', 'admin', 'owner'],
   'support:read': ['admin', 'owner'],
   'ai:read': ['admin', 'owner'],
@@ -25,10 +25,10 @@ const GRANTS: Record<string, readonly string[]> = {
   'procurement:read': ['warehouse', 'admin', 'owner'],
   'b2b:read': ['seller', 'senior_seller', 'admin', 'owner'],
   'protection:read': ['seller', 'senior_seller', 'admin', 'owner'],
-  'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
+  'tradeins:intake': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'staff:manage': ['owner'],
-  'debts:read': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
-  'debts:create': ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'],
+  'debts:read': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
+  'debts:create': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'debts:pay': ['cashier', 'senior_seller', 'admin', 'owner'],
   'giftcards:issue': ['cashier', 'senior_seller', 'admin', 'owner'],
   'refunds:read': ['admin', 'owner'],
@@ -36,7 +36,7 @@ const GRANTS: Record<string, readonly string[]> = {
   'refunds:manage': ['admin', 'owner'],
   'documents:read': ['seller', 'cashier', 'warehouse', 'admin', 'owner'],
   'labels:print': ['seller', 'cashier', 'warehouse', 'admin', 'owner'],
-  'receipts:print': ['seller', 'cashier', 'senior_seller', 'franchise', 'admin', 'owner'],
+  'receipts:print': ['seller', 'cashier', 'senior_seller', 'admin', 'owner'],
 };
 
 /** `g, child, parent` policy edges: a role also holds every grant of its parent. */

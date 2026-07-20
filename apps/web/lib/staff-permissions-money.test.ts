@@ -15,8 +15,8 @@ import {
  * cannot complete lands staff on a 403, hiding one it holds blocks a legal sale.
  */
 describe('staff-permissions · debts grants (mirror of RBAC policy)', () => {
-  it('debts:create — cashier, seller, senior_seller, franchise, admin, owner', () => {
-    for (const role of ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner']) {
+  it('debts:create — cashier, seller, senior_seller, admin, owner', () => {
+    for (const role of ['cashier', 'seller', 'senior_seller', 'admin', 'owner']) {
       expect(canCreateDebt(role)).toBe(true);
     }
     for (const role of ['warehouse', 'courier', 'service', 'technician', 'marketer']) {
@@ -25,7 +25,7 @@ describe('staff-permissions · debts grants (mirror of RBAC policy)', () => {
   });
 
   it('debts:read — same set as create', () => {
-    for (const role of ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner']) {
+    for (const role of ['cashier', 'seller', 'senior_seller', 'admin', 'owner']) {
       expect(canReadDebts(role)).toBe(true);
     }
     for (const role of ['warehouse', 'courier', 'service']) {

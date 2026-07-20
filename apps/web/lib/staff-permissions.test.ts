@@ -54,8 +54,8 @@ describe('staffCan (casbin mirror)', () => {
     // labels:print — seller/cashier/warehouse/admin/owner
     expect(staffCan('warehouse', 'labels', 'print')).toBe(true);
     expect(staffCan('franchise', 'labels', 'print')).toBe(false);
-    // receipts:print — seller/cashier/senior_seller/franchise/admin/owner, NOT warehouse
-    for (const role of ['seller', 'cashier', 'senior_seller', 'franchise', 'admin', 'owner']) {
+    // receipts:print — seller/cashier/senior_seller/admin/owner, NOT warehouse
+    for (const role of ['seller', 'cashier', 'senior_seller', 'admin', 'owner']) {
       expect(staffCan(role, 'receipts', 'print')).toBe(true);
     }
     for (const role of ['warehouse', 'service', 'courier', 'marketer', 'technician']) {
@@ -146,7 +146,6 @@ describe('staffTabAllowed (/staff tabs, WEB-005 regression)', () => {
 
   it('buyback follows tradeins:intake and b2b follows b2b:read', () => {
     expect(staffTabAllowed('cashier', 'buyback')).toBe(true);
-    expect(staffTabAllowed('franchise', 'buyback')).toBe(true);
     expect(staffTabAllowed('warehouse', 'buyback')).toBe(false);
     expect(staffTabAllowed('courier', 'buyback')).toBe(false);
     expect(staffTabAllowed('seller', 'b2b')).toBe(true);
@@ -157,9 +156,18 @@ describe('staffTabAllowed (/staff tabs, WEB-005 regression)', () => {
 });
 
 describe('STAFF_ROLES (create-account form options)', () => {
-  it('mirrors the Prisma Role enum', () => {
+  it('lists every assignable role', () => {
     expect([...STAFF_ROLES].sort()).toEqual(
-      ['admin', 'cashier', 'courier', 'franchise', 'marketer', 'owner', 'seller', 'senior_seller', 'service', 'technician', 'warehouse'].sort(),
+      ['admin', 'cashier', 'courier', 'marketer', 'owner', 'seller', 'senior_seller', 'service', 'technician', 'warehouse'].sort(),
     );
+  });
+
+  // `franchise` stays in the Prisma enum (Postgres cannot drop an enum value in
+  // place) but is retired: no grants, not offered when creating an account.
+  it('does not offer the retired franchise role', () => {
+    expect([...STAFF_ROLES]).not.toContain('franchise');
+    expect(staffCan('franchise', 'store_operations', 'read')).toBe(false);
+    expect(staffCan('franchise', 'receipts', 'print')).toBe(false);
+    expect(staffCan('franchise', 'debts', 'create')).toBe(false);
   });
 });

@@ -17,7 +17,6 @@ export const Role = {
   marketer: 'marketer',
   admin: 'admin',
   owner: 'owner',
-  franchise: 'franchise',
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
@@ -56,7 +55,6 @@ export const ROLE_DISCOUNT_LIMIT_PCT: Record<Role, number> = {
   marketer: 0,
   admin: 100,
   owner: 100,
-  franchise: 20,
 };
 
 /** May this role approve this action? */
