@@ -4881,3 +4881,14 @@
   `apps/api/test/media-payments-rbac.e2e-spec.ts` `5/5`.
 - Result: a clean generated Prisma Client is now part of the API build contract; media upload
   transformation and upload/payments RBAC remain green.
+
+## NATIVE-EVIDENCE-067
+
+- Date: 2026-07-20
+- Scope: refresh trusted iOS packaged UI acceptance evidence without changing concurrent API/ERP work.
+- Checks: trusted recorder ran `npm run ios:ui` in a clean clone; Client `23/23`, Staff `10/10`,
+  Courier `3/3` and POS `4/4` XCUITest cases passed on the iPhone 17 Pro Max simulator.
+- Evidence: accepted manifest and artifact
+  `docs/acceptance/artifacts/ios-app-ui-f01b047cf51c56d48971407597cb425b754793a5717aa795435aaa9198620021.json`.
+- Result: iOS simulator software evidence is refreshed and hash-bound. Physical-device Face ID,
+  push, camera, maps, offline behavior and store certification remain open.
