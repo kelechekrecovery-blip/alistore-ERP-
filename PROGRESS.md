@@ -4902,3 +4902,13 @@
   Ledger recording are green. Concurrent Web settings client changes remain outside this commit.
 - Next: resolve the trusted npm toolchain lock mismatch and rerun the strict ecosystem audit on
   one clean source boundary.
+
+## RECONCILIATION-069
+
+- Date: 2026-07-20
+- Scope: refresh the POS/refund reconciliation evidence on the clean current HEAD.
+- Checks: trusted `npm run ecosystem:pos-refund:e2e`; Chromium passed `1/1` for POS sale,
+  customer return, approved refund, quarantine and exact reconciliation.
+- Evidence: `docs/acceptance/artifacts/pos-refund-reconciliation-9152f7f1501a755c71cf2d82a867ad964d3c87191d81daa9754a4580e5b54dc4.json`, source commit `40455f4`.
+- Result: POS/refund software evidence is refreshed. Courier/COD, service/loaner, procurement/sale,
+  composite E2E and clean-source acceptance remain open.
