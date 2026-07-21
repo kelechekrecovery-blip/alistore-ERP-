@@ -47,8 +47,19 @@ public struct PINAttemptStatus: Sendable, Equatable {
     }
 }
 
+/// Хранилище секрета быстрого входа. В бою это Keychain (`SecureTokenStore`),
+/// в тестах — реализация в памяти: `AliStoreCoreTests` собирается без подписи,
+/// а неподписанному бандлу Keychain отвечает `errSecMissingEntitlement`.
+public protocol QuickUnlockStorage: Sendable {
+    func save(_ value: String, account: String) throws
+    func read(account: String) throws -> String?
+    func clear(account: String) throws
+}
+
+extension SecureTokenStore: QuickUnlockStorage {}
+
 public struct LocalPINStore: Sendable {
-    private let tokens: SecureTokenStore
+    private let tokens: any QuickUnlockStorage
     private static let maximumFailures = 5
     private static let lockoutMillis: Int64 = 30_000
     private static let pinAccount = "quick-unlock-pin"
@@ -56,6 +67,10 @@ public struct LocalPINStore: Sendable {
 
     public init(service: String) {
         self.tokens = SecureTokenStore(service: service)
+    }
+
+    public init(storage: any QuickUnlockStorage) {
+        self.tokens = storage
     }
 
     public var isConfigured: Bool {
@@ -77,7 +92,32 @@ public struct LocalPINStore: Sendable {
         )
     }
 
-    public func save(pin: String) throws {
+    /// Первичная установка PIN. Отказывает, если секрет уже есть: единственный
+    /// законный способ заменить существующий — `changePIN(current:new:)`.
+    ///
+    /// Раньше здесь был `save(pin:)` без единой проверки, и он же вызывался с
+    /// locked-экрана. Человек, взявший разблокированный телефон, ставил свой PIN
+    /// и попутно обнулял счётчик попыток. Проверка сделана на уровне API, а не
+    /// пряталкой кнопки: спрятанную кнопку вернёт первый же рефакторинг вью.
+    public func setInitialPIN(_ pin: String) throws {
+        guard !isConfigured else { throw QuickUnlockError.alreadyConfigured }
+        try writePIN(pin)
+    }
+
+    /// Замена PIN с доказательством знания текущего.
+    ///
+    /// Промах считается наравне с неудачным входом и упирается в тот же лок-аут —
+    /// иначе смена PIN была бы безлимитным оракулом для подбора шестизначного кода.
+    public func changePIN(current: String, new: String) throws {
+        guard attemptStatus.allowed else { throw QuickUnlockError.locked }
+        guard matches(pin: current) else {
+            registerFailure()
+            throw QuickUnlockError.wrongPIN
+        }
+        try writePIN(new)
+    }
+
+    private func writePIN(_ pin: String) throws {
         guard pin.count == 6, pin.allSatisfy(\.isNumber) else { throw QuickUnlockError.invalidPIN }
         let salt = UUID().uuidString
         let digest = SHA256.hash(data: Data((salt + pin).utf8)).map { String(format: "%02x", $0) }.joined()
@@ -118,11 +158,19 @@ public struct LocalPINStore: Sendable {
     private static var nowMillis: Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
 }
 
-public enum QuickUnlockError: LocalizedError, Sendable {
+public enum QuickUnlockError: LocalizedError, Sendable, Equatable {
     case invalidPIN
+    case wrongPIN
+    case alreadyConfigured
+    case locked
 
     public var errorDescription: String? {
-        switch self { case .invalidPIN: "PIN должен состоять из 6 цифр" }
+        switch self {
+        case .invalidPIN: "PIN должен состоять из 6 цифр"
+        case .wrongPIN: "Неверный текущий PIN"
+        case .alreadyConfigured: "PIN уже задан. Смените его, введя текущий"
+        case .locked: "Слишком много попыток. Подождите и повторите"
+        }
     }
 }
 
@@ -138,6 +186,8 @@ public struct QuickUnlockView: View {
     @State private var biometricAvailable = false
     @State private var showingSetup = false
     @State private var setupPin = ""
+    /// Текущий PIN — требуется только при замене уже заданного.
+    @State private var currentPin = ""
     @State private var confirmPin = ""
     private static let lime = Design3.lime
     private static let card = Color.white.opacity(0.07)
@@ -291,6 +341,18 @@ public struct QuickUnlockView: View {
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.62))
                     VStack(spacing: 12) {
+                        if pinStore.isConfigured {
+                            SecureField("Текущий PIN", text: $currentPin)
+                                .keyboardType(.numberPad)
+                                .textContentType(.oneTimeCode)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .frame(height: 50)
+                                .background(Self.field, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Self.line))
+                                .onChange(of: currentPin) { _, newValue in currentPin = Self.normalizedPIN(newValue) }
+                                .accessibilityIdentifier("quick-unlock-current-pin")
+                        }
                         SecureField("Новый PIN", text: $setupPin)
                             .keyboardType(.numberPad)
                             .textContentType(.oneTimeCode)
@@ -313,7 +375,14 @@ public struct QuickUnlockView: View {
                     Button {
                         guard setupPin == confirmPin else { message = "PIN-коды не совпадают"; return }
                         do {
-                            try pinStore.save(pin: setupPin)
+                            // Замена существующего PIN требует знания текущего —
+                            // иначе экран блокировки сам себя и обходит.
+                            if pinStore.isConfigured {
+                                try pinStore.changePIN(current: currentPin, new: setupPin)
+                            } else {
+                                try pinStore.setInitialPIN(setupPin)
+                            }
+                            currentPin = ""
                             pinStatus = pinStore.attemptStatus
                             setupPin = ""
                             confirmPin = ""
