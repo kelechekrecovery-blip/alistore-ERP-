@@ -1,4 +1,5 @@
 import { PaymentGatewayProvider } from './payment-gateway-provider';
+import { NonePaymentGatewayProvider } from './none-payment-gateway.provider';
 import { ProductionPaymentGatewayProvider } from './production-payment-gateway.provider';
 import { SandboxPaymentGatewayProvider } from './sandbox-payment-gateway.provider';
 
@@ -9,6 +10,10 @@ export function selectPaymentGatewayProvider(env: PaymentEnvReader): PaymentGate
   if (!mode || mode === 'sandbox') {
     return new SandboxPaymentGatewayProvider();
   }
+  // Явный отказ от онлайн-оплаты: магазин продаёт за наличные при получении и
+  // не нуждается в шлюзе. Ветка стоит до проверки на 'production', потому что
+  // это законное состояние, а не неизвестное значение.
+  if (mode === 'none') return new NonePaymentGatewayProvider();
   if (mode !== 'production') {
     throw new Error(`Unsupported PAYMENT_PROVIDER: ${mode}`);
   }

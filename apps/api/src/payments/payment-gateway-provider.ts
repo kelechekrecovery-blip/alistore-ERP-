@@ -70,7 +70,7 @@ export interface GatewayRefundWebhookRequest {
 }
 
 export interface PaymentGatewayProvider {
-  readonly name: 'sandbox' | 'production';
+  readonly name: 'sandbox' | 'production' | 'none';
   assertOperational(): void;
   createIntent(input: GatewayCreateIntentInput): Promise<PaymentIntentView>;
   verifyWebhook(input: GatewayWebhookRequest): Promise<GatewayWebhookPayload>;

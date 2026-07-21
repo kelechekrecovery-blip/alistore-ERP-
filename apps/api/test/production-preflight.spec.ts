@@ -84,6 +84,48 @@ describe('Production preflight report', () => {
     expect(report.checks.find((check) => check.id === 'refund_relay')?.status).toBe('unsafe');
   });
 
+  /**
+   * Магазин за наличные — законное боевое состояние, а не полумера.
+   *
+   * До этого кейса `refund_relay` считался пройденным только при
+   * demo+sandbox+uncertified, а значит выключение демо-режима не запускало
+   * магазин, а роняло старт: `assertProductionRuntimeReady` бросает на любой
+   * непройденной проверке. Продавать за наличные можно без платёжного шлюза, и
+   * преflight обязан это допускать.
+   */
+  it('признаёт боевой режим с оплатой только при получении', () => {
+    const base = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://alistore.internal:5432/alistore',
+      CORS_ORIGINS: 'https://ali.kg',
+      ALLOWED_HOSTS: 'api.ali.kg',
+      JWT_SECRET: '0123456789abcdef0123456789abcdef',
+      AUTH_OTP_DEV_ECHO: 'false',
+      RESERVATION_SWEEP_ENABLED: 'true',
+      OUTBOX_RELAY_ENABLED: 'true',
+      SMS_PROVIDER: 'disabled',
+      PUBLIC_DEMO_MODE: 'false',
+      PAYMENT_PROVIDER: 'none',
+      PAYMENT_PROVIDER_CERTIFIED: 'false',
+      JOB_BACKEND: 'bullmq',
+      REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
+      PROCESS_ROLE: 'api',
+    };
+
+    const ready = buildProductionPreflightReport(
+      (name) => ({ ...base, REFUND_RELAY_ENABLED: 'false' })[name],
+    );
+    expect(ready.checks.find((check) => check.id === 'refund_relay')?.status).toBe('ready');
+    expect(ready.status).toBe('ready');
+
+    // Провайдерских возвратов при оплате наличными не существует — релею нечего
+    // делать, и включённым он остаётся небезопасным.
+    const relayOn = buildProductionPreflightReport(
+      (name) => ({ ...base, REFUND_RELAY_ENABLED: 'true' })[name],
+    );
+    expect(relayOn.checks.find((check) => check.id === 'refund_relay')?.status).toBe('unsafe');
+  });
+
   it('accepts the Render sandbox worker relay and rejects the same relay on the API role', () => {
     const base = {
       NODE_ENV: 'production',
