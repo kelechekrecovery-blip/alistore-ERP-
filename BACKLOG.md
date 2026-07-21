@@ -1,5 +1,10 @@
 # BACKLOG
 
+## Web Audit Follow-up 2026-07-21O
+- `WEB-AUDIT-076` Fixed a real route-audit defect on `/`: CMS-managed external `heroImageUrl` values such as `https://media.example.com/hero.webp` caused `next/image` to throw because the host was not allowlisted. The storefront hero and managed banner now render operator-managed HTTPS media with fixed dimensions through a plain image element; no wildcard Next image allowlist was added.
+- Checks: Web production build `45` routes; Chromium route audit `46/46` in `3.4m`; `git diff --check`. Commit `0e3df12`.
+- `VERIFY-077` The isolated full MVP runner remains sensitive to concurrent commits: stale runs failed in isolated B2B/refund/approval batches while the same specs passed on clean targeted reruns. Run the authoritative full gate on a quiescent worktree/CI runner before release acceptance.
+
 ## Web Audit Follow-up 2026-07-21
 - `WEB-AUDIT-073` Full local Web route audit recheck is green: Chromium `46/46` across anonymous storefront, protected customer-shell redirects, Staff/ERP/POS/Warehouse routes, health, Apple/Android association files, `robots.txt` and `sitemap.xml`. Public acceptance remains blocked because `https://ali.kg/`, `https://admin.ali.kg/` and both API health URLs return Cloudflare `530` / error `1033`.
 - `RELEASE-CLOUD-074` Root `render.yaml` is present on both `origin/main` and `codex/open-source-integrations`; current branch is 122 commits ahead of `origin/main`. The public `530/1033` is therefore an unavailable Render/origin or tunnel state, not a missing Blueprint in the repository. Required external action: deploy the current immutable Render Web/API/worker artifacts or restore the managed connector, then rerun public health/CORS/Host/Swagger/demo smoke.
