@@ -24,6 +24,8 @@ describe('Courier run deadlock (LOGIC-002)', () => {
   });
 
   const clean = async () => {
+    // Движения ящика ссылаются на проводки (FK RESTRICT) — раньше них.
+    await prisma.cashDrawerMovement.deleteMany();
     await prisma.outboxMessage.deleteMany();
     await prisma.courierCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
@@ -50,7 +52,15 @@ describe('Courier run deadlock (LOGIC-002)', () => {
     await prisma.$disconnect();
   });
 
-  beforeEach(clean);
+  beforeEach(async () => {
+    await clean();
+    // Сдача COD теперь попадает в кассовую смену принявшего кассира
+    // (`shifts/cash-drawer.ts`): спек написан до этого контроля.
+    await prisma.cashShift.deleteMany({ where: { staffId: 'cashier' } });
+    await prisma.cashShift.create({
+      data: { staffId: 'cashier', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
+  });
 
   const createCourier = async () => {
     seq += 1;

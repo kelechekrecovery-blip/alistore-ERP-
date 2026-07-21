@@ -295,6 +295,9 @@ export class ReportsService {
           select: {
             openCash: true,
             payments: { where: { method: 'cash' }, select: { amount: true } },
+            // Та же арифметика, что в ShiftsService.expectedCash: без движений
+            // «наличные в кассах» на дашборде расходились с актом закрытия.
+            drawerMovements: { select: { amount: true } },
           },
         }),
         this.prisma.debtPlan.aggregate({ _sum: { balance: true }, where: { status: 'open' } }),
@@ -320,7 +323,10 @@ export class ReportsService {
     // на дашборде отличалась от P&L на всю закупку.
     const cogs = await this.soldCogs();
     const cashInDrawers = openShiftRows.reduce(
-      (sum, shift) => sum + shift.openCash + shift.payments.reduce((acc, p) => acc + p.amount, 0),
+      (sum, shift) => sum
+        + shift.openCash
+        + shift.payments.reduce((acc, p) => acc + p.amount, 0)
+        + shift.drawerMovements.reduce((acc, m) => acc + m.amount, 0),
       0,
     );
 

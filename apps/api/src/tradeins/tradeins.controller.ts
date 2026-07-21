@@ -104,7 +104,8 @@ export class TradeInsController {
   ) {
     const key = requireIdempotencyKey(idempotencyKey);
     const customerId = requiredCustomerId(dto.customerId);
-    return this.tradeIns.create({ ...dto, customerId }, user.customerId, key);
+    // Приёмка у прилавка — выдача наличных: денежный след пишется только здесь.
+    return this.tradeIns.create({ ...dto, customerId }, user.customerId, key, true);
   }
 
   @ApiOperation({ summary: 'Get a trade-in by id with protected fields masked' })

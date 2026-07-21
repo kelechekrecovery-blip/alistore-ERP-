@@ -75,6 +75,8 @@ describe('Courier and print/export RBAC', () => {
   });
 
   beforeEach(async () => {
+    // Движения ящика ссылаются на проводки (FK RESTRICT) — раньше них.
+    await prisma.cashDrawerMovement.deleteMany();
     await prisma.courierCommand.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
@@ -83,6 +85,14 @@ describe('Courier and print/export RBAC', () => {
     await prisma.courierRun.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
+    // Сдача COD теперь попадает в кассовую смену принявшего кассира
+    // (`shifts/cash-drawer.ts`): раньше проводка Дт 1000 утверждала приход
+    // наличных, но ожидаемый остаток её не видел, и у кассира каждая сдача
+    // превращалась в излишек. Спеки написаны до этого контроля.
+    await prisma.cashShift.deleteMany({ where: { staffId: { in: ['cashier', cashierId] } } });
+    await prisma.cashShift.create({
+      data: { staffId: cashierId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
   });
 
   it('guards courier assignment and COD handover by role and staff actor', async () => {

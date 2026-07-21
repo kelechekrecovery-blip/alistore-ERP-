@@ -5,7 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
-import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { paymentAccountCode, postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { IssueGiftCardDto } from './giftcards.dto';
 
 export interface GiftCardView {
@@ -58,7 +59,8 @@ export class GiftcardsService {
       //
       // Проводка идёт в той же транзакции, что и сама карта: если она не
       // пройдёт, карты тоже не будет.
-      await postAccountingEntryOnTx(tx, {
+      const method = dto.method ?? 'cash';
+      const entry = await postAccountingEntryOnTx(tx, {
         idempotencyKey: `accounting:giftcard.issued:${created.id}`,
         sourceType: 'giftcard.issued',
         sourceRef: created.id,
@@ -68,10 +70,26 @@ export class GiftcardsService {
         occurredAt: created.createdAt,
         createdBy: actor,
         lines: [
-          { accountCode: '1000', debit: dto.amount, credit: 0, memo: 'Оплата подарочной карты' },
+          { accountCode: paymentAccountCode(method), debit: dto.amount, credit: 0, memo: 'Оплата подарочной карты' },
           { accountCode: '2300', debit: 0, credit: dto.amount, memo: 'Обязательство по подарочной карте' },
         ],
       });
+      // Наличная оплата обязана быть видна в смене: проводка утверждает, что в
+      // кассу пришли деньги, а `expectedCash` считал только Payment — вечером
+      // кассир получал излишек ровно на сумму проданных за смену карт.
+      if (method === 'cash') {
+        await recordCashDrawerMovementOnTx(tx, {
+          idempotencyKey: `drawer:giftcard.issued:${created.id}`,
+          staffId: actor,
+          amount: dto.amount,
+          kind: 'giftcard_issue',
+          sourceType: 'giftcard.issued',
+          sourceRef: created.id,
+          reason: `Продажа подарочной карты ${created.code}`,
+          createdBy: actor,
+          accountingEntryId: entry.id,
+        });
+      }
       return {
         result: created,
         events: [

@@ -48,6 +48,13 @@ describe('Service loaner custody (integration + ownership)', () => {
     ownerId = owner.id;
     await prisma.staffUser.update({ where: { id: owner.id }, data: { point: 'BISHKEK-2' } });
     ownerToken = (await auth.login(owner.username, 'pass')).accessToken;
+    // Залог за подменное устройство теперь приходуется в кассу
+    // (`shifts/cash-drawer.ts`): проводка Дт 1000 / Кт 2400 утверждает приход
+    // наличных, и это утверждение обязано сверяться с ящиком. Спек написан до
+    // контроля, поэтому у принимающего смена просто есть.
+    await prisma.cashShift.create({
+      data: { staffId: ownerId, point: 'BISHKEK-2', openCash: 0, openedAt: new Date() },
+    });
     const seller = await auth.createStaff(`seller-loaner-${run}`, 'pass', 'seller');
     sellerToken = (await auth.login(seller.username, 'pass')).accessToken;
     const foreignService = await auth.createStaff(`service-loaner-${run}`, 'pass', 'service', 'BISHKEK-1');

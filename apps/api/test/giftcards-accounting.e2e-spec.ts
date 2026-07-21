@@ -43,6 +43,15 @@ describe('Gift card issuance (accounting)', () => {
    * затирающий чужие данные, ловит не дефект продукта, а сам себя.
    */
   beforeEach(async () => {
+    // Наличная продажа подарочной карты теперь видна в кассовой смене
+    // (`shifts/cash-drawer.ts`): проводка Дт 1000 утверждает, что в кассу
+    // пришли деньги, и это утверждение обязано сверяться с ящиком. Спеки
+    // написаны до этого контроля, поэтому смена у актора просто есть.
+    await prisma.cashDrawerMovement.deleteMany({ where: { createdBy: 'owner-1' } });
+    await prisma.cashShift.deleteMany({ where: { staffId: 'owner-1' } });
+    await prisma.cashShift.create({
+      data: { staffId: 'owner-1', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
     const mine = await prisma.giftCard.findMany({
       where: { code: { startsWith: PREFIX } },
       select: { id: true },

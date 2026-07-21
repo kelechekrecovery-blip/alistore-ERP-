@@ -7,6 +7,9 @@ import { ConflictError, ValidationError } from '../common/errors';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { INVENTORY_ASSET_ACCOUNT } from '../inventory/inventory-valuation';
+import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
 
 type TradeInCreateInput = Omit<CreateTradeInDto, 'customerId'> & { customerId: string };
@@ -38,7 +41,15 @@ export class TradeInsService {
     return tradeIns.map((tradeIn) => this.view(tradeIn));
   }
 
-  async create(dto: TradeInCreateInput, actor: string, idempotencyKey: string): Promise<TradeInViewDto> {
+  /**
+   * `payout` отличает выкуп у прилавка от заявки клиента.
+   *
+   * `POST /tradeins` — самообслуживание: человек присылает заявку на оценку, и
+   * деньги при этом не двигаются. `POST /tradeins/intake` — приёмка
+   * сотрудником: аппарат забирают, наличные выдают из ящика. Денежный след
+   * принадлежит только второму пути.
+   */
+  async create(dto: TradeInCreateInput, actor: string, idempotencyKey: string, payout = false): Promise<TradeInViewDto> {
     const key = idempotencyKey.trim();
     if (!key || key.length > 128) {
       throw new ValidationError('invalid_idempotency_key', 'Idempotency key должен быть от 1 до 128 символов');
@@ -78,6 +89,40 @@ export class TradeInsService {
             idempotencyKey: key,
           },
         });
+        // Выкуп у клиента — это выдача денег из кассы, и до сих пор он не
+        // создавал ни проводки, ни движения: кассир отдавал 40 000 сом за б/у
+        // телефон, а система об этом не знала вовсе. Вечером в ящике
+        // недоставало ровно суммы выкупов за смену, и при самозакрытии
+        // расхождение получало системную причину.
+        //
+        // Аппарат приходуется на товарные запасы, деньги уходят из кассы.
+        const entry = payout ? await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:tradein.buyback:${tradeIn.id}`,
+          sourceType: 'tradein.buyback',
+          sourceRef: tradeIn.id,
+          description: `Выкуп ${tradeIn.model} по договору ${tradeIn.contractId}`,
+          documentAmount: tradeIn.price,
+          baseAmount: tradeIn.price,
+          occurredAt: new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: INVENTORY_ASSET_ACCOUNT, debit: tradeIn.price, credit: 0, memo: 'Оприходование выкупленного устройства' },
+            { accountCode: '1000', debit: 0, credit: tradeIn.price, memo: 'Выплата клиенту за trade-in' },
+          ],
+        }) : null;
+        if (entry) {
+          await recordCashDrawerMovementOnTx(tx, {
+            idempotencyKey: `drawer:tradein.buyback:${tradeIn.id}`,
+            staffId: actor,
+            amount: -tradeIn.price,
+            kind: 'tradein_buyback',
+            sourceType: 'tradein.buyback',
+            sourceRef: tradeIn.id,
+            reason: `Выкуп ${tradeIn.model}`,
+            createdBy: actor,
+            accountingEntryId: entry.id,
+          });
+        }
         if (this.outbox) {
           await enqueueConsentedCustomerNotice(tx, this.outbox, {
             customerId: input.customerId,

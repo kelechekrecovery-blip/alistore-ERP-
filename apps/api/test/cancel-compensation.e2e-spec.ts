@@ -54,7 +54,16 @@ describe('Cancel compensation (integration)', () => {
     await prisma.$disconnect();
   });
 
-  beforeEach(() => clean());
+  beforeEach(async () => {
+    await clean();
+    // Наличная продажа подарочной карты видна в кассовой смене
+    // (`shifts/cash-drawer.ts`): проводка Дт 1000 утверждает приход наличных, и
+    // это утверждение обязано сверяться с ящиком. Спек написан до контроля.
+    await prisma.cashShift.deleteMany({ where: { staffId: 'cashier' } });
+    await prisma.cashShift.create({
+      data: { staffId: 'cashier', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
+  });
 
   async function clean() {
     await prisma.onlinePaymentIntentCommand.deleteMany();

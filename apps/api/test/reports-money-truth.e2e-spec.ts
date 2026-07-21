@@ -48,10 +48,12 @@ describe('Отчёты · одна правда о деньгах', () => {
     await prisma.cashShift.deleteMany();
     await prisma.courierRun.deleteMany();
     await prisma.$transaction(async (tx) => {
-      // Баланс строк проверяется отложенным триггером: строки и проводки
-      // удаляются в одной транзакции, иначе осиротевшая строка его уронит.
-      await tx.accountingJournalLine.deleteMany();
-      await tx.accountingJournalEntry.deleteMany();
+      // Только свои проводки. Сплошное `deleteMany()` роняло чужие спеки: на
+      // журнал ссылаются CashIncassation и CashDrawerMovement, и тест, стирающий
+      // общий леджер, ловит не дефект продукта, а сам себя.
+      const mine = { sourceType: { in: ['cod.receivable', 'accounting.reversal'] } };
+      await tx.accountingJournalLine.deleteMany({ where: { entry: mine } });
+      await tx.accountingJournalEntry.deleteMany({ where: mine });
     });
     await prisma.customer.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'seller-payroll-' } } });

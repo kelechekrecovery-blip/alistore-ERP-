@@ -42,6 +42,7 @@ describe('Gift cards / store credit (integration)', () => {
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.giftCard.deleteMany();
+    await prisma.cashDrawerMovement.deleteMany();
     await prisma.cashShift.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -51,6 +52,14 @@ describe('Gift cards / store credit (integration)', () => {
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.approval.deleteMany();
+    // Наличная продажа подарочной карты теперь видна в кассовой смене
+    // (`shifts/cash-drawer.ts`): проводка Дт 1000 утверждает, что в кассу
+    // пришли деньги, и это утверждение обязано сверяться с ящиком. Спеки
+    // написаны до этого контроля, поэтому смена у актора просто есть.
+    await prisma.cashShift.create({
+      data: { staffId: 'cashier', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
+
   });
 
   async function webOrder(total = 100000) {

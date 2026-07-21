@@ -1330,6 +1330,7 @@ model CashShift {
   payments            Payment[]
   refundAllocations   RefundAllocation[]
   incassations        CashIncassation[]
+  drawerMovements     CashDrawerMovement[]
   exchangeRequests    ExchangeRequest[]
   posOrders           Order[]
 
@@ -1356,6 +1357,42 @@ model CashIncassation {
   @@index([shiftId, depositedAt])
   @@index([point, depositedAt])
   @@index([status, depositedAt])
+}
+
+/// Наличные, вошедшие в ящик или вышедшие из него не через `Payment`.
+///
+/// Ожидаемый остаток смены считался как `openCash + Σ Payment(cash)`, поэтому
+/// пять каналов двигали реальные деньги мимо сверки: сдача COD курьером, выпуск
+/// подарочной карты, выплата комитенту, выкуп trade-in и залог подменного фонда.
+/// Смена с продажей карт на 50 000 и выплатой комитенту 90 000 давала недостачу
+/// 40 000 на пустом месте, и объяснить её кассиру было нечем.
+///
+/// Форма повторяет `CashIncassation`: ключ идемпотентности, точка и ссылка на
+/// проводку. Отдельный `Payment` для этих движений создавать нельзя — он удвоил
+/// бы выручку (`salesGross = Payment + cod.receivable`).
+model CashDrawerMovement {
+  id                String                  @id @default(cuid())
+  idempotencyKey    String                  @unique
+  /// Cascade, а не Restrict: движение не существует без своей смены, а в
+  /// проде смены не удаляются вовсе (леджер append-only). Restrict здесь
+  /// давал только хрупкую уборку в тестах.
+  shift             CashShift               @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  shiftId           String
+  point             String
+  amount            Int // > 0 — приход в ящик, < 0 — расход из ящика
+  kind              String // cod_handover | giftcard_issue | consignment_payout | tradein_buyback | loaner_deposit
+  sourceType        String?
+  sourceRef         String?
+  reason            String?
+  createdBy         String
+  createdAt         DateTime                @default(now())
+  /// Ссылка информационная: авторитетная запись — сама проводка. SetNull,
+  /// чтобы удаление проводки не требовало знать о движениях.
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: SetNull)
+  accountingEntryId String?                 @unique
+
+  @@index([shiftId, createdAt])
+  @@index([point, createdAt])
 }
 
 model CashShiftHandover {
@@ -1899,6 +1936,7 @@ model AccountingJournalEntry {
   accountableAdvanceReimbursement AccountableAdvanceReimbursement?  @relation("AccountableAdvanceReimbursement")
   bankStatementLine               BankStatementLine?
   cashIncassation                 CashIncassation?
+  cashDrawerMovement              CashDrawerMovement?
   taxSettlement                   AccountingTaxSettlement?
   debtPlan                        DebtPlan?
   reversalOfId                    String?                           @unique

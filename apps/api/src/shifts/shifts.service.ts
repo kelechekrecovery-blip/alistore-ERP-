@@ -174,11 +174,16 @@ export class ShiftsService {
     shiftId: string,
     openCash: number,
   ): Promise<number> {
-    const agg = await tx.payment.aggregate({
-      _sum: { amount: true },
-      where: { shiftId, method: 'cash' },
-    });
-    return openCash + (agg._sum.amount ?? 0);
+    // Раньше здесь были только наличные платежи, поэтому пять каналов двигали
+    // реальные деньги мимо сверки (см. `shifts/cash-drawer.ts`): сдача COD,
+    // выпуск подарочной карты, выплата комитенту, выкуп trade-in и залог
+    // подменного фонда. Смена с продажей карт на 50 000 и выплатой комитенту
+    // 90 000 давала недостачу 40 000 на пустом месте.
+    const [payments, movements] = await Promise.all([
+      tx.payment.aggregate({ _sum: { amount: true }, where: { shiftId, method: 'cash' } }),
+      tx.cashDrawerMovement.aggregate({ _sum: { amount: true }, where: { shiftId } }),
+    ]);
+    return openCash + (payments._sum.amount ?? 0) + (movements._sum.amount ?? 0);
   }
 
   private async assertNoPendingCashRefunds(tx: Prisma.TransactionClient, shiftId: string) {

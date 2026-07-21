@@ -9,6 +9,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { assertCourierRunOwner, replayCourierHandover } from './courier-handover';
 import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/accounting-journal';
+import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { UnitsService } from '../units/units.service';
 import {
   assertOrderInventoryFinalizedOnTx,
@@ -503,6 +504,25 @@ export class CourierService {
                 ],
           })
           : null;
+        // Проводка Дт 1000 утверждает, что наличные пришли в кассу, но смены не
+        // касалась: `expectedCash` считал только Payment, поэтому у принявшего
+        // кассира каждая сдача превращалась в излишек, а инкассировать эти
+        // деньги через систему было нельзя. Отдельный Payment здесь создавать
+        // нельзя — выручка COD уже признана проводкой `cod.receivable`, и он
+        // удвоил бы её.
+        if (dto.amount > 0) {
+          await recordCashDrawerMovementOnTx(tx, {
+            idempotencyKey: `drawer:cod.handover:${dto.runId}:${key}`,
+            staffId: actor,
+            amount: dto.amount,
+            kind: 'cod_handover',
+            sourceType: 'cod.handover',
+            sourceRef: `${dto.runId}:${key}`,
+            reason: normalized.reason,
+            createdBy: actor,
+            accountingEntryId: accountingEntry?.id ?? null,
+          });
+        }
         const events: AuditInput[] = [{
           type: EventType.CashHandover,
           actor,

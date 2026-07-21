@@ -63,6 +63,7 @@ describe('Trade-in self-service and staff intake RBAC', () => {
   });
 
   beforeEach(async () => {
+    await prisma.cashDrawerMovement.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.supplierRma.deleteMany();
@@ -83,6 +84,13 @@ describe('Trade-in self-service and staff intake RBAC', () => {
     await prisma.cashShift.deleteMany();
     await prisma.courierRun.deleteMany();
     await prisma.customer.deleteMany();
+    // Приёмка у прилавка выдаёт наличные из ящика (`shifts/cash-drawer.ts`),
+    // поэтому у принимающего нужна открытая смена. Спек написан до этого
+    // контроля; создаём смену после собственной очистки спека, которая сносит
+    // все смены.
+    await prisma.cashShift.create({
+      data: { staffId: sellerId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
   });
 
   async function customerFixture() {

@@ -6,6 +6,8 @@ import { ConflictError, ForbiddenError, ValidationError } from '../common/errors
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { PrismaService } from '../prisma/prisma.service';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { PrepareLoanerLoanDto, RegisterLoanerDeviceDto, ReturnLoanerLoanDto } from './service-center.dto';
 import { isServiceCommandUniqueViolation, replayServiceCommand, requiredServiceKey, serviceJson, ServiceCommandInput } from './service-command';
 
@@ -102,6 +104,38 @@ export class ServiceLoanerService {
       const active = await tx.loanerLoan.findFirst({ where: { OR: [{ deviceId: device.id }, { workOrderId }], status: { in: ACTIVE_LOAN_STATUSES } } });
       if (active) throw new ConflictError('loaner_active_loan_exists', 'Устройство или ремонт уже имеют активную выдачу');
       const loan = await tx.loanerLoan.create({ data: { deviceId: device.id, workOrderId, customerId: workOrder.warrantyCase.customerId, dueAt, issueCondition: dto.issueCondition.trim(), depositAmount: dto.depositAmount ?? 0, agreementRef: dto.agreementRef?.trim() || null, preparedBy: actor }, include: loanInclude });
+      // Залог принимается наличными и не проводился нигде: `depositAmount` жил
+      // только в строке выдачи. Деньги ложились в ящик, ожидаемый остаток о них
+      // не знал, и вечером кассир получал излишек ровно на сумму принятых
+      // залогов — а при возврате аппарата ту же сумму как недостачу.
+      if (loan.depositAmount > 0) {
+        const entry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:loaner.deposit:${loan.id}`,
+          sourceType: 'loaner.deposit',
+          sourceRef: loan.id,
+          description: `Залог за подменное устройство по ремонту ${workOrderId}`,
+          documentAmount: loan.depositAmount,
+          baseAmount: loan.depositAmount,
+          point: workOrder.point,
+          occurredAt: new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: '1000', debit: loan.depositAmount, credit: 0, memo: 'Получен залог за подменное устройство' },
+            { accountCode: '2400', debit: 0, credit: loan.depositAmount, memo: 'Обязательство по залогу' },
+          ],
+        });
+        await recordCashDrawerMovementOnTx(tx, {
+          idempotencyKey: `drawer:loaner.deposit:${loan.id}`,
+          staffId: actor,
+          amount: loan.depositAmount,
+          kind: 'loaner_deposit',
+          sourceType: 'loaner.deposit',
+          sourceRef: loan.id,
+          reason: 'Залог за подменное устройство',
+          createdBy: actor,
+          accountingEntryId: entry.id,
+        });
+      }
       return { result: loan, event: { type: EventType.ServiceLoanerPrepared, actor, payload: { loanId: loan.id, workOrderId, deviceId: device.id, dueAt: dueAt.toISOString(), depositAmount: loan.depositAmount }, refs: [loan.id, device.id, workOrderId, workOrder.warrantyCaseId, workOrder.warrantyCase.customerId] } };
     });
   }
@@ -136,6 +170,35 @@ export class ServiceLoanerService {
       const disputed = Boolean(dto.damageNote?.trim());
       await tx.deviceUnit.update({ where: { id: loan.device.unitId }, data: { status: disputed ? 'in_repair' : 'loaner_available' } });
       const result = await tx.loanerLoan.update({ where: { id: loan.id }, data: { status: disputed ? 'disputed' : 'returned', returnCondition: dto.returnCondition.trim(), damageNote: dto.damageNote?.trim() || null, returnedBy: actor, returnedAt: new Date() }, include: loanInclude });
+      // Залог возвращается вместе с аппаратом, если претензий нет. При споре
+      // деньги остаются у магазина до решения — обязательство не гасится здесь.
+      if (!disputed && result.depositAmount > 0) {
+        const refundEntry = await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:loaner.deposit_refund:${loan.id}`,
+          sourceType: 'loaner.deposit_refund',
+          sourceRef: loan.id,
+          description: `Возврат залога по ремонту ${loan.workOrderId}`,
+          documentAmount: result.depositAmount,
+          baseAmount: result.depositAmount,
+          occurredAt: new Date(),
+          createdBy: actor,
+          lines: [
+            { accountCode: '2400', debit: result.depositAmount, credit: 0, memo: 'Погашение обязательства по залогу' },
+            { accountCode: '1000', debit: 0, credit: result.depositAmount, memo: 'Возврат залога клиенту' },
+          ],
+        });
+        await recordCashDrawerMovementOnTx(tx, {
+          idempotencyKey: `drawer:loaner.deposit_refund:${loan.id}`,
+          staffId: actor,
+          amount: -result.depositAmount,
+          kind: 'loaner_deposit',
+          sourceType: 'loaner.deposit_refund',
+          sourceRef: loan.id,
+          reason: 'Возврат залога клиенту',
+          createdBy: actor,
+          accountingEntryId: refundEntry.id,
+        });
+      }
       return { result, type: disputed ? EventType.ServiceLoanerDisputed : EventType.ServiceLoanerReturned, payload: { loanId, workOrderId: loan.workOrderId, deviceId: loan.deviceId, disputed, damageNote: result.damageNote } };
     }, { returnCondition: dto.returnCondition.trim(), damageNote: dto.damageNote?.trim() ?? null });
   }

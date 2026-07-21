@@ -37,6 +37,9 @@ describe('Courier COD handover (integration)', () => {
       .map((allocation) => allocation.id);
     await prisma.outboxMessage.deleteMany();
     await prisma.courierCommand.deleteMany();
+    // Движения ящика ссылаются на проводки (FK RESTRICT), поэтому удаляются
+    // раньше них.
+    await prisma.cashDrawerMovement.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.reservation.deleteMany();
@@ -73,6 +76,16 @@ describe('Courier COD handover (integration)', () => {
     await prisma.product.deleteMany({ where: { id: { in: productIds } } });
     await prisma.customer.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'courier-integration-' } } });
+    // Сдача COD попадает в кассовую смену принявшего кассира
+    // (`shifts/cash-drawer.ts`): раньше проводка Дт 1000 утверждала приход
+    // наличных, но ожидаемый остаток её не видел, и каждая сдача превращалась в
+    // излишек. Спек написан до этого контроля.
+    await prisma.cashShift.deleteMany({ where: { staffId: { startsWith: 'cashier' } } });
+    await prisma.cashShift.createMany({
+      data: ['cashier', 'cashier-1'].map((staffId) => ({
+        staffId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date(),
+      })),
+    });
   };
 
   afterAll(async () => {

@@ -915,6 +915,12 @@ export class InventoryService {
             { accountCode: '1000', credit: paid.ownerAmount, memo: 'Выплата владельцу' },
           ],
         });
+        // К кассовой смене выплата НЕ привязывается сознательно: комитенту
+        // платят переводом (спеки так и называют ключи — `bank-1`), а не из
+        // ящика. Настоящий дефект здесь другой и остаётся открытым: счёт 1000
+        // «Наличные в кассе» захардкожен независимо от канала, поэтому
+        // банковский перевод списывается с кассы. Чинить это надо способом
+        // оплаты в DTO — как сделано для долгов и подарочных карт.
       }
       await tx.consignmentItem.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
       await tx.quantityConsignmentAllocation.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
