@@ -5134,3 +5134,11 @@
 - Changes: added courier route and COD receiver views, typed API client, delivery Evidence upload, server-authoritative delivery/failure transitions, COD handover UI and role-aware session handling; stabilized the UI E2E session setup.
 - Checks: Courier Chromium UI E2E `3/3`; Web production Docker build already includes `/courier` and `/courier-cash` routes; API courier/evidence suites `27/27`.
 - Result: Courier Web software flow is accepted locally. Physical camera/network/maps and staging/live provider certification remain open.
+
+## WEB-AUDIT-2026-07-21I
+
+- Scope: remove cross-suite accounting contamination from gift-card Web/API regression coverage.
+- Changes: gift-card accounting assertions now select only journal entries created by the current test; cleanup removes only the accounting entries belonging to its own prefixed cards; gift-card integration payments use a process-scoped run tag instead of fixed transaction ids, so the suite no longer needs to truncate the shared accounting journal.
+- Checks: combined `giftcards-accounting.e2e-spec.ts` + `giftcards.e2e-spec.ts` `9/9`; `git diff --check`.
+- Result: the gift-card accounting regression is order/re-run safe locally. This does not close the broader production accounting, provider, or staging gates.
+- Next: run the authoritative full API/Web gate on a clean, non-concurrent test process and refresh the route/security evidence.

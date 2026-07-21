@@ -17,6 +17,7 @@ describe('Gift cards / store credit (integration)', () => {
   let giftcards: GiftcardsService;
   let intents: PaymentIntentsService;
   let seq = 0;
+  const runTag = `${Date.now().toString(36)}-${process.pid}`;
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -50,18 +51,6 @@ describe('Gift cards / store credit (integration)', () => {
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.approval.deleteMany();
-    // Проводки чистятся вместе со строками: баланс проверяется отложенным
-    // триггером на commit, и осиротевшая строка его уронит.
-    //
-    // Без этой очистки спек проходил ровно один раз после сброса тестовой базы:
-    // тендеры здесь используют фиксированные txnId ('gc-split-card'), а из них
-    // выводится ключ идемпотентности проводки. На втором прогоне платёж получал
-    // новый id, ключ оставался прежним, и postAccountingEntryOnTx честно падал
-    // с accounting_idempotency_conflict.
-    await prisma.$transaction(async (tx) => {
-      await tx.accountingJournalLine.deleteMany();
-      await tx.accountingJournalEntry.deleteMany();
-    });
   });
 
   async function webOrder(total = 100000) {
@@ -107,7 +96,7 @@ describe('Gift cards / store credit (integration)', () => {
 
   it('issues a card and pays a reserved order with gift-card + cash split tender', async () => {
     const { order } = await reservedOrder();
-    const card = await giftcards.issue({ code: 'gc-split', amount: 50000 }, 'cashier');
+    const card = await giftcards.issue({ code: `GC-SPLIT-${runTag}`, amount: 50000 }, 'cashier');
     const staffId = 'giftcard-cashier';
     const shift = await prisma.cashShift.create({ data: { staffId, point: 'BISHKEK-1', openCash: 0 } });
 
@@ -115,8 +104,8 @@ describe('Gift cards / store credit (integration)', () => {
       {
         orderId: order.id,
         payments: [
-          { method: 'gift_card', amount: 30000, giftCardCode: card.code, txnId: 'gc-split-card' },
-          { method: 'cash', amount: 70000, txnId: 'gc-split-cash' },
+          { method: 'gift_card', amount: 30000, giftCardCode: card.code, txnId: `gc-split-card-${runTag}` },
+          { method: 'cash', amount: 70000, txnId: `gc-split-cash-${runTag}` },
         ],
       },
       'cashier',
@@ -137,7 +126,7 @@ describe('Gift cards / store credit (integration)', () => {
 
   it('applies store credit first, then creates an online intent for the remaining due', async () => {
     const { order } = await webOrder();
-    const card = await giftcards.issue({ code: 'gc-web', amount: 40000 }, 'cashier');
+    const card = await giftcards.issue({ code: `GC-WEB-${runTag}`, amount: 40000 }, 'cashier');
 
     const partial = await payments.pay(
       { orderId: order.id, method: 'gift_card', amount: 25000, giftCardCode: card.code },

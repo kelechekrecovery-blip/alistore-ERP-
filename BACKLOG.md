@@ -1,5 +1,8 @@
 # BACKLOG
 
+## Web Audit Follow-up 2026-07-21
+- `WEB-AUDIT-070` Test isolation: gift-card accounting specs previously summed retained journal rows and one suite truncated the entire accounting journal. They now scope issuance assertions to their own entries and use run-scoped payment keys; combined gift-card coverage is green `9/9`. Keep full API gate and clean-DB verification as the next check.
+
 ## Web Audit Findings Added 2026-07-21
 - `WEB-AUDIT-061` High: public `/api/docs` and `/api/docs-json` are still reachable without staff authorization; production must either disable Swagger or protect it with active staff RBAC and add a regression test.
 - `WEB-AUDIT-061` source fix: production Swagger is now unconditionally disabled in `a9d7a1f` follow-up source; redeploy and public verification remain required before closing the finding.
