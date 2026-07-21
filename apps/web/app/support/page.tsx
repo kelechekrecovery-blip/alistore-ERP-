@@ -28,7 +28,16 @@ export default function SupportPage() {
   const [error, setError] = useState<string | null>(null);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
 
-  useEffect(() => { fetchStorefrontContent().then(setStorefront).catch(() => setStorefront(null)); }, []);
+  // «Телефон не указан» и «не смогли загрузить контакты» — разные вещи. Первое
+  // клиент читает как «звонить некуда» и уходит; второе означает лишь, что
+  // стоит обновить страницу. Тот же принцип, что и с зашитым номером ниже:
+  // молчание честнее выдумки, но и сбой нельзя выдавать за пустую настройку.
+  const [storefrontError, setStorefrontError] = useState(false);
+  useEffect(() => {
+    fetchStorefrontContent()
+      .then((content) => { setStorefront(content); setStorefrontError(false); })
+      .catch(() => setStorefrontError(true));
+  }, []);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
   useEffect(() => {
@@ -115,6 +124,11 @@ export default function SupportPage() {
               {storefront.content.supportHours ? ` · ${storefront.content.supportHours}` : ''}
             </div>
           </>
+        ) : storefrontError ? (
+          <div className="mt-2 text-[12px] text-muted">
+            Не удалось загрузить контакты — обновите страницу. Форма ниже работает,
+            обращение зарегистрируется в любом случае.
+          </div>
         ) : (
           <div className="mt-2 text-[12px] text-muted">
             Телефон поддержки пока не указан — воспользуйтесь формой ниже, обращение
