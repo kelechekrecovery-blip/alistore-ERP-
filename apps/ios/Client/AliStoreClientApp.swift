@@ -323,19 +323,12 @@ private struct ClientLoginView: View {
                     .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (requested && code.filter(\.isNumber).count != 6))
                     .padding(.top, 12)
                     .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
-                    Button {
-                        Task {
-                            if await BiometricAuthenticator().unlock(reason: "Вход в AliStore по Face ID") { onGuest() }
-                        }
-                    } label: {
-                        HStack { Spacer(); Image(systemName: "faceid"); Text("Войти по Face ID"); Spacer() }
-                            .font(ClientTheme.body(15, weight: .semibold))
-                            .foregroundStyle(Design3.blue)
-                            .frame(height: 50)
-                            .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(Design3.blue.opacity(0.4), lineWidth: 1))
-                    }
-                    .padding(.top, 10)
-                    .accessibilityIdentifier("client-faceid")
+                    // Кнопки «Войти по Face ID» здесь быть не может: на экране входа нет
+                    // сессии, которую можно разблокировать, а эндпоинта биометрического
+                    // входа на сервере не существует. Прежняя версия при успешной
+                    // биометрии вызывала onGuest() — то есть обещала вход в аккаунт, а
+                    // делала гостем, ровно как кнопка ниже. Биометрия остаётся там, где
+                    // она осмысленна: в QuickUnlock уже открытой сессии.
                     Button("Продолжить как гость →", action: onGuest)
                         .font(ClientTheme.body(13))
                         .foregroundStyle(ClientTheme.muted)
