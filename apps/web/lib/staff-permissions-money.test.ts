@@ -44,11 +44,11 @@ describe('staff-permissions · debts grants (mirror of RBAC policy)', () => {
 });
 
 describe('staff-permissions · giftcards grant', () => {
-  it('giftcards:issue — cashier, senior_seller, admin, owner', () => {
-    for (const role of ['cashier', 'senior_seller', 'admin', 'owner']) {
+  it('giftcards:issue — admin and owner only until issuance is tied to a cash shift', () => {
+    for (const role of ['admin', 'owner']) {
       expect(canIssueGiftCard(role)).toBe(true);
     }
-    for (const role of ['seller', 'franchise', 'warehouse', 'courier', 'service']) {
+    for (const role of ['cashier', 'senior_seller', 'seller', 'franchise', 'warehouse', 'courier', 'service']) {
       expect(canIssueGiftCard(role)).toBe(false);
     }
   });

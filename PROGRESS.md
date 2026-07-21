@@ -5120,3 +5120,10 @@
 - Changes: gift-card issue now atomically posts cash debit 1000 and gift-card liability credit 2300; duplicate issuance cannot duplicate the journal entry.
 - Checks: gift-card suites `9/9`; API production build; `git diff --check`.
 - Result: the local gift-card accounting invariant is accepted; live fiscal/payment certification and first-store reconciliation remain open.
+
+## FIN-AUDIT-2026-07-21G
+
+- Scope: align gift-card issuance permissions with its accounting risk.
+- Changes: removed cashier and senior-seller `giftcards:issue` grants from API Casbin policy and the Web permission mirror until issuance is bound to a cash shift; updated the money-permission regression.
+- Checks: Web tests `68/68`; API production build; `git diff --check`.
+- Result: unauthorized staff cannot initiate an unverified cash/liability event through the UI or API policy.

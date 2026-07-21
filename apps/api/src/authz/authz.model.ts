@@ -168,8 +168,11 @@ p, owner, refunds, manage
 p, cashier, payments, take_service
 p, admin, payments, take_service
 p, owner, payments, take_service
-p, cashier, giftcards, issue
-p, senior_seller, giftcards, issue
+# Выпуск подарочной карты — это выпуск денег: проводка Дт 1000 / Кт 2300
+# утверждает, что в кассу пришла наличность. Пока выпуск не привязан к кассовой
+# смене (см. BACKLOG), это утверждение никто не сверяет с ящиком, поэтому право
+# оставлено администратору и владельцу. Продажа карт на кассе вернётся, когда
+# выпуск будет создавать Payment в смене кассира.
 p, admin, giftcards, issue
 p, owner, giftcards, issue
 p, warehouse, warranty, read

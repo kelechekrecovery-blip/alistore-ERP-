@@ -31,7 +31,7 @@ const GRANTS: Record<string, readonly string[]> = {
   'debts:read': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'debts:create': ['cashier', 'seller', 'senior_seller', 'admin', 'owner'],
   'debts:pay': ['cashier', 'senior_seller', 'admin', 'owner'],
-  'giftcards:issue': ['cashier', 'senior_seller', 'admin', 'owner'],
+  'giftcards:issue': ['admin', 'owner'],
   'refunds:read': ['admin', 'owner'],
   'refunds:retry': ['admin', 'owner'],
   'refunds:manage': ['admin', 'owner'],
