@@ -12,8 +12,12 @@ import { Insight } from './insight';
 import { buildInsightMessages, parseInsightsResponse } from './openrouter-provider';
 import type { LlmClient, LlmToolDef } from './llm/llm-client';
 import { resolveLlmClient } from './llm/llm.factory';
+import { serializeToolResult } from './tool-budget';
 import { PricingService } from './pricing.service';
 import { ReorderService } from './reorder.service';
+
+/** Сколько строк списка попадает в промпт неагентного режима. */
+const CONTEXT_LIST_LIMIT = 25;
 
 const EMPTY_TOOL_SCHEMA: Record<string, unknown> = { type: 'object', properties: {}, additionalProperties: false };
 
@@ -88,7 +92,10 @@ export class InsightsService {
       name,
       description,
       inputSchema: EMPTY_TOOL_SCHEMA,
-      run: async () => JSON.stringify(await run()),
+      // Результат инструмента остаётся в переписке на все последующие итерации
+      // (до семи), поэтому объём режется здесь, а не «когда-нибудь потом»:
+      // pricing/reorder отдают строку на каждый неархивный товар.
+      run: async () => serializeToolResult(await run()),
     });
     return [
       tool('get_kpi', 'KPI: маржа, средний чек, оплаченные заказы, топ-товары и продавцы.', () => this.reports.kpi()),
@@ -125,8 +132,13 @@ export class InsightsService {
       net: dashboard.money.net,
       refunds: dashboard.money.refunds,
       pendingApprovals: dashboard.ops.pendingApprovals,
-      risks: risksRes.signals.map((s) => ({ kind: s.kind, severity: s.severity, detail: s.detail })),
-      reorderUrgent: { count: urgent.length, names: urgent.map((r) => r.name) },
+      // Списки идут в промпт целиком, поэтому счётчик остаётся полным, а
+      // перечисление — усечённым: на большом каталоге `names` раздувал запрос
+      // пропорционально дефициту, то есть тем сильнее, чем хуже дела.
+      risks: risksRes.signals
+        .slice(0, CONTEXT_LIST_LIMIT)
+        .map((s) => ({ kind: s.kind, severity: s.severity, detail: s.detail })),
+      reorderUrgent: { count: urgent.length, names: urgent.slice(0, CONTEXT_LIST_LIMIT).map((r) => r.name) },
       overstock: { count: overstockItems.length, topName: overstockItems[0]?.name ?? null },
     };
   }

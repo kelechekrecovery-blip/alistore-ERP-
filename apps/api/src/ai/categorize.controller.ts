@@ -1,11 +1,18 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AiReadGuard } from './ai-read.decorator';
 import { CategorizeService } from './categorize.service';
 import { CategorizeDto } from './categorize.dto';
 
+/**
+ * Каждый вызов стоит денег провайдера, а лимита не было ни на одном
+ * AI-эндпоинте.
+ */
 @ApiTags('ai')
 @AiReadGuard()
+@UseGuards(ThrottlerGuard)
+@Throttle({ default: { limit: 30, ttl: 60_000 } })
 @Controller('ai')
 export class CategorizeController {
   constructor(private readonly categorize: CategorizeService) {}

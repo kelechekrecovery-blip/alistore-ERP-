@@ -36,15 +36,25 @@ export class GradingService {
       if (client.supportsVision) {
         const images = await resolvePhotoImages(input.photos);
         if (images.length > 0) {
+          // Сбой СВЯЗИ и брак РАЗБОРА — разные случаи, и раньше их ловил один
+          // catch. Если vision-вызов прошёл, но ответ не распарсился, повтор
+          // уходил в gradeFromLabels — второй платный вызов той же модели с тем
+          // же промптом, то есть двойная оплата ровно за отказной случай.
+          let res: Awaited<ReturnType<typeof client.chat>> | null = null;
           try {
-            const res = await client.chat(buildVisionGradingMessages(input, images), {
+            res = await client.chat(buildVisionGradingMessages(input, images), {
               system: gradingSystemPrompt(),
               jsonSchema: PHOTO_GRADING_SCHEMA,
               maxTokens: 700,
             });
-            return { source: res.source, ...parsePhotoGradingResponse(res.text) };
           } catch (error) {
-            this.logger.warn(`vision grading failed, retrying from labels: ${String(error)}`);
+            this.logger.warn(`vision grading transport failed, retrying from labels: ${String(error)}`);
+          }
+          if (res) {
+            // Ответ получен и оплачен. Не разбирается — это брак модели, и
+            // лечится он бесплатным правилом, а не вторым платным вызовом:
+            // ошибка разбора летит во внешний catch.
+            return { source: res.source, ...parsePhotoGradingResponse(res.text) };
           }
         }
         this.logger.debug('vision grading: no photos resolved, grading from labels');
