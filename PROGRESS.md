@@ -5073,3 +5073,12 @@
   release gates.
 - Next: commit only the toolchain slice without staging the concurrent Courier/API/Web changes,
   then use the new tooling first on the highest-risk money/stock/idempotency vertical.
+
+## WEB-AUDIT-2026-07-21
+
+- Scope: close the highest-risk Web findings discovered during the public/local audit.
+- Changes: guest checkout now creates only a new customer and refuses capability issuance for an existing phone; ERP Stock and Service Center no longer fabricate fallback products/queues/loaners; catalog failures render explicit unavailable/retry states instead of deleting data as if a product were missing; login `next` is restricted to same-origin paths; account notifications now load and mark durable customer inbox records through JWT-owned API endpoints.
+- Checks: Web unit `68/68`; Web production build with `45` routes; API production build; customer regression `4/4`; public-rate-limit regression `4/4`; Chromium route audit `46/46`; `git diff --check`.
+- Commit: `ef41426` (`fix(web): harden guest checkout and live account data`).
+- Result: this bounded Web/API security and data-integrity slice is accepted locally. The public domain still reports development Sentry/demo configuration and remains workstation/tunnel-backed; public deployment certification is not claimed.
+- Next: inspect and validate the concurrent Evidence ownership changes, then close public deployment configuration and security headers without staging unrelated Courier work.

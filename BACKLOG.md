@@ -452,6 +452,8 @@ Independent fresh-eyes sweep recorded in `docs/GAP-ANALYSIS-2026-07-17.md`. Thes
 - [ ] Obtain or explicitly retire the 64 missing linked handoff references with owner approval; strict audit remains blocked until then.
 - [ ] Complete external gates: live providers, staging certification, physical-device checks, and store release.
 
+- `WEB-AUDIT-047` **Accepted locally 2026-07-21.** Guest checkout no longer impersonates an existing customer; ERP stock/service screens no longer display fabricated fallback data; catalog/API failures have explicit retry states; login redirects are same-origin; account notifications use the JWT-owned durable inbox. Web/API builds, focused regressions and `46/46` Chromium route audit pass. Public `ali.kg` still requires a durable production deployment and correct runtime configuration.
+
 # E2E-AUDIT-2026-07-19 — full ecosystem e2e (prod smoke + local write-flow, 3 browsers)
 
 Scope: read-only prod smoke against `https://ali.kg` (chromium+webkit+firefox) + local
