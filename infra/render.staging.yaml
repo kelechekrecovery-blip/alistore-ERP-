@@ -7,7 +7,7 @@ services:
     dockerfilePath: ./docker/api.Dockerfile
     dockerContext: .
     autoDeployTrigger: checksPass
-    healthCheckPath: /api/health/live
+    healthCheckPath: /api/health/ready
     preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
       - fromGroup: alistore-staging-common
@@ -118,6 +118,18 @@ envVarGroups:
       - { key: SERVICE_SLA_SWEEP_ENABLED, value: "true" }
       - { key: OUTBOX_RELAY_ENABLED, value: "true" }
       - { key: REFUND_RELAY_ENABLED, value: "false" }
+      # Ниже — то, без чего assertProductionRuntimeReady не даёт процессу
+      # стартовать. Staging поднимается с NODE_ENV=production, поэтому проверки
+      # к нему применяются те же, что к бою; без этих значений он падал при
+      # старте до первого запроса, и снаружи это выглядело как 502 без причин.
+      - { key: DEBT_REMINDERS_ENABLED, value: "true" }
+      - { key: NOTIFICATION_TRANSPORT, value: realtime }
+      - { key: SMS_PROVIDER, value: disabled }
+      - { key: SMS_PROVIDER_CERTIFIED, value: "false" }
+      - { key: POS_HARDWARE_CERTIFIED, value: "false" }
+      # Канал алертов: значения задаёт владелец в дашборде Render.
+      - { key: ALERT_TELEGRAM_BOT_TOKEN, sync: false }
+      - { key: ALERT_TELEGRAM_CHAT_ID, sync: false }
       - { key: MEILI_HOST, value: "http://alistore-meilisearch-staging:7700" }
       - { key: MEDIA_STORAGE, value: s3 }
       - { key: S3_REGION, value: auto }

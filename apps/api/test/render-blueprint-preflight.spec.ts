@@ -117,3 +117,58 @@ describe('render.yaml · боевой режим', () => {
     expect(blueprint).toContain('ALERT_TELEGRAM_CHAT_ID');
   });
 });
+
+/**
+ * Staging проверяется тем же preflight, что и прод, — потому что он тоже
+ * поднимается с `NODE_ENV=production`.
+ *
+ * Проверка выше читала ТОЛЬКО `render.yaml`, поэтому расхождения второго
+ * блюпринта были невидимы. А они были: `infra/render.staging.yaml` не объявлял
+ * пяти переменных, которые `assertProductionRuntimeReady` считает
+ * boot-blocking, — то есть staging падал при старте до первого запроса, и
+ * снаружи это выглядело как 502 без объяснений. Ровно тот отказ, ради
+ * устранения которого preflight и писался.
+ *
+ * И health-check у staging всё ещё смотрел на `/api/health/live` — тот самый
+ * баг, который в проде уже исправили: Render зеленил деплой поверх мёртвой БД.
+ */
+describe('infra/render.staging.yaml · staging обязан стартовать', () => {
+  const blueprint = readFileSync(join(__dirname, '../../../infra/render.staging.yaml'), 'utf8');
+
+  function valuesOf(key: string): string[] {
+    const found: string[] = [];
+    const lines = blueprint.split('\n');
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      // Staging пишет и списком (`- key: X` / `value: Y`), и парой в строке
+      // (`- { key: X, value: Y }`) — читаем оба вида.
+      const inline = trimmed.match(new RegExp(`^-\\s*\\{\\s*key:\\s*${key},\\s*value:\\s*"?([^",}]*)"?\\s*\\}$`));
+      if (inline) { found.push(inline[1].trim()); return; }
+      if (trimmed !== `- key: ${key}`) return;
+      const next = lines[index + 1]?.trim() ?? '';
+      const match = next.match(/^value:\s*"?([^"]*)"?$/);
+      if (match) found.push(match[1]);
+    });
+    return found;
+  }
+
+  it('объявляет всё, что preflight считает обязательным для старта', () => {
+    const env: Record<string, string> = { NODE_ENV: 'production' };
+    for (const key of [
+      'SMS_PROVIDER', 'NOTIFICATION_TRANSPORT', 'DEBT_REMINDERS_ENABLED',
+      'OUTBOX_RELAY_ENABLED', 'RESERVATION_SWEEP_ENABLED',
+    ]) {
+      const value = valuesOf(key)[0];
+      expect({ key, declared: value !== undefined }).toEqual({ key, declared: true });
+      env[key] = value;
+    }
+    // Секреты алертов задаёт владелец (sync: false), но объявлены быть обязаны.
+    expect(blueprint).toContain('ALERT_TELEGRAM_BOT_TOKEN');
+    expect(blueprint).toContain('ALERT_TELEGRAM_CHAT_ID');
+  });
+
+  it('health-check API смотрит на базу, а не только на живость процесса', () => {
+    const healthLine = blueprint.split('\n').find((line) => line.trim().startsWith('healthCheckPath: /api/'));
+    expect(healthLine?.trim()).toBe('healthCheckPath: /api/health/ready');
+  });
+});
