@@ -91,6 +91,29 @@ export class AlerterService {
     });
   }
 
+  /**
+   * То же самое, но с ожиданием доставки — для короткоживущих процессов.
+   *
+   * `notifyCritical` намеренно fire-and-forget: в запросе и в тике worker'а
+   * нельзя ждать Telegram. Но крон бэкапа живёт секунды и завершается сразу
+   * после ошибки, поэтому незавершённый `void deliver()` умирает вместе с
+   * процессом — то есть единственный сигнал о провале бэкапа терялся бы именно
+   * в тот момент, когда он нужен. Здесь ждём и глотаем ошибку доставки: она не
+   * должна подменять собой исходную причину падения.
+   */
+  async notifyCriticalAndWait(alert: CriticalAlert): Promise<void> {
+    const message = this.stableMessage(alert.message);
+    this.remember(alert.source, message, this.enabled, Date.now());
+    if (!this.enabled) return;
+    try {
+      await this.deliver(alert.source, message, alert.error);
+    } catch (err) {
+      this.logger.warn(
+        `Alert delivery failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
+    }
+  }
+
   /** Newest first, for the protected status dashboard. */
   recentAlerts(limit = 20): AlertRecord[] {
     return this.recent.slice(0, Math.max(0, limit));

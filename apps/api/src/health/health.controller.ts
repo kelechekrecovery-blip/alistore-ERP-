@@ -6,6 +6,13 @@ import {
   MemoryHealthIndicator,
   PrismaHealthIndicator,
 } from '@nestjs/terminus';
+import {
+  BACKUP_LAST_FAILURE_KEY,
+  BACKUP_LAST_SUCCESS_KEY,
+  evaluateBackupFreshness,
+  parseBackupFailureAt,
+  parseBackupMarker,
+} from '../ops/backup-status';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildExternalReadinessReport } from './external-readiness';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -58,7 +65,30 @@ export class HealthController {
   @Get('integrations')
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('reports', 'read')
-  integrations() {
-    return buildExternalReadinessReport((name) => this.config.get<string>(name));
+  async integrations() {
+    return {
+      ...buildExternalReadinessReport((name) => this.config.get<string>(name)),
+      backup: await this.backupFreshness(),
+    };
+  }
+
+  /**
+   * Возраст последнего успешного бэкапа.
+   *
+   * Отметку пишет крон `backup-to-s3`; до неё сломанный бэкап был неотличим от
+   * рабочего, и «дампов нет третью неделю» никак не проявлялось. Сознательно
+   * НЕ участвует в `/health/ready`: тот гейт снимает сервис с трафика, а
+   * устаревший бэкап обязан кричать, но не имеет права останавливать продажи.
+   */
+  private async backupFreshness() {
+    const [success, failure] = await Promise.all([
+      this.prisma.setting.findUnique({ where: { key: BACKUP_LAST_SUCCESS_KEY } }),
+      this.prisma.setting.findUnique({ where: { key: BACKUP_LAST_FAILURE_KEY } }),
+    ]);
+    const marker = parseBackupMarker(success?.value);
+    return {
+      ...evaluateBackupFreshness(marker?.completedAt ?? null),
+      lastFailureAt: parseBackupFailureAt(failure?.value),
+    };
   }
 }
