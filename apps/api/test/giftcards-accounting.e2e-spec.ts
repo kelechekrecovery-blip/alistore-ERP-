@@ -1,7 +1,6 @@
 import { AuditService } from '../src/audit/audit.service';
 import { GiftcardsService } from '../src/giftcards/giftcards.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { clearGiftCardTransactions } from './db-test-cleanup';
 
 /**
  * Выпуск подарочной карты — это выпуск денег.
@@ -33,18 +32,41 @@ describe('Gift card issuance (accounting)', () => {
     await prisma.$disconnect();
   });
 
+  const PREFIX = 'GC-ACC-';
+
+  /**
+   * Чистим только своё.
+   *
+   * Первая версия делала `giftCard.deleteMany()` и стирала журнал целиком — и
+   * уронила соседний спек `giftcards.e2e-spec.ts`, который в том же прогоне
+   * держит карты с привязанными платежами (`Payment_giftCardId_fkey`). Тест,
+   * затирающий чужие данные, ловит не дефект продукта, а сам себя.
+   */
   beforeEach(async () => {
-    await clearGiftCardTransactions(prisma);
-    await prisma.giftCard.deleteMany();
-    await prisma.$transaction(async (tx) => {
-      // Строки удаляются вместе с проводками: баланс проверяется отложенным
-      // триггером на commit, и осиротевшая строка его уронит.
-      await tx.accountingJournalLine.deleteMany();
-      await tx.accountingJournalEntry.deleteMany();
+    const mine = await prisma.giftCard.findMany({
+      where: { code: { startsWith: PREFIX } },
+      select: { id: true },
     });
+    const ids = mine.map((card) => card.id);
+    if (ids.length === 0) return;
+
+    await prisma.$transaction(async (tx) => {
+      // Строки и проводки удаляются вместе: баланс проверяется отложенным
+      // триггером на commit, и осиротевшая строка его уронит.
+      const entries = await tx.accountingJournalEntry.findMany({
+        where: { sourceType: 'giftcard.issued', sourceRef: { in: ids } },
+        select: { id: true },
+      });
+      const entryIds = entries.map((entry) => entry.id);
+      await tx.accountingJournalLine.deleteMany({ where: { entryId: { in: entryIds } } });
+      await tx.accountingJournalEntry.deleteMany({ where: { id: { in: entryIds } } });
+    });
+    // Карты этого спека не погашаются. Не вызываем общий cleanup: он чистит
+    // транзакции карт соседних integration suites в общей test-БД.
+    await prisma.giftCard.deleteMany({ where: { id: { in: ids } } });
   });
 
-  const code = () => `GC-ACC-${Date.now().toString(36)}-${(seq += 1)}`;
+  const code = () => `${PREFIX}${Date.now().toString(36)}-${(seq += 1)}`;
 
   it('проводит выпуск карты как обязательство: Дт 1000 / Кт 2300', async () => {
     const amount = 50_000;
@@ -69,11 +91,19 @@ describe('Gift card issuance (accounting)', () => {
     // проводке. Проверяем то, что действительно нарушено: обязательство должно
     // возникать в момент выпуска и совпадать с выпущенной суммой.
     const amounts = [50_000, 12_500];
+    const issuedIds: string[] = [];
     for (const amount of amounts) {
-      await giftcards.issue({ code: code(), amount }, 'owner-1');
+      const card = await giftcards.issue({ code: code(), amount }, 'owner-1');
+      issuedIds.push(card.id);
     }
 
-    const lines = await prisma.accountingJournalLine.findMany({ where: { accountCode: '2300' } });
+    const entries = await prisma.accountingJournalEntry.findMany({
+      where: { sourceType: 'giftcard.issued', sourceRef: { in: issuedIds } },
+      select: { id: true },
+    });
+    const lines = await prisma.accountingJournalLine.findMany({
+      where: { accountCode: '2300', entryId: { in: entries.map((entry) => entry.id) } },
+    });
     const credited = lines.reduce((sum, line) => sum + line.credit - line.debit, 0);
 
     expect(credited).toBe(amounts.reduce((sum, amount) => sum + amount, 0));

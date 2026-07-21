@@ -50,6 +50,18 @@ describe('Gift cards / store credit (integration)', () => {
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.approval.deleteMany();
+    // Проводки чистятся вместе со строками: баланс проверяется отложенным
+    // триггером на commit, и осиротевшая строка его уронит.
+    //
+    // Без этой очистки спек проходил ровно один раз после сброса тестовой базы:
+    // тендеры здесь используют фиксированные txnId ('gc-split-card'), а из них
+    // выводится ключ идемпотентности проводки. На втором прогоне платёж получал
+    // новый id, ключ оставался прежним, и postAccountingEntryOnTx честно падал
+    // с accounting_idempotency_conflict.
+    await prisma.$transaction(async (tx) => {
+      await tx.accountingJournalLine.deleteMany();
+      await tx.accountingJournalEntry.deleteMany();
+    });
   });
 
   async function webOrder(total = 100000) {
