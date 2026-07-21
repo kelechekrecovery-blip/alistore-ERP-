@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -42,6 +42,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): AuthPrincipal {
+    // Только access-токены. Гостевой capability подписан тем же секретом, но
+    // несёт `typ: 'guest_capability'` и узкий scope; без этой проверки он
+    // проходил `JwtAuthGuard` как полноценный `request.user`. Тот же контракт
+    // уже стоит на WebSocket-пути (`auth.service.ts` verifyAccessToken) —
+    // HTTP-путь его не имел.
+    if (payload.typ !== 'customer' && payload.typ !== 'staff') {
+      throw new UnauthorizedException('access_token_required');
+    }
     return {
       customerId: payload.sub,
       phone: payload.phone,

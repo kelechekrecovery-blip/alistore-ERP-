@@ -139,6 +139,26 @@ export class OrdersService {
     });
   }
 
+  /**
+   * Проекция леджера для клиента: тип, время, статус — без сырого `payload`.
+   *
+   * Полный `ledger()` отдавал клиенту `payload` всех событий с этим orderId в
+   * refs, а туда пишутся `inventory.cogs.amount` (себестоимость каждой единицы)
+   * и `commissionAmount`/`ownerAmount` по комиссионному товару. Покупатель мог
+   * посчитать маржу магазина поштучно. Витрине из леджера нужны только `type` и
+   * `ts` (`lib/order-status.ts` строит по ним таймлайн) — payload не нужен вовсе.
+   */
+  async customerLedger(orderId: string) {
+    const events = await this.prisma.auditEvent.findMany({
+      where: { refs: { has: orderId } },
+      orderBy: { ts: 'desc' },
+      take: 50,
+      select: { id: true, type: true, ts: true, actor: true },
+    });
+    // actor обезличиваем: id сотрудника клиенту знать незачем.
+    return events.map(({ actor, ...event }) => ({ ...event, actor: actor ? 'staff' : null }));
+  }
+
   /** Create an order (status `created`) and write order.created to the ledger. */
   async createFromCatalog(dto: CreateOrderDto, actor: string, idempotencyKey?: string, allowLoyalty = false) {
     const requestHash = orderRequestHash(dto, false);

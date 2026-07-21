@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { ConfigService } from '@nestjs/config';
 import { AuthzModule } from '../authz/authz.module';
 import { ObservabilityModule } from '../observability/observability.module';
@@ -13,7 +14,7 @@ import { RefundRelay } from './refunds.relay';
 import { RefundWebhooksController } from './refund-webhooks.controller';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule, ObservabilityModule, OutboxModule],
+  imports: [StaffAuthModule, AuthzModule, ObservabilityModule, OutboxModule, RateLimitModule],
   providers: [
     RefundsService,
     RefundProcessor,

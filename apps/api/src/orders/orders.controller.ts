@@ -107,8 +107,11 @@ export class OrdersController {
       if (await this.orders.isOwnOpenShiftOrder(id, staffId)) {
         throw new ForbiddenException('Леджер кассового заказа доступен после закрытия смены');
       }
+      return this.orders.ledger(id);
     }
-    return this.orders.ledger(id);
+    // Клиенту — проекция без payload: сырой леджер содержит себестоимость
+    // (inventory.cogs) и комиссию поставщика (consignment.sold).
+    return this.orders.customerLedger(id);
   }
 
   @ApiOperation({ summary: 'Get an order with items and payments' })

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -16,7 +17,11 @@ export class PromotionsPublicController {
   constructor(private readonly promotions: PromotionsService) {}
 
   @Post('quote')
-  @UseGuards(OptionalJwtAuthGuard)
+  // Оракул промокодов: неизвестный код → promo_not_found, известный → сумма
+  // скидки. Анонимно и без лимита это перебор словарных кодов (BACK2SCHOOL) и
+  // заодно дешёвый амплификатор нагрузки на БД (до 100 SKU за запрос).
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   quote(@CurrentUser() user: AuthPrincipal | undefined, @Body() dto: PromotionQuoteDto) {
     return this.promotions.quote(dto, user?.typ === 'customer' ? user.customerId : undefined);
   }

@@ -77,7 +77,12 @@ export class PaymentsController {
   @ApiConflictResponse({ description: 'Order is not reserved or IMEI cannot be sold.' })
   @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  // Без лимита этот маршрут — оракул перебора кодов подарочных карт: код
+  // приходит в теле, а балансовый GET /giftcards/:code закрыт 30/мин — закрыт
+  // был не тот маршрут. Владение заказом проверяется, поэтому лимит на попытки
+  // не мешает легальной оплате, но убивает перебор.
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async pay(
     @CurrentUser() user: AuthPrincipal | undefined,
     @Headers('x-guest-capability') capability: string | undefined,
