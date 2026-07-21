@@ -162,8 +162,22 @@ export class OrdersService {
     }
     const fulfillmentType: NonNullable<CreateOrderDto['fulfillmentType']> = dto.fulfillmentType ?? defaultFulfillment(dto.channel);
     const paymentMode = dto.paymentMode ?? 'prepaid';
-    if (paymentMode === 'cod' && fulfillmentType !== 'courier') {
-      throw new ValidationError('cod_courier_required', 'Оплата при получении доступна только для курьерской доставки');
+    // Правило было «оплата при получении только для курьера» и держалось
+    // CHECK-констрейнтом Order_cod_courier_check. Оно писалось, когда самовывоз
+    // оплачивался онлайн; после перехода на наличные предоплата отдаёт 503, и
+    // самовывоз — способ получения по умолчанию — остался без единого рабочего
+    // метода оплаты.
+    //
+    // Самовывоз и выдача в магазине курьерской механики не требуют: человек
+    // платит кассиру у прилавка. Экспресс остаётся под запретом обоснованно —
+    // такие заказы не попадают в курьерский рейс (`courier.service.ts` требует
+    // fulfillmentType === 'courier'), собирать по ним деньги нечем.
+    // См. миграцию 20260721090000_cod_allows_pickup.
+    if (paymentMode === 'cod' && fulfillmentType === 'express') {
+      throw new ValidationError(
+        'cod_express_unsupported',
+        'Оплата при получении недоступна для экспресс-доставки: по таким заказам нет курьерского рейса',
+      );
     }
     const requiresPointSelection = fulfillmentType === 'pickup';
     const storePoint = this.logistics

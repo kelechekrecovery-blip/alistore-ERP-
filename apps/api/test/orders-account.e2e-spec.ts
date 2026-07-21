@@ -193,14 +193,35 @@ describe('Orders by customer (account)', () => {
       data: { imei: `COD-CONTRACT-${seq}-IMEI`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1', acquisitionCost: 7000 },
     });
 
-    await expect(orders.createFromCatalog({
+    // Раньше здесь утверждалось обратное: оплата при получении отвергалась для
+    // всего, кроме курьера, и держалась CHECK-констрейнтом в базе. Правило
+    // писалось, когда самовывоз оплачивался онлайн. После перехода магазина на
+    // наличные предоплата отдаёт 503, и самовывоз — способ получения по
+    // умолчанию — остался без единого рабочего метода оплаты: магазин,
+    // объявленный «наличными при получении», наличные запрещал.
+    //
+    // Курьерской механики самовывозу не нужно: человек платит кассиру у
+    // прилавка. Экспресс по-прежнему нельзя — его заказы не попадают в
+    // курьерский рейс, собирать деньги нечем; это проверяется следом.
+    const pickup = await orders.createFromCatalog({
       customerId: owner.id,
       channel: 'web',
       fulfillmentType: 'pickup',
       paymentMode: 'cod',
       total: 1,
       items: [{ sku: product.sku, qty: 1, price: 1 }],
-    }, owner.id, `cod-pickup-${seq}`)).rejects.toMatchObject({ code: 'cod_courier_required' });
+    }, owner.id, `cod-pickup-${seq}`);
+    expect(pickup).toMatchObject({ status: 'created', paymentMode: 'cod', fulfillmentType: 'pickup' });
+
+    await expect(orders.createFromCatalog({
+      customerId: owner.id,
+      channel: 'web',
+      fulfillmentType: 'express',
+      paymentMode: 'cod',
+      deliveryAddress: 'Бишкек, ул. Киевская 95',
+      total: 1,
+      items: [{ sku: product.sku, qty: 1, price: 1 }],
+    }, owner.id, `cod-express-${seq}`)).rejects.toMatchObject({ code: 'cod_express_unsupported' });
 
     const order = await orders.createFromCatalog({
       customerId: owner.id,
@@ -226,10 +247,18 @@ describe('Orders by customer (account)', () => {
     await expect(orders.transition(order.id, 'paid', 'warehouse:test')).rejects.toMatchObject({
       code: 'order_payment_unsettled',
     });
+    // Проверка держала констрейнт Order_cod_courier_check («COD только курьеру»).
+    // Он заменён на Order_cod_fulfillment_check: самовывоз и выдача в магазине
+    // разрешены, экспресс — нет, потому что такие заказы не попадают в
+    // курьерский рейс и собрать по ним деньги нечем. Инвариант проверяется на
+    // уровне базы, а не только кода, поэтому обход через прямой update ловится.
     await expect(prisma.order.update({
       where: { id: order.id },
-      data: { fulfillmentType: 'pickup' },
-    })).rejects.toThrow('Order_cod_courier_check');
+      data: { fulfillmentType: 'express' },
+    })).rejects.toThrow('Order_cod_fulfillment_check');
+    // А самовывоз для COD-заказа теперь законен.
+    await prisma.order.update({ where: { id: order.id }, data: { fulfillmentType: 'pickup' } });
+    await prisma.order.update({ where: { id: order.id }, data: { fulfillmentType: 'courier' } });
     expect(await orders.transition(order.id, 'picking', 'warehouse:test')).toMatchObject({ status: 'picking' });
     expect(await orders.transition(order.id, 'packed', 'warehouse:test')).toMatchObject({ status: 'packed' });
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);

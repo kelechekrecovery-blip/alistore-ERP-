@@ -89,6 +89,12 @@ export default function CheckoutPage() {
   const [pickupPoints, setPickupPoints] = useState<StorePoint[]>([]);
   const [pickupPoint, setPickupPoint] = useState('');
   const [payment, setPayment] = useState<PaymentChoice>('card');
+  // Оплата при получении доступна везде, кроме экспресса: такие заказы не
+  // попадают в курьерский рейс, поэтому собрать по ним деньги нечем
+  // (`Order_cod_fulfillment_check`, миграция 20260721090000). Раньше наличные
+  // были привилегией курьера, и самовывоз — способ получения по умолчанию —
+  // оставался без единого рабочего метода оплаты: онлайн-оплата отдаёт 503.
+  const cashAllowed = delivery !== 'express';
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -127,8 +133,8 @@ export default function CheckoutPage() {
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
   useEffect(() => {
-    if (delivery !== 'courier' && payment === 'cash') setPayment('card');
-  }, [delivery, payment]);
+    if (!cashAllowed && payment === 'cash') setPayment('card');
+  }, [cashAllowed, payment]);
   useEffect(() => {
     if (!authHydrated) return;
     if (!user) {
@@ -219,7 +225,7 @@ export default function CheckoutPage() {
       const orderInput = {
         channel: 'web',
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
-        paymentMode: payment === 'cash' && delivery === 'courier' ? 'cod' as const : 'prepaid' as const,
+        paymentMode: payment === 'cash' && cashAllowed ? 'cod' as const : 'prepaid' as const,
         storePointId: delivery === 'pickup' ? pickupPoint : undefined,
         deliveryAddress: delivery !== 'pickup' ? deliveryAddress.trim() : undefined,
         deliverySlot: delivery === 'pickup'
@@ -484,7 +490,7 @@ export default function CheckoutPage() {
         {step === 2 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
-            {PAYMENT.filter((p) => p.id !== 'cash' || delivery === 'courier').map((p) => (
+            {PAYMENT.filter((p) => p.id !== 'cash' || cashAllowed).map((p) => (
               <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
                 <p.icon size={20} className="text-ink" />
                 <span className="flex-1 text-sm">{p.name}</span>

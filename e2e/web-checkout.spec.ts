@@ -97,7 +97,14 @@ test('web checkout pays a cart by sandbox card', async ({ page }) => {
   await page.getByPlaceholder('+996 700 12 34 56').fill('+996700900001');
   await page.getByPlaceholder('Имя').fill('E2E Buyer');
   await page.getByRole('button', { name: 'Далее' }).last().click();
-  await expect(page.getByRole('button', { name: /Наличными при получении/ })).toHaveCount(0);
+  // Раньше здесь утверждалось, что при самовывозе наличных быть не должно:
+  // оплата при получении была привилегией курьера и держалась
+  // CHECK-констрейнтом Order_cod_courier_check. Правило писалось, когда
+  // самовывоз оплачивался онлайн; после перехода магазина на наличные
+  // предоплата отдаёт 503, и способ получения по умолчанию остался без единого
+  // рабочего метода оплаты. Владелец решил открыть наличные для самовывоза
+  // (миграция 20260721090000_cod_allows_pickup), поэтому кнопка обязана быть.
+  await expect(page.getByRole('button', { name: /Наличными при получении/ })).toHaveCount(1);
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();
   await page.getByLabel(/Согласен с условиями/).check();
