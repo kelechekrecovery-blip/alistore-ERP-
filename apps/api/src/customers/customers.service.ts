@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuditInput } from '../audit/audit.service';
@@ -175,6 +175,37 @@ export class CustomersService {
       update: dto.name ? { name: dto.name } : {},
       create: { phone: dto.phone, name: dto.name ?? 'Клиент' },
     });
+  }
+
+  /**
+   * Guest checkout may create a new customer, but must never identify an
+   * existing customer by phone. Existing customers must authenticate first.
+   */
+  async createGuest(dto: UpsertCustomerDto) {
+    const existing = await this.prisma.customer.findUnique({
+      where: { phone: dto.phone },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException({
+        code: 'guest_customer_requires_auth',
+        message: 'Для этого номера войдите в аккаунт перед оформлением заказа',
+      });
+    }
+    try {
+      return await this.prisma.customer.create({
+        data: { phone: dto.phone, name: dto.name ?? 'Клиент' },
+      });
+    } catch (error) {
+      // A concurrent checkout can win the unique phone race after the lookup.
+      if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+        throw new ConflictException({
+          code: 'guest_customer_requires_auth',
+          message: 'Для этого номера войдите в аккаунт перед оформлением заказа',
+        });
+      }
+      throw error;
+    }
   }
 
   /**

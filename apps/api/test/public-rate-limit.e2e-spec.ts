@@ -29,7 +29,7 @@ describe('public endpoint rate limits', () => {
       imports: [ConfigModule.forRoot({ isGlobal: true }), RateLimitModule],
       controllers: [CustomersController, OrdersController, PaymentsController, SupportController],
       providers: [
-        { provide: CustomersService, useValue: { upsert: async () => ({ id: 'customer-1' }) } },
+        { provide: CustomersService, useValue: { createGuest: async () => ({ id: 'customer-1' }) } },
         { provide: OrdersService, useValue: { createFromCatalog: async () => ({ id: 'order-1' }) } },
         { provide: PaymentsService, useValue: { find: async () => [], pay: async () => ({ id: 'pay-1' }), payForCustomer: async () => ({ id: 'pay-1' }) } },
         { provide: PaymentIntentsService, useValue: { create: async () => ({ id: 'intent-1' }), webhook: async () => ({ ok: true }) } },

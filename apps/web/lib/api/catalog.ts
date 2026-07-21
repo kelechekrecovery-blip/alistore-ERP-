@@ -78,6 +78,13 @@ export async function fetchCatalog(query: CatalogQuery = {}): Promise<CatalogRes
 /** Ответ каталога, полученный не с сервера, а из аварийной ветки клиента. */
 export const CATALOG_UNAVAILABLE = 'unavailable';
 
+export class CatalogUnavailableError extends Error {
+  constructor(message = 'Каталог временно недоступен') {
+    super(message);
+    this.name = 'CatalogUnavailableError';
+  }
+}
+
 /** Отличить «каталог пуст» от «каталог не ответил». */
 export function isCatalogUnavailable(response: { source: string }): boolean {
   return response.source === CATALOG_UNAVAILABLE;
@@ -215,8 +222,9 @@ export async function fetchProduct(id: string): Promise<CatalogProduct | null> {
     if (!res.ok) throw new Error(`product responded ${res.status}`);
     const result = (await res.json()) as ProductWithRelated;
     return result.product;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof CatalogUnavailableError) throw error;
+    throw new CatalogUnavailableError();
   }
 }
 
@@ -267,10 +275,12 @@ export async function fetchProductWithRelated(id: string, relatedLimit = 6): Pro
 async function fetchProductWithRelatedUncached(id: string, relatedLimit: number): Promise<ProductWithRelated> {
   try {
     const res = await fetch(`${API_BASE}/catalog/products/${encodeURIComponent(id)}?relatedLimit=${relatedLimit}`, { cache: 'no-store' });
-    if (!res.ok) return { product: null, variants: [], related: [] };
+    if (res.status === 404) return { product: null, variants: [], related: [] };
+    if (!res.ok) throw new CatalogUnavailableError(`Товар временно недоступен (${res.status})`);
     return (await res.json()) as ProductWithRelated;
-  } catch {
-    return { product: null, variants: [], related: [] };
+  } catch (error) {
+    if (error instanceof CatalogUnavailableError) throw error;
+    throw new CatalogUnavailableError();
   }
 }
 

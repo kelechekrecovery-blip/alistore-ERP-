@@ -35,7 +35,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const favorites = useFavorites();
   const compare = useCompare();
   const { user, hydrated, authed } = useAuth();
-  const [product, setProduct] = useState<CatalogProduct | null | "missing">(
+  const [product, setProduct] = useState<CatalogProduct | null | "missing" | "unavailable">(
     null,
   );
   const [similar, setSimilar] = useState<CatalogProduct[]>([]);
@@ -62,7 +62,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         const nextReviews = await fetchProductReviews(detail.product.id).catch(() => null);
         if (active) setReviews(nextReviews);
       })
-      .catch(() => active && setProduct("missing"));
+      .catch(() => active && setProduct("unavailable"));
     return () => {
       active = false;
     };
@@ -79,6 +79,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           <Link href="/catalog" className="mt-4 inline-block text-deep">
             Вернуться в каталог
           </Link>
+        </div>
+      </StoreMessage>
+    );
+  if (product === "unavailable")
+    return (
+      <StoreMessage>
+        <div className="text-center">
+          <h1 className="font-display text-2xl font-bold text-ink">Товар временно недоступен</h1>
+          <p className="mt-2 text-sm text-muted">Сервис каталога не ответил. Попробуйте обновить страницу.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-btn bg-coral px-4 py-2 text-sm font-bold text-white">Повторить</button>
         </div>
       </StoreMessage>
     );
@@ -127,7 +137,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     : null;
 
   function addToCart() {
-    if (!product || product === "missing") return;
+    if (!product || typeof product === "string") return;
     add(
       {
         id: product.id,
@@ -144,7 +154,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!product || product === "missing") return;
+    if (!product || typeof product === "string") return;
     setReviewMsg("Сохраняем...");
     try {
       await authed((token) =>

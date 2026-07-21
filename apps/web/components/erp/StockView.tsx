@@ -24,15 +24,6 @@ import type { Dashboard } from '@/lib/reports';
 
 const LOW = 5;
 
-const DEFAULT_PRODUCTS: CatalogProduct[] = [
-  { id: 'p1', name: 'iPhone 15 128', availableUnits: 8, price: 109900, category: 'phone', sku: 'IPH15-128', attrs: {}, reviewCount: 0, avgRating: null },
-  { id: 'p2', name: 'MacBook Air M2', availableUnits: 3, price: 189900, category: 'laptop', sku: 'MBA-M2', attrs: {}, reviewCount: 0, avgRating: null },
-  { id: 'p3', name: 'AirPods Pro 2', availableUnits: 25, price: 24900, category: 'audio', sku: 'APP-2', attrs: {}, reviewCount: 0, avgRating: null },
-  { id: 'p4', name: 'Galaxy S24', availableUnits: 6, price: 99900, category: 'phone', sku: 'GS24', attrs: {}, reviewCount: 0, avgRating: null },
-  { id: 'p5', name: 'iPad Air', availableUnits: 5, price: 74900, category: 'tablet', sku: 'IPDAIR', attrs: {}, reviewCount: 0, avgRating: null },
-  { id: 'p6', name: 'Apple Watch S9', availableUnits: 2, price: 44900, category: 'watch', sku: 'AWS9', attrs: {}, reviewCount: 0, avgRating: null },
-];
-
 const ORDER_STATUS: Record<string, string> = {
   created: 'Оформлен',
   reserved: 'Зарезервирован',
@@ -174,7 +165,7 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
     }
   }
 
-  const items = [...(products?.length ? products : DEFAULT_PRODUCTS)].sort((a, b) => a.availableUnits - b.availableUnits);
+  const items = [...(products ?? [])].sort((a, b) => a.availableUnits - b.availableUnits);
   const totalValue = items.reduce((sum, p) => sum + p.price * p.availableUnits, 0);
   const low = items.filter((p) => p.availableUnits > 0 && p.availableUnits < LOW).length;
   const stockTabs = [

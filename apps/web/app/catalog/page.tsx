@@ -6,7 +6,7 @@ import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import MobileCatalog from '@/components/mobile/MobileCatalog';
-import { fetchCatalog, fetchCatalogCategories, type CatalogProduct, type CatalogQuery } from '@/lib/api';
+import { fetchCatalog, fetchCatalogCategories, isCatalogUnavailable, type CatalogProduct, type CatalogQuery } from '@/lib/api';
 
 const PAGE_SIZE = 24;
 
@@ -34,7 +34,7 @@ export default function CatalogPage() {
       setProducts(null);
       setError(false);
       fetchCatalog({ q: query.trim() || undefined, category: category === 'Все' ? undefined : category, stockOnly, sort, limit: PAGE_SIZE, offset })
-        .then((response) => { setProducts(response.items); setTotal(response.total); })
+        .then((response) => { if (isCatalogUnavailable(response)) throw new Error('catalog unavailable'); setProducts(response.items); setTotal(response.total); })
         .catch(() => { setProducts([]); setTotal(0); setError(true); });
     }, 250);
     return () => window.clearTimeout(timer);

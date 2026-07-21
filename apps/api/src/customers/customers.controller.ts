@@ -154,15 +154,15 @@ export class CustomersController {
     return this.maskCustomer(customer, user);
   }
 
-  @ApiOperation({ summary: 'Find-or-create a customer by phone (guest checkout)' })
-  @ApiCreatedResponse({ description: 'Customer created or matched by phone.' })
+  @ApiOperation({ summary: 'Create a new customer for guest checkout' })
+  @ApiCreatedResponse({ description: 'Customer created for this guest checkout.' })
   @Post()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async upsert(@Body() dto: UpsertCustomerDto) {
-    const customer = await this.customers.upsert(dto);
+    const customer = await this.customers.createGuest(dto);
     return {
-      ...customer,
+      id: customer.id,
       guestCapability: issueGuestCheckoutCapability(customer.id),
       capabilityExpiresIn: 1800,
     };

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
-import { fetchCatalog, fetchCatalogCategories, type CatalogProduct, type CatalogQuery } from '@/lib/api';
+import { fetchCatalog, fetchCatalogCategories, isCatalogUnavailable, type CatalogProduct, type CatalogQuery } from '@/lib/api';
 
 const SORTS = [
   { id: 'stock_desc', label: 'В наличии' },
@@ -19,6 +19,8 @@ export default function MobileCatalog() {
   const [categories, setCategories] = useState(['Все']);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -26,7 +28,7 @@ export default function MobileCatalog() {
     fetchCatalogCategories().then((items) => setCategories(['Все', ...items.map((item) => item.category)]));
   }, []);
   const sort = SORTS[sortIdx];
-  useEffect(() => { setProducts(null); fetchCatalog({ category: category === 'Все' ? undefined : category, stockOnly, sort: sort.id as CatalogQuery['sort'], limit: 20, offset }).then((response) => { setProducts(response.items); setTotal(response.total); }).catch(() => { setProducts([]); setTotal(0); }); }, [category, stockOnly, sort, offset]);
+  useEffect(() => { setProducts(null); setError(false); fetchCatalog({ category: category === 'Все' ? undefined : category, stockOnly, sort: sort.id as CatalogQuery['sort'], limit: 20, offset }).then((response) => { if (isCatalogUnavailable(response)) throw new Error('catalog unavailable'); setProducts(response.items); setTotal(response.total); }).catch(() => { setProducts([]); setTotal(0); setError(true); }); }, [category, stockOnly, sort, offset, reloadKey]);
 
   const reset = () => {
     setCategory('Все');
@@ -86,6 +88,12 @@ export default function MobileCatalog() {
             {Array.from({ length: 6 }, (_, i) => (
               <div key={i} className="h-[248px] animate-pulse rounded-[16px] border border-surface-3 bg-surface-2" />
             ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-[13px] border border-danger-soft/30 bg-danger-soft/10 px-4 py-12 text-center">
+            <div className="font-display text-[17px] font-bold text-danger-soft">Каталог временно недоступен</div>
+            <div className="mt-2 text-[13px] text-muted">Проверьте соединение и повторите попытку.</div>
+            <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="mt-4 rounded-[10px] border border-surface-3 bg-surface-2 px-5 py-2.5 text-[13px] text-lime">Повторить</button>
           </div>
         ) : products.length > 0 ? (
           <><div className="grid grid-cols-2 gap-3">

@@ -21,7 +21,10 @@ function LoginForm() {
   const { requestOtp, verifyOtp, requestRecoveryOtp, verifyRecoveryOtp, telegramLogin } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') || '/account';
+  const requestedNext = params.get('next');
+  const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/account';
 
   const [stepCode, setStepCode] = useState(false);
   const [phone, setPhone] = useState('');

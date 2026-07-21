@@ -3,25 +3,41 @@
 import { useEffect, useState } from 'react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { fetchMySettings, updateMySettings, type CustomerSettings } from '@/lib/api';
-
-const notifications = [
-  { icon: '📦', title: 'Заказ собирается', text: 'Скоро передадим курьеру', time: '5 мин назад', bg: '#221E19' },
-  { icon: '🏷', title: 'Цена снизилась', text: 'Apple Watch S9 дешевле на 5 000 с', time: '1 ч назад', bg: '#16130F' },
-  { icon: '🛡', title: 'Гарантия скоро истекает', text: 'AirPods Pro — осталось 12 дней', time: 'вчера', bg: '#16130F' },
-  { icon: '🎁', title: 'Начислены бонусы', text: '+300 за отзыв', time: '2 дня назад', bg: '#16130F' },
-];
+import {
+  fetchMyNotifications,
+  fetchMySettings,
+  markNotificationRead,
+  updateMySettings,
+  type CustomerNotification,
+  type CustomerSettings,
+} from '@/lib/api';
 
 export default function NotificationsPage() {
   const { user, authed } = useAuth();
   const [settings, setSettings] = useState<CustomerSettings | null>(null);
+  const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [saving, setSaving] = useState<keyof CustomerSettings | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!user) return;
-    authed(fetchMySettings).then(setSettings).catch(() => setError('Не удалось загрузить настройки связи'));
+    Promise.all([authed(fetchMySettings), authed(fetchMyNotifications)])
+      .then(([nextSettings, nextNotifications]) => {
+        setSettings(nextSettings);
+        setNotifications(nextNotifications);
+      })
+      .catch(() => setError('Не удалось загрузить уведомления и настройки связи'));
   }, [user, authed]);
+
+  async function readNotification(notification: CustomerNotification) {
+    if (notification.readAt) return;
+    try {
+      const updated = await authed((token) => markNotificationRead(notification.id, token));
+      setNotifications((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch {
+      setError('Не удалось отметить уведомление прочитанным');
+    }
+  }
 
   async function toggle(key: 'push' | 'whatsapp' | 'service' | 'promos' | 'consent') {
     if (!settings || saving) return;
@@ -39,18 +55,30 @@ export default function NotificationsPage() {
 
   return (
     <MobileAppFrame title="Уведомления" subtitle="Статусы заказов, гарантия, бонусы и настройки связи." backHref="/account">
-      {notifications.map((n) => (
-        <div key={n.title} className="mb-2 flex gap-3 rounded-[13px] border border-surface-3 p-3.5" style={{ background: n.bg }}>
-          <span className="text-xl">{n.icon}</span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold">{n.title}</div>
-            <div className="mt-1 text-[12px] leading-relaxed text-muted">{n.text}</div>
-            <div className="mt-1 font-mono text-[11px] text-faint">{n.time}</div>
-          </div>
+      {user ? (
+        <div className="mb-3 space-y-2">
+          {notifications.length === 0 && <div className="rounded-[13px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">Новых уведомлений пока нет.</div>}
+          {notifications.map((notification) => (
+            <button
+              type="button"
+              key={notification.id}
+              onClick={() => readNotification(notification)}
+              className={`block w-full rounded-[13px] border p-4 text-left transition ${notification.readAt ? 'border-surface-3 bg-surface-2' : 'border-lime/40 bg-lime/10'}`}
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span>
+                  <span className="block text-sm font-semibold text-bright">{notification.title}</span>
+                  <span className="mt-1 block text-[13px] leading-relaxed text-muted">{notification.detail}</span>
+                </span>
+                {!notification.readAt && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-lime" aria-label="Новое уведомление" />}
+              </span>
+            </button>
+          ))}
         </div>
-      ))}
-
-      {!user && <a href="/login?next=/account/notifications" className="mt-4 block rounded-[13px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">Войдите по OTP, чтобы синхронизировать каналы.</a>}
+      ) : (
+        <div className="mb-3 rounded-[13px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">Войдите по OTP, чтобы увидеть персональные уведомления.</div>
+      )}
+      {!user && <a href="/login?next=/account/notifications" className="mb-4 block rounded-[13px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">Войти в аккаунт</a>}
       {error && <div className="mt-3 rounded-[13px] border border-danger-soft/30 bg-surface-2 p-4 text-sm text-danger-soft">{error}</div>}
 
       <div className="mt-4 rounded-[14px] border border-surface-3 bg-surface-2 p-4">

@@ -36,6 +36,19 @@ describe('Customers find-or-create (integration)', () => {
     expect(count).toBe(1);
   });
 
+  it('does not issue a guest capability for an existing customer', async () => {
+    await customers.upsert({ phone: '+996700111333', name: 'Закрытый профиль' });
+
+    await expect(customers.createGuest({ phone: '+996700111333', name: 'Подмена' }))
+      .rejects.toMatchObject({
+        status: 409,
+        response: expect.objectContaining({ code: 'guest_customer_requires_auth' }),
+      });
+
+    await expect(prisma.customer.findUnique({ where: { phone: '+996700111333' } }))
+      .resolves.toMatchObject({ name: 'Закрытый профиль' });
+  });
+
   it('defaults the name when none is given', async () => {
     const c = await customers.upsert({ phone: '+996555000111' });
     expect(c.name).toBe('Клиент');
