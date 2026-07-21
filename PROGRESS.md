@@ -5098,3 +5098,10 @@
 - Checks: API production build; focused OpenAPI/runtime-security tests `7/7`; `git diff --check`.
 - Result: the source-level production policy is accepted. The live API still needs redeployment and a post-deploy check because `api.ali.kg` was serving the previous behavior during audit.
 - Next: redeploy the API artifact through the protected Render pipeline, then validate docs `404`, health, host allowlist and CORS from the public domain.
+
+## WEB-AUDIT-2026-07-21D
+
+- Scope: add explicit regression coverage for courier Evidence ownership.
+- Changes: the integration suite now proves assigned-courier access, foreign-courier denial, manager access, matching delivery Evidence, foreign actor denial and wrong-order denial.
+- Checks: Evidence integration `7/7`; `git diff --check`.
+- Result: the ownership contract is now directly tested; the concurrent Courier/Evidence implementation remains in its owning dirty slice and still needs a coordinated review/commit.

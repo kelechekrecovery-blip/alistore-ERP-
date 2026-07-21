@@ -150,6 +150,62 @@ describe('Evidence Vault (integration)', () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
+  it('binds courier order evidence to the assigned courier and order', async () => {
+    const suffix = `${Date.now()}-${seq++}`;
+    const customer = await prisma.customer.create({
+      data: { phone: `+996700ORDER${suffix}`, name: 'Order evidence owner' },
+    });
+    const courier = await prisma.staffUser.create({
+      data: { username: `order-evidence-courier-${suffix}`, passwordHash: 'x', role: 'courier' },
+    });
+    const foreignCourier = await prisma.staffUser.create({
+      data: { username: `order-evidence-foreign-${suffix}`, passwordHash: 'x', role: 'courier' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        courierId: courier.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        total: 10_000,
+      },
+    });
+
+    await expect(evidence.assertStaffCanAttachOrder(courier.id, 'courier', order.id))
+      .resolves.toBeUndefined();
+    await expect(evidence.assertStaffCanAttachOrder(foreignCourier.id, 'courier', order.id))
+      .rejects.toMatchObject({ status: 404 });
+    await expect(evidence.assertStaffCanAttachOrder('manager', 'owner', order.id))
+      .resolves.toBeUndefined();
+
+    const key = `courier-order-evidence-${suffix}`;
+    await evidence.attachImage(await pngBuffer(), {
+      entityType: 'order',
+      entityId: order.id,
+      label: 'Подтверждение доставки',
+      actor: `staff:${courier.id}`,
+    }, true, key);
+
+    await expect(evidence.assertCourierOrderEvidence(
+      key,
+      courier.id,
+      order.id,
+      'Подтверждение доставки',
+    )).resolves.toBeUndefined();
+    await expect(evidence.assertCourierOrderEvidence(
+      key,
+      foreignCourier.id,
+      order.id,
+      'Подтверждение доставки',
+    )).rejects.toMatchObject({ code: 'courier_evidence_mismatch' });
+    await expect(evidence.assertCourierOrderEvidence(
+      key,
+      courier.id,
+      'another-order',
+      'Подтверждение доставки',
+    )).rejects.toMatchObject({ code: 'courier_evidence_mismatch' });
+  });
+
   it('replays a keyed upload without duplicating the asset or ledger event', async () => {
     const mv = await movement();
     const image = await pngBuffer();
