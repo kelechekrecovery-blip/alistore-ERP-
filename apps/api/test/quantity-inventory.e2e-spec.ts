@@ -87,14 +87,12 @@ describe('Quantity inventory (integration)', () => {
   it('receives quantity stock atomically and exposes available stock to the catalog', async () => {
     const product = await quantityProduct();
 
-    const first = await inventory.receiveQuantity({
-      productId: product.id,
+    const first = await inventory.receiveQuantity({ idempotencyKey: `recv-3-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 25,
       reason: 'PO-1001',
     }, 'warehouse-quantity-test');
-    const second = await inventory.receiveQuantity({
-      productId: product.id,
+    const second = await inventory.receiveQuantity({ idempotencyKey: `recv-4-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 5,
     }, 'warehouse-quantity-test');
@@ -135,8 +133,7 @@ describe('Quantity inventory (integration)', () => {
       location: 'BISHKEK-1',
       imeis: ['QTY-MUST-NOT-GET-IMEI'],
     }, 'warehouse-quantity-test')).rejects.toMatchObject({ code: 'serialized_product_required' });
-    await expect(inventory.receiveQuantity({
-      productId: serialized.id,
+    await expect(inventory.receiveQuantity({ idempotencyKey: `recv-5-${Math.random().toString(36).slice(2)}`, productId: serialized.id,
       location: 'BISHKEK-1',
       quantity: 1,
     }, 'warehouse-quantity-test')).rejects.toMatchObject({ code: 'quantity_product_required' });
@@ -144,7 +141,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('moves only available quantity stock once and rejects key reuse', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({ productId: product.id, location: 'BISHKEK-1', quantity: 8 }, 'warehouse');
+    await inventory.receiveQuantity({ idempotencyKey: `recv-6-${Math.random().toString(36).slice(2)}`, productId: product.id, location: 'BISHKEK-1', quantity: 8 }, 'warehouse');
     await prisma.inventoryBalance.update({
       where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
       data: { reserved: 3 },
@@ -177,11 +174,9 @@ describe('Quantity inventory (integration)', () => {
 
   it('moves FIFO valuation with quantity stock without changing total inventory value', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id, location: 'BISHKEK-1', quantity: 3, unitCost: 1000,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-7-${Math.random().toString(36).slice(2)}`, productId: product.id, location: 'BISHKEK-1', quantity: 3, unitCost: 1000,
     }, 'warehouse');
-    await inventory.receiveQuantity({
-      productId: product.id, location: 'BISHKEK-1', quantity: 4, unitCost: 1500,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-8-${Math.random().toString(36).slice(2)}`, productId: product.id, location: 'BISHKEK-1', quantity: 4, unitCost: 1500,
     }, 'warehouse');
 
     const moved = await inventory.transferQuantity({
@@ -216,8 +211,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('serializes competing quantity transfers from the same balance', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id, location: 'BISHKEK-1', quantity: 5, unitCost: 1100,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-9-${Math.random().toString(36).slice(2)}`, productId: product.id, location: 'BISHKEK-1', quantity: 5, unitCost: 1100,
     }, 'warehouse');
 
     const results = await Promise.allSettled(['BISHKEK-2', 'BISHKEK-3'].map((to, index) => inventory.transferQuantity({
@@ -241,8 +235,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('prevents tracking-mode changes once stock exists', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-10-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 1,
     }, 'warehouse-quantity-test');
@@ -254,8 +247,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('reserves, sells, and deduplicates quantity stock through the web order flow', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-11-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 3,
     }, 'warehouse-quantity-test');
@@ -298,8 +290,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('allows only one concurrent order to reserve the final quantity', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-12-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 1,
     }, 'warehouse-quantity-test');
@@ -324,8 +315,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('releases quantity stock on cancellation and rejects unstocked serialized POS lines', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-13-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 2,
     }, 'warehouse-quantity-test');
@@ -363,8 +353,7 @@ describe('Quantity inventory (integration)', () => {
 
   it('sells quantity stock through POS exactly once', async () => {
     const product = await quantityProduct();
-    await inventory.receiveQuantity({
-      productId: product.id,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-14-${Math.random().toString(36).slice(2)}`, productId: product.id,
       location: 'BISHKEK-1',
       quantity: 4,
     }, 'warehouse-quantity-test');

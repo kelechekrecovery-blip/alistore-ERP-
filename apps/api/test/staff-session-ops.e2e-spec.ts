@@ -456,7 +456,10 @@ describe('Staff session rollout for operational endpoints', () => {
         attrs: {},
       },
     });
-    const payload = { productId: product.id, location: 'BISHKEK-1', quantity: 12, requester: 'spoof' };
+    // Ключ обязателен: приёмка количественного товара была единственным путём
+    // оприходования без идемпотентности, и повтор удваивал остаток согласованно
+    // со слоями оценки — сверка объявляла такое состояние здоровым.
+    const payload = { idempotencyKey: `recv-staff-ops-${RUN}`, productId: product.id, location: 'BISHKEK-1', quantity: 12, requester: 'spoof' };
 
     await request(app.getHttpServer()).post('/inventory/receive-quantity').send(payload).expect(401);
     await request(app.getHttpServer())

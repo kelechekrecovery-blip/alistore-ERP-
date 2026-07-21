@@ -43,9 +43,10 @@ describe('Gift cards / store credit (integration)', () => {
     await prisma.payment.deleteMany();
     await prisma.giftCard.deleteMany();
     await prisma.cashDrawerMovement.deleteMany();
-    await prisma.cashShift.deleteMany();
     await prisma.orderItem.deleteMany();
+    // Заказы ссылаются на смену через posShiftId — смены удаляются после них.
     await prisma.order.deleteMany();
+    await prisma.cashShift.deleteMany();
     await prisma.inventoryMovement.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();

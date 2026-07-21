@@ -541,6 +541,35 @@ export class InventoryService {
     if (!location) throw new ValidationError('location_required', 'Укажите склад приёмки');
 
     return this.audit.transaction(async (tx) => {
+      // Тот же приём, что в `transferQuantity` ниже: блокировка по ключу и
+      // перечитывание внутри транзакции. Без них повтор удваивал остаток
+      // согласованно со слоями оценки, и собственная сверка склада объявляла
+      // такое состояние здоровым.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'quantity-receive:' + dto.idempotencyKey}))::text AS locked`;
+      const replay = await tx.inventoryMovement.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+      if (replay) {
+        if (replay.productId !== dto.productId || replay.qty !== dto.quantity || replay.to !== location) {
+          throw new ConflictError(
+            'receive_idempotency_mismatch',
+            'Ключ приёмки уже использован с другими параметрами',
+          );
+        }
+        const current = await tx.inventoryBalance.findUniqueOrThrow({
+          where: { productId_location: { productId: dto.productId, location } },
+        });
+        return {
+          result: {
+            productId: dto.productId,
+            location,
+            received: dto.quantity,
+            onHand: current.onHand,
+            reserved: current.reserved,
+            available: current.onHand - current.reserved,
+            movementId: replay.id,
+          },
+          events: [],
+        };
+      }
       const unitCost = dto.unitCost ?? product.cost;
       const balance = await tx.inventoryBalance.upsert({
         where: { productId_location: { productId: dto.productId, location } },
@@ -556,6 +585,7 @@ export class InventoryService {
           reason: dto.reason?.trim() || null,
           unitCost,
           totalValue: dto.quantity * unitCost,
+          idempotencyKey: dto.idempotencyKey,
         },
       });
       await tx.inventoryValuationLayer.create({

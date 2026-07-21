@@ -69,7 +69,21 @@ export class ServiceLoanerService {
         if (!unit) throw new ValidationError('loaner_unit_not_found', 'IMEI не найден на складе');
         if (unit.status !== 'in_stock') throw new ConflictError('loaner_unit_unavailable', 'В подменный фонд можно добавить только свободное устройство');
         if (!MANAGER_ROLES.has(staff.role) && unit.location !== staff.point) throw new ConflictError('loaner_point_forbidden', 'Устройство относится к другой точке');
-        await tx.deviceUnit.update({ where: { id: unit.id }, data: { status: 'loaner_available' } });
+        // Здесь был безусловный `update` после чтения: классический lost update
+        // под Read Committed. Advisory-lock взят по ключу `loaner-register:*`,
+        // которого не берёт больше никто, поэтому параллельный резерв заказа
+        // (`units.reserveOnTx`) проскакивал между проверкой и записью —
+        // регистрация затирала свежий резерв клиента. Дальше клиент не мог
+        // оплатить (`order_reservation_incomplete`), а `releaseOnTx` молчал:
+        // он условен по `reserved`, поэтому события `stock.released` не было, и
+        // резерв исчезал из леджера бесследно.
+        const claimed = await tx.deviceUnit.updateMany({
+          where: { id: unit.id, status: 'in_stock' },
+          data: { status: 'loaner_available' },
+        });
+        if (claimed.count !== 1) {
+          throw new ConflictError('loaner_unit_unavailable', 'Устройство перестало быть свободным — регистрация отменена');
+        }
         const result = await tx.loanerDevice.create({ data: { unitId: unit.id, condition, registeredBy: actor, registrationIdempotencyKey: key }, include: { unit: true } });
         return { result, events: [{ type: EventType.ServiceLoanerRegistered, actor, payload: { loanerDeviceId: result.id, imei, location: unit.location, condition }, refs: [result.id, unit.id, imei] }] };
       });

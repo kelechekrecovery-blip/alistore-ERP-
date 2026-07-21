@@ -76,6 +76,16 @@ export class ReceiveDto {
 }
 
 export class ReceiveQuantityDto {
+  /**
+   * Единственный DTO приёмки без ключа — и единственный путь оприходования
+   * количественного товара. Повтор запроса удваивал `onHand`, `inventoryValue`,
+   * движение и слой оценки **согласованно**, поэтому `valuationReconciliation`
+   * рапортовала `consistent: true`: приписка становилась видна только при
+   * инвентаризации, уже как недостача с назначенным виновным.
+   */
+  @ApiProperty({ example: 'receive-2026-07-21-001' })
+  @IsString() @MaxLength(128) idempotencyKey!: string;
+
   @ApiProperty({ example: 'clx_product_accessory' })
   @IsString() productId!: string;
 

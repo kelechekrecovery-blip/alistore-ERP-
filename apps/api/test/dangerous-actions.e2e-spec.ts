@@ -105,11 +105,9 @@ describe('Dangerous actions via approval (integration)', () => {
 
   it('consumes FIFO value and posts the approved write-off to inventory GL', async () => {
     const p = await product(100000, 'quantity');
-    await inventory.receiveQuantity({
-      productId: p.id, location: 'BISHKEK-1', quantity: 3, unitCost: 1000,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-1-${Math.random().toString(36).slice(2)}`, productId: p.id, location: 'BISHKEK-1', quantity: 3, unitCost: 1000,
     }, 'warehouse');
-    await inventory.receiveQuantity({
-      productId: p.id, location: 'BISHKEK-1', quantity: 2, unitCost: 1500,
+    await inventory.receiveQuantity({ idempotencyKey: `recv-2-${Math.random().toString(36).slice(2)}`, productId: p.id, location: 'BISHKEK-1', quantity: 2, unitCost: 1500,
     }, 'warehouse');
     const requested = await inventory.movement({
       productId: p.id, qty: 2, type: 'write_off', location: 'BISHKEK-1', reason: 'бой',
