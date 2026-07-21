@@ -17,11 +17,21 @@
  * Escape hatch: put `// fixtures-allowed: <reason>` on the line above. It is
  * deliberately explicit — a reviewer should see the justification in the diff.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const SCAN = ['apps/web/components/erp', 'apps/web/app/erp'];
+/*
+ * Область: весь веб, а не только экраны ERP.
+ *
+ * Первая версия сканировала два каталога ERP — и пропустила ровно ту
+ * поверхность, где цена ошибки выше всего. Витрина при упавшем каталоге
+ * показывает покупателю пустой магазин: ни ошибки, ни повтора, ни намёка, что
+ * это сбой. Именно в таком состоянии сейчас находится прод.
+ */
+const SCAN = ['apps/web/app', 'apps/web/components', 'apps/web/lib'];
+/** В тестах фикстуры уместны — это их работа. */
+const SKIP_FILE = /\.(test|spec)\.tsx?$/;
 const ALLOW = /\/\/\s*fixtures-allowed:/;
 
 /** A number this large in a UI constant is a price, a salary or a balance. */
@@ -34,7 +44,7 @@ function walk(dir) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...walk(full));
-    else if (/\.tsx?$/.test(entry)) out.push(full);
+    else if (/\.tsx?$/.test(entry) && !SKIP_FILE.test(entry)) out.push(full);
   }
   return out;
 }
@@ -58,6 +68,32 @@ function readDeclaration(lines, start, fromColumn = 0) {
     }
     if (depth <= 0 && i > start) break;
     if (depth === 0 && /;\s*$/.test(text)) break;
+  }
+  return chunk.join('\n');
+}
+
+/**
+ * Собрать аргумент промисного `.catch(...)` — от открывающей скобки до парной.
+ *
+ * Это не то же самое, что блок `try/catch`: у `.catch(() => setProducts([]))`
+ * фигурных скобок нет вовсе, и разбор по ним находит пустоту. Первая версия
+ * правила именно поэтому пропускала все тридцать мест, ради которых её писали.
+ */
+function readCatchCallback(lines, start, fromColumn) {
+  let depth = 0;
+  const chunk = [];
+  for (let i = start; i < lines.length && i < start + 40; i += 1) {
+    const text = i === start ? lines[i].slice(fromColumn) : lines[i];
+    let cut = text.length;
+    for (let c = 0; c < text.length; c += 1) {
+      if (text[c] === '(') depth += 1;
+      if (text[c] === ')') {
+        depth -= 1;
+        if (depth === 0) { cut = c + 1; break; }
+      }
+    }
+    chunk.push(text.slice(0, cut));
+    if (depth === 0) break;
   }
   return chunk.join('\n');
 }
@@ -99,17 +135,59 @@ for (const scanDir of SCAN) {
       // but perfectly honest setter. The harm was never silence as such: it is
       // substituting fixtures, which turns a failure into confident-looking data.
       // So the rule now targets exactly that, plus a genuinely empty handler.
-      const catchAt = /\bcatch\s*(\([^)]*\))?\s*\{/.exec(line);
-      if (catchAt) {
-        const body = readDeclaration(lines, index, catchAt.index);
-        const usesFixture = /\b(DEFAULT_[A-Z0-9_]*|MOCK_[A-Z0-9_]*|FAKE_[A-Z0-9_]*|\w*_FIXTURE\w*|default[A-Z]\w*\()/.test(body);
-        const stripped = body.replace(/catch\s*(\([^)]*\))?\s*\{/, '').replace(/[{}\s]/g, '').replace(/\/\/.*$/gm, '');
+      // Промисный `.catch(cb)` — тот же вред, другая форма. Разбирается
+      // отдельно: скобок вида `{ … }` у стрелки может не быть вовсе.
+      const promiseCatchAt = /\.catch\s*\(/.exec(line);
+      if (promiseCatchAt) {
+        const body = readCatchCallback(lines, index, promiseCatchAt.index + promiseCatchAt[0].length - 1);
+        const recordsError = /\b(set\w*(Error|Message|Notice|Failed)|console\.(error|warn))\s*\(/i.test(body);
+        const neutralReset = /\bset[A-Z]\w*\(\s*(\[\]|null|0|''|""|false)\s*\)/.test(body);
+        const usesFixture = /\b(DEFAULT_[A-Z0-9_]*|MOCK_[A-Z0-9_]*|FAKE_[A-Z0-9_]*|\w*_FIXTURE\w*)/.test(body);
         if (usesFixture) {
           findings.push({
             file: rel,
             line: index + 1,
             what: 'catch подставляет фикстуру вместо ошибки',
             why: 'Сбой превращается в правдоподобные данные — владелец их не отличит.',
+          });
+        } else if (neutralReset && !recordsError) {
+          findings.push({
+            file: rel,
+            line: index + 1,
+            what: 'catch выдаёт сбой за пустоту',
+            why: 'Пустой список и упавший запрос — разные вещи. Покажите ошибку и дайте повтор.',
+          });
+        }
+      }
+
+      const catchAt = /\bcatch\s*(\([^)]*\))?\s*\{/.exec(line);
+      if (catchAt) {
+        const body = readDeclaration(lines, index, catchAt.index);
+        const usesFixture = /\b(DEFAULT_[A-Z0-9_]*|MOCK_[A-Z0-9_]*|FAKE_[A-Z0-9_]*|\w*_FIXTURE\w*|default[A-Z]\w*\()/.test(body);
+        const stripped = body.replace(/catch\s*(\([^)]*\))?\s*\{/, '').replace(/[{}\s]/g, '').replace(/\/\/.*$/gm, '');
+        // Правило 3 — сбой, выданный за пустоту.
+        //
+        // Самая частая форма, и первая версия правила её пропускала: тело у
+        // `.catch(() => setProducts([]))` непустое и фикстуры не содержит, а
+        // результат тот же — «сервер лёг» становится неотличимо от «данных
+        // нет». Владелец не пойдёт чинить то, о чём ему не сказали, а
+        // покупатель на витрине просто уйдёт из пустого магазина.
+        const recordsError = /\b(set\w*(Error|Message|Notice|Failed)|console\.(error|warn))\s*\(/i.test(body);
+        const neutralReset = /\bset[A-Z]\w*\(\s*(\[\]|null|0|''|""|false)\s*\)/.test(body);
+
+        if (usesFixture) {
+          findings.push({
+            file: rel,
+            line: index + 1,
+            what: 'catch подставляет фикстуру вместо ошибки',
+            why: 'Сбой превращается в правдоподобные данные — владелец их не отличит.',
+          });
+        } else if (neutralReset && !recordsError) {
+          findings.push({
+            file: rel,
+            line: index + 1,
+            what: 'catch выдаёт сбой за пустоту',
+            why: 'Пустой список и упавший запрос — разные вещи. Покажите ошибку и дайте повтор.',
           });
         } else if (stripped.length === 0) {
           findings.push({
@@ -125,40 +203,67 @@ for (const scanDir of SCAN) {
 }
 
 /*
- * Ratchet. Some screens still carry known fixtures (Склад, Сервис-центр) and are
- * scheduled separately. Failing on them would make the guard unusable today and
- * it would simply be removed. So the baseline records what is already known and
- * the guard fails only on anything NEW — the count can go down, never up.
- * Fixing a screen means deleting its lines from the baseline in the same commit.
+ * Храповик по количеству, а не по факту.
+ *
+ * Раньше ключом было «файл + вид нарушения», поэтому файл с пятью молчащими
+ * catch'ами и файл с одним выглядели одинаково: починив один, ты не двигал
+ * базовую линию, а добавив шестой — не ронял гейт. Теперь в линии хранится
+ * число: оно может только уменьшаться. Гейт падает и когда появляется новый
+ * вид нарушения, и когда старого становится больше.
+ *
+ * Строки вида "путь::вид::N". Обновлять командой
+ *   node scripts/check-no-fixtures.mjs --update-baseline
+ * и только осознанно — это фиксация долга, а не способ заглушить гейт.
  */
 const BASELINE_PATH = join(ROOT, 'scripts/no-fixtures-baseline.json');
 let baseline = [];
-try { baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')); } catch { /* no baseline yet */ }
+try { baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')); } catch { /* базовой линии ещё нет */ }
 
-const key = (f) => `${f.file}::${f.what}`;
-const known = new Set(baseline);
-const fresh = findings.filter((f) => !known.has(key(f)));
-const fixed = [...known].filter((entry) => !findings.some((f) => key(f) === entry));
+const groupKey = (f) => `${f.file}::${f.what}`;
+const counts = new Map();
+for (const f of findings) counts.set(groupKey(f), (counts.get(groupKey(f)) ?? 0) + 1);
 
-if (fixed.length > 0) {
-  console.log(`✓ Исправлено с прошлого запуска: ${fixed.length}. Удалите из базовой линии:`);
-  for (const entry of fixed) console.log(`    ${entry}`);
+const allowed = new Map();
+for (const entry of baseline) {
+  const at = entry.lastIndexOf('::');
+  const parsed = Number(entry.slice(at + 2));
+  if (Number.isInteger(parsed)) allowed.set(entry.slice(0, at), parsed);
+  else allowed.set(entry, 1); // формат старой линии — считаем за одно
+}
+
+const lines = [...counts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => `${k}::${n}`);
+
+if (process.argv.includes('--update-baseline')) {
+  writeFileSync(BASELINE_PATH, `${JSON.stringify(lines, null, 2)}\n`);
+  console.log(`Базовая линия обновлена: ${findings.length} нарушений в ${counts.size} группах.`);
+  process.exit(0);
+}
+
+const grown = [...counts.entries()].filter(([k, n]) => n > (allowed.get(k) ?? 0));
+const shrunk = [...allowed.entries()].filter(([k, n]) => (counts.get(k) ?? 0) < n);
+
+if (shrunk.length > 0) {
+  console.log(`✓ Стало лучше в ${shrunk.length} местах. Зафиксируйте: --update-baseline`);
+  for (const [k, n] of shrunk) console.log(`    ${k}: ${n} → ${counts.get(k) ?? 0}`);
   console.log('');
 }
 
-if (fresh.length === 0) {
+if (grown.length === 0) {
   const rest = findings.length;
   console.log(rest === 0
-    ? '✓ Фикстур в экранах ERP не осталось'
-    : `✓ Новых фикстур нет (в базовой линии ещё ${rest} — они запланированы отдельно)`);
-  process.exit(fixed.length > 0 ? 1 : 0);
+    ? '✓ Ни одна поверхность не выдаёт сбой за данные'
+    : `✓ Новых нарушений нет (в базовой линии ещё ${rest} — они запланированы отдельно)`);
+  process.exit(shrunk.length > 0 ? 1 : 0);
 }
 
-console.error(`\n✗ Новых нарушений: ${fresh.length}\n`);
-for (const f of fresh) {
-  console.error(`  ${f.file}:${f.line}`);
-  console.error(`    ${f.what}`);
-  console.error(`    ${f.why}\n`);
+console.error(`\n✗ Новых нарушений: ${grown.reduce((sum, [k, n]) => sum + n - (allowed.get(k) ?? 0), 0)}\n`);
+for (const [k, n] of grown) {
+  const [file, what] = k.split('::');
+  console.error(`  ${file}`);
+  console.error(`    ${what}: было ${allowed.get(k) ?? 0}, стало ${n}`);
+  const first = findings.find((f) => groupKey(f) === k);
+  console.error(`    ${first.why}`);
+  console.error(`    строки: ${findings.filter((f) => groupKey(f) === k).map((f) => f.line).join(', ')}\n`);
 }
 console.error('Если случай действительно оправдан — добавьте строкой выше:');
 console.error('  // fixtures-allowed: <причина>\n');
