@@ -5106,3 +5106,10 @@
 - Checks: Evidence integration `7/7`; `git diff --check`.
 - Result: the ownership contract is now directly tested; the concurrent Courier/Evidence implementation remains in its owning dirty slice and still needs a coordinated review/commit.
 - Follow-up: Courier/Evidence implementation was reviewed and committed as `7e56e03`; delivery completion/failure now requires an Evidence upload owned by the assigned courier and order, with manager/cashier policy preserved.
+
+## WEB-AUDIT-2026-07-21E
+
+- Scope: validate the managed-cloud Docker build path.
+- Changes: API image now installs PostgreSQL 16 client for backups and declares the default Render port; Web image has explicit build-time API/site/demo arguments; Docker context excludes generated Next build directories and courier build artifacts.
+- Checks: API Docker image `alistore-api-audit:local` built successfully; Web Docker image `alistore-web-audit:local` built successfully with `https://api.ali.kg/api` and demo mode; Web production build generated `45` routes.
+- Result: local image build is accepted. Render deployment, registry provenance, health probes and rollback remain external gates.
