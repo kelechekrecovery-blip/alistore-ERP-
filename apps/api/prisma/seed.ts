@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -297,10 +297,102 @@ async function main(): Promise<void> {
     await prisma.storefrontBlock.upsert({ where: { id: b.id }, update: data, create: { id: b.id, ...data } });
   }
 
+  await seedStaffAndDelivery();
+
   const products = await prisma.product.count();
   const units = await prisma.deviceUnit.count();
+  const staff = await prisma.staffUser.count();
   // eslint-disable-next-line no-console
-  console.log(`Seed done: customer ${customer.phone}, ${products} products, ${units} units in stock, storefront published.`);
+  console.log(`Seed done: customer ${customer.phone}, ${products} products, ${units} units in stock, ${staff} staff accounts, storefront published.`);
+}
+
+/**
+ * Учётные записи персонала и справочник доставки.
+ *
+ * Без этого в Staff, Courier и POS войти было не во что: сидер создавал только
+ * покупателей, а все три приложения помечены `demoAccountRequired=true` в
+ * App Store Connect. Ревьюер Apple упирался в экран входа.
+ *
+ * Роли выбраны по тому, что приложения реально проверяют:
+ *  - Courier принимает строго `courier` (AliStoreCourierApp.swift:63)
+ *  - POS принимает `cashier | admin | owner` (AliStorePOSApp.swift:62)
+ *  - Staff открывается любой аутентифицированной роли, но данные закрывает сервер
+ *
+ * Пароли — только из окружения. Дефолт намеренно отсутствует: сидер с зашитым
+ * паролем персонала однажды уедет в прод, и это будет ровно тот же класс дефекта,
+ * что и `dev-secret-alistore-local` в репозитории.
+ */
+async function seedStaffAndDelivery(): Promise<void> {
+  const password = process.env.SEED_STAFF_PASSWORD?.trim();
+  if (!password) {
+    // eslint-disable-next-line no-console
+    console.warn('Seed: SEED_STAFF_PASSWORD не задан — учётные записи персонала пропущены.');
+  } else {
+    const argon2 = await import('argon2');
+    const passwordHash = await argon2.hash(password);
+    const staffAccounts = [
+      { username: 'demo.owner', role: Role.owner },
+      { username: 'demo.seller', role: Role.seller },
+      { username: 'demo.courier', role: Role.courier },
+      { username: 'demo.cashier', role: Role.cashier },
+    ];
+    for (const account of staffAccounts) {
+      await prisma.staffUser.upsert({
+        where: { username: account.username },
+        // Пароль обновляем и на update: иначе смена SEED_STAFF_PASSWORD не подействует
+        // на уже созданные учётки, и владелец будет гадать, почему вход не работает.
+        update: { passwordHash, role: account.role, active: true },
+        create: {
+          username: account.username,
+          passwordHash,
+          role: account.role,
+          point: 'BISHKEK-1',
+          active: true,
+        },
+      });
+    }
+  }
+
+  // Без зоны и слота на оформлении доставки нечего выбрать — checkout упирается в пустой список.
+  const zone = await prisma.deliveryZone.upsert({
+    where: { code: 'bishkek-center' },
+    update: { name: 'Бишкек, центр', fee: 20000, etaMinMinutes: 60, etaMaxMinutes: 120, active: true },
+    create: {
+      code: 'bishkek-center',
+      name: 'Бишкек, центр',
+      fee: 20000,
+      etaMinMinutes: 60,
+      etaMaxMinutes: 120,
+      active: true,
+      createdBy: 'seed',
+      idempotencyKey: 'seed:delivery-zone:bishkek-center',
+    },
+  });
+
+  // Слоты на ближайшие три дня, по одному дневному окну. Идемпотентность — по составному
+  // ключу zone+start+end, поэтому повторный прогон не размножает.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let dayOffset = 1; dayOffset <= 3; dayOffset += 1) {
+    const startsAt = new Date(today);
+    startsAt.setDate(startsAt.getDate() + dayOffset);
+    startsAt.setHours(12, 0, 0, 0);
+    const endsAt = new Date(startsAt);
+    endsAt.setHours(18, 0, 0, 0);
+    await prisma.deliverySlot.upsert({
+      where: { zoneId_startsAt_endsAt: { zoneId: zone.id, startsAt, endsAt } },
+      update: { capacity: 10, active: true },
+      create: {
+        zoneId: zone.id,
+        startsAt,
+        endsAt,
+        capacity: 10,
+        active: true,
+        createdBy: 'seed',
+        idempotencyKey: `seed:delivery-slot:${startsAt.toISOString()}`,
+      },
+    });
+  }
 }
 
 main()
