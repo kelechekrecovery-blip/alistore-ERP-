@@ -209,7 +209,9 @@ private struct POSRootView: View {
 
     @MainActor private func replayQueuedSales() async {
         guard let queued = try? modelContext.fetch(FetchDescriptor<PendingMutation>()) else { return }
-        for mutation in queued where mutation.endpoint == "pos/sale" && mutation.state == "queued" {
+        // Отбор вынесен в ядро и покрыт тестами: он решает два вопроса сразу —
+        // чью продажу вообще можно отправить и какие состояния переигрывать.
+        for mutation in OfflinePOSQueue.replayable(queued, owner: session.staffId) {
             await OfflinePOSQueue.replay(mutation, api: api, token: session.accessToken, context: modelContext)
         }
     }

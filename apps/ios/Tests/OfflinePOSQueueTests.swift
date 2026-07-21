@@ -25,7 +25,7 @@ final class OfflinePOSQueueTests: XCTestCase {
     /// разделяются внутри процесса, и записи одного теста доживали до соседнего.
     @MainActor
     private func makeContext() throws -> ModelContext {
-        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
+        let schema = Schema(versionedSchema: OfflineSchemaV2.self)
         let container = try ModelContainer(
             for: schema,
             configurations: ModelConfiguration(
@@ -87,5 +87,56 @@ final class OfflinePOSQueueTests: XCTestCase {
         try OfflinePOSQueue.enqueue(sale(id: "sale-2", qty: 1), context: context)
 
         XCTAssertEqual(try queued(context).count, 2)
+    }
+
+    // MARK: - Чья продажа уходит на сервер
+
+    /// Реплей шёл токеном того, кто вошёл сейчас: выручку и ответственность за
+    /// продажу одного кассира леджер записывал на следующего.
+    @MainActor
+    func testForeignSaleIsNotReplayedUnderTheCurrentCashier() throws {
+        let context = try makeContext()
+        try OfflinePOSQueue.enqueue(sale(id: "sale-1", qty: 1), context: context, owner: "cashier-a")
+
+        let mine = OfflinePOSQueue.replayable(try queued(context), owner: "cashier-b")
+        XCTAssertTrue(mine.isEmpty, "продажа чужого кассира не должна уходить под моим токеном")
+
+        let theirs = OfflinePOSQueue.replayable(try queued(context), owner: "cashier-a")
+        XCTAssertEqual(theirs.count, 1, "своя продажа обязана отправиться")
+    }
+
+    /// Записи, сделанные до появления владельца, отправляет тот, кто есть, —
+    /// иначе они не уйдут никогда.
+    @MainActor
+    func testOwnerlessLegacySaleIsStillReplayed() throws {
+        let context = try makeContext()
+        try OfflinePOSQueue.enqueue(sale(id: "sale-1", qty: 1), context: context)
+
+        XCTAssertEqual(OfflinePOSQueue.replayable(try queued(context), owner: "cashier-b").count, 1)
+    }
+
+    /// Приложение могли убить посреди отправки. Такие записи раньше не
+    /// переигрывались никогда: деньги стояли в очереди и не уходили.
+    @MainActor
+    func testSaleStuckInSyncingIsRetried() throws {
+        let context = try makeContext()
+        try OfflinePOSQueue.enqueue(sale(id: "sale-1", qty: 1), context: context, owner: "cashier-a")
+        let mutation = try XCTUnwrap(try queued(context).first)
+        mutation.state = "syncing"
+        try context.save()
+
+        XCTAssertEqual(OfflinePOSQueue.replayable(try queued(context), owner: "cashier-a").count, 1)
+    }
+
+    /// Конфликт и отказ — не для автоматического повтора: их разбирает человек.
+    @MainActor
+    func testConflictedSaleIsNotReplayedAutomatically() throws {
+        let context = try makeContext()
+        try OfflinePOSQueue.enqueue(sale(id: "sale-1", qty: 1), context: context, owner: "cashier-a")
+        let mutation = try XCTUnwrap(try queued(context).first)
+        mutation.state = "conflict"
+        try context.save()
+
+        XCTAssertTrue(OfflinePOSQueue.replayable(try queued(context), owner: "cashier-a").isEmpty)
     }
 }

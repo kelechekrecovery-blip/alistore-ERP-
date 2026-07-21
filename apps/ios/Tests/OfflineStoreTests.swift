@@ -43,7 +43,7 @@ final class OfflineStoreTests: XCTestCase {
     func testExistingQueueSurvivesVersionedSchema() throws {
         // Прямой сторож инварианта: имя сущности — это и есть ключ, по которому
         // SwiftData находит накопленные строки. Меняется имя — очередь исчезает.
-        let entities = Schema(versionedSchema: OfflineSchemaV1.self).entities.map(\.name)
+        let entities = Schema(versionedSchema: OfflineSchemaV2.self).entities.map(\.name)
         XCTAssertEqual(entities, ["PendingMutation"], "имя сущности менять нельзя — осиротеют существующие очереди")
 
         let url = directory.appendingPathComponent("queue.store")
@@ -68,6 +68,33 @@ final class OfflineStoreTests: XCTestCase {
         let survived = try context.fetch(FetchDescriptor<PendingMutation>())
         XCTAssertEqual(survived.count, 1, "непроведённая продажа исчезла при переходе на версионированную схему")
         XCTAssertEqual(survived.first?.idempotencyKey, "sale-1")
+    }
+
+    /// Настоящая проверка плана миграций: store, записанный схемой V1, обязан
+    /// открыться после того, как в модель добавили поле (V2), и непроведённая
+    /// продажа обязана уцелеть. Без плана это был бы отказ запуска у всех
+    /// устройств разом — вместе с единственным следом этих продаж.
+    @MainActor
+    func testQueueWrittenBeforeTheOwnerFieldSurvivesMigration() throws {
+        let url = directory.appendingPathComponent("v1.store")
+        let v1 = Schema(versionedSchema: OfflineSchemaV1.self)
+        let legacy = try ModelContainer(for: v1, configurations: ModelConfiguration(schema: v1, url: url))
+        let legacyContext = ModelContext(legacy)
+        legacyContext.insert(PendingMutation(
+            endpoint: "pos/sale",
+            method: "POST",
+            body: Data("{\"clientSaleId\":\"sale-9\"}".utf8),
+            idempotencyKey: "sale-9"
+        ))
+        try legacyContext.save()
+
+        let opened = OfflineStore.open(url: url)
+        XCTAssertFalse(opened.isEphemeral, "миграция не прошла, очередь ушла в память: \(opened.failure ?? "-")")
+
+        let survived = try ModelContext(opened.container).fetch(FetchDescriptor<PendingMutation>())
+        XCTAssertEqual(survived.count, 1, "продажа исчезла при добавлении поля в модель")
+        XCTAssertEqual(survived.first?.idempotencyKey, "sale-9")
+        XCTAssertNil(survived.first?.owner, "у записи из прошлой версии владельца быть не может")
     }
 
     /// Непригодный файл базы больше не убивает приложение. Касса обязана

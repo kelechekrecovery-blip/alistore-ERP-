@@ -13,8 +13,19 @@ public final class PendingMutation {
     public var lastError: String?
     public var createdAt: Date
     public var updatedAt: Date
+    /// Кто поставил операцию в очередь. Реплей шёл токеном того, кто вошёл в
+    /// приложение сейчас, — то есть продажу одного кассира леджер записывал на
+    /// следующего. Необязательное: у записей, созданных до этого поля, владельца
+    /// нет, и терять их нельзя.
+    public var owner: String?
 
-    public init(endpoint: String, method: String, body: Data, idempotencyKey: String = UUID().uuidString) {
+    public init(
+        endpoint: String,
+        method: String,
+        body: Data,
+        idempotencyKey: String = UUID().uuidString,
+        owner: String? = nil
+    ) {
         self.id = UUID()
         self.endpoint = endpoint
         self.method = method
@@ -25,6 +36,7 @@ public final class PendingMutation {
         self.lastError = nil
         self.createdAt = Date()
         self.updatedAt = Date()
+        self.owner = owner
     }
 }
 
@@ -227,7 +239,8 @@ public enum OfflinePOSQueue {
     @MainActor
     public static func enqueue(
         _ request: POSSaleRequest,
-        context: ModelContext
+        context: ModelContext,
+        owner: String? = nil
     ) throws {
         let body = try OfflineQueueCoding.encode(request)
         let descriptor = FetchDescriptor<PendingMutation>(
@@ -245,9 +258,31 @@ public enum OfflinePOSQueue {
             endpoint: "pos/sale",
             method: "POST",
             body: body,
-            idempotencyKey: request.clientSaleId
+            idempotencyKey: request.clientSaleId,
+            owner: owner
         ))
         try context.save()
+    }
+
+    /// Продажи, которые может отправить именно этот кассир.
+    ///
+    /// Реплей шёл токеном того, кто вошёл сейчас: продажа, отложенная одним
+    /// кассиром, уходила на сервер от имени следующего — и леджер записывал
+    /// выручку и ответственность не на того человека. Чужие записи остаются
+    /// в очереди и ждут своего владельца, а не отправляются под чужим именем.
+    ///
+    /// `syncing` включается намеренно: приложение могли убить посреди отправки,
+    /// и такая запись раньше не переигрывалась никогда. Повторная отправка
+    /// безопасна — у неё тот же ключ идемпотентности, сервер отсечёт дубль.
+    public static func replayable(_ all: [PendingMutation], owner: String?) -> [PendingMutation] {
+        all.filter { mutation in
+            guard mutation.endpoint == "pos/sale" else { return false }
+            guard mutation.state == "queued" || mutation.state == "syncing" else { return false }
+            // Записи без владельца созданы до появления поля — их отправляет тот,
+            // кто есть: иначе они не уйдут никогда.
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
+        }
     }
 
     @MainActor
@@ -332,13 +367,21 @@ public enum OfflineSchemaV1: VersionedSchema {
     public static var models: [any PersistentModel.Type] { [PendingMutation.self] }
 }
 
-/// План миграций. Пока переход один — сама V1, стадий нет. Ценность не в текущем
-/// содержимом, а в том, что у следующего изменения модели есть куда встать:
-/// без плана оно молча ломает запуск у всех, включая устройства с непроведёнными
-/// продажами.
+/// V2 добавляет `owner` — необязательное поле, поэтому переход облегчённый:
+/// у записей, созданных до него, владелец остаётся пустым, и они не теряются.
+public enum OfflineSchemaV2: VersionedSchema {
+    public static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
+    public static var models: [any PersistentModel.Type] { [PendingMutation.self] }
+}
+
+/// План миграций. Ровно ради него делался предыдущий срез: без плана добавление
+/// поля в модель молча ломало бы запуск у всех, включая устройства с
+/// непроведёнными продажами.
 public enum OfflineMigrationPlan: SchemaMigrationPlan {
-    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self] }
-    public static var stages: [MigrationStage] { [] }
+    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self, OfflineSchemaV2.self] }
+    public static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: OfflineSchemaV1.self, toVersion: OfflineSchemaV2.self)]
+    }
 }
 
 @MainActor
@@ -362,7 +405,7 @@ public enum OfflineStore {
     /// - Parameter url: путь к store. `nil` — расположение по умолчанию;
     ///   продовый путь своё имя не задаёт, иначе сменился бы файл базы.
     public static func open(url: URL? = nil) -> Opened {
-        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
+        let schema = Schema(versionedSchema: OfflineSchemaV2.self)
         do {
             let configuration = url.map { ModelConfiguration(schema: schema, url: $0) }
                 ?? ModelConfiguration(schema: schema)

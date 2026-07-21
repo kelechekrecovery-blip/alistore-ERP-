@@ -325,7 +325,7 @@ struct POSSaleView: View {
                 return
             }
             do {
-                try OfflinePOSQueue.enqueue(request, context: modelContext)
+                try OfflinePOSQueue.enqueue(request, context: modelContext, owner: session.staffId)
                 message = "Продажа сохранена офлайн"
                 // Ключ не ротировался, корзина не чистилась — и следующая
                 // офлайн-продажа уходила под тем же `clientSaleId`. Очередь
