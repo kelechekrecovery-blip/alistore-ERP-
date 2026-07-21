@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
@@ -11,6 +12,14 @@ import {
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthPrincipal } from './jwt.strategy';
+import {
+  clearWebSessionCookies,
+  isWebSessionRequest,
+  readWebCookie,
+  setWebSessionCookies,
+  WEB_REFRESH_COOKIE,
+  webAuthResponse,
+} from './web-session';
 
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
@@ -27,8 +36,10 @@ export class AuthController {
   /** Verify the OTP → access + refresh tokens. Capped to slow brute-forcing. */
   @Post('otp/verify')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.auth.verifyOtp(dto.phone, dto.code);
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.verifyOtp(dto.phone, dto.code);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
   }
 
   /** Request an account recovery OTP. Same SMS channel, separate product intent. */
@@ -41,35 +52,47 @@ export class AuthController {
   /** Verify recovery OTP, revoke old refresh sessions, issue fresh tokens. */
   @Post('recovery/verify')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  verifyRecovery(@Body() dto: VerifyOtpDto) {
-    return this.auth.verifyRecoveryOtp(dto.phone, dto.code);
+  async verifyRecovery(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.verifyRecoveryOtp(dto.phone, dto.code);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
   }
 
   /** Telegram Mini App/Login Widget auth → access + refresh tokens. */
   @Post('social/telegram')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  telegramSocialLogin(@Body() dto: TelegramSocialLoginDto) {
-    return this.auth.loginWithTelegram(dto);
+  async telegramSocialLogin(@Body() dto: TelegramSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.loginWithTelegram(dto);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
   }
 
   /** Sign in with Apple identity token → access + refresh tokens. */
   @Post('social/apple')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  appleSocialLogin(@Body() dto: AppleSocialLoginDto) {
-    return this.auth.loginWithApple(dto);
+  async appleSocialLogin(@Body() dto: AppleSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.loginWithApple(dto);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
   }
 
   /** Rotate the refresh token → a fresh access + refresh pair. */
   @Post('refresh')
-  refresh(@Body() dto: RefreshDto) {
-    return this.auth.refresh(dto.refreshToken);
+  async refresh(@Body() dto: RefreshDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = dto.refreshToken?.trim() || readWebCookie(request, WEB_REFRESH_COOKIE);
+    if (!refreshToken) return this.auth.refresh('');
+    const tokens = await this.auth.refresh(refreshToken);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
   }
 
   /** Revoke a refresh token (logout). */
   @Post('logout')
   @HttpCode(204)
-  logout(@Body() dto: RefreshDto) {
-    return this.auth.logout(dto.refreshToken);
+  async logout(@Body() dto: RefreshDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = dto.refreshToken?.trim() || readWebCookie(request, WEB_REFRESH_COOKIE);
+    if (refreshToken) await this.auth.logout(refreshToken);
+    if (isWebSessionRequest(request)) clearWebSessionCookies(response, process.env.NODE_ENV === 'production');
   }
 
   /** The current authenticated principal (guarded — proves the JWT pipeline). */

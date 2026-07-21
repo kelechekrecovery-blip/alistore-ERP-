@@ -38,34 +38,21 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const STORAGE_KEY = 'alistore.auth.v1';
 
-interface StoredTokens {
+interface SessionTokens {
   accessToken: string;
-  refreshToken: string;
-}
-
-function load(): StoredTokens | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredTokens) : null;
-  } catch {
-    return null;
-  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const tokens = useRef<StoredTokens | null>(null);
+  const tokens = useRef<SessionTokens | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const persist = useCallback((t: AuthTokens | null) => {
     if (t) {
-      tokens.current = { accessToken: t.accessToken, refreshToken: t.refreshToken };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens.current));
+      tokens.current = { accessToken: t.accessToken };
     } else {
       tokens.current = null;
-      localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 
@@ -73,25 +60,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const stored = load();
-      tokens.current = stored;
-      if (stored) {
-        try {
-          const me = await authMe(stored.accessToken);
-          if (!cancelled) setUser(me);
-        } catch (error) {
-          // Only an actual authentication failure consumes the refresh token. A
-          // validation, server, or network error must not silently log the user out.
-          if (error instanceof ApiError && error.status === 401) {
-            try {
-              const fresh = await authRefresh(stored.refreshToken);
-              persist(fresh);
-              const me = await authMe(fresh.accessToken);
-              if (!cancelled) setUser(me);
-            } catch {
-              persist(null);
-            }
-          }
+      // Remove sessions created by the pre-cookie release. Shopping state uses
+      // separate keys and is intentionally preserved.
+      localStorage.removeItem('alistore.auth.v1');
+      try {
+        const fresh = await authRefresh();
+        persist(fresh);
+        const me = await authMe(fresh.accessToken);
+        if (!cancelled) setUser(me);
+      } catch (error) {
+        // No cookie is the normal anonymous state; keep network failures visible
+        // to the page instead of deleting unrelated local shopping data.
+        if (error instanceof ApiError && error.status !== 401 && error.status !== 422) {
+          // The shell still hydrates; protected requests can retry explicitly.
         }
       }
       if (!cancelled) setHydrated(true);
@@ -139,8 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const stored = tokens.current;
-    if (stored) await authLogout(stored.refreshToken);
+    await authLogout();
     persist(null);
     setUser(null);
   }, [persist]);
@@ -153,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return await fn(stored.accessToken);
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 401) throw error;
-        const fresh = await authRefresh(stored.refreshToken).catch(() => null);
+        const fresh = await authRefresh().catch(() => null);
         if (!fresh) {
           persist(null);
           setUser(null);

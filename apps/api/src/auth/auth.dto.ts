@@ -20,6 +20,7 @@ export class VerifyOtpDto {
 }
 
 export class RefreshDto {
+  @IsOptional()
   @IsString()
   refreshToken!: string;
 }

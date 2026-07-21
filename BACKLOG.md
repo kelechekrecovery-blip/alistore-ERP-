@@ -3,6 +3,7 @@
 ## Web Audit Follow-up 2026-07-21
 - `WEB-AUDIT-070` Test isolation: gift-card accounting specs previously summed retained journal rows and one suite truncated the entire accounting journal. They now scope issuance assertions to their own entries and use run-scoped payment keys; combined gift-card coverage is green `9/9`. Keep full API gate and clean-DB verification as the next check.
 - `WEB-AUDIT-071` Accepted locally: courier COD handover now checks receivable coverage for delivered orders, supports partial/zero collection without a false `cash.shortage`, and rejects fully undelivered manual release; API courier `18/18` and deadlock `5/5`. Public deployment, live provider and physical-device gates remain open.
+- `WEB-AUDIT-072` Customer Web auth cookie slice accepted locally: HttpOnly refresh/access cookies, in-memory access token, rotation, legacy customer-token cleanup and HTTP smoke are green. Staff/ERP still persist access JWT in `localStorage`; migrate staff session/auth API without weakening native bearer compatibility before production traffic.
 
 ## Web Audit Findings Added 2026-07-21
 - `WEB-AUDIT-061` High: public `/api/docs` and `/api/docs-json` are still reachable without staff authorization; production must either disable Swagger or protect it with active staff RBAC and add a regression test.

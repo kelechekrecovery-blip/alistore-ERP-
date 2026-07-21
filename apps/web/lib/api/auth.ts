@@ -2,7 +2,7 @@ import { API_BASE, getJson, postJson } from './http';
 
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   tokenType: string;
   expiresIn: string;
 }
@@ -18,7 +18,7 @@ export function authRequestOtp(phone: string): Promise<{ challengeId: string; de
 }
 
 export function authVerifyOtp(phone: string, code: string): Promise<AuthTokens> {
-  return postJson('/auth/otp/verify', { phone, code });
+  return postJson('/auth/otp/verify', { phone, code }, { 'x-alistore-web': '1' }, true);
 }
 
 export function authRequestRecoveryOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
@@ -26,32 +26,33 @@ export function authRequestRecoveryOtp(phone: string): Promise<{ challengeId: st
 }
 
 export function authVerifyRecoveryOtp(phone: string, code: string): Promise<AuthTokens> {
-  return postJson('/auth/recovery/verify', { phone, code });
+  return postJson('/auth/recovery/verify', { phone, code }, { 'x-alistore-web': '1' }, true);
 }
 
 export function authTelegramLogin(
   initData: string,
   source: 'mini_app' | 'login_widget' = 'mini_app',
 ): Promise<AuthTokens> {
-  return postJson('/auth/social/telegram', { initData, source });
+  return postJson('/auth/social/telegram', { initData, source }, { 'x-alistore-web': '1' }, true);
 }
 
 export function authAppleLogin(
   identityToken: string,
   options: { nonce?: string; name?: string } = {},
 ): Promise<AuthTokens> {
-  return postJson('/auth/social/apple', { identityToken, ...options });
+  return postJson('/auth/social/apple', { identityToken, ...options }, { 'x-alistore-web': '1' }, true);
 }
 
-export function authRefresh(refreshToken: string): Promise<AuthTokens> {
-  return postJson('/auth/refresh', { refreshToken });
+export function authRefresh(refreshToken?: string): Promise<AuthTokens> {
+  return postJson('/auth/refresh', refreshToken ? { refreshToken } : {}, { 'x-alistore-web': '1' }, true);
 }
 
-export async function authLogout(refreshToken: string): Promise<void> {
+export async function authLogout(refreshToken?: string): Promise<void> {
   await fetch(`${API_BASE}/auth/logout`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
+    headers: { 'content-type': 'application/json', 'x-alistore-web': '1' },
+    credentials: 'include',
+    body: JSON.stringify(refreshToken ? { refreshToken } : {}),
   }).catch(() => undefined);
 }
 

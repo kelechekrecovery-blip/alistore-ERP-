@@ -47,10 +47,11 @@ async function responseError(res: Response): Promise<ApiError> {
 }
 
 /** POST JSON and unwrap the response, surfacing the API's error message on failure. */
-export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
+export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>, credentials = false): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
+    ...(credentials ? { credentials: 'include' as const } : {}),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw await responseError(res);

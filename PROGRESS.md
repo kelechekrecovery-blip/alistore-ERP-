@@ -5136,6 +5136,14 @@
 - Result: the COD Web/API vertical is accepted on an isolated migrated test database. Physical device, live payment/fiscal provider and public deployment gates remain open.
 - Next: finish the complete Web audit on a clean committed source boundary, then redeploy and verify the public origin instead of treating the current HTTP 530 as a route-level defect.
 
+## WEB-AUDIT-2026-07-21K
+
+- Scope: remove persistent customer Web JWT storage from the browser.
+- Changes: customer Web auth now uses HttpOnly access/refresh cookies marked Secure in production and SameSite=Lax, rotates refresh cookies, accepts cookie auth only with the explicit Web marker, omits refresh tokens from Web JSON, clears legacy customer token storage, and preserves bearer responses for native clients.
+- Checks: API build; Web cookie contract `4/4`; Web unit `68/68`; Web production HTTP smoke confirmed cookie-authenticated `/auth/me` and refresh rotation with no `refreshToken` in Web responses; `git diff --check`.
+- Result: customer storefront authentication is accepted locally. Staff/ERP still use a separate localStorage session and require their own migration before the global browser-session finding closes.
+- Next: migrate Staff/ERP session handling, then run route/security regression and redeploy the public origin.
+
 ## COURIER-WEB-2026-07-21H
 
 - Scope: accept the Web Courier operational surface.
