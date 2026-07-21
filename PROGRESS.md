@@ -5128,6 +5128,14 @@
 - Checks: Web tests `68/68`; API production build; `git diff --check`.
 - Result: unauthorized staff cannot initiate an unverified cash/liability event through the UI or API policy.
 
+## WEB-AUDIT-2026-07-21J
+
+- Scope: close the courier COD handover deadlock exposed by the Web/API audit.
+- Changes: handover now validates receivable coverage per delivered order and permits partial/zero collection without inventing a courier cash shortage; an undelivered run cannot be manually released. Added regression coverage for partial collection, zero collection, replay and failed-delivery handover compatibility.
+- Checks: API build; courier COD `18/18`; courier deadlock `5/5`; runtime/auth/staff security `13/13`; `git diff --check`.
+- Result: the COD Web/API vertical is accepted on an isolated migrated test database. Physical device, live payment/fiscal provider and public deployment gates remain open.
+- Next: finish the complete Web audit on a clean committed source boundary, then redeploy and verify the public origin instead of treating the current HTTP 530 as a route-level defect.
+
 ## COURIER-WEB-2026-07-21H
 
 - Scope: accept the Web Courier operational surface.

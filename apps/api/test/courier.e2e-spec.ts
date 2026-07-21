@@ -791,4 +791,112 @@ describe('Courier COD handover (integration)', () => {
     expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'inventory.cogs', sourceRef: issues[0].id } })).toBe(1);
     expect(await prisma.courierRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ collectedTotal: 2000 });
   });
+
+  /**
+   * Недобор не должен запирать наличность всего рейса.
+   *
+   * Существующий тест выше доводит частичную оплату до доставки и на этом
+   * заканчивается — а дыра открывается на следующем шаге. При недоборе
+   * дебиторка проводится на полную сумму заказа, а `collectedTotal` растёт на
+   * фактически полученную. Сдача же требовала, чтобы признанная дебиторка в
+   * точности равнялась `collectedTotal`, — совпасть они при недоборе не могут
+   * никогда. Снять доставленный заказ с рейса тоже нельзя.
+   *
+   * Итог: один клиент, доплативший половину, замораживал у курьера всю
+   * наличность рейса без выхода через интерфейс.
+   */
+  it('позволяет сдать выручку рейса после частичной оплаты у двери', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967059${seq.toString().padStart(3, '0')}`, name: 'Partial handover' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        paymentMode: 'cod',
+        total: 2000,
+        status: 'packed',
+        items: { create: { lineNumber: 1, sku: `COD-PH-${seq}`, qty: 1, price: 2000 } },
+      },
+    });
+    const run = await courier.createRun(
+      { courierId: staff.id, codTotal: order.total, orderIds: [order.id] },
+      'dispatcher',
+      `assign-ph-${seq}`,
+    );
+    await courier.startDelivery(order.id, staff.id, `start-ph-${seq}`);
+    await courier.completeDelivery(
+      order.id,
+      { codAmount: 800, reason: 'Клиент внёс часть, остаток обещал в пятницу' },
+      staff.id,
+      `deliver-ph-${seq}`,
+    );
+
+    const settled = await courier.handover(
+      { runId: run.id, amount: 800, reason: 'Недобор по заказу: остаток за клиентом' },
+      'cashier-1',
+      undefined,
+      `handover-ph-${seq}`,
+    );
+
+    expect(settled).toMatchObject({ handedOver: true, handoverAmount: 800 });
+  });
+
+  /**
+   * Нулевой COD означает долг клиента, а не недостачу курьера.
+   *
+   * `cod.receivable` уже признаёт полный долг при доставке. При сдаче нулевой
+   * суммы нельзя создавать `cash.shortage`: это исказило бы сверку и превратило
+   * остаток дебиторки клиента в долг сотрудника.
+   */
+  it('сохраняет дебиторку и не создаёт ложную недостачу при нулевом COD', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967060${seq.toString().padStart(3, '0')}`, name: 'Zero collected' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        paymentMode: 'cod',
+        total: 3000,
+        status: 'packed',
+        items: { create: { lineNumber: 1, sku: `COD-ZC-${seq}`, qty: 1, price: 3000 } },
+      },
+    });
+    const run = await courier.createRun(
+      { courierId: staff.id, codTotal: order.total, orderIds: [order.id] },
+      'dispatcher',
+      `assign-zc-${seq}`,
+    );
+    await courier.startDelivery(order.id, staff.id, `start-zc-${seq}`);
+    await courier.completeDelivery(
+      order.id,
+      { codAmount: 0, reason: 'Клиент попросил отсрочку' },
+      staff.id,
+      `deliver-zc-${seq}`,
+    );
+
+    await courier.handover(
+      { runId: run.id, amount: 0, reason: 'Ничего не собрано' },
+      'cashier-1',
+      undefined,
+      `handover-zc-${seq}`,
+    );
+
+    const receivable = await prisma.accountingJournalEntry.findUnique({
+      where: { sourceType_sourceRef: { sourceType: 'cod.receivable', sourceRef: order.id } },
+    });
+    expect(receivable?.documentAmount).toBe(3000);
+
+    const shortages = await prisma.auditEvent.findMany({
+      where: { type: 'cash.shortage', refs: { has: run.id } },
+    });
+    expect(shortages).toHaveLength(0);
+  });
 });

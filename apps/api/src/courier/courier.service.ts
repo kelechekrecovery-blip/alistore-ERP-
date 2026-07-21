@@ -383,7 +383,9 @@ export class CourierService {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${dto.runId}))`;
         const run = await tx.courierRun.findUnique({
           where: { id: dto.runId },
-          include: { orders: { select: { id: true } } },
+          // status нужен, чтобы сверять признание дебиторки только по
+          // доставленным заказам: недоставленные её и не должны иметь.
+          include: { orders: { select: { id: true, status: true } } },
         });
         if (!run) throw new ValidationError('run_not_found', `Курьерский рейс ${dto.runId} не найден`);
         assertCourierRunOwner(run, expectedCourierId);
@@ -405,12 +407,47 @@ export class CourierService {
         if (diff !== 0 && !normalized.reason) {
           throw new ValidationError('handover_reason_required', `Расхождение COD ${diff} сом требует причину`);
         }
-        if (run.orders.length > 0 && expected > 0) {
-          const recognized = await tx.accountingJournalEntry.aggregate({
+        // Сверяем ПОКРЫТИЕ, а не равенство сумм.
+        //
+        // Смысл проверки — «нельзя сдать деньги раньше, чем признана дебиторка
+        // по доставленным заказам». Раньше она требовала, чтобы признанная
+        // сумма в точности равнялась собранной наличности. Но при недоборе
+        // дебиторка проводится на полную сумму заказа, а `collectedTotal` растёт
+        // на фактически полученную — совпасть они не могут никогда. Один
+        // клиент, доплативший половину, запирал наличность всего рейса: снять
+        // доставленный заказ с рейса тоже нельзя.
+        //
+        // Разница сумм — это долг клиента, а не признак незавершённой проводки,
+        // и она уже отражена на счёте 1100.
+        if (run.orders.length > 0) {
+          const deliveredOrderIds = run.orders
+            .filter((order) => order.status === 'delivered')
+            .map((order) => order.id);
+          const recognized = await tx.accountingJournalEntry.findMany({
             where: { sourceType: 'cod.receivable', sourceRef: { in: run.orders.map((order) => order.id) } },
-            _sum: { documentAmount: true },
+            select: { sourceRef: true, documentAmount: true },
           });
-          if ((recognized._sum.documentAmount ?? 0) !== expected) {
+          const covered = new Set(recognized.map((entry) => entry.sourceRef));
+          const recognizedTotal = recognized.reduce((sum, entry) => sum + (entry.documentAmount ?? 0), 0);
+
+          // Не допускаем ручного разблокирования полностью недоставленного
+          // рейса. Частичный рейс после failed-delivery остаётся допустимым:
+          // доставленная часть проверяется ниже, а недоставленная требует
+          // отдельной причины или снятия с рейса.
+          if (deliveredOrderIds.length === 0) {
+            throw new ConflictError(
+              expected > 0 ? 'cod_receivable_not_recognized' : 'run_delivery_incomplete',
+              'Ни одна доставка рейса ещё не признана выполненной',
+            );
+          }
+
+          // Условие 1: у каждой доставленной позиции есть проводка дебиторки.
+          if (deliveredOrderIds.some((orderId) => !covered.has(orderId))) {
+            throw new ConflictError('cod_receivable_not_recognized', 'COD нельзя сдать до признания дебиторской задолженности всех доставок');
+          }
+          // Условие 2: собранного не может быть больше признанного. Наличность,
+          // под которую нет доставки, — это деньги ниоткуда.
+          if (expected > recognizedTotal) {
             throw new ConflictError('cod_receivable_not_recognized', 'COD нельзя сдать до признания дебиторской задолженности всех доставок');
           }
         }
