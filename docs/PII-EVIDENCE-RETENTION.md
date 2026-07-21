@@ -1,6 +1,11 @@
-# Evidence Vault PII Retention
+# PII Retention
 
-## Scope
+Two independent stores hold personal data on a clock: the Evidence Vault (uploaded
+documents) and `OtpChallenge` (phone numbers). They are unrelated in code and were
+implemented at different times — the second one is easy to forget, which is exactly
+what happened.
+
+## Evidence Vault scope
 
 The automatic retention policy currently covers only explicitly classified
 trade-in identity documents: `passport`, `passport_front`, `passport_back`,
@@ -20,6 +25,22 @@ approved.
   reference.
 - Storage failures remain visible and retry with bounded exponential backoff.
 - Reads of purged uploads fail with `evidence_purged`.
+
+## OTP challenges (`OtpChallenge`)
+
+Separate from the Evidence Vault and easy to miss: `OtpChallenge.phone` stores the
+phone number in plain text, and one row is written on every login attempt — including
+attempts that never become an account (mistyped digit, abandoned code screen, someone
+probing another person's number).
+
+- Account deletion erases the challenges of that phone inside the same transaction,
+  **before** the customer phone is renamed to `deleted:<id>` — after the rename the
+  rows can no longer be matched.
+- `OtpRetentionService` sweeps hourly and deletes challenges more than 24 hours past
+  `expiresAt`. Deleting is safe: nothing reads a challenge after expiry — `verifyOtp`
+  rejects on the deadline, not on row presence. The 24-hour window exists so that
+  number-probing abuse, which is only visible in the trail of attempts, can still be
+  investigated.
 
 ## Release requirements
 
