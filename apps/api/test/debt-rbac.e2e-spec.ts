@@ -131,10 +131,15 @@ describe('Debt RBAC', () => {
       .send({ amount: 5000, actor: 'spoof' })
       .expect(403);
 
+    // Наличное погашение требует открытой смены: без неё деньги попадают в
+    // ящик, о котором система не знает.
+    await prisma.cashShift.create({
+      data: { staffId: cashierId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
     await request(app.getHttpServer())
       .post(`/debts/${debt.body.id}/payments`)
       .set('Authorization', `Bearer ${cashierToken}`)
-      .send({ amount: 5000, actor: 'spoof' })
+      .send({ amount: 5000, actor: 'spoof', method: 'cash' })
       .expect(201);
 
     const paid = await prisma.auditEvent.findFirst({ where: { type: 'debt.payment' } });

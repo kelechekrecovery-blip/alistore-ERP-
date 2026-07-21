@@ -58,6 +58,12 @@ describe('Debts (integration)', () => {
     await prisma.supplierRma.deleteMany();
     await prisma.supplier.deleteMany();
     await prisma.approval.deleteMany();
+    // Наличное погашение теперь требует открытой смены — иначе деньги попадают
+    // в ящик, о котором система не знает. Тесты ниже проверяют арифметику
+    // баланса, а не кассовую политику, поэтому смена у актора просто есть.
+    await prisma.cashShift.create({
+      data: { staffId: 'cashier', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
   });
 
   async function order(consent = true) {
@@ -155,8 +161,14 @@ describe('Debts (integration)', () => {
 
     const types = (await prisma.auditEvent.findMany()).map((e) => e.type);
     expect(types).toEqual(expect.arrayContaining(['debt.payment', 'debt.settled']));
-    // installment Payment rows recorded against the order
-    const payments = await prisma.payment.findMany({ where: { orderId, method: 'installment' } });
+    // Раньше здесь ожидалось `method: 'installment'` — значение описывало
+    // назначение платежа, а не то, чем он внесён. Из-за этого наличное
+    // погашение не попадало в кассовую смену (`expectedCash` фильтрует
+    // `method: 'cash'`), а `paymentAccountCode('installment')` уводило деньги
+    // на счёт 1020 «средства у провайдеров», хотя они лежали в ящике.
+    // Назначение платежа не потеряно: оно в `sourceType: 'debt.payment'`
+    // проводки и в связи с планом рассрочки.
+    const payments = await prisma.payment.findMany({ where: { orderId, method: 'cash' } });
     expect(payments).toHaveLength(2);
   });
 
@@ -320,5 +332,56 @@ describe('Debts (integration)', () => {
     expect(await debts.enqueueReminders({ now, dueSoonDays: 3 })).toEqual({ considered: 1, queued: 0 });
     expect(await prisma.outboxMessage.count()).toBe(0);
     expect(await prisma.auditEvent.count({ where: { type: 'debt.reminder_queued' } })).toBe(0);
+  });
+
+  /**
+   * Наличное погашение долга обязано входить в ожидаемый остаток смены.
+   *
+   * `pay()` создавал платёж с `method: 'installment'`, `accountCode: '1000'`
+   * («Наличные в кассе») и проводкой `Дт 1000` — но без `shiftId` и без
+   * `point`. `ShiftsService.expectedCash` считает сумму по
+   * `{ shiftId, method: 'cash' }`, поэтому эти деньги в ожидаемом остатке не
+   * появлялись никогда.
+   *
+   * Практический смысл: клиент приносит 20 000 сом по рассрочке, кассир кладёт
+   * их в ящик. Вечером в ящике на 20 000 больше ожидаемого — излишек, который
+   * при самозакрытии система же и объяснит. За смену с несколькими погашениями
+   * расхождение становится неразбираемым.
+   *
+   * Метод оплаты при этом был захардкожен: погашение картой всё равно ложилось
+   * на счёт наличных.
+   */
+  it('наличное погашение попадает в ожидаемый остаток смены', async () => {
+    const { orderId } = await order();
+    const debt = (await debts.create({ orderId, principal: 20000 }, 'seller')) as DebtPlan;
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'cashier-debt-1', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
+
+    await debts.pay(debt.id, { amount: 20000, method: 'cash' }, 'cashier-debt-1');
+
+    const drawer = await prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { shiftId: shift.id, method: 'cash' },
+    });
+    expect(drawer._sum.amount).toBe(20000);
+  });
+
+  it('безналичное погашение в кассовый ящик не попадает', async () => {
+    const { orderId } = await order();
+    const debt = (await debts.create({ orderId, principal: 20000 }, 'seller')) as DebtPlan;
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'cashier-debt-2', point: 'BISHKEK-1', openCash: 0, openedAt: new Date() },
+    });
+
+    await debts.pay(debt.id, { amount: 20000, method: 'card' }, 'cashier-debt-2');
+
+    const drawer = await prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { shiftId: shift.id, method: 'cash' },
+    });
+    expect(drawer._sum.amount ?? 0).toBe(0);
+    const card = await prisma.payment.findFirst({ where: { method: 'card' }, select: { accountCode: true } });
+    expect(card?.accountCode).toBe('1020');
   });
 });

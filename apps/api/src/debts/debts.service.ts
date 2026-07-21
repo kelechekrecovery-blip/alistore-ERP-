@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -8,7 +9,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { insertDebt } from './debt-insert';
 import { CreateDebtDto, DebtPaymentDto } from './debts.dto';
-import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { paymentAccountCode, postAccountingEntryOnTx } from '../finance/accounting-journal';
 
 /** Debt above this (сом) requires approval (Approval Rules Matrix, action=debt). */
 export const DEBT_LIMIT = 50_000;
@@ -32,6 +33,28 @@ export class DebtsService {
     private readonly approvals: ApprovalsService,
     private readonly outbox: OutboxService,
   ) {}
+
+  /**
+   * Наличные принимает только сотрудник с открытой сменой в своей точке — тот
+   * же контракт, что в `payments.service.ts`. Без него деньги попадали в ящик,
+   * о котором система не знала.
+   */
+  private async resolveCashShiftOnTx(tx: Prisma.TransactionClient, actor: string) {
+    const candidate = await tx.cashShift.findFirst({
+      where: { staffId: actor, closedAt: null },
+      select: { id: true },
+      orderBy: { openedAt: 'desc' },
+    });
+    if (!candidate) {
+      throw new ConflictError('cash_shift_required', 'Для наличного погашения нужна открытая кассовая смена');
+    }
+    await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${candidate.id} FOR UPDATE`;
+    const shift = await tx.cashShift.findUnique({ where: { id: candidate.id } });
+    if (!shift || shift.closedAt) {
+      throw new ConflictError('cash_shift_closed', 'Нельзя добавить погашение в закрытую кассовую смену');
+    }
+    return shift;
+  }
 
   get(id: string) {
     return this.prisma.debtPlan.findUnique({ where: { id } });
@@ -144,13 +167,25 @@ export class DebtsService {
       const updated = settled
         ? await tx.debtPlan.update({ where: { id }, data: { status: 'settled' } })
         : decremented;
+      // Платёж создавался с method: 'installment' и захардкоженным счётом 1000
+      // «Наличные в кассе», но без shiftId и без point. ShiftsService.expectedCash
+      // считает по { shiftId, method: 'cash' }, поэтому наличное погашение в
+      // ожидаемый остаток не попадало никогда: вечером в ящике оказывался
+      // излишек ровно на сумму всех погашений за смену. Погашение картой при
+      // этом тоже ложилось на счёт наличных.
+      const method = dto.method ?? 'cash';
+      const cashShift = method === 'cash'
+        ? await this.resolveCashShiftOnTx(tx, actor)
+        : null;
       const payment = await tx.payment.create({
         data: {
           orderId: debt.orderId,
           amount: dto.amount,
-          method: 'installment',
+          method,
           status: 'received',
-          accountCode: '1000',
+          accountCode: paymentAccountCode(method),
+          shiftId: cashShift?.id ?? null,
+          point: cashShift?.point ?? null,
           idempotencyKey: commandKey ? `debt:${commandKey}` : undefined,
           receivedBy: actor,
         },
@@ -163,7 +198,7 @@ export class DebtsService {
         occurredAt: payment.createdAt,
         createdBy: actor,
         lines: [
-          { accountCode: '1000', debit: dto.amount, memo: 'Получение платежа по рассрочке' },
+          { accountCode: paymentAccountCode(method), debit: dto.amount, memo: 'Получение платежа по рассрочке' },
           { accountCode: '1100', credit: dto.amount, memo: 'Уменьшение дебиторской задолженности' },
         ],
       });

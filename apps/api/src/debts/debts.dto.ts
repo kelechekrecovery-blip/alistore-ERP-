@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDebtDto {
@@ -24,9 +24,19 @@ export class CreateDebtDto {
   @IsOptional() @IsString() actor?: string;
 }
 
+export const DEBT_PAYMENT_METHODS = ['cash', 'card', 'qr_mbank', 'qr_odengi'] as const;
+
 export class DebtPaymentDto {
   @ApiProperty({ minimum: 1, example: 12000, description: 'Payment amount (сом)' })
   @IsInt() @Min(1) amount!: number;
+
+  /**
+   * Метод был захардкожен как `installment` со счётом 1000 «Наличные в кассе»:
+   * погашение картой всё равно ложилось на наличные, а наличное погашение не
+   * попадало в кассовую смену. Теперь способ оплаты указывается явно.
+   */
+  @ApiPropertyOptional({ enum: DEBT_PAYMENT_METHODS, example: 'cash', default: 'cash' })
+  @IsOptional() @IsIn(DEBT_PAYMENT_METHODS) method?: (typeof DEBT_PAYMENT_METHODS)[number];
 
   @ApiPropertyOptional({ example: 'debt-payment-2026-001' })
   @IsOptional() @IsString() @MaxLength(128) idempotencyKey?: string;
