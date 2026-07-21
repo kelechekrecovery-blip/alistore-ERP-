@@ -5144,6 +5144,14 @@
 - Result: customer storefront authentication is accepted locally. Staff/ERP still use a separate localStorage session and require their own migration before the global browser-session finding closes.
 - Next: migrate Staff/ERP session handling, then run route/security regression and redeploy the public origin.
 
+## WEB-AUDIT-2026-07-21L
+
+- Scope: remove the anonymous Web refresh probe introduced by the customer cookie session migration and make the isolated route audit model production CORS correctly.
+- Changes: Playwright's API server now receives explicit local `CORS_ORIGINS`; Web auth sets/clears a non-secret root-scoped session hint while access/refresh cookies remain HttpOnly, Secure in production and SameSite=Lax; anonymous mounts skip refresh until the hint exists.
+- Checks: Web session contract `4/4`; Web unit tests `68/68`; isolated Chromium route audit `46/46` in `3.1m`.
+- Result: the complete local Web route inventory is green across anonymous, protected-shell redirect, and system endpoint checks. Staff/ERP localStorage sessions, live deployment HTTP 530, provider credentials, staging and native/physical gates remain open.
+- Next: migrate Staff/ERP sessions to the same protected browser contract, then run the full Web security/E2E gate against a deployed origin.
+
 ## COURIER-WEB-2026-07-21H
 
 - Scope: accept the Web Courier operational surface.

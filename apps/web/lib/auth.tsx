@@ -63,6 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Remove sessions created by the pre-cookie release. Shopping state uses
       // separate keys and is intentionally preserved.
       localStorage.removeItem('alistore.auth.v1');
+      // This flag is non-secret. Tokens remain HttpOnly and are never read by
+      // the Web bundle; the flag only avoids an anonymous refresh probe.
+      const hasSessionHint = document.cookie
+        .split(';')
+        .some((entry) => entry.trim().startsWith('alistore_session_hint='));
+      if (!hasSessionHint) {
+        if (!cancelled) setHydrated(true);
+        return;
+      }
       try {
         const fresh = await authRefresh();
         persist(fresh);
