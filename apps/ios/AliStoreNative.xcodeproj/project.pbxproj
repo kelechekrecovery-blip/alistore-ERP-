@@ -69,6 +69,7 @@
 		CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */; };
 		D10A68419B9AC3F5E5048EBC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 34EA386491279732C58F06E5 /* PrivacyInfo.xcprivacy */; };
 		D1F1BA53DC9B26473B962F02 /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2D17FA3900F6A16DD7BA9C62 /* JetBrainsMono-Regular.ttf */; };
+		D3267E880FEF79B442F04BD0 /* QuickUnlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BC4CE3DCC041CF32038A86 /* QuickUnlockTests.swift */; };
 		D41D08C37ADC9A026A6A1BD9 /* OFL-JetBrainsMono.txt in Resources */ = {isa = PBXBuildFile; fileRef = 242B1D211D250E4D9D64635B /* OFL-JetBrainsMono.txt */; };
 		D8540E88D9B3581F66746FF8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */; };
 		DAF231BFB615CD79C0300ADF /* SmartSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = C348479F602D4264A6697DC8 /* SmartSearch.swift */; };
@@ -241,6 +242,7 @@
 		4138BDA48D595174DC088C57 /* Manrope-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-ExtraBold.ttf"; sourceTree = "<group>"; };
 		41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientApp.swift; sourceTree = "<group>"; };
 		42436819B18857A22AC06504 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		42BC4CE3DCC041CF32038A86 /* QuickUnlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlockTests.swift; sourceTree = "<group>"; };
 		48457E88937519CA203EA7DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4996F20715B374377C19415D /* WaitlistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitlistView.swift; sourceTree = "<group>"; };
 		4B87620B30BD0C4257DDBEE1 /* JetBrainsMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Medium.ttf"; sourceTree = "<group>"; };
@@ -555,6 +557,7 @@
 				20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */,
 				13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */,
 				23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */,
+				42BC4CE3DCC041CF32038A86 /* QuickUnlockTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -966,6 +969,7 @@
 				351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */,
 				4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */,
 				563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */,
+				D3267E880FEF79B442F04BD0 /* QuickUnlockTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
