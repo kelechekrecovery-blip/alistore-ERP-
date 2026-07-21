@@ -58,6 +58,39 @@ export function createPosClientSaleId(): string {
   return `pos-${rand}`;
 }
 
+/**
+ * Ключ идемпотентности незавершённой продажи переживает перезагрузку вкладки.
+ *
+ * Он жил только в React-стейте. Прокси отдавал 502 **после** того, как API
+ * закоммитил продажу; тело не JSON, сообщение `request failed 502` под регексп
+ * сетевых ошибок не подходит — в очередь не клали, чек не печатали, показывали
+ * тост. Кассир жал F5, стейт терялся, генерировался новый clientSaleId, и
+ * сервер проводил вторую продажу того же товара: второй заказ, второй Payment,
+ * второе списание единицы. Недостача ровно в цену чека при одной ушедшей
+ * коробке.
+ */
+const ACTIVE_SALE_KEY = 'alistore.pos.activeClientSaleId.v1';
+
+export function loadActiveClientSaleId(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem(ACTIVE_SALE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function rememberActiveClientSaleId(clientSaleId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (clientSaleId) window.localStorage.setItem(ACTIVE_SALE_KEY, clientSaleId);
+    else window.localStorage.removeItem(ACTIVE_SALE_KEY);
+  // fixtures-allowed: private-mode/storage quota failures must not block a sale.
+  } catch {
+    // Приватный режим/переполнение: продажа важнее памяти о ключе.
+  }
+}
+
 export function createLocalReceiptNo(clientSaleId: string): string {
   return `OFF-${clientSaleId.replace(/^pos-/, '').slice(0, 8).toUpperCase()}`;
 }

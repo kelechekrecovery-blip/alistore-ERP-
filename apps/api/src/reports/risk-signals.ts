@@ -164,16 +164,25 @@ interface RiskInputs {
   writeOffSpike: WriteOffSpike | null;
 }
 
+import { BLIND_COUNT_REASON } from '../shifts/shifts.service';
+
 /** Normalize raw risk rows into a single ranked signal list (high → low). */
 export function buildRiskSignals(input: RiskInputs, now: Date): RiskSignal[] {
   const signals: RiskSignal[] = [];
 
   for (const s of input.cashDiscrepancies) {
+    // Расхождение при слепом пересчёте не объяснено человеком — причину
+    // подставила система. Без этой пометки владелец видел в списке строку
+    // «Слепой пересчёт кассы», неотличимую от настоящего объяснения, и не шёл
+    // разбираться.
+    const unexplained = !s.closeReason || s.closeReason === BLIND_COUNT_REASON;
     signals.push({
       kind: 'cash_discrepancy',
       severity: 'high',
       ref: s.id,
-      detail: `Касса ${s.point}: расхождение ${s.diff} сом`,
+      detail: unexplained
+        ? `Касса ${s.point}: расхождение ${s.diff} сом — объяснения нет (слепой пересчёт)`
+        : `Касса ${s.point}: расхождение ${s.diff} сом — ${s.closeReason}`,
     });
   }
 

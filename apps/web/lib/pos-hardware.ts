@@ -55,7 +55,11 @@ export function createScannerKeyHandler(onScan: (code: string) => void) {
 
 export async function checkPaymentTerminal(method: string, online: boolean): Promise<{ ok: boolean; message: string }> {
   if (method === 'cash') return { ok: true, message: 'Касса готова' };
-  if (!online) return { ok: false, message: 'Терминал offline: продажа уйдёт в очередь' };
+  // Сообщение обещало «продажа уйдёт в очередь» — и она действительно уходила,
+  // как состоявшаяся оплата картой. Терминал при этом не авторизовал ничего.
+  // Безналичную оплату без связи принять нельзя; обещать обратное — значит
+  // отдать товар бесплатно.
+  if (!online) return { ok: false, message: `Нет связи: ${methodName(method)} принять нельзя. Возьмите наличными или дождитесь сети.` };
   await new Promise((resolve) => window.setTimeout(resolve, 160));
   return { ok: true, message: `${methodName(method)} готов к оплате` };
 }

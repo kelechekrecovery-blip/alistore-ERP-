@@ -8,6 +8,8 @@ import {
   clearSyncedOfflinePosQueue,
   createLocalReceiptNo,
   createPosClientSaleId,
+  loadActiveClientSaleId,
+  rememberActiveClientSaleId,
   createScannerKeyHandler,
   enqueueOfflinePosSale,
   findProductByScan,
@@ -58,7 +60,9 @@ export default function PosPage() {
   const [pending, setPending] = useState<PosPendingApproval | null>(null);
   const [offlineResult, setOfflineResult] = useState<OfflinePosQueueItem | null>(null);
   const [receiptSnapshot, setReceiptSnapshot] = useState<PosReceiptSnapshot | null>(null);
-  const [activeClientSaleId, setActiveClientSaleId] = useState('');
+  // Ленивая инициализация из localStorage: после F5 повтор обязан уйти с тем же
+  // ключом, иначе сервер увидит новую продажу и проведёт её второй раз.
+  const [activeClientSaleId, setActiveClientSaleId] = useState(() => loadActiveClientSaleId());
   const [queue, setQueue] = useState<OfflinePosQueueItem[]>([]);
   const [online, setOnline] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -215,6 +219,7 @@ export default function PosPage() {
     if (salePayments.length === 0) return;
     const clientSaleId = activeClientSaleId || createPosClientSaleId();
     setActiveClientSaleId(clientSaleId);
+    rememberActiveClientSaleId(clientSaleId);
     setMethod(salePayments[0]?.method ?? null);
     const payload = buildPayload(clientSaleId, salePayments);
     const snapshot = buildSnapshot(clientSaleId, salePayments);
@@ -238,7 +243,16 @@ export default function PosPage() {
         setRoute('done');
       }
     } catch (e) {
-      if (isLikelyNetworkError(e, online)) {
+      // Офлайн можно принять только наличные: их кассир физически держит в
+      // руках. Раньше `isLikelyNetworkError` возвращал true на любую ошибку при
+      // !online, поэтому отказ терминала («карта недоступна») тоже попадал в
+      // очередь — как состоявшаяся оплата картой. Кассир печатал чек и отдавал
+      // телефон, терминал не авторизовал ничего, а наутро сервер оформлял это
+      // как полученный карточный платёж с самодельным txnId, которого нет ни у
+      // одного эквайера. В кассовое расхождение это не попадает вовсе: карта не
+      // входит в ожидаемый остаток смены.
+      const cashOnly = salePayments.every((payment) => payment.method === 'cash');
+      if (isLikelyNetworkError(e, online) && cashOnly) {
         const queued = enqueueOfflinePosSale(payload, snapshot);
         setQueue(loadOfflinePosQueue());
         setReceiptSnapshot(queued.snapshot);
@@ -247,6 +261,8 @@ export default function PosPage() {
         setPending(null);
         setRoute('done');
         flash('Сохранено в offline очередь');
+      } else if (isLikelyNetworkError(e, online)) {
+        flash('Без связи можно принять только наличные — безналичную оплату сохранить нельзя');
       } else {
         flash(e instanceof Error ? e.message : 'Ошибка продажи');
       }
@@ -260,6 +276,7 @@ export default function PosPage() {
     const query = customerQuery.trim();
     const clientSaleId = activeClientSaleId || createPosClientSaleId();
     setActiveClientSaleId(clientSaleId);
+    rememberActiveClientSaleId(clientSaleId);
     setCustomerBusy(true);
     try {
       const found = await findPosCustomer(query, POINT, clientSaleId, session.accessToken);
@@ -325,6 +342,7 @@ export default function PosPage() {
     setOfflineResult(null);
     setReceiptSnapshot(null);
     setActiveClientSaleId('');
+    rememberActiveClientSaleId('');
     setCustomer(null);
     setCustomerQuery('');
     setRoute('sell');

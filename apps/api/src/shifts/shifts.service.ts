@@ -19,9 +19,23 @@ import { CloseShiftDto, HandoverShiftDto, OpenShiftDto } from './shifts.dto';
  * Expected drawer cash = openCash + Σ(cash payments on this shift). Refunds are
  * stored as negative amounts, so they subtract naturally.
  */
+/**
+ * Причина, которую подставляет система при слепом пересчёте.
+ *
+ * Слепой пересчёт сам по себе верен: кассир не видит ожидаемую сумму, поэтому
+ * объяснить расхождение, о котором он не знает, физически не может — требовать
+ * от него текст значило бы получать бессмысленные отписки.
+ *
+ * Дефект был не в подстановке, а в том, что она невидима: `reasonSource:
+ * 'system'` писался в леджер и не читался нигде, а Risk Center показывал эту
+ * строку наравне с настоящим объяснением. Экспортирована, чтобы отчёт отличал
+ * «объяснено человеком» от «объяснения нет» по константе, а не по литералу.
+ */
+export const BLIND_COUNT_REASON = 'Слепой пересчёт кассы';
+
 @Injectable()
 export class ShiftsService {
-  private static readonly BLIND_COUNT_REASON = 'Слепой пересчёт кассы';
+  static readonly BLIND_COUNT_REASON = BLIND_COUNT_REASON;
 
   constructor(
     private readonly prisma: PrismaService,
