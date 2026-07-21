@@ -115,13 +115,13 @@ p, courier, orders, transition
 p, admin, orders, transition
 p, owner, orders, transition
 p, courier, courier, read
+p, cashier, courier, read
 p, warehouse, courier, read
 p, admin, courier, read
 p, owner, courier, read
 p, warehouse, courier, assign
 p, admin, courier, assign
 p, owner, courier, assign
-p, courier, courier, handover
 p, cashier, courier, handover
 p, admin, courier, handover
 p, owner, courier, handover

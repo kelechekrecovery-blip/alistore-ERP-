@@ -46,6 +46,9 @@ export class EvidenceController {
           upload.entityId,
         );
       }
+      if (upload.entityType === 'order') {
+        await this.evidence.assertStaffCanAttachOrder(user.customerId, staff.role, upload.entityId);
+      }
       actor = `staff:${user.customerId}`;
     } else {
       const customerId = user?.typ === 'customer'
@@ -100,6 +103,9 @@ export class EvidenceController {
       const staff = await this.staffAuth.me(user.customerId);
       if (dto.entityType === 'shift') {
         await this.evidence.assertStaffCanAttachShift(user.customerId, staff.role, dto.entityId);
+      }
+      if (dto.entityType === 'order') {
+        await this.evidence.assertStaffCanAttachOrder(user.customerId, staff.role, dto.entityId);
       }
       if (custodyEvidence) await this.evidence.assertStaffCanAttachLoanerCustody(user.customerId, dto.entityId);
       if (exchangeEvidence) await this.evidence.assertStaffCanAttachExchange(user.customerId, dto.entityId);

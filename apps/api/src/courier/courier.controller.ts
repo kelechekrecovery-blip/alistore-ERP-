@@ -28,13 +28,14 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
+import { EvidenceService } from '../evidence/evidence.service';
 
 @ApiTags('courier')
 @ApiBearerAuth()
 @Controller('courier')
 @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
 export class CourierController {
-  constructor(private readonly courier: CourierService) {}
+  constructor(private readonly courier: CourierService, private readonly evidence: EvidenceService) {}
 
   @ApiOperation({ summary: 'Get a courier run' })
   @ApiParam({ name: 'id', description: 'Courier run id' })
@@ -82,12 +83,18 @@ export class CourierController {
   @ApiOperation({ summary: 'Complete delivery and record server-reconciled COD' })
   @Post('orders/:id/deliver')
   @RequirePermission('orders', 'transition')
-  deliver(
+  async deliver(
     @CurrentUser() user: AuthPrincipal,
     @Param('id') id: string,
     @Headers('idempotency-key') key: string | undefined,
     @Body() dto: CompleteDeliveryDto,
   ) {
+    await this.evidence.assertCourierOrderEvidence(
+      dto.evidenceIdempotencyKey,
+      user.customerId,
+      id,
+      'Подтверждение доставки',
+    );
     return this.courier.completeDelivery(id, dto, user.customerId, requireIdempotencyKey(key));
   }
 

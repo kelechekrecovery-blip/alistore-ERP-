@@ -160,7 +160,11 @@ export class CourierService {
   }
 
   completeDelivery(orderId: string, dto: CompleteDeliveryDto, courierId: string, idempotencyKey: string) {
-    return this.executeCommand(orderId, courierId, idempotencyKey, 'deliver', { codAmount: dto.codAmount, reason: dto.reason?.trim() || null }, async (tx, order) => {
+    return this.executeCommand(orderId, courierId, idempotencyKey, 'deliver', {
+      codAmount: dto.codAmount,
+      reason: dto.reason?.trim() || null,
+      evidenceIdempotencyKey: dto.evidenceIdempotencyKey ?? null,
+    }, async (tx, order) => {
       if (order.status !== 'out_for_delivery') {
         throw new ConflictError('delivery_not_out', `Заказ ${orderId} имеет статус ${order.status}`);
       }
@@ -232,8 +236,9 @@ export class CourierService {
             expectedCod,
             remainingReceivable: expectedCod - dto.codAmount,
             reason,
+            evidenceIdempotencyKey: dto.evidenceIdempotencyKey ?? null,
           },
-          refs: [orderId, order.courierRunId].filter((value): value is string => Boolean(value)),
+          refs: [orderId, order.courierRunId, dto.evidenceIdempotencyKey].filter((value): value is string => Boolean(value)),
         },
         ...inventoryEvents,
         ...(receivableEntry ? [{
@@ -254,7 +259,11 @@ export class CourierService {
   }
 
   failDelivery(orderId: string, dto: FailDeliveryDto, courierId: string, idempotencyKey: string) {
-    const payload = { reason: dto.reason.trim(), evidence: dto.evidence ?? null };
+    const payload = {
+      reason: dto.reason.trim(),
+      evidence: dto.evidence ?? null,
+      evidenceIdempotencyKey: dto.evidenceIdempotencyKey ?? null,
+    };
     if (!payload.reason) throw new ValidationError('failure_reason_required', 'Укажите причину неуспешной доставки');
     return this.executeCommand(orderId, courierId, idempotencyKey, 'fail', payload, async (tx, order) => {
       if (order.status !== 'out_for_delivery') {
@@ -271,7 +280,7 @@ export class CourierService {
         type: EventType.DeliveryFailed,
         actor: courierId,
         payload: { orderId, ...payload },
-        refs: [orderId, order.courierRunId].filter((value): value is string => Boolean(value)),
+        refs: [orderId, order.courierRunId, dto.evidenceIdempotencyKey].filter((value): value is string => Boolean(value)),
       }] };
     });
   }

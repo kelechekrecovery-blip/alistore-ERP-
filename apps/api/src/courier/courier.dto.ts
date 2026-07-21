@@ -39,6 +39,9 @@ export class FailDeliveryDto {
   /** Evidence (photo refs, notes) required for a failed delivery per Evidence Vault. */
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsOptional() @IsObject() evidence?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Idempotency key of the courier-owned Evidence image.' })
+  @IsOptional() @IsString() @MaxLength(128) evidenceIdempotencyKey?: string;
 }
 
 export class RemoveFromRunDto {
@@ -55,4 +58,7 @@ export class CompleteDeliveryDto {
     example: 'Клиент внёс часть суммы, остаток подтверждён к оплате завтра',
   })
   @IsOptional() @IsString() @MaxLength(500) reason?: string;
+
+  @ApiPropertyOptional({ description: 'Idempotency key of the courier-owned delivery Evidence image.' })
+  @IsOptional() @IsString() @MaxLength(128) evidenceIdempotencyKey?: string;
 }

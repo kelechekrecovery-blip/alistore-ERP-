@@ -169,6 +169,45 @@ export class EvidenceService {
     }
   }
 
+  async assertStaffCanAttachOrder(staffId: string, role: Role, orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { courierId: true },
+    });
+    if (!order) throw new ValidationError('evidence_entity_not_found', `order ${orderId} не найден`);
+    if (role === 'courier' && order.courierId !== staffId) {
+      throw new NotFoundException('order_evidence_not_found');
+    }
+  }
+
+  async assertCourierOrderEvidence(
+    idempotencyKey: string | undefined,
+    courierId: string,
+    orderId: string,
+    label: string,
+  ): Promise<void> {
+    const key = idempotencyKey?.trim();
+    if (!key) throw new ValidationError('courier_evidence_required', 'Для операции требуется фото Evidence');
+    const upload = await this.prisma.evidenceUpload.findUnique({
+      where: { idempotencyKey: key },
+      select: {
+        actor: true,
+        entityType: true,
+        entityId: true,
+        label: true,
+        purgedAt: true,
+      },
+    });
+    if (!upload
+      || upload.purgedAt
+      || upload.actor !== `staff:${courierId}`
+      || upload.entityType !== 'order'
+      || upload.entityId !== orderId
+      || upload.label !== label) {
+      throw new ValidationError('courier_evidence_mismatch', 'Evidence не принадлежит этой доставке');
+    }
+  }
+
   async issueRead(idempotencyKey: string, actor: string) {
     const upload = await this.findUpload(idempotencyKey);
     if (upload.purgedAt) {
