@@ -149,30 +149,51 @@ if [[ "$strict_signing" == "1" ]]; then
   fi
 fi
 
-settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
-  xcodebuild -project "$ios_root/AliStoreNative.xcodeproj" \
-  -scheme AliStoreClient -configuration Release -showBuildSettings \
-  DEVELOPMENT_TEAM="$team_id" ALISTORE_API_BASE_URL="$api_base" 2>/dev/null)" \
-  || fail 'xcodebuild could not resolve Release settings'
+# Версии берём из project.yml, а не из констант в этом скрипте. Раньше здесь стояло
+# `== "2"`, и следующая же заливка (номер сборки 3) роняла бы preflight с сообщением,
+# по которому невозможно догадаться, что «сломался» именно скрипт, а не проект.
+expected_marketing_version="$(awk -F': *' '/^ *MARKETING_VERSION:/ {gsub(/"/,"",$2); print $2; exit}' "$ios_root/project.yml")"
+expected_build_number="$(awk -F': *' '/^ *CURRENT_PROJECT_VERSION:/ {gsub(/"/,"",$2); print $2; exit}' "$ios_root/project.yml")"
+[[ -n "$expected_marketing_version" && -n "$expected_build_number" ]] \
+  || fail 'could not read MARKETING_VERSION / CURRENT_PROJECT_VERSION from project.yml'
 
-resolved_api="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*API_BASE_URL$/ {print $2; exit}')"
-[[ "$resolved_api" == "$api_base" ]] || fail 'Release API_BASE_URL did not resolve to ALISTORE_API_BASE_URL'
-resolved_bundle_id="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER$/ {print $2; exit}')"
-[[ "$resolved_bundle_id" == "kg.alistore.client" ]] || fail 'Release bundle identifier must be kg.alistore.client'
-resolved_icon="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*ASSETCATALOG_COMPILER_APPICON_NAME$/ {print $2; exit}')"
-[[ "$resolved_icon" == "AppIcon" ]] || fail 'Release AppIcon asset catalog must be configured'
-resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*APS_ENVIRONMENT$/ {print $2; exit}')"
-[[ "$resolved_aps" == "production" ]] || fail 'Release APS_ENVIRONMENT must resolve to production'
-resolved_marketing_version="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ {print $2; exit}')"
-[[ "$resolved_marketing_version" == "1.0.0" ]] || fail 'Release MARKETING_VERSION must resolve to 1.0.0'
-resolved_build_number="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*CURRENT_PROJECT_VERSION$/ {print $2; exit}')"
-[[ "$resolved_build_number" == "2" ]] || fail 'Release CURRENT_PROJECT_VERSION must resolve to 2'
+# Проверяем все четыре приложения, а не только Client: три остальных принимают деньги
+# и данные клиентов, и до сих пор были вне проверок HTTPS-URL, APNs, bundle id и версии.
+for entry in \
+  'AliStoreClient:kg.alistore.client' \
+  'AliStoreStaff:kg.alistore.staff' \
+  'AliStoreCourier:kg.alistore.courier' \
+  'AliStorePOS:kg.alistore.pos'; do
+  scheme="${entry%%:*}"
+  expected_bundle_id="${entry##*:}"
+
+  settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
+    xcodebuild -project "$ios_root/AliStoreNative.xcodeproj" \
+    -scheme "$scheme" -configuration Release -showBuildSettings \
+    DEVELOPMENT_TEAM="$team_id" ALISTORE_API_BASE_URL="$api_base" 2>/dev/null)" \
+    || fail "xcodebuild could not resolve Release settings for $scheme"
+
+  resolved_api="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*API_BASE_URL$/ {print $2; exit}')"
+  [[ "$resolved_api" == "$api_base" ]] || fail "$scheme: Release API_BASE_URL did not resolve to ALISTORE_API_BASE_URL"
+  resolved_bundle_id="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER$/ {print $2; exit}')"
+  [[ "$resolved_bundle_id" == "$expected_bundle_id" ]] || fail "$scheme: Release bundle identifier must be $expected_bundle_id"
+  resolved_icon="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*ASSETCATALOG_COMPILER_APPICON_NAME$/ {print $2; exit}')"
+  [[ "$resolved_icon" == "AppIcon" ]] || fail "$scheme: Release AppIcon asset catalog must be configured"
+  resolved_aps="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*APS_ENVIRONMENT$/ {print $2; exit}')"
+  [[ "$resolved_aps" == "production" ]] || fail "$scheme: Release APS_ENVIRONMENT must resolve to production"
+  resolved_marketing_version="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*MARKETING_VERSION$/ {print $2; exit}')"
+  [[ "$resolved_marketing_version" == "$expected_marketing_version" ]] \
+    || fail "$scheme: Release MARKETING_VERSION must resolve to $expected_marketing_version"
+  resolved_build_number="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*CURRENT_PROJECT_VERSION$/ {print $2; exit}')"
+  [[ "$resolved_build_number" == "$expected_build_number" ]] \
+    || fail "$scheme: Release CURRENT_PROJECT_VERSION must resolve to $expected_build_number"
+
+  printf 'store-preflight: %s — HTTPS API, bundle id %s, AppIcon, production APNs, %s (%s)\n' \
+    "$scheme" "$resolved_bundle_id" "$resolved_marketing_version" "$resolved_build_number"
+done
 
 printf 'store-preflight: App Store metadata and privacy manifest are present\n'
-printf 'store-preflight: Release API URL resolved to HTTPS\n'
-printf 'store-preflight: Release bundle id and AppIcon are configured\n'
-printf 'store-preflight: Release APNs environment resolved to production\n'
-printf 'store-preflight: Release version resolved to 1.0.0 (2)\n'
+printf 'store-preflight: all four apps verified\n'
 if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'
 fi
@@ -182,4 +203,4 @@ fi
 if [[ "$strict_asc" != "1" && "$strict_signing" != "1" ]]; then
   printf 'store-preflight: Apple credentials skipped in non-strict mode\n'
 fi
-printf 'store-preflight: native Client configuration passed\n'
+printf 'store-preflight: native configuration passed for all four apps\n'
