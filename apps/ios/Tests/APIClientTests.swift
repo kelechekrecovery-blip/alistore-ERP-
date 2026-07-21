@@ -565,12 +565,49 @@ final class APIClientTests: XCTestCase {
         )
         XCTAssertTrue(run.handedOver)
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "courier-handover-run-1")
-        let encoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 59900))
+        let encoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 59900, evidenceIdempotencyKey: "ev-1"))
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         XCTAssertEqual(payload["codAmount"] as? Int, 59900)
-        let partialEncoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 500, reason: "Клиент доплатит позже"))
+        let partialEncoded = try JSONEncoder().encode(CompleteCourierDeliveryRequest(codAmount: 500, evidenceIdempotencyKey: "ev-2", reason: "Клиент доплатит позже"))
         let partialPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: partialEncoded) as? [String: Any])
         XCTAssertEqual(partialPayload["reason"] as? String, "Клиент доплатит позже")
+    }
+
+    /**
+     Регрессия: курьер не мог закрыть доставку вообще.
+
+     Сервер требует ключ уже загруженного Evidence: `evidence.service.ts:190`
+     бросает `courier_evidence_required`, если поле пустое. В DTO оно помечено
+     `@IsOptional()` (`courier.dto.ts:44,63`), поэтому валидация пропускает, а
+     сервис отказывает — то есть 422 приходит и на доставку, и на неудачу.
+
+     Второй барьер за первым: `evidence.service.ts:201-208` сверяет метку
+     загруженного фото с ожидаемой. Приложение слало `"delivery_proof"`, сервер
+     ждёт `"Подтверждение доставки"` (`courier.controller.ts:96`) либо
+     `"Неуспешная доставка"` (`deliveries.controller.ts:47`). Даже с ключом это
+     дало бы `courier_evidence_mismatch`, и починка «добавить поле» выглядела бы
+     неработающей.
+
+     Метки вынесены в константы: строка, которую сверяют побайтово на другой
+     стороне сети, не должна жить литералом внутри вью.
+     */
+    func testCourierCommandsCarryEvidenceKeyAndServerLabels() throws {
+        let delivered = try JSONEncoder().encode(
+            CompleteCourierDeliveryRequest(codAmount: 59900, evidenceIdempotencyKey: "ev-delivered-1")
+        )
+        let deliveredPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: delivered) as? [String: Any])
+        XCTAssertEqual(deliveredPayload["evidenceIdempotencyKey"] as? String, "ev-delivered-1")
+        XCTAssertEqual(deliveredPayload["codAmount"] as? Int, 59900)
+
+        let failed = try JSONEncoder().encode(
+            FailCourierDeliveryRequest(reason: "Клиента нет дома", evidenceIdempotencyKey: "ev-failed-1")
+        )
+        let failedPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: failed) as? [String: Any])
+        XCTAssertEqual(failedPayload["evidenceIdempotencyKey"] as? String, "ev-failed-1")
+
+        // Побайтовое совпадение с тем, что сверяет сервер. Меняется только вместе с ним.
+        XCTAssertEqual(CourierEvidenceLabel.delivered, "Подтверждение доставки")
+        XCTAssertEqual(CourierEvidenceLabel.failed, "Неуспешная доставка")
     }
 
     @MainActor

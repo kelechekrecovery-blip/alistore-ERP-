@@ -303,6 +303,10 @@ private struct CourierDeliveryCard: View {
     @State private var partialCODReason = ""
     @State private var isBusy = false
     @State private var statusMessage: String?
+    /// Фото держим здесь, а не внутри `CourierEvidenceView`: метка Evidence зависит
+    /// от того, какое действие выберет курьер, а это известно только в момент нажатия.
+    @State private var evidenceImage: Data?
+    private let environment = AppEnvironment.live()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -328,7 +332,7 @@ private struct CourierDeliveryCard: View {
                     await execute(endpoint: "courier/orders/\(delivery.id)/start", body: EmptyMutationRequest())
                 }
             } else if delivery.status == "out_for_delivery" {
-                CourierEvidenceView(orderId: delivery.id, session: session)
+                CourierEvidenceView(imageData: $evidenceImage)
                 TextField("Получено COD", text: $collectedCOD)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
@@ -339,11 +343,13 @@ private struct CourierDeliveryCard: View {
                     TextField("Причина частичной оплаты", text: $partialCODReason, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                 }
-                primaryButton("Доставлено · \(collectedCODValue) сом", disabled: !canCompleteCOD) {
+                primaryButton("Доставлено · \(collectedCODValue) сом", disabled: !canCompleteCOD || evidenceImage == nil) {
+                    guard let key = await uploadEvidence(label: CourierEvidenceLabel.delivered) else { return }
                     await execute(
                         endpoint: "courier/orders/\(delivery.id)/deliver",
                         body: CompleteCourierDeliveryRequest(
                             codAmount: collectedCODValue,
+                            evidenceIdempotencyKey: key,
                             reason: partialCODReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                 ? nil
                                 : partialCODReason.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -354,15 +360,29 @@ private struct CourierDeliveryCard: View {
                     .textFieldStyle(.roundedBorder)
                 Button("Не удалось доставить", systemImage: "exclamationmark.octagon") {
                     Task {
+                        guard let key = await uploadEvidence(label: CourierEvidenceLabel.failed) else { return }
                         await execute(
                             endpoint: "deliveries/\(delivery.id)/fail",
-                            body: FailCourierDeliveryRequest(reason: failureReason.trimmingCharacters(in: .whitespacesAndNewlines))
+                            body: FailCourierDeliveryRequest(
+                                reason: failureReason.trimmingCharacters(in: .whitespacesAndNewlines),
+                                evidenceIdempotencyKey: key
+                            )
                         )
                     }
                 }
                 .buttonStyle(.bordered)
                 .tint(courierCoral)
-                .disabled(isBusy || failureReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    isBusy
+                    || evidenceImage == nil
+                    || failureReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+                if evidenceImage == nil {
+                    Label("Сначала приложите фото — сервер закроет доставку только с ним",
+                          systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(courierMuted)
+                }
             } else {
                 Label("Доставка завершена", systemImage: "checkmark.seal.fill").foregroundStyle(courierLime)
             }
@@ -397,6 +417,39 @@ private struct CourierDeliveryCard: View {
         return amount == delivery.outstandingCOD || !partialCODReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Грузит фото под меткой, которую сервер ждёт для ЭТОГО действия, и возвращает
+    /// ключ для тела команды. `nil` — значит загрузка не удалась и команду слать нельзя:
+    /// сервер всё равно ответит `courier_evidence_required`.
+    ///
+    /// В офлайн-очередь фото не кладём осознанно: `assertCourierOrderEvidence`
+    /// требует, чтобы Evidence уже существовал на сервере, поэтому отложенная
+    /// доставка без него будет отвергнута на реплее — сейчас именно так она и
+    /// умирает молча.
+    @MainActor
+    private func uploadEvidence(label: String) async -> String? {
+        guard let evidenceImage else {
+            statusMessage = "Приложите фото доставки"
+            return nil
+        }
+        isBusy = true
+        defer { isBusy = false }
+        let key = UUID().uuidString
+        do {
+            let _: EvidenceAttachment = try await APIClient(baseURL: environment.apiBaseURL).uploadEvidence(
+                imageData: evidenceImage,
+                entityType: "order",
+                entityId: delivery.id,
+                label: label,
+                token: session.accessToken,
+                idempotencyKey: key
+            )
+            return key
+        } catch {
+            statusMessage = "Фото не загрузилось: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
     @MainActor
     private func execute<Body: Encodable & Sendable>(endpoint: String, body: Body) async {
         isBusy = true
@@ -423,15 +476,13 @@ private struct CourierDeliveryCard: View {
     }
 }
 
+/// Только выбор фото. Загрузку делает `CourierDeliveryCard` в момент действия —
+/// иначе метку Evidence пришлось бы угадывать заранее, а сервер сверяет её побайтово.
 private struct CourierEvidenceView: View {
-    let orderId: String
-    let session: StaffSession
+    @Binding var imageData: Data?
     @State private var selectedPhoto: PhotosPickerItem?
-    @State private var imageData: Data?
     @State private var showCamera = false
-    @State private var isUploading = false
     @State private var message: String?
-    private let environment = AppEnvironment.live()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -451,10 +502,11 @@ private struct CourierEvidenceView: View {
             .buttonStyle(.bordered)
             .tint(.white)
             if imageData != nil {
-                Button("Сохранить фото", systemImage: "arrow.up.circle.fill") { Task { await upload() } }
-                    .buttonStyle(.borderedProminent).tint(courierCoral).disabled(isUploading)
+                Label("Фото приложено — уйдёт вместе с закрытием доставки",
+                      systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(courierLime)
             }
-            if isUploading { ProgressView().tint(courierLime) }
             if let message { Text(message).font(.caption).foregroundStyle(courierMuted) }
         }
         .sheet(isPresented: $showCamera) { CourierCameraPicker { imageData = $0 } }
@@ -467,25 +519,6 @@ private struct CourierEvidenceView: View {
         }
     }
 
-    @MainActor
-    private func upload() async {
-        guard let imageData else { return }
-        isUploading = true
-        defer { isUploading = false }
-        do {
-            let _: EvidenceAttachment = try await APIClient(baseURL: environment.apiBaseURL).uploadEvidence(
-                imageData: imageData,
-                entityType: "order",
-                entityId: orderId,
-                label: "delivery_proof",
-                token: session.accessToken
-            )
-            self.imageData = nil
-            message = "Evidence сохранён"
-        } catch {
-            message = error.localizedDescription
-        }
-    }
 }
 
 private struct CourierCODView: View {

@@ -1214,18 +1214,44 @@ public struct CourierDelivery: Decodable, Identifiable, Sendable {
     }
 }
 
+/// Метки Evidence, которые сервер сверяет побайтово.
+///
+/// `evidence.service.ts:201-208` сравнивает `upload.label` с ожидаемой строкой и
+/// при расхождении отвечает `courier_evidence_mismatch`. Ожидаемые значения заданы
+/// на вызывающей стороне: `courier.controller.ts:96` и `deliveries.controller.ts:47`.
+/// Держим их константами, а не литералами внутри вью: строка, которую сверяют на
+/// другом конце сети, обязана меняться осознанно и вместе с сервером.
+public enum CourierEvidenceLabel {
+    public static let delivered = "Подтверждение доставки"
+    public static let failed = "Неуспешная доставка"
+}
+
+/// Завершение доставки.
+///
+/// `evidenceIdempotencyKey` объявлен **обязательным**, хотя серверный DTO помечает
+/// его `@IsOptional()`. Это намеренно: `evidence.service.ts:190` безусловно бросает
+/// `courier_evidence_required`, если поле пустое, — то есть запрос без ключа не
+/// имеет смысла никогда. Требование на уровне типа не даёт собрать такой запрос,
+/// вместо того чтобы получать 422 в руках у курьера.
 public struct CompleteCourierDeliveryRequest: Codable, Sendable {
     public let codAmount: Int
+    public let evidenceIdempotencyKey: String
     public let reason: String?
-    public init(codAmount: Int, reason: String? = nil) {
+    public init(codAmount: Int, evidenceIdempotencyKey: String, reason: String? = nil) {
         self.codAmount = codAmount
+        self.evidenceIdempotencyKey = evidenceIdempotencyKey
         self.reason = reason
     }
 }
 
+/// Неуспешная доставка. Ключ обязателен по той же причине, что и выше.
 public struct FailCourierDeliveryRequest: Codable, Sendable {
     public let reason: String
-    public init(reason: String) { self.reason = reason }
+    public let evidenceIdempotencyKey: String
+    public init(reason: String, evidenceIdempotencyKey: String) {
+        self.reason = reason
+        self.evidenceIdempotencyKey = evidenceIdempotencyKey
+    }
 }
 
 public struct CourierCommandResponse: Decodable, Sendable {
