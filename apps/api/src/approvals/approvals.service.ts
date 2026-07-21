@@ -20,6 +20,23 @@ export interface ApprovalRequest {
   evidence?: Record<string, unknown>;
 }
 
+/**
+ * Материальные действия, которые инициатор не решает сам.
+ *
+ * Список вынесен в константу намеренно: пока он был литералом внутри условия,
+ * два действия оказались вне правила незаметно. Добавляя новое опасное
+ * действие, добавьте его сюда — либо осознанно объясните, почему нет.
+ */
+export const FOUR_EYES_ACTIONS: readonly string[] = [
+  'campaign_budget',
+  'refund',
+  'quarantine_write_off',
+  'exchange',
+  'manual_adjustment',
+  'discount',
+  'price_change',
+];
+
 export interface DecideInput {
   status: 'approved' | 'rejected';
   approver: string;
@@ -127,7 +144,12 @@ export class ApprovalsService {
           `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
         );
       }
-      if (['campaign_budget', 'refund', 'quarantine_write_off', 'exchange', 'manual_adjustment'].includes(approval.action)
+      // `discount` и `price_change` были вне правила, хотя одобряет их
+      // senior_seller — та же роль, что стоит за кассой и просит скидку.
+      // `discountPct` допускает 100, а продажа с нулевым итогом вообще не
+      // создаёт строку Payment: товар уходил бесплатно по решению одного
+      // человека.
+      if (FOUR_EYES_ACTIONS.includes(approval.action)
         && approval.requester === input.approver) {
         throw new ForbiddenError(
           'four_eye_approval_required',
