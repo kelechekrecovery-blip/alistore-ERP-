@@ -46,6 +46,14 @@ const PAYMENT = [
 ] as const;
 type PaymentChoice = (typeof PAYMENT)[number]['id'];
 const STEPS = ['Получение', 'Контакты', 'Оплата', 'Подтверждение'];
+
+/**
+ * Демо-стенд или боевой магазин. Кнопка «подтвердить платёж вручную» имеет
+ * смысл только на демо: в бою её эндпоинт закрыт SandboxConfirmGuard и отдаёт
+ * 404, то есть покупатель нажимал бы кнопку и получал «Платёж не подтверждён»
+ * по своему настоящему заказу. Оплату в бою подтверждает вебхук провайдера.
+ */
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean };
 
 function logisticsDate() {
@@ -337,10 +345,19 @@ export default function CheckoutPage() {
           <div className="checkout-surface mt-5 w-full rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-left">
             <div className="text-[13px] font-semibold text-white">{PAYMENT.find((p) => p.id === done.intent?.method)?.name}</div>
             <div className="mt-1 font-mono text-[11px] break-all text-subtle">{done.intent.qrPayload ?? done.intent.paymentUrl}</div>
-            <div className="mt-2 text-[12px] text-muted">Sandbox intent: {done.intent.intentId} · до {new Date(done.intent.expiresAt).toLocaleTimeString('ru-RU')}</div>
-            <button type="button" disabled={busy} onClick={confirmPayment} className="checkout-primary mt-3 w-full rounded-[12px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60">
-              {busy ? 'Проверяем…' : 'Подтвердить sandbox-платёж'}
-            </button>
+            <div className="mt-2 text-[12px] text-muted">
+              {DEMO_MODE ? `Sandbox intent: ${done.intent.intentId} · ` : 'Счёт действует '}
+              до {new Date(done.intent.expiresAt).toLocaleTimeString('ru-RU')}
+            </div>
+            {DEMO_MODE ? (
+              <button type="button" disabled={busy} onClick={confirmPayment} className="checkout-primary mt-3 w-full rounded-[12px] bg-lime py-3 text-center text-sm font-bold text-lime-ink disabled:opacity-60">
+                {busy ? 'Проверяем…' : 'Подтвердить sandbox-платёж'}
+              </button>
+            ) : (
+              <p className="mt-3 text-[12px] text-muted">
+                Оплатите по ссылке или QR выше. Заказ обновится сам, как только банк подтвердит платёж — страницу можно закрыть.
+              </p>
+            )}
             {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
           </div>
         )}
