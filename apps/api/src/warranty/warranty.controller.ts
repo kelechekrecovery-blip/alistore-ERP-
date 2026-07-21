@@ -22,6 +22,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { AuthzService } from '../authz/authz.service';
 import { WarrantyService } from './warranty.service';
 import { OpenWarrantyDto, WarrantyStatusDto } from './warranty.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -38,7 +39,10 @@ const SYSTEM_ACTOR = 'system';
 @ApiTags('warranty')
 @Controller('warranty')
 export class WarrantyController {
-  constructor(private readonly warranty: WarrantyService) {}
+  constructor(
+    private readonly warranty: WarrantyService,
+    private readonly authz: AuthzService,
+  ) {}
 
   @ApiOperation({ summary: 'List warranty cases by customer / imei / status' })
   @ApiQuery({ name: 'customerId', required: false })
@@ -75,7 +79,7 @@ export class WarrantyController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // anti-spam on anonymous case creation
-  open(
+  async open(
     @Body() dto: OpenWarrantyDto,
     @CurrentUser() user?: AuthPrincipal,
     @Headers('x-guest-capability') capability?: string,
@@ -86,10 +90,24 @@ export class WarrantyController {
     }
     const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
     if (!user) requireGuestCapability(capability, 'warranty:create', customerId);
-    if (user?.typ === 'staff') throw new ForbiddenException('Используйте staff warranty workflow');
+    // Здесь стоял безусловный отказ сотруднику со ссылкой на staff warranty
+    // workflow, которого не существует: этот маршрут — единственный способ
+    // завести заявку. Клиент тоже не мог (вход по SMS отключён), поэтому приём
+    // устройства за прилавком был недостижим с обеих сторон.
+    //
+    // Маршрут остаётся под OptionalJwtAuthGuard ради гостя и клиента, поэтому
+    // право проверяется здесь, а не декоратором: PermissionGuard закрыл бы их.
+    if (user?.typ === 'staff') {
+      if (!user.role || !(await this.authz.can(user.role, 'warranty', 'create'))) {
+        throw new ForbiddenException('Недостаточно прав для приёма в гарантию');
+      }
+    }
     return this.warranty.open(
       { ...dto, customerId },
-      user?.typ === 'customer' ? user.customerId : SYSTEM_ACTOR,
+      // customerId в принципале — это payload.sub: для сотрудника там staffId.
+      // Актором должен быть принявший человек, иначе нельзя спросить, кто взял
+      // устройство у клиента.
+      user ? user.customerId : SYSTEM_ACTOR,
       idempotencyKey,
     );
   }

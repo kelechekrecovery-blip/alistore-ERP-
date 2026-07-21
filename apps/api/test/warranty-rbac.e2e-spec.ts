@@ -17,6 +17,8 @@ describe('Warranty console RBAC', () => {
   let staffAuth: StaffAuthService;
   let jwt: JwtService;
   let sellerToken: string;
+  let sellerId: string;
+  let courierToken: string;
   let warehouseToken: string;
   let warehouseId: string;
   const RUN = Math.floor(Math.random() * 1_000_000);
@@ -40,7 +42,7 @@ describe('Warranty console RBAC', () => {
     staffAuth = moduleRef.get(StaffAuthService);
     jwt = moduleRef.get(JwtService);
 
-    const createSession = async (role: 'seller' | 'warehouse') => {
+    const createSession = async (role: 'seller' | 'warehouse' | 'courier') => {
       const username = `${role}-warranty-${RUN}`;
       const staff = await staffAuth.createStaff(username, 'pass', role);
       const token = (await staffAuth.login(username, 'pass')).accessToken;
@@ -48,7 +50,10 @@ describe('Warranty console RBAC', () => {
     };
 
     const seller = await createSession('seller');
+    sellerId = seller.id;
     sellerToken = seller.token;
+
+    courierToken = (await createSession('courier')).token;
 
     const warehouse = await createSession('warehouse');
     warehouseId = warehouse.id;
@@ -111,6 +116,62 @@ describe('Warranty console RBAC', () => {
   function customerToken(customerId: string, phone: string) {
     return jwt.sign({ sub: customerId, typ: 'customer', phone });
   }
+
+
+  /**
+   * Приём в гарантию за прилавком был невозможен ни для кого.
+   *
+   * `POST /warranty` явно отбивал сотрудника:
+   * `if (user?.typ === 'staff') throw new ForbiddenException('Используйте staff
+   * warranty workflow')` — а такого workflow не существует: единственный маршрут
+   * создания в системе этот. Право `warranty:create` в casbin отсутствовало
+   * вовсе, у ролей были только `read` и `transition`.
+   *
+   * Клиент при этом тоже не мог: вход по SMS отключён (`DisabledOtpSender`), а
+   * гостевая capability выдаётся при оформлении заказа, не при визите в магазин.
+   *
+   * Итог: человек приносит сломанный телефон, продавец видит консоль гарантий,
+   * видит кнопки «Одобрить ремонт» и «Отремонтировано» — и не может завести
+   * заявку, к которой они относятся. Сервисный контур недостижим с обеих сторон.
+   */
+  it('позволяет продавцу принять устройство в гарантию за прилавком', async () => {
+    const { customer, imei } = await warrantyFixture();
+
+    const opened = await request(app.getHttpServer())
+      .post('/warranty')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .set('Idempotency-Key', `staff-warranty-${RUN}`)
+      .send({ customerId: customer.id, imei, problem: 'Не держит заряд' })
+      .expect(201);
+
+    expect(opened.body).toMatchObject({ customerId: customer.id, imei });
+
+    // Актор в леджере — принявший сотрудник, а не SYSTEM: иначе нельзя спросить,
+    // кто принял устройство у человека.
+    const events = await prisma.auditEvent.findMany({ where: { refs: { has: opened.body.id } } });
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.some((event) => event.actor === sellerId)).toBe(true);
+
+    // Приём — не доступ к консоли. Существующая политика (тест ниже) намеренно
+    // держит список и переходы за складом; продавец их не получает. Это
+    // сознательное решение, а не побочный эффект правки.
+    await request(app.getHttpServer())
+      .patch(`/warranty/${opened.body.id}`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ status: 'approved' })
+      .expect(403);
+  });
+
+  it('курьеру приём в гарантию недоступен', async () => {
+    const { customer, imei } = await warrantyFixture();
+
+    await request(app.getHttpServer())
+      .post('/warranty')
+      .set('Authorization', `Bearer ${courierToken}`)
+      .set('Idempotency-Key', `courier-warranty-${RUN}`)
+      .send({ customerId: customer.id, imei, problem: 'Не держит заряд' })
+      .expect(403);
+  });
 
   it('keeps customer warranty opening public but guards console list/get/transition', async () => {
     const { customer, imei } = await warrantyFixture();

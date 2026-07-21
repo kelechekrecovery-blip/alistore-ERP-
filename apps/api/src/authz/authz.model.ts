@@ -181,6 +181,16 @@ p, owner, warranty, read
 p, warehouse, warranty, transition
 p, admin, warranty, transition
 p, owner, warranty, transition
+# Приём в гарантию за прилавком. Права не существовало вовсе, а POST /warranty
+# отбивал любого сотрудника словами «используйте staff warranty workflow» —
+# которого нет. Устройство принимает тот, кто стоит за прилавком, поэтому
+# продавец и кассир здесь наравне со складом. Курьер — нет.
+p, seller, warranty, create
+p, senior_seller, warranty, create
+p, cashier, warranty, create
+p, warehouse, warranty, create
+p, admin, warranty, create
+p, owner, warranty, create
 p, service, service_center, read
 p, technician, service_center, read
 p, admin, service_center, read
