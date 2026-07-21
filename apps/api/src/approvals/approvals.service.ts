@@ -34,8 +34,19 @@ export const FOUR_EYES_ACTIONS: readonly string[] = [
   'exchange',
   'manual_adjustment',
   'discount',
-  'price_change',
+  'price',
+  'debt',
+  'delete',
 ];
+
+/**
+ * Действия, которые инициатор решает сам — сознательное исключение.
+ *
+ * Список намеренно пуст: сегодня каждое действие, уходящее в approvals.request,
+ * материально. Он существует, чтобы будущее исключение потребовало строки кода
+ * и объяснения рядом с ней, а не молчаливого отсутствия в списке выше.
+ */
+export const SINGLE_APPROVER_ACTIONS: readonly string[] = [];
 
 export interface DecideInput {
   status: 'approved' | 'rejected';

@@ -1,4 +1,6 @@
-import { ApprovalsService } from '../src/approvals/approvals.service';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { ApprovalsService, FOUR_EYES_ACTIONS, SINGLE_APPROVER_ACTIONS } from '../src/approvals/approvals.service';
 import { AuditService } from '../src/audit/audit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -51,6 +53,45 @@ describe('Approvals · правило четырёх глаз', () => {
     await expect(
       approvals.decide(approvalId, { status: 'approved', approver: actor, approverRole: 'senior_seller' }),
     ).rejects.toMatchObject({ code: 'four_eye_approval_required' });
+  });
+
+  /**
+   * Список обязан покрывать действия, которые код реально создаёт.
+   *
+   * Первая версия правила внесла в список `price_change` — строку, которую не
+   * производит ни одна строка кода: настоящее действие называется `price`
+   * (`products.service.ts`). Правка выглядела закрывающей дыру и оставила её
+   * открытой: `includes('price')` возвращал false, и админ по-прежнему
+   * согласовывал собственное изменение цены. Заодно вне списка молча остались
+   * `debt` (лимит 50 000) и `delete`.
+   *
+   * Поэтому тест не перечисляет действия руками, а вычитывает литералы из
+   * вызовов `approvals.request` в исходниках и требует, чтобы каждое было
+   * классифицировано явно — в одном из двух списков. Опечатка или новое опасное
+   * действие теперь падают здесь, а не в проде.
+   */
+  it('каждое действие approvals классифицировано явно', () => {
+    const literals = new Set<string>();
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!entry.name.endsWith('.ts')) continue;
+        const source = readFileSync(full, 'utf8');
+        for (const match of source.matchAll(/approvals\.request\(\s*\{[\s\S]{0,240}?action: '([a-z_]+)'/g)) {
+          literals.add(match[1]);
+        }
+      }
+    };
+    walk(join(__dirname, '../src'));
+
+    // Защита от «зелено, потому что ничего не нашли».
+    expect(literals.size).toBeGreaterThanOrEqual(5);
+    const classified = new Set([...FOUR_EYES_ACTIONS, ...SINGLE_APPROVER_ACTIONS]);
+    expect([...literals].filter((action) => !classified.has(action)).sort()).toEqual([]);
   });
 
   it('другой сотрудник с тем же правом скидку одобряет', async () => {
