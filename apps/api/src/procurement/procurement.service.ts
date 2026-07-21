@@ -288,9 +288,27 @@ export class ProcurementService {
       if (!supplier) throw new ValidationError('supplier_not_found', `Поставщик ${dto.supplierId} не найден`);
       if (!order) throw new ValidationError('purchase_order_not_found', `PO ${dto.purchaseOrderId} не найден`);
       if (order.supplierId !== supplier.id) throw new ConflictError('supplier_invoice_supplier_mismatch', 'Счёт не соответствует поставщику PO');
+      // Блокировка PO: без неё два параллельных счёта читали одну и ту же
+      // принятую стоимость и оба проходили матч.
+      await tx.$queryRaw`SELECT id FROM "PurchaseOrder" WHERE id = ${order.id} FOR UPDATE`;
       const match = receiptMatch(order.items);
       if (match.receivedQty === 0) throw new ConflictError('supplier_invoice_no_receipt', 'Нельзя сопоставить счёт без принятого товара');
-      if (dto.amount !== match.value) throw new ConflictError('supplier_invoice_three_way_mismatch', `Счёт ${dto.amount} не совпадает с принятой стоимостью ${match.value}`);
+      // Трёхсторонний матч сравнивал счёт с принятой стоимостью и **не сверял с
+      // уже выставленными**: два счёта с разными номерами на одну поставку
+      // проходили проверку и оплачивались оба. Уникальности по PO в схеме нет
+      // (только по паре поставщик+номер), поэтому сверяем суммой.
+      const invoiced = await tx.supplierInvoice.aggregate({
+        _sum: { amount: true },
+        where: { purchaseOrderId: order.id, status: { not: 'cancelled' } },
+      });
+      const alreadyInvoiced = invoiced._sum?.amount ?? 0;
+      if (alreadyInvoiced + dto.amount > match.value) {
+        throw new ConflictError(
+          'supplier_invoice_over_receipt',
+          `По поставке уже выставлено ${alreadyInvoiced} из ${match.value} — счёт на ${dto.amount} превышает принятое`,
+        );
+      }
+      if (alreadyInvoiced === 0 && dto.amount !== match.value) throw new ConflictError('supplier_invoice_three_way_mismatch', `Счёт ${dto.amount} не совпадает с принятой стоимостью ${match.value}`);
       const invoice = await tx.supplierInvoice.create({
         data: {
           supplierId: supplier.id,

@@ -248,6 +248,21 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .expect(201);
     expect(invoice.body.status).toBe('draft');
     expect((await request(app.getHttpServer()).post('/procurement/supplier-invoices').set('Authorization', `Bearer ${adminToken}`).send(invoicePayload)).body.idempotent).toBe(true);
+    // Второй счёт на ту же поставку с другим номером и ключом. Трёхсторонний
+    // матч сравнивал счёт с принятой стоимостью и не сверял с уже
+    // выставленными, а уникальности по PO в схеме нет — только по паре
+    // поставщик+номер. Обе поставки оплачивались, счёт 2000 уходил в дебет
+    // дважды, и сверка выписки принимала каждую проводку как законную.
+    await request(app.getHttpServer())
+      .post('/procurement/supplier-invoices')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        ...invoicePayload,
+        invoiceNumber: `${invoicePayload.invoiceNumber}-DUP`,
+        idempotencyKey: `${invoicePayload.idempotencyKey}-dup`,
+      })
+      .expect(409)
+      .expect(({ body }) => expect(body.code).toBe('supplier_invoice_over_receipt'));
     await request(app.getHttpServer())
       .post(`/procurement/supplier-invoices/${invoice.body.id}/approve`)
       .set('Authorization', `Bearer ${adminToken}`)
