@@ -72,6 +72,32 @@ export class OrdersService {
     });
   }
 
+  async getForStaff(id: string, staffId: string) {
+    const order = await this.get(id);
+    if (!order?.posShiftId) return order;
+    const ownOpenShift = await this.prisma.cashShift.findFirst({
+      where: { id: order.posShiftId, staffId, closedAt: null },
+      select: { id: true },
+    });
+    if (!ownOpenShift) return order;
+    return {
+      ...order,
+      posShiftId: null,
+      payments: [],
+      drawerBlind: true,
+    };
+  }
+
+  async isOwnOpenShiftOrder(orderId: string, staffId: string): Promise<boolean> {
+    const count = await this.prisma.order.count({
+      where: {
+        id: orderId,
+        posShift: { staffId, closedAt: null },
+      },
+    });
+    return count > 0;
+  }
+
   getGuest(id: string) {
     return this.prisma.order.findUnique({
       where: { id },
@@ -837,6 +863,29 @@ export class OrdersService {
   listByStatus(status: OrderStatus, limit = 50) {
     return this.prisma.order.findMany({
       where: { status },
+      include: { items: true, customer: { select: { phone: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  async listByStatusForStaff(status: OrderStatus, staffId: string, limit = 50) {
+    const ownOpenShift = await this.prisma.cashShift.findFirst({
+      where: { staffId, closedAt: null },
+      select: { id: true },
+    });
+    return this.prisma.order.findMany({
+      where: {
+        status,
+        ...(ownOpenShift
+          ? {
+              OR: [
+                { posShiftId: null },
+                { posShiftId: { not: ownOpenShift.id } },
+              ],
+            }
+          : {}),
+      },
       include: { items: true, customer: { select: { phone: true, name: true } } },
       orderBy: { createdAt: 'desc' },
       take: limit,

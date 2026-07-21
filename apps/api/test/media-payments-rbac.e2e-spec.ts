@@ -9,6 +9,7 @@ import { PaymentsModule } from '../src/payments/payments.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Two permission holes closed together:
@@ -24,8 +25,10 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 describe('Media upload / payments read RBAC', () => {
   let app: INestApplication;
   let staffAuth: StaffAuthService;
+  let prisma: PrismaService;
   const RUN = Math.floor(Math.random() * 1_000_000);
   const tokens: Record<string, string> = {};
+  const staffIds: Record<string, string> = {};
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -44,10 +47,12 @@ describe('Media upload / payments read RBAC', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     staffAuth = moduleRef.get(StaffAuthService);
+    prisma = moduleRef.get(PrismaService);
 
     for (const role of ['owner', 'marketer', 'seller', 'cashier'] as const) {
       const username = `${role}-media-${RUN}`;
-      await staffAuth.createStaff(username, 'pass', role);
+      const staff = await staffAuth.createStaff(username, 'pass', role);
+      staffIds[role] = staff.id;
       tokens[role] = (await staffAuth.login(username, 'pass')).accessToken;
     }
   });
@@ -111,5 +116,40 @@ describe('Media upload / payments read RBAC', () => {
       .get('/payments')
       .set('Authorization', `Bearer ${tokens.seller}`);
     expect(denied.status).toBe(403);
+  });
+
+  it('never exposes payments from the caller’s own open drawer', async () => {
+    const ownShift = await prisma.cashShift.create({
+      data: { staffId: staffIds.owner, point: 'BISHKEK-1', openCash: 5_000 },
+    });
+    const foreignShift = await prisma.cashShift.create({
+      data: { staffId: staffIds.cashier, point: 'BISHKEK-1', openCash: 2_000 },
+    });
+    const ownPayment = await prisma.payment.create({
+      data: { shiftId: ownShift.id, amount: 11_000, method: 'cash', status: 'received' },
+    });
+    const foreignPayment = await prisma.payment.create({
+      data: { shiftId: foreignShift.id, amount: 7_000, method: 'cash', status: 'received' },
+    });
+    const shiftlessPayment = await prisma.payment.create({
+      data: { amount: 3_000, method: 'card', status: 'received' },
+    });
+
+    const broad = await request(app.getHttpServer())
+      .get('/payments')
+      .set('Authorization', `Bearer ${tokens.owner}`)
+      .expect(200);
+    expect(broad.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: foreignPayment.id })]));
+    expect(broad.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: shiftlessPayment.id })]));
+    expect(broad.body).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: ownPayment.id })]));
+
+    const direct = await request(app.getHttpServer())
+      .get(`/payments?shiftId=${ownShift.id}`)
+      .set('Authorization', `Bearer ${tokens.owner}`)
+      .expect(200);
+    expect(direct.body).toEqual([]);
+
+    await prisma.payment.deleteMany({ where: { id: { in: [ownPayment.id, foreignPayment.id, shiftlessPayment.id] } } });
+    await prisma.cashShift.deleteMany({ where: { id: { in: [ownShift.id, foreignShift.id] } } });
   });
 });

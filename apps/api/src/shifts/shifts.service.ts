@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
@@ -12,22 +12,31 @@ import { CloseShiftDto, HandoverShiftDto, OpenShiftDto } from './shifts.dto';
  * Cash shift lifecycle with drawer reconciliation.
  *
  * Invariant #3: «Нельзя закрыть кассу без фактической сверки». Closing requires the
- * counted cash; when it diverges from the expected drawer amount (diff ≠ 0) a reason
- * is mandatory and a cash.shortage event is written to the ledger. Approval + Risk
- * routing on discrepancies lands in v1 — the ledger record is the MVP guarantee.
+ * counted cash. A self-close is a one-shot blind count: when it diverges from the
+ * expected drawer amount, the server records a system workflow marker and a
+ * cash.shortage event. A manager closing somebody else's drawer must supply a reason.
  *
  * Expected drawer cash = openCash + Σ(cash payments on this shift). Refunds are
  * stored as negative amounts, so they subtract naturally.
  */
 @Injectable()
 export class ShiftsService {
+  private static readonly BLIND_COUNT_REASON = 'Слепой пересчёт кассы';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Optional() private readonly outbox?: OutboxService,
   ) {}
 
-  get(id: string) {
+  async getForStaff(id: string, staffId: string, role: string | undefined) {
+    const manager = role === Role.owner || role === Role.admin;
+    const shift = await this.prisma.cashShift.findUnique({
+      where: { id },
+    });
+    if (!shift) return null;
+    if (shift.staffId === staffId) return shift;
+    if (!manager) return null;
     return this.prisma.cashShift.findUnique({
       where: { id },
       include: { payments: true },
@@ -41,14 +50,55 @@ export class ShiftsService {
     });
   }
 
-  async openShifts(point?: string) {
-    const [shifts, staff] = await Promise.all([
-      this.prisma.cashShift.findMany({ where: { closedAt: null, ...(point?.trim() ? { point: point.trim() } : {}) }, include: { payments: { where: { method: 'cash' }, select: { amount: true } } }, orderBy: { openedAt: 'asc' } }),
-      this.prisma.staffUser.findMany({ where: { active: true, role: { in: ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'] } }, select: { id: true, username: true, role: true }, orderBy: { username: 'asc' } }),
-    ]);
+  async openShifts(
+    point: string | undefined,
+    staffId: string,
+    role: string | undefined,
+    staffPoint?: string,
+  ) {
+    const manager = role === Role.owner || role === Role.admin;
+    const staff = await this.prisma.staffUser.findMany({
+      where: {
+        active: true,
+        ...(!manager && staffPoint ? { point: staffPoint } : {}),
+        role: {
+          in: manager
+            ? ['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner']
+            : ['cashier', 'seller', 'senior_seller'],
+        },
+      },
+      select: { id: true, username: true, role: true },
+      orderBy: { username: 'asc' },
+    });
     const names = new Map(staff.map((person) => [person.id, person]));
+    const where = {
+      closedAt: null,
+      ...(point?.trim() ? { point: point.trim() } : {}),
+    };
+    if (!manager) {
+      const shifts = await this.prisma.cashShift.findMany({
+        where: { ...where, staffId },
+        orderBy: { openedAt: 'asc' },
+      });
+      return {
+        shifts: shifts.map((shift) => ({ ...shift, staff: names.get(shift.staffId) ?? null })),
+        staff,
+      };
+    }
+    const shifts = await this.prisma.cashShift.findMany({
+      where,
+      include: { payments: { where: { method: 'cash' }, select: { amount: true } } },
+      orderBy: { openedAt: 'asc' },
+    });
     return {
-      shifts: shifts.map((shift) => ({ ...shift, expectedCash: shift.openCash + shift.payments.reduce((sum, payment) => sum + payment.amount, 0), staff: names.get(shift.staffId) ?? null, payments: undefined })),
+      shifts: shifts.map((shift) => ({
+        ...shift,
+        ...(shift.staffId === staffId
+          ? {}
+          : { expectedCash: shift.openCash + shift.payments.reduce((sum, payment) => sum + payment.amount, 0) }),
+        staff: names.get(shift.staffId) ?? null,
+        payments: undefined,
+      })),
       staff,
     };
   }
@@ -138,13 +188,28 @@ export class ShiftsService {
    */
   private assertOwnerOrManager(shiftStaffId: string, actor: string, actorRole: string | undefined) {
     const manager = actorRole === Role.owner || actorRole === Role.admin;
-    if (shiftStaffId !== actor && !manager) throw new ConflictError('shift_handover_owner_mismatch', 'Можно передать только свою кассовую смену');
+    if (shiftStaffId !== actor && !manager) {
+      throw new NotFoundException('Смена не найдена');
+    }
+  }
+
+  private closeReason(
+    shiftStaffId: string,
+    actor: string,
+    actorRole: string | undefined,
+    diff: number,
+    requestedReason: string | undefined,
+  ) {
+    const reason = requestedReason?.trim() || null;
+    if (diff === 0 || reason) return reason;
+    const selfBlindCount = shiftStaffId === actor && actorRole !== undefined;
+    return selfBlindCount ? ShiftsService.BLIND_COUNT_REASON : null;
   }
 
   /**
-   * Close a shift with reconciliation. diff = closeCash − expected. A non-zero diff
-   * without a reason is rejected (422); with a reason it is recorded and a
-   * cash.shortage event is appended.
+   * Close a shift with reconciliation. diff = closeCash − expected. The owner of the
+   * drawer submits one blind count; a manager closing another drawer must explain a
+   * non-zero difference. Every discrepancy appends cash.shortage.
    */
   async close(shiftId: string, dto: CloseShiftDto, actor: string, idempotencyKey?: string, actorRole?: string) {
     return this.audit.transaction(async (tx) => {
@@ -152,7 +217,7 @@ export class ShiftsService {
       await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
       const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
       if (!shift) {
-        throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
+        throw new NotFoundException('Смена не найдена');
       }
       // The controller always passes the staff role; legacy service-level callers
       // without role context keep the previous owner-blind behavior.
@@ -161,9 +226,16 @@ export class ShiftsService {
       }
       if (shift.closedAt) {
         if (idempotencyKey && shift.closeIdempotencyKey === idempotencyKey) {
+          const replayReason = this.closeReason(
+            shift.staffId,
+            actor,
+            actorRole,
+            shift.diff ?? 0,
+            dto.reason,
+          );
           if (
             shift.closeCash !== dto.closeCash ||
-            (shift.closeReason ?? null) !== (dto.reason?.trim() || null)
+            (shift.closeReason ?? null) !== replayReason
           ) {
             throw new ConflictError(
               'shift_idempotency_mismatch',
@@ -188,12 +260,14 @@ export class ShiftsService {
       await this.assertNoPendingCashRefunds(tx, shiftId);
       const expected = await this.expectedCash(tx, shiftId, shift.openCash);
       const diff = dto.closeCash - expected;
+      const reason = this.closeReason(shift.staffId, actor, actorRole, diff, dto.reason);
+      const userNote = dto.reason?.trim() || null;
 
       // Invariant #3: a discrepancy must be explained.
-      if (diff !== 0 && !dto.reason?.trim()) {
+      if (diff !== 0 && !reason) {
         throw new ValidationError(
           'reconciliation_reason_required',
-          `Расхождение кассы ${diff} сом требует причину`,
+          'Расхождение кассы требует причину',
         );
       }
 
@@ -202,7 +276,7 @@ export class ShiftsService {
         where: { id: shiftId },
         data: {
           closeCash: dto.closeCash,
-          closeReason: dto.reason?.trim() || null,
+          closeReason: reason,
           closeIdempotencyKey: idempotencyKey,
           diff,
           closedAt: new Date(),
@@ -216,7 +290,10 @@ export class ShiftsService {
           expected,
           closeCash: dto.closeCash,
           diff,
-          reason: dto.reason ?? null,
+          reason,
+          reconciliationMode: shift.staffId === actor ? 'blind' : 'manager',
+          reasonSource: userNote ? 'user' : 'system',
+          userNote,
         },
         refs: [shiftId],
       });
@@ -224,7 +301,14 @@ export class ShiftsService {
         events.push({
           type: EventType.CashShortage,
           actor,
-          payload: { shiftId, diff, reason: dto.reason },
+          payload: {
+            shiftId,
+            diff,
+            reason,
+            reconciliationMode: shift.staffId === actor ? 'blind' : 'manager',
+            reasonSource: userNote ? 'user' : 'system',
+            userNote,
+          },
           refs: [shiftId],
         });
       }
@@ -239,7 +323,7 @@ export class ShiftsService {
           await enqueueStaffNotice(tx, this.outbox, {
             template: 'cash_shortage',
             title: 'Недостача кассы',
-            body: `${diff} сом · ${dto.reason?.trim()}`,
+            body: `${diff} сом · ${reason}`,
             payload: { shiftId, diff, deepLink: `alistore-admin://shifts/${shiftId}` },
           });
         }
@@ -251,41 +335,53 @@ export class ShiftsService {
   async handover(shiftId: string, dto: HandoverShiftDto, actor: string, actorRole: string | undefined, rawKey?: string) {
     const key = rawKey?.trim();
     if (!key || key.length > 100) throw new ValidationError('idempotency_key_required', 'Требуется Idempotency-Key до 100 символов');
-    const reason = dto.reason?.trim() || null;
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-handover-key:' + key}))::text AS locked`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-handover:' + shiftId}))::text AS locked`;
+      await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
+      const source = await tx.cashShift.findUnique({ where: { id: shiftId } });
+      if (!source) throw new NotFoundException('Смена не найдена');
+      this.assertOwnerOrManager(source.staffId, actor, actorRole);
+
       const replay = await tx.cashShiftHandover.findUnique({ where: { idempotencyKey: key } });
       if (replay) {
-        if (replay.fromShiftId !== shiftId || replay.toStaffId !== dto.toStaffId || replay.countedCash !== dto.countedCash || replay.reason !== reason) throw new ConflictError('shift_idempotency_mismatch', 'Ключ передачи уже использован для другой команды');
+        const replayReason = this.closeReason(
+          source.staffId,
+          actor,
+          actorRole,
+          replay.diff,
+          dto.reason,
+        );
+        if (replay.fromShiftId !== shiftId || replay.toStaffId !== dto.toStaffId || replay.countedCash !== dto.countedCash || replay.reason !== replayReason) throw new ConflictError('shift_idempotency_mismatch', 'Ключ передачи уже использован для другой команды');
         const targetShift = await tx.cashShift.findUniqueOrThrow({ where: { id: replay.toShiftId } });
         return { result: { handover: replay, targetShift }, events: [] };
       }
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-handover:' + shiftId}))::text AS locked`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'shift-open:' + dto.toStaffId}))::text AS locked`;
-      await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
-      const source = await tx.cashShift.findUnique({ where: { id: shiftId } });
-      if (!source) throw new ValidationError('shift_not_found', `Смена ${shiftId} не найдена`);
       if (source.closedAt) throw new ConflictError('shift_already_closed', 'Закрытую смену нельзя передать');
       await this.assertNoPendingCashRefunds(tx, source.id);
-      this.assertOwnerOrManager(source.staffId, actor, actorRole);
       if (source.staffId === dto.toStaffId) throw new ValidationError('shift_handover_same_staff', 'Получатель должен отличаться от передающего');
       const target = await tx.staffUser.findUnique({ where: { id: dto.toStaffId } });
       if (!target?.active || !['cashier', 'seller', 'senior_seller', 'franchise', 'admin', 'owner'].includes(target.role)) throw new ValidationError('shift_handover_target_invalid', 'Получатель неактивен или не может работать с кассой');
+      if (target.point !== source.point) {
+        throw new ValidationError('shift_handover_point_mismatch', 'Получатель должен работать в той же точке');
+      }
       const targetOpen = await tx.cashShift.findFirst({ where: { staffId: dto.toStaffId, closedAt: null } });
       if (targetOpen) throw new ConflictError('shift_already_open', 'У получателя уже есть открытая кассовая смена');
       const expected = await this.expectedCash(tx, source.id, source.openCash);
       const diff = dto.countedCash - expected;
-      if (diff !== 0 && !reason) throw new ValidationError('reconciliation_reason_required', `Расхождение кассы ${diff} сом требует причину`);
+      const reason = this.closeReason(source.staffId, actor, actorRole, diff, dto.reason);
+      const userNote = dto.reason?.trim() || null;
+      if (diff !== 0 && !reason) throw new ValidationError('reconciliation_reason_required', 'Расхождение кассы требует причину');
       const closedAt = new Date();
       await tx.cashShift.update({ where: { id: source.id }, data: { closeCash: dto.countedCash, closeReason: reason, closeIdempotencyKey: `handover:${key}:close`, diff, closedAt } });
       const targetShift = await tx.cashShift.create({ data: { staffId: dto.toStaffId, point: source.point, openCash: dto.countedCash, openIdempotencyKey: `handover:${key}:open` } });
       const handover = await tx.cashShiftHandover.create({ data: { idempotencyKey: key, fromShiftId: source.id, toShiftId: targetShift.id, fromStaffId: source.staffId, toStaffId: dto.toStaffId, point: source.point, expectedCash: expected, countedCash: dto.countedCash, diff, reason, createdBy: actor } });
       const events: AuditInput[] = [
-        { type: EventType.ShiftClosed, actor, payload: { shiftId: source.id, expected, closeCash: dto.countedCash, diff, reason, handoverId: handover.id }, refs: [source.id, handover.id] },
+        { type: EventType.ShiftClosed, actor, payload: { shiftId: source.id, expected, closeCash: dto.countedCash, diff, reason, reconciliationMode: source.staffId === actor ? 'blind' : 'manager', reasonSource: userNote ? 'user' : 'system', userNote, handoverId: handover.id }, refs: [source.id, handover.id] },
         { type: EventType.CashHandover, actor, payload: { handoverId: handover.id, fromShiftId: source.id, toShiftId: targetShift.id, fromStaffId: source.staffId, toStaffId: dto.toStaffId, amount: dto.countedCash, diff }, refs: [handover.id, source.id, targetShift.id] },
         { type: EventType.ShiftOpened, actor, payload: { shiftId: targetShift.id, staffId: dto.toStaffId, point: source.point, openCash: dto.countedCash, handoverId: handover.id }, refs: [targetShift.id, handover.id] },
       ];
-      if (diff !== 0) events.splice(1, 0, { type: EventType.CashShortage, actor, payload: { shiftId: source.id, diff, reason, handoverId: handover.id }, refs: [source.id, handover.id] });
+      if (diff !== 0) events.splice(1, 0, { type: EventType.CashShortage, actor, payload: { shiftId: source.id, diff, reason, reconciliationMode: source.staffId === actor ? 'blind' : 'manager', reasonSource: userNote ? 'user' : 'system', userNote, handoverId: handover.id }, refs: [source.id, handover.id] });
       return { result: { handover, targetShift }, events };
     });
   }

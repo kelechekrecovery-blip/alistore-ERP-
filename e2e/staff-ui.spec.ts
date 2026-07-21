@@ -44,3 +44,46 @@ test('Staff app follows the canonical four-section mobile shell', async ({ page 
     await page.evaluate(() => document.documentElement.clientWidth),
   );
 });
+
+test('cashier closes a shift with a blind physical count before seeing the variance', async ({ page }) => {
+  await resetDb();
+  const session = await seedStaffCredentials('cashier', 'e2e-staff-blind-count');
+  const shift = await prisma.cashShift.create({
+    data: { staffId: session.staffId, point: 'BISHKEK-1', openCash: 5_000 },
+  });
+  await prisma.payment.create({
+    data: { shiftId: shift.id, amount: 10_000, method: 'cash', status: 'received' },
+  });
+
+  await page.addInitScript((auth) => {
+    localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(auth));
+  }, {
+    accessToken: session.accessToken,
+    staffId: session.staffId,
+    username: session.username,
+    role: 'cashier',
+    totpEnabled: false,
+  });
+  await page.goto('/staff');
+
+  await expect(page.getByText('Ожидаемая сумма скрыта до отправки. Пересчитайте наличные самостоятельно.')).toBeVisible();
+  await expect(page.getByLabel('Фактически пересчитано в кассе')).toHaveValue('');
+  await expect(page.getByText('15 000 сом')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Закрыть' })).toBeDisabled();
+  await page.getByLabel('Фактически пересчитано в кассе').fill('14000');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Закрыть' }).click();
+
+  const reconciliation = page.getByTestId('staff-last-reconciliation');
+  await expect(reconciliation).toContainText('14 000 сом');
+  await expect(reconciliation).toContainText('15 000 сом');
+  await expect(reconciliation).toContainText('-1 000 сом');
+  await expect.poll(async () => (await prisma.cashShift.findUniqueOrThrow({ where: { id: shift.id } })).closedAt)
+    .not.toBeNull();
+  const closed = await prisma.cashShift.findUniqueOrThrow({ where: { id: shift.id } });
+  expect(closed).toMatchObject({
+    closeCash: 14_000,
+    diff: -1_000,
+    closeReason: 'Слепой пересчёт кассы',
+  });
+});

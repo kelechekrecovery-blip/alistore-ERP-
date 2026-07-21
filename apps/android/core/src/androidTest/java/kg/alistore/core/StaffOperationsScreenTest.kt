@@ -63,28 +63,37 @@ class StaffOperationsScreenTest {
     compose.onNodeWithTag("shift-open").assertIsEnabled().performClick()
     compose.waitUntil(5_000) { gateway.openKeys.size == 1 && runCatching { compose.onNodeWithTag("staff-retry").fetchSemanticsNode() }.isSuccess }
     compose.onNodeWithTag("shift-open").performClick()
-    compose.waitUntil(5_000) { gateway.openKeys.size == 2 && runCatching { compose.onNodeWithTag("shift-expected").fetchSemanticsNode() }.isSuccess }
+    compose.waitUntil(5_000) { gateway.openKeys.size == 2 && runCatching { compose.onNodeWithTag("shift-close-cash").fetchSemanticsNode() }.isSuccess }
 
     assertEquals(gateway.openKeys[0], gateway.openKeys[1])
-    compose.onNodeWithText("Ожидается: 5000 сом").assertIsDisplayed()
+    compose.onNodeWithTag("shift-close").assertIsNotEnabled()
+    compose.onNodeWithTag("shift-expected").assertDoesNotExist()
+    compose.onNodeWithText("Ожидается: 5000 сом").assertDoesNotExist()
   }
 
   @Test
-  fun discrepancyRequiresReasonAndCloseRetryKeepsKey() {
-    val shift = CashShift("shift-1", "staff-1", "BISHKEK-1", 5000, null, null, null, "2026-07-13", null)
+  fun blindCountAllowsOptionalNoteAndRevealsServerResultAfterSubmit() {
+    val shift = CashShift("shift-1", "staff-1", "BISHKEK-1", 5000, null, null, null, "2026-07-13", null, expected = 9000)
     val gateway = UiStaffGateway(current = shift, failFirstClose = true)
     compose.setContent { MaterialTheme { StaffShiftScreen(session, gateway, {}) } }
 
     compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("shift-close-cash").fetchSemanticsNode() }.isSuccess }
-    compose.onNodeWithTag("shift-close-cash").performTextReplacement("4900")
     compose.onNodeWithTag("shift-close").assertIsNotEnabled()
-    compose.onNodeWithTag("shift-reason").performTextReplacement("Недостача")
+    compose.onNodeWithTag("shift-expected").assertDoesNotExist()
+    compose.onNodeWithText("9000", substring = true).assertDoesNotExist()
+    compose.onNodeWithTag("shift-reason").assertIsDisplayed()
+    compose.onNodeWithTag("shift-close-cash").performTextReplacement("-1")
+    compose.onNodeWithTag("shift-close").assertIsNotEnabled()
+    compose.onNodeWithTag("shift-close-cash").performTextReplacement("0")
     compose.onNodeWithTag("shift-close").assertIsEnabled().performClick()
     compose.waitUntil(5_000) { gateway.closeKeys.size == 1 }
     compose.onNodeWithTag("shift-close").performClick()
-    compose.waitUntil(5_000) { gateway.closeKeys.size == 2 }
+    compose.waitUntil(5_000) { gateway.closeKeys.size == 2 && runCatching { compose.onNodeWithTag("shift-result").fetchSemanticsNode() }.isSuccess }
 
     assertEquals(gateway.closeKeys[0], gateway.closeKeys[1])
+    assertEquals(CloseShiftRequest(0, null), gateway.closeRequests.last())
+    compose.onNodeWithText("Ожидалось: 9000 сом").assertIsDisplayed()
+    compose.onNodeWithText("Расхождение: -9000 сом").assertIsDisplayed()
   }
 
   @Test
@@ -110,6 +119,7 @@ private class UiStaffGateway(
 ) : StaffOperationsGateway {
   val openKeys = mutableListOf<String>()
   val closeKeys = mutableListOf<String>()
+  val closeRequests = mutableListOf<CloseShiftRequest>()
   val transitions = mutableListOf<Pair<String, String>>()
   var orderLoads = 0
   var hrLoads = 0
@@ -127,8 +137,9 @@ private class UiStaffGateway(
 
   override suspend fun closeShift(shiftId: String, request: CloseShiftRequest, token: String, idempotencyKey: String): CashShift {
     closeKeys += idempotencyKey
+    closeRequests += request
     if (failFirstClose && closeKeys.size == 1) throw IOException("Сеть недоступна")
-    return current!!.copy(closeCash = request.closeCash, closeReason = request.reason, diff = request.closeCash - current!!.expectedCash, closedAt = "2026-07-13").also { current = null }
+    return current!!.copy(closeCash = request.closeCash, closeReason = request.reason, diff = -9000, closedAt = "2026-07-13").also { current = null }
   }
 
   override suspend fun staffHrWeek(weekStart: String, token: String): StaffHrWeek {

@@ -82,6 +82,21 @@ describe('Finance expenses (integration + RBAC)', () => {
   afterEach(clean);
   afterAll(async () => app.close());
 
+  it('blocks finance reads while the caller has an open cash drawer', async () => {
+    await prisma.cashShift.create({
+      data: { staffId: ownerId, point: 'BISHKEK-1', openCash: 5_000 },
+    });
+
+    await request(app.getHttpServer())
+      .get('/finance/journal?accountCode=1010')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/finance/periods/2026-07/readiness')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+  });
+
   it('runs submitted → approved → paid with RBAC, concurrency and idempotency', async () => {
     const payload = {
       idempotencyKey: `expense-${run}-1`,

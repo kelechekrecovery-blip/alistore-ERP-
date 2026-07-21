@@ -131,6 +131,25 @@ describe('Evidence Vault (integration)', () => {
     });
   });
 
+  it('allows shift evidence only to the shift owner or a manager', async () => {
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'cashier-evidence-owner', point: 'BISHKEK-1', openCash: 0 },
+    });
+
+    await expect(
+      evidence.assertStaffCanAttachShift('cashier-evidence-owner', 'cashier', shift.id),
+    ).resolves.toBeUndefined();
+    await expect(
+      evidence.assertStaffCanAttachShift('foreign-cashier', 'cashier', shift.id),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      evidence.assertStaffCanAttachShift('manager', 'owner', shift.id),
+    ).resolves.toBeUndefined();
+    await expect(
+      evidence.assertStaffCanAttachShift('manager', 'owner', 'missing-shift'),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
   it('replays a keyed upload without duplicating the asset or ledger event', async () => {
     const mv = await movement();
     const image = await pngBuffer();

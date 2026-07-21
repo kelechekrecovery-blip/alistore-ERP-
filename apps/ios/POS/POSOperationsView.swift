@@ -80,10 +80,12 @@ struct POSShiftView: View {
     let enablePush: () -> Void
     let logout: () -> Void
     @State private var shift: CashShift?
+    @State private var closedShift: CashShift?
     @State private var point = "BISHKEK-1"
     @State private var openCash = "0"
     @State private var closeCash = ""
     @State private var reason = ""
+    @State private var closeKey = UUID().uuidString
     @State private var isBusy = false
     @State private var errorMessage: String?
     @State private var message: String?
@@ -102,14 +104,29 @@ struct POSShiftView: View {
                     Section("Открытая смена") {
                         LabeledContent("Точка", value: shift.point)
                         LabeledContent("Открытие", value: "\(shift.openCash) сом")
-                        LabeledContent("Ожидается", value: "\(shift.expectedCash) сом")
-                        LabeledContent("Платежей", value: "\(shift.payments?.count ?? 0)")
-                        TextField("Фактически в кассе", text: $closeCash).keyboardType(.numberPad)
-                        TextField("Причина расхождения", text: $reason)
+                        TextField("Фактически в кассе", text: $closeCash)
+                            .keyboardType(.numberPad)
+                            .accessibilityIdentifier("pos-close-cash")
+                        TextField("Заметка (необязательно)", text: $reason)
+                            .accessibilityIdentifier("pos-close-note")
                         Button("Закрыть смену", systemImage: "lock.fill", role: .destructive) { Task { await close(shift) } }
-                            .disabled(isBusy || Int(closeCash) == nil)
+                            .disabled(isBusy || !canClose)
+                            .accessibilityIdentifier("pos-close-shift")
                     }
                 } else {
+                    if let closedShift {
+                        Section("Смена закрыта") {
+                            LabeledContent("Точка", value: closedShift.point)
+                            if let closeCash = closedShift.closeCash {
+                                LabeledContent("Фактически", value: "\(closeCash) сом")
+                            }
+                            LabeledContent("Ожидалось", value: "\(closedShift.expectedCash) сом")
+                            if let diff = closedShift.diff {
+                                LabeledContent("Расхождение", value: "\(diff) сом")
+                            }
+                        }
+                        .accessibilityIdentifier("pos-closed-shift-result")
+                    }
                     Section("Открыть смену") {
                         TextField("Точка", text: $point).textInputAutocapitalization(.characters)
                         TextField("Наличные при открытии", text: $openCash).keyboardType(.numberPad)
@@ -130,12 +147,28 @@ struct POSShiftView: View {
 
     @MainActor private func load() async {
         #if DEBUG
+        if UITestBootstrap.usesCashShiftFixture {
+            shift = Self.uiTestOpenShift
+            closedShift = nil
+            closeCash = ""
+            reason = ""
+            errorMessage = nil
+            return
+        }
         if UITestBootstrap.startsAtVisualEvidence {
             errorMessage = nil
             return
         }
         #endif
-        do { shift = try await api.get("shifts/current", token: session.accessToken) }
+        do {
+            let loaded: CashShift? = try await api.get("shifts/current", token: session.accessToken)
+            if shift?.id != loaded?.id, loaded != nil {
+                closeCash = ""
+                reason = ""
+                closeKey = UUID().uuidString
+            }
+            shift = loaded
+        }
         catch { errorMessage = error.localizedDescription }
     }
 
@@ -148,23 +181,73 @@ struct POSShiftView: View {
                 token: session.accessToken,
                 idempotencyKey: UUID().uuidString
             )
+            closeKey = UUID().uuidString
+            closedShift = nil
             message = "Смена открыта"
         } catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor private func close(_ current: CashShift) async {
+        guard let amount = Int(closeCash), canClose else { return }
         isBusy = true; errorMessage = nil; defer { isBusy = false }
         do {
-            let closed: CashShift = try await api.post(
+            let note = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+            let closed: CashShift
+            #if DEBUG
+            if UITestBootstrap.usesCashShiftFixture {
+                closed = Self.uiTestClosedShift(closeCash: amount)
+            } else {
+                closed = try await api.post(
+                    "shifts/\(current.id)/close",
+                    body: CloseShiftRequest(closeCash: amount, reason: note.isEmpty ? nil : note),
+                    token: session.accessToken,
+                    idempotencyKey: closeKey
+                )
+            }
+            #else
+            closed = try await api.post(
                 "shifts/\(current.id)/close",
-                body: CloseShiftRequest(closeCash: Int(closeCash) ?? 0, reason: reason.isEmpty ? nil : reason),
+                body: CloseShiftRequest(closeCash: amount, reason: note.isEmpty ? nil : note),
                 token: session.accessToken,
-                idempotencyKey: UUID().uuidString
+                idempotencyKey: closeKey
             )
+            #endif
             message = "Смена закрыта · расхождение \(closed.diff ?? 0) сом"
+            closedShift = closed
+            closeKey = UUID().uuidString
             shift = nil; closeCash = ""; reason = ""
         } catch { errorMessage = error.localizedDescription }
     }
+
+    private var canClose: Bool {
+        guard let amount = Int(closeCash) else { return false }
+        return amount >= 0
+    }
+
+    #if DEBUG
+    private static let uiTestOpenShift = CashShift(
+        id: "ui-test-shift",
+        staffId: "staff-ui-test",
+        point: "BISHKEK-1",
+        openCash: 5_000,
+        openedAt: Date(timeIntervalSince1970: 1_784_000_000),
+        expected: 6_200
+    )
+
+    private static func uiTestClosedShift(closeCash: Int) -> CashShift {
+        CashShift(
+            id: uiTestOpenShift.id,
+            staffId: uiTestOpenShift.staffId,
+            point: uiTestOpenShift.point,
+            openCash: uiTestOpenShift.openCash,
+            closeCash: closeCash,
+            diff: closeCash - uiTestOpenShift.expectedCash,
+            openedAt: uiTestOpenShift.openedAt,
+            closedAt: Date(timeIntervalSince1970: 1_784_030_000),
+            expected: uiTestOpenShift.expectedCash
+        )
+    }
+    #endif
 }
 
 struct POSOperationsView: View {

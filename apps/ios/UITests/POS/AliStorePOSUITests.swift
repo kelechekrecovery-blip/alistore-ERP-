@@ -64,6 +64,35 @@ final class AliStorePOSUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Включить уведомления"].exists)
     }
 
+    func testCashShiftUsesBlindCountAndShowsServerResultAfterClose() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing-signed-in",
+            "--ui-testing-role=cashier",
+            "--ui-testing-cash-shift",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        app.buttons["Смена"].firstMatch.tap()
+
+        let amount = app.textFields["pos-close-cash"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "Фактически в кассе")
+        XCTAssertFalse(app.staticTexts["Ожидается"].exists)
+        XCTAssertFalse(app.staticTexts["Ожидалось"].exists)
+        XCTAssertFalse(app.buttons["pos-close-shift"].isEnabled)
+
+        amount.tap()
+        amount.typeText("6100")
+        XCTAssertTrue(app.buttons["pos-close-shift"].isEnabled)
+        app.buttons["pos-close-shift"].tap()
+
+        XCTAssertTrue(app.staticTexts["Смена закрыта"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ожидалось' AND label CONTAINS '6200'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Расхождение' AND label CONTAINS '100'")).firstMatch.exists)
+    }
+
     func testPublicStoreVisualEvidence() {
         let app = XCUIApplication()
         app.launchArguments = [

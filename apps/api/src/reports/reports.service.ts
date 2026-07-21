@@ -195,7 +195,7 @@ export class ReportsService {
   }
 
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
-  async dashboard() {
+  async dashboard(staffId?: string) {
     const now = new Date();
     // Same UTC day boundary the revenue chart buckets on, so «сегодня» and the
     // chart's last bar always agree.
@@ -248,7 +248,10 @@ export class ReportsService {
         // Cash currently in drawers = opening float + cash taken, per open shift
         // (the same arithmetic ShiftsService.list uses for expectedCash).
         this.prisma.cashShift.findMany({
-          where: { closedAt: null },
+          where: {
+            closedAt: null,
+            ...(staffId ? { staffId: { not: staffId } } : {}),
+          },
           select: {
             openCash: true,
             payments: { where: { method: 'cash' }, select: { amount: true } },
@@ -291,7 +294,7 @@ export class ReportsService {
         salesGross: (todaySales._sum.amount ?? 0) + (codToday._sum.documentAmount ?? 0),
         orders: todayOrders,
       },
-      cash: { inDrawers: cashInDrawers, openShifts },
+      cash: { inDrawers: cashInDrawers, openShifts, ownOpenShiftExcluded: Boolean(staffId) },
       debts: { openBalance: debtAggregate._sum.balance ?? 0, overdue: overdueDebts },
       orders: {
         total: orderCount,

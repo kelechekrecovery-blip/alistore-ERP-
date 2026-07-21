@@ -37,8 +37,15 @@ export class EvidenceController {
     const upload = await this.evidence.findUpload(key);
     let actor: string;
     if (user?.typ === 'staff') {
-      await this.staffAuth.me(user.customerId);
+      const staff = await this.staffAuth.me(user.customerId);
       await this.evidence.assertStaffCanRead(user.role ?? '');
+      if (upload.entityType === 'shift') {
+        await this.evidence.assertStaffCanAttachShift(
+          user.customerId,
+          staff.role,
+          upload.entityId,
+        );
+      }
       actor = `staff:${user.customerId}`;
     } else {
       const customerId = user?.typ === 'customer'
@@ -90,7 +97,10 @@ export class EvidenceController {
     const trustedStaffEvidence = custodyEvidence || quarantineEvidence || exchangeEvidence;
     let guestCustomerId: string | undefined;
     if (user?.typ === 'staff') {
-      await this.staffAuth.me(user.customerId);
+      const staff = await this.staffAuth.me(user.customerId);
+      if (dto.entityType === 'shift') {
+        await this.evidence.assertStaffCanAttachShift(user.customerId, staff.role, dto.entityId);
+      }
       if (custodyEvidence) await this.evidence.assertStaffCanAttachLoanerCustody(user.customerId, dto.entityId);
       if (exchangeEvidence) await this.evidence.assertStaffCanAttachExchange(user.customerId, dto.entityId);
     } else {

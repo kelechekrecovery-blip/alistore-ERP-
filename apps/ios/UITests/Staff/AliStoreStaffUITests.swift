@@ -51,6 +51,36 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Выйти из аккаунта"].exists)
     }
 
+    func testCashShiftUsesBlindCountAndShowsServerResultAfterClose() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-cash-shift"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["Открыть смену"].tap()
+
+        let amount = app.textFields["staff-close-cash"]
+        let form = app.collectionViews.firstMatch
+        for _ in 0..<3 {
+            if amount.exists { break }
+            form.swipeUp()
+        }
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "Фактически в кассе")
+        XCTAssertFalse(app.staticTexts["Ожидается"].exists)
+        XCTAssertFalse(app.staticTexts["Ожидалось"].exists)
+        XCTAssertFalse(app.buttons["staff-close-shift"].isEnabled)
+
+        amount.tap()
+        amount.typeText("6100")
+        XCTAssertTrue(app.buttons["staff-close-shift"].isEnabled)
+        app.buttons["staff-close-shift"].tap()
+
+        XCTAssertTrue(app.staticTexts["Смена закрыта"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ожидалось' AND label CONTAINS '6' AND label CONTAINS '200'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Расхождение' AND label CONTAINS '100'")).firstMatch.exists)
+    }
+
     func testSignedInStaffTasksMatchesPrototypeShell() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-in"]

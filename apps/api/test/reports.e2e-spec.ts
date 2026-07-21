@@ -119,6 +119,27 @@ describe('Reports (integration)', () => {
     expect(d.debts.overdue).toBe(1);
   });
 
+  it('excludes the caller’s own open drawer from dashboard cash totals', async () => {
+    const own = await prisma.cashShift.create({
+      data: { staffId: 'owner-blind-dashboard', point: 'BISHKEK-1', openCash: 5_000 },
+    });
+    const foreign = await prisma.cashShift.create({
+      data: { staffId: 'cashier-visible-dashboard', point: 'BISHKEK-1', openCash: 2_000 },
+    });
+    await prisma.payment.createMany({
+      data: [
+        { shiftId: own.id, amount: 11_000, method: 'cash', status: 'received' },
+        { shiftId: foreign.id, amount: 7_000, method: 'cash', status: 'received' },
+      ],
+    });
+
+    const dashboard = await reports.dashboard('owner-blind-dashboard');
+    expect(dashboard.cash).toMatchObject({
+      inDrawers: 9_000,
+      ownOpenShiftExcluded: true,
+    });
+  });
+
   it('counts COD revenue recognised at delivery, which never becomes a Payment', async () => {
     const customer = await prisma.customer.create({ data: { phone: '+996700900005', name: 'COD' } });
     const order = await prisma.order.create({

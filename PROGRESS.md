@@ -5030,3 +5030,23 @@
 - Result: the bounded POS customer-binding software vertical is accepted locally. This does not
   certify physical POS hardware, live payments, production deployment or the full ecosystem gate.
 - Next: commit this isolated slice, then continue the next unblocked `OWNER-AUDIT-001` operation.
+
+## SHIFT-BLIND-079
+
+- Date: 2026-07-21
+- Scope: close the owner-audit gap where Staff/POS could see or reconstruct expected drawer cash
+  before submitting a physical count.
+- Changes: implemented one-shot blind close/handover semantics, stable retry keys, post-close
+  reconciliation cards and native/web empty-state validation. Own open-drawer payments are
+  redacted from shift, payments and dashboard reads; foreign shift operations and Evidence use
+  uniform authorization behavior. Close photos are uploaded only after the irreversible close,
+  use deterministic per-file keys, expose retry without repeating the close, and terminal logout
+  clears all shift-scoped state.
+- Checks: eight API suites `67/67`; API production build; Web production build (43 routes);
+  Chromium Staff `2/2`; iOS all-target simulator build; Android core unit/androidTest compilation,
+  Staff packaged `2/2`, POS packaged `2/2`, core Staff operations `4/4`; `git diff --check`.
+  Independent code, TypeScript and security reviews were rerun after their initial findings.
+- Result: the bounded software vertical is accepted locally. This does not certify physical cash
+  handling, POS hardware, live providers, production deployment or the full ecosystem gate.
+- Next: commit only this slice, preserve concurrent package/tooling changes, then continue the
+  remaining unblocked owner-audit item: the Web courier operations surface.

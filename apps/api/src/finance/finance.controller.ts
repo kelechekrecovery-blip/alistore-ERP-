@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { BlindCashReadGuard } from '../auth/blind-cash-read.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -171,6 +172,7 @@ export class FinancePlanningController {
   }
 
   @Get('tax-periods/:period')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   taxPeriod(@Param('period') period: string, @Query('point') point?: string) {
     return this.finance.taxPeriod(period, point);
@@ -201,6 +203,7 @@ export class FinancePlanningController {
   }
 
   @Get('journal')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   journal(@Query() query: FinanceAccountingQueryDto) {
     return this.finance.accountingJournal(query);
@@ -219,6 +222,7 @@ export class FinancePlanningController {
   }
 
   @Get('journal/export')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   async journalExport(@Query() query: FinanceAccountingQueryDto, @Res() response: Response) {
     const csv = await this.finance.accountingJournalExport(query);
@@ -236,12 +240,14 @@ export class FinancePlanningController {
   }
 
   @Get('trial-balance')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   trialBalance(@Query() query: FinanceAccountingQueryDto) {
     return this.finance.trialBalance(query);
   }
 
   @Get('statements')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   statements(@Query() query: FinanceAccountingQueryDto) {
     return this.finance.financialStatements(query);
@@ -260,18 +266,21 @@ export class FinancePlanningController {
   }
 
   @Get('plan-fact')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   planFact(@Query() query: FinancePeriodQueryDto) {
     return this.finance.planFact(query.period, query.point);
   }
 
   @Get('settlement-sources')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   settlementSources(@Query() query: FinanceSettlementQueryDto) {
     return this.finance.settlementSources(query);
   }
 
   @Get('settlements')
+  @UseGuards(BlindCashReadGuard)
   @RequirePermission('finance', 'read')
   settlements() {
     return this.finance.listSettlements();

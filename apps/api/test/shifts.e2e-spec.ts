@@ -238,4 +238,69 @@ describe('Cash shift reconciliation (integration)', () => {
     expect(await prisma.cashShiftHandover.count({ where: { fromShiftId: source.id } })).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'cash.handover', refs: { has: first.handover.id } } })).toBe(1);
   });
+
+  it('commits a self-handover blind count once instead of exposing a reusable variance oracle', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const sourceStaff = await prisma.staffUser.create({ data: { username: `handover-test-blind-source-${suffix}`, passwordHash: 'x', role: 'cashier' } });
+    const targetStaff = await prisma.staffUser.create({ data: { username: `handover-test-blind-target-${suffix}`, passwordHash: 'x', role: 'seller' } });
+    const source = await shifts.open({ staffId: sourceStaff.id, point: 'BISHKEK-1', openCash: 5_000 }, sourceStaff.id, `handover-blind-open-${suffix}`);
+    await prisma.payment.create({ data: { amount: 100_000, method: 'cash', status: 'received', shiftId: source.id } });
+
+    const result = await shifts.handover(
+      source.id,
+      { toStaffId: targetStaff.id, countedCash: 104_000 },
+      sourceStaff.id,
+      'cashier',
+      `handover-blind-${suffix}`,
+    );
+    expect(result.handover).toMatchObject({
+      expectedCash: 105_000,
+      countedCash: 104_000,
+      diff: -1_000,
+      reason: 'Слепой пересчёт кассы',
+    });
+    expect((await prisma.cashShift.findUniqueOrThrow({ where: { id: source.id } })).closedAt).not.toBeNull();
+    const shortage = await prisma.auditEvent.findFirstOrThrow({ where: { type: 'cash.shortage', refs: { has: source.id } } });
+    expect(shortage.payload).toMatchObject({
+      reconciliationMode: 'blind',
+      reasonSource: 'system',
+      userNote: null,
+    });
+  });
+
+  it('rejects handover to staff assigned to another store point', async () => {
+    const suffix = `${Date.now()}-${++seq}`;
+    const sourceStaff = await prisma.staffUser.create({
+      data: {
+        username: `handover-point-source-${suffix}`,
+        passwordHash: 'x',
+        role: 'cashier',
+        point: 'BISHKEK-1',
+      },
+    });
+    const targetStaff = await prisma.staffUser.create({
+      data: {
+        username: `handover-point-target-${suffix}`,
+        passwordHash: 'x',
+        role: 'cashier',
+        point: 'OSH-1',
+      },
+    });
+    const source = await shifts.open(
+      { staffId: sourceStaff.id, point: 'BISHKEK-1', openCash: 5_000 },
+      sourceStaff.id,
+      `handover-point-open-${suffix}`,
+    );
+
+    await expect(
+      shifts.handover(
+        source.id,
+        { toStaffId: targetStaff.id, countedCash: 5_000 },
+        sourceStaff.id,
+        'cashier',
+        `handover-point-${suffix}`,
+      ),
+    ).rejects.toMatchObject({ code: 'shift_handover_point_mismatch' });
+    expect((await prisma.cashShift.findUniqueOrThrow({ where: { id: source.id } })).closedAt).toBeNull();
+  });
 });

@@ -53,6 +53,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -473,6 +475,7 @@ fun StaffShiftScreen(
   val attendanceQueue = remember { OfflineQueueDb(context, STAFF_QUEUE_DB) }
   val attendanceManager = remember(gateway, attendanceQueue) { StaffAttendanceManager(gateway, attendanceQueue) }
   var shift by remember { mutableStateOf<CashShift?>(null) }
+  var closedShift by remember { mutableStateOf<CashShift?>(null) }
   var hrWeek by remember { mutableStateOf<StaffHrWeek?>(null) }
   var hrLoading by remember { mutableStateOf(true) }
   var hrError by remember { mutableStateOf<String?>(null) }
@@ -498,7 +501,6 @@ fun StaffShiftScreen(
         shift = it
         onShiftChanged(it)
         error = null
-        if (it != null && closeCash.isBlank()) closeCash = it.expectedCash.toString()
       }
       .onFailure { error = it.message ?: "Не удалось загрузить смену" }
     loading = false
@@ -603,9 +605,11 @@ fun StaffShiftScreen(
               runCatching { gateway.openShift(OpenShiftRequest(session.staffId, point.trim(), openCash.toInt()), session.accessToken, openKey) }
                 .onSuccess {
                   shift = it
+                  closedShift = null
                   onShiftChanged(it)
                   openKey = UUID.randomUUID().toString()
-                  closeCash = it.expectedCash.toString()
+                  closeCash = ""
+                  reason = ""
                 }
                 .onFailure { error = it.message }
               busy = false
@@ -624,19 +628,38 @@ fun StaffShiftScreen(
             Text("Смена открыта", color = StaffLime, fontWeight = FontWeight.Bold)
             Text(current.point, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 4.dp))
             Text("Начало: ${current.openCash} сом", color = StaffMuted, modifier = Modifier.padding(top = 8.dp))
-            Text("Ожидается: ${current.expectedCash} сом", color = Color.White, modifier = Modifier.padding(top = 2.dp).testTag("shift-expected"))
           }
         }
         Text("Сверка кассы", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
-        OutlinedTextField(closeCash, { closeCash = it.filter(Char::isDigit) }, label = { Text("Фактически в кассе") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("shift-close-cash"))
-        val discrepancy = closeCash.toIntOrNull()?.let { it != current.expectedCash } == true
-        if (discrepancy) OutlinedTextField(reason, { reason = it }, label = { Text("Причина расхождения") }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("shift-reason"))
+        OutlinedTextField(
+          closeCash,
+          { closeCash = it },
+          label = { Text("Фактически в кассе") },
+          singleLine = true,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier.fillMaxWidth().testTag("shift-close-cash"),
+        )
+        OutlinedTextField(
+          reason,
+          { reason = it },
+          label = { Text("Заметка (необязательно)") },
+          modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("shift-reason"),
+        )
+        val countedCash = closeCash.toIntOrNull()
         Button(
           onClick = {
             busy = true; error = null
             scope.launch {
-              runCatching { gateway.closeShift(current.id, CloseShiftRequest(closeCash.toInt(), reason), session.accessToken, closeKey) }
+              runCatching {
+                gateway.closeShift(
+                  current.id,
+                  CloseShiftRequest(countedCash!!, reason.trim().takeIf(String::isNotBlank)),
+                  session.accessToken,
+                  closeKey,
+                )
+              }
                 .onSuccess {
+                  closedShift = it
                   shift = null
                   onShiftChanged(null)
                   closeKey = UUID.randomUUID().toString()
@@ -647,10 +670,35 @@ fun StaffShiftScreen(
               busy = false
             }
           },
-          enabled = !busy && closeCash.toIntOrNull() != null && (!discrepancy || reason.isNotBlank()),
+          enabled = !busy && countedCash != null && countedCash >= 0,
           colors = ButtonDefaults.buttonColors(containerColor = StaffCoral),
           modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("shift-close"),
         ) { Text(if (busy) "Сверяем..." else "Закрыть смену") }
+      }
+    }
+    closedShift?.let { result ->
+      item {
+        Card(
+          colors = CardDefaults.cardColors(containerColor = StaffSurface),
+          shape = RoundedCornerShape(8.dp),
+          modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("shift-result"),
+        ) {
+          Column(Modifier.padding(16.dp)) {
+            Text("Смена закрыта", color = StaffLime, fontWeight = FontWeight.Bold)
+            result.closeCash?.let {
+              Text("Фактически: $it сом", color = Color.White, modifier = Modifier.padding(top = 8.dp))
+            }
+            result.expected?.let {
+              Text("Ожидалось: $it сом", color = Color.White, modifier = Modifier.padding(top = 2.dp).testTag("shift-result-expected"))
+            }
+            result.diff?.let {
+              Text("Расхождение: $it сом", color = StaffMuted, modifier = Modifier.padding(top = 2.dp).testTag("shift-result-diff"))
+            }
+            result.closeReason?.let {
+              Text("Заметка: $it", color = StaffMuted, modifier = Modifier.padding(top = 2.dp))
+            }
+          }
+        }
       }
     }
   }

@@ -12,20 +12,29 @@ import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { ReportsService } from './reports.service';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthPrincipal } from '../auth/jwt.strategy';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireActiveStaff } from '../auth/staff-principal';
+import { BlindCashReadGuard } from '../auth/blind-cash-read.guard';
 
 @ApiTags('reports')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, ActiveStaffGuard, BlindCashReadGuard, PermissionGuard)
 @RequirePermission('reports', 'read')
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @ApiOperation({ summary: 'Owner dashboard KPIs (money, orders, stock, ops)' })
   @ApiOkResponse({ description: 'Aggregated metrics from the Event Ledger tables.' })
   @Get('dashboard')
-  dashboard() {
-    return this.reports.dashboard();
+  async dashboard(@CurrentUser() user: AuthPrincipal) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.reports.dashboard(staffId);
   }
 
   @ApiOperation({ summary: 'Owner KPIs — gross margin, average check, top products' })

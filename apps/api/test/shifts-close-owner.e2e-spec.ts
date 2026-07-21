@@ -1,7 +1,6 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
-import { ConflictError } from '../src/common/errors';
 
 /**
  * LOGIC-005: close() must enforce the same owner-or-manager guard as handover()
@@ -39,7 +38,7 @@ describe('Shift close ownership (integration)', () => {
     return `close-owner-staff-${seq}`;
   };
 
-  it('rejects a foreign staff member closing the shift (409, same code as handover)', async () => {
+  it('hides a foreign shift from a staff member trying to close it', async () => {
     const owner = staff();
     const shift = await shifts.open(
       { staffId: owner, point: 'BISHKEK-1', openCash: 5000 },
@@ -49,9 +48,8 @@ describe('Shift close ownership (integration)', () => {
     const err = await shifts
       .close(shift.id, { closeCash: 5000 }, 'close-owner-stranger', undefined, 'cashier')
       .catch((e) => e);
-    expect(err).toBeInstanceOf(ConflictError);
-    expect(err.getStatus()).toBe(409);
-    expect(err.code).toBe('shift_handover_owner_mismatch');
+    expect(err.getStatus()).toBe(404);
+    expect(err.message).toBe('Смена не найдена');
 
     // the shift stays open and no ledger events are written
     expect((await prisma.cashShift.findUniqueOrThrow({ where: { id: shift.id } })).closedAt).toBeNull();

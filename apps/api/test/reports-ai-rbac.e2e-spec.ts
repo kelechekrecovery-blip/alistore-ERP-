@@ -22,6 +22,7 @@ describe('Reports and AI RBAC', () => {
   let ownerToken: string;
   let sellerToken: string;
   let warehouseToken: string;
+  let adminId: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -44,14 +45,17 @@ describe('Reports and AI RBAC', () => {
 
     const createSession = async (role: 'admin' | 'owner' | 'seller' | 'warehouse') => {
       const username = `${role}-reports-ai-${RUN}`;
-      await staffAuth.createStaff(username, 'pass', role);
-      return (await staffAuth.login(username, 'pass')).accessToken;
+      const staff = await staffAuth.createStaff(username, 'pass', role);
+      const token = (await staffAuth.login(username, 'pass')).accessToken;
+      return { id: staff.id, token };
     };
 
-    adminToken = await createSession('admin');
-    ownerToken = await createSession('owner');
-    sellerToken = await createSession('seller');
-    warehouseToken = await createSession('warehouse');
+    const admin = await createSession('admin');
+    adminId = admin.id;
+    adminToken = admin.token;
+    ownerToken = (await createSession('owner')).token;
+    sellerToken = (await createSession('seller')).token;
+    warehouseToken = (await createSession('warehouse')).token;
   });
 
   afterAll(async () => {
@@ -65,6 +69,7 @@ describe('Reports and AI RBAC', () => {
     await prisma.order.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
+    await prisma.cashShift.deleteMany();
   });
 
   function customerToken(customer: { id: string; phone: string }) {
@@ -129,6 +134,25 @@ describe('Reports and AI RBAC', () => {
         expect(res.body.source).toBe('rules');
         expect(res.body.recommendedPrice).toBeGreaterThan(0);
       });
+  });
+
+  it('blocks reports and financial AI insights while the caller has an open drawer', async () => {
+    await prisma.cashShift.create({
+      data: { staffId: adminId, point: 'BISHKEK-1', openCash: 5_000 },
+    });
+
+    await request(app.getHttpServer())
+      .get('/reports/dashboard')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/reports/ledger?type=payment.received')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/ai/insights')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(403);
   });
 
   it('keeps order timeline ledger scoped to the owning customer or staff queue readers', async () => {

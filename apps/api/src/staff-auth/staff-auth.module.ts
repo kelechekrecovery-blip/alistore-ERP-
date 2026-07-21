@@ -8,6 +8,7 @@ import { AuthzModule } from '../authz/authz.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { BlindCashReadGuard } from '../auth/blind-cash-read.guard';
 
 /**
  * Staff auth. Signs with the same JWT_SECRET as customer auth, so the shared
@@ -25,8 +26,8 @@ import { ActiveStaffGuard } from '../auth/active-staff.guard';
       }),
     }),
   ],
-  providers: [StaffAuthService, ActiveStaffGuard],
+  providers: [StaffAuthService, ActiveStaffGuard, BlindCashReadGuard],
   controllers: [StaffAuthController],
-  exports: [StaffAuthService, ActiveStaffGuard],
+  exports: [StaffAuthService, ActiveStaffGuard, BlindCashReadGuard],
 })
 export class StaffAuthModule {}

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
@@ -8,7 +8,6 @@ import { MediaService, type IngestedImage } from '../media/media.service';
 import { MediaCleanupService } from '../media/media-cleanup.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceEntityType, EvidenceImageDto } from './evidence.dto';
-import { ForbiddenException } from '@nestjs/common';
 import { AuthzService } from '../authz/authz.service';
 import { decideEvidenceRetention } from './evidence-retention.policy';
 
@@ -258,6 +257,17 @@ export class EvidenceService {
     }
     if (!ownerId) throw new ValidationError('evidence_entity_not_found', `${type} ${id} не найден`);
     if (ownerId !== customerId) throw new ForbiddenException('evidence_owner_mismatch');
+  }
+
+  async assertStaffCanAttachShift(staffId: string, role: Role, shiftId: string): Promise<void> {
+    const shift = await this.prisma.cashShift.findUnique({
+      where: { id: shiftId },
+      select: { staffId: true },
+    });
+    const manager = role === Role.owner || role === Role.admin;
+    if (!shift || (shift.staffId !== staffId && !manager)) {
+      throw new NotFoundException('Сущность Evidence не найдена');
+    }
   }
 
   private async assertEntityExists(type: EvidenceEntityType, id: string) {

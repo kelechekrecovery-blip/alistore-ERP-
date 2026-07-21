@@ -59,9 +59,10 @@ export async function uploadEvidenceImages(input: {
   actor?: string;
   accessToken?: string;
   guestCapability?: string;
+  idempotencyKeyPrefix?: string;
 }): Promise<EvidenceAttachment[]> {
   const results: EvidenceAttachment[] = [];
-  for (const file of input.files) {
+  for (const [index, file] of input.files.entries()) {
     results.push(await uploadEvidenceImage({
       file,
       entityType: input.entityType,
@@ -70,6 +71,9 @@ export async function uploadEvidenceImages(input: {
       actor: input.actor,
       accessToken: input.accessToken,
       guestCapability: input.guestCapability,
+      idempotencyKey: input.idempotencyKeyPrefix
+        ? `${input.idempotencyKeyPrefix}:${index}`
+        : undefined,
     }));
   }
   return results;

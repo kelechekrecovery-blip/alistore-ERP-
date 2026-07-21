@@ -61,8 +61,13 @@ export class PaymentsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('payments', 'read')
-  find(@Query('orderId') orderId?: string, @Query('shiftId') shiftId?: string) {
-    return this.payments.find({ orderId, shiftId });
+  async find(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('orderId') orderId?: string,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.payments.findForStaff(staffId, { orderId, shiftId });
   }
 
   @ApiOperation({

@@ -22,6 +22,7 @@ describe('Staff session rollout for operational endpoints', () => {
   let cashierToken: string;
   let cashierId: string;
   let sellerToken: string;
+  let sellerId: string;
   let warehouseToken: string;
   let warehouseId: string;
   const RUN = Math.floor(Math.random() * 1_000_000);
@@ -62,6 +63,7 @@ describe('Staff session rollout for operational endpoints', () => {
     cashierToken = cashier.token;
 
     const seller = await createSession('seller');
+    sellerId = seller.id;
     sellerToken = seller.token;
 
     const warehouse = await createSession('warehouse');
@@ -137,15 +139,30 @@ describe('Staff session rollout for operational endpoints', () => {
     const opened = await request(app.getHttpServer())
       .post('/shifts/open')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ staffId: 'spoof', point: 'BISHKEK-1', openCash: 0 })
+      .send({ staffId: 'spoof', point: 'OSH-SPOOF', openCash: 0 })
       .expect(201);
     expect(opened.body.staffId).toBe(staffId);
+    expect(opened.body.point).toBe('BISHKEK-1');
 
     const current = await request(app.getHttpServer())
       .get('/shifts/current?staffId=spoof')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(current.body.staffId).toBe(staffId);
+
+    await prisma.payment.create({
+      data: { shiftId: opened.body.id, amount: 7_000, method: 'cash', status: 'received' },
+    });
+    const ownDetail = await request(app.getHttpServer())
+      .get(`/shifts/${opened.body.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(ownDetail.body).not.toHaveProperty('payments');
+    const ownManagerList = await request(app.getHttpServer())
+      .get('/shifts/open?point=BISHKEK-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(ownManagerList.body.shifts[0]).not.toHaveProperty('expectedCash');
   });
 
   it('protects order detail from anonymous and foreign-customer IDOR', async () => {
@@ -199,6 +216,83 @@ describe('Staff session rollout for operational endpoints', () => {
     expect(opened.body.staffId).toBe(cashierId);
   });
 
+  it('keeps the cashier count blind, blocks foreign shift reads and reveals reconciliation only after close', async () => {
+    const opened = await request(app.getHttpServer())
+      .post('/shifts/open')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .set('Idempotency-Key', `blind-open-${RUN}`)
+      .send({ staffId: 'spoof', point: 'BISHKEK-1', openCash: 5_000 })
+      .expect(201);
+    await prisma.payment.create({
+      data: { shiftId: opened.body.id, amount: 10_000, method: 'cash', status: 'received' },
+    });
+
+    const own = await request(app.getHttpServer())
+      .get(`/shifts/${opened.body.id}`)
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .expect(200);
+    expect(own.body).not.toHaveProperty('payments');
+    expect(own.body).not.toHaveProperty('expectedCash');
+
+    await request(app.getHttpServer())
+      .get(`/shifts/${opened.body.id}`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(404);
+
+    const ownOpen = await request(app.getHttpServer())
+      .get('/shifts/open?point=BISHKEK-1')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .expect(200);
+    expect(ownOpen.body.shifts).toHaveLength(1);
+    expect(ownOpen.body.shifts[0]).not.toHaveProperty('expectedCash');
+
+    const managerView = await request(app.getHttpServer())
+      .get(`/shifts/${opened.body.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(managerView.body.payments).toEqual([
+      expect.objectContaining({ amount: 10_000, method: 'cash' }),
+    ]);
+
+    await request(app.getHttpServer())
+      .post(`/shifts/${opened.body.id}/close`)
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send({ closeCash: 14_000 })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('idempotency_key_required'));
+    expect((await prisma.cashShift.findUniqueOrThrow({ where: { id: opened.body.id } })).closedAt).toBeNull();
+
+    const closed = await request(app.getHttpServer())
+      .post(`/shifts/${opened.body.id}/close`)
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .set('Idempotency-Key', `blind-close-${RUN}`)
+      .send({ closeCash: 14_000 })
+      .expect(201);
+    expect(closed.body).toMatchObject({ expected: 15_000, diff: -1_000 });
+    const persisted = await prisma.cashShift.findUniqueOrThrow({ where: { id: opened.body.id } });
+    expect(persisted.closeReason).toBe('Слепой пересчёт кассы');
+    const shortage = await prisma.auditEvent.findFirstOrThrow({
+      where: { type: 'cash.shortage', refs: { has: opened.body.id } },
+    });
+    expect(shortage.payload).toMatchObject({
+      reconciliationMode: 'blind',
+      reasonSource: 'system',
+      userNote: null,
+    });
+
+    const sellerShift = await prisma.cashShift.create({
+      data: { staffId: sellerId, point: 'BISHKEK-1', openCash: 5_000 },
+    });
+    const managerMismatch = await request(app.getHttpServer())
+      .post(`/shifts/${sellerShift.id}/close`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Idempotency-Key', `manager-blind-close-${RUN}`)
+      .send({ closeCash: 4_000 })
+      .expect(422);
+    expect(managerMismatch.body.message).toBe('Расхождение кассы требует причину');
+    expect(managerMismatch.body.message).not.toContain('-1000');
+  });
+
   it('requires staff JWT for POS sale and books the shift under the JWT staff id', async () => {
     const product = await productWithUnit('OPS-POS');
     const payload = {
@@ -216,6 +310,40 @@ describe('Staff session rollout for operational endpoints', () => {
       .expect(201);
     const shift = await prisma.cashShift.findUnique({ where: { id: sale.body.shiftId } });
     expect(shift?.staffId).toBe(staffId);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/orders/${sale.body.orderId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(detail.body).toMatchObject({ posShiftId: null, payments: [], drawerBlind: true });
+
+    const webCustomer = await prisma.customer.create({
+      data: { phone: `+996700${RUN}77`, name: 'Web queue customer' },
+    });
+    const webOrder = await prisma.order.create({
+      data: {
+        customerId: webCustomer.id,
+        channel: 'web',
+        status: 'paid',
+        total: 1_000,
+        items: { create: { sku: `WEB-QUEUE-${RUN}`, qty: 1, price: 1_000 } },
+      },
+    });
+    const queue = await request(app.getHttpServer())
+      .get('/orders?status=paid')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(queue.body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: webOrder.id })]),
+    );
+    expect(queue.body).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: sale.body.orderId })]),
+    );
+
+    await request(app.getHttpServer())
+      .get(`/orders/${sale.body.orderId}/ledger`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
   });
 
   it('enforces POS sale role permissions before booking a sale', async () => {

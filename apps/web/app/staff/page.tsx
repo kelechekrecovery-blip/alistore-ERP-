@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, HTMLAttributes } from 'react';
-import { closeShift, currentShift, fetchShift, openShift, type Shift } from '@/lib/staff';
+import { closeShift, currentShift, openShift, type Shift } from '@/lib/staff';
 import {
   createCustomer,
   createTradeIn,
@@ -95,6 +95,22 @@ export default function StaffPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [openShiftFiles, setOpenShiftFiles] = useState<File[]>([]);
   const [closeShiftFiles, setCloseShiftFiles] = useState<File[]>([]);
+  const [closeCash, setCloseCash] = useState('');
+  const [closeNote, setCloseNote] = useState('');
+  const [closeShiftKey, setCloseShiftKey] = useState(() => crypto.randomUUID());
+  const [lastReconciliation, setLastReconciliation] = useState<{
+    counted: number;
+    expected: number;
+    diff: number;
+  } | null>(null);
+  const [pendingCloseEvidence, setPendingCloseEvidence] = useState<{
+    shiftId: string;
+    files: File[];
+    keyPrefix: string;
+  } | null>(null);
+  const previousShiftId = useRef<string | null>(null);
+  const shiftLoadVersion = useRef(0);
+  const sessionVersion = useRef(0);
   const [hrWeek, setHrWeek] = useState<HrWeek | null>(null);
   const [hrError, setHrError] = useState('');
   const [absenceForm, setAbsenceForm] = useState({ type: 'annual_leave' as HrAbsenceType, startsOn: '', endsOn: '', reason: '' });
@@ -103,10 +119,45 @@ export default function StaffPage() {
     setSession(loadStaffSession());
   }, []);
 
+  useEffect(() => {
+    sessionVersion.current += 1;
+    shiftLoadVersion.current += 1;
+    setBusy(null);
+    setShift(undefined);
+    setOpenShiftFiles([]);
+    setCloseShiftFiles([]);
+    setCloseCash('');
+    setCloseNote('');
+    setCloseShiftKey(crypto.randomUUID());
+    setLastReconciliation(null);
+    setPendingCloseEvidence(null);
+    previousShiftId.current = null;
+  }, [session?.staffId]);
+
+  useEffect(() => {
+    const activeShiftId = shift?.id ?? null;
+    if (activeShiftId && previousShiftId.current !== activeShiftId) {
+      setCloseShiftFiles([]);
+      setCloseCash('');
+      setCloseNote('');
+      setCloseShiftKey(crypto.randomUUID());
+      setLastReconciliation(null);
+      setPendingCloseEvidence(null);
+      previousShiftId.current = activeShiftId;
+    }
+  }, [shift?.id]);
+
   const loadShift = useCallback(async () => {
     if (!session) return;
-    const s = await currentShift(session.accessToken);
-    setShift(s ? await fetchShift(s.id, session.accessToken) : null);
+    const requestVersion = ++shiftLoadVersion.current;
+    const loaded = await currentShift(session.accessToken);
+    const persistedSession = loadStaffSession();
+    if (
+      requestVersion === shiftLoadVersion.current
+      && persistedSession?.staffId === session.staffId
+    ) {
+      setShift(loaded);
+    }
   }, [session]);
   useEffect(() => { if (session) loadShift(); }, [loadShift, session]);
 
@@ -226,9 +277,12 @@ export default function StaffPage() {
 
   async function doOpenShift() {
     if (!session) return;
+    const operationVersion = sessionVersion.current;
+    const operationStaffId = session.staffId;
     setBusy('shift');
     try {
       const opened = await openShift({ staffId: session.staffId, point: POINT, openCash: 0 }, session.accessToken);
+      if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
       const evidence = openShiftFiles.length
         ? await uploadEvidenceImages({
           files: openShiftFiles,
@@ -239,33 +293,118 @@ export default function StaffPage() {
           accessToken: session.accessToken,
         })
         : [];
+      if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
       setOpenShiftFiles([]);
       await loadShift();
+      if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
       flash(`Смена открыта · фото ${evidence.length}`);
     }
-    catch { flash('Ошибка'); } finally { setBusy(null); }
+    catch {
+      if (sessionIsCurrent(operationStaffId, operationVersion)) flash('Ошибка');
+    } finally {
+      if (sessionIsCurrent(operationStaffId, operationVersion)) setBusy(null);
+    }
   }
   async function doCloseShift() {
     if (!shift || !session) return;
-    const expected = shift.openCash + (shift.payments ?? []).filter((p) => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
+    if (!closeCash.trim()) {
+      flash('Укажите фактически пересчитанную сумму');
+      return;
+    }
+    const counted = Number(closeCash);
+    if (!Number.isInteger(counted) || counted < 0) {
+      flash('Укажите фактически пересчитанную сумму');
+      return;
+    }
+    if (!window.confirm(`Закрыть смену с фактической суммой ${som(counted)}? После отправки изменить пересчёт нельзя.`)) return;
+    const operationVersion = sessionVersion.current;
+    const operationStaffId = session.staffId;
     setBusy('shift');
     try {
-      await closeShift(shift.id, expected, session.accessToken);
-      const evidence = closeShiftFiles.length
-        ? await uploadEvidenceImages({
-          files: closeShiftFiles,
+      const shiftId = shift.id;
+      const evidenceFiles = closeShiftFiles;
+      const evidenceKeyPrefix = `shift-close:${closeShiftKey}`;
+      const closed = await closeShift(
+        shiftId,
+        counted,
+        session.accessToken,
+        closeShiftKey,
+        closeNote.trim() || undefined,
+      );
+      if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
+      setCloseShiftFiles([]);
+      setCloseCash('');
+      setCloseNote('');
+      setCloseShiftKey(crypto.randomUUID());
+      setLastReconciliation({
+        counted,
+        expected: closed.expected,
+        diff: closed.diff,
+      });
+      setShift(null);
+      const diff = closed.diff;
+      if (!evidenceFiles.length) {
+        flash(diff === 0 ? 'Касса сошлась' : `Расхождение ${som(diff)}`);
+        return;
+      }
+      try {
+        const evidence = await uploadEvidenceImages({
+          files: evidenceFiles,
           entityType: 'shift',
-          entityId: shift.id,
+          entityId: shiftId,
           label: 'shift_close_photo',
           actor: session.staffId,
           accessToken: session.accessToken,
-        })
-        : [];
-      setCloseShiftFiles([]);
-      await loadShift();
-      flash(`Смена закрыта · фото ${evidence.length}`);
+          idempotencyKeyPrefix: evidenceKeyPrefix,
+        });
+        if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
+        setPendingCloseEvidence(null);
+        flash(`${diff === 0 ? 'Касса сошлась' : `Расхождение ${som(diff)}`} · фото ${evidence.length}`);
+      } catch {
+        if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
+        setPendingCloseEvidence({ shiftId, files: evidenceFiles, keyPrefix: evidenceKeyPrefix });
+        flash('Смена закрыта · фото ожидают повторной отправки');
+      }
     }
-    catch { flash('Ошибка закрытия'); } finally { setBusy(null); }
+    catch {
+      if (sessionIsCurrent(operationStaffId, operationVersion)) flash('Ошибка закрытия');
+    } finally {
+      if (sessionIsCurrent(operationStaffId, operationVersion)) setBusy(null);
+    }
+  }
+
+  async function retryCloseEvidence() {
+    if (!pendingCloseEvidence || !session) return;
+    const operationVersion = sessionVersion.current;
+    const operationStaffId = session.staffId;
+    setBusy('shift-evidence');
+    try {
+      const evidence = await uploadEvidenceImages({
+        files: pendingCloseEvidence.files,
+        entityType: 'shift',
+        entityId: pendingCloseEvidence.shiftId,
+        label: 'shift_close_photo',
+        actor: session.staffId,
+        accessToken: session.accessToken,
+        idempotencyKeyPrefix: pendingCloseEvidence.keyPrefix,
+      });
+      if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
+      setPendingCloseEvidence(null);
+      flash(`Фото закрытия сохранены · ${evidence.length}`);
+    } catch {
+      if (sessionIsCurrent(operationStaffId, operationVersion)) {
+        flash('Фото не отправлены · повторите ещё раз');
+      }
+    } finally {
+      if (sessionIsCurrent(operationStaffId, operationVersion)) setBusy(null);
+    }
+  }
+
+  function sessionIsCurrent(staffId: string, version: number) {
+    return (
+      sessionVersion.current === version
+      && loadStaffSession()?.staffId === staffId
+    );
   }
   async function orderAction(o: QueueOrder) {
     if (!session) return;
@@ -365,8 +504,6 @@ export default function StaffPage() {
     }
   }
 
-  const cashSales = (shift?.payments ?? []).filter((p) => p.method === 'cash');
-  const revenue = (shift?.payments ?? []).reduce((s, p) => s + p.amount, 0);
 
   if (!session) {
     return (
@@ -408,12 +545,22 @@ export default function StaffPage() {
           <button
             type="button"
             onClick={() => {
+              sessionVersion.current += 1;
+              shiftLoadVersion.current += 1;
               clearStaffSession();
               setSession(null);
               setShift(null);
               setOrders(null);
               setB2BQuotes(null);
               setProtection(null);
+              setOpenShiftFiles([]);
+              setCloseShiftFiles([]);
+              setCloseCash('');
+              setCloseNote('');
+              setCloseShiftKey(crypto.randomUUID());
+              setLastReconciliation(null);
+              setPendingCloseEvidence(null);
+              previousShiftId.current = null;
             }}
             className="text-[#8A7F76]"
           >
@@ -430,13 +577,34 @@ export default function StaffPage() {
                 <div className="mb-4 rounded-[18px] border border-[#2E2822] bg-[#221E19] p-4.5" style={{ padding: 18 }}>
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] font-semibold text-lime">● Смена открыта</span>
-                    <button type="button" disabled={busy === 'shift'} onClick={doCloseShift} className="text-xs text-[#FF8A7A]">Закрыть</button>
+                    <button type="button" disabled={busy === 'shift' || !closeCash.trim()} onClick={doCloseShift} className="text-xs text-[#FF8A7A] disabled:opacity-40">Закрыть</button>
                   </div>
                   <div className="mt-3.5 grid grid-cols-3 gap-2.5">
-                    <Stat value={String(cashSales.length + (shift.payments?.length ?? 0) - cashSales.length)} label="платежей" />
-                    <Stat value={som(revenue)} label="выручка" />
-                    <Stat value={som(shift.openCash)} label="в кассе" accent="#C6FF3D" />
+                    <Stat value={shift.point} label="точка" />
+                    <Stat value={new Date(shift.openedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} label="открыта" />
+                    <Stat value={som(shift.openCash)} label="размен" accent="#C6FF3D" />
                   </div>
+                  <label className="mt-3 block text-[11px] font-semibold uppercase text-[#8A7F76]">
+                    Фактически пересчитано
+                    <input
+                      aria-label="Фактически пересчитано в кассе"
+                      inputMode="numeric"
+                      value={closeCash}
+                      onChange={(event) => setCloseCash(event.target.value.replace(/\D/g, ''))}
+                      placeholder="Введите сумму после пересчёта"
+                      className="mt-1.5 h-11 w-full rounded-[11px] border border-[#2E2822] bg-[#16130F] px-3 font-mono text-sm text-white outline-none focus:border-lime"
+                    />
+                  </label>
+                  <label className="mt-3 block text-[11px] font-semibold uppercase text-[#8A7F76]">
+                    Заметка
+                    <input
+                      aria-label="Заметка к пересчёту"
+                      value={closeNote}
+                      onChange={(event) => setCloseNote(event.target.value)}
+                      placeholder="Необязательно"
+                      className="mt-1.5 h-11 w-full rounded-[11px] border border-[#2E2822] bg-[#16130F] px-3 text-sm text-white outline-none focus:border-lime"
+                    />
+                  </label>
                   <label className="mt-3 block rounded-[12px] border border-[#2E2822] bg-[#16130F] px-3 py-2.5">
                     <span className="block text-[11px] font-semibold uppercase text-[#8A7F76]">Фото закрытия</span>
                     <input
@@ -448,8 +616,42 @@ export default function StaffPage() {
                     />
                     {closeShiftFiles.length > 0 && <span className="mt-1 block font-mono text-[11px] text-lime">{closeShiftFiles.length} фото</span>}
                   </label>
+                  <p className="mt-3 text-[11px] leading-4 text-[#8A7F76]">
+                    Ожидаемая сумма скрыта до отправки. Пересчитайте наличные самостоятельно.
+                  </p>
                 </div>
               ) : (
+                <>
+                {lastReconciliation && (
+                  <div data-testid="staff-last-reconciliation" className="mb-3 rounded-[14px] border border-lime/30 bg-[#1D2415] p-4">
+                    <div className="text-xs font-semibold uppercase text-lime">Сверка сохранена</div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <Stat value={som(lastReconciliation.counted)} label="фактически" />
+                      <Stat value={som(lastReconciliation.expected)} label="ожидалось" />
+                      <Stat
+                        value={som(lastReconciliation.diff)}
+                        label="расхождение"
+                        accent={lastReconciliation.diff === 0 ? '#C6FF3D' : '#FF8A7A'}
+                      />
+                    </div>
+                  </div>
+                )}
+                {pendingCloseEvidence && (
+                  <div className="mb-3 rounded-[14px] border border-coral/30 bg-[#2A1B18] p-4">
+                    <div className="text-xs font-semibold uppercase text-coral">Фото ожидают отправки</div>
+                    <p className="mt-1 text-xs text-[#D8CFC6]">
+                      Смена уже закрыта. Повтор затронет только {pendingCloseEvidence.files.length} фото.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={busy === 'shift-evidence'}
+                      onClick={retryCloseEvidence}
+                      className="mt-3 rounded-[10px] bg-coral px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      Повторить отправку фото
+                    </button>
+                  </div>
+                )}
                 <div className="mb-4 rounded-[18px] bg-gradient-to-br from-coral to-deep p-5">
                   <div className="font-display text-[17px] font-bold">Смена не открыта</div>
                   <div className="mt-1 text-[13px] leading-snug text-[#FFE0D5]">Откройте смену, чтобы принимать оплату и заказы.</div>
@@ -468,6 +670,7 @@ export default function StaffPage() {
                     {busy === 'shift' ? '…' : 'Открыть смену'}
                   </button>
                 </div>
+                </>
               )}
 
               <div className="mb-4 grid grid-cols-2 gap-2.5" data-testid="staff-primary-actions">

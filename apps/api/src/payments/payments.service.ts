@@ -210,8 +210,27 @@ export class PaymentsService {
     });
   }
 
-  find(where: { orderId?: string; shiftId?: string }) {
-    return this.prisma.payment.findMany({ where, orderBy: { createdAt: 'desc' } });
+  async findForStaff(staffId: string, where: { orderId?: string; shiftId?: string }) {
+    const ownOpenShift = await this.prisma.cashShift.findFirst({
+      where: { staffId, closedAt: null },
+      select: { id: true },
+    });
+    return this.prisma.payment.findMany({
+      where: ownOpenShift
+        ? {
+            AND: [
+              where,
+              {
+                OR: [
+                  { shiftId: null },
+                  { shiftId: { not: ownOpenShift.id } },
+                ],
+              },
+            ],
+          }
+        : where,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   findByTxnId(txnId: string) {

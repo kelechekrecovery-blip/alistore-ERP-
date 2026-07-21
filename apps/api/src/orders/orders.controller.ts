@@ -81,8 +81,8 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('orders', 'queue')
   async queue(@CurrentUser() user: AuthPrincipal, @Query('status') status?: string) {
-    await requireActiveStaff(user, this.staffAuth);
-    return this.orders.listByStatus((status ?? 'created') as OrderStatus);
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.orders.listByStatusForStaff((status ?? 'created') as OrderStatus, staffId);
   }
 
   @ApiOperation({ summary: 'Order Event Ledger timeline — customer owner or staff queue read' })
@@ -100,9 +100,12 @@ export class OrdersController {
         throw new NotFoundException(`Заказ ${id} не найден`);
       }
     } else {
-      await requireActiveStaff(user, this.staffAuth);
+      const staffId = await requireActiveStaff(user, this.staffAuth);
       if (!user.role || !(await this.authz.can(user.role, 'orders', 'queue'))) {
         throw new ForbiddenException('Недостаточно прав для просмотра заказа');
+      }
+      if (await this.orders.isOwnOpenShiftOrder(id, staffId)) {
+        throw new ForbiddenException('Леджер кассового заказа доступен после закрытия смены');
       }
     }
     return this.orders.ledger(id);
@@ -115,17 +118,18 @@ export class OrdersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
-    const order = await this.orders.get(id);
+    let order = await this.orders.get(id);
     if (!order) throw new NotFoundException(`Заказ ${id} не найден`);
     if (user.typ === 'customer') {
       if (order.customerId !== user.customerId) {
         throw new NotFoundException(`Заказ ${id} не найден`);
       }
     } else {
-      await requireActiveStaff(user, this.staffAuth);
+      const staffId = await requireActiveStaff(user, this.staffAuth);
       if (!user.role || !(await this.authz.can(user.role, 'orders', 'queue'))) {
         throw new ForbiddenException('Недостаточно прав для просмотра заказа');
       }
+      order = await this.orders.getForStaff(id, staffId);
     }
     return order;
   }

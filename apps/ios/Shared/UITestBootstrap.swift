@@ -63,6 +63,14 @@ public enum UITestBootstrap {
         #endif
     }
 
+    public static var usesCashShiftFixture: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-cash-shift")
+        #else
+        false
+        #endif
+    }
+
     public static var requiresQuickUnlock: Bool {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("--ui-testing-quick-unlock")
