@@ -31,6 +31,8 @@
 		4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */; };
 		4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */; };
 		563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */; };
+		5C4A0A294F055F12ACC271CD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AE157FE93CD516D1CBF400CF /* PrivacyInfo.xcprivacy */; };
+		60A91B77ED6D2F052725E568 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E5C4B9BAAE039961AFE73B38 /* PrivacyInfo.xcprivacy */; };
 		615203EBFF70A2140FAB6A11 /* AliStoreStaffUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */; };
 		652FDF2063F51338694979A9 /* StaffWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7596CAED282254008F7309B8 /* StaffWorkView.swift */; };
 		6671744F29AD025FF2589365 /* StoriesViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D95C4B497368547545CF2AB /* StoriesViewer.swift */; };
@@ -65,6 +67,7 @@
 		BB51670BC2D528ECA213E260 /* Manrope-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4138BDA48D595174DC088C57 /* Manrope-ExtraBold.ttf */; };
 		BB9F1E820E92F5AE7302734F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2CD07CA19B272D575A7C4E3D /* Assets.xcassets */; };
 		BCA60888879A0F2A828FCBE4 /* CheckoutContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */; };
+		BE916851B616DAF5F4F639FA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 75FA9A6B569FE2E36871089D /* PrivacyInfo.xcprivacy */; };
 		C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F23ACBE05CF3A0E1499E0B /* APIClient.swift */; };
 		CB9F0F7A3C01608E128CE403 /* AliStoreClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */; };
 		D10A68419B9AC3F5E5048EBC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 34EA386491279732C58F06E5 /* PrivacyInfo.xcprivacy */; };
@@ -259,6 +262,7 @@
 		72CCB230F61743790D08A7C6 /* POSOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSOperationsView.swift; sourceTree = "<group>"; };
 		739B68D254BC1DE9AB4F5022 /* GolosText-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GolosText-Bold.ttf"; sourceTree = "<group>"; };
 		7596CAED282254008F7309B8 /* StaffWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffWorkView.swift; sourceTree = "<group>"; };
+		75FA9A6B569FE2E36871089D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7B1EBE9146CA6573C91B73B8 /* AliStoreStaffUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreStaffUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStorePOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F3BF5A1B6E49634345025FF /* AliStoreClientUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -282,6 +286,7 @@
 		A9EBC4D5C06A5630E3B7D69D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		AAB7EC94315C8CB6A45D9EDF /* POS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = POS.entitlements; sourceTree = "<group>"; };
 		AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Staff.entitlements; sourceTree = "<group>"; };
+		AE157FE93CD516D1CBF400CF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
 		C348479F602D4264A6697DC8 /* SmartSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSearch.swift; sourceTree = "<group>"; };
@@ -292,6 +297,7 @@
 		DBC38565DF1A732BD3F92A67 /* Manrope-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-SemiBold.ttf"; sourceTree = "<group>"; };
 		DDA937EE43556002834E5E61 /* GolosText-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GolosText-SemiBold.ttf"; sourceTree = "<group>"; };
 		E3930B564A069DBB66A1EF6E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E5C4B9BAAE039961AFE73B38 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestBootstrap.swift; sourceTree = "<group>"; };
 		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
 		F17D6035DF91395FA9C419FE /* OFL-Manrope.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Manrope.txt"; sourceTree = "<group>"; };
@@ -378,6 +384,7 @@
 				92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */,
 				0D52D0200FC74225D8DA7907 /* Assets.xcassets */,
 				942E788E79F852B2161181F9 /* Info.plist */,
+				AE157FE93CD516D1CBF400CF /* PrivacyInfo.xcprivacy */,
 				AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */,
 				3DDD9376D59012178E0570F2 /* StaffScannerView.swift */,
 				7596CAED282254008F7309B8 /* StaffWorkView.swift */,
@@ -424,6 +431,7 @@
 				AAB7EC94315C8CB6A45D9EDF /* POS.entitlements */,
 				72CCB230F61743790D08A7C6 /* POSOperationsView.swift */,
 				82C7F7335AA46910CF656B72 /* POSSaleView.swift */,
+				E5C4B9BAAE039961AFE73B38 /* PrivacyInfo.xcprivacy */,
 			);
 			path = POS;
 			sourceTree = "<group>";
@@ -436,6 +444,7 @@
 				13A9A1766E34065A9DE2EE32 /* Courier.entitlements */,
 				304D36F0FCB733F1FA319FFE /* CourierOperationsView.swift */,
 				1897622CBA172469A7099983 /* Info.plist */,
+				75FA9A6B569FE2E36871089D /* PrivacyInfo.xcprivacy */,
 			);
 			path = Courier;
 			sourceTree = "<group>";
@@ -853,6 +862,7 @@
 			files = (
 				E782525DE9BA891168B79DC2 /* Assets.xcassets in Resources */,
 				E9AD728C67345D0B10525495 /* Assets.xcassets in Resources */,
+				5C4A0A294F055F12ACC271CD /* PrivacyInfo.xcprivacy in Resources */,
 				E57E3F0730FC547D46F22256 /* alistore-icon.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -888,6 +898,7 @@
 			files = (
 				BB9F1E820E92F5AE7302734F /* Assets.xcassets in Resources */,
 				3469A62E39FDA40C52D6CCCB /* Assets.xcassets in Resources */,
+				60A91B77ED6D2F052725E568 /* PrivacyInfo.xcprivacy in Resources */,
 				F02017A9DEDB594FB4F87FF2 /* alistore-icon.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -898,6 +909,7 @@
 			files = (
 				94459A9148B2AD4EAAE1A4F4 /* Assets.xcassets in Resources */,
 				21A26D50DD49AB956D2FE4D5 /* Assets.xcassets in Resources */,
+				BE916851B616DAF5F4F639FA /* PrivacyInfo.xcprivacy in Resources */,
 				1A0DD02233D463CD63BCE9C0 /* alistore-icon.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
