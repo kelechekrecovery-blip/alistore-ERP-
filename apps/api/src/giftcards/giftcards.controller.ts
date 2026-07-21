@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -30,8 +30,12 @@ export class GiftcardsController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('giftcards', 'issue')
   @Post()
-  issue(@CurrentUser() user: AuthPrincipal, @Body() dto: IssueGiftCardDto) {
-    return this.giftcards.issue(dto, user.customerId);
+  issue(
+    @CurrentUser() user: AuthPrincipal,
+    @Body() dto: IssueGiftCardDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    return this.giftcards.issue(dto, user.customerId, requireIdempotencyKey(idempotencyKey));
   }
 
   @ApiOperation({ summary: 'Check gift-card balance by code' })
@@ -43,4 +47,15 @@ export class GiftcardsController {
   get(@Param('code') code: string) {
     return this.giftcards.getByCode(code);
   }
+}
+
+/**
+ * Ключ обязателен, как на возвратах: выпуск карты создаёт деньги, и повтор без
+ * ключа отличить от новой операции невозможно.
+ */
+function requireIdempotencyKey(value: string | undefined): string {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

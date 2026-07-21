@@ -104,6 +104,53 @@ describe('Gift cards / store credit (integration)', () => {
     return seeded;
   }
 
+  /**
+   * Выпуск карты — это выпуск денег, и он обязан быть идемпотентным.
+   *
+   * До фикса защиты не было вовсе. Проверка `existing` смотрит на код карты, но
+   * когда код не передан (обычный случай — его генерирует сервер), повтор
+   * запроса генерировал НОВЫЙ код и проверку проходил. Один повтор от
+   * нажавшего дважды кассира или ретрая сети давал вторую карту с полным
+   * балансом и вторую проводку в 2300. Обе проводки внутренне корректны,
+   * поэтому расхождения не видел ни один риск-сигнал: деньги просто удваивались
+   * молча. Это был единственный денежный эндпоинт с нулевой защитой от повтора.
+   */
+  it('повтор выпуска по тому же ключу не создаёт вторые деньги', async () => {
+    const key = `giftcard-issue-${runTag}-${(seq += 1)}`;
+
+    const first = await giftcards.issue({ amount: 5_000, method: 'card' }, 'owner-1', key);
+    const second = await giftcards.issue({ amount: 5_000, method: 'card' }, 'owner-1', key);
+
+    expect(second.code).toBe(first.code);
+    expect(await prisma.giftCard.count({ where: { code: first.code } })).toBe(1);
+
+    // Обязательство по этой карте кредитуется ровно один раз: до фикса второй
+    // запрос давал вторую карту и вторые 5 000 в 2300.
+    const issued = await prisma.giftCard.findUniqueOrThrow({ where: { code: first.code } });
+    const liability = await prisma.accountingJournalLine.aggregate({
+      _sum: { credit: true },
+      where: {
+        accountCode: '2300',
+        entry: { sourceType: 'giftcard.issued', sourceRef: issued.id },
+      },
+    });
+    expect(liability._sum.credit).toBe(5_000);
+  });
+
+  /**
+   * Тот же ключ с другой суммой — это не повтор, а другая операция, и молча
+   * возвращать первую карту нельзя: кассир получил бы подтверждение на 9 000,
+   * держа в руках карту на 5 000.
+   */
+  it('тот же ключ с другими данными — явный отказ, а не тихая подмена', async () => {
+    const key = `giftcard-conflict-${runTag}-${(seq += 1)}`;
+    await giftcards.issue({ amount: 5_000, method: 'card' }, 'owner-1', key);
+
+    await expect(giftcards.issue({ amount: 9_000, method: 'card' }, 'owner-1', key)).rejects.toThrow(
+      ConflictError,
+    );
+  });
+
   it('issues a card and pays a reserved order with gift-card + cash split tender', async () => {
     const { order } = await reservedOrder();
     const card = await giftcards.issue({ code: `GC-SPLIT-${runTag}`, amount: 50000 }, 'cashier');

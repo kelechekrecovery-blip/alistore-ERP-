@@ -35,11 +35,18 @@ describe('issueGiftCard', () => {
       redeemable: true,
     };
     const calls = stubFetch(issued);
-    const result = await issueGiftCard({ amount: 5000, note: 'Подарочная карта за возврат' }, 'token-1');
+    const result = await issueGiftCard(
+      { amount: 5000, note: 'Подарочная карта за возврат' },
+      'token-1',
+      'issue-key-1',
+    );
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toMatch(/\/giftcards$/);
     expect(calls[0].init.method).toBe('POST');
     expect((calls[0].init.headers as Record<string, string>).authorization).toBe('Bearer token-1');
+    // Выпуск карты создаёт деньги: без ключа сервер не отличит повтор от второй
+    // карты, поэтому заголовок обязателен и на клиенте.
+    expect((calls[0].init.headers as Record<string, string>)['Idempotency-Key']).toBe('issue-key-1');
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       amount: 5000,
       note: 'Подарочная карта за возврат',

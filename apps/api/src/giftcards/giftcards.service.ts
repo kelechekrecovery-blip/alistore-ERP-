@@ -28,7 +28,33 @@ export class GiftcardsService {
     private readonly audit: AuditService,
   ) {}
 
-  async issue(dto: IssueGiftCardDto, actor: string): Promise<GiftCardView> {
+  async issue(
+    dto: IssueGiftCardDto,
+    actor: string,
+    idempotencyKey?: string,
+  ): Promise<GiftCardView> {
+    // Выпуск карты — это выпуск денег, поэтому повтор обязан вернуть ту же
+    // карту. Проверки по `code` ниже для этого недостаточно: когда код не
+    // передан, `generateCode()` выдаёт новый на каждый вызов, и реплей от
+    // дважды нажавшего кассира или ретрая сети проходил её насквозь — вторая
+    // карта с полным балансом и вторая проводка в 2300. Обе внутренне
+    // корректны, поэтому расхождения не видел ни один риск-сигнал.
+    if (idempotencyKey) {
+      const replay = await this.prisma.giftCard.findUnique({ where: { idempotencyKey } });
+      if (replay) {
+        // Тот же ключ с другими данными — не повтор, а другая операция.
+        // Молча вернуть первую карту нельзя: кассир получил бы подтверждение на
+        // одну сумму, держа в руках карту на другую.
+        if (replay.initialBalance !== dto.amount) {
+          throw new ConflictError(
+            'giftcard_idempotency_conflict',
+            `Ключ идемпотентности уже использован для карты на ${replay.initialBalance}`,
+          );
+        }
+        return this.view(replay);
+      }
+    }
+
     const code = normalizeCode(dto.code ?? this.generateCode());
     const existing = await this.prisma.giftCard.findUnique({ where: { code } });
     if (existing) {
@@ -40,6 +66,7 @@ export class GiftcardsService {
       const created = await tx.giftCard.create({
         data: {
           code,
+          idempotencyKey,
           initialBalance: dto.amount,
           balance: dto.amount,
           customerId: dto.customerId,

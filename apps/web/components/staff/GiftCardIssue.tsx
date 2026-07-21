@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { issueGiftCard, type IssuedGiftCard } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -23,6 +23,7 @@ export function GiftCardIssue({
   const [form, setForm] = useState({ amount: '', note: '' });
   const [issued, setIssued] = useState<IssuedGiftCard | null>(null);
   const [busy, setBusy] = useState(false);
+  const attemptKey = useRef<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -31,14 +32,20 @@ export function GiftCardIssue({
       flash('Укажите номинал карты');
       return;
     }
+    // Ключ живёт до успешного выпуска и переживает ошибку: повтор после сбоя
+    // сети вернёт ту же карту, а не выпустит вторую. Свежий ключ на каждый
+    // вызов не защитил бы от двойного клика — ровно того случая, ради которого
+    // идемпотентность и нужна.
+    attemptKey.current ??= crypto.randomUUID();
     setBusy(true);
     try {
       const card = await issueGiftCard({
         amount,
         note: form.note.trim() || undefined,
-      }, accessToken);
+      }, accessToken, attemptKey.current);
       setIssued(card);
       setForm({ amount: '', note: '' });
+      attemptKey.current = null;
       flash('Карта выпущена');
     } catch (error) {
       flash(error instanceof Error ? error.message : 'Ошибка выпуска карты');

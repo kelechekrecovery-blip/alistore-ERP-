@@ -24,13 +24,22 @@ export async function fetchGiftCard(code: string): Promise<GiftCardView> {
   return (await res.json()) as GiftCardView;
 }
 
-/** Issue a gift card / store-credit balance (staff: giftcards,issue). */
+/**
+ * Issue a gift card / store-credit balance (staff: giftcards,issue).
+ *
+ * Ключ идемпотентности обязателен: выпуск карты создаёт деньги, и повтор без
+ * ключа сервер не отличит от второй карты. Ключ должен быть СТАБИЛЬНЫМ для
+ * одной попытки — свежий `randomUUID()` на каждый вызов не защитил бы от
+ * двойного клика, ради которого всё и делается.
+ */
 export function issueGiftCard(input: {
   amount: number;
   code?: string;
   customerId?: string;
   note?: string;
   expiresAt?: string;
-}, accessToken: string): Promise<IssuedGiftCard> {
-  return postAuthJson('/giftcards', input, accessToken);
+}, accessToken: string, idempotencyKey: string): Promise<IssuedGiftCard> {
+  return postAuthJson('/giftcards', input, accessToken, {
+    'Idempotency-Key': idempotencyKey,
+  });
 }

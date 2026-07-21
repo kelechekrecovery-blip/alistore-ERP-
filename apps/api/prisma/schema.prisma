@@ -1298,6 +1298,11 @@ model OnlinePaymentIntentCommand {
 model GiftCard {
   id             String                @id @default(cuid())
   code           String                @unique
+  // Выпуск карты — это выпуск денег, поэтому повтор запроса обязан вернуть ту
+  // же карту, а не вторую. Проверки по `code` для этого недостаточно: когда код
+  // не передан, сервер генерирует новый на каждый вызов, и реплей проходил её
+  // насквозь. Nullable — исторические карты ключа не имеют.
+  idempotencyKey String?               @unique
   initialBalance Int
   balance        Int
   currency       String                @default("KGS")
