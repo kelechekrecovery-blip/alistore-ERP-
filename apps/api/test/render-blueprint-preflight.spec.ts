@@ -1,0 +1,84 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildProductionPreflightReport } from '../src/health/production-preflight';
+import { selectPaymentGatewayProvider } from '../src/payments/payment-gateway-selector';
+import { NonePaymentGatewayProvider } from '../src/payments/none-payment-gateway.provider';
+
+/**
+ * Блюпринт — это то, с чем сервис реально поедет. Код может быть покрыт
+ * полностью и всё равно уехать не в том режиме.
+ *
+ * Так и вышло: селектор платежей давно умел `none` (честный 503
+ * `online_payments_unavailable`), preflight умел его принимать, а `render.yaml`
+ * всё это время держал `PAYMENT_PROVIDER: sandbox` и `PUBLIC_DEMO_MODE: true`.
+ * На боевом домене это означало:
+ *
+ * - покупатель, выбравший «Картой», получал страницу «Тестовая оплата.
+ *   Списание средств не производится», а кнопка подтверждения отвечала 404,
+ *   потому что `PAYMENTS_SANDBOX_CONFIRM_ENABLED` в блюпринте не задан;
+ * - каждый заказ витрины помечался `isDemo`, из-за чего выбранные зона и
+ *   интервал доставки писались как `null`, слот не бронировался, а
+ *   подтверждение заказа гасилось условием `!order.isDemo`.
+ *
+ * Тесты против выдуманных значений env такого не ловят по построению. Этот
+ * читает файл, с которым идёт деплой, и прогоняет по нему тот же preflight,
+ * который поднимает контейнер.
+ */
+describe('render.yaml · боевой режим', () => {
+  const blueprint = readFileSync(join(__dirname, '../../../render.yaml'), 'utf8');
+
+  /**
+   * Разбор текстом, а не через js-yaml: зависимость (и её типы) ради нескольких
+   * ключей дороже, чем прочитать пары «key/value». Тот же приём уже используется
+   * в `otp-sender-selector.spec.ts`.
+   */
+  function valuesOf(key: string): string[] {
+    const found: string[] = [];
+    const lines = blueprint.split('\n');
+    lines.forEach((line, index) => {
+      if (line.trim() !== `- key: ${key}`) return;
+      const next = lines[index + 1]?.trim() ?? '';
+      const match = next.match(/^value:\s*"?([^"]*)"?$/);
+      if (match) found.push(match[1]);
+    });
+    return found;
+  }
+
+  it('не выпускает магазин в песочницу и в демо-режим', () => {
+    expect(valuesOf('PAYMENT_PROVIDER')).toEqual(['none']);
+    // Оба сервиса — веб и API — должны выйти из демо одновременно: витрина
+    // читает NEXT_PUBLIC_DEMO_MODE, заказы — PUBLIC_DEMO_MODE.
+    expect(new Set(valuesOf('PUBLIC_DEMO_MODE'))).toEqual(new Set(['false']));
+    expect(new Set(valuesOf('NEXT_PUBLIC_DEMO_MODE'))).toEqual(new Set(['false']));
+  });
+
+  it('выбирает честно недоступный шлюз на значении из блюпринта', () => {
+    const [provider] = valuesOf('PAYMENT_PROVIDER');
+    expect(selectPaymentGatewayProvider((name) => (name === 'PAYMENT_PROVIDER' ? provider : undefined)))
+      .toBeInstanceOf(NonePaymentGatewayProvider);
+  });
+
+  /**
+   * Релей возвратов провайдера при оплате наличными включённым быть не может:
+   * деньги приходят курьеру или на кассу, возврат идёт через домен `refunds`.
+   * Preflight считает включённый релей `unsafe` — проверяем обе роли разом,
+   * потому что в блюпринте они описаны разными сервисами и разъезжались.
+   */
+  it('проходит боевой preflight в обеих ролях', () => {
+    const relays = valuesOf('REFUND_RELAY_ENABLED');
+    expect(new Set(relays)).toEqual(new Set(['false']));
+
+    for (const role of ['api', 'worker']) {
+      const env: Record<string, string> = {
+        PROCESS_ROLE: role,
+        REFUND_RELAY_ENABLED: 'false',
+        PUBLIC_DEMO_MODE: valuesOf('PUBLIC_DEMO_MODE')[0],
+        PAYMENT_PROVIDER: valuesOf('PAYMENT_PROVIDER')[0],
+        PAYMENT_PROVIDER_CERTIFIED: valuesOf('PAYMENT_PROVIDER_CERTIFIED')[0] ?? 'false',
+      };
+      const report = buildProductionPreflightReport((name) => env[name]);
+      const relay = report.checks.find((check) => check.id === 'refund_relay');
+      expect({ role, status: relay?.status }).toEqual({ role, status: 'ready' });
+    }
+  });
+});

@@ -61,10 +61,14 @@ services:
       # Значение совпадает с CORS_ORIGINS и ALLOWED_HOSTS сервиса API ниже.
       - key: NEXT_PUBLIC_API_BASE
         value: https://api.ali.kg/api
+      # Демо-режим штамповал каждый заказ витрины как isDemo: выбранные зона и
+      # интервал доставки писались в базу как null (orders.service.ts), слот не
+      # бронировался, а order_confirmed гасилось условием `!order.isDemo`.
+      # Покупатель выбирал «14:00–16:00» и не получал ни брони, ни письма.
       - key: PUBLIC_DEMO_MODE
-        value: "true"
+        value: "false"
       - key: NEXT_PUBLIC_DEMO_MODE
-        value: "true"
+        value: "false"
       - key: SENTRY_DSN
         fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
       - key: NEXT_PUBLIC_SENTRY_DSN
@@ -87,8 +91,11 @@ services:
       - fromGroup: alistore-prod-common
       - key: PROCESS_ROLE
         value: worker
+      # Провайдерских возвратов при оплате наличными не существует физически:
+      # деньги приходят курьеру или на кассу, возврат идёт через домен refunds.
+      # При PAYMENT_PROVIDER=none preflight считает включённый релей unsafe.
       - key: REFUND_RELAY_ENABLED
-        value: "true"
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: alistore-postgres-prod
@@ -183,11 +190,16 @@ envVarGroups:
       - key: ALLOWED_HOSTS
         value: api.ali.kg
       - key: PUBLIC_DEMO_MODE
-        value: "true"
+        value: "false"
       - key: AUTH_OTP_DEV_ECHO
         value: "false"
+      # Запуск за наличные при получении: онлайн-шлюза нет по решению
+      # владельца. `sandbox` здесь означал, что реальный покупатель на реальном
+      # домене получает счёт со страницей «Списание средств не производится» и
+      # кнопкой подтверждения, которая 404-ит (PAYMENTS_SANDBOX_CONFIRM_ENABLED
+      # не задан). `none` — честный 503 online_payments_unavailable.
       - key: PAYMENT_PROVIDER
-        value: sandbox
+        value: none
       - key: PAYMENT_PROVIDER_CERTIFIED
         value: "false"
       # `silent` селектор не знает: otp-sender-selector.ts принимает `noop` и
