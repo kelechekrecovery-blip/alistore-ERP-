@@ -515,3 +515,20 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
   (`Parse Error: Expected HTTP/`) in `finance-expenses.e2e-spec.ts` batch 55/172 from
   shared-resource contention with the parallel Codex; re-verified **17/17 PASS in
   isolation**. API layer healthy; CI runs this gate in isolation.
+- `RBAC-AUDIT-001` **HIGH — исправлено** (`f392ecc`) — правило четырёх глаз не срабатывало
+  там, где выглядело работающим. В `FOUR_EYES_ACTIONS` было внесено `price_change` —
+  литерал, которого не производит ни одна строка кода: реальное действие называется
+  `price` (`products.service.ts:508`). `includes('price')` = false, админ согласовывал
+  собственное изменение цены. Вне списка молча оставались `debt` (лимит 50 000 сом,
+  `canApprove('debt','senior_seller')` = true) и `delete`. Список исправлен по фактическим
+  литералам; тест `approvals-four-eyes.spec.ts` больше не перечисляет действия руками —
+  вычитывает их из вызовов `approvals.request` и требует явной классификации каждого.
+- `RBAC-AUDIT-002` INFO — **не подтвердилось в заявленной форме.** Аудит указал, что
+  маршруты `inventory.controller.ts` (`receive`, `transfer`, `count`, `consignments/*`) не
+  сверяют `staff.point` с `location`, в отличие от `pos.service.ts:88-108`. Проверено:
+  `inventory.service.ts` действительно содержит ноль упоминаний `point`, но `location` там —
+  свободная складская зона (`RETURNS`, `RECON-WH`, `ROLL-A`, `SALE-FLOOR`), а не точка
+  продаж; с `StorePoint.inventoryLocation` совпадает лишь часть значений. Привязка к точке
+  сотрудника запретила бы легитимное перемещение с центрального склада в магазин. Реальный
+  остаток — не баг, а пробел проектирования: **изоляции склада по точкам не существует как
+  понятия**. При одной активной точке не эксплуатируется; отдельный срез при второй точке.
