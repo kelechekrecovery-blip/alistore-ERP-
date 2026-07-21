@@ -1,0 +1,153 @@
+name: Uptime — Production
+
+# Внешний наблюдатель за проданкой. Появился после инцидента 19–21.07.2026:
+# API и worker умерли, кто-то поднял обратно только витрину, и api.ali.kg отдавал
+# 502 полтора суток. Никто не узнал.
+#
+# Почему этого не замечал существующий алертинг: `AlerterService`
+# (apps/api/src/observability/alerter.service.ts) срабатывает на 5xx внутри
+# процесса и на хуки outbox/refund. Мёртвый процесс, упавший туннель или
+# выключенная машина не порождают ни одного 5xx — порождать их некому. Такой
+# отказ детектируется только снаружи, и до этого файла ни одного внешнего
+# наблюдателя в репозитории не было: `grep -l schedule .github/workflows/*`
+# не давал ничего, а единственный cron в render.yaml — ночной бэкап.
+#
+# Ограничения, о которых надо знать:
+#   * Расписания GitHub Actions — best-effort. Под нагрузкой запуск сдвигается
+#     на 5–20 минут, а иногда пропускается. Для «магазин лежит» этого хватает,
+#     для строгого SLA — нет; тогда нужен платный внешний монитор.
+#   * Scheduled workflow выполняется ТОЛЬКО с дефолтной ветки репозитория.
+#     Пока этот файл не влит в main, он не запустится ни разу.
+#   * Провал workflow сам по себе шлёт письмо владельцу репозитория — это
+#     базовый канал. Telegram ниже включается, только если заданы секреты.
+#
+# Настройка владельцем (необязательно):
+#   Secrets: ALERT_TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID — те же имена, что
+#     читает AlerterService, чтобы канал был один.
+#   Vars: PROD_API_BASE_URL, PROD_WEB_BASE_URL — если хосты изменятся.
+
+on:
+  schedule:
+    # Каждые 10 минут: чаще смысла нет — расписание всё равно плавает.
+    - cron: '*/10 * * * *'
+    # Раз в сутки — проверка контрактов, которые ломаются молча (см. job contracts).
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+env:
+  API_BASE_URL: ${{ vars.PROD_API_BASE_URL || 'https://api.ali.kg' }}
+  WEB_BASE_URL: ${{ vars.PROD_WEB_BASE_URL || 'https://ali.kg' }}
+
+jobs:
+  uptime:
+    # Единственная проверка, которая ловит смерть процесса, обрыв туннеля и
+    # выключенную машину.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      failed: ${{ steps.probe.outputs.failed }}
+      detail: ${{ steps.probe.outputs.detail }}
+    steps:
+      - name: Probe public endpoints
+        id: probe
+        run: |
+          set -uo pipefail
+          failed=""
+          # Три попытки с паузой: одиночный сетевой блип не повод будить владельца,
+          # а вот три подряд — уже отказ.
+          probe() {
+            local url="$1" name="$2" attempt code
+            for attempt in 1 2 3; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url" || echo 000)"
+              if [ "$code" = "200" ]; then
+                echo "  ok   $name ($url)"
+                return 0
+              fi
+              echo "  try$attempt $name -> $code"
+              [ "$attempt" -lt 3 ] && sleep 20
+            done
+            echo "::error::$name недоступен: $url вернул $code"
+            failed="${failed}${name}=$code "
+            return 1
+          }
+          probe "$WEB_BASE_URL/healthz"           "web-health"     || true
+          probe "$API_BASE_URL/api/health/live"   "api-liveness"   || true
+          probe "$API_BASE_URL/api/health/ready"  "api-readiness"  || true
+          # Каталог — доказательство, что жив не только health-эндпоинт, но и путь
+          # до базы. Health может отвечать при мёртвой БД.
+          probe "$API_BASE_URL/api/catalog/products?limit=1" "catalog" || true
+
+          {
+            echo "failed=${failed:+true}"
+            echo "detail=${failed:-}"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -n "$failed" ]; then
+            echo "::error::Прод недоступен: $failed"
+            exit 1
+          fi
+          echo "Все публичные проверки прошли."
+
+  notify:
+    # Отдельная job, чтобы уведомление ушло даже когда probe упал.
+    needs: uptime
+    if: failure() && github.event.schedule != '17 6 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telegram alert
+        env:
+          BOT_TOKEN: ${{ secrets.ALERT_TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
+          DETAIL: ${{ needs.uptime.outputs.detail }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          if [ -z "${BOT_TOKEN:-}" ] || [ -z "${CHAT_ID:-}" ]; then
+            echo "::notice::ALERT_TELEGRAM_* не заданы — уведомление ушло только письмом GitHub о провале workflow."
+            exit 0
+          fi
+          curl -fsS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=AliStore: прод недоступен. ${DETAIL:-} ${RUN_URL}" \
+            >/dev/null && echo "Уведомление отправлено."
+
+  contracts:
+    # Раз в сутки. Здесь живут поломки, которые НЕ видны как падение сайта:
+    # витрина отвечает 200, а приложения при этом сломаны.
+    if: github.event.schedule == '17 6 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deep-link files must be served, not gated
+        # apps/web/app/.well-known/*/route.ts отдают 503 с пустым телом, если не
+        # заданы APPLE_TEAM_ID / ANDROID_APP_LINK_SHA256. Тогда universal links и
+        # app links молча перестают работать во всех восьми приложениях: возврат
+        # с оплаты открывает браузер вместо приложения.
+        #
+        # Существующие гейты этого не ловят: scripts/validate-deeplink-contract.mjs
+        # грепает исходники и зелёный при пустом окружении, а
+        # e2e-prod/prod-smoke.spec.ts явно вносит 503 в список допустимых.
+        # На 21.07.2026 обе ссылки на проде отдавали именно 503.
+        run: |
+          set -uo pipefail
+          failed=0
+          for path in ".well-known/apple-app-site-association" ".well-known/assetlinks.json"; do
+            code="$(curl -s -o /tmp/body -w '%{http_code}' --max-time 15 "$WEB_BASE_URL/$path" || echo 000)"
+            if [ "$code" != "200" ]; then
+              echo "::error::$path вернул $code — deep links не работают. Задайте APPLE_TEAM_ID и ANDROID_APP_LINK_SHA256 в окружении web-сервиса."
+              failed=1
+            elif [ ! -s /tmp/body ] || grep -qE '^\[\]$|"details":\[\]' /tmp/body; then
+              echo "::error::$path отвечает 200, но содержимое пустое — подписи не подставлены."
+              failed=1
+            else
+              echo "  ok   $path"
+            fi
+          done
+          exit "$failed"

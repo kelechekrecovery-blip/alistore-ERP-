@@ -293,4 +293,53 @@ describe('ACCESS-STAFF-BATCH: SEC-010 + STAFF-002 + STAFF-001', () => {
       expect(events).toHaveLength(1);
     });
   });
+
+  /**
+   * STAFF-003: деактивация обязана резать и создание сотрудников.
+   *
+   * `POST /staff-auth/staff` был единственным опасным маршрутом этого
+   * контроллера без `ActiveStaffGuard` — у соседних `staff/:id/totp-reset` и
+   * `staff/:id/deactivate` он есть. Staff-токен живёт 8 часов и не отзывается,
+   * поэтому уволенный владелец до конца этого окна успевал завести себе новую
+   * учётку owner. Такая учётка переживает даже ротацию JWT_SECRET — то есть
+   * восстановление доступа получается постоянным.
+   *
+   * Существующая проверка деактивации (выше) смотрит только `GET /staff-auth/me`
+   * и потому эту дыру не видела.
+   */
+  describe('STAFF-003: деактивированный владелец не создаёт сотрудников', () => {
+    it('отклоняет создание по ещё живому токену и не оставляет учётку в БД', async () => {
+      const server = app.getHttpServer();
+      const admin = await staffSession('owner');
+      const fired = await staffSession('owner');
+
+      // Токен получен ДО деактивации и остаётся криптографически валидным.
+      const firedToken = fired.token;
+      await request(server)
+        .post(`/staff-auth/staff/${fired.staffId}/deactivate`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .expect(201);
+
+      seq += 1;
+      const smuggled = `asb-smuggled-${RUN}-${seq}`;
+      await request(server)
+        .post('/staff-auth/staff')
+        .set('Authorization', `Bearer ${firedToken}`)
+        .send({ username: smuggled, password: 'pass', role: 'owner' })
+        .expect(403);
+
+      // Отказ должен быть до записи, а не после.
+      const leaked = await prisma.staffUser.findUnique({ where: { username: smuggled } });
+      expect(leaked).toBeNull();
+
+      // Действующий владелец при этом не задет.
+      seq += 1;
+      const legitimate = `asb-legit-${RUN}-${seq}`;
+      await request(server)
+        .post('/staff-auth/staff')
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ username: legitimate, password: 'pass', role: 'cashier' })
+        .expect(201);
+    });
+  });
 });

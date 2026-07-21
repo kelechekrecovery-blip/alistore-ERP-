@@ -16,6 +16,11 @@ playwright-report
 test-results
 uploads
 *.log
-.env*
-!.env.example
-!.env.production.example
+# Паттерны .dockerignore матчатся по ПОЛНОМУ относительному пути, поэтому `.env*`
+# покрывал только корень репозитория. `COPY . .` затягивал в слой образа
+# apps/api/.env (живой OPENROUTER_API_KEY, DATABASE_URL, JWT_SECRET) и
+# apps/ios/.env.production (ключи App Store Connect). Обнаружено 21.07.2026 на
+# фактически собранном образе, а не по чтению файла.
+**/.env*
+!**/.env.example
+!**/.env.production.example

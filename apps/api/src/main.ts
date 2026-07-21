@@ -4,13 +4,20 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { setupOpenApi, shouldExposeOpenApi } from './openapi';
 import helmet from 'helmet';
-import { allowedHostsMiddleware, resolveCorsOptions, resolveHelmetOptions } from './config/runtime-security';
+import {
+  allowedHostsMiddleware,
+  resolveCorsOptions,
+  resolveHelmetOptions,
+  resolveTrustProxy,
+} from './config/runtime-security';
 import { assertProductionRuntimeReady } from './health/production-preflight';
 
 async function bootstrap(): Promise<void> {
   const env = (name: string) => process.env[name];
   assertProductionRuntimeReady(env);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  // До этой строки req.ip был адресом прокси, а не клиента — см. resolveTrustProxy.
+  app.set('trust proxy', resolveTrustProxy(env));
   app.use(allowedHostsMiddleware(env));
   app.setGlobalPrefix('api');
   app.useStaticAssets(process.env.MEDIA_LOCAL_DIR ?? './uploads', {

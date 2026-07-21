@@ -32,9 +32,17 @@ export class StaffAuthController {
     return this.staffAuth.login(dto.username, dto.password);
   }
 
-  /** Create a staff account — owner only (casbin guard, role from the JWT). */
+  /**
+   * Create a staff account — owner only (casbin guard, role from the JWT).
+   *
+   * `ActiveStaffGuard` здесь обязателен и был пропущен: staff-токен живёт 8 часов
+   * и не отзывается, поэтому без него уволенный владелец до конца этого окна
+   * заводил себе новую учётку owner — а она переживает даже ротацию JWT_SECRET.
+   * Соседние `staff/:id/totp-reset` и `staff/:id/deactivate` guard имели.
+   * Покрыто STAFF-003 в `test/access-staff-batch.e2e-spec.ts`.
+   */
   @Post('staff')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('staff', 'manage')
   async createStaff(@Body() dto: CreateStaffDto) {
     return this.publicView(

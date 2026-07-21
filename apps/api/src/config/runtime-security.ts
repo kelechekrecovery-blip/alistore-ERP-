@@ -36,6 +36,31 @@ export function resolveHelmetOptions(env: RuntimeEnvReader): HelmetOptions {
   };
 }
 
+/**
+ * Сколько обратных прокси стоит перед приложением. Express доверяет ровно
+ * этому числу последних адресов в `X-Forwarded-For` и берёт следующий за ними
+ * как `req.ip`.
+ *
+ * Зачем: без этого `req.ip` равен адресу прокси (для cloudflared — `127.0.0.1`),
+ * то есть у всех клиентов планеты один общий бакет rate-limit, и три запроса
+ * гасят вход по SMS всем сразу. Слепо читать `X-Forwarded-For` вместо этого
+ * нельзя: заголовок подделывается клиентом, и лимит превратился бы в фикцию.
+ *
+ * Вне production по умолчанию выключено: там обращаются напрямую, и доверие к
+ * заголовку дало бы именно ту подделку, от которой мы защищаемся.
+ */
+export function resolveTrustProxy(env: RuntimeEnvReader): number | false {
+  const raw = env('TRUST_PROXY_HOPS')?.trim();
+  if (raw === undefined || raw === '') {
+    return env('NODE_ENV') === 'production' ? 1 : false;
+  }
+  const hops = Number(raw);
+  if (!Number.isInteger(hops) || hops < 0) {
+    throw new Error(`Invalid TRUST_PROXY_HOPS: ${raw}`);
+  }
+  return hops === 0 ? false : hops;
+}
+
 export function resolveAllowedHosts(env: RuntimeEnvReader): string[] {
   const hosts = (env('ALLOWED_HOSTS') ?? '')
     .split(',')
