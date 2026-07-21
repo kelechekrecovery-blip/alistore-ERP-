@@ -1,5 +1,21 @@
 # BACKLOG
 
+## Изоляция тестов 2026-07-21
+
+- `VERIFY-078` **Спеки не изолированы друг от друга — отдельный проект, не срез.** Сьюты
+  делят одну `alistore_test` и чистят фикстуры голым `deleteMany()`: 1175 вызовов в 108
+  спек-файлах, 72 из них стирают `AuditEvent` целиком, плюс глобальный `TRUNCATE` в
+  `apps/api/test/db-test-cleanup.ts:10` на каждый `beforeEach`. Пока это так, **ни один
+  прогон не воспроизводим при втором работающем процессе**, и красный результат
+  неотличим от настоящего дефекта. Цена уже уплачена: 21.07 четыре сьюта
+  (`courier.e2e`, `staff-session-ops`, `supplier-rbac`, `customer-deletion`) были
+  ошибочно занесены в дефекты — все четыре оказались контаминацией от параллельного
+  прогона, продукт корректен. Тот же механизм стоит за `VERIFY-057`, `VERIFY-075`,
+  `VERIFY-077` и `OWNER-AUDIT-003` — это одна причина, а не четыре наблюдения.
+  Направление: схема-на-прогон (`?schema=test_<pid>`) или транзакционный откат вместо
+  `deleteMany`, чтобы параллельность перестала быть запретом. До этого — правило
+  «один прогон на машину», описанное в `CLAUDE.md`.
+
 ## Web Audit Follow-up 2026-07-21O
 - `WEB-AUDIT-076` Fixed a real route-audit defect on `/`: CMS-managed external `heroImageUrl` values such as `https://media.example.com/hero.webp` caused `next/image` to throw because the host was not allowlisted. The storefront hero and managed banner now render operator-managed HTTPS media with fixed dimensions through a plain image element; no wildcard Next image allowlist was added.
 - Checks: Web production build `45` routes; Chromium route audit `46/46` in `3.4m`; `git diff --check`. Commit `0e3df12`.

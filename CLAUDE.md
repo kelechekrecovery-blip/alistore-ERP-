@@ -32,7 +32,8 @@ iOS/Android. Монорепо на npm workspaces.
 | Задача | Команда |
 |---|---|
 | API — один спек | `cd apps/api && NODE_PATH=./node_modules npx jest --runInBand --testPathPattern <name>` |
-| API — все тесты | `npm run api:test` |
+| API — все тесты, как в CI | `npm run api:test` (один процесс, `--runInBand`) — `ci.yml:72` |
+| API — все тесты, как в `mvp:verify` | `node scripts/run-api-test-batches.mjs` (один спек-файл на процесс) — `mvp-verify.mjs:41` |
 | Typecheck API | `npx tsc --noEmit -p apps/api/tsconfig.json` |
 | Typecheck web | `npx tsc --noEmit -p apps/web/tsconfig.json` |
 | Build API | `npm run api:build` |
@@ -48,6 +49,18 @@ iOS/Android. Монорепо на npm workspaces.
 - **Живой Postgres обязателен** для `apps/api` jest и e2e (`test/setup-db.ts` beforeAll
   подключается). БД: `alistore_dev` / `alistore_test`. Нет БД → тесты падают на старте,
   а не в ассертах.
+- **Два разных гейта, и они расходятся.** CI гоняет `npm run api:test` — один процесс,
+  `--runInBand` (`ci.yml:72`). `mvp:verify` гоняет батчер — один спек-файл на процесс
+  (`mvp-verify.mjs:41`), чтобы сьюты не наследовали фикстуры друг друга. Прогон одного
+  ничего не говорит о другом; перед релизом нужны оба.
+- **Любой прогон API-тестов одинок по определению.** Сьюты делят одну БД и чистят фикстуры
+  голым `deleteMany()`: 1175 вызовов в 108 спек-файлах, 72 из них стирают `AuditEvent`
+  целиком. **Если параллельно идёт второй прогон** — другой агент, второй терминал, CI по
+  той же `alistore_test` — **результат мусорный**: чужой `deleteMany` попадает между
+  `findFirst` и `FOR UPDATE` и роняет посторонние сьюты. Красный отсюда не диагноз, а шум:
+  проверено — коммит давал PASS 18/18 в одиночку и два FAIL под конфликтом.
+  Перед разбором падения: `ps aux | grep -e jest -e "playwright test"`, затем перепроверь
+  одиночным `--testPathPattern` — детерминированный баг падает и в одиночку.
 - **Нет ESLint и Prettier.** Единственный статический гейт — **`tsc`** (+ `prisma validate`).
   Не ссылайся на lint/format — их нет. Нет enforced coverage %.
 - `mvp:verify` бросает без `TEST_DATABASE_URL` и не ресетит БД без «test» в имени.
