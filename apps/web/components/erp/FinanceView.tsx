@@ -160,7 +160,21 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
     event.preventDefault();
     const numericAmount = Math.round(Number(amount));
     const numericTaxRateBps = Math.round(Number(taxRatePercent) * 100);
-    if (!description.trim() || !Number.isFinite(numericAmount) || numericAmount < 1 || (currency !== 'KGS' && !exchangeRateId) || !Number.isInteger(numericTaxRateBps) || numericTaxRateBps < 0 || numericTaxRateBps > 10_000 || (taxMode === 'none' ? numericTaxRateBps !== 0 : numericTaxRateBps === 0)) return;
+    // Раньше здесь стоял молчаливый `return`: оператор нажимал «Создать» и не
+    // происходило РОВНО НИЧЕГО — ни расхода, ни сообщения. Отличить это от
+    // зависшей сети было нечем, и человек жал кнопку снова и снова.
+    const problem =
+      !description.trim() ? 'Укажите описание расхода'
+      : !amount.trim() || !Number.isFinite(numericAmount) || numericAmount < 1 ? 'Сумма должна быть целым числом от 1'
+      : currency !== 'KGS' && !exchangeRateId ? 'Для валютного расхода выберите курс'
+      : !Number.isInteger(numericTaxRateBps) || numericTaxRateBps < 0 || numericTaxRateBps > 10_000 ? 'Ставка налога — от 0 до 100%'
+      : taxMode === 'none' && numericTaxRateBps !== 0 ? 'Без налога ставка должна быть 0'
+      : taxMode !== 'none' && numericTaxRateBps === 0 ? 'Для выбранного режима укажите ненулевую ставку'
+      : null;
+    if (problem) {
+      setMessage(problem);
+      return;
+    }
     setBusy('create');
     setMessage('');
     try {
@@ -186,7 +200,16 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   async function submitCurrencyRate(event: FormEvent) {
     event.preventDefault();
     const rateMicros = Math.round(Number(rateValue) * 1_000_000);
-    if (!/^[A-Z]{3}$/.test(rateCurrency) || rateCurrency === 'KGS' || !Number.isSafeInteger(rateMicros) || rateMicros < 1 || !rateSource.trim()) return;
+    const rateProblem =
+      !/^[A-Z]{3}$/.test(rateCurrency) ? 'Код валюты — три заглавные буквы, например USD'
+      : rateCurrency === 'KGS' ? 'Курс сома к самому себе не регистрируется'
+      : !rateValue.trim() || !Number.isSafeInteger(rateMicros) || rateMicros < 1 ? 'Укажите положительный курс'
+      : !rateSource.trim() ? 'Укажите источник курса'
+      : null;
+    if (rateProblem) {
+      setMessage(rateProblem);
+      return;
+    }
     setBusy('currency-rate');
     setMessage('');
     try {
@@ -210,7 +233,14 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   async function submitBudget(event: FormEvent) {
     event.preventDefault();
     const numericAmount = Math.round(Number(budgetAmount));
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || !Number.isFinite(numericAmount) || numericAmount < 1) return;
+    const budgetProblem =
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(period) ? 'Период — в формате ГГГГ-ММ, например 2026-07'
+      : !budgetAmount.trim() || !Number.isFinite(numericAmount) || numericAmount < 1 ? 'Сумма бюджета — целое число от 1'
+      : null;
+    if (budgetProblem) {
+      setPlanningMessage(budgetProblem);
+      return;
+    }
     setPlanningBusy(true);
     setPlanningMessage('');
     try {

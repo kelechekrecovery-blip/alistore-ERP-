@@ -68,8 +68,23 @@ export function parseAttrs(text: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+/**
+ * Пустая строка — это НЕ ноль.
+ *
+ * `Number('')` и `Number('   ')` в JavaScript равны 0 и проходят проверку
+ * `Number.isInteger(x) && x >= 0`. Из-за этого пустое поле цены доезжало до
+ * сервера честным нулём, а сервер его принимал: товар оказывался на витрине
+ * бесплатным. Явный «0» при этом остаётся допустимым — это осознанный ввод, а
+ * не пропущенное поле.
+ */
+function requireFilled(value: string, label: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error(`${label}: поле не заполнено`);
+  return trimmed;
+}
+
 export function parseSom(value: string, label: string): number {
-  const parsed = Number(value);
+  const parsed = Number(requireFilled(value, label));
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(`${label}: укажите целое число >= 0`);
   }
@@ -77,7 +92,7 @@ export function parseSom(value: string, label: string): number {
 }
 
 export function parseBasisPoints(value: string): number {
-  const parsed = Number(value);
+  const parsed = Number(requireFilled(value, 'Ставка налога'));
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10_000) {
     throw new Error('Ставка налога: укажите целое число от 0 до 10000 bps');
   }

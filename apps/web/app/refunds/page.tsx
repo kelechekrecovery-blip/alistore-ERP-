@@ -102,7 +102,17 @@ export default function RefundsPage() {
 
   async function submitCancel(event: FormEvent) {
     event.preventDefault();
-    if (!session || !cancelForm.id || cancelForm.reason.trim().length < 3) return;
+    // Молчаливый выход на денежном экране неотличим от зависшего запроса:
+    // оператор жал «Отменить» и не получал ни отмены, ни объяснения.
+    if (!session) return;
+    if (!cancelForm.id) {
+      flash('Выберите refund для отмены');
+      return;
+    }
+    if (cancelForm.reason.trim().length < 3) {
+      flash('Причина отмены — минимум 3 символа');
+      return;
+    }
     setBusy(`cancel-${cancelForm.id}`);
     try {
       const storageKey = `alistore.refund.cancel.${cancelForm.id}`;
@@ -122,7 +132,15 @@ export default function RefundsPage() {
 
   async function submitResolve(event: FormEvent) {
     event.preventDefault();
-    if (!session || !resolveForm.id || resolveForm.reason.trim().length < 3) return;
+    if (!session) return;
+    if (!resolveForm.id) {
+      flash('Выберите refund для разрешения');
+      return;
+    }
+    if (resolveForm.reason.trim().length < 3) {
+      flash('Причина — минимум 3 символа');
+      return;
+    }
     if (resolveForm.action === 'confirm' && !resolveForm.providerReference.trim()) {
       flash('Укажите подтверждение провайдера');
       return;

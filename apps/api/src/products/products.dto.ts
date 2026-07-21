@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
@@ -199,8 +200,14 @@ export class ChangePriceDto {
   @ApiProperty({ minimum: 0, example: 119900, description: 'New price (сом)' })
   @IsInt() @Min(0) price!: number;
 
+  /**
+   * Причина обязана быть непустой: изменение цены выше порога уходит в
+   * согласование, и утверждающий видит только её. Пустая строка проходила
+   * `@IsString()` насквозь, и в инбоксе оказывалась заявка без единого слова о
+   * том, почему цену меняют.
+   */
   @ApiProperty({ example: 'подорожание у поставщика' })
-  @IsString() reason!: string;
+  @IsString() @IsNotEmpty() reason!: string;
 
   @ApiPropertyOptional({ example: 'senior_seller_azamat' })
   @IsOptional() @IsString() requester?: string;

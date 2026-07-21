@@ -102,7 +102,10 @@ export function HrView({ accessToken }: { accessToken: string }) {
 
   async function submitSchedule(event: FormEvent) {
     event.preventDefault();
-    if (!selectedStaff || !point.trim()) return;
+    // Молчаливый выход не отличить от зависшего запроса — оператор жал
+    // кнопку повторно, не понимая, что форма просто не заполнена.
+    if (!selectedStaff) { setMessage('Выберите сотрудника'); return; }
+    if (!point.trim()) { setMessage('Укажите точку'); return; }
     setBusy('schedule'); setMessage('');
     try {
       const localIso = (clock: string) => new Date(`${shiftDate}T${clock}:00+06:00`).toISOString();
@@ -129,7 +132,8 @@ export function HrView({ accessToken }: { accessToken: string }) {
 
   async function submitHandover(event: FormEvent) {
     event.preventDefault();
-    if (!sourceShiftId || !targetStaffId) return;
+    if (!sourceShiftId) { setMessage('Выберите передаваемую смену'); return; }
+    if (!targetStaffId) { setMessage('Выберите, кому передаётся смена'); return; }
     setBusy('handover'); setMessage('');
     try {
       await handoverHrShift(sourceShiftId, { toStaffId: targetStaffId, countedCash: Number(countedCash), reason: handoverReason.trim() || undefined }, accessToken);

@@ -83,7 +83,11 @@ export function StoreOperationsView({ accessToken }: Props) {
 
   async function submitIncident(event: FormEvent) {
     event.preventDefault();
-    if (!incidentTitle.trim() || !incidentDescription.trim() || !point.trim()) return;
+    // Молчаливый выход неотличим от зависшего запроса: инцидент не заводился
+    // и причина не называлась.
+    if (!point.trim()) { setMessage('Укажите точку'); return; }
+    if (!incidentTitle.trim()) { setMessage('Укажите заголовок инцидента'); return; }
+    if (!incidentDescription.trim()) { setMessage('Опишите инцидент'); return; }
     const fingerprint = `${point}:${date}:${incidentCategory}:${incidentSeverity}:${incidentTitle.trim()}:${incidentDescription.trim()}`;
     await run('incident-create', async () => {
       await createStoreIncident({ point: point.trim(), businessDate: date, category: incidentCategory.trim(), severity: incidentSeverity, title: incidentTitle.trim(), description: incidentDescription.trim() }, accessToken, keyFor('incident', fingerprint));
@@ -93,7 +97,7 @@ export function StoreOperationsView({ accessToken }: Props) {
 
   async function resolveIncident(event: FormEvent, incident: StoreIncident) {
     event.preventDefault();
-    if (!resolution.trim()) return;
+    if (!resolution.trim()) { setMessage('Опишите, как инцидент закрыт'); return; }
     await run(`resolve-${incident.id}`, () => resolveStoreIncident(incident.id, resolution.trim(), accessToken, keyFor('resolve', `${incident.id}:${resolution.trim()}`)));
     setResolving(null); setResolution('');
   }
