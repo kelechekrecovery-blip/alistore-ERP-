@@ -24,7 +24,7 @@ gate.
 
 ## Safe usage
 
-`npm run api:fuzz` requires a local API with `API_DOCS_ENABLED=true`; never aim
+`npm run api:fuzz` requires a local non-production API with Swagger enabled; never aim
 generative tests at production. `npm run perf:smoke` defaults to local ports and
 accepts `BASE_URL`, `API_URL`, `VUS`, and `DURATION` overrides.
 

@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
-import { setupOpenApi } from './openapi';
+import { setupOpenApi, shouldExposeOpenApi } from './openapi';
 import helmet from 'helmet';
 import { allowedHostsMiddleware, resolveCorsOptions, resolveHelmetOptions } from './config/runtime-security';
 import { assertProductionRuntimeReady } from './health/production-preflight';
@@ -21,7 +21,7 @@ async function bootstrap(): Promise<void> {
   );
   app.enableCors(resolveCorsOptions(env));
   app.use(helmet(resolveHelmetOptions(env)));
-  setupOpenApi(app, process.env.NODE_ENV !== 'production' || process.env.API_DOCS_ENABLED === 'true');
+  setupOpenApi(app, shouldExposeOpenApi());
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
   // eslint-disable-next-line no-console

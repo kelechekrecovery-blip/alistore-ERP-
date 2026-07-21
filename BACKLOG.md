@@ -2,6 +2,7 @@
 
 ## Web Audit Findings Added 2026-07-21
 - `WEB-AUDIT-061` High: public `/api/docs` and `/api/docs-json` are still reachable without staff authorization; production must either disable Swagger or protect it with active staff RBAC and add a regression test.
+- `WEB-AUDIT-061` source fix: production Swagger is now unconditionally disabled in `a9d7a1f` follow-up source; redeploy and public verification remain required before closing the finding.
 - `WEB-AUDIT-062` High: Web auth tokens remain browser-persisted in `localStorage`; plan an HttpOnly secure-cookie migration with CSRF protection and an explicit logout/session-revocation test before real customer traffic.
 - `WEB-AUDIT-063` Release: `https://ali.kg` currently depends on a workstation/Cloudflare tunnel process; complete Render immutable deployment, API origin health, Sentry, R2, backups and rollback before calling the site production-ready.
 - `WEB-AUDIT-064` UX: live public smoke is green for anonymous home/app/catalog → product at Chromium desktop/mobile checks; expand the same evidence to all route roles, cross-browser, accessibility and failure-state matrices.

@@ -5090,3 +5090,11 @@
 - Checks: Web unit `68/68`; Web production build with `45` routes; live Chromium smoke `3/3` for `/`, `/app`, and catalog → product; `git diff --check`.
 - Result: this public Web slice is accepted locally. The public process is still a workstation/tunnel demo rather than durable Render production; Swagger exposure, browser token storage, provider credentials, and physical/native gates remain open.
 - Next: validate the concurrent Evidence ownership slice, then address the highest-risk public API exposure and durable deployment blockers.
+
+## WEB-AUDIT-2026-07-21C
+
+- Scope: remove the production Swagger exposure escape hatch found on the public API.
+- Changes: Swagger/OpenAPI exposure is now strictly non-production; the legacy `API_DOCS_ENABLED=true` value cannot publish the API contract in production. Local and test environments retain Swagger for development and fuzzing.
+- Checks: API production build; focused OpenAPI/runtime-security tests `7/7`; `git diff --check`.
+- Result: the source-level production policy is accepted. The live API still needs redeployment and a post-deploy check because `api.ali.kg` was serving the previous behavior during audit.
+- Next: redeploy the API artifact through the protected Render pipeline, then validate docs `404`, health, host allowlist and CORS from the public domain.

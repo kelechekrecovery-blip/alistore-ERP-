@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { RuntimeEnvReader } from './config/runtime-security';
 
 const description = [
   'AliStore MVP backend contract.',
@@ -7,7 +8,11 @@ const description = [
   'or money must write audit events atomically in the same transaction.',
 ].join(' ');
 
-export function setupOpenApi(app: INestApplication, enabled = process.env.NODE_ENV !== 'production' || process.env.API_DOCS_ENABLED === 'true'): void {
+export function shouldExposeOpenApi(env: RuntimeEnvReader = (name) => process.env[name]): boolean {
+  return env('NODE_ENV') !== 'production';
+}
+
+export function setupOpenApi(app: INestApplication, enabled = shouldExposeOpenApi()): void {
   if (!enabled) return;
   const config = new DocumentBuilder()
     .setTitle('AliStore API')
