@@ -37,7 +37,7 @@ import { ServicePosPayment } from '@/components/pos/ServicePosPayment';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
   clearStaffSession,
-  loadStaffSession,
+  restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
 
@@ -73,7 +73,7 @@ export default function PosPage() {
   const [customerBusy, setCustomerBusy] = useState(false);
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
     setServiceWorkOrderId(new URLSearchParams(window.location.search).get('serviceWorkOrderId') ?? '');
   }, []);
 

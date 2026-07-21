@@ -1,14 +1,23 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
 import { CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
+import { RefreshDto } from '../auth/auth.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
+import {
+  clearStaffSessionCookies,
+  isStaffWebSessionRequest,
+  readWebCookie,
+  setStaffSessionCookies,
+  STAFF_REFRESH_COOKIE,
+} from '../auth/web-session';
 
 @Controller('staff-auth')
 export class StaffAuthController {
@@ -28,8 +37,34 @@ export class StaffAuthController {
   @Post('login')
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // anti brute-force on staff passwords
-  login(@Body() dto: StaffLoginDto) {
-    return this.staffAuth.login(dto.username, dto.password);
+  async login(@Body() dto: StaffLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.staffAuth.login(dto.username, dto.password);
+    if (isStaffWebSessionRequest(request)) setStaffSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    if (isStaffWebSessionRequest(request)) {
+      const { refreshToken: _refreshToken, ...safe } = tokens;
+      return safe;
+    }
+    return tokens;
+  }
+
+  @Post('refresh')
+  async refresh(@Body() dto: RefreshDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = dto.refreshToken?.trim() || readWebCookie(request, STAFF_REFRESH_COOKIE);
+    const tokens = await this.staffAuth.refresh(refreshToken ?? '');
+    if (isStaffWebSessionRequest(request)) setStaffSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    if (isStaffWebSessionRequest(request)) {
+      const { refreshToken: _refreshToken, ...safe } = tokens;
+      return safe;
+    }
+    return tokens;
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  async logout(@Body() dto: RefreshDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = dto.refreshToken?.trim() || readWebCookie(request, STAFF_REFRESH_COOKIE);
+    if (refreshToken) await this.staffAuth.logout(refreshToken);
+    if (isStaffWebSessionRequest(request)) clearStaffSessionCookies(response, process.env.NODE_ENV === 'production');
   }
 
   /**

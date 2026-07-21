@@ -16,7 +16,7 @@ import { ConsignmentOps } from '@/components/ConsignmentOps';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
   clearStaffSession,
-  loadStaffSession,
+  restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
 
@@ -45,7 +45,7 @@ export default function WarehousePage() {
   const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   const load = useCallback((s: Stage) => {

@@ -13,7 +13,7 @@ import {
 import { som } from '@/lib/format';
 import {
   clearStaffSession,
-  loadStaffSession,
+  restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
 
@@ -30,7 +30,7 @@ export default function CourierCashPage() {
   const handoverKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
     setRunId(new URLSearchParams(window.location.search).get('runId')?.trim() ?? '');
   }, []);
 

@@ -79,6 +79,44 @@ describe('Staff management guard (owner-only, casbin)', () => {
     expect(res.body.typ).toBe('staff');
   });
 
+  it('supports Web HttpOnly staff session rotation without returning refreshToken', async () => {
+    const username = `web-staff-${RUN}`;
+    await staffAuth.createStaff(username, 'pass', 'admin');
+    const server = app.getHttpServer();
+    const login = await request(server)
+      .post('/staff-auth/login')
+      .set('x-alistore-staff-web', '1')
+      .send({ username, password: 'pass' })
+      .expect(201);
+    expect(login.body).not.toHaveProperty('refreshToken');
+    const oldCookies = (login.headers['set-cookie'] as unknown as string[])
+      .map((cookie) => cookie.split(';', 1)[0])
+      .join('; ');
+    expect(oldCookies).toContain('alistore_staff_access=');
+    expect(oldCookies).toContain('alistore_staff_refresh=');
+    expect(oldCookies).toContain('alistore_staff_session_hint=1');
+
+    const rotated = await request(server)
+      .post('/staff-auth/refresh')
+      .set('x-alistore-staff-web', '1')
+      .set('Cookie', oldCookies)
+      .send({})
+      .expect(201);
+    expect(rotated.body).not.toHaveProperty('refreshToken');
+    await request(server)
+      .get('/staff-auth/me')
+      .set('x-alistore-staff-web', '1')
+      .set('Cookie', oldCookies)
+      .expect(200);
+
+    await request(server)
+      .post('/staff-auth/refresh')
+      .set('x-alistore-staff-web', '1')
+      .set('Cookie', oldCookies)
+      .send({})
+      .expect(422);
+  });
+
   it('bootstrap is refused once staff already exist', async () => {
     await login('owner'); // ensure at least one staff row exists
     await request(app.getHttpServer())

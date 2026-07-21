@@ -15,7 +15,7 @@ import {
   type CampaignRoi,
   type SegmentRules,
 } from '@/lib/api/campaigns';
-import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 import { ImageField } from './ImageField';
 
 const CHANNELS = ['sms', 'push', 'telegram', 'whatsapp'] as const;
@@ -66,7 +66,7 @@ export function CampaignsView() {
   }, [session]);
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
     setHydrated(true);
   }, []);
 

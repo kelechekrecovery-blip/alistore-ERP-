@@ -24,7 +24,7 @@ import { ApprovalList } from '@/components/approvals/ApprovalList';
 import { canPrintDocuments, canReadRefunds } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
-  loadStaffSession,
+  restoreStaffSession,
   saveStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -51,7 +51,7 @@ export default function ApprovalsPage() {
   const [resolveForm, setResolveForm] = useState({ refundId: '', action: 'confirm' as 'confirm' | 'cancel', reason: '', providerReference: '' });
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   const load = useCallback((status: string, token = session?.accessToken) => {

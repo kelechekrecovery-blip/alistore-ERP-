@@ -46,7 +46,7 @@ import { ServiceCenterView } from '@/components/erp/ServiceCenterView';
 import { StorefrontView } from '@/components/erp/StorefrontView';
 import { AdminView } from '@/components/erp/AdminView';
 import { StoreOperationsView } from '@/components/erp/StoreOperationsView';
-import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 import { erpRouteAllowed, staffCan, type ErpRoute } from '@/lib/staff-permissions';
 
 type Route = ErpRoute;
@@ -157,7 +157,7 @@ export default function ErpPage() {
   }
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   useEffect(() => {

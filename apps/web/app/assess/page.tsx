@@ -6,7 +6,7 @@ import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 import { assessUsed, type Valuation } from '@/lib/ai';
 import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const GRADES: { id: 'A' | 'B' | 'C'; label: string }[] = [
   { id: 'A', label: 'A · как новый' },
@@ -33,7 +33,7 @@ export default function AssessPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   useEffect(() => {

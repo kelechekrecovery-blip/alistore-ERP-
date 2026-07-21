@@ -9,7 +9,7 @@ import {
   type ProductDescription,
 } from '@/lib/ai';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 interface AttrRow {
   key: string;
@@ -51,7 +51,7 @@ export default function AiToolsPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   function setRow(i: number, patch: Partial<AttrRow>) {

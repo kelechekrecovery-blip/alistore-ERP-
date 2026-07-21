@@ -15,7 +15,7 @@ import {
 import { som } from '@/lib/format';
 import { LoadFailure } from '@/components/LoadFailure';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
+import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const METHODS = [
   { id: 'cash', name: 'Наличные' },
@@ -39,7 +39,7 @@ export default function ExchangePage() {
   const exchangeKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
     setHydrated(true);
     fetchCatalog({ limit: 100, stockOnly: true }).then((c) => { if (isCatalogUnavailable(c)) throw new Error('Каталог не ответил'); setProducts(c.items); setLoadError(''); }).catch((cause: unknown) => {
       // Пустой список в этом select читается как «менять не на что». Это не так:

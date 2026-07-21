@@ -1,7 +1,8 @@
-import { postAuthJson, postJson } from './http';
+import { API_BASE, getJson, postAuthJson, postJson } from './http';
 
 export interface StaffLoginResult {
   accessToken: string;
+  refreshToken?: string;
   staffId: string;
   username: string;
   role: string;
@@ -23,7 +24,24 @@ export interface StaffTotpSetupResult {
 }
 
 export function staffLogin(username: string, password: string): Promise<StaffLoginResult> {
-  return postJson('/staff-auth/login', { username, password });
+  return postJson('/staff-auth/login', { username, password }, { 'x-alistore-staff-web': '1' }, true);
+}
+
+export function staffAuthRefresh(): Promise<StaffLoginResult> {
+  return postJson('/staff-auth/refresh', {}, { 'x-alistore-staff-web': '1' }, true);
+}
+
+export async function staffAuthLogout(): Promise<void> {
+  await fetch(`${API_BASE}/staff-auth/logout`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-alistore-staff-web': '1' },
+    credentials: 'include',
+    body: '{}',
+  }).catch(() => undefined);
+}
+
+export function staffAuthMe(accessToken: string): Promise<StaffPublicProfile> {
+  return getJson('/staff-auth/me', accessToken);
 }
 
 export function staffTotpSetup(accessToken: string): Promise<StaffTotpSetupResult> {

@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, Role, StaffUser } from '@prisma/client';
+import { createHash, randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
@@ -10,12 +11,16 @@ import { EventType } from '../audit/event-types';
 
 export interface StaffTokens {
   accessToken: string;
+  refreshToken: string;
   staffId: string;
   username: string;
   role: Role;
   point: string;
   totpEnabled: boolean;
 }
+
+const STAFF_REFRESH_PREFIX = 'staff:';
+const STAFF_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Staff authentication. Login issues a JWT that carries the staff role, so
@@ -66,18 +71,66 @@ export class StaffAuthService {
         'Неверный логин или пароль',
       );
     }
+    return this.issueTokens(staff);
+  }
+
+  async refresh(refreshToken: string): Promise<StaffTokens> {
+    const tokenHash = this.hashToken(refreshToken);
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new ValidationError('staff_refresh_invalid', 'Staff-сессия недействительна');
+      const record = await tx.refreshToken.findUnique({ where: { tokenHash } });
+      if (!record || record.expiresAt < new Date() || !record.customerId.startsWith(STAFF_REFRESH_PREFIX)) {
+        throw new ValidationError('staff_refresh_invalid', 'Staff-сессия недействительна');
+      }
+      if (record.revokedAt) {
+        await tx.refreshToken.updateMany({ where: { customerId: record.customerId, revokedAt: null }, data: { revokedAt: new Date() } });
+        return { kind: 'reused' as const };
+      }
+      await tx.refreshToken.update({ where: { id: record.id }, data: { revokedAt: new Date() } });
+      const staff = await tx.staffUser.findUnique({ where: { id: record.customerId.slice(STAFF_REFRESH_PREFIX.length) } });
+      if (!staff?.active) throw new ValidationError('staff_inactive', 'Сотрудник деактивирован');
+      return { kind: 'rotated' as const, tokens: await this.issueTokens(staff, tx) };
+    });
+    if (outcome.kind === 'reused') throw new ValidationError('staff_refresh_reused', 'Повторное использование staff-сессии — вход выполнен заново');
+    return outcome.tokens;
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({ where: { tokenHash: this.hashToken(refreshToken), revokedAt: null }, data: { revokedAt: new Date() } });
+  }
+
+  private async issueTokens(
+    staff: StaffUser,
+    db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
+  ): Promise<StaffTokens> {
     const accessToken = await this.jwt.signAsync(
       { sub: staff.id, role: staff.role, typ: 'staff' },
-      { expiresIn: '8h' },
+      { expiresIn: '15m' },
     );
+    const refreshToken = randomBytes(32).toString('base64url');
+    await db.refreshToken.create({
+      data: {
+        customerId: `${STAFF_REFRESH_PREFIX}${staff.id}`,
+        tokenHash: this.hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + STAFF_REFRESH_TTL_MS),
+      },
+    });
     return {
       accessToken,
+      refreshToken,
       staffId: staff.id,
       username: staff.username,
       role: staff.role,
       point: staff.point,
       totpEnabled: staff.totpEnabled,
     };
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   /** Current staff profile for session refresh / UI gates. */

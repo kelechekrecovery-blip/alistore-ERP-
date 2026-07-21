@@ -43,6 +43,7 @@ import { canCreateDebt, canIssueGiftCard, canPayDebt, canPrintDocuments, canPrin
 import {
   clearStaffSession,
   loadStaffSession,
+  restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
 
@@ -116,7 +117,7 @@ export default function StaffPage() {
   const [absenceForm, setAbsenceForm] = useState({ type: 'annual_leave' as HrAbsenceType, startsOn: '', endsOn: '', reason: '' });
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   useEffect(() => {

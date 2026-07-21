@@ -5152,6 +5152,14 @@
 - Result: the complete local Web route inventory is green across anonymous, protected-shell redirect, and system endpoint checks. Staff/ERP localStorage sessions, live deployment HTTP 530, provider credentials, staging and native/physical gates remain open.
 - Next: migrate Staff/ERP sessions to the same protected browser contract, then run the full Web security/E2E gate against a deployed origin.
 
+## WEB-AUDIT-2026-07-21M
+
+- Scope: migrate Staff/ERP/POS/Courier Web sessions off persistent JWT storage.
+- Changes: staff auth now issues a short-lived access JWT plus a rotating hashed refresh record bound to `staff:<id>`; Web login/refresh/logout use separate HttpOnly cookies, a non-secret session hint and explicit staff Web marker; JWT strategy reads the staff cookie only for that marker; active staff is revalidated on refresh and restore. All service pages restore asynchronously; dev-only localStorage fixtures remain available for deterministic E2E, never production.
+- Checks: API build; Web production build with `45` routes; Web unit tests `68/68`; staff auth/RBAC integration `4/4`; Staff Chromium UI `2/2`; isolated Chromium route audit `46/46`; `git diff --check`.
+- Result: the local browser session-storage finding is closed for customer and staff Web surfaces. Native bearer clients remain compatible. Public deployment remains unavailable (`ali.kg` and API HTTP `530`), so no production readiness claim is made.
+- Next: commit this vertical, then address the durable public deployment/origin outage and run post-deploy health/CORS/host/security checks.
+
 ## COURIER-WEB-2026-07-21H
 
 - Scope: accept the Web Courier operational surface.

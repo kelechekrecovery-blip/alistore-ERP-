@@ -16,7 +16,7 @@ import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { canManageRefunds, canReadRefunds, canRetryRefund } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
-  loadStaffSession,
+  restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
 
@@ -49,7 +49,7 @@ export default function RefundsPage() {
   const [resolveForm, setResolveForm] = useState({ id: '', action: 'confirm' as 'confirm' | 'cancel', reason: '', providerReference: '' });
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
   }, []);
 
   function flash(message: string) {

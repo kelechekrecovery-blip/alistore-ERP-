@@ -36,7 +36,7 @@ import {
 import { som } from '@/lib/format';
 import {
   clearStaffSession,
-  loadStaffSession,
+  restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
 
@@ -59,7 +59,7 @@ export default function CourierPage() {
   const requestVersion = useRef(0);
 
   useEffect(() => {
-    setSession(loadStaffSession());
+    void restoreStaffSession().then(setSession);
     const updateOnline = () => setOnline(window.navigator.onLine);
     updateOnline();
     window.addEventListener('online', updateOnline);
