@@ -5160,6 +5160,15 @@
 - Result: the local browser session-storage finding is closed for customer and staff Web surfaces. Native bearer clients remain compatible. Public deployment remains unavailable (`ali.kg` and API HTTP `530`), so no production readiness claim is made.
 - Next: commit this vertical, then address the durable public deployment/origin outage and run post-deploy health/CORS/host/security checks.
 
+## WEB-AUDIT-2026-07-21N
+
+- Scope: full Web availability and route recheck after the Staff/ERP cookie-session migration.
+- Checks: `E2E_REUSE_EXISTING_SERVER=true npm run web:route-audit` passed `46/46` in `3.2m`; coverage included anonymous storefront, protected customer-shell redirects, Staff/ERP/POS/Warehouse pages, `/healthz`, Apple/Android association files, `robots.txt` and `sitemap.xml`. `render.yaml` parses successfully and is present on `origin/main`; `git diff --check` remains clean for tracked changes.
+- Public smoke: `https://ali.kg/`, `https://admin.ali.kg/`, `https://api.ali.kg/api/health/live` and `/ready` all return Cloudflare `530`, error `1033`. This is an origin/tunnel availability failure, not a Next.js route failure.
+- Gate blockers: `mvp:verify` requires explicit `ALISTORE_TEST_DATABASE_CONFIRMED=1` before its destructive test reset; `ecosystem:audit:strict` rejects the current environment because `scripts/ecosystem-toolchain-lock.json` no longer matches `package-lock.json`.
+- Result: local Web route surface is green for the covered matrix; public availability and full release certification are not claimed.
+- Next: restore/deploy the Render origin or managed tunnel, run post-deploy health/CORS/Host/Swagger/demo smoke, then refresh the trusted toolchain lock only in a controlled reproducible environment.
+
 ## COURIER-WEB-2026-07-21H
 
 - Scope: accept the Web Courier operational surface.
