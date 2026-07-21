@@ -18,8 +18,13 @@ const DEFAULT_TERM_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_REMINDER_DAYS = 3;
 const DEFAULT_REMINDER_LIMIT = 100;
+// Свип пишет уведомление и строку outbox на каждый долг: при лимите в 100 это
+// сотни запросов в одной транзакции, и дефолтных 5 секунд не хватает.
+const REMINDER_SWEEP_TIMEOUT_MS = 30_000;
+const REMINDER_SWEEP_MAX_WAIT_MS = 10_000;
 
 type DebtReminderKind = 'debt_due_soon' | 'debt_overdue';
+const REMINDER_KINDS: readonly DebtReminderKind[] = ['debt_due_soon', 'debt_overdue'];
 
 /**
  * Sale on credit / installments. A debt within the limit is booked directly; a debt
@@ -259,15 +264,34 @@ export class DebtsService {
       const events: AuditInput[] = [];
       let queued = 0;
 
+      // Дедупликация одним запросом вместо одного на долг. При лимите в 100
+      // долгов цикл делал до сотни последовательных `findFirst` внутри одной
+      // транзакции — вместе с проверкой согласия это до четырёхсот round-trip
+      // при дефолтном таймауте Prisma в 5 секунд: свип отваливался целиком, и
+      // ни одно напоминание не уходило.
+      const debtIds = new Set(debts.map((debt) => debt.id));
+      const queuedEvents = await tx.auditEvent.findMany({
+        where: {
+          type: EventType.DebtReminderQueued,
+          refs: { hasSome: [...debtIds] },
+        },
+        select: { refs: true },
+      });
+      // Ключ строится только по ссылкам, которые действительно являются id
+      // долгов из этой выборки: в `refs` лежат ещё orderId и customerId, и
+      // мешать их в один ключ означало бы сверять долг с чужой сущностью.
+      const alreadyQueuedKeys = new Set(
+        queuedEvents.flatMap((event) => {
+          const kinds = REMINDER_KINDS.filter((kind) => event.refs.includes(kind));
+          return event.refs
+            .filter((ref) => debtIds.has(ref))
+            .flatMap((ref) => kinds.map((kind) => `${ref}:${kind}`));
+        }),
+      );
+
       for (const debt of debts) {
         const kind: DebtReminderKind = debt.dueDate.getTime() <= now.getTime() ? 'debt_overdue' : 'debt_due_soon';
-        const alreadyQueued = await tx.auditEvent.findFirst({
-          where: {
-            type: EventType.DebtReminderQueued,
-            refs: { hasEvery: [debt.id, kind] },
-          },
-        });
-        if (alreadyQueued) continue;
+        if (alreadyQueuedKeys.has(`${debt.id}:${kind}`)) continue;
 
         const daysUntilDue = Math.ceil((debt.dueDate.getTime() - now.getTime()) / DAY_MS);
         const queuedNotice = await enqueueConsentedCustomerNotice(tx, this.outbox, {
@@ -301,6 +325,6 @@ export class DebtsService {
       }
 
       return { result: { considered: debts.length, queued }, events };
-    });
+    }, { timeout: REMINDER_SWEEP_TIMEOUT_MS, maxWait: REMINDER_SWEEP_MAX_WAIT_MS });
   }
 }

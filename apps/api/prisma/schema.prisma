@@ -2684,6 +2684,12 @@ model AuditEvent {
 
   @@index([type])
   @@index([actor])
+  // Кокпит ERP открывает ленту событий без фильтра: `orderBy ts desc, take 50`
+  // по пустому where — то есть полный проход append-only таблицы с сортировкой
+  // при каждом открытии. Индекс по ts превращает это в чтение 50 строк.
+  @@index([ts])
+  // Та же лента с фильтром по типу (`where.type` + сортировка по ts).
+  @@index([type, ts])
   @@index([refs], type: Gin) // array-containment (has/hasEvery) needs GIN, not B-tree
 }
 

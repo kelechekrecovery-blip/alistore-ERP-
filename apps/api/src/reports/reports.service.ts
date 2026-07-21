@@ -114,11 +114,31 @@ export class ReportsService {
   }
 
   private async soldCogs(): Promise<number> {
-    const soldUnits = await this.prisma.deviceUnit.findMany({
+    // Раньше здесь грузился КАЖДЫЙ когда-либо проданный юнит (`findMany` по
+    // всем `status: 'sold'`), и сумма считалась в памяти: объём ответа рос
+    // линейно с историей продаж, а зовётся это на каждом открытии дашборда и
+    // KPI. Группировка по товару даёт тот же результат, но объём ответа — по
+    // числу товаров, а не проданных штук.
+    //
+    // Период сюда сознательно НЕ вводится: выручка на обоих экранах-потребителях
+    // считается за всё время, и урезание одной лишь себестоимости сделало бы
+    // маржу «период против всей истории» — ровно то расхождение, которое здесь
+    // однажды уже чинили.
+    const soldByProduct = await this.prisma.deviceUnit.groupBy({
+      by: ['productId'],
       where: { status: 'sold' },
-      select: { product: { select: { cost: true } } },
+      _count: { _all: true },
     });
-    return soldUnits.reduce((sum, unit) => sum + (unit.product?.cost ?? 0), 0);
+    if (soldByProduct.length === 0) return 0;
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: soldByProduct.map((row) => row.productId) } },
+      select: { id: true, cost: true },
+    });
+    const costById = new Map(products.map((product) => [product.id, product.cost]));
+    return soldByProduct.reduce(
+      (sum, row) => sum + (costById.get(row.productId) ?? 0) * row._count._all,
+      0,
+    );
   }
 
   /** Journal rows shaped like payments so revenue bucketing can merge them. */
