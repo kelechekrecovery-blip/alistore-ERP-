@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createAdminProduct,
   fetchAdminProducts,
+  importProductsExcel,
+  type ImportProductsResult,
   requestProductArchive,
   requestProductPriceChange,
   updateAdminProduct,
@@ -35,6 +37,8 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
   const [toast, setToast] = useState('');
   const [priceDraft, setPriceDraft] = useState('');
   const [priceReason, setPriceReason] = useState('изменение закупочной цены');
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<ImportProductsResult | null>(null);
   const [archiveReason, setArchiveReason] = useState('снят с продажи');
   const loadRequest = useRef(0);
 
@@ -42,6 +46,21 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
     () => products.find((product) => product.id === selectedId) ?? null,
     [products, selectedId],
   );
+
+  async function runImport(file: File) {
+    setImporting(true);
+    setImportReport(null);
+    try {
+      const report = await importProductsExcel(file, accessToken);
+      setImportReport(report);
+      flash(`Импорт: +${report.created} новых, ${report.updated} обновлено`);
+      await load();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Импорт не удался');
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function flash(message: string) {
     setToast(message);
@@ -217,6 +236,44 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
   }
 
   return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-[8px] border border-surface-3 bg-ink-dark px-4 py-3">
+        <div className="text-sm text-subtle">
+          Заводите товары по одному справа — или загрузите весь ассортимент из Excel.
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href="/product-import-template.csv"
+            download
+            className="rounded-[9px] border border-surface-3 px-3.5 py-2 text-xs font-semibold text-bright hover:text-white"
+          >
+            ↓ Шаблон
+          </a>
+          <label className="cursor-pointer rounded-[9px] bg-lime px-3.5 py-2 text-xs font-bold text-lime-ink hover:brightness-110">
+            {importing ? 'Импорт…' : '↑ Импорт Excel'}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              disabled={importing}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void runImport(file);
+              }}
+            />
+          </label>
+        </div>
+      </div>
+      {importReport && (
+        <div className="rounded-[8px] border border-surface-3 bg-surface px-4 py-3 text-[13px] text-bright">
+          Создано {importReport.created}, обновлено {importReport.updated}, без изменений {importReport.unchanged}.
+          {importReport.errors.length > 0 && (
+            <span className="text-danger-soft"> Ошибок: {importReport.errors.length} (строки {importReport.errors.slice(0, 5).map((err) => err.row).join(', ')}
+              {importReport.errors.length > 5 ? '…' : ''}).</span>
+          )}
+        </div>
+      )}
     <div
       data-testid="erp-product-management"
       className="relative grid min-h-[620px] overflow-hidden rounded-[8px] border border-surface-3 bg-ink-dark lg:grid-cols-[minmax(300px,360px)_1fr]"
@@ -258,6 +315,7 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
           {toast}
         </div>
       )}
+    </div>
     </div>
   );
 }

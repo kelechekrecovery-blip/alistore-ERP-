@@ -47,6 +47,11 @@ export class StaffAuthService {
   }
 
   /** Bootstrap the first owner (only when no staff exist yet — chicken-and-egg). */
+  /** Нужна ли первичная настройка — есть ли хоть одна учётка. */
+  async needsBootstrap(): Promise<boolean> {
+    return (await this.prisma.staffUser.count()) === 0;
+  }
+
   async bootstrapOwner(username: string, password: string) {
     const count = await this.prisma.staffUser.count();
     if (count > 0) {

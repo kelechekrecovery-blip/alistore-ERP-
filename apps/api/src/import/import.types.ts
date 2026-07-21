@@ -4,6 +4,7 @@ export interface ParsedProductRow {
   price: number;
   cost: number;
   category: string;
+  trackingMode: 'quantity' | 'serialized';
 }
 
 export interface ImportRowError {

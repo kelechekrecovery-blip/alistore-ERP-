@@ -222,7 +222,15 @@ export function receiveQuantityInventory(
   quantity: number,
   accessToken: string,
 ): Promise<ReceiveQuantityResult> {
-  return postAuthJson('/inventory/receive-quantity', { productId, location, quantity }, accessToken);
+  // idempotencyKey обязателен на сервере (защита от двойного оприходования).
+  // Без него запрос резался ValidationPipe и вся приёмка количественного
+  // товара падала с 400 — регрессия после того, как ключ стал обязательным.
+  // Соседний transferQuantity его давно шлёт.
+  return postAuthJson(
+    '/inventory/receive-quantity',
+    { idempotencyKey: crypto.randomUUID(), productId, location, quantity },
+    accessToken,
+  );
 }
 
 export function requestInventoryMovement(

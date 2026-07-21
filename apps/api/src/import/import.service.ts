@@ -9,6 +9,20 @@ import { ImportResult, ImportRowError, ParsedProductRow } from './import.types';
 const REQUIRED = ['sku', 'name', 'price', 'cost', 'category'] as const;
 
 /**
+ * Синонимы заголовков. Файл владельца называет колонки по-русски; раньше импорт
+ * матчил только латинские и падал с missing_columns. Ключ — каноническое имя,
+ * значения — что может стоять в шапке (lowercase).
+ */
+const HEADER_ALIASES: Record<string, string[]> = {
+  sku: ['sku', 'артикул', 'код'],
+  name: ['name', 'наименование', 'название', 'товар'],
+  price: ['price', 'цена', 'розница'],
+  cost: ['cost', 'себестоимость', 'закуп', 'закупка'],
+  category: ['category', 'категория', 'раздел'],
+  tracking_mode: ['tracking_mode', 'trackingmode', 'учёт', 'учет', 'тип учёта', 'тип учета'],
+};
+
+/**
  * Launch-time data migration — import products from an Excel file (Roadmap:
  * «Импорт данных из Excel/тетради»). Header row maps columns by name in any
  * order; rows upsert by SKU so re-imports are safe. Prices are whole сом (Int).
@@ -37,11 +51,18 @@ export class ImportService {
       throw new ValidationError('empty_workbook', 'Пустой файл Excel');
     }
 
-    const col: Record<string, number> = {};
+    // Заголовки резолвятся через синонимы: латинское каноническое имя ← любой
+    // из его алиасов, встреченный в шапке (в т.ч. русский).
+    const raw: Record<string, number> = {};
     ws.getRow(1).eachCell((cell, c) => {
       const header = String(cell.value ?? '').trim().toLowerCase();
-      if (header) col[header] = c;
+      if (header) raw[header] = c;
     });
+    const col: Record<string, number> = {};
+    for (const [canonical, aliases] of Object.entries(HEADER_ALIASES)) {
+      const hit = aliases.find((alias) => raw[alias] !== undefined);
+      if (hit) col[canonical] = raw[hit];
+    }
     const missing = REQUIRED.filter((h) => !col[h]);
     if (missing.length) {
       throw new ValidationError(
@@ -68,7 +89,14 @@ export class ImportService {
         });
         continue;
       }
-      rows.push({ sku, name, price, cost, category });
+      // По умолчанию количественный: схема ставит serialized, из-за чего
+      // аксессуары попадали в IMEI-учёт и их нельзя было оприходовать
+      // количеством. Серийный товар заводится явным tracking_mode.
+      const rawMode = col.tracking_mode ? this.str(row.getCell(col.tracking_mode).value).toLowerCase() : '';
+      const trackingMode = rawMode === 'serialized' || rawMode === 'серийный' || rawMode === 'imei'
+        ? 'serialized'
+        : 'quantity';
+      rows.push({ sku, name, price, cost, category, trackingMode });
     }
     return { rows, errors };
   }
@@ -96,6 +124,7 @@ export class ImportService {
               price: p.price,
               cost: p.cost,
               category: p.category,
+              trackingMode: p.trackingMode,
               attrs: {},
             },
           });

@@ -21,7 +21,7 @@ import {
 } from './inventory.dto';
 import { transferQuantityConsignmentOnTx } from './consignment-accounting';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
-import { transferQuantityValuationOnTx } from './inventory-valuation';
+import { adjustQuantityValuationOnTx, transferQuantityValuationOnTx } from './inventory-valuation';
 import { inventoryValuationRollForward } from './inventory-roll-forward';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
@@ -994,6 +994,28 @@ export class InventoryService {
           reason: `counted ${dto.counted} vs expected ${expected}`,
         },
       });
+      // Для количественного товара инвентаризация приводит остаток к
+      // пересчитанному — иначе `count` был холостым: писал движение и событие,
+      // но `onHand` не трогал, и склад после пересчёта «с нуля» оставался пуст.
+      // Для серийного товара расхождение означает пропажу/излишек конкретных
+      // IMEI и требует ручного разбора — там остаток не правим, только сигнал.
+      if (product.trackingMode === 'quantity' && diff !== 0) {
+        const balance = await tx.inventoryBalance.upsert({
+          where: { productId_location: { productId: dto.productId, location: dto.location } },
+          create: { productId: dto.productId, location: dto.location, onHand: dto.counted },
+          update: { onHand: dto.counted },
+        });
+        await adjustQuantityValuationOnTx(tx, {
+          movementId: movement.id,
+          productId: dto.productId,
+          balanceId: balance.id,
+          location: dto.location,
+          quantityDelta: diff,
+          unitCost: product.cost,
+          actor,
+          sourceType: 'inventory.adjustment',
+        });
+      }
       return {
         result: { productId: dto.productId, location: dto.location, expected, counted: dto.counted, diff, movementId: movement.id },
         events: [

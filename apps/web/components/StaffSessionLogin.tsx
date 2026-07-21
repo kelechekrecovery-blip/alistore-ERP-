@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { staffLogin } from '@/lib/api';
+import { staffBootstrapNeeded, staffBootstrapOwner, staffLogin } from '@/lib/api';
 import { saveStaffSession, type StaffSession } from '@/lib/staff-session';
 
 export function StaffSessionLogin({
@@ -19,18 +19,29 @@ export function StaffSessionLogin({
   const [form, setForm] = useState({ username: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // При пустой базе (seed не создаёт учёток) показываем создание первого
+  // владельца вместо тупика на форме логина. null — статус ещё неизвестен.
+  const [needsBootstrap, setNeedsBootstrap] = useState<boolean | null>(null);
   const dark = mode === 'dark';
+
+  useEffect(() => {
+    let active = true;
+    staffBootstrapNeeded().then((needed) => { if (active) setNeedsBootstrap(needed); });
+    return () => { active = false; };
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const session = await staffLogin(form.username.trim(), form.password);
+      const session = needsBootstrap
+        ? await staffBootstrapOwner(form.username.trim(), form.password)
+        : await staffLogin(form.username.trim(), form.password);
       saveStaffSession(session);
       onAuthenticated(session);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка входа');
+      setError(err instanceof Error ? err.message : needsBootstrap ? 'Не удалось создать владельца' : 'Ошибка входа');
     } finally {
       setBusy(false);
     }
@@ -45,9 +56,11 @@ export function StaffSessionLogin({
           : 'w-full max-w-sm rounded-card border border-ink/10 bg-white p-6 text-ink shadow-soft'
       }
     >
-      <div className="font-display text-xl font-bold">{title}</div>
+      <div className="font-display text-xl font-bold">{needsBootstrap ? 'Создание владельца' : title}</div>
       <div className={dark ? 'mt-1 text-sm text-subtle' : 'mt-1 text-sm text-ink/55'}>
-        {caption}
+        {needsBootstrap
+          ? 'В системе ещё нет сотрудников. Придумайте логин и пароль владельца (не короче 8 символов) — это первый и единственный раз.'
+          : caption}
       </div>
       <input
         value={form.username}
@@ -65,7 +78,7 @@ export function StaffSessionLogin({
         onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))}
         placeholder="password"
         type="password"
-        autoComplete="current-password"
+        autoComplete={needsBootstrap ? 'new-password' : 'current-password'}
         className={
           dark
             ? 'mt-3 w-full rounded-[11px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime'
@@ -82,7 +95,7 @@ export function StaffSessionLogin({
             : 'mt-4 rounded-btn bg-ink px-5 py-3 text-sm font-semibold text-sand disabled:opacity-50'
         }
       >
-        {busy ? 'Входим…' : 'Войти'}
+        {busy ? (needsBootstrap ? 'Создаём…' : 'Входим…') : needsBootstrap ? 'Создать владельца' : 'Войти'}
       </button>
     </form>
   );

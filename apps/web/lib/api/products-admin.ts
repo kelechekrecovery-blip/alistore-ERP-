@@ -1,4 +1,4 @@
-import { deleteAuthJson, getJson, patchAuthJson, postAuthJson } from './http';
+import { API_BASE, ApiError, deleteAuthJson, getJson, patchAuthJson, postAuthJson } from './http';
 
 export interface AdminProduct {
   id: string;
@@ -99,4 +99,39 @@ export function requestProductArchive(
   accessToken: string,
 ): Promise<ApprovalRequestResult> {
   return deleteAuthJson(`/products/${encodeURIComponent(id)}`, input, accessToken);
+}
+
+export interface ImportProductsResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  errors: { row: number; sku: string; message: string }[];
+}
+
+/**
+ * Массовый импорт товаров из Excel. Эндпоинт существовал, но не был доступен из
+ * интерфейса — 200 позиций приходилось вбивать формой по одной. Multipart
+ * `file`, права products:create (admin/owner).
+ */
+export async function importProductsExcel(file: File, accessToken: string): Promise<ImportProductsResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/import/products`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  if (!res.ok) {
+    let message = `Импорт не удался (${res.status})`;
+    try {
+      const payload = (await res.json()) as { message?: string };
+      if (payload.message) message = payload.message;
+    } catch {
+      // не-JSON тело (прокси-ошибка) оставляет текст по умолчанию
+    }
+    if (res.status === 403) message = 'Импорт доступен только владельцу и администратору';
+    if (res.status === 401) message = 'Сессия истекла — войдите снова';
+    throw new ApiError(res.status, message);
+  }
+  return (await res.json()) as ImportProductsResult;
 }

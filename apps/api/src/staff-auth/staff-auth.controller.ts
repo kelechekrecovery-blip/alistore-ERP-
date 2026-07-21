@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
-import { CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
+import { BootstrapOwnerDto, CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
 import { RefreshDto } from '../auth/auth.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
@@ -23,11 +23,17 @@ import {
 export class StaffAuthController {
   constructor(private readonly staffAuth: StaffAuthService) {}
 
+  /** Есть ли уже персонал — веб решает, показать логин или форму первого владельца. */
+  @Get('bootstrap-status')
+  async bootstrapStatus() {
+    return { needsBootstrap: await this.staffAuth.needsBootstrap() };
+  }
+
   /** One-time bootstrap of the first owner (only when no staff exist yet). */
   @Post('bootstrap')
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  async bootstrap(@Body() dto: StaffLoginDto) {
+  async bootstrap(@Body() dto: BootstrapOwnerDto) {
     return this.publicView(
       await this.staffAuth.bootstrapOwner(dto.username, dto.password),
     );

@@ -19,13 +19,18 @@ describe('ImportService (exceljs)', () => {
   });
 
   afterAll(async () => {
+    await prisma.product.deleteMany({ where: { sku: { startsWith: 'SKU-' } } });
     await prisma.$disconnect();
   });
 
   async function xlsx(rows: (string | number)[][]): Promise<Buffer> {
+    return xlsxWithHeader(['sku', 'name', 'price', 'cost', 'category'], rows);
+  }
+
+  async function xlsxWithHeader(header: (string | number)[], rows: (string | number)[][]): Promise<Buffer> {
     const wb = new Workbook();
     const ws = wb.addWorksheet('products');
-    ws.addRow(['sku', 'name', 'price', 'cost', 'category']);
+    ws.addRow(header);
     rows.forEach((r) => ws.addRow(r));
     return Buffer.from(await wb.xlsx.writeBuffer());
   }
@@ -84,5 +89,42 @@ describe('ImportService (exceljs)', () => {
     const err = await importer.importProducts(buf).catch((e) => e);
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('missing_columns');
+  });
+
+  /**
+   * Русская шапка. Файл владельца называет колонки «Артикул / Наименование /
+   * Цена / Себестоимость / Категория», а импорт матчил только латинские
+   * заголовки и падал с missing_columns.
+   */
+  it('принимает русские заголовки колонок', async () => {
+    const buf = await xlsxWithHeader(
+      ['Артикул', 'Наименование', 'Цена', 'Себестоимость', 'Категория'],
+      [[`SKU-RU-${RUN}-1`, 'Наушники', 3000, 1800, 'accessories']],
+    );
+    const res = await importer.importProducts(buf);
+    expect(res.created).toBe(1);
+    const p = await prisma.product.findUnique({ where: { sku: `SKU-RU-${RUN}-1` } });
+    expect(p?.name).toBe('Наушники');
+  });
+
+  /**
+   * По умолчанию импортированный товар — количественный. Схема ставит
+   * `serialized`, и аксессуары попадали в IMEI-учёт: их нельзя было оприходовать
+   * количеством. Колонка tracking_mode позволяет явно завести серийный товар.
+   */
+  it('импортирует товар как количественный по умолчанию и уважает tracking_mode', async () => {
+    const buf = await xlsxWithHeader(
+      ['sku', 'name', 'price', 'cost', 'category', 'tracking_mode'],
+      [
+        [`SKU-TM-${RUN}-q`, 'Кабель', 500, 200, 'accessories', ''],
+        [`SKU-TM-${RUN}-s`, 'iPhone', 100000, 80000, 'phones', 'serialized'],
+      ],
+    );
+    const res = await importer.importProducts(buf);
+    expect(res.created).toBe(2);
+    const accessory = await prisma.product.findUniqueOrThrow({ where: { sku: `SKU-TM-${RUN}-q` } });
+    const phone = await prisma.product.findUniqueOrThrow({ where: { sku: `SKU-TM-${RUN}-s` } });
+    expect(accessory.trackingMode).toBe('quantity');
+    expect(phone.trackingMode).toBe('serialized');
   });
 });

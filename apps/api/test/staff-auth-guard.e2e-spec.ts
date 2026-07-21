@@ -121,7 +121,32 @@ describe('Staff management guard (owner-only, casbin)', () => {
     await login('owner'); // ensure at least one staff row exists
     await request(app.getHttpServer())
       .post('/staff-auth/bootstrap')
-      .send({ username: `boot-${RUN}`, password: 'p' })
+      .send({ username: `boot-${RUN}`, password: 'owner-strong-pass' })
       .expect(422);
+  });
+
+  /**
+   * Первый вход владельца: seed не создаёт ни одной учётки, и веб должен уметь
+   * спросить, нужна ли первичная настройка, чтобы показать форму «создать
+   * владельца» вместо тупика на форме логина. Без этого статуса единственный
+   * путь — недокументированный curl.
+   */
+  it('bootstrap-status сообщает, есть ли уже персонал', async () => {
+    // К этому моменту owner уже создан предыдущим тестом.
+    const res = await request(app.getHttpServer())
+      .get('/staff-auth/bootstrap-status')
+      .expect(200);
+    expect(res.body).toMatchObject({ needsBootstrap: false });
+  });
+
+  /**
+   * Пароль владельца без минимальной длины — пароль «1» проходил. На публичном
+   * маршруте создания первого владельца это особенно опасно.
+   */
+  it('bootstrap отвергает слишком короткий пароль', async () => {
+    await request(app.getHttpServer())
+      .post('/staff-auth/bootstrap')
+      .send({ username: `boot-weak-${RUN}`, password: '1' })
+      .expect(422); // глобальный ValidationPipe отдаёт 422 на нарушение DTO
   });
 });
