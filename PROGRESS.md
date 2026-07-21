@@ -5113,3 +5113,10 @@
 - Changes: API image now installs PostgreSQL 16 client for backups and declares the default Render port; Web image has explicit build-time API/site/demo arguments; Docker context excludes generated Next build directories and courier build artifacts.
 - Checks: API Docker image `alistore-api-audit:local` built successfully; Web Docker image `alistore-web-audit:local` built successfully with `https://api.ali.kg/api` and demo mode; Web production build generated `45` routes.
 - Result: local image build is accepted. Render deployment, registry provenance, health probes and rollback remain external gates.
+
+## FIN-AUDIT-2026-07-21F
+
+- Scope: reconcile gift-card issuance with the accounting journal.
+- Changes: gift-card issue now atomically posts cash debit 1000 and gift-card liability credit 2300; duplicate issuance cannot duplicate the journal entry.
+- Checks: gift-card suites `9/9`; API production build; `git diff --check`.
+- Result: the local gift-card accounting invariant is accepted; live fiscal/payment certification and first-store reconciliation remain open.

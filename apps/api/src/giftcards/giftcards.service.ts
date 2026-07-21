@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { IssueGiftCardDto } from './giftcards.dto';
 
 export interface GiftCardView {
@@ -45,6 +46,31 @@ export class GiftcardsService {
           note: dto.note,
           expiresAt,
         },
+      });
+      // Выпуск карты — это выпуск денег, и он обязан иметь проводку.
+      //
+      // Раньше её не было вовсе: карта получала реальный баланс, а погашение
+      // дебетовало счёт 2300 «Обязательства по подарочным картам»
+      // (`payments.service.ts` postPaymentEntryOnTx) — обязательство, которое
+      // никогда не кредитовалось. Счёт уходил в минус, и ни один риск-сигнал
+      // этого не проверял. Кассир мог выпустить карту, погасить ею телефон, и в
+      // отчётах это выглядело честной выручкой при пустой кассе.
+      //
+      // Проводка идёт в той же транзакции, что и сама карта: если она не
+      // пройдёт, карты тоже не будет.
+      await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:giftcard.issued:${created.id}`,
+        sourceType: 'giftcard.issued',
+        sourceRef: created.id,
+        description: `Выпуск подарочной карты ${created.code}`,
+        documentAmount: dto.amount,
+        baseAmount: dto.amount,
+        occurredAt: created.createdAt,
+        createdBy: actor,
+        lines: [
+          { accountCode: '1000', debit: dto.amount, credit: 0, memo: 'Оплата подарочной карты' },
+          { accountCode: '2300', debit: 0, credit: dto.amount, memo: 'Обязательство по подарочной карте' },
+        ],
       });
       return {
         result: created,
