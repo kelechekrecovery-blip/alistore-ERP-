@@ -1,5 +1,6 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { sign, verify } from 'jsonwebtoken';
+import { resolveJwtSecretFromEnv } from './jwt-secret';
 
 export type GuestCapabilityScope =
   | 'orders:create'
@@ -24,11 +25,17 @@ interface GuestCapabilityClaims {
 
 const ISSUER = 'alistore-api';
 const AUDIENCE = 'alistore-guest-checkout';
-const DEV_SECRET = 'dev-insecure-change-me';
 
-function secret(): string {
-  return process.env.JWT_SECRET ?? DEV_SECRET;
-}
+/**
+ * Секрет берётся из общего резолвера, а не резолвится здесь заново.
+ *
+ * Раньше тут стоял собственный `process.env.JWT_SECRET ?? 'dev-insecure-change-me'`
+ * без единой проверки: `jwt-secret.ts` отказывал dev-значению в проде, а этот
+ * модуль — нет. При неверно выставленном окружении гостевой токен подписывался
+ * строкой из этого же репозитория, а он несёт scope'ы `orders:create`,
+ * `payments:intent` и `payments:gift_card`.
+ */
+const secret = resolveJwtSecretFromEnv;
 
 export function issueGuestCheckoutCapability(customerId: string): string {
   return sign(

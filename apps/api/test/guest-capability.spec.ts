@@ -4,6 +4,52 @@ import {
   requireGuestCapability,
 } from '../src/auth/guest-capability';
 
+/**
+ * Второго резолвера секрета быть не должно.
+ *
+ * `jwt-secret.ts` отказывается работать в проде с dev-значением, и это защищало
+ * основные токены. Но гостевые возможности резолвили секрет сами —
+ * `process.env.JWT_SECRET ?? 'dev-insecure-change-me'` — без единой проверки.
+ * То есть при неверно выставленном окружении гостевой токен подписывался
+ * строкой, опубликованной в этом же репозитории, а с ним идут scope'ы
+ * `orders:create`, `payments:intent` и `payments:gift_card`.
+ *
+ * Один секрет — одно место, где можно ошибиться.
+ */
+describe('гостевые возможности · секрет тот же, что у основных токенов', () => {
+  const original = process.env.NODE_ENV;
+  const originalSecret = process.env.JWT_SECRET;
+
+  afterEach(() => {
+    process.env.NODE_ENV = original;
+    if (originalSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originalSecret;
+  });
+
+  it('в проде без секрета — отказ, а не подпись публично известной строкой', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.JWT_SECRET;
+
+    expect(() => issueGuestCheckoutCapability('customer-1')).toThrow(/JWT_SECRET/);
+    expect(() => issueGuestOrderCapability('customer-1', 'order-1')).toThrow(/JWT_SECRET/);
+  });
+
+  it('в проде dev-значение отвергается явно', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'dev-insecure-change-me';
+
+    expect(() => issueGuestCheckoutCapability('customer-1')).toThrow(/JWT_SECRET/);
+  });
+
+  it('вне прода запасное значение по-прежнему разрешено — dev и тесты не ломаются', () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.JWT_SECRET;
+
+    const token = issueGuestCheckoutCapability('customer-1');
+    expect(requireGuestCapability(token, 'orders:create', 'customer-1').sub).toBe('customer-1');
+  });
+});
+
 describe('guest checkout capability', () => {
   it('binds checkout scopes to one customer', () => {
     const token = issueGuestCheckoutCapability('customer-1');
