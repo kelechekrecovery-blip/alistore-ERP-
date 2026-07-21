@@ -31,6 +31,7 @@
 		492FE010C8F04B72F808B040 /* ReferralView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D9ECDFDBC25D5BACF48D03 /* ReferralView.swift */; };
 		4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */; };
 		4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */; };
+		53285FF6D8C6D246506563B5 /* POSMoney.swift in Sources */ = {isa = PBXBuildFile; fileRef = F52F3009B428C385457F9163 /* POSMoney.swift */; };
 		563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */; };
 		5C4A0A294F055F12ACC271CD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AE157FE93CD516D1CBF400CF /* PrivacyInfo.xcprivacy */; };
 		60A91B77ED6D2F052725E568 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E5C4B9BAAE039961AFE73B38 /* PrivacyInfo.xcprivacy */; };
@@ -85,6 +86,7 @@
 		E782525DE9BA891168B79DC2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0D52D0200FC74225D8DA7907 /* Assets.xcassets */; };
 		E9AD728C67345D0B10525495 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2984688119D5255CF5B06009 /* Assets.xcassets */; };
 		EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1835E8741DBB19503E6334A1 /* QuickUnlock.swift */; };
+		ECF0126BBFB5ACBBB4C9EEE2 /* POSMoneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E1AAF7478E1B91443AA042 /* POSMoneyTests.swift */; };
 		F02017A9DEDB594FB4F87FF2 /* alistore-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */; };
 		F5420D98BEB7F7E63A8AFCAE /* AliStoreCourierApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */; };
 		F7A028D6B8F54E1E0D6756EF /* WaitlistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4996F20715B374377C19415D /* WaitlistView.swift */; };
@@ -245,6 +247,7 @@
 		3DDD9376D59012178E0570F2 /* StaffScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffScannerView.swift; sourceTree = "<group>"; };
 		4138BDA48D595174DC088C57 /* Manrope-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-ExtraBold.ttf"; sourceTree = "<group>"; };
 		41DB2C73385C8B88CC17B5CA /* AliStoreClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientApp.swift; sourceTree = "<group>"; };
+		41E1AAF7478E1B91443AA042 /* POSMoneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSMoneyTests.swift; sourceTree = "<group>"; };
 		42436819B18857A22AC06504 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		42BC4CE3DCC041CF32038A86 /* QuickUnlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlockTests.swift; sourceTree = "<group>"; };
 		48457E88937519CA203EA7DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -303,6 +306,7 @@
 		EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestBootstrap.swift; sourceTree = "<group>"; };
 		F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierApp.swift; sourceTree = "<group>"; };
 		F17D6035DF91395FA9C419FE /* OFL-Manrope.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Manrope.txt"; sourceTree = "<group>"; };
+		F52F3009B428C385457F9163 /* POSMoney.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSMoney.swift; sourceTree = "<group>"; };
 		F8492CB93F0DA4FC652D7AA7 /* ClientDebugFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDebugFeature.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -360,6 +364,7 @@
 				A9EBC4D5C06A5630E3B7D69D /* Models.swift */,
 				04AAB6220384C05861A21153 /* NativeShell.swift */,
 				8A5A549F226050ACB113FF4E /* OfflineQueue.swift */,
+				F52F3009B428C385457F9163 /* POSMoney.swift */,
 				CD7187EA0C9EF4F8DA4016FE /* POSReturnFlow.swift */,
 				3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */,
 				1835E8741DBB19503E6334A1 /* QuickUnlock.swift */,
@@ -568,6 +573,7 @@
 				20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */,
 				B1E18DBDC8F966E6FE986281 /* OfflineStoreTests.swift */,
 				13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */,
+				41E1AAF7478E1B91443AA042 /* POSMoneyTests.swift */,
 				23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */,
 				42BC4CE3DCC041CF32038A86 /* QuickUnlockTests.swift */,
 			);
@@ -984,6 +990,7 @@
 				351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */,
 				05A08312A8BD5E5165442246 /* OfflineStoreTests.swift in Sources */,
 				4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */,
+				ECF0126BBFB5ACBBB4C9EEE2 /* POSMoneyTests.swift in Sources */,
 				563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */,
 				D3267E880FEF79B442F04BD0 /* QuickUnlockTests.swift in Sources */,
 			);
@@ -1000,6 +1007,7 @@
 				8C5A4F7C9419670E633A9668 /* Models.swift in Sources */,
 				95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */,
 				03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */,
+				53285FF6D8C6D246506563B5 /* POSMoney.swift in Sources */,
 				801111550678A8B136CA7459 /* POSReturnFlow.swift in Sources */,
 				EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */,
 				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,

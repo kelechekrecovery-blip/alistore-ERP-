@@ -12,7 +12,11 @@ struct POSSaleView: View {
     @State private var isLoading = false
     @State private var shift: CashShift?
     @State private var cart: [String: Int] = [:]
-    @State private var selectedIMEI: [String: String] = [:]
+    // Список, а не один IMEI на товар: сервер при указанном IMEI принудительно
+    // ставит строке `qty: 1` (`pos.service.ts:558`), поэтому две единицы одной
+    // модели — это две строки. Пока здесь лежал один номер, второй сканированный
+    // IMEI затирал первый, а количество откатывалось к единице.
+    @State private var selectedIMEI: [String: [String]] = [:]
     @State private var scannerCode = ""
     @State private var showScanner = false
     @State private var discount = "0"
@@ -30,7 +34,9 @@ struct POSSaleView: View {
     private var gross: Int {
         products.reduce(0) { $0 + ($1.price * (cart[$1.id] ?? 0)) }
     }
-    private var total: Int { max(0, gross - gross * discountPct / 100) }
+    // Формула сервера, одной копией в `POSMoney`. Целочисленный вариант
+    // `gross - gross * pct / 100` отбрасывал дробь скидки и завышал чек.
+    private var total: Int { POSMoney.total(gross: gross, discountPct: discountPct) }
 
     var body: some View {
         NavigationStack {
@@ -105,7 +111,7 @@ struct POSSaleView: View {
                         Spacer()
                         Text("\(product.availableUnits) шт.").font(.caption2).foregroundStyle(POSPalette.muted)
                     }
-                    if let imei = selectedIMEI[product.id] {
+                    ForEach(selectedIMEI[product.id] ?? [], id: \.self) { imei in
                         Text("IMEI …\(imei.suffix(6))").font(.caption2).foregroundStyle(POSPalette.lime)
                     }
                     HStack {
@@ -226,8 +232,20 @@ struct POSSaleView: View {
             let unit: POSUnit = try await api.get("units/\(encoded)", token: session.accessToken)
             guard unit.status == "in_stock" else { throw POSLocalError.message("IMEI недоступен: \(unit.status)") }
             guard let product = products.first(where: { $0.id == unit.productId }) else { throw POSLocalError.message("Товар IMEI отсутствует в каталоге") }
-            cart[product.id] = 1
-            selectedIMEI[product.id] = unit.imei
+            var attached = selectedIMEI[product.id] ?? []
+            guard !attached.contains(unit.imei) else {
+                scannerCode = ""
+                message = "IMEI …\(unit.imei.suffix(6)) уже в чеке"
+                return
+            }
+            guard attached.count < product.availableUnits else {
+                throw POSLocalError.message("В наличии \(product.availableUnits) шт. — больше единиц не привязать")
+            }
+            attached.append(unit.imei)
+            selectedIMEI[product.id] = attached
+            // Количество догоняет число привязанных номеров, а не обнуляется до
+            // единицы: раньше второй скан молча возвращал корзину к одной штуке.
+            cart[product.id] = max(cart[product.id] ?? 0, attached.count)
             scannerCode = ""
             message = "IMEI …\(unit.imei.suffix(6)) привязан"
         } catch { errorMessage = error.localizedDescription }
@@ -240,16 +258,32 @@ struct POSSaleView: View {
         defer { isBusy = false }
         let cash = min(total, max(0, Int(splitCash) ?? 0))
         let payments: [POSTender]
-        if cash > 0 && cash < total {
+        if cash > 0 && cash == total {
+            // Раньше эта сумма проваливалась в общую ветку и уходила методом
+            // `paymentMethod`: клиент отдал наличные ровно в чек, а продажа
+            // записывалась как оплата картой. Касса и выручка расходились.
+            payments = [POSTender(method: "cash", amount: total)]
+        } else if cash > 0 {
             payments = [POSTender(method: "cash", amount: cash), POSTender(method: paymentMethod == "cash" ? "card" : paymentMethod, amount: total - cash)]
         } else {
             payments = [POSTender(method: paymentMethod, amount: total)]
         }
         let request = POSSaleRequest(
             point: shift.point,
-            lines: products.compactMap { product in
-                guard let qty = cart[product.id], qty > 0 else { return nil }
-                return POSLine(productId: product.id, sku: product.sku, price: product.price, qty: qty, imei: selectedIMEI[product.id])
+            lines: products.flatMap { product -> [POSLine] in
+                guard let qty = cart[product.id], qty > 0 else { return [] }
+                // По строке на каждый привязанный номер — сервер всё равно
+                // сведёт такую строку к одной единице. Остаток без номеров
+                // уходит одной обычной строкой.
+                let imeis = (selectedIMEI[product.id] ?? []).prefix(qty)
+                let serialized = imeis.map {
+                    POSLine(productId: product.id, sku: product.sku, price: product.price, qty: 1, imei: $0)
+                }
+                let rest = qty - serialized.count
+                let bulk = rest > 0
+                    ? [POSLine(productId: product.id, sku: product.sku, price: product.price, qty: rest, imei: nil)]
+                    : []
+                return serialized + bulk
             },
             payments: payments,
             discountPct: discountPct,
@@ -272,6 +306,7 @@ struct POSSaleView: View {
             approvalId = nil
             activeSaleId = UUID().uuidString
             splitCash = ""
+            discount = "0"
             return
         }
         #endif
@@ -303,6 +338,10 @@ struct POSSaleView: View {
             approvalId = nil
             activeSaleId = UUID().uuidString
             splitCash = ""
+            // Скидка не сбрасывалась вместе с остальным: следующий покупатель
+            // молча получал скидку предыдущего, а при превышении порога — ещё и
+            // требование одобрения на пустом месте.
+            discount = "0"
             await refresh()
         }
     }
@@ -310,7 +349,13 @@ struct POSSaleView: View {
     private func change(_ product: Product, by delta: Int) {
         let next = min(product.availableUnits, max(0, (cart[product.id] ?? 0) + delta))
         cart[product.id] = next
-        if next == 0 { selectedIMEI[product.id] = nil }
+        // Привязанных номеров не может быть больше, чем единиц в чеке: иначе
+        // лишний IMEI уехал бы в продажу молча, отдельной строкой.
+        if next == 0 {
+            selectedIMEI[product.id] = nil
+        } else if let attached = selectedIMEI[product.id], attached.count > next {
+            selectedIMEI[product.id] = Array(attached.prefix(next))
+        }
     }
 
     #if DEBUG
