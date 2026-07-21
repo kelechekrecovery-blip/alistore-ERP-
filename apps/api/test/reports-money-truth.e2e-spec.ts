@@ -1,5 +1,6 @@
 import { AuditService } from '../src/audit/audit.service';
 import { postAccountingEntryOnTx } from '../src/finance/accounting-journal';
+import { postCogsOnTx } from '../src/inventory/inventory-valuation';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReportsService } from '../src/reports/reports.service';
 import { SettingsService } from '../src/settings/settings.service';
@@ -51,7 +52,14 @@ describe('Отчёты · одна правда о деньгах', () => {
       // Только свои проводки. Сплошное `deleteMany()` роняло чужие спеки: на
       // журнал ссылаются CashIncassation и CashDrawerMovement, и тест, стирающий
       // общий леджер, ловит не дефект продукта, а сам себя.
-      const mine = { sourceType: { in: ['cod.receivable', 'accounting.reversal'] } };
+      // Себестоимость теперь читается из журнала (счёт 5000), поэтому проводки
+      // продаж и сторно возвратов тоже «свои»: без их уборки счёт копится между
+      // тестами и маржа считается по чужим продажам.
+      const mine = {
+        sourceType: {
+          in: ['cod.receivable', 'accounting.reversal', 'inventory.cogs', 'inventory.return'],
+        },
+      };
       await tx.accountingJournalLine.deleteMany({ where: { entry: mine } });
       await tx.accountingJournalEntry.deleteMany({ where: mine });
     });
@@ -71,8 +79,8 @@ describe('Отчёты · одна правда о деньгах', () => {
     // Обе единицы проданы — так их видит расчёт себестоимости.
     await prisma.deviceUnit.createMany({
       data: [
-        { imei: `MT-${seq}-A`, productId: product.id, status: 'sold', location: 'BISHKEK-1' },
-        { imei: `MT-${seq}-B`, productId: product.id, status: 'sold', location: 'BISHKEK-1' },
+        { imei: `MT-${seq}-A`, productId: product.id, status: 'sold', location: 'BISHKEK-1', acquisitionCost: 80_000 },
+        { imei: `MT-${seq}-B`, productId: product.id, status: 'sold', location: 'BISHKEK-1', acquisitionCost: 80_000 },
       ],
     });
     const cardOrder = await prisma.order.create({
@@ -87,6 +95,25 @@ describe('Отчёты · одна правда о деньгах', () => {
         customerId: customer.id, channel: 'web', status: 'delivered',
         fulfillmentType: 'courier', paymentMode: 'cod', total: 100_000,
       },
+    });
+    // Себестоимость проводится по-настоящему, обеими продажами: отчёт читает
+    // счёт 5000, а не каталожную цену товара.
+    await prisma.$transaction(async (tx) => {
+      for (const [imei, orderId] of [
+        [`MT-${seq}-A`, cardOrder.id],
+        [`MT-${seq}-B`, codOrder.id],
+      ] as const) {
+        await postCogsOnTx(tx, {
+          productId: product.id,
+          orderId,
+          sourceRef: `${orderId}:${imei}`,
+          imei,
+          location: 'BISHKEK-1',
+          quantity: 1,
+          unitCost: 80_000,
+          actor: 'test',
+        });
+      }
     });
     await prisma.$transaction(async (tx) => {
       await postAccountingEntryOnTx(tx, {
@@ -165,6 +192,11 @@ describe('Отчёты · одна правда о деньгах', () => {
   /**
    * `operatingProfit` читается владельцем как прибыль, а вычитал только
    * операционные расходы: себестоимость проданного в него не входила вовсе.
+   *
+   * Себестоимость здесь проводится по-настоящему (`postCogsOnTx`), а не
+   * подразумевается из `Product.cost`: каталожная цена — текущая настройка
+   * товара, а не то, во что он обошёлся магазину. Второй акт теста меняет
+   * `Product.cost` уже после продажи и требует, чтобы прибыль не шелохнулась.
    */
   it('операционная прибыль вычитает себестоимость проданного', async () => {
     seq += 1;
@@ -175,7 +207,13 @@ describe('Отчёты · одна правда о деньгах', () => {
       data: { sku: `PR-${seq}`, name: 'x', price: 100_000, cost: 80_000, category: 'c', attrs: {} },
     });
     await prisma.deviceUnit.create({
-      data: { imei: `PR-${seq}-A`, productId: product.id, status: 'sold', location: 'BISHKEK-1' },
+      data: {
+        imei: `PR-${seq}-A`,
+        productId: product.id,
+        status: 'sold',
+        location: 'BISHKEK-1',
+        acquisitionCost: 80_000,
+      },
     });
     const order = await prisma.order.create({
       data: { customerId: customer.id, channel: 'web', status: 'paid', total: 100_000 },
@@ -196,10 +234,32 @@ describe('Отчёты · одна правда о деньгах', () => {
       },
     });
 
+    await prisma.$transaction(async (tx) => {
+      await postCogsOnTx(tx, {
+        productId: product.id,
+        orderId: order.id,
+        sourceRef: `${order.id}:PR-${seq}-A`,
+        imei: `PR-${seq}-A`,
+        location: 'BISHKEK-1',
+        quantity: 1,
+        unitCost: 80_000,
+        actor: 'test',
+      });
+    });
+
     const dashboard = await reports.dashboard();
 
     // 100 000 выручки − 80 000 себестоимости − 10 000 аренды.
     expect(dashboard.money.operatingProfit).toBe(10_000);
+
+    // Товар переоценили в каталоге — на уже состоявшуюся продажу это не влияет.
+    // До фикса себестоимость читалась из `Product.cost`, и прибыль владельца
+    // задним числом менялась от правки карточки товара: этот же тест давал
+    // 30 000 вместо 10 000.
+    await prisma.product.update({ where: { id: product.id }, data: { cost: 60_000 } });
+
+    const afterRepricing = await reports.dashboard();
+    expect(afterRepricing.money.operatingProfit).toBe(10_000);
   });
 
   /**

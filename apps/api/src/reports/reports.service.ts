@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
+import { COGS_ACCOUNT } from '../inventory/inventory-valuation';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildRiskSignals,
@@ -114,31 +115,36 @@ export class ReportsService {
   }
 
   private async soldCogs(): Promise<number> {
-    // Раньше здесь грузился КАЖДЫЙ когда-либо проданный юнит (`findMany` по
-    // всем `status: 'sold'`), и сумма считалась в памяти: объём ответа рос
-    // линейно с историей продаж, а зовётся это на каждом открытии дашборда и
-    // KPI. Группировка по товару даёт тот же результат, но объём ответа — по
-    // числу товаров, а не проданных штук.
+    // Себестоимость берётся из журнала — счёт 5000, — а не из `Product.cost`.
     //
-    // Период сюда сознательно НЕ вводится: выручка на обоих экранах-потребителях
+    // `Product.cost` это текущая каталожная настройка товара, а не то, во что
+    // он обошёлся магазину: правка карточки задним числом меняла прибыль по
+    // всем прошлым продажам. Схема про это прямо предупреждает над
+    // `InventoryValuationLayer` («Product.cost is only the current catalog
+    // default»), но отчёт всё равно читал её. Из-за этого дашборд и
+    // /finance/statements показывали РАЗНУЮ прибыль по одной и той же базе.
+    //
+    // Четыре дефекта уходят разом: в 5000 попадает `acquisitionCost` вместе с
+    // капитализированными расходами на доставку и растаможку (раньше они были
+    // невидимы, и прибыль завышалась); консигнация проводки не делает и больше
+    // не даёт фантомной себестоимости; количественные товары списываются по
+    // слоям FIFO и перестают показывать 100% маржи; сторно возврата приходит
+    // кредитом в тот же счёт и вычитается само.
+    //
+    // Фильтр по `reversal` здесь НЕ нужен, в отличие от выручки: сторно пишется
+    // зеркальными строками в тот же счёт, поэтому в сумме дебет−кредит оно
+    // гасится само. Именно так считает /finance/statements — совпадение двух
+    // экранов теперь обеспечено конструкцией, а не совпадением формул.
+    //
+    // Период сознательно НЕ вводится: выручка на обоих экранах-потребителях
     // считается за всё время, и урезание одной лишь себестоимости сделало бы
     // маржу «период против всей истории» — ровно то расхождение, которое здесь
     // однажды уже чинили.
-    const soldByProduct = await this.prisma.deviceUnit.groupBy({
-      by: ['productId'],
-      where: { status: 'sold' },
-      _count: { _all: true },
+    const totals = await this.prisma.accountingJournalLine.aggregate({
+      _sum: { debit: true, credit: true },
+      where: { accountCode: COGS_ACCOUNT },
     });
-    if (soldByProduct.length === 0) return 0;
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: soldByProduct.map((row) => row.productId) } },
-      select: { id: true, cost: true },
-    });
-    const costById = new Map(products.map((product) => [product.id, product.cost]));
-    return soldByProduct.reduce(
-      (sum, row) => sum + (costById.get(row.productId) ?? 0) * row._count._all,
-      0,
-    );
+    return (totals._sum.debit ?? 0) - (totals._sum.credit ?? 0);
   }
 
   /** Journal rows shaped like payments so revenue bucketing can merge them. */
