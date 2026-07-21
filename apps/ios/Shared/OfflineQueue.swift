@@ -266,13 +266,77 @@ private struct IgnoredMutationResponse: Decodable, Sendable {
     init(from decoder: Decoder) throws {}
 }
 
+/// Первая версия офлайн-схемы. `PendingMutation` намеренно остаётся top-level
+/// классом, а не вкладывается сюда: имя сущности SwiftData берёт из имени класса,
+/// и вложение переименовало бы её — существующие очереди стали бы невидимыми.
+public enum OfflineSchemaV1: VersionedSchema {
+    public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
+    public static var models: [any PersistentModel.Type] { [PendingMutation.self] }
+}
+
+/// План миграций. Пока переход один — сама V1, стадий нет. Ценность не в текущем
+/// содержимом, а в том, что у следующего изменения модели есть куда встать:
+/// без плана оно молча ломает запуск у всех, включая устройства с непроведёнными
+/// продажами.
+public enum OfflineMigrationPlan: SchemaMigrationPlan {
+    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self] }
+    public static var stages: [MigrationStage] { [] }
+}
+
 @MainActor
 public enum OfflineStore {
-    public static func container() -> ModelContainer {
+    /// Результат открытия хранилища. Деградация обязана быть видимой: очередь
+    /// в памяти выглядит рабочей ровно до перезапуска, после которого продажи
+    /// исчезают без следа.
+    public struct Opened {
+        public let container: ModelContainer
+        /// Очередь живёт только в оперативной памяти — офлайн-приём принимать нельзя.
+        public let isEphemeral: Bool
+        /// Причина отказа, пригодная для показа человеку.
+        public let failure: String?
+    }
+
+    /// Состояние последнего открытия — чтобы экраны могли отказать в офлайн-приёме
+    /// и сказать об этом кассиру, а не принимать продажи в никуда.
+    public private(set) static var isEphemeral = false
+    public private(set) static var failure: String?
+
+    /// - Parameter url: путь к store. `nil` — расположение по умолчанию;
+    ///   продовый путь своё имя не задаёт, иначе сменился бы файл базы.
+    public static func open(url: URL? = nil) -> Opened {
+        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
         do {
-            return try ModelContainer(for: PendingMutation.self)
+            let configuration = url.map { ModelConfiguration(schema: schema, url: $0) }
+                ?? ModelConfiguration(schema: schema)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: OfflineMigrationPlan.self,
+                configurations: configuration
+            )
+            return finish(Opened(container: container, isEphemeral: false, failure: nil))
         } catch {
-            preconditionFailure("Unable to create native offline database: \(error)")
+            // Файл базы не удаляем ни при каких обстоятельствах: он может быть
+            // единственным следом непроведённых продаж, и его ещё можно достать
+            // руками. Приложение при этом обязано открыться — касса работает
+            // в онлайне, а офлайн-приём выключается явно.
+            let reason = "Офлайн-очередь недоступна: \(error.localizedDescription)"
+            if let memory = try? ModelContainer(
+                for: schema,
+                configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            ) {
+                return finish(Opened(container: memory, isEphemeral: true, failure: reason))
+            }
+            // Контейнер в памяти не создаётся только при поломке самой схемы —
+            // это дефект сборки, а не состояние устройства.
+            preconditionFailure("Не удалось создать даже временное офлайн-хранилище: \(error)")
         }
+    }
+
+    public static func container() -> ModelContainer { open().container }
+
+    private static func finish(_ opened: Opened) -> Opened {
+        isEphemeral = opened.isEphemeral
+        failure = opened.failure
+        return opened
     }
 }
