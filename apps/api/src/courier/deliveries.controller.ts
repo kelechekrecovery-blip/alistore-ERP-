@@ -39,6 +39,7 @@ export class DeliveriesController {
     const key = idempotencyKey?.trim();
     if (!key) throw new BadRequestException('Idempotency-Key обязателен');
     if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+    await this.courier.assertAssignedCourier(id, user.customerId);
     await this.evidence.assertCourierOrderEvidence(
       dto.evidenceIdempotencyKey,
       user.customerId,

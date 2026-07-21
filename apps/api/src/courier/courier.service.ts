@@ -43,6 +43,22 @@ export class CourierService {
     });
   }
 
+  /**
+   * Check delivery ownership before validating attached evidence. A foreign
+   * courier must receive the authorization response, not an evidence-shape
+   * error that reveals how this order is processed.
+   */
+  async assertAssignedCourier(orderId: string, courierId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { courierId: true },
+    });
+    if (!order) throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+    if (order.courierId !== courierId) {
+      throw new ForbiddenError('delivery_forbidden', 'Доставка назначена другому курьеру');
+    }
+  }
+
   async getRun(id: string, expectedCourierId?: string) {
     const run = await this.prisma.courierRun.findUnique({ where: { id }, include: { orders: true } });
     if (run && expectedCourierId && run.courierId !== expectedCourierId) {

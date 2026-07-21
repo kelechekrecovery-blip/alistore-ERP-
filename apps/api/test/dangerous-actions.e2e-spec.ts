@@ -75,7 +75,7 @@ describe('Dangerous actions via approval (integration)', () => {
 
   it('gates delete → soft-delete (archived) on approve', async () => {
     const p = await product();
-    const res = (await products.archive(p.id, 'снят', 'owner')) as { approvalId: string };
+    const res = (await products.archive(p.id, 'снят', 'seller')) as { approvalId: string };
     expect((await prisma.product.findUnique({ where: { id: p.id } }))?.archived).toBe(false);
 
     await approvals.decide(res.approvalId, { status: 'approved', approver: 'owner', approverRole: 'owner' });
