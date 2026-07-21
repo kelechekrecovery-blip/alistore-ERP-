@@ -15,21 +15,21 @@
   "review": {
     "demoAccountRequired": true,
     "demoAccountReference": "Provide a production review cashier account in App Store Connect notes. Do not commit credentials.",
-    "notes": "AliStore POS is a role-restricted point-of-sale app for authorized AliStore cashiers. It supports catalog lookup, cart and split tender preparation, server-issued receipts, shift status and operation history. External receipt printers or payment hardware require separately certified compatible equipment and are not required to review the software workflow. App Review must receive an active demo cashier account with representative non-production review data."
+    "notes": "AliStore POS is a point-of-sale app for electronics retail stores. A store cashier looks up catalog items, builds a sale, prepares split tender, receives a server-issued receipt, tracks shift status and reviews operation history. Access is role-based; a store provisions accounts for its own cashiers. External receipt printers or payment hardware require separately certified compatible equipment and are not required to review the software workflow. App Review must receive an active demo cashier account with representative non-production review data."
   },
   "localizations": {
     "ru-KG": {
       "name": "AliStore POS",
-      "subtitle": "Касса и смена AliStore",
-      "promotionalText": "Продажи, чеки, состояние смены и история кассовых операций для сотрудников AliStore.",
-      "description": "AliStore POS — рабочее кассовое приложение для авторизованных сотрудников AliStore. Оно помогает находить товары, формировать продажу, подготавливать раздельную оплату, получать чек с сервера, контролировать состояние смены и просматривать историю операций.",
+      "subtitle": "Касса для розничного магазина",
+      "promotionalText": "Продажи, чеки, состояние смены и история кассовых операций для розничного магазина.",
+      "description": "AliStore POS — кассовое приложение для розничных магазинов электроники. Кассир магазина находит товары, формирует продажу, готовит раздельную оплату, получает чек с сервера, контролирует состояние смены и просматривает историю операций. Доступ ролевой: магазин выдаёт учётные записи своим кассирам.",
       "keywords": [
         "касса",
-        "продажи",
-        "чеки",
-        "смена",
+        "pos",
+        "розница",
         "магазин",
-        "AliStore"
+        "продажи",
+        "смена"
       ]
     }
   },

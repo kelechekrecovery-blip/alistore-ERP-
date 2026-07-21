@@ -15,21 +15,21 @@
   "review": {
     "demoAccountRequired": true,
     "demoAccountReference": "Provide a production review employee account in App Store Connect notes. Do not commit credentials.",
-    "notes": "AliStore Staff is a role-restricted workplace app for authorized AliStore employees. It provides order processing, store tasks and KPI, customer service, product intake and buyback workflows. App Review must receive an active demo employee account with access to representative non-production review data."
+    "notes": "AliStore Staff is a retail back-office (ERP) app for electronics stores. Store staff use it for order processing, warehouse and service tasks, KPI, customer service, product intake and buyback. Access is role-based; a store provisions accounts for its own staff. App Review must receive an active demo staff account with representative non-production review data."
   },
   "localizations": {
     "ru-KG": {
       "name": "AliStore Staff",
-      "subtitle": "Рабочее место сотрудника",
-      "promotionalText": "Заказы, задачи, KPI и обслуживание клиентов AliStore в одном рабочем приложении.",
-      "description": "AliStore Staff — рабочее приложение для авторизованных сотрудников AliStore. Оно помогает обрабатывать заказы, выполнять задачи магазина, отслеживать KPI, обслуживать клиентов, принимать товары и вести операции скупки по установленным регламентам.",
+      "subtitle": "ERP для розничного магазина",
+      "promotionalText": "Заказы, задачи, KPI и обслуживание клиентов розничного магазина электроники.",
+      "description": "AliStore Staff — операционное ERP-приложение для розничных магазинов электроники. Персонал магазина обрабатывает заказы, выполняет складские и сервисные задачи, отслеживает KPI, обслуживает клиентов, принимает товары и ведёт операции скупки по регламентам магазина. Доступ ролевой: магазин выдаёт учётные записи своим сотрудникам.",
       "keywords": [
-        "сотрудники",
-        "заказы",
+        "розница",
+        "erp",
         "магазин",
-        "задачи",
-        "продажи",
-        "AliStore"
+        "заказы",
+        "склад",
+        "kpi"
       ]
     }
   },

@@ -15,21 +15,21 @@
   "review": {
     "demoAccountRequired": true,
     "demoAccountReference": "Provide a production review courier account in App Store Connect notes. Do not commit credentials.",
-    "notes": "AliStore Courier is a role-restricted delivery app for authorized AliStore couriers. It provides assigned delivery routes, delivery evidence, cash-on-delivery reconciliation and courier profile functions. App Review must receive an active demo courier account with representative non-production review data."
+    "notes": "AliStore Courier is a delivery app for electronics retail stores. A store courier sees assigned deliveries and route, records delivery evidence, handles cash-on-delivery and reconciles the completed run. Access is role-based; a store provisions accounts for its own couriers. App Review must receive an active demo courier account with representative non-production review data."
   },
   "localizations": {
     "ru-KG": {
       "name": "AliStore Courier",
-      "subtitle": "Доставка заказов AliStore",
-      "promotionalText": "Маршруты, подтверждение доставки и сверка наложенных платежей для курьеров AliStore.",
-      "description": "AliStore Courier — рабочее приложение для авторизованных курьеров AliStore. Оно показывает назначенные доставки и маршрут, помогает зафиксировать результат вручения заказа, вести операции с наложенными платежами и сверять завершённый рейс.",
+      "subtitle": "Доставка розничного магазина",
+      "promotionalText": "Маршруты, подтверждение доставки и сверка наложенных платежей для доставки розничного магазина.",
+      "description": "AliStore Courier — приложение доставки для розничных магазинов электроники. Курьер магазина видит назначенные доставки и маршрут, фиксирует результат вручения заказа, ведёт операции с наложенными платежами и сверяет завершённый рейс. Доступ ролевой: магазин выдаёт учётные записи своим курьерам.",
       "keywords": [
-        "курьер",
         "доставка",
+        "курьер",
+        "розница",
+        "магазин",
         "маршрут",
-        "заказы",
-        "логистика",
-        "AliStore"
+        "cod"
       ]
     }
   },
