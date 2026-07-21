@@ -5082,3 +5082,11 @@
 - Commit: `ef41426` (`fix(web): harden guest checkout and live account data`).
 - Result: this bounded Web/API security and data-integrity slice is accepted locally. The public domain still reports development Sentry/demo configuration and remains workstation/tunnel-backed; public deployment certification is not claimed.
 - Next: inspect and validate the concurrent Evidence ownership changes, then close public deployment configuration and security headers without staging unrelated Courier work.
+
+## WEB-AUDIT-2026-07-21B
+
+- Scope: harden the public mobile shell and dynamic product route observed during live `https://ali.kg` smoke.
+- Changes: clipped the mobile frame's intentional horizontal carousels at the page boundary; corrected the public demo launcher defaults to use `https://api.ali.kg/api` and explicit demo mode; added a server loading fallback and accessible loading status for `/product/[id]`; made the product smoke wait for a meaningful loading/content state after `waitUntil: commit`.
+- Checks: Web unit `68/68`; Web production build with `45` routes; live Chromium smoke `3/3` for `/`, `/app`, and catalog → product; `git diff --check`.
+- Result: this public Web slice is accepted locally. The public process is still a workstation/tunnel demo rather than durable Render production; Swagger exposure, browser token storage, provider credentials, and physical/native gates remain open.
+- Next: validate the concurrent Evidence ownership slice, then address the highest-risk public API exposure and durable deployment blockers.

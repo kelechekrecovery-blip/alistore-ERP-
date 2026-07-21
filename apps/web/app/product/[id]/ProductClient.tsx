@@ -508,9 +508,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
 function ProductLoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-[#0b0a08] font-sans text-white">
+    <div
+      className="min-h-screen bg-[#0b0a08] font-sans text-white"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <SiteHeader variant="design3" />
       <main className="mx-auto max-w-[1400px] px-5 py-8">
+        <h1 className="sr-only">Загружаем товар</h1>
+        <p className="mb-4 text-sm text-white/60">Загружаем информацию о товаре...</p>
         <div className="mb-7 h-4 w-56 animate-pulse rounded-full bg-linen" />
         <div className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
           <div className="aspect-square max-h-[610px] animate-pulse rounded-[22px] border border-white/10 bg-white/[.04]" />

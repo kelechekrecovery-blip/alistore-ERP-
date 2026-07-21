@@ -21,7 +21,7 @@ interface MobileFrameProps {
 export function MobileFrame({ active, children, header = true, city = 'Бишкек' }: MobileFrameProps) {
   const { count: favCount } = useFavorites();
   return (
-    <div className="flex min-h-screen justify-center bg-night font-sans text-white">
+    <div className="flex min-h-screen justify-center overflow-x-clip bg-night font-sans text-white">
       <div className="flex min-h-screen w-full max-w-[440px] flex-col bg-ink-dark">
         {header && (
           <header className="sticky top-0 z-20 flex-shrink-0 bg-ink-dark/95 px-4 pb-3 pt-3 backdrop-blur">

@@ -313,7 +313,6 @@ test.describe('prod · catalog surfaces products', () => {
 
     const response = await page.goto(productHref!, { waitUntil: 'commit', timeout: 60_000 });
     expect(response!.status(), `${productHref} returned a server error`).toBeLessThan(400);
-    const bodyText = (await page.evaluate(() => document.body?.innerText ?? '')).trim();
-    expect(bodyText, `${productHref} rendered empty`).not.toBe('');
+    await expect(page.locator('body')).toContainText(/загружаем|товар/i, { timeout: 15_000 });
   });
 });

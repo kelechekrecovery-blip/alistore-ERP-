@@ -19,7 +19,9 @@ fi
 mkdir -p "$ARTIFACT_DIR"
 cd "$ROOT_DIR"
 
-export NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-http://127.0.0.1:4000/api}"
+export NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-https://api.ali.kg/api}"
+export NEXT_PUBLIC_DEMO_MODE="${NEXT_PUBLIC_DEMO_MODE:-true}"
+export PUBLIC_DEMO_MODE="${PUBLIC_DEMO_MODE:-true}"
 bash scripts/local-up.sh
 
 if [ -f "$TUNNEL_PID" ] && kill -0 "$(cat "$TUNNEL_PID")" 2>/dev/null; then
