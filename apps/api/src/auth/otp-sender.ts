@@ -8,7 +8,7 @@ export interface SendOtpInput {
 }
 
 export interface OtpSender {
-  readonly name: 'noop' | 'production';
+  readonly name: 'noop' | 'production' | 'disabled';
   assertOperational(): void;
   send(input: SendOtpInput): Promise<void>;
 }

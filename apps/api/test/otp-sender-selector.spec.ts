@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { NoopOtpSender } from '../src/auth/noop-otp.sender';
 import { selectOtpSender } from '../src/auth/otp-sender-selector';
 import { ProductionOtpSender } from '../src/auth/production-otp.sender';
@@ -24,5 +26,69 @@ describe('OTP sender selector', () => {
       SMS_API_KEY: 'secret',
       SMS_SENDER_ID: 'AliStore',
     })).toBeInstanceOf(ProductionOtpSender);
+  });
+
+  /**
+   * Логика селектора была покрыта полностью — и всё же прод не поднимался.
+   * `render.yaml` задавал `SMS_PROVIDER: silent`, селектор такого значения не
+   * знает и бросает, а вызов стоит в `useFactory` провайдера `OTP_SENDER`
+   * (`auth.module.ts`), то есть выполняется при инициализации модуля Nest.
+   * Контейнер падал до первого запроса, и снаружи это выглядело как 502 от
+   * Cloudflare без единой подсказки о причине.
+   *
+   * Тесты выше проверяют код против выдуманных значений и такого поймать не
+   * могут. Этот проверяет код против того, с чем сервис реально поедет.
+   */
+  it('принимает каждое значение SMS_PROVIDER, объявленное в render.yaml', () => {
+    // Разбор текстом, а не через js-yaml: тянуть зависимость (и её типы) ради
+    // одного ключа дороже, чем прочитать пару строк блюпринта.
+    const blueprint = readFileSync(join(__dirname, '../../../render.yaml'), 'utf8');
+    const declared = [...new Set(
+      [...blueprint.matchAll(/key:\s*SMS_PROVIDER\s*\n\s*value:\s*(.+)/g)]
+        .map((match) => match[1].trim().replace(/^["']|["']$/g, ''))
+        .filter(Boolean),
+    )];
+
+    expect(declared.length).toBeGreaterThan(0);
+    for (const value of declared) {
+      expect(() => select({ SMS_PROVIDER: value })).not.toThrow();
+    }
+  });
+
+  /**
+   * И то же самое в тех условиях, в которых сервис реально работает.
+   *
+   * Первая версия этой проверки не задавала `NODE_ENV`, поэтому «зеленела» на
+   * `noop` — и пропустила бы главное: в блюпринте стоит `NODE_ENV=production`
+   * (`render.yaml`), а под ним `noop` бросает «SMS_PROVIDER is required in
+   * production», `production` — «Incomplete production SMS configuration» (кредов
+   * в блюпринте нет). То есть API не мог подняться ни при одном значении, и
+   * подмена одного слова на другое ничего бы не исправила.
+   *
+   * Вход по SMS не нужен, чтобы оформить заказ гостем с оплатой при получении.
+   * Поэтому отсутствие SMS-провайдера обязано быть рабочим состоянием, а не
+   * причиной падения контейнера.
+   */
+  it('поднимается в production с тем, что объявлено в render.yaml', () => {
+    const blueprint = readFileSync(join(__dirname, '../../../render.yaml'), 'utf8');
+    const declared = [...new Set(
+      [...blueprint.matchAll(/key:\s*SMS_PROVIDER\s*\n\s*value:\s*(.+)/g)]
+        .map((match) => match[1].trim().replace(/^["']|["']$/g, ''))
+        .filter(Boolean),
+    )];
+
+    for (const value of declared) {
+      expect(() => select({ SMS_PROVIDER: value, NODE_ENV: 'production' })).not.toThrow();
+    }
+  });
+
+  it('без SMS-провайдера отправка кода отклоняется понятной ошибкой, а не падением старта', async () => {
+    const sender = select({ SMS_PROVIDER: 'disabled', NODE_ENV: 'production' });
+    await expect(sender.send({
+      phone: '+996700000000',
+      code: '123456',
+      purpose: 'login',
+      expiresInSeconds: 300,
+    })).rejects.toThrow(/не подключ/i);
   });
 });

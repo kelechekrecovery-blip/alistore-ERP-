@@ -177,6 +177,27 @@ const CHECKS: CheckDefinition[] = [
       }
     },
   },
+  {
+    id: 'sms_provider_value',
+    area: 'identity',
+    title: 'SMS provider is a value the code understands',
+    requiredEnv: ['SMS_PROVIDER'],
+    note: 'Допустимы production (с полным набором SMS_*), disabled (вход по SMS выключен) и noop вне production.',
+    evaluate: (env) => {
+      // Блюпринт задавал `silent` — значение, которого селектор не знает
+      // (`otp-sender-selector.ts`). Вызов стоит в useFactory провайдера
+      // OTP_SENDER, поэтому опечатка роняла контейнер Nest до первого запроса, и
+      // снаружи это выглядело как 502 без объяснения. Преflight существует ровно
+      // для того, чтобы такое имело внятное имя, а не превращалось в тишину.
+      const mode = env('SMS_PROVIDER')?.trim().toLowerCase();
+      if (!mode) return 'missing';
+      if (mode === 'disabled') return 'ready';
+      if (mode !== 'production') return 'unsafe';
+      const complete = ['SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID']
+        .every((name) => Boolean(env(name)?.trim()));
+      return complete ? 'ready' : 'unsafe';
+    },
+  },
 ];
 
 export function buildProductionPreflightReport(

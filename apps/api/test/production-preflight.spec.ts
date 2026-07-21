@@ -19,7 +19,10 @@ describe('Production preflight report', () => {
 
     expect(report.status).toBe('blocked');
     expect(report.generatedAt).toBe('2026-07-08T00:00:00.000Z');
-    expect(report.summary.missing).toBe(6);
+    // 7, а не 6: добавлена проверка sms_provider_value. Конфигурация без
+    // SMS_PROVIDER в production неполна — именно её отсутствие роняло контейнер
+    // Nest при инициализации провайдера OTP_SENDER.
+    expect(report.summary.missing).toBe(7);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
@@ -67,6 +70,7 @@ describe('Production preflight report', () => {
         OUTBOX_RELAY_ENABLED: 'true',
         REFUND_RELAY_ENABLED: 'true',
         PROCESS_ROLE: 'worker',
+        SMS_PROVIDER: 'disabled',
         PUBLIC_DEMO_MODE: 'false',
         PAYMENT_PROVIDER: 'production',
         PAYMENT_PROVIDER_CERTIFIED: 'true',
@@ -91,6 +95,7 @@ describe('Production preflight report', () => {
       RESERVATION_SWEEP_ENABLED: 'true',
       OUTBOX_RELAY_ENABLED: 'true',
       REFUND_RELAY_ENABLED: 'true',
+      SMS_PROVIDER: 'disabled',
       PUBLIC_DEMO_MODE: 'true',
       PAYMENT_PROVIDER: 'sandbox',
       PAYMENT_PROVIDER_CERTIFIED: 'false',

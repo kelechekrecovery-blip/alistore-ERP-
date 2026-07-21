@@ -190,8 +190,13 @@ envVarGroups:
         value: sandbox
       - key: PAYMENT_PROVIDER_CERTIFIED
         value: "false"
+      # `silent` селектор не знает: otp-sender-selector.ts принимает `noop` и
+      # `production`. Вызов стоит в useFactory провайдера OTP_SENDER, поэтому
+      # неизвестное значение роняло контейнер Nest до первого запроса — снаружи
+      # это выглядело как 502 без объяснения. Покрыто тестом, который читает
+      # этот файл: apps/api/test/otp-sender-selector.spec.ts
       - key: SMS_PROVIDER
-        value: silent
+        value: disabled
       - key: SMS_PROVIDER_CERTIFIED
         value: "false"
       - key: POS_HARDWARE_CERTIFIED
