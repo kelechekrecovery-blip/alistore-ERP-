@@ -43,6 +43,9 @@ playwright-web.png
 .claude/autonomous/
 .artifacts/
 apps/api/uploads/
+.serena/cache/
+.serena/memories/
+.serena/project.local.yml
 # editor
 .idea/
 .vscode/

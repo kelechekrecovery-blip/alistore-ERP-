@@ -22,6 +22,7 @@
     "ios:build": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project AliStoreNative.xcodeproj -alltargets -sdk iphonesimulator -configuration Debug -arch arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build",
     "ios:test": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project AliStoreNative.xcodeproj -scheme AliStoreClient -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO",
     "ios:ui": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project AliStoreNative.xcodeproj -scheme AliStoreUITests -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO",
+    "ios:lint": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swiftlint lint --quiet",
     "ios:visual": "bash apps/ios/scripts/visual-capture.sh",
     "ios:store-screenshots": "node scripts/prepare-ios-store-screenshots.mjs",
     "ios:store-preflight": "bash apps/ios/scripts/store-preflight.sh",
@@ -59,17 +60,30 @@
     "db:seed": "npm run db:seed -w @alistore/api",
     "db:studio": "npm run db:studio -w @alistore/api",
     "docs:sync": "node scripts/docs-sync.mjs",
-    "migration:test:service-payment": "bash scripts/test-service-payment-migration.sh"
+    "migration:test:service-payment": "bash scripts/test-service-payment-migration.sh",
+    "tooling:verify": "node scripts/verify-engineering-toolchain.mjs",
+    "security:secrets": "gitleaks dir --redact --no-banner .",
+    "security:dependencies": "osv-scanner scan source -r .",
+    "web:a11y": "playwright test e2e/accessibility-smoke.spec.ts",
+    "perf:smoke": "k6 run tests/performance/smoke.js",
+    "api:fuzz": "schemathesis run http://127.0.0.1:4000/api/docs-json --checks all"
   },
   "engines": {
     "node": ">=20"
   },
   "overrides": {
     "postcss": "8.5.16",
+    "qs": "6.15.2",
+    "tmp": "0.2.7",
     "uuid": "11.1.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@axe-core/playwright": "^4.12.1",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.61.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "fast-check": "^4.9.0",
+    "testcontainers": "^12.0.4"
   },
   "dependencies": {
     "@nestjs/platform-express": "^11.1.28"

@@ -5050,3 +5050,26 @@
   handling, POS hardware, live providers, production deployment or the full ecosystem gate.
 - Next: commit only this slice, preserve concurrent package/tooling changes, then continue the
   remaining unblocked owner-audit item: the Web courier operations surface.
+
+## TOOLCHAIN-080
+
+- Date: 2026-07-21
+- Scope: install a reproducible multi-language engineering and agent toolchain tailored to the
+  AliStore TypeScript, SwiftUI and Compose monorepo.
+- Changes: initialized Spec Kit with AliStore's server-authoritative invariants; configured Serena
+  for TypeScript, Swift and Kotlin; added project MCP entries for XcodeBuildMCP, Apple Docs, Serena
+  and isolated Chrome DevTools; installed Schemathesis, fast-check, Testcontainers, Toxiproxy,
+  Axe Playwright, Lighthouse CI, StrykerJS, Gitleaks, OSV Scanner and k6; added accessibility,
+  performance, fuzzing, dependency, secret and tool-verification commands plus safe-use docs.
+- Checks: `npm run tooling:verify`; `npm audit --audit-level=high` (0 vulnerabilities); API
+  production build; Web production build (45 generated pages); Lighthouse/Stryker version checks;
+  Playwright Axe suite discovery (5 tests); MCP JSON parse; Spec Kit shell syntax; k6 inspect;
+  `npm run security:secrets` (49.63 MB scanned, no leaks); `git diff --check`.
+- Findings: SwiftLint is operational but exposes existing non-green iOS structural debt; Kotlin
+  LSP installation and optional Semgrep/Trivy/Maestro downloads were interrupted by slow network.
+  TypeScript and Swift Serena LSP startup passed. These gaps are recorded rather than hidden.
+- Result: the required local foundation is accepted. Individual property, chaos, mutation,
+  accessibility and native flows still require bounded implementation tasks before they become
+  release gates.
+- Next: commit only the toolchain slice without staging the concurrent Courier/API/Web changes,
+  then use the new tooling first on the highest-risk money/stock/idempotency vertical.

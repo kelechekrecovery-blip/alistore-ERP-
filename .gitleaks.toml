@@ -1,0 +1,27 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated dependencies and build outputs"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.git/''',
+  '''(^|/)\.next[^/]*/''',
+  '''(^|/)DerivedData/''',
+  '''(^|/)build-output/''',
+  '''(^|/)apps/android/[^/]+/build/''',
+  '''(^|/)apps/ios/build/''',
+  '''^apps/api/\.env$''',
+  '''^apps/web/build-courier/''',
+  '''(^|/)docs/acceptance/artifacts/''',
+]
+
+[[allowlists]]
+description = "Documented non-secret test fixtures"
+regexTarget = "match"
+regexes = [
+  '''0123456789abcdef0123456789abcdef''',
+  '''queue-secret''',
+  '''local-maintenance-token''',
+  '''e2e-consignment-sold''',
+]
