@@ -1,11 +1,9 @@
 import AliStoreCore
-@preconcurrency import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
 
 enum StaffScannerMode: String, CaseIterable, Identifiable {
-    case addProduct
     case buyback
     case evidence
 
@@ -13,7 +11,6 @@ enum StaffScannerMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .addProduct: "Добавить"
         case .buyback: "Скупка"
         case .evidence: "Evidence"
         }
@@ -23,9 +20,6 @@ enum StaffScannerMode: String, CaseIterable, Identifiable {
 struct StaffScannerView: View {
     let session: StaffSession
     @Binding private var mode: StaffScannerMode
-    @State private var code = ""
-    @State private var isScanning = false
-    @State private var addProductSubmitted = false
     @State private var buybackChecks: Set<Int> = []
     @State private var entityType = "order"
     @State private var entityId = ""
@@ -47,7 +41,7 @@ struct StaffScannerView: View {
     private let coral = Design3.orange
     private let lime = Design3.lime
 
-    init(session: StaffSession, mode: Binding<StaffScannerMode> = .constant(.addProduct)) {
+    init(session: StaffSession, mode: Binding<StaffScannerMode> = .constant(.buyback)) {
         self.session = session
         _mode = mode
     }
@@ -58,8 +52,6 @@ struct StaffScannerView: View {
                 header
                 modePicker
                 switch mode {
-                case .addProduct:
-                    addProductSection
                 case .buyback:
                     buybackSection
                 case .evidence:
@@ -73,12 +65,6 @@ struct StaffScannerView: View {
         .background(background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $isScanning) {
-            BarcodeScannerSheet { value in
-                code = value
-                isScanning = false
-            }
-        }
         .sheet(isPresented: $showCamera) {
             CameraPicker { data in imageData = data }
         }
@@ -113,126 +99,6 @@ struct StaffScannerView: View {
         }
         .pickerStyle(.segmented)
         .tint(coral)
-    }
-
-    private var addProductSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if addProductSubmitted {
-                submittedProductCard
-            } else {
-                scanProductCard
-                if !code.isEmpty {
-                    aiProductCard
-                }
-                Button(action: { addProductSubmitted = true }) {
-                    Text("Отправить на модерацию")
-                        .font(.headline.weight(.bold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .background(code.isEmpty ? surfaceSoft : coral, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .disabled(code.isEmpty)
-            }
-        }
-    }
-
-    private var scanProductCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: code.isEmpty ? "barcode.viewfinder" : "checkmark.seal.fill")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(code.isEmpty ? lime : coral)
-                    .frame(width: 42, height: 42)
-                    .background((code.isEmpty ? lime : coral).opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(code.isEmpty ? "Сканировать штрихкод / фото" : "Штрихкод распознан")
-                        .font(.headline.weight(.black))
-                        .foregroundStyle(primaryText)
-                    Text(code.isEmpty ? "Камера распознаёт код, AI заполнит первичную карточку." : "4 870123 456789")
-                        .font(.subheadline)
-                        .foregroundStyle(secondaryText)
-                }
-            }
-            Button(action: scanProductCode) {
-                Label(code.isEmpty ? "Сканировать штрихкод / фото" : "Сканировать заново", systemImage: "camera.viewfinder")
-                    .font(.subheadline.weight(.bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(primaryText)
-            .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            if !code.isEmpty {
-                TextField("IMEI / штрихкод", text: $code)
-                    .keyboardType(.asciiCapable)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .foregroundStyle(primaryText)
-                    .padding(12)
-                    .background(background.opacity(0.6), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .onChange(of: code) { _, newValue in entityId = newValue }
-            }
-        }
-        .padding(16)
-        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private var aiProductCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Text("🤖 AI заполнил карточку")
-                .font(.headline.weight(.black))
-                .foregroundStyle(lime)
-            productRow("Модель", "iPhone 15 128 ГБ")
-            productRow("Категория", "Смартфоны")
-            productRow("Цена (рынок)", "109 900 сом")
-            productRow("Остаток", "10 шт")
-        }
-        .padding(16)
-        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private var submittedProductCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 44, weight: .black))
-                .foregroundStyle(lime)
-            Text("Товар отправлен на модерацию")
-                .font(.title3.weight(.black))
-                .foregroundStyle(primaryText)
-            Text("SKU: ALS-IP15-128 · штрихкод сгенерирован. После проверки появится в каталоге.")
-                .font(.subheadline)
-                .foregroundStyle(secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("4 870123 456789")
-                .font(.title3.monospacedDigit().weight(.black))
-                .foregroundStyle(primaryText)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-                .background(background.opacity(0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Button("🖨 Печать этикетки 40×40") {}
-                .font(.headline.weight(.bold))
-                .buttonStyle(.plain)
-                .foregroundStyle(primaryText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Button("Добавить ещё") {
-                addProductSubmitted = false
-                code = ""
-                entityId = ""
-            }
-            .font(.headline.weight(.bold))
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(coral, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .padding(16)
-        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var buybackSection: some View {
@@ -360,7 +226,6 @@ struct StaffScannerView: View {
 
     private var screenTitle: String {
         switch mode {
-        case .addProduct: "Добавить товар"
         case .buyback: "Скупка Б/У"
         case .evidence: "Evidence Vault"
         }
@@ -368,7 +233,6 @@ struct StaffScannerView: View {
 
     private var screenSubtitle: String {
         switch mode {
-        case .addProduct: "Сканируйте товар, проверьте AI-заполнение и отправьте карточку на модерацию."
         case .buyback: "Осмотр, проверка IMEI, фото и переход к договору купли-продажи."
         case .evidence: "Прикрепляйте фото к заказам, гарантиям, сменам и складским операциям."
         }
@@ -402,15 +266,6 @@ struct StaffScannerView: View {
             .foregroundStyle(primaryText)
             .padding(12)
             .background(background.opacity(0.6), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private func scanProductCode() {
-        if ProcessInfo.processInfo.arguments.contains("--ui-testing-signed-in") {
-            code = "4870123456789"
-            entityId = code
-        } else {
-            isScanning = true
-        }
     }
 
     private func toggleBuybackCheck(_ index: Int) {
@@ -452,52 +307,6 @@ struct StaffScannerView: View {
 
     private func entityLabel(_ type: String) -> String {
         ["order": "Заказ", "warranty": "Гарантия", "shift": "Смена", "inventory": "Склад", "support": "Поддержка", "return": "Возврат", "tradein": "Trade-in"][type] ?? type
-    }
-}
-
-private struct BarcodeScannerSheet: UIViewControllerRepresentable {
-    let onCode: (String) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
-    func makeUIViewController(context: Context) -> ScannerController {
-        let controller = ScannerController()
-        controller.onCode = context.coordinator.onCode
-        return controller
-    }
-    func updateUIViewController(_ uiViewController: ScannerController, context: Context) {}
-
-    final class Coordinator {
-        let onCode: (String) -> Void
-        init(onCode: @escaping (String) -> Void) { self.onCode = onCode }
-    }
-}
-
-private final class ScannerController: UIViewController, @preconcurrency AVCaptureMetadataOutputObjectsDelegate {
-    var onCode: ((String) -> Void)?
-    private let session = AVCaptureSession()
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .black
-        guard let device = AVCaptureDevice.default(for: .video),
-              let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) else { return }
-        session.addInput(input)
-        let output = AVCaptureMetadataOutput()
-        guard session.canAddOutput(output) else { return }
-        session.addOutput(output)
-        output.setMetadataObjectsDelegate(self, queue: .main)
-        output.metadataObjectTypes = [.ean8, .ean13, .code128, .qr]
-        let preview = AVCaptureVideoPreviewLayer(session: session)
-        preview.videoGravity = .resizeAspectFill
-        preview.frame = view.bounds
-        view.layer.addSublayer(preview)
-        Task.detached { [session] in session.startRunning() }
-    }
-
-    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        guard let value = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue else { return }
-        session.stopRunning()
-        onCode?(value)
     }
 }
 

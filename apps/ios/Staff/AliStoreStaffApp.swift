@@ -76,7 +76,7 @@ private struct StaffRootView: View {
     let logout: () -> Void
     @State private var selectedTab = StaffTab.home
     @State private var workMode = StaffWorkMode.orders
-    @State private var scannerMode = StaffScannerMode.addProduct
+    @State private var scannerMode = StaffScannerMode.buyback
     @State private var routedTaskId: String?
     @State private var pushStatus = "Push не настроен"
     private let environment = AppEnvironment.live()
@@ -93,10 +93,6 @@ private struct StaffRootView: View {
                     openTasks: {
                         selectedTab = .kpi
                         workMode = .tasks
-                    },
-                    openAddProduct: {
-                        scannerMode = .addProduct
-                        selectedTab = .buyback
                     },
                     openBuyback: {
                         scannerMode = .buyback
@@ -219,7 +215,6 @@ private struct StaffHomeView: View {
     let session: StaffSession
     let openOrders: () -> Void
     let openTasks: () -> Void
-    let openAddProduct: () -> Void
     let openBuyback: () -> Void
     let openEvidence: () -> Void
     let openCustomer360: () -> Void
@@ -322,7 +317,6 @@ private struct StaffHomeView: View {
                 .foregroundStyle(primaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 actionTile("Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders", action: openOrders)
-                actionTile("Добавить товар", subtitle: "сканер", icon: "plus.app.fill", tint: lime, identifier: "staff-home-add-product", action: openAddProduct)
                 actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback", action: openBuyback)
                 actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi", action: openTasks)
             }

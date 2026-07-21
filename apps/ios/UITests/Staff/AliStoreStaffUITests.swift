@@ -27,7 +27,6 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Открыть смену"].exists)
         XCTAssertTrue(app.staticTexts["Быстрые действия"].exists)
         XCTAssertTrue(app.buttons["staff-home-orders"].exists)
-        XCTAssertTrue(app.buttons["staff-home-add-product"].exists)
         XCTAssertTrue(app.buttons["staff-home-buyback"].exists)
         XCTAssertTrue(app.buttons["staff-home-kpi"].exists)
         XCTAssertTrue(app.staticTexts["ЗАДАЧА ОТ AI"].exists)
@@ -118,30 +117,6 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["№4090"].exists)
         XCTAssertTrue(app.staticTexts["Выдан"].exists)
         XCTAssertTrue(app.staticTexts["MacBook Air ×1"].exists)
-    }
-
-    func testSignedInStaffAddProductMatchesPrototypeShell() {
-        let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing-signed-in"]
-        app.launch()
-
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
-        app.buttons["staff-home-add-product"].tap()
-
-        XCTAssertTrue(app.staticTexts["Добавить товар"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Сканировать штрихкод / фото"].exists)
-        app.buttons["Сканировать штрихкод / фото"].tap()
-
-        XCTAssertTrue(app.staticTexts["Штрихкод распознан"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["🤖 AI заполнил карточку"].exists)
-        XCTAssertTrue(app.staticTexts["iPhone 15 128 ГБ"].exists)
-        XCTAssertTrue(app.staticTexts["109 900 сом"].exists)
-        app.buttons["Отправить на модерацию"].tap()
-
-        XCTAssertTrue(app.staticTexts["Товар отправлен на модерацию"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["4 870123 456789"].exists)
-        XCTAssertTrue(app.buttons["🖨 Печать этикетки 40×40"].exists)
-        XCTAssertTrue(app.buttons["Добавить ещё"].exists)
     }
 
     func testSignedInStaffBuybackMatchesPrototypeShell() {
