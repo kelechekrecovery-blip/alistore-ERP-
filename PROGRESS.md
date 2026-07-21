@@ -5105,3 +5105,4 @@
 - Changes: the integration suite now proves assigned-courier access, foreign-courier denial, manager access, matching delivery Evidence, foreign actor denial and wrong-order denial.
 - Checks: Evidence integration `7/7`; `git diff --check`.
 - Result: the ownership contract is now directly tested; the concurrent Courier/Evidence implementation remains in its owning dirty slice and still needs a coordinated review/commit.
+- Follow-up: Courier/Evidence implementation was reviewed and committed as `7e56e03`; delivery completion/failure now requires an Evidence upload owned by the assigned courier and order, with manager/cashier policy preserved.
