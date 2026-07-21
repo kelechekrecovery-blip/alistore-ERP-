@@ -94,6 +94,70 @@ describe('Supplier RMA (integration)', () => {
     expect((await prisma.deviceUnit.findUnique({ where: { imei } }))?.status).toBe('written_off');
   });
 
+
+  /**
+   * RMA нельзя открыть на проданный или зарезервированный аппарат.
+   *
+   * `open()` читал юнит вне транзакции и не проверял его статус вообще:
+   * `tx.deviceUnit.update({ where: { imei }, data: { status: 'in_repair' } })` —
+   * безусловно, без `updateMany` с условием, без `FOR UPDATE`. Предпосылки не
+   * было ни в каком виде.
+   *
+   * Практический смысл: клиент оплатил телефон, COGS проведён, деньги в кассе —
+   * а кладовщик одним запросом отправляет этот же IMEI поставщику. Заказ теряет
+   * товар без единого события, объясняющего куда.
+   *
+   * Хуже то, что аппарат возвращается: `transition → repaired` переводит юнит
+   * обратно в `in_stock`, сохраняя `orderId` клиента, и он снова продаётся.
+   * Главный инвариант проекта — «один IMEI нельзя продать дважды» — ломается не
+   * через продажу, а через закупочный контур.
+   */
+  it('не открывает RMA на проданный аппарат', async () => {
+    const { supplier, imei } = await fixture();
+    await prisma.deviceUnit.update({ where: { imei }, data: { status: 'sold' } });
+
+    await expect(rma.open({ supplierId: supplier.id, imei, defect: 'DOA' }, 'wh')).rejects.toMatchObject({
+      code: 'rma_unit_not_in_stock',
+    });
+    expect((await prisma.deviceUnit.findUnique({ where: { imei } }))?.status).toBe('sold');
+    expect(await prisma.supplierRma.count({ where: { imei } })).toBe(0);
+  });
+
+  it('не открывает RMA на зарезервированный аппарат', async () => {
+    const { supplier, imei } = await fixture();
+    await prisma.deviceUnit.update({ where: { imei }, data: { status: 'reserved' } });
+
+    await expect(rma.open({ supplierId: supplier.id, imei, defect: 'DOA' }, 'wh')).rejects.toMatchObject({
+      code: 'rma_unit_not_in_stock',
+    });
+    expect((await prisma.deviceUnit.findUnique({ where: { imei } }))?.status).toBe('reserved');
+  });
+
+  /**
+   * Разрешение RMA не переписывает статус, если аппарат уже ушёл из ремонта.
+   *
+   * `transition()` применяло `UNIT_EFFECT` безусловным `update`. Два
+   * параллельных разрешения из `accepted` (оба легальны по машине состояний:
+   * `repaired` и `rejected`) проходили проверку оба, а победители по строке RMA
+   * и по строке юнита определялись независимо. Получалось «RMA отремонтирована,
+   * аппарат списан» — или наоборот, списанный поставщиком аппарат снова в
+   * продаже.
+   */
+  it('не переписывает статус аппарата, если он уже покинул ремонт', async () => {
+    const { supplier, imei } = await fixture();
+    const opened = await rma.open({ supplierId: supplier.id, imei, defect: 'no power' }, 'wh');
+    await rma.transition(opened.id, 'shipped', 'wh');
+    await rma.transition(opened.id, 'accepted', 'wh');
+
+    // Аппарат ушёл из ремонта другим путём — разрешение не должно его трогать.
+    await prisma.deviceUnit.update({ where: { imei }, data: { status: 'written_off' } });
+
+    await expect(rma.transition(opened.id, 'repaired', 'wh')).rejects.toMatchObject({
+      code: 'rma_unit_effect_lost',
+    });
+    expect((await prisma.deviceUnit.findUnique({ where: { imei } }))?.status).toBe('written_off');
+  });
+
   it('rejects an illegal transition (created → repaired)', async () => {
     const { supplier, imei } = await fixture();
     const opened = await rma.open({ supplierId: supplier.id, imei, defect: 'x' }, 'wh');

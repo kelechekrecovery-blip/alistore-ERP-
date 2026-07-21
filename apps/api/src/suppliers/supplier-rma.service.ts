@@ -3,7 +3,7 @@ import { RmaStatus, UnitStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ValidationError } from '../common/errors';
+import { ConflictError, ValidationError } from '../common/errors';
 import { assertRmaTransition, RMA_RESOLUTIONS } from './rma-state';
 import { buildScorecard, SupplierScore } from './scorecard';
 
@@ -75,7 +75,26 @@ export class SupplierRmaService {
           sla,
         },
       });
-      await tx.deviceUnit.update({ where: { imei: input.imei }, data: { status: 'in_repair' } });
+      // Здесь стоял безусловный `update` без единой проверки статуса: RMA
+      // открывалась на проданный, зарезервированный или зажатый под обмен
+      // аппарат одним запросом. Оплаченный клиентом телефон физически уезжал
+      // поставщику, а после `transition → repaired` возвращался в сток со
+      // старым orderId и продавался второй раз.
+      //
+      // Условный updateMany + проверка count — тот же приём, что в
+      // `units.service.ts` и `inventory.service.ts`: предпосылка проверяется
+      // той же операцией, что и меняет строку, поэтому параллельная продажа
+      // не может проскочить между проверкой и записью.
+      const claimed = await tx.deviceUnit.updateMany({
+        where: { imei: input.imei, status: 'in_stock' },
+        data: { status: 'in_repair' },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictError(
+          'rma_unit_not_in_stock',
+          `Устройство ${input.imei} не в свободном остатке — RMA открыть нельзя`,
+        );
+      }
       return {
         result: rma,
         events: [
@@ -93,6 +112,11 @@ export class SupplierRmaService {
   /** Advance an RMA through its guarded machine, applying unit effects on resolution. */
   async transition(id: string, to: RmaStatus, actor: string) {
     return this.audit.transaction(async (tx) => {
+      // Read-then-update без охраны позволял двум параллельным разрешениям из
+      // `accepted` (по машине состояний легальны и `repaired`, и `rejected`)
+      // пройти проверку обоим, а победители по строке RMA и по строке юнита
+      // определялись независимо: «RMA отремонтирована, аппарат списан».
+      await tx.$queryRaw`SELECT id FROM "SupplierRma" WHERE id = ${id} FOR UPDATE`;
       const rma = await tx.supplierRma.findUnique({ where: { id } });
       if (!rma) {
         throw new ValidationError('rma_not_found', `RMA ${id} не найдена`);
@@ -105,7 +129,18 @@ export class SupplierRmaService {
       });
       const unitEffect = UNIT_EFFECT[to];
       if (unitEffect) {
-        await tx.deviceUnit.update({ where: { imei: rma.imei }, data: { status: unitEffect } });
+        // Аппарат обязан всё ещё быть в ремонте: безусловная запись возвращала
+        // в сток то, что уже списали, — и списывала то, что уже вернули.
+        const applied = await tx.deviceUnit.updateMany({
+          where: { imei: rma.imei, status: 'in_repair' },
+          data: { status: unitEffect },
+        });
+        if (applied.count !== 1) {
+          throw new ConflictError(
+            'rma_unit_effect_lost',
+            `Устройство ${rma.imei} уже покинуло ремонт — разрешение RMA не применено`,
+          );
+        }
       }
       return {
         result: updated,
