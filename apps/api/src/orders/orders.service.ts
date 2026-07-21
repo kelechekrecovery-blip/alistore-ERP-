@@ -511,9 +511,13 @@ export class OrdersService {
               paymentMode: order.paymentMode,
               storePointId: order.storePointId,
               pickupPoint: order.pickupPoint,
-              pickupAddress: order.pickupAddress,
               fulfillmentLocation: order.fulfillmentLocation,
-              deliveryAddress: order.deliveryAddress,
+              // Текст адреса в append-only леджер не пишется: его нельзя удалить
+              // по запросу клиента, а `deliveryAddress`/`pickupAddress` — это
+              // домашний адрес человека. Сам адрес остаётся на строке Order
+              // (её при удалении можно обезличить); id зоны/точки достаточно для
+              // маршрутизации и отчётов.
+              deliveryZoneId: order.deliveryZoneId,
               deliverySlot: order.deliverySlot,
               pickupCode: order.pickupCode,
               subtotal: order.subtotal,

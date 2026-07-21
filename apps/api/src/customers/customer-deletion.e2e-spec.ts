@@ -147,6 +147,42 @@ describe('Customer account deletion and export', () => {
     expect(await prisma.auditEvent.count({ where: { refs: { has: order.id } } })).toBe(1);
   });
 
+  /**
+   * Удаление обязано убрать ПДн из мест, где они не нужны бухгалтерии:
+   * имя клиента с публичного отзыва и номер паспорта из скупки Б/У. Сами
+   * заказы, сделки и события остаются — они нужны учёту и анти-фроду.
+   */
+  it('обезличивает публичный отзыв и очищает паспорт скупки', async () => {
+    const owner = await customer('66');
+    const product = await prisma.product.create({
+      data: { sku: `DEL-REV-${run}`, name: 'iPhone', price: 100000, cost: 80000, category: 'phones', attrs: {} },
+    });
+    const soldOrder = await prisma.order.create({
+      data: { customerId: owner.id, channel: 'web', status: 'completed', total: 100000 },
+    });
+    await prisma.productReview.create({
+      data: { productId: product.id, sku: product.sku, orderId: soldOrder.id, customerId: owner.id, customerName: 'Нурбек Асанов', rating: 5, text: 'Отлично, звоните 0555', status: 'approved' },
+    });
+    await prisma.tradeInDevice.create({
+      data: { customerId: owner.id, model: `TI-DEL-${run}`, grade: 'B', price: 40000, sellerPassport: 'AN7654321' },
+    });
+
+    await request(app.getHttpServer())
+      .delete('/customers/me')
+      .set('Authorization', `Bearer ${token(owner)}`)
+      .expect(200);
+
+    const review = await prisma.productReview.findFirstOrThrow({ where: { customerId: owner.id } });
+    expect(review.customerName).not.toContain('Нурбек');
+    const tradeIn = await prisma.tradeInDevice.findFirstOrThrow({ where: { customerId: owner.id } });
+    expect(tradeIn.sellerPassport).toBe('');
+
+    await prisma.productReview.deleteMany({ where: { customerId: owner.id } });
+    await prisma.tradeInDevice.deleteMany({ where: { customerId: owner.id } });
+    await prisma.order.deleteMany({ where: { id: soldOrder.id } });
+    await prisma.product.deleteMany({ where: { id: product.id } });
+  });
+
   it('exports only the signed-in customer data and rejects staff tokens', async () => {
     const owner = await customer('44');
     const other = await customer('55');

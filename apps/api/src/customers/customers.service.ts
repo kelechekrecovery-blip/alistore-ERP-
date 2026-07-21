@@ -221,16 +221,40 @@ export class CustomersService {
   async exportData(customerId: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
-    const [addresses, orders, loyaltyEntries, coupons, preferences] = await Promise.all([
+    // Выгрузка объявлена полной («всё, что привязано к аккаунту»), но раньше
+    // отдавала меньше половины хранимого: без trade-in, гарантий, тикетов,
+    // отзывов и адреса доставки заказов. Добавлено, чтобы ответ на запрос
+    // субъекта совпадал с тем, что система реально хранит о человеке.
+    const [addresses, orders, loyaltyEntries, coupons, preferences, tradeIns, warranties, tickets, reviews] = await Promise.all([
       this.prisma.customerAddress.findMany({ where: { customerId }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] }),
       this.prisma.order.findMany({
         where: { customerId },
-        select: { id: true, status: true, channel: true, total: true, createdAt: true },
+        select: { id: true, status: true, channel: true, total: true, deliveryAddress: true, pickupPoint: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.loyaltyEntry.findMany({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
       this.prisma.customerCoupon.findMany({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
       this.prisma.customerPreferences.findUnique({ where: { customerId } }),
+      this.prisma.tradeInDevice.findMany({
+        where: { customerId },
+        // Паспорт не выгружаем — маскируется на чтении и не является данными,
+        // которые субъект запрашивает о себе (это KYC-документ магазина).
+        select: { id: true, model: true, imei: true, grade: true, price: true, contractId: true },
+      }),
+      this.prisma.warrantyCase.findMany({
+        where: { customerId },
+        select: { id: true, imei: true, problem: true, status: true },
+      }),
+      this.prisma.supportTicket.findMany({
+        where: { customerId },
+        select: { id: true, subject: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.productReview.findMany({
+        where: { customerId },
+        select: { id: true, sku: true, rating: true, text: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
     return {
       exportedAt: new Date().toISOString(),
@@ -239,6 +263,10 @@ export class CustomersService {
       orders,
       loyaltyEntries,
       coupons,
+      tradeIns,
+      warranties,
+      tickets,
+      reviews,
       notifications: { consent: customer.consent, ...preferenceValues(preferences) },
     };
   }
@@ -274,6 +302,18 @@ export class CustomersService {
       await tx.refreshToken.updateMany({
         where: { customerId, revokedAt: null },
         data: { revokedAt: new Date() },
+      });
+      // Имя клиента — независимая копия в публичном отзыве (`ProductReview`),
+      // оно оставалось видимым в интернете после удаления аккаунта. Обезличиваем.
+      await tx.productReview.updateMany({
+        where: { customerId },
+        data: { customerName: DELETED_CUSTOMER_NAME },
+      });
+      // Паспорт продавца Б/У — открытый текст, не нужный ни бухгалтерии, ни
+      // анти-фроду (тем служат IMEI и связь с клиентом). Сама сделка остаётся.
+      await tx.tradeInDevice.updateMany({
+        where: { customerId },
+        data: { sellerPassport: '' },
       });
 
       const events: AuditInput[] = [

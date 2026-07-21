@@ -233,6 +233,14 @@ describe('Orders by customer (account)', () => {
       items: [{ sku: product.sku, qty: 1, price: 1 }],
     }, owner.id, `cod-order-${seq}`);
     expect(order).toMatchObject({ status: 'created', paymentMode: 'cod', total: 10200 });
+
+    // Текст адреса не должен попадать в append-only событие: удалить его оттуда
+    // по запросу клиента нельзя, а это домашний адрес человека.
+    const createdEvent = await prisma.auditEvent.findFirstOrThrow({
+      where: { type: 'order.created', refs: { has: order.id } },
+    });
+    expect(JSON.stringify(createdEvent.payload)).not.toContain('Киевская');
+
     await expect(orders.createFromCatalog({
       customerId: owner.id,
       channel: 'web',
