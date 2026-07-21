@@ -100,21 +100,29 @@ public enum OfflineCourierQueue {
         idempotencyKey: String,
         context: ModelContext
     ) throws {
-        let encoded = try JSONEncoder().encode(body)
+        let encoded = try OfflineQueueCoding.encode(body)
         try enqueueEncoded(endpoint: endpoint, body: encoded, idempotencyKey: idempotencyKey, context: context)
     }
 
     @MainActor
     public static func enqueueEncoded(
         endpoint: String,
-        body: Data,
+        body rawBody: Data,
         idempotencyKey: String,
         context: ModelContext
     ) throws {
+        // Тело могло прийти от произвольного кодировщика — приводим к канону,
+        // иначе сравнение с уже сохранённым бессмысленно.
+        let body = OfflineQueueCoding.canonical(rawBody)
         let descriptor = FetchDescriptor<PendingMutation>(
             predicate: #Predicate { $0.idempotencyKey == idempotencyKey }
         )
-        if try !context.fetch(descriptor).isEmpty { return }
+        // Та же развилка, что и в кассе: повтор — идемпотентен, подмена тела под
+        // тем же ключом — потеря операции, о которой курьер обязан узнать.
+        if let existing = try context.fetch(descriptor).first {
+            guard existing.body == body else { throw OfflineQueueError.keyReused }
+            return
+        }
         context.insert(PendingMutation(
             endpoint: endpoint,
             method: "POST",
@@ -171,6 +179,48 @@ public enum OfflineCourierQueue {
     }
 }
 
+/**
+ Каноническое кодирование тел очереди.
+
+ `JSONEncoder` **не гарантирует порядок ключей**: замерено, что два кодирования
+ одного и того же `POSSaleRequest` в одном процессе дают разный JSON. Поэтому
+ сравнивать тела побайтово можно только после приведения к канону — иначе повтор
+ той же продажи выглядит как другая операция.
+
+ Сортировка ключей не меняет смысла для сервера, а тело становится сравнимым и
+ стабильным между запусками.
+ */
+public enum OfflineQueueCoding {
+    public static func encode<Body: Encodable>(_ body: Body) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try encoder.encode(body)
+    }
+
+    /// Приводит уже закодированное тело к тому же канону. Если это не JSON —
+    /// возвращает как есть: терять операцию из-за формата нельзя.
+    public static func canonical(_ body: Data) -> Data {
+        guard let object = try? JSONSerialization.jsonObject(with: body),
+              let sorted = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        else { return body }
+        return sorted
+    }
+}
+
+/// Ошибки офлайн-очереди, которые обязан увидеть человек.
+public enum OfflineQueueError: LocalizedError, Equatable {
+    /// Под этим ключом уже лежит другая операция — принимать нельзя, потому что
+    /// одна из двух была бы потеряна без следа.
+    case keyReused
+
+    public var errorDescription: String? {
+        switch self {
+        case .keyReused:
+            return "Под этим номером продажи уже сохранена другая операция. Начните новую продажу."
+        }
+    }
+}
+
 public enum OfflinePOSQueue {
     private static let approvalPrefix = "approval:"
 
@@ -179,14 +229,22 @@ public enum OfflinePOSQueue {
         _ request: POSSaleRequest,
         context: ModelContext
     ) throws {
+        let body = try OfflineQueueCoding.encode(request)
         let descriptor = FetchDescriptor<PendingMutation>(
             predicate: #Predicate { $0.idempotencyKey == request.clientSaleId }
         )
-        if try !context.fetch(descriptor).isEmpty { return }
+        // Совпадение ключа — это два разных случая, и раньше оба молча
+        // проглатывались. Тот же запрос — идемпотентный повтор. Другой запрос
+        // под тем же ключом — следующий покупатель, продажа которого исчезала
+        // бы целиком, при том что касса писала «сохранено».
+        if let existing = try context.fetch(descriptor).first {
+            guard existing.body == body else { throw OfflineQueueError.keyReused }
+            return
+        }
         context.insert(PendingMutation(
             endpoint: "pos/sale",
             method: "POST",
-            body: try JSONEncoder().encode(request),
+            body: body,
             idempotencyKey: request.clientSaleId
         ))
         try context.save()
@@ -249,7 +307,7 @@ public enum OfflinePOSQueue {
     public static func attachApproval(_ mutation: PendingMutation, context: ModelContext) throws {
         guard let approvalId = approvalId(from: mutation.lastError) else { return }
         let request = try JSONDecoder().decode(POSSaleRequest.self, from: mutation.body)
-        mutation.body = try JSONEncoder().encode(request.approved(with: approvalId))
+        mutation.body = try OfflineQueueCoding.encode(request.approved(with: approvalId))
         mutation.state = "queued"
         mutation.lastError = nil
         mutation.updatedAt = Date()

@@ -318,11 +318,31 @@ struct POSSaleView: View {
         } catch let error as APIError {
             errorMessage = error.localizedDescription
         } catch {
+            // Офлайн-очередь, живущая только в памяти, до перезапуска выглядит
+            // рабочей и теряет всё после него. Принимать в неё деньги нельзя.
+            guard !OfflineStore.isEphemeral else {
+                errorMessage = OfflineStore.failure ?? "Офлайн-очередь недоступна — проведите продажу при связи"
+                return
+            }
             do {
                 try OfflinePOSQueue.enqueue(request, context: modelContext)
                 message = "Продажа сохранена офлайн"
+                // Ключ не ротировался, корзина не чистилась — и следующая
+                // офлайн-продажа уходила под тем же `clientSaleId`. Очередь
+                // считала её повтором, касса писала «сохранено», выручки не было.
+                resetSale()
             } catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    /// Закрытие продажи: одинаково после успеха и после офлайн-сохранения.
+    private func resetSale() {
+        cart = [:]
+        selectedIMEI = [:]
+        approvalId = nil
+        activeSaleId = UUID().uuidString
+        splitCash = ""
+        discount = "0"
     }
 
     @MainActor private func consume(_ result: POSSaleResult) async {
@@ -333,15 +353,10 @@ struct POSSaleView: View {
         case let .completed(orderId, receiptNo, paidTotal, _, _, _):
             message = "\(receiptNo) · оплачено \(paidTotal) сом · Event Ledger"
             receipt = try? await api.get("receipts/order/\(orderId)", token: session.accessToken)
-            cart = [:]
-            selectedIMEI = [:]
-            approvalId = nil
-            activeSaleId = UUID().uuidString
-            splitCash = ""
-            // Скидка не сбрасывалась вместе с остальным: следующий покупатель
-            // молча получал скидку предыдущего, а при превышении порога — ещё и
-            // требование одобрения на пустом месте.
-            discount = "0"
+            // Скидка раньше не сбрасывалась вместе с остальным: следующий
+            // покупатель молча получал скидку предыдущего, а при превышении
+            // порога — ещё и требование одобрения на пустом месте.
+            resetSale()
             await refresh()
         }
     }
