@@ -263,6 +263,50 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/auth/otp/verify")
     }
 
+    /**
+     Регрессия: вход в Client был невозможен вообще.
+
+     `auth/otp/request` на сервере (`apps/api/src/auth/auth.service.ts:69,86`) возвращает
+     `{ challengeId, devCode? }` и `expiresIn` не шлёт никогда. Модель `OTPChallenge`
+     требовала его обязательным, поэтому декодирование падало на КАЖДОМ запросе кода,
+     и покупатель видел «Не удалось прочитать ответ» вместо экрана ввода OTP.
+
+     Тест выше проверял только `otp/verify` и этой дыры не видел: там другой тип ответа.
+     Здесь фиксируется форма ровно того ответа, с которым сервис реально едет.
+     */
+    func testDecodesOtpRequestWithoutExpiresIn() async throws {
+        let session = makeSession(status: 200, body: """
+        {"challengeId":"ch-1"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let challenge: OTPChallenge = try await client.post(
+            "auth/otp/request",
+            body: OTPRequest(phone: "+996555000000")
+        )
+
+        XCTAssertEqual(challenge.challengeId, "ch-1")
+        XCTAssertNil(challenge.devCode, "Без dev-эха сервер devCode не присылает")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "POST")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/api/auth/otp/request")
+    }
+
+    /// Вторая форма того же ответа: при включённом `AUTH_OTP_DEV_ECHO` вне production
+    /// сервер добавляет `devCode` — приложение обязано принять и её.
+    func testDecodesOtpRequestWithDevEcho() async throws {
+        let session = makeSession(status: 200, body: """
+        {"challengeId":"ch-2","devCode":"828468"}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let challenge: OTPChallenge = try await client.post(
+            "auth/otp/request",
+            body: OTPRequest(phone: "+996555000000")
+        )
+
+        XCTAssertEqual(challenge.devCode, "828468")
+    }
+
     func testDecodesCustomerOrderHistory() async throws {
         let session = makeSession(status: 200, body: """
         [{"id":"o1","channel":"mobile","fulfillmentType":"pickup","pickupPoint":"BISHKEK-1","deliveryAddress":null,"deliverySlot":null,"pickupCode":"4281","status":"paid","total":109900,"createdAt":"2026-07-12T12:00:00Z","items":[{"sku":"IP-1","qty":1,"price":109900,"imei":"123456789012345"}]}]

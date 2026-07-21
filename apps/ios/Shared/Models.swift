@@ -261,8 +261,19 @@ public struct OTPVerification: Encodable, Sendable {
     }
 }
 
+/// Ответ `POST auth/otp/request`.
+///
+/// Форма задана сервером в `apps/api/src/auth/auth.service.ts:69,86`:
+/// `{ challengeId }`, а при включённом `AUTH_OTP_DEV_ECHO` вне production —
+/// `{ challengeId, devCode }`. Поля `expiresIn` сервер не присылает НИКОГДА;
+/// пока оно было объявлено обязательным, декодирование падало на каждом запросе
+/// кода и вход в приложение был невозможен.
+///
+/// `challengeId` объявлен обязательным намеренно: он приходит в обеих ветках,
+/// и если сервер перестанет его слать, это должно сломать тест, а не тихо
+/// разъехаться. Само приложение его не использует — `verify` шлёт телефон и код.
 public struct OTPChallenge: Decodable, Sendable {
-    public let expiresIn: Int
+    public let challengeId: String
     public let devCode: String?
 }
 
