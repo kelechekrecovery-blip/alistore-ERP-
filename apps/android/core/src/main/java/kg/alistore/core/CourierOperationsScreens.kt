@@ -247,8 +247,8 @@ private fun CourierWorkspace(
     when {
       loading -> CourierLoading(Modifier.padding(padding))
       selected == 0 -> CourierRoute(deliveries, focusedDeliveryId, message, session, commands, api, apiBaseUrl, { revision++ }, Modifier.padding(padding))
-      selected == 1 -> CourierCod(deliveries, queue.pending(), session, commands, apiBaseUrl, { revision++ }, Modifier.padding(padding))
-      else -> CourierProfile(session, queue.pending(), onLogout, Modifier.padding(padding))
+      selected == 1 -> CourierCod(deliveries, queue.pending(includeConflicts = true), session, commands, apiBaseUrl, { revision++ }, Modifier.padding(padding))
+      else -> CourierProfile(session, queue.pending(includeConflicts = true), onLogout, Modifier.padding(padding))
     }
   }
 }
@@ -504,11 +504,28 @@ private fun CourierCod(
 
 @Composable
 private fun CourierProfile(session: StaffSession, pending: List<PendingMutation>, onLogout: () -> Unit, modifier: Modifier) {
+  val conflicts = pending.filter { it.state == "conflict" }
   Column(modifier.fillMaxSize().background(CourierInk).statusBarsPadding().padding(24.dp)) {
     Text(session.username, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
     Text("Курьер · ${session.staffId.takeLast(6)}", color = CourierMuted)
     Spacer(Modifier.height(24.dp))
-    Text("Очередь: ${pending.count { it.state == "queued" }} · Конфликты: ${pending.count { it.state == "conflict" }}", color = Color.White)
+    Text("Очередь: ${pending.count { it.state == "queued" }} · Конфликты: ${conflicts.size}", color = Color.White)
+    if (conflicts.isNotEmpty()) {
+      Text(
+        "Сервер отклонил эти команды (не доставлено автоматически) — нужен диспетчер:",
+        color = CourierCoral,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(top = 10.dp),
+      )
+      conflicts.forEach { command ->
+        Text(
+          "${command.endpoint} · ${command.lastError ?: "конфликт"} · ${command.idempotencyKey.takeLast(8)}",
+          color = CourierCoral,
+          fontSize = 11.sp,
+          modifier = Modifier.padding(top = 5.dp).testTag("courier-conflict-row"),
+        )
+      }
+    }
     OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) { Text("Выйти") }
   }
 }

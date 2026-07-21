@@ -79,6 +79,26 @@ sealed interface PosSubmitResult {
   data class Queued(val id: String) : PosSubmitResult
 }
 
+/**
+ * Mirrors apps/api/src/pos/margin-control.ts saleTotal byte-for-byte:
+ * `Math.round(gross * (1 - discountPct / 100))`. JS `Math.round` breaks ties towards
+ * positive infinity (`floor(x + 0.5)`) — that is `java.lang.Math.round`, NOT
+ * `kotlin.math.round` which breaks ties to the nearest even integer. Do not swap this.
+ */
+internal fun posSaleTotal(gross: Int, discountPct: Int): Int =
+  java.lang.Math.round(gross * (1.0 - discountPct / 100.0)).toInt()
+
+/**
+ * Mirrors the split-tender boundary: cash that fully covers the total is a full cash
+ * sale, never routed to the secondary tender method. `cash == total` must not fall
+ * through to a card/other-method-only tender.
+ */
+internal fun posTenders(method: String, total: Int, cash: Int): List<PosTender> = when {
+  cash <= 0 -> listOf(PosTender(method, total))
+  cash >= total -> listOf(PosTender("cash", total))
+  else -> listOf(PosTender("cash", cash), PosTender(method.takeUnless { it == "cash" } ?: "card", total - cash))
+}
+
 class PosSaleManager(private val gateway: PosGateway, private val queue: MutationQueue) {
   suspend fun submit(request: PosSaleRequest, token: String): PosSubmitResult {
     require(request.clientSaleId.isNotBlank()) { "clientSaleId is required" }
@@ -236,7 +256,7 @@ private fun PosSaleScreen(
   }
   val gross = products.sumOf { (cart[it.id] ?: 0) * it.price }
   val pct = discount.toIntOrNull()?.coerceIn(0, 100) ?: 0
-  val total = gross * (100 - pct) / 100
+  val total = posSaleTotal(gross, pct)
   LazyColumn(modifier.fillMaxSize().background(PosInk).statusBarsPadding(), contentPadding = PaddingValues(14.dp)) {
     item {
       Text("Продажа", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
@@ -309,7 +329,7 @@ private fun PosSaleScreen(
       Button(
         onClick = {
           val cash = splitCash.toIntOrNull()?.coerceIn(0, total) ?: 0
-          val tenders = if (cash in 1 until total) listOf(PosTender("cash", cash), PosTender(method.takeUnless { it == "cash" } ?: "card", total - cash)) else listOf(PosTender(method, total))
+          val tenders = posTenders(method, total, cash)
           val request = PosSaleRequest(
             point = shift?.point ?: "BISHKEK-1", lines = products.mapNotNull { product -> cart[product.id]?.takeIf { it > 0 }?.let { PosLine(product.id, product.sku, product.price, it, selectedImeis[product.id]) } },
             tenders = tenders, discountPct = pct, clientSaleId = activeSaleId, approvalId = approvalId,
@@ -325,6 +345,7 @@ private fun PosSaleScreen(
                     message = "${sale.receiptNo} · оплачено ${sale.total} сом"
                     receipt = runCatching { gateway.renderPosReceipt(sale.orderId, session.accessToken) }.getOrNull()
                     cart = emptyMap(); selectedImeis = emptyMap(); approvalId = null; activeSaleId = UUID.randomUUID().toString()
+                    discount = "0"; splitCash = ""
                   }
                 }
               } }

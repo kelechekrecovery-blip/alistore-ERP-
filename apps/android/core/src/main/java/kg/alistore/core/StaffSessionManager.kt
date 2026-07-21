@@ -1,5 +1,9 @@
 package kg.alistore.core
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 interface StaffAuthGateway {
   suspend fun staffLogin(username: String, password: String): StaffSession
   suspend fun staffMe(accessToken: String): StaffPrincipal
@@ -22,7 +26,11 @@ class StaffSessionManager(
   private val api: StaffAuthGateway,
   private val store: StaffSessionStore,
 ) {
-  var requiresQuickUnlock: Boolean = false
+  // Compose-observable: a plain `var` here is never re-read by a running composition once
+  // it changes outside a recomposition triggered by other state, so the unlock gate could
+  // silently become a no-op. Backing this with mutableStateOf makes every reader (PosApp,
+  // StaffApp, CourierApp) recompose whenever restore()/login()/unlock()/logout() flip it.
+  var requiresQuickUnlock: Boolean by mutableStateOf(false)
     private set
   suspend fun restore(): StaffAuthState {
     val token = store.readToken() ?: return StaffAuthState.SignedOut

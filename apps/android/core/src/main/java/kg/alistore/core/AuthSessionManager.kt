@@ -1,5 +1,9 @@
 package kg.alistore.core
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 interface AuthGateway {
   suspend fun requestOtp(phone: String): OtpChallenge
   suspend fun verifyOtp(phone: String, code: String): AuthTokens
@@ -25,7 +29,10 @@ class AuthSessionManager(
   private val api: AuthGateway,
   private val store: SessionStore,
 ) {
-  var requiresQuickUnlock: Boolean = false
+  // Compose-observable, see StaffSessionManager.requiresQuickUnlock for the rationale:
+  // a plain var is not tracked by the snapshot system, so AliStoreApp's overlay check
+  // (`authManager.requiresQuickUnlock`) would not reliably recompose on its own.
+  var requiresQuickUnlock: Boolean by mutableStateOf(false)
     private set
   suspend fun restore(): AuthState {
     val stored = store.readSession() ?: return AuthState.Guest

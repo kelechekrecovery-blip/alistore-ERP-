@@ -20,11 +20,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -68,7 +68,32 @@ class QuickUnlockStore(context: Context, private val alias: String) {
   val isPinConfigured: Boolean
     get() = prefs.getString(pinKey, null)?.startsWith("v1:") == true
 
-  fun savePin(pin: String): Boolean {
+  /**
+   * First-time PIN setup only. Refuses when a PIN is already configured — the only
+   * legitimate way to replace an existing one is [changePin], which proves knowledge of
+   * the current PIN. Without this split, anyone holding the phone on the locked gate
+   * screen could set their own PIN over the real one and unlock the workspace.
+   */
+  fun setInitialPin(pin: String): Boolean {
+    if (isPinConfigured) return false
+    return writePin(pin)
+  }
+
+  /**
+   * Replaces an existing PIN, but only after [current] is verified against the stored
+   * one. A wrong [current] counts as a failed attempt against the same lockout counter
+   * as a failed unlock, so this cannot be used to brute-force the PIN without limit.
+   */
+  fun changePin(current: String, new: String): Boolean {
+    if (!pinStatus().allowed) return false
+    if (!matches(current)) {
+      registerPinFailure()
+      return false
+    }
+    return writePin(new)
+  }
+
+  private fun writePin(pin: String): Boolean {
     if (pin.length != 6 || pin.any { !it.isDigit() }) return false
     return runCatching {
       val salt = java.util.UUID.randomUUID().toString()
@@ -133,10 +158,15 @@ fun QuickUnlockGate(
   content: @Composable () -> Unit,
 ) {
   val context = LocalContext.current
-  var unlocked by rememberSaveable { mutableStateOf(false) }
-  var pin by rememberSaveable { mutableStateOf("") }
-  var setup by rememberSaveable { mutableStateOf("") }
-  var confirmation by rememberSaveable { mutableStateOf("") }
+  // None of these may be rememberSaveable: that writes them into the on-disk
+  // savedInstanceState bundle. `unlocked` surviving a process restart would make the lock
+  // screen a no-op after the process is recreated, and `pin`/`currentPin`/`setup`/
+  // `confirmation` are secrets that must never be persisted outside the encrypted store.
+  var unlocked by remember { mutableStateOf(false) }
+  var pin by remember { mutableStateOf("") }
+  var currentPin by remember { mutableStateOf("") }
+  var setup by remember { mutableStateOf("") }
+  var confirmation by remember { mutableStateOf("") }
   var message by remember { mutableStateOf<String?>(null) }
   var pinStatus by remember { mutableStateOf(store.pinStatus()) }
   var biometricAvailable by remember { mutableStateOf(false) }
@@ -176,16 +206,35 @@ fun QuickUnlockGate(
       if (biometricAvailable) "Подтвердите биометрию или используйте PIN" else "Биометрия недоступна — используйте PIN",
       color = StaffMuted,
     )
-    OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("6-значный PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("6-значный PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().testTag("quick-unlock-pin"))
     Button(onClick = {
       if (!pinStatus.allowed) pinStatus = store.pinStatus()
       else if (store.matches(pin)) { store.registerPinSuccess(); unlocked = true; onUnlocked() }
       else { pinStatus = store.registerPinFailure(); message = if (pinStatus.allowed) "Неверный PIN" else "Слишком много попыток" }
-    }, enabled = pin.length == 6 && pinStatus.allowed, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Открыть по PIN") }
-    OutlinedTextField(setup, { setup = it.filter(Char::isDigit).take(6) }, label = { Text("Новый PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 18.dp))
-    OutlinedTextField(confirmation, { confirmation = it.filter(Char::isDigit).take(6) }, label = { Text("Повторите PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-    Button(onClick = { message = if (setup == confirmation && store.savePin(setup)) { pinStatus = store.pinStatus(); "PIN сохранён" } else "Введите одинаковые PIN-коды из 6 цифр" }, enabled = setup.length == 6 && confirmation.length == 6, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Настроить PIN") }
-    message?.let { Text(it, color = StaffCoral, modifier = Modifier.padding(top = 12.dp)) }
+    }, enabled = pin.length == 6 && pinStatus.allowed, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("quick-unlock-pin-submit")) { Text("Открыть по PIN") }
+    val pinConfigured = store.isPinConfigured
+    if (pinConfigured) {
+      // Changing an already-configured PIN must prove knowledge of the current one —
+      // otherwise anyone holding the locked phone could set their own PIN here and unlock
+      // the workspace with it, without ever passing biometrics or the real PIN.
+      OutlinedTextField(currentPin, { currentPin = it.filter(Char::isDigit).take(6) }, label = { Text("Текущий PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 18.dp).testTag("quick-unlock-current-pin"))
+    }
+    OutlinedTextField(setup, { setup = it.filter(Char::isDigit).take(6) }, label = { Text("Новый PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = if (pinConfigured) 8.dp else 18.dp).testTag("quick-unlock-setup-pin"))
+    OutlinedTextField(confirmation, { confirmation = it.filter(Char::isDigit).take(6) }, label = { Text("Повторите PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("quick-unlock-confirm-pin"))
+    Button(
+      onClick = {
+        message = when {
+          setup != confirmation -> "Введите одинаковые PIN-коды из 6 цифр"
+          !pinConfigured -> if (store.setInitialPin(setup)) { pinStatus = store.pinStatus(); setup = ""; confirmation = ""; "PIN сохранён" } else "Введите одинаковые PIN-коды из 6 цифр"
+          !pinStatus.allowed -> "Слишком много попыток"
+          store.changePin(currentPin, setup) -> { pinStatus = store.pinStatus(); currentPin = ""; setup = ""; confirmation = ""; "PIN сохранён" }
+          else -> { pinStatus = store.pinStatus(); "Неверный текущий PIN" }
+        }
+      },
+      enabled = setup.length == 6 && confirmation.length == 6 && (!pinConfigured || (currentPin.length == 6 && pinStatus.allowed)),
+      modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("quick-unlock-pin-change-submit"),
+    ) { Text(if (pinConfigured) "Изменить PIN" else "Настроить PIN") }
+    message?.let { Text(it, color = StaffCoral, modifier = Modifier.padding(top = 12.dp).testTag("quick-unlock-message")) }
     if (!pinStatus.allowed) Text("Слишком много попыток. Повторите через ${pinStatus.retryAfterSeconds} сек.", color = Design3.gold, modifier = Modifier.padding(top = 8.dp))
     Button(onClick = { store.clear(); onLogout() }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Выйти из аккаунта") }
   }
