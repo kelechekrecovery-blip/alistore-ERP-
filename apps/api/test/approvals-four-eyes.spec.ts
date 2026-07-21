@@ -1,6 +1,5 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { ApprovalsService, FOUR_EYES_ACTIONS, SINGLE_APPROVER_ACTIONS } from '../src/approvals/approvals.service';
+import { APPROVAL_APPROVER_ROLES } from '../src/rbac/permissions';
 import { AuditService } from '../src/audit/audit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -56,42 +55,29 @@ describe('Approvals · правило четырёх глаз', () => {
   });
 
   /**
-   * Список обязан покрывать действия, которые код реально создаёт.
+   * Список обязан покрывать каждое согласуемое действие системы.
    *
-   * Первая версия правила внесла в список `price_change` — строку, которую не
-   * производит ни одна строка кода: настоящее действие называется `price`
-   * (`products.service.ts`). Правка выглядела закрывающей дыру и оставила её
-   * открытой: `includes('price')` возвращал false, и админ по-прежнему
-   * согласовывал собственное изменение цены. Заодно вне списка молча остались
-   * `debt` (лимит 50 000) и `delete`.
+   * У этой проверки было две версии, и первые две ошиблись одинаково — считали
+   * список полным, не сверяясь с реестром.
    *
-   * Поэтому тест не перечисляет действия руками, а вычитывает литералы из
-   * вызовов `approvals.request` в исходниках и требует, чтобы каждое было
-   * классифицировано явно — в одном из двух списков. Опечатка или новое опасное
-   * действие теперь падают здесь, а не в проде.
+   * Версия 1: список содержал `price_change` — строку, которую не производит ни
+   * одна строка кода (реальное действие называется `price`). Правило для цен не
+   * срабатывало, дыра выглядела закрытой.
+   *
+   * Версия 2 вычитывала литералы `action: '...'` из вызовов `approvals.request`
+   * в исходниках. Она поймала бы опечатку, но не увидела `write_off` и
+   * `stock_adjust`: там действие вычисляемое — `ACTION_BY_TYPE[dto.type]`
+   * (`inventory.service.ts`). Именно этими двумя выносят склад.
+   *
+   * Теперь источник — `APPROVAL_APPROVER_ROLES`: реестр, без записи в котором
+   * действие вообще нельзя согласовать (`canApprove`). Обойти его нечем.
    */
-  it('каждое действие approvals классифицировано явно', () => {
-    const literals = new Set<string>();
-    const walk = (dir: string) => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          walk(full);
-          continue;
-        }
-        if (!entry.name.endsWith('.ts')) continue;
-        const source = readFileSync(full, 'utf8');
-        for (const match of source.matchAll(/approvals\.request\(\s*\{[\s\S]{0,240}?action: '([a-z_]+)'/g)) {
-          literals.add(match[1]);
-        }
-      }
-    };
-    walk(join(__dirname, '../src'));
-
-    // Защита от «зелено, потому что ничего не нашли».
-    expect(literals.size).toBeGreaterThanOrEqual(5);
+  it('каждое согласуемое действие классифицировано явно', () => {
     const classified = new Set([...FOUR_EYES_ACTIONS, ...SINGLE_APPROVER_ACTIONS]);
-    expect([...literals].filter((action) => !classified.has(action)).sort()).toEqual([]);
+    const unclassified = Object.keys(APPROVAL_APPROVER_ROLES)
+      .filter((action) => !classified.has(action))
+      .sort();
+    expect(unclassified).toEqual([]);
   });
 
   it('другой сотрудник с тем же правом скидку одобряет', async () => {
