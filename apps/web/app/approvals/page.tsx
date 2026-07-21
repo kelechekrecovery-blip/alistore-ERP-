@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { ApiError } from '@/lib/api/http';
 import type { FormEvent } from 'react';
 import {
   decideApproval,
@@ -37,6 +38,7 @@ const TABS = [
 export default function ApprovalsPage() {
   const [tab, setTab] = useState(TABS[0]);
   const [items, setItems] = useState<Approval[] | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [session, setSession] = useState<StaffSession | null>(null);
@@ -55,12 +57,22 @@ export default function ApprovalsPage() {
   const load = useCallback((status: string, token = session?.accessToken) => {
     if (!token) return;
     setItems(null);
+    setLoadError('');
     fetchApprovals(status, token)
       .then(setItems)
-      .catch(() => {
-        setItems([]);
-        setSession(null);
-        clearStaffSession();
+      .catch((cause: unknown) => {
+        // Раньше любой сбой трактовался как отказ авторизации: согласующего
+        // выбрасывало из системы, а на прощание он видел «Пусто · нет заявок»
+        // — при том что заявки на возвраты и списания стояли неразобранными.
+        const status = cause instanceof ApiError ? cause.status : 0;
+        if (status === 401 || status === 403) {
+          setItems([]);
+          setSession(null);
+          clearStaffSession();
+          return;
+        }
+        setItems(null);
+        setLoadError(cause instanceof Error && cause.message ? cause.message : 'Не удалось загрузить заявки');
       });
   }, [session?.accessToken]);
 
@@ -569,7 +581,14 @@ export default function ApprovalsPage() {
                   />
                 )}
               </div>
-              {items === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
+              {loadError !== '' && (
+                <div role="alert" className="rounded-card border border-danger/30 bg-danger/5 px-6 py-8 text-center">
+                  <p className="font-display text-base font-bold text-ink">Не удалось загрузить заявки</p>
+                  <p className="mt-1 text-sm text-ink/55">{loadError}</p>
+                  <button type="button" onClick={() => load(tab.status)} className="mt-4 rounded-[10px] border border-ink/20 px-4 py-2 text-sm font-semibold">Повторить</button>
+                </div>
+              )}
+              {loadError === '' && items === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
               {items && items.length === 0 && (
                 <div className="rounded-card border border-dashed border-ink/15 bg-white/50 px-6 py-16 text-center">
                   <p className="font-display text-lg font-bold text-ink">Пусто</p>

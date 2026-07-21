@@ -1,4 +1,4 @@
-import { API_BASE } from './http';
+import { API_BASE, ApiError } from './http';
 
 export interface Approval {
   id: string;
@@ -27,7 +27,10 @@ export async function fetchApprovals(status: string, accessToken: string): Promi
     headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`approvals ${res.status}`);
+  // Статус нужен вызывающему: экран согласований выкидывал сотрудника из
+  // системы на любой ошибке, потому что отличить «нет доступа» от «сервер
+  // споткнулся» по строке `approvals 500` невозможно.
+  if (!res.ok) throw new ApiError(res.status, `approvals ${res.status}`);
   return (await res.json()) as Approval[];
 }
 
