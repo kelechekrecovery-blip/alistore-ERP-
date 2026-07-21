@@ -585,7 +585,13 @@ private struct CourierRunCard: View {
     private func handover() async {
         guard let amountValue = Int(amount) else { return }
         let request = CourierHandoverRequest(runId: run.id, amount: amountValue, reason: reason.nilIfBlank)
-        let key = "courier-handover-\(run.id)"
+        // Ключ от содержимого, а не от рейса: прежний `courier-handover-<runId>`
+        // делал исправленную сумму невидимой — сервер узнавал ключ и возвращал
+        // результат первой попытки, а разница ложилась недостачей на курьера.
+        guard let key = try? IdempotencyKeys.courierHandover(runId: run.id, request: request) else {
+            message = "Не удалось подготовить сдачу COD — повторите"
+            return
+        }
         isBusy = true
         defer { isBusy = false }
         do {
