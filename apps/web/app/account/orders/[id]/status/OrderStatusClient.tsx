@@ -19,6 +19,7 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
   const { user, hydrated, authed } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
   const [steps, setSteps] = useState<TimelineStep[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!hydrated) return;
@@ -35,9 +36,11 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
         setOrder(nextOrder ?? 'missing');
         setSteps(buildOrderTimeline(ledger));
       })
-      .catch(() => {
-        setOrder('missing');
-        setSteps([]);
+      // `setOrder('missing')` объявлял заказ несуществующим при любом сбое сети.
+      // Покупатель читал «Заказ не найден» про оплаченный заказ — худшая из
+      // подмен в этом классе: она провоцирует повторную оплату и звонок.
+      .catch((cause) => {
+        setLoadError(cause instanceof Error ? cause.message : 'Не удалось загрузить заказ');
       });
   }, [authed, hydrated, params.id, user]);
 
@@ -45,6 +48,18 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
     <AccountDetailFrame>{children}</AccountDetailFrame>
   );
 
+  if (loadError) {
+    return frame(
+      <div className="grid flex-1 place-items-center text-center">
+        <div>
+          <p className="font-display text-lg font-bold">Заказ не загрузился</p>
+          <p className="mt-2 px-6 text-sm text-subtle">{loadError}</p>
+          <p className="mt-1 px-6 text-sm text-muted">Заказ никуда не делся — мы не смогли получить его статус.</p>
+          <Link href="/account" className="mt-3 inline-block text-sm text-lime">← В кабинет</Link>
+        </div>
+      </div>,
+    );
+  }
   if (order === null) return frame(<div className="grid flex-1 place-items-center font-mono text-sm text-subtle">Загрузка…</div>);
   if (order === 'missing') return frame(<div className="grid flex-1 place-items-center text-center"><div><p className="font-display text-lg font-bold">Заказ не найден</p><Link href="/account" className="mt-3 inline-block text-sm text-lime">← В кабинет</Link></div></div>);
 

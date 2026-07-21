@@ -45,6 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       })),
     ];
+    // fixtures-allowed: sitemap для поисковиков, не экран пользователя; при недоступном API отдаём статические маршруты, а не выдумываем товары
   } catch {
     // API unreachable — degrade to the static routes only.
     return staticRoutes;

@@ -62,7 +62,11 @@ export function CampaignsView() {
 
   const load = useCallback(() => {
     if (!session) return;
-    fetchCampaigns(session.accessToken).then(setCampaigns).catch(() => setCampaigns([]));
+    // Пустой список кампаний и упавший запрос — разные вещи: раньше сбой
+    // рисовал «кампаний нет», и маркетолог заводил дубль уже существующей.
+    fetchCampaigns(session.accessToken)
+      .then(setCampaigns)
+      .catch((error) => setNotice(error instanceof Error ? error.message : 'Не удалось загрузить кампании'));
   }, [session]);
 
   useEffect(() => {

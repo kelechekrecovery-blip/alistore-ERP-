@@ -38,7 +38,9 @@ export function PromotionsView({ accessToken }: { accessToken: string }) {
   }
   useEffect(() => { load().catch((error) => setNotice(error instanceof Error ? error.message : 'Не удалось загрузить промокоды')); }, [accessToken]);
   useEffect(() => {
-    const timer = window.setTimeout(() => fetchCatalog({ q: query.trim() || undefined, limit: 20, sort: 'stock_desc' }).then((result) => setProducts(result.items)).catch(() => setProducts([])), 250);
+    // Сбой поиска не выдаём за «товар не найден»: иначе промокод привяжут не к
+    // тому SKU, решив, что нужного товара в каталоге нет.
+    const timer = window.setTimeout(() => fetchCatalog({ q: query.trim() || undefined, limit: 20, sort: 'stock_desc' }).then((result) => setProducts(result.items)).catch((error) => setNotice(error instanceof Error ? error.message : 'Не удалось загрузить товары — поиск недоступен')), 250);
     return () => window.clearTimeout(timer);
   }, [query]);
 

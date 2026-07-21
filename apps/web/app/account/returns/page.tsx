@@ -16,6 +16,7 @@ export default function ReturnsPage() {
   const router = useRouter();
   const { user, hydrated, authed } = useAuth();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
+  const [ordersError, setOrdersError] = useState('');
   const [orderId, setOrderId] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
@@ -32,7 +33,9 @@ export default function ReturnsPage() {
       setOrders(list);
       const first = list.find((o) => !BLOCKED.has(o.status));
       if (first) selectOrder(first);
-    }).catch(() => setOrders([]));
+      // `setOrders([])` печатал «Нет заказов для возврата» — покупатель уходил
+      // с уверенностью, что вернуть товар нельзя, хотя список не загрузился.
+    }).catch((cause) => setOrdersError(cause instanceof Error ? cause.message : 'Не удалось загрузить заказы'));
   }, [user, authed]);
 
   const eligible = useMemo(() => (orders ?? []).filter((o) => !BLOCKED.has(o.status)), [orders]);
@@ -103,8 +106,15 @@ export default function ReturnsPage() {
 
   return (
     <MobileAppFrame title="Возврат товара" subtitle="Выберите заказ, причину и отправьте заявку на проверку." backHref="/account">
-      {orders === null && <p className="font-mono text-sm text-subtle">Загрузка заказов…</p>}
-      {orders && eligible.length === 0 && (
+      {ordersError && (
+        <div className="rounded-[14px] border border-danger-soft/40 bg-danger-soft/10 p-5 text-center">
+          <div className="font-display text-base font-bold">Заказы не загрузились</div>
+          <p className="mt-1 text-sm text-subtle">{ordersError}</p>
+          <p className="mt-1 text-sm text-muted">Это не значит, что вернуть нечего — попробуйте ещё раз.</p>
+        </div>
+      )}
+      {!ordersError && orders === null && <p className="font-mono text-sm text-subtle">Загрузка заказов…</p>}
+      {!ordersError && orders && eligible.length === 0 && (
         <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-5 text-center">
           <div className="font-display text-base font-bold">Нет заказов для возврата</div>
           <Link href="/" className="mt-3 inline-block text-sm text-lime">В каталог</Link>

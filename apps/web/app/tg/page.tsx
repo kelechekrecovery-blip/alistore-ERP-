@@ -97,6 +97,7 @@ export default function TelegramMiniAppPage() {
   useEffect(() => {
     fetchCheckoutOptions(new Date().toISOString().slice(0, 10))
       .then((options) => setStorePoint(options.pickupPoints[0] ?? null))
+      // fixtures-allowed: null здесь честен — кнопка блокируется и подписывается «Самовывоз временно недоступен», что верно и когда точек нет, и когда мы их не получили; оформить заказ вслепую нельзя
       .catch(() => setStorePoint(null));
   }, []);
 

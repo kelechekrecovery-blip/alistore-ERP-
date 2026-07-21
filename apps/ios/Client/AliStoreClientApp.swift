@@ -153,23 +153,6 @@ private struct ClientProductImage: View {
     }
 }
 
-private struct ClientStatusBar: View {
-    var body: some View {
-        HStack {
-            Text("9:41")
-            Spacer()
-            Text("AliStore").font(.system(size: 12, design: .monospaced))
-            Spacer()
-            Text("▪▪▪ 100%")
-        }
-        .font(ClientTheme.body(13, weight: .semibold))
-        .foregroundStyle(.white)
-        .padding(.horizontal, 28)
-        .frame(height: 44)
-        .background(ClientTheme.background)
-    }
-}
-
 private struct ClientHeader: View {
     let onCompare: () -> Void
     let onNotifications: () -> Void
@@ -961,7 +944,6 @@ private struct ClientRootView: View {
                 ClientLoginView(auth: auth, onGuest: { guestMode = true })
             } else {
                 VStack(spacing: 0) {
-                    ClientStatusBar()
                     ClientHeader(onCompare: { overlay = .compare }, onNotifications: { overlay = .notifications }, onSearch: { overlay = .search })
                     ZStack {
                         switch selectedTab {
@@ -989,11 +971,9 @@ private struct ClientRootView: View {
                     ClientBottomNav(selected: selectedTab, cartCount: cart.values.reduce(0, +), onSelect: { selectedTab = $0 })
                 }
                 .background(ClientTheme.background)
-                .ignoresSafeArea(edges: [.top, .bottom])
             }
         }
         .preferredColorScheme(.dark)
-        .statusBarHidden(true)
         .fullScreenCover(item: $debugFeature) { feature in
             feature.screen
         }

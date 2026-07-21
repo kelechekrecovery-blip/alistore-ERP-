@@ -42,6 +42,7 @@ export default function WarehousePage() {
   const [orders, setOrders] = useState<QueueOrder[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [session, setSession] = useState<StaffSession | null>(null);
 
   useEffect(() => {
@@ -51,9 +52,12 @@ export default function WarehousePage() {
   const load = useCallback((s: Stage) => {
     if (!session) return;
     setOrders(null);
+    setLoadError('');
     fetchOrdersByStatus(s.status, session.accessToken)
       .then(setOrders)
-      .catch(() => setOrders([]));
+      // `setOrders([])` рисовал кладовщику «Пусто — нет заказов в статусе», и
+      // очередь на сборку выглядела разобранной. Заказы при этом ждали.
+      .catch((error) => setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить очередь'));
   }, [session]);
 
   useEffect(() => {
@@ -166,8 +170,22 @@ export default function WarehousePage() {
         <div className="mx-auto max-w-7xl">
           <WarehouseOps accessToken={session.accessToken} actor={session.staffId} />
           <ConsignmentOps accessToken={session.accessToken} role={session.role} />
-          {orders === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
-          {orders && orders.length === 0 && (
+          {loadError && (
+            <div className="rounded-card border border-coral/40 bg-coral/10 px-6 py-8 text-center">
+              <p className="font-display text-lg font-bold text-white">Очередь не загрузилась</p>
+              <p className="mt-1 text-sm text-coral-tint">{loadError}</p>
+              <p className="mt-1 text-sm text-subtle">Это не значит, что заказов нет — мы их просто не увидели.</p>
+              <button
+                type="button"
+                onClick={() => load(stage)}
+                className="mt-4 rounded-[6px] border border-line px-4 py-2 text-sm text-white hover:bg-surface-3"
+              >
+                Повторить
+              </button>
+            </div>
+          )}
+          {!loadError && orders === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
+          {!loadError && orders && orders.length === 0 && (
             <div className="rounded-card border border-dashed border-surface-3 bg-surface px-6 py-16 text-center">
               <p className="font-display text-lg font-bold text-white">Пусто</p>
               <p className="mt-1 text-sm text-subtle">Нет заказов в статусе «{stage.label}».</p>

@@ -42,6 +42,7 @@ function statusLabel(status: string): string {
 export default function RefundsPage() {
   const [session, setSession] = useState<StaffSession | null>(null);
   const [returns, setReturns] = useState<ReturnRequest[] | null>(null);
+  const [returnsError, setReturnsError] = useState('');
   const [selected, setSelected] = useState<RefundAggregate | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
@@ -59,7 +60,12 @@ export default function RefundsPage() {
 
   const loadReturns = useCallback((token = session?.accessToken) => {
     if (!token) return Promise.resolve();
-    return fetchStaffReturns(token).then(setReturns).catch(() => setReturns([]));
+    setReturnsError('');
+    // `setReturns([])` печатал «Refund пока не создавались» — оператор делал
+    // вывод, что возвращать нечего, хотя список просто не пришёл.
+    return fetchStaffReturns(token)
+      .then(setReturns)
+      .catch((error) => setReturnsError(error instanceof Error ? error.message : 'Не удалось загрузить возвраты'));
   }, [session?.accessToken]);
 
   useEffect(() => {
@@ -211,8 +217,18 @@ export default function RefundsPage() {
                   </button>
                 </div>
                 <div className="mt-4 space-y-2">
-                  {returns === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
-                  {returns !== null && refundsWithReturn.length === 0 && (
+                  {returnsError && (
+                    <div className="rounded-btn border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-ink">
+                      <div className="font-semibold">Возвраты не загрузились</div>
+                      <div className="mt-1 text-ink/70">{returnsError}</div>
+                      <div className="mt-1 text-ink/55">Это не значит, что refund нет — список не пришёл.</div>
+                      <button type="button" onClick={() => refresh(selected?.id)} className="mt-2 rounded-btn border border-ink/20 px-3 py-1.5 text-xs font-semibold text-ink">
+                        Повторить
+                      </button>
+                    </div>
+                  )}
+                  {!returnsError && returns === null && <p className="font-mono text-sm text-ink/40">Загрузка…</p>}
+                  {!returnsError && returns !== null && refundsWithReturn.length === 0 && (
                     <div className="rounded-btn bg-sand/70 px-4 py-3 text-sm text-ink/50">Refund пока не создавались</div>
                   )}
                   {refundsWithReturn.map((ret) => {

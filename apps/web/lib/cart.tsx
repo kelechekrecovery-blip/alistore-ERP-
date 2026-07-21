@@ -76,6 +76,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           qty: Math.max(1, Math.min(item.qty!, Number.isFinite(item.stockLimit) ? item.stockLimit! : item.qty!)),
         })));
       }
+      // fixtures-allowed: корзина — клиентское состояние; при испорченном JSON восстанавливать её неоткуда, пустая корзина здесь и есть правда, а не подменённые данные
     } catch {
       /* ignore corrupt storage */
     }
@@ -86,6 +87,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setPromoCode(pricing.promoCode ? pricing.promoCode : null);
         setBonusApplied(Boolean(pricing.bonusApplied));
       }
+      // fixtures-allowed: промокод и бонусы всё равно пересчитываются сервером при оформлении — испорченный локальный кэш просто не применяется
     } catch {
       /* ignore corrupt storage */
     }
@@ -121,6 +123,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      // fixtures-allowed: не сохранили корзину (квота/приватный режим) — она продолжает работать в памяти текущей сессии
     } catch {
       /* ignore quota errors */
     }
@@ -130,6 +133,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(PRICING_KEY, JSON.stringify({ promoCode, bonusApplied }));
+      // fixtures-allowed: не сохранили промокод/бонусы локально — сервер всё равно пересчитает их при оформлении
     } catch {
       /* ignore quota errors */
     }

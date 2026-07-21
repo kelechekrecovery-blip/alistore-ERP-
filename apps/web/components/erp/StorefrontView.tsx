@@ -56,7 +56,8 @@ export function StorefrontView({ accessToken, role }: { accessToken: string; rol
           setProducts(response.items);
           setKnownProducts((current) => mergeProducts(current, response.items));
         })
-        .catch(() => setProducts([]));
+        // Сбой поиска — не «товаров нет»: иначе подборку соберут не из того.
+        .catch((error) => setNotice(error instanceof Error ? error.message : 'Не удалось загрузить товары — поиск недоступен'));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [query]);

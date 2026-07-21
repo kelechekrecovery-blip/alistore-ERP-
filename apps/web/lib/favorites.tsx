@@ -30,6 +30,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setIds(JSON.parse(raw) as string[]);
+      // fixtures-allowed: избранное — чисто клиентское состояние; при испорченном или недоступном localStorage восстанавливать его неоткуда
     } catch {
       /* ignore */
     }
@@ -40,6 +41,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+      // fixtures-allowed: не сохранили избранное (квота/приватный режим) — оно продолжает работать в памяти текущей сессии
     } catch {
       /* ignore */
     }

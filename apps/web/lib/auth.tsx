@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         persist(fresh);
         const me = await authMe(fresh.accessToken);
         if (!cancelled) setUser(me);
+        // fixtures-allowed: гидратация анонимной сессии — отсутствие куки это норма; реальные сбои всплывают на явных защищённых запросах, локальные данные корзины не трогаем
       } catch (error) {
         // No cookie is the normal anonymous state; keep network failures visible
         // to the page instead of deleting unrelated local shopping data.

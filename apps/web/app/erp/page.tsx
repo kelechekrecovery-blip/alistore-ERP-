@@ -187,12 +187,24 @@ export default function ErpPage() {
     // норме, — при том что система об этом ничего не знала. `RiskCenterView` и
     // `CrmView` уже типизированы под `null` и умеют показывать «загружается»;
     // ветка была мертва, потому что null не приходил никогда.
-    fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks(null));
-    fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
+    fetchRisks(session.accessToken)
+      .then((r) => setRisks(r.signals))
+      .catch((cause) => {
+        // null оставляет «не знаем» вместо зелёного «тревог нет», но молча он
+        // держал бы риск-центр в вечной «загрузке» — поэтому ещё и баннер.
+        setRisks(null);
+        setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить риски');
+      });
+    fetchLedger(session.accessToken)
+      .then(setLedger)
+      // `setLedger([])` выдавал сбой за «событий не было» в книге, которая по
+      // смыслу append-only и пустой не бывает.
+      .catch((cause) => setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить Event Ledger'));
     // Право staff_tasks:manage есть не у всех, кто открывает ERP: без него
     // счётчика просто не будет — как у бейджа готовности ниже.
     fetchStaffTaskBoard({ status: ['open'] }, session.accessToken)
       .then((list) => setOpenTasks(list.length))
+      // fixtures-allowed: null убирает бейдж счётчика, а не рисует ноль; у части ролей нет права staff_tasks:manage, и отсутствие бейджа — штатный вид, а не подменённые данные
       .catch(() => setOpenTasks(null));
     setInsightsError('');
     fetchInsights(session.accessToken)
@@ -217,8 +229,17 @@ export default function ErpPage() {
 
   useEffect(() => {
     if (!session) return;
-    fetchRevenue(period, session.accessToken).then(setRevenue).catch(() => setRevenue([]));
-    fetchRevenueTrend(period, session.accessToken).then(setTrend).catch(() => setTrend(null));
+    // `setRevenue([])` рисовал владельцу пустой график выручки за период —
+    // ровно так же, как настоящий день без продаж. Сбой обязан быть виден.
+    fetchRevenue(period, session.accessToken)
+      .then(setRevenue)
+      .catch((cause) => setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить выручку'));
+    fetchRevenueTrend(period, session.accessToken)
+      .then(setTrend)
+      .catch((cause) => {
+        setTrend(null);
+        setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить динамику выручки');
+      });
   }, [period, session]);
 
   useEffect(() => {

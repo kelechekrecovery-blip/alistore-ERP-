@@ -126,6 +126,7 @@ export async function importProductsExcel(file: File, accessToken: string): Prom
     try {
       const payload = (await res.json()) as { message?: string };
       if (payload.message) message = payload.message;
+      // fixtures-allowed: внутренний catch лишь оставляет текст по умолчанию — ошибка всё равно бросается ApiError ниже
     } catch {
       // не-JSON тело (прокси-ошибка) оставляет текст по умолчанию
     }

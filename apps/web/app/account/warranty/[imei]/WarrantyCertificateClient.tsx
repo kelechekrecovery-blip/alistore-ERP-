@@ -13,12 +13,15 @@ export default function WarrantyCertificatePage({ params }: { params: { imei: st
   const { user, hydrated, authed } = useAuth();
   const router = useRouter();
   const [devices, setDevices] = useState<MyDevice[] | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (hydrated && !user) router.replace(`/login?next=/account/warranty/${encodeURIComponent(imei)}`);
   }, [hydrated, user, router, imei]);
   useEffect(() => {
-    if (user) authed(fetchMyDevices).then(setDevices).catch(() => setDevices([]));
+    // `setDevices([])` выдавал «Устройство не найдено» — владелец гарантийного
+    // телефона решал, что гарантия не оформлена, хотя список не загрузился.
+    if (user) { setLoadError(''); authed(fetchMyDevices).then(setDevices).catch((cause) => setLoadError(cause instanceof Error ? cause.message : 'Не удалось загрузить устройства')); }
   }, [user, authed]);
 
   if (!hydrated || !user) {
@@ -35,8 +38,16 @@ export default function WarrantyCertificatePage({ params }: { params: { imei: st
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-8">
-          {devices === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
-          {devices !== null && !device && (
+          {loadError && (
+            <div className="py-12 text-center">
+              <div className="mt-3.5 font-display text-[17px] font-bold">Устройства не загрузились</div>
+              <p className="mt-2 text-sm text-subtle">{loadError}</p>
+              <p className="mt-1 text-sm text-muted">Это не значит, что гарантии нет — список не пришёл.</p>
+              <Link href="/account/devices" className="mt-4 inline-block text-sm text-lime">← Мои устройства</Link>
+            </div>
+          )}
+          {!loadError && devices === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
+          {!loadError && devices !== null && !device && (
             <div className="py-12 text-center">
               <div className="text-5xl">🔍</div>
               <div className="mt-3.5 font-display text-[17px] font-bold">Устройство не найдено</div>

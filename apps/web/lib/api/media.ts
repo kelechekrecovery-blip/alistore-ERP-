@@ -42,6 +42,7 @@ export async function uploadImage(file: File, accessToken: string): Promise<Uplo
     try {
       const payload = (await res.json()) as { message?: string };
       if (payload.message) message = payload.message;
+      // fixtures-allowed: внутренний catch лишь оставляет текст по умолчанию — ошибка всё равно бросается ApiError ниже
     } catch {
       // A non-JSON body (proxy error page, 413 from the body parser) keeps the default text.
     }

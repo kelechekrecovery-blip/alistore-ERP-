@@ -35,6 +35,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setIds((JSON.parse(raw) as string[]).slice(0, COMPARE_MAX));
+      // fixtures-allowed: список сравнения — чисто клиентское состояние; при испорченном или недоступном localStorage восстанавливать его неоткуда, пустой список здесь и есть правда
     } catch {
       /* ignore */
     }
@@ -45,6 +46,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+      // fixtures-allowed: не сохранили список сравнения (квота/приватный режим) — он продолжает работать в памяти текущей сессии
     } catch {
       /* ignore */
     }

@@ -64,6 +64,7 @@ export async function fetchCatalog(query: CatalogQuery = {}): Promise<CatalogRes
     });
     if (!res.ok) throw new Error(`catalog responded ${res.status}`);
     return (await res.json()) as CatalogResponse;
+    // fixtures-allowed: не пустые данные, а сентинел source=CATALOG_UNAVAILABLE; вызывающий обязан проверить isCatalogUnavailable и показать сбой
   } catch {
     // Мягкий отказ намеренный: серверные компоненты и офлайн-касса не должны
     // падать из-за недоступного каталога. Но `source` здесь — не украшение, а

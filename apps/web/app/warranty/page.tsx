@@ -29,13 +29,17 @@ export default function WarrantyConsolePage() {
   const [cases, setCases] = useState<WarrantyCase[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   const load = useCallback((s: Stage) => {
     if (!session) return;
     setCases(null);
+    setLoadError('');
     fetchWarranty({ status: s.status, accessToken: session.accessToken })
       .then(setCases)
-      .catch(() => setCases([]));
+      // `setCases([])` показывал «Пусто — нет обращений», и гарантийная очередь
+      // выглядела разобранной. Клиент при этом ждал ответа.
+      .catch((error) => setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить обращения'));
   }, [session]);
 
   useEffect(() => {
@@ -143,8 +147,22 @@ export default function WarrantyConsolePage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl">
-          {cases === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
-          {cases && cases.length === 0 && (
+          {loadError && (
+            <div className="rounded-card border border-coral/40 bg-coral/10 px-6 py-8 text-center">
+              <p className="font-display text-lg font-bold text-white">Обращения не загрузились</p>
+              <p className="mt-1 text-sm text-coral-tint">{loadError}</p>
+              <p className="mt-1 text-sm text-subtle">Это не значит, что обращений нет — мы их просто не увидели.</p>
+              <button
+                type="button"
+                onClick={() => load(stage)}
+                className="mt-4 rounded-[6px] border border-line px-4 py-2 text-sm text-white hover:bg-surface-3"
+              >
+                Повторить
+              </button>
+            </div>
+          )}
+          {!loadError && cases === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
+          {!loadError && cases && cases.length === 0 && (
             <div className="rounded-card border border-dashed border-surface-3 bg-surface px-6 py-16 text-center">
               <p className="font-display text-lg font-bold text-white">Пусто</p>
               <p className="mt-1 text-sm text-subtle">Нет обращений в статусе «{stage.label}».</p>

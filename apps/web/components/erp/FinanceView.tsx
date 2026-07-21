@@ -60,6 +60,10 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
   const [currencyRates, setCurrencyRates] = useState<AccountingCurrencyRate[]>([]);
   const [fxExposure, setFxExposure] = useState<FxExposureReport | null>(null);
+  // Отдельно от `message`: сбой запроса нельзя показывать баннером над блоком,
+  // который при этом рапортует «экспозиции нет» — владелец прочтёт это как
+  // «валютных рисков нет», хотя мы про них просто не знаем.
+  const [fxExposureError, setFxExposureError] = useState('');
   const [rateCurrency, setRateCurrency] = useState('USD');
   const [rateValue, setRateValue] = useState('');
   const [rateDate, setRateDate] = useState(new Date().toISOString().slice(0, 10));
@@ -97,8 +101,11 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
 
   const reloadFxExposure = useCallback(() => {
     fetchFxExposure(new Date().toISOString(), '', planPoint, accessToken)
-      .then(setFxExposure)
-      .catch(() => setFxExposure(null));
+      .then((report) => { setFxExposure(report); setFxExposureError(''); })
+      .catch((error) => {
+        setFxExposure(null);
+        setFxExposureError(error instanceof Error ? error.message : 'Не удалось загрузить валютную экспозицию');
+      });
   }, [accessToken, planPoint]);
 
   useEffect(() => reloadFxExposure(), [reloadFxExposure]);
@@ -457,7 +464,9 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
                 {(total.missingRateDocuments > 0 || total.overflowDocuments > 0) && <div className="mt-2 text-[10px] text-coral-tint">{total.missingRateDocuments ? `${total.missingRateDocuments} без курса` : ''}{total.missingRateDocuments && total.overflowDocuments ? ' · ' : ''}{total.overflowDocuments ? `${total.overflowDocuments} вне диапазона` : ''}</div>}
               </div>
             ))}
-            {!fxExposure?.totals.length && <span className="text-[11px] text-faint">Открытых расходов в иностранной валюте нет</span>}
+            {fxExposureError
+              ? <span className="text-[11px] text-coral-tint">{fxExposureError} — сумма экспозиции неизвестна, это не ноль</span>
+              : !fxExposure?.totals.length && <span className="text-[11px] text-faint">Открытых расходов в иностранной валюте нет</span>}
           </div>
         </section>
         <form onSubmit={submit} className="border-t border-surface-3 pt-5">

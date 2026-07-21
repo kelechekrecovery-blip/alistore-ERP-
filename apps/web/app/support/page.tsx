@@ -22,6 +22,7 @@ export default function SupportPage() {
   const [name, setName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketsError, setTicketsError] = useState('');
   const [done, setDone] = useState<{ ticket: SupportTicket; evidenceCount: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +30,12 @@ export default function SupportPage() {
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
   useEffect(() => {
     if (!user?.customerId) return;
-    authed((token) => fetchSupportTickets(user.customerId, token)).then(setTickets).catch(() => setTickets([]));
+    // `setTickets([])` просто убирал блок «Мои обращения»: клиент не видел
+    // своего открытого тикета и заводил второй по тому же вопросу.
+    setTicketsError('');
+    authed((token) => fetchSupportTickets(user.customerId, token))
+      .then(setTickets)
+      .catch((cause) => setTicketsError(cause instanceof Error ? cause.message : 'Не удалось загрузить обращения'));
   }, [user?.customerId, done, authed]);
 
   async function submit() {
@@ -111,6 +117,13 @@ export default function SupportPage() {
         <button type="button" disabled={busy || !subject.trim() || !body.trim() || (!user && phone.trim().length < 9)} onClick={submit} className="mt-3 w-full rounded-[13px] bg-lime py-3.5 text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">{busy ? 'Создаём…' : 'Создать обращение'}</button>
       </div>
 
+      {ticketsError && (
+        <div className="mt-5 rounded-[13px] border border-danger-soft/40 bg-danger-soft/10 p-3">
+          <div className="text-[13px] font-semibold">Обращения не загрузились</div>
+          <p className="mt-1 text-[12px] text-subtle">{ticketsError}</p>
+          <p className="mt-1 text-[12px] text-muted">Если вы уже писали нам, обращение не потерялось — оно просто не отобразилось.</p>
+        </div>
+      )}
       {tickets.length > 0 && (
         <>
           <div className="mb-2 mt-5 text-[13px] text-muted">Мои обращения</div>

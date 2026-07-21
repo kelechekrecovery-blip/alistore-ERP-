@@ -128,6 +128,7 @@ export default function CheckoutPage() {
   function rotateCheckoutAttempt() {
     const next = currentCheckoutAttempt() + 1;
     checkoutAttempt.current = next;
+    // fixtures-allowed: счётчик попыток живёт в памяти и без localStorage (приватный режим, переполнена квота); на экран ничего ложного не выводится
     try { localStorage.setItem('alistore.checkout.attempt.v1', String(next)); } catch { /* storage is optional */ }
   }
 
@@ -143,6 +144,7 @@ export default function CheckoutPage() {
     }
     authed(fetchMyAddresses)
       .then((addresses) => setDeliveryAddress((current) => current || addresses.find((item) => item.isPrimary)?.text || addresses[0]?.text || ''))
+      // fixtures-allowed: это лишь автоподстановка сохранённого адреса; поле остаётся обязательным и редактируемым, покупатель вводит адрес сам — ложного «адресов нет» на экране не возникает
       .catch(() => setDeliveryAddress(''));
   }, [authHydrated, user, authed]);
   useEffect(() => {

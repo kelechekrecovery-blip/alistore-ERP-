@@ -47,6 +47,7 @@ export default function ApprovalsPage() {
   const [totpToken, setTotpToken] = useState('');
   const [refundForm, setRefundForm] = useState({ returnId: '', amount: '', reason: '', shiftId: '' });
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
+  const [returnsError, setReturnsError] = useState('');
   const [restockLocation, setRestockLocation] = useState('RETURNS-BISHKEK');
   const [resolveForm, setResolveForm] = useState({ refundId: '', action: 'confirm' as 'confirm' | 'cancel', reason: '', providerReference: '' });
 
@@ -82,7 +83,12 @@ export default function ApprovalsPage() {
 
   const loadReturns = useCallback((token = session?.accessToken) => {
     if (!token) return Promise.resolve();
-    return fetchStaffReturns(token).then(setReturns).catch(() => setReturns([]));
+    setReturnsError('');
+    // `setReturns([])` печатал «Очередь возвратов пуста» — оператор закрывал
+    // вкладку, хотя возвраты просто не загрузились.
+    return fetchStaffReturns(token)
+      .then(setReturns)
+      .catch((error) => setReturnsError(error instanceof Error ? error.message : 'Не удалось загрузить очередь возвратов'));
   }, [session?.accessToken]);
 
   useEffect(() => {
@@ -396,7 +402,17 @@ export default function ApprovalsPage() {
                   />
                 </div>
                 <div className="mt-4 space-y-2">
-                  {returns.length === 0 && <div className="rounded-btn bg-sand/70 px-4 py-3 text-sm text-ink/50">Очередь возвратов пуста</div>}
+                  {returnsError && (
+                    <div className="rounded-btn border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-ink">
+                      <div className="font-semibold">Очередь возвратов не загрузилась</div>
+                      <div className="mt-1 text-ink/70">{returnsError}</div>
+                      <div className="mt-1 text-ink/55">Это не значит, что она пуста.</div>
+                      <button type="button" onClick={() => void loadReturns()} className="mt-2 rounded-btn border border-ink/20 px-3 py-1.5 text-xs font-semibold text-ink">
+                        Повторить
+                      </button>
+                    </div>
+                  )}
+                  {!returnsError && returns.length === 0 && <div className="rounded-btn bg-sand/70 px-4 py-3 text-sm text-ink/50">Очередь возвратов пуста</div>}
                   {returns.slice(0, 8).map((ret) => {
                     const next = ret.status === 'requested' ? 'under_review'
                       : ret.status === 'under_review' ? 'approved'

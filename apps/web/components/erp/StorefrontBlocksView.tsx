@@ -40,7 +40,9 @@ export function StorefrontBlocksView({ accessToken }: { accessToken: string }) {
 
   async function load() { setBlocks(await fetchStorefrontBlocks(accessToken)); }
   useEffect(() => { load().catch(() => setNotice('Не удалось загрузить блоки')); }, [accessToken]);
-  useEffect(() => { fetchCatalog({ limit: 30, sort: 'stock_desc' }).then((result) => setProducts(result.items)).catch(() => setProducts([])); }, []);
+  // Без товаров подборку не собрать. Раньше сбой каталога выглядел как пустой
+  // каталог — редактор жал «сохранить» с пустым блоком и вешал его на витрину.
+  useEffect(() => { fetchCatalog({ limit: 30, sort: 'stock_desc' }).then((result) => setProducts(result.items)).catch((error) => setNotice(error instanceof Error ? error.message : 'Не удалось загрузить каталог — список товаров недоступен')); }, []);
   const byId = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
 
   async function run(action: () => Promise<unknown>, success: string) {

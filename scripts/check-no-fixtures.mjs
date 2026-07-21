@@ -110,9 +110,15 @@ for (const scanDir of SCAN) {
     const lines = source.split('\n');
     const rel = relative(ROOT, file);
 
-    lines.forEach((line, index) => {
+    lines.forEach((rawLine, index) => {
       const allowed = index > 0 && ALLOW.test(lines[index - 1]);
       if (allowed) return;
+
+      // Отрезаем хвостовой строчный комментарий, прежде чем искать `catch`.
+      // Иначе комментарий, документирующий старый плохой паттерн
+      // (`// раньше было .catch(() => setD(null))`), сам ловится правилом как
+      // нарушение. `(^|[^:])` бережёт `https://` — двоеточие перед `//` не режем.
+      const line = rawLine.replace(/(^|[^:])\/\/.*$/, '$1');
 
       // Rule 1 — a constant that looks like invented business data.
       const decl = /^\s*(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*(?::[^=]+)?=/.exec(line);
@@ -140,10 +146,15 @@ for (const scanDir of SCAN) {
       const promiseCatchAt = /\.catch\s*\(/.exec(line);
       if (promiseCatchAt) {
         const body = readCatchCallback(lines, index, promiseCatchAt.index + promiseCatchAt[0].length - 1);
-        const recordsError = /\b(set\w*(Error|Message|Notice|Failed)|console\.(error|warn))\s*\(/i.test(body);
+        const recordsError = /\b(set\w*(Error|Err|Message|Msg|Notice|Failed)|console\.(error|warn)|flash|toast)\s*\(/i.test(body);
         const neutralReset = /\bset[A-Z]\w*\(\s*(\[\]|null|0|''|""|false)\s*\)/.test(body);
         const usesFixture = /\b(DEFAULT_[A-Z0-9_]*|MOCK_[A-Z0-9_]*|FAKE_[A-Z0-9_]*|\w*_FIXTURE\w*)/.test(body);
-        if (usesFixture) {
+        // Пробрасывающий catch ошибку не глотает — она уходит вызывающему,
+        // который её и покажет. Это честный путь, а не подмена данных.
+        const rethrows = /\bthrow\b/.test(body);
+        if (rethrows) {
+          // ошибка распространяется дальше — не нарушение
+        } else if (usesFixture) {
           findings.push({
             file: rel,
             line: index + 1,
@@ -164,7 +175,16 @@ for (const scanDir of SCAN) {
       if (catchAt) {
         const body = readDeclaration(lines, index, catchAt.index);
         const usesFixture = /\b(DEFAULT_[A-Z0-9_]*|MOCK_[A-Z0-9_]*|FAKE_[A-Z0-9_]*|\w*_FIXTURE\w*|default[A-Z]\w*\()/.test(body);
-        const stripped = body.replace(/catch\s*(\([^)]*\))?\s*\{/, '').replace(/[{}\s]/g, '').replace(/\/\/.*$/gm, '');
+        // Комментарии снимаем ДО схлопывания пробелов. В обратном порядке
+        // `[{}\s]` убирает переводы строк, всё тело становится одной строкой, и
+        // `//.*$` вырезает от первого комментария до самого конца. Любой catch,
+        // начинающийся с пояснения, выглядел пустым — например обработчик
+        // офлайн-продажи в кассе, где под комментарием три ветки с `flash`.
+        const stripped = body
+          .replace(/catch\s*(\([^)]*\))?\s*\{/, '')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\/\/.*$/gm, '')
+          .replace(/[{}\s]/g, '');
         // Правило 3 — сбой, выданный за пустоту.
         //
         // Самая частая форма, и первая версия правила её пропускала: тело у
@@ -172,10 +192,20 @@ for (const scanDir of SCAN) {
         // результат тот же — «сервер лёг» становится неотличимо от «данных
         // нет». Владелец не пойдёт чинить то, о чём ему не сказали, а
         // покупатель на витрине просто уйдёт из пустого магазина.
-        const recordsError = /\b(set\w*(Error|Message|Notice|Failed)|console\.(error|warn))\s*\(/i.test(body);
+        //
+        // `flash`/`toast` в теле catch — это и есть канал ошибки в этом
+        // приложении (тост сотруднику). Раньше правило их не знало и флагало
+        // честные action-хендлеры, которые уже показывают `flash(e.message)` и
+        // лишь сбрасывают `setBusy(null)` в finally. В catch эти вызовы всегда
+        // на пути ошибки, так что распознавать их безопасно.
+        const recordsError = /\b(set\w*(Error|Err|Message|Msg|Notice|Failed)|console\.(error|warn)|flash|toast)\s*\(/i.test(body);
         const neutralReset = /\bset[A-Z]\w*\(\s*(\[\]|null|0|''|""|false)\s*\)/.test(body);
+        // См. промисный catch выше: `throw` пробрасывает ошибку, не глотает её.
+        const rethrows = /\bthrow\b/.test(body);
 
-        if (usesFixture) {
+        if (rethrows) {
+          // ошибка уходит вызывающему — не нарушение
+        } else if (usesFixture) {
           findings.push({
             file: rel,
             line: index + 1,
