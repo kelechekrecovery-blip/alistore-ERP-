@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { InventoryService } from '../src/inventory/inventory.service';
@@ -35,12 +36,13 @@ describe('Quantity inventory (integration)', () => {
     payments = new PaymentsService(prisma, audit, units, approvals);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit),
+      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       new ShiftsService(prisma, audit),
       units,
       orders,
       payments,
       approvals,
+      new SettingsService(prisma, audit),
     );
   });
 

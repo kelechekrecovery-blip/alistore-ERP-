@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SettingsModule } from '../settings/settings.module';
 import { PosService } from './pos.service';
 import { PosController } from './pos.controller';
 import { CustomersModule } from '../customers/customers.module';
@@ -11,7 +12,7 @@ import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
 
 @Module({
-  imports: [
+  imports: [SettingsModule, 
     CustomersModule,
     ShiftsModule,
     UnitsModule,

@@ -27,7 +27,11 @@ const DEFECT_PENALTY: Record<string, number> = {
   camera: 0.1,
 };
 const DEFECT_CAP = 0.5; // total defect penalty capped at 50%
-const BUYBACK_OF_RESALE = 0.7; // store buys at 70% of resale to keep margin
+/**
+ * Доля выкупа от цены перепродажи по умолчанию. Владелец меняет её в настройках
+ * (`tradein.buyback_of_resale_pct`) и передаёт параметром — модуль чистый.
+ */
+export const DEFAULT_BUYBACK_OF_RESALE = 0.7;
 
 const round100 = (n: number): number => Math.max(0, Math.round(n / 100) * 100);
 
@@ -36,7 +40,7 @@ const round100 = (n: number): number => Math.max(0, Math.round(n / 100) * 100);
  * age, grade and known defects, then derives a buyback price that preserves margin.
  * Pure — a vision/LLM provider can later grade from photos behind the same port.
  */
-export function assessDevice(input: ValuationInput): Valuation {
+export function assessDevice(input: ValuationInput, buybackOfResale: number = DEFAULT_BUYBACK_OF_RESALE): Valuation {
   const age = Math.max(AGE_FLOOR, 1 - Math.max(0, input.ageMonths) * AGE_DEPREC_PER_MONTH);
   const grade = GRADE_FACTOR[input.grade] ?? GRADE_FACTOR.C;
   const defect = Math.min(
@@ -45,7 +49,7 @@ export function assessDevice(input: ValuationInput): Valuation {
   );
 
   const resale = round100(input.basePrice * age * grade * (1 - defect));
-  const buyback = round100(resale * BUYBACK_OF_RESALE);
+  const buyback = round100(resale * buybackOfResale);
 
   const notes: string[] = [];
   if (input.ageMonths >= 24) notes.push('Старше 2 лет — спрос ниже, закладывайте запас на скидку.');

@@ -104,14 +104,24 @@ describe('Transactional customer notifications (integration)', () => {
     });
     await orders.transition(paid.id, 'ready_for_pickup', 'staff');
 
+    // Раньше здесь ожидалось, что клиент без согласия не получит подтверждения
+    // заказа: `order_confirmed` считался промо. Гость создаётся с
+    // `consent: false`, поэтому подтверждения не получал вовсе — даже строки в
+    // ленте, — а экран успеха обещал «мы свяжемся для подтверждения».
+    // Подтверждение заказа и «готов к выдаче» транзакционны по существу:
+    // человек только что оформил заказ, и без второго сообщения самовывоз
+    // теряет смысл. Проверка согласия осталась на маркетинговых путях —
+    // кампаниях и напоминаниях о долге.
     const outbox = await prisma.outboxMessage.findMany({ orderBy: { createdAt: 'asc' } });
     expect(outbox.map((message) => message.template)).toEqual([
       'order_confirmed',
+      'order_confirmed',
       'order_ready',
     ]);
-    expect(outbox.map((message) => message.recipient)).toEqual([optedIn.phone, optedIn.phone]);
+    expect(outbox.map((message) => message.recipient))
+      .toEqual([optedIn.phone, optedOut.phone, optedIn.phone]);
     expect(outbox[0].payload).toMatchObject({ customerId: optedIn.id, orderId: created.id });
-    expect(outbox[1].payload).toMatchObject({ customerId: optedIn.id, orderId: paid.id });
+    expect(outbox[2].payload).toMatchObject({ customerId: optedIn.id, orderId: paid.id });
   });
 
   it('queues warranty lifecycle templates only for consented customers', async () => {

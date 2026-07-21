@@ -1,4 +1,5 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ExchangesService } from '../src/exchanges/exchanges.service';
 import { ValidationError } from '../src/common/errors';
@@ -53,7 +54,7 @@ describe('Exchange (integration)', () => {
       {} as AuthzService,
       new MediaCleanupService(prisma, media),
     );
-    customers = new CustomersService(prisma, audit);
+    customers = new CustomersService(prisma, audit, new SettingsService(prisma, audit));
   });
 
   afterAll(async () => {

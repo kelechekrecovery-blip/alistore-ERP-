@@ -1,4 +1,5 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
@@ -33,12 +34,13 @@ describe('POS sale resume after payment failure (integration)', () => {
     payments = new PaymentsService(prisma, audit, units, approvals);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit),
+      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       new ShiftsService(prisma, audit),
       units,
       orders,
       payments,
       approvals,
+      new SettingsService(prisma, audit),
     );
   });
 

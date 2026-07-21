@@ -221,6 +221,14 @@ envVarGroups:
         value: "true"
       - key: OUTBOX_RELAY_ENABLED
         value: "true"
+      # Без явного значения выбиралась лог-заглушка: она резолвится успешно,
+      # сообщение помечается sent, дашборд показывает pending: 0 / failed: 0 —
+      # и ни один клиент ничего не получает. `realtime` честен: сотрудники
+      # получают события в интерфейсе, клиенты — строки в своей ленте
+      # (CustomerNotification создаётся независимо от транспорта). SMS/e-mail
+      # появятся здесь, когда владелец подключит провайдера.
+      - key: NOTIFICATION_TRANSPORT
+        value: realtime
       - key: REFUND_RELAY_ENABLED
         value: "false"
       - key: MEILI_HOST

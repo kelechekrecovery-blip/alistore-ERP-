@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SettingsModule } from '../settings/settings.module';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { UnitsModule } from '../units/units.module';
@@ -12,7 +13,7 @@ import { PromotionsModule } from '../promotions/promotions.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
 
 @Module({
-  imports: [UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule, PromotionsModule, CampaignsModule],
+  imports: [SettingsModule, UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule, PromotionsModule, CampaignsModule],
   providers: [OrdersService],
   controllers: [OrdersController],
   exports: [OrdersService],

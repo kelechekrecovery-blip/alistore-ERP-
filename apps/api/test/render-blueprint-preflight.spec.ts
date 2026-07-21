@@ -64,6 +64,24 @@ describe('render.yaml · боевой режим', () => {
    * Preflight считает включённый релей `unsafe` — проверяем обе роли разом,
    * потому что в блюпринте они описаны разными сервисами и разъезжались.
    */
+  /**
+   * Транспорт уведомлений обязан быть объявлен явно: без значения выбиралась
+   * лог-заглушка, которая помечает сообщения `sent` и показывает владельцу
+   * идеальную доставку при нуле полученных клиентами сообщений.
+   */
+  it('объявляет транспорт уведомлений и не оставляет его заглушкой', () => {
+    const declared = valuesOf('NOTIFICATION_TRANSPORT');
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared).not.toContain('log');
+
+    for (const mode of declared) {
+      const report = buildProductionPreflightReport((name) =>
+        name === 'NOTIFICATION_TRANSPORT' ? mode : undefined);
+      const check = report.checks.find((row) => row.id === 'notification_transport');
+      expect({ mode, status: check?.status }).toEqual({ mode, status: 'ready' });
+    }
+  });
+
   it('проходит боевой preflight в обеих ролях', () => {
     const relays = valuesOf('REFUND_RELAY_ENABLED');
     expect(new Set(relays)).toEqual(new Set(['false']));

@@ -27,7 +27,7 @@ describe('Debts (integration)', () => {
     const audit = new AuditService(prisma);
     approvals = new ApprovalsService(prisma, audit);
     const outbox = new OutboxService(prisma, new LogNotificationTransport());
-    debts = new DebtsService(prisma, audit, approvals, outbox);
+    debts = new DebtsService(prisma, audit, approvals, outbox, new SettingsService(prisma, audit));
     reports = new ReportsService(prisma, new SettingsService(prisma, new AuditService(prisma)));
   });
 

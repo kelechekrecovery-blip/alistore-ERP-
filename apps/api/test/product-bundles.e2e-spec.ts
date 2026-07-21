@@ -1,4 +1,5 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { AuditService } from '../src/audit/audit.service';
 import { ProductsService } from '../src/products/products.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
@@ -41,12 +42,13 @@ describe('Product bundles (integration)', () => {
     payments = new PaymentsService(prisma, audit, units, approvals);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit),
+      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       new ShiftsService(prisma, audit),
       units,
       orders,
       payments,
       approvals,
+      new SettingsService(prisma, audit),
     );
   });
 

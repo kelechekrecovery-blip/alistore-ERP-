@@ -6,6 +6,7 @@ import { OutboxService } from './outbox.service';
 import { OutboxController } from './outbox.controller';
 import { OutboxRelay } from './outbox.relay';
 import { LogNotificationTransport } from './transports/log.transport';
+import { selectNotificationTransport } from './notification-transport-selector';
 import { NovuHttpTransport } from './transports/novu.transport';
 import { EmailNotificationTransport } from './transports/email.transport';
 import { RealtimeNotificationTransport } from './transports/realtime.transport';
@@ -38,20 +39,16 @@ import { PrismaService } from '../prisma/prisma.service';
         gateway: RealtimeGateway,
         prisma: PrismaService,
       ): NotificationTransport => {
-        const mode = config.get<string>('NOTIFICATION_TRANSPORT');
-        if (mode === 'channels' || mode === 'providers') {
-          return new ChannelNotificationTransport(config, prisma);
-        }
-        if (mode === 'novu' && config.get<string>('NOVU_API_KEY')) {
-          return new NovuHttpTransport(config);
-        }
-        if (mode === 'email') {
-          return new EmailNotificationTransport(config);
-        }
-        if (mode === 'realtime') {
-          return new RealtimeNotificationTransport(gateway);
-        }
-        return new LogNotificationTransport();
+        // Выбор вынесен в чистую функцию, чтобы его можно было проверить без
+        // поднятия контейнера: раньше отсутствие или опечатка в переменной
+        // молча давали лог-заглушку, которая помечает сообщения `sent`.
+        return selectNotificationTransport((name) => config.get<string>(name), {
+          channels: () => new ChannelNotificationTransport(config, prisma),
+          novu: () => new NovuHttpTransport(config),
+          email: () => new EmailNotificationTransport(config),
+          realtime: () => new RealtimeNotificationTransport(gateway),
+          log: () => new LogNotificationTransport(),
+        });
       },
     },
   ],

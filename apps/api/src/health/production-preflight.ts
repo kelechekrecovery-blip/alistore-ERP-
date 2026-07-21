@@ -137,6 +137,22 @@ const CHECKS: CheckDefinition[] = [
     evaluate: (env) => boolReady(env, 'OUTBOX_RELAY_ENABLED'),
   },
   {
+    id: 'notification_transport',
+    area: 'jobs',
+    title: 'Notification transport is explicit',
+    requiredEnv: ['NOTIFICATION_TRANSPORT'],
+    note: 'Без явного значения выбиралась лог-заглушка: она резолвится успешно, сообщение помечается sent, дашборд показывает pending: 0 / failed: 0 — и ни один клиент ничего не получает.',
+    evaluate: (env) => {
+      const mode = env('NOTIFICATION_TRANSPORT')?.trim().toLowerCase();
+      if (!mode) return 'missing';
+      // `log` в проде — та самая тихая заглушка, ради которой проверка и заведена.
+      if (mode === 'log') return 'unsafe';
+      if (['channels', 'providers', 'email', 'realtime'].includes(mode)) return 'ready';
+      if (mode === 'novu') return env('NOVU_API_KEY')?.trim() ? 'ready' : 'missing';
+      return 'unsafe';
+    },
+  },
+  {
     id: 'refund_relay',
     area: 'jobs',
     title: 'Refund execution relay matches payment mode',

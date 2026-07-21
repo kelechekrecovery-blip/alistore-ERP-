@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SettingsService } from '../settings/settings.service';
 import type { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
@@ -21,6 +22,9 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    // Имя `ownerSettings`, потому что `settings()` уже занят методом настроек
+    // клиента — это разные вещи.
+    private readonly ownerSettings: SettingsService,
   ) {}
 
   get(id: string) {
@@ -295,16 +299,18 @@ export class CustomersService {
     if (orderIds.length === 0) return [];
     const purchasedAt = new Map(orders.map((o) => [o.id, o.createdAt]));
 
-    const [units, warranties] = await Promise.all([
+    const [units, warranties, coverageMonths] = await Promise.all([
       this.prisma.deviceUnit.findMany({
         where: { orderId: { in: orderIds }, status: { in: ['sold', 'returned', 'in_repair'] } },
         include: { product: { select: { name: true } } },
       }),
       this.prisma.warrantyCase.findMany({ where: { customerId } }),
+      // Срок гарантии — параметр владельца, а не константа рядом с кодом.
+      this.ownerSettings.value('warranty.coverage_months'),
     ]);
 
     return units.map((u) => {
-      const cover = warrantyCoverage(u.orderId ? purchasedAt.get(u.orderId) : undefined);
+      const cover = warrantyCoverage(u.orderId ? purchasedAt.get(u.orderId) : undefined, new Date(), coverageMonths);
       return {
         imei: u.imei,
         product: u.product.name,

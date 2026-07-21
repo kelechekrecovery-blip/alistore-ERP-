@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SettingsModule } from '../settings/settings.module';
 import { DebtsService } from './debts.service';
 import { DebtsController } from './debts.controller';
 import { ApprovalsModule } from '../approvals/approvals.module';
@@ -8,7 +9,7 @@ import { OutboxModule } from '../outbox/outbox.module';
 import { DebtsReminderScheduler } from './debts.scheduler';
 
 @Module({
-  imports: [ApprovalsModule, StaffAuthModule, AuthzModule, OutboxModule],
+  imports: [SettingsModule, ApprovalsModule, StaffAuthModule, AuthzModule, OutboxModule],
   providers: [DebtsService, DebtsReminderScheduler],
   controllers: [DebtsController],
   exports: [DebtsService],

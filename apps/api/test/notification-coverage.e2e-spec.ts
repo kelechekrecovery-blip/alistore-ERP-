@@ -198,9 +198,16 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
       },
       'web',
     );
-    // Promo-class template (order_confirmed) stays consent-gated.
-    expect(await outboxFor('order_confirmed')).toHaveLength(0);
-    expect(await inboxFor(optedOut.id, 'order_confirmed')).toHaveLength(0);
+    // Раньше здесь утверждалось обратное: `order_confirmed` считался промо и
+    // отсекался по согласию. Гость создаётся с `consent: false`, поэтому
+    // подтверждения заказа он не получал вовсе — даже строки в ленте, — а экран
+    // успеха обещал «мы свяжемся для подтверждения». Подтверждение заказа
+    // транзакционно по существу: человек только что оформил заказ.
+    //
+    // Проверка согласия не потеряна: маркетинговые рассылки идут через
+    // кампании (`campaign_offer`) и напоминания о долге, и они по-прежнему без
+    // `transactional`.
+    await expectCustomerNotice('order_confirmed', optedOut.id, optedOut.phone);
 
     const order = await prisma.order.create({
       data: {

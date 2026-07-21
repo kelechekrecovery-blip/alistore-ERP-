@@ -6,6 +6,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { SettingsService } from '../settings/settings.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { insertDebt } from './debt-insert';
 import { CreateDebtDto, DebtPaymentDto } from './debts.dto';
@@ -32,6 +33,7 @@ export class DebtsService {
     private readonly audit: AuditService,
     private readonly approvals: ApprovalsService,
     private readonly outbox: OutboxService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -110,11 +112,16 @@ export class DebtsService {
     const existing = await this.prisma.debtPlan.findUnique({ where: { orderId: dto.orderId } });
     if (existing) throw new ConflictError('order_debt_exists', 'Для заказа уже оформлен долг или рассрочка');
 
-    if (dto.principal > DEBT_LIMIT) {
+    // Лимит был константой рядом с кодом, а панель владельца писала значение в
+    // таблицу и событие в леджер — рычаг подтверждал срабатывание и ничего не
+    // менял. Дефолт остался в реестре, поэтому поведение прежнее, пока владелец
+    // ничего не трогал.
+    const debtLimit = await this.settings.value('credit.debt_limit_som');
+    if (dto.principal > debtLimit) {
       return this.approvals.request({
         action: 'debt',
         requester: actor,
-        reason: dto.reason ?? `Долг ${dto.principal} сом (> лимита ${DEBT_LIMIT})`,
+        reason: dto.reason ?? `Долг ${dto.principal} сом (> лимита ${debtLimit})`,
         payload: { ...input, dueDate: dueDate.toISOString() },
       });
     }

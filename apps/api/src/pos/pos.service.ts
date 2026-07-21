@@ -7,8 +7,8 @@ import { UnitsService } from '../units/units.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { ApprovalsService } from '../approvals/approvals.service';
-import { APPROVAL_THRESHOLDS } from '../rbac/permissions';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PosSaleDto } from './pos.dto';
 import { evaluateMarginControl, MarginControlResult, saleTotal } from './margin-control';
@@ -63,7 +63,26 @@ export class PosService {
     private readonly orders: OrdersService,
     private readonly payments: PaymentsService,
     private readonly approvals: ApprovalsService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * Пороги согласования из настроек владельца.
+   *
+   * Раньше это были константы `APPROVAL_THRESHOLDS`, а панель владельца писала
+   * значения в таблицу и событие в леджер — рычаг подтверждал срабатывание и
+   * ничего не менял. Приём тот же, что в `hr.service.payrollConfig()`:
+   * значения по умолчанию живут в реестре, поведение не меняется, пока владелец
+   * ничего не трогал.
+   */
+  private async approvalThresholds() {
+    const [discountPct, priceChangePct, minMarginSom] = await Promise.all([
+      this.settings.value('discount.approval_threshold_pct'),
+      this.settings.value('discount.price_change_threshold_pct'),
+      this.settings.value('discount.min_margin_som'),
+    ]);
+    return { discountPct, priceChangePct, minMarginSom };
+  }
 
   async findCustomer(rawPhone: string | undefined, staffId: string, point: string, clientSaleId: string) {
     const requestedPoint = point.trim();
@@ -239,10 +258,11 @@ export class PosService {
     }
 
     const items = await this.resolveOrderLines(dto, storePoint.inventoryLocation);
-    const margin = this.evaluateMargin(items, pct);
+    const margin = await this.evaluateMargin(items, pct);
     const total = margin.total;
     const payments = this.normalizePayments(dto, total);
-    const discountApprovalNeeded = pct > APPROVAL_THRESHOLDS.discountPct;
+    const { discountPct: discountThresholdPct } = await this.approvalThresholds();
+    const discountApprovalNeeded = pct > discountThresholdPct;
     const marginApprovalNeeded = margin.breaches.length > 0;
     const approvalReason = this.approvalReason(discountApprovalNeeded, marginApprovalNeeded);
 
@@ -255,7 +275,7 @@ export class PosService {
         const parked = await this.approvals.request({
           action: 'discount',
           requester: actor,
-          reason: dto.reason ?? this.defaultApprovalMessage(approvalReason, pct, margin),
+          reason: dto.reason ?? this.defaultApprovalMessage(approvalReason, pct, margin, discountThresholdPct),
           payload: {
             staffId: dto.staffId,
             point: storePoint.inventoryLocation,
@@ -505,7 +525,8 @@ export class PosService {
     return [{ method: dto.method, amount: total }];
   }
 
-  private evaluateMargin(items: OrderLine[], pct: number): MarginControlResult {
+  private async evaluateMargin(items: OrderLine[], pct: number): Promise<MarginControlResult> {
+    const { minMarginSom } = await this.approvalThresholds();
     return evaluateMarginControl(
       items.map((item) => ({
         productId: item.productId,
@@ -516,7 +537,7 @@ export class PosService {
         costRef: item.costRef ?? item.imei,
       })),
       pct,
-      APPROVAL_THRESHOLDS.minMarginSom,
+      minMarginSom,
     );
   }
 
@@ -641,14 +662,14 @@ export class PosService {
     return 'discount';
   }
 
-  private defaultApprovalMessage(reason: string, pct: number, margin: MarginControlResult) {
+  private defaultApprovalMessage(reason: string, pct: number, margin: MarginControlResult, discountThresholdPct: number) {
     if (reason === 'margin') {
       return `Маржа ${margin.worstMargin} сом ниже лимита ${margin.minMargin} сом в POS`;
     }
     if (reason === 'discount_and_margin') {
       return `Скидка ${pct}% и маржа ${margin.worstMargin} сом ниже лимита ${margin.minMargin} сом в POS`;
     }
-    return `Скидка ${pct}% в POS (> лимита ${APPROVAL_THRESHOLDS.discountPct}%)`;
+    return `Скидка ${pct}% в POS (> лимита ${discountThresholdPct}%)`;
   }
 
   private async completedFromExistingPayment(orderId: string, shiftId: string | null) {

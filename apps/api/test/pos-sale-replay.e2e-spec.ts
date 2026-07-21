@@ -1,4 +1,5 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
@@ -29,12 +30,13 @@ describe('POS sale replay (integration)', () => {
     const approvals = new ApprovalsService(prisma, audit);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit),
+      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       new ShiftsService(prisma, audit),
       units,
       new OrdersService(prisma, audit, units),
       new PaymentsService(prisma, audit, units, approvals),
       approvals,
+      new SettingsService(prisma, audit),
     );
   });
 

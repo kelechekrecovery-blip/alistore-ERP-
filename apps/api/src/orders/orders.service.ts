@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OrderStatus, Prisma, StorePoint } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
@@ -63,6 +64,7 @@ export class OrdersService {
     @Optional() private readonly logistics?: LogisticsService,
     @Optional() private readonly promotions?: PromotionsService,
     @Optional() private readonly campaignAttribution?: CampaignAttributionService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
 
   get(id: string) {
@@ -470,6 +472,12 @@ export class OrdersService {
             customerId: order.customerId,
             template: 'order_confirmed',
             payload: { orderId: order.id, channel: order.channel, total: order.total },
+            // Подтверждение заказа — транзакционное сообщение, а не рассылка:
+            // человек только что оформил заказ и должен знать, что он принят.
+            // Без этого флага гость (`consent: false` по умолчанию) не получал
+            // даже строки в ленте уведомлений, а экран успеха обещал «мы
+            // свяжемся для подтверждения».
+            transactional: true,
           });
         }
         events.unshift(
@@ -841,7 +849,11 @@ export class OrdersService {
         },
       ];
       if (to === 'completed') {
+        // Ставка начисления — параметр владельца (`loyalty.earn_rate_bps`);
+        // раньше 100 bps были константой в модуле лояльности.
+        const earnRateBps = this.settings ? await this.settings.value('loyalty.earn_rate_bps') : undefined;
         const loyaltyEarned = await earnLoyaltyOnTx(tx, {
+          earnRateBps,
           customerId: order.customerId,
           orderId,
           paidTotal: order.total,
@@ -856,6 +868,10 @@ export class OrdersService {
           customerId: order.customerId,
           template: to === 'confirmed' ? 'order_confirmed' : 'order_ready',
           payload: { orderId, from: order.status, to },
+          // `order_ready` — единственное сообщение, ради которого самовывоз
+          // вообще имеет смысл: без него человек не узнает, что заказ можно
+          // забрать.
+          transactional: true,
         });
       }
       if (this.outbox && to === 'completed') {

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { ValidationError } from '../common/errors';
 import { assessDevice, Valuation } from './valuation';
 import { AssessDto } from './valuation.dto';
@@ -11,7 +12,10 @@ import { AssessDto } from './valuation.dto';
  */
 @Injectable()
 export class ValuationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
 
   async assess(dto: AssessDto): Promise<Valuation> {
     let basePrice = dto.basePrice ?? 0;
@@ -25,11 +29,13 @@ export class ValuationService {
     if (basePrice <= 0) {
       throw new ValidationError('base_price_required', 'Укажите basePrice или существующий sku');
     }
+    // Доля выкупа — параметр владельца: раньше 70% были константой в модуле.
+    const buybackPct = await this.settings.value('tradein.buyback_of_resale_pct');
     return assessDevice({
       basePrice,
       grade: dto.grade,
       ageMonths: dto.ageMonths ?? 0,
       defects: dto.defects ?? [],
-    });
+    }, buybackPct / 100);
   }
 }

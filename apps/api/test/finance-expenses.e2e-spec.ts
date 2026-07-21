@@ -195,8 +195,15 @@ describe('Finance expenses (integration + RBAC)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
     expect(dashboard.body.money.expenses).toBe(120_000);
+    // Раньше формула была `salesGross − refunds − expenses`: себестоимость
+    // проданного в «операционную прибыль» не входила вовсе, хотя владелец
+    // читает это поле как прибыль и сравнивает с P&L, где COGS вычтен.
+    // Расхождение измерялось всей закупкой.
     expect(dashboard.body.money.operatingProfit).toBe(
-      dashboard.body.money.salesGross - dashboard.body.money.refunds - 120_000,
+      dashboard.body.money.salesGross
+        - dashboard.body.money.refunds
+        - 120_000
+        - dashboard.body.money.cogs,
     );
 
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: created.body.id } }, orderBy: { ts: 'asc' } });

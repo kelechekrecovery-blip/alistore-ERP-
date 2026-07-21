@@ -3,7 +3,12 @@ import { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 
-const EARN_RATE_BPS = 100;
+/**
+ * Ставка начисления по умолчанию. Владелец меняет её в настройках
+ * (`loyalty.earn_rate_bps`); значение приходит параметром, чтобы модуль остался
+ * чистым — тот же приём, что у зарплатных параметров в `hr.service`.
+ */
+export const DEFAULT_EARN_RATE_BPS = 100;
 
 export async function loyaltyBalanceOnTx(
   tx: Prisma.TransactionClient,
@@ -60,10 +65,10 @@ export async function redeemLoyaltyOnTx(
 
 export async function earnLoyaltyOnTx(
   tx: Prisma.TransactionClient,
-  input: { customerId: string; orderId: string; paidTotal: number; paymentId?: string; actor: string },
+  input: { customerId: string; orderId: string; paidTotal: number; paymentId?: string; actor: string; earnRateBps?: number },
   events: AuditInput[],
 ): Promise<number> {
-  const amount = Math.floor((Math.max(0, input.paidTotal) * EARN_RATE_BPS) / 10_000);
+  const amount = Math.floor((Math.max(0, input.paidTotal) * (input.earnRateBps ?? DEFAULT_EARN_RATE_BPS)) / 10_000);
   if (amount <= 0) return 0;
   await lockCustomerLoyalty(tx, input.customerId);
   const sourceRef = `loyalty:earn:${input.orderId}`;

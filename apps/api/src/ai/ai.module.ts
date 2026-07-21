@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SettingsModule } from '../settings/settings.module';
 import { AuthzModule } from '../authz/authz.module';
 import { ReportsModule } from '../reports/reports.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
@@ -21,7 +22,7 @@ import { PriceScoutService } from './price-scout.service';
 import { PriceScoutController } from './price-scout.controller';
 
 @Module({
-  imports: [ReportsModule, StaffAuthModule, AuthzModule, ModerationModule],
+  imports: [SettingsModule, ReportsModule, StaffAuthModule, AuthzModule, ModerationModule],
   providers: [
     InsightsService,
     ValuationService,
