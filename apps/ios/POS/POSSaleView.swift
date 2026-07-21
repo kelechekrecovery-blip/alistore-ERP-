@@ -9,6 +9,7 @@ struct POSSaleView: View {
     let openShift: () -> Void
     @Environment(\.modelContext) private var modelContext
     @State private var products: [Product] = []
+    @State private var isLoading = false
     @State private var shift: CashShift?
     @State private var cart: [String: Int] = [:]
     @State private var selectedIMEI: [String: String] = [:]
@@ -38,7 +39,13 @@ struct POSSaleView: View {
                     header
                     scanner
                     if let errorMessage { POSNotice(text: errorMessage, isError: true) }
-                    if products.isEmpty && errorMessage == nil { ProgressView("Загружаем каталог…") }
+                    // Три разных состояния, а не одно: грузим — спиннер; загрузилось пусто —
+                    // честный empty state с повтором; ошибка — POSNotice выше.
+                    if isLoading && products.isEmpty {
+                        ProgressView("Загружаем каталог…")
+                    } else if products.isEmpty && errorMessage == nil {
+                        emptyCatalog
+                    }
                     productGrid
                     receiptPanel
                 }
@@ -193,6 +200,10 @@ struct POSSaleView: View {
             return
         }
         #endif
+        // Флаг обязателен: без него «ещё грузим» и «загрузилось пусто» неразличимы,
+        // и при 200 с нулём товаров касса показывала спиннер бесконечно.
+        isLoading = true
+        defer { isLoading = false }
         do {
             async let catalog: CatalogResponse = api.get("catalog/products")
             async let currentShift: CashShift? = api.get("shifts/current", token: session.accessToken)
@@ -324,6 +335,32 @@ struct POSSaleView: View {
 private enum POSLocalError: LocalizedError {
     case message(String)
     var errorDescription: String? { if case let .message(value) = self { return value }; return nil }
+}
+
+extension POSSaleView {
+    /// Каталог ответил успешно, но товаров нет. Кассиру нужно сказать это прямо и дать
+    /// повтор — вместо спиннера, который раньше крутился в этом случае бесконечно.
+    var emptyCatalog: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "shippingbox")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(POSPalette.muted)
+            Text("Каталог пуст")
+                .font(.headline)
+                .foregroundStyle(Design3.textPrimary)
+            Text("Сервер ответил, но товаров нет. Проверьте, что каталог заполнен и опубликован.")
+                .font(.subheadline)
+                .foregroundStyle(POSPalette.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Повторить") { Task { await refresh() } }
+                .buttonStyle(.borderedProminent)
+                .tint(POSPalette.coral)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .accessibilityIdentifier("pos-empty-catalog")
+    }
 }
 
 struct POSNotice: View {
