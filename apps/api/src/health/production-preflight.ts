@@ -129,6 +129,32 @@ const CHECKS: CheckDefinition[] = [
     evaluate: (env) => boolReady(env, 'RESERVATION_SWEEP_ENABLED'),
   },
   {
+    id: 'debt_reminders',
+    area: 'jobs',
+    title: 'Debt reminder sweep enabled',
+    requiredEnv: ['DEBT_REMINDERS_ENABLED'],
+    // Без флага debts.scheduler молча не стартует, а рассрочки клиентов не
+    // напоминаются с самого запуска. Preflight про него не спрашивал — деньги
+    // магазина утекали без единого события.
+    note: 'DEBT_REMINDERS_ENABLED=true запускает напоминания о просроченных рассрочках.',
+    evaluate: (env) => boolReady(env, 'DEBT_REMINDERS_ENABLED'),
+  },
+  {
+    id: 'critical_alerting',
+    area: 'observability',
+    title: 'Critical alert channel configured',
+    requiredEnv: ['ALERT_TELEGRAM_BOT_TOKEN', 'ALERT_TELEGRAM_CHAT_ID'],
+    // Без канала alerter держит алерты в памяти процесса — рестарт их стирает.
+    // Это ровно та слепота, при которой 502 держался полтора суток и никто не
+    // узнал.
+    note: 'ALERT_TELEGRAM_BOT_TOKEN и ALERT_TELEGRAM_CHAT_ID нужны, чтобы 5xx и смерть relay дошли до дежурного.',
+    evaluate: (env) => {
+      const token = env('ALERT_TELEGRAM_BOT_TOKEN')?.trim();
+      const chat = env('ALERT_TELEGRAM_CHAT_ID')?.trim();
+      return token && chat ? 'ready' : 'missing';
+    },
+  },
+  {
     id: 'outbox_relay',
     area: 'jobs',
     title: 'Outbox relay enabled',

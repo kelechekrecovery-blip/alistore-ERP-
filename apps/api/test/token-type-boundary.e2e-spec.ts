@@ -60,7 +60,20 @@ describe('Граница типа токена · capability не проходи
 
   afterAll(async () => {
     await prisma.tradeInDevice.deleteMany({ where: { model: { startsWith: `TT-${RUN}` } } });
-    await prisma.customer.deleteMany({ where: { name: { startsWith: `TokType-${RUN}` } } });
+    // Заказы и их события ссылаются на клиента (FK) — убираем их до клиента,
+    // иначе глобальный customer.deleteMany() в соседних спеках падает.
+    const mine = await prisma.customer.findMany({
+      where: { name: { startsWith: `TokType-${RUN}` } },
+      select: { id: true },
+    });
+    const ids = mine.map((row) => row.id);
+    if (ids.length) {
+      const orders = await prisma.order.findMany({ where: { customerId: { in: ids } }, select: { id: true } });
+      const orderIds = orders.map((o) => o.id);
+      if (orderIds.length) await prisma.auditEvent.deleteMany({ where: { refs: { hasSome: orderIds } } });
+      await prisma.order.deleteMany({ where: { customerId: { in: ids } } });
+      await prisma.customer.deleteMany({ where: { id: { in: ids } } });
+    }
     await app.close();
   });
 

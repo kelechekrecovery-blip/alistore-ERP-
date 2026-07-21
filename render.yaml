@@ -8,7 +8,11 @@ services:
     dockerContext: .
     autoDeployTrigger: off
     renderSubdomainPolicy: allowed
-    healthCheckPath: /api/health/live
+    # /live возвращал { status: 'ok' } без проверки БД, поэтому Render объявлял
+    # деплой успешным поверх недоступной базы, а каждый запрос каталога отдавал
+    # 500. /ready дёргает db.pingCheck — деплой не переключит трафик на мёртвую
+    # базу.
+    healthCheckPath: /api/health/ready
     preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
       - fromGroup: alistore-prod-common
@@ -185,6 +189,15 @@ envVarGroups:
         value: production
       - key: JWT_SECRET
         generateValue: true
+      # Канал критических алертов. Без этих двух значений alerter.service держит
+      # алерты в массиве в памяти процесса (delivered: false) — рестарт их
+      # стирает, и о 5xx, смерти relay и падении refund-релея не узнаёт никто.
+      # Владелец задаёт токен и chatId бота в дашборде Render (sync: false —
+      # секрет не в блюпринте).
+      - key: ALERT_TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ALERT_TELEGRAM_CHAT_ID
+        sync: false
       - key: CORS_ORIGINS
         value: https://ali.kg,https://www.ali.kg,https://admin.ali.kg
       - key: ALLOWED_HOSTS
@@ -218,6 +231,11 @@ envVarGroups:
       - key: RESERVATION_SWEEP_ENABLED
         value: "true"
       - key: SERVICE_SLA_SWEEP_ENABLED
+        value: "true"
+      # Напоминания о долгах не включались ни разу: без этого флага
+      # debts.scheduler молча не стартует, а preflight про него не спрашивал.
+      # Рассрочки — деньги магазина, о просрочке которых иначе никто не узнает.
+      - key: DEBT_REMINDERS_ENABLED
         value: "true"
       - key: OUTBOX_RELAY_ENABLED
         value: "true"

@@ -24,7 +24,9 @@ describe('Production preflight report', () => {
     // Nest при инициализации провайдера OTP_SENDER.
     // +1: транспорт уведомлений. Без явного значения выбиралась лог-заглушка,
     // помечающая сообщения `sent` при нуле доставленных.
-    expect(report.summary.missing).toBe(8);
+    // +2: напоминания о долгах и канал алертов — обе наблюдаемости, которых не
+    // хватало, чтобы авария стала видимой.
+    expect(report.summary.missing).toBe(10);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
@@ -70,6 +72,9 @@ describe('Production preflight report', () => {
         AUTH_OTP_DEV_ECHO: 'false',
         RESERVATION_SWEEP_ENABLED: 'true',
         OUTBOX_RELAY_ENABLED: 'true',
+        DEBT_REMINDERS_ENABLED: 'true',
+        ALERT_TELEGRAM_BOT_TOKEN: 'bot-token',
+        ALERT_TELEGRAM_CHAT_ID: '-100123',
       NOTIFICATION_TRANSPORT: 'realtime',
                 REFUND_RELAY_ENABLED: 'true',
         PROCESS_ROLE: 'worker',
@@ -106,6 +111,9 @@ describe('Production preflight report', () => {
       AUTH_OTP_DEV_ECHO: 'false',
       RESERVATION_SWEEP_ENABLED: 'true',
       OUTBOX_RELAY_ENABLED: 'true',
+      DEBT_REMINDERS_ENABLED: 'true',
+      ALERT_TELEGRAM_BOT_TOKEN: 'bot-token',
+      ALERT_TELEGRAM_CHAT_ID: '-100123',
       NOTIFICATION_TRANSPORT: 'realtime',
       SMS_PROVIDER: 'disabled',
       PUBLIC_DEMO_MODE: 'false',
@@ -140,6 +148,9 @@ describe('Production preflight report', () => {
       AUTH_OTP_DEV_ECHO: 'false',
       RESERVATION_SWEEP_ENABLED: 'true',
       OUTBOX_RELAY_ENABLED: 'true',
+      DEBT_REMINDERS_ENABLED: 'true',
+      ALERT_TELEGRAM_BOT_TOKEN: 'bot-token',
+      ALERT_TELEGRAM_CHAT_ID: '-100123',
       NOTIFICATION_TRANSPORT: 'realtime',
       REFUND_RELAY_ENABLED: 'true',
       SMS_PROVIDER: 'disabled',

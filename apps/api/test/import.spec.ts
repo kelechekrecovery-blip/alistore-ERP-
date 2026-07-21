@@ -19,7 +19,18 @@ describe('ImportService (exceljs)', () => {
   });
 
   afterAll(async () => {
-    await prisma.product.deleteMany({ where: { sku: { startsWith: 'SKU-' } } });
+    // Только свои товары и их зависимости — сплошной deleteMany роняет соседей
+    // по FK (DeviceUnit других спеков ссылаются на их продукты).
+    const mine = await prisma.product.findMany({
+      where: { sku: { startsWith: 'SKU-' } },
+      select: { id: true },
+    });
+    const ids = mine.map((row) => row.id);
+    if (ids.length) {
+      await prisma.deviceUnit.deleteMany({ where: { productId: { in: ids } } });
+      await prisma.inventoryBalance.deleteMany({ where: { productId: { in: ids } } });
+      await prisma.product.deleteMany({ where: { id: { in: ids } } });
+    }
     await prisma.$disconnect();
   });
 

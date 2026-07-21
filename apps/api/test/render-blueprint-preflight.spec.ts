@@ -99,4 +99,21 @@ describe('render.yaml · боевой режим', () => {
       expect({ role, status: relay?.status }).toEqual({ role, status: 'ready' });
     }
   });
+
+  /**
+   * Наблюдаемость: авария должна быть видимой. Health-check обязан смотреть на
+   * БД (иначе Render переключит трафик на мёртвую базу), напоминания о долгах —
+   * включены, канал алертов — объявлен. Ровно та конфигурация, при которой 502
+   * держался полтора суток.
+   */
+  it('здоровье смотрит на базу, а фоновые задачи и алерты объявлены', () => {
+    // healthCheckPath API-сервиса — первое вхождение (worker'а нет).
+    const healthLine = blueprint.split('\n').find((line) => line.trim().startsWith('healthCheckPath: /api/'));
+    expect(healthLine?.trim()).toBe('healthCheckPath: /api/health/ready');
+    expect(valuesOf('DEBT_REMINDERS_ENABLED')).toContain('true');
+
+    // Секреты алертов объявлены как sync: false — значения задаёт владелец.
+    expect(blueprint).toContain('ALERT_TELEGRAM_BOT_TOKEN');
+    expect(blueprint).toContain('ALERT_TELEGRAM_CHAT_ID');
+  });
 });
