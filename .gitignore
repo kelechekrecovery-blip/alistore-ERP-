@@ -4,12 +4,20 @@ node_modules/
 dist/
 build/
 apps/web/build-output/
+apps/web/build-courier/
 apps/web/tsconfig.tsbuildinfo
 .next/
 .next-*/
 out/
 # env & secrets (never commit)
+# `.env` ловит только файлы с этим точным именем. Ротация JWT_SECRET 21.07.2026
+# оставила рядом `apps/api/.env.bak-20260721` с живым OPENROUTER_API_KEY — и он
+# оказался НЕ покрыт: git показал его как untracked, то есть один `git add -A`
+# отправил бы ключ в историю. Закрываем весь класс, кроме примеров.
 .env
+.env.*
+!.env*.example
+!**/.env*.example
 .env.local
 .env.*.local
 apps/api/.env.production
