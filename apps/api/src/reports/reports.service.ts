@@ -10,6 +10,7 @@ import {
 } from './risk-signals';
 import { buildKpi } from './kpi';
 import { buildPayroll } from './payroll';
+import { sellerRevenueRows, sellerRevenueWhere, soldBy } from './seller-revenue';
 import {
   buildRangeBuckets,
   buildRevenueBuckets,
@@ -74,14 +75,50 @@ export class ReportsService {
    * recognises revenue, but each repayment writes a real `Payment`
    * (`debts.service` → method `installment`), so adding it would double count.
    */
+  /**
+   * Сторнированные проводки исключаются: сторно пишется отдельной записью
+   * (`accounting.reversal`) со ссылкой `reversalOfId`, а не правкой исходной.
+   * Без этого фильтра единственный штатный способ исправить ошибку курьера
+   * чинил P&L и **навсегда** оставлял ошибочную сумму в дашборде.
+   */
+  private static readonly COD_RECOGNISED_WHERE = {
+    sourceType: 'cod.receivable',
+    reversal: { is: null },
+  } as const;
+
   private codRecognisedRevenue(from?: Date, to?: Date) {
     return this.prisma.accountingJournalEntry.findMany({
       where: {
-        sourceType: 'cod.receivable',
+        ...ReportsService.COD_RECOGNISED_WHERE,
         ...(from || to ? { occurredAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } } : {}),
       },
       select: { documentAmount: true, occurredAt: true },
     });
+  }
+
+  /**
+   * Себестоимость проданного. Один источник на все экраны: дашборд и KPI
+   * считали её независимо (а дашборд не считал вовсе), из-за чего «операционная
+   * прибыль» и «валовая маржа» на соседних экранах расходились на всю закупку.
+   */
+  /**
+   * Платежи для расчёта выручки продавца. Условие и атрибуция живут в
+   * `reports/seller-revenue.ts` вместе с HR: раньше два экрана зарплаты
+   * держали свои копии и разошлись в десять раз.
+   */
+  private sellerRevenuePayments() {
+    return this.prisma.payment.findMany({
+      where: sellerRevenueWhere(),
+      select: { amount: true, receivedBy: true, shift: { select: { staffId: true } } },
+    });
+  }
+
+  private async soldCogs(): Promise<number> {
+    const soldUnits = await this.prisma.deviceUnit.findMany({
+      where: { status: 'sold' },
+      select: { product: { select: { cost: true } } },
+    });
+    return soldUnits.reduce((sum, unit) => sum + (unit.product?.cost ?? 0), 0);
   }
 
   /** Journal rows shaped like payments so revenue bucketing can merge them. */
@@ -227,10 +264,13 @@ export class ReportsService {
         this.prisma.expense.aggregate({ _sum: { amount: true }, where: { status: 'paid' } }),
         this.prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
         this.prisma.deviceUnit.groupBy({ by: ['status'], _count: { _all: true } }),
+        // Статус фильтруется так же, как в salesGross. Без этого припаркованный
+        // pending-платёж попадал в разбивку и не попадал в заголовок: сумма
+        // столбиков превышала «продажи», и объяснить это было нечем.
         this.prisma.payment.groupBy({
           by: ['method'],
           _sum: { amount: true },
-          where: { amount: { gt: 0 } },
+          where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
         }),
         this.prisma.order.count(),
         this.prisma.cashShift.count({ where: { closedAt: null } }),
@@ -261,11 +301,11 @@ export class ReportsService {
         this.prisma.debtPlan.count({ where: { status: 'open', dueDate: { lt: now } } }),
         this.prisma.accountingJournalEntry.aggregate({
           _sum: { documentAmount: true },
-          where: { sourceType: 'cod.receivable' },
+          where: ReportsService.COD_RECOGNISED_WHERE,
         }),
         this.prisma.accountingJournalEntry.aggregate({
           _sum: { documentAmount: true },
-          where: { sourceType: 'cod.receivable', occurredAt: { gte: todayStart } },
+          where: { ...ReportsService.COD_RECOGNISED_WHERE, occurredAt: { gte: todayStart } },
         }),
       ]);
 
@@ -275,6 +315,10 @@ export class ReportsService {
     const salesGross = (sales._sum.amount ?? 0) + (codAll._sum.documentAmount ?? 0);
     const refunded = Math.abs(refunds._sum.amount ?? 0);
     const operatingExpenses = expenses._sum.amount ?? 0;
+    // Поле читается владельцем как прибыль, а вычитало только операционные
+    // расходы: себестоимость проданного в него не входила вовсе, и «прибыль»
+    // на дашборде отличалась от P&L на всю закупку.
+    const cogs = await this.soldCogs();
     const cashInDrawers = openShiftRows.reduce(
       (sum, shift) => sum + shift.openCash + shift.payments.reduce((acc, p) => acc + p.amount, 0),
       0,
@@ -286,7 +330,8 @@ export class ReportsService {
         refunds: refunded,
         net: salesGross - refunded,
         expenses: operatingExpenses,
-        operatingProfit: salesGross - refunded - operatingExpenses,
+        cogs,
+        operatingProfit: salesGross - refunded - operatingExpenses - cogs,
         byMethod: byMethod.map((m) => ({ method: m.method, amount: m._sum.amount ?? 0 })),
       },
       /** Today only (UTC day, matching the revenue chart's last bucket). */
@@ -311,29 +356,32 @@ export class ReportsService {
   /** Owner KPIs: gross margin (revenue − COGS), average check, top products. */
   async kpi() {
     const paid = REVENUE_STATUSES;
-    const [rev, soldUnits, paidOrders, items, products, sellerPayments] = await Promise.all([
+    const [rev, codRevenue, cogs, paidOrders, items, products, sellerPayments] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
         where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
       }),
-      this.prisma.deviceUnit.findMany({ where: { status: 'sold' }, select: { product: { select: { cost: true } } } }),
+      // Выручка бралась только из Payment, а себестоимость — по всем проданным
+      // юнитам. COD-продажа помечает юнит `sold`, но Payment не создаёт, поэтому
+      // на реальных данных маржа уходила в минус, а средний чек занижался вдвое:
+      // два одинаковых телефона (закупка 80 000, цена 100 000), один картой и
+      // один курьером, давали revenue 100 000 при cogs 160 000.
+      this.prisma.accountingJournalEntry.aggregate({
+        _sum: { documentAmount: true },
+        where: ReportsService.COD_RECOGNISED_WHERE,
+      }),
+      this.soldCogs(),
       this.prisma.order.count({ where: { status: { in: paid } } }),
       this.prisma.orderItem.findMany({
         where: { order: { status: { in: paid } } },
         select: { sku: true, qty: true, price: true },
       }),
       this.prisma.product.findMany({ select: { sku: true, name: true } }),
-      this.prisma.payment.findMany({
-        where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, shiftId: { not: null } },
-        select: { amount: true, shift: { select: { staffId: true } } },
-      }),
+      this.sellerRevenuePayments(),
     ]);
-    const revenue = rev._sum.amount ?? 0;
-    const cogs = soldUnits.reduce((sum, u) => sum + (u.product?.cost ?? 0), 0);
+    const revenue = (rev._sum.amount ?? 0) + (codRevenue._sum.documentAmount ?? 0);
     const names = Object.fromEntries(products.map((p) => [p.sku, p.name]));
-    const sellerRows = sellerPayments
-      .filter((p) => p.shift)
-      .map((p) => ({ staffId: p.shift!.staffId, amount: p.amount }));
+    const sellerRows = sellerRevenueRows(sellerPayments);
     return buildKpi({ revenue, cogs, paidOrders, items, names, sellerRows });
   }
 
@@ -346,17 +394,15 @@ export class ReportsService {
    * quote different salaries.
    */
   async payroll() {
-    const sellerPayments = await this.prisma.payment.findMany({
-      where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, shiftId: { not: null } },
-      select: { amount: true, shift: { select: { staffId: true } } },
-    });
+    const sellerPayments = await this.sellerRevenuePayments();
     const bySeller = new Map<string, { revenue: number; sales: number }>();
-    for (const p of sellerPayments) {
-      if (!p.shift) continue;
-      const cur = bySeller.get(p.shift.staffId) ?? { revenue: 0, sales: 0 };
-      cur.revenue += p.amount;
+    for (const payment of sellerPayments) {
+      const staffId = soldBy(payment);
+      if (!staffId) continue;
+      const cur = bySeller.get(staffId) ?? { revenue: 0, sales: 0 };
+      cur.revenue += payment.amount;
       cur.sales += 1;
-      bySeller.set(p.shift.staffId, cur);
+      bySeller.set(staffId, cur);
     }
     const staff = await this.prisma.staffUser.findMany({
       where: { id: { in: [...bySeller.keys()] } },

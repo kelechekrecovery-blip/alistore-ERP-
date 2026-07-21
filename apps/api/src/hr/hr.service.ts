@@ -7,6 +7,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { PrismaService } from '../prisma/prisma.service';
+import { sellerRevenueWhere, soldBy } from '../reports/seller-revenue';
 import { CreateHrScheduleDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
 
 const DAY_MS = 86_400_000;
@@ -98,27 +99,14 @@ export class HrService {
       tx.hrAbsence.findMany({
         where: { status: 'approved', type: { in: ['annual_leave', 'sick_leave'] }, startsOn: { lt: end }, endsOn: { gte: start } },
       }),
+      // Условие и атрибуция общие с `/reports/payroll`
+      // (`reports/seller-revenue.ts`): раньше два экрана зарплаты держали свои
+      // копии и расходились в десять раз.
       tx.payment.findMany({
-        // Выборка шла через `shift: { point }`, а `shiftId` пишется только для
-        // наличных (`payments.service.ts`: card/transfer/giftcard/bonus дают
-        // null). Безналичная продажа не попадала в расчёт вовсе. У `Payment`
-        // есть собственный `point` с индексом `[point, createdAt]`; `shift.point`
-        // оставлен для исторических строк, где `point` не заполнялся.
-        where: {
-          amount: { gt: 0 },
-          status: { in: ['received', 'reconciled'] },
-          createdAt: { gte: start, lt: end },
-          OR: [{ point }, { shift: { point } }],
-        },
+        where: sellerRevenueWhere({ from: start, to: end, point }),
         select: { amount: true, receivedBy: true, shift: { select: { staffId: true } } },
       }),
     ]);
-    // Выручка принадлежит тому, кто продал (`receivedBy`), а не владельцу
-    // смены: наличные пробиваются в смене кассира, но закрывает сделку
-    // продавец. Откат на владельца смены — для исторических платежей, у
-    // которых `receivedBy` ещё не заполнялся.
-    const soldBy = (payment: { receivedBy: string | null; shift: { staffId: string } | null }) =>
-      payment.receivedBy ?? payment.shift?.staffId ?? null;
     const staffIds = new Set<string>(schedules.map((row) => row.staffId));
     payments.forEach((payment) => { const seller = soldBy(payment); if (seller) staffIds.add(seller); });
     const staff = await tx.staffUser.findMany({ where: { id: { in: [...staffIds] } }, select: { id: true, username: true } });

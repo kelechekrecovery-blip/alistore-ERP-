@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
@@ -312,6 +313,32 @@ export class ShiftsService {
         refs: [shiftId],
       });
       if (diff !== 0) {
+        // Недостача кассы не попадала в бухгалтерию вообще: счёт 6990
+        // «Финансовые расхождения» использовал только курьерский модуль.
+        // Событие в леджере было, риск-сигнал был, а `netProfit` в P&L
+        // оставался завышенным ровно на сумму расхождения — навсегда.
+        // Проводится тем же приёмом, что у курьера (`courier.service.ts`),
+        // внутри той же транзакции, что и закрытие смены.
+        await postAccountingEntryOnTx(tx, {
+          idempotencyKey: `accounting:shift.reconciliation:${shiftId}`,
+          sourceType: 'shift.reconciliation',
+          sourceRef: shiftId,
+          description: `Расхождение кассы по смене ${shiftId}`,
+          documentAmount: Math.abs(diff),
+          baseAmount: Math.abs(diff),
+          point: shift.point,
+          occurredAt: closed.closedAt ?? new Date(),
+          createdBy: actor,
+          lines: diff < 0
+            ? [
+              { accountCode: '6990', debit: -diff, credit: 0, memo: 'Недостача кассы' },
+              { accountCode: '1000', debit: 0, credit: -diff, memo: 'Выбытие наличных из кассы' },
+            ]
+            : [
+              { accountCode: '1000', debit: diff, credit: 0, memo: 'Излишек наличных в кассе' },
+              { accountCode: '6990', debit: 0, credit: diff, memo: 'Излишек кассы' },
+            ],
+        });
         events.push({
           type: EventType.CashShortage,
           actor,
