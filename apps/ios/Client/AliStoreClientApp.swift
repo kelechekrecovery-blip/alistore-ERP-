@@ -3811,21 +3811,12 @@ private struct AccountView: View {
                 AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath", badge: "оценка") {
                     CustomerTradeInsView(environment: environment, auth: auth)
                 }
-                AccountMenuTile(title: "Отследить заказ", detail: "Курьер и самовывоз", symbol: "location.fill", badge: "в пути") {
-                    OrderTrackingView()
-                }
-                AccountMenuTile(title: "Моя рассрочка", detail: "График и платежи", symbol: "creditcard.fill", badge: "1 активна") {
-                    InstallmentView()
-                }
-                AccountMenuTile(title: "Живой чат", detail: "Поддержка ~2 мин", symbol: "bubble.left.and.text.bubble.right.fill") {
-                    SupportChatView()
-                }
-                AccountMenuTile(title: "Снова в наличии", detail: "Списки ожидания", symbol: "bell.badge.fill") {
-                    WaitlistView()
-                }
-                AccountMenuTile(title: "Пригласи друга", detail: "+500 бонусов", symbol: "gift.fill", badge: "+500") {
-                    ReferralView()
-                }
+                // Убраны плитки OrderTracking / Installment / SupportChat / Waitlist /
+                // Referral: экраны рендерили `.sample`-фикстуры (заказ №4102, курьер
+                // «Данияр», «Тикет создан» без сети) и вводили в заблуждение (Guideline
+                // 2.3). Waitlist и referral на сервере не существуют; трекинг дублирует
+                // «Мои заказы», живой чат — «Поддержку». Сами экраны оставлены: они
+                // достижимы только из UI-тестов через DEBUG-флаг (ClientDebugFeature).
                 AccountMenuTile(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3") {
                     CustomerSettingsView(environment: environment, auth: auth)
                 }
