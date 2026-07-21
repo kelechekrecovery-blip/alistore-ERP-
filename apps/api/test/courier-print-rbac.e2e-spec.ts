@@ -187,11 +187,30 @@ describe('Courier and print/export RBAC', () => {
       .expect(200);
     expect(foreign.body).toHaveLength(0);
 
+    // Неуспешная доставка требует фото Evidence: без него курьер мог бы заявить
+    // «клиента нет» и оставить COD себе (`deliveries.controller.ts` →
+    // `assertCourierOrderEvidence`). Тест был написан до этого контроля и слал
+    // отказ без фото, поэтому получал 422 — контроль работает, устарел тест.
+    // Ослаблять его нельзя, поэтому здесь воспроизводится реальный порядок:
+    // сначала загруженное фото, привязанное к курьеру и заказу, затем отказ.
+    const evidenceKey = `courier-fail-evidence-${RUN}`;
+    await prisma.evidenceUpload.create({
+      data: {
+        idempotencyKey: evidenceKey,
+        actor: `staff:${courierId}`,
+        entityType: 'order',
+        entityId: order.id,
+        label: 'Неуспешная доставка',
+        fingerprint: `fp-${RUN}`,
+        asset: { key: `evidence/${RUN}.jpg`, width: 1, height: 1, bytes: 1, contentType: 'image/jpeg' },
+      },
+    });
+
     await request(app.getHttpServer())
       .post(`/deliveries/${order.id}/fail`)
       .set('Authorization', `Bearer ${courierToken}`)
       .set('Idempotency-Key', `courier-fail-${RUN}`)
-      .send({ reason: 'client unavailable' })
+      .send({ reason: 'client unavailable', evidenceIdempotencyKey: evidenceKey })
       .expect(201);
 
     const failed = await prisma.auditEvent.findFirst({ where: { type: 'delivery.failed' } });
