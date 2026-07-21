@@ -128,6 +128,27 @@ describe('Customer account deletion and export', () => {
     expect(oldRow!.phone).toBe(`deleted:${owner.id}`);
   });
 
+  // Переименование `customer.phone` в `deleted:<id>` освобождает номер, но не стирает
+  // его: каждый вход по OTP оставляет строку `OtpChallenge` с телефоном в открытом
+  // виде, и её никто не удалял ни при удалении аккаунта, ни по сроку. Обещание
+  // политики («данные удаляются») выполнялось только в таблице `Customer`.
+  it('стирает телефон из OtpChallenge — после удаления его нет ни в одной таблице', async () => {
+    const phone = `+9967${run.slice(-6)}77`;
+    const { devCode } = await auth.requestOtp(phone);
+    await auth.verifyOtp(phone, devCode!);
+    const owner = await prisma.customer.findUnique({ where: { phone } });
+    expect(owner).not.toBeNull();
+    // предусловие: телефон действительно лежит в OtpChallenge открытым текстом
+    expect(await prisma.otpChallenge.count({ where: { phone } })).toBeGreaterThan(0);
+
+    await request(app.getHttpServer())
+      .delete('/customers/me')
+      .set('Authorization', `Bearer ${token(owner!)}`)
+      .expect(200);
+
+    expect(await prisma.otpChallenge.count({ where: { phone } })).toBe(0);
+  });
+
   it('keeps orders and ledger rows intact for accounting', async () => {
     const owner = await customer('33');
     const order = await prisma.order.create({

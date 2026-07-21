@@ -287,6 +287,10 @@ export class CustomersService {
       if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
       if (isAnonymized(customer)) return { result: { id: customer.id, deleted: true }, events: [] };
 
+      // Строго до переименования: challenge'ы связаны с клиентом только телефоном,
+      // после подмены на `deleted:<id>` их уже не найти, и номер остался бы в базе
+      // открытым текстом навсегда — при том что аккаунт удалён.
+      await tx.otpChallenge.deleteMany({ where: { phone: customer.phone } });
       await tx.customer.update({
         where: { id: customerId },
         data: { name: DELETED_CUSTOMER_NAME, phone: deletedPhone(customerId), consent: false },

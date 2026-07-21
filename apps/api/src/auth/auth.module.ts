@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+import { OtpRetentionService } from './otp-retention.service';
 import { TotpService } from './totp.service';
 import { JwtStrategy } from './jwt.strategy';
 import { resolveJwtSecret } from './jwt-secret';
@@ -35,6 +36,9 @@ import { selectOtpSender } from './otp-sender-selector';
     TotpService,
     JwtStrategy,
     OptionalJwtAuthGuard,
+    // Без него телефоны в `OtpChallenge` копятся бессрочно: удаление аккаунта
+    // чистит только свой номер, а большинство challenge аккаунтом не становятся.
+    OtpRetentionService,
     {
       provide: OTP_SENDER,
       inject: [ConfigService],
