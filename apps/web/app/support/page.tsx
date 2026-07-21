@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { createCustomer, fetchSupportTickets, openSupportTicket, uploadEvidenceImages, type SupportTicket } from '@/lib/api';
+import { createCustomer, fetchStorefrontContent, fetchSupportTickets, openSupportTicket, uploadEvidenceImages, type StorefrontPayload, type SupportTicket } from '@/lib/api';
 
 const faq = ['Как отследить заказ?', 'Условия возврата и обмена', 'Как работает рассрочка?', 'Гарантия на Б/У технику'];
 const channels = [
@@ -26,6 +26,9 @@ export default function SupportPage() {
   const [done, setDone] = useState<{ ticket: SupportTicket; evidenceCount: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
+
+  useEffect(() => { fetchStorefrontContent().then(setStorefront).catch(() => setStorefront(null)); }, []);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
   useEffect(() => {
@@ -82,6 +85,45 @@ export default function SupportPage() {
         Связаться с AliStore можно через форму ниже. Укажите телефон, тему и описание —
         обращение будет зарегистрировано, а ответ появится в истории обращений после входа.
       </div>
+      {/* Прямые контакты. Guideline 1.5 требует, чтобы страница поддержки давала
+          реальный способ связаться, а не только форму. Номер берём из контента
+          витрины — тот же источник, что в шапке и подвале, которым владелец
+          управляет через ERP. Если он не задан, честно об этом говорим: фальшивый
+          номер (как зашитый ранее wa.me/996700000000) хуже, чем его отсутствие. */}
+      <div className="mb-4 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+        <div className="text-[13px] font-semibold text-bright">Связаться напрямую</div>
+        {storefront?.content.contactPhone ? (
+          <>
+            <div className="mt-2.5 grid grid-cols-2 gap-2 text-[13px]">
+              <a
+                href={`tel:${storefront.content.contactPhone.replace(/[^\d+]/g, '')}`}
+                className="rounded-[11px] border border-surface-3 bg-surface-1 py-3 text-center text-bright"
+              >
+                📞 Позвонить
+              </a>
+              <a
+                href={`https://wa.me/${storefront.content.contactPhone.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-[11px] border border-surface-3 bg-surface-1 py-3 text-center text-bright"
+              >
+                💬 WhatsApp
+              </a>
+            </div>
+            <div className="mt-2 text-[12px] text-muted">
+              {storefront.content.contactPhone}
+              {storefront.content.supportHours ? ` · ${storefront.content.supportHours}` : ''}
+            </div>
+          </>
+        ) : (
+          <div className="mt-2 text-[12px] text-muted">
+            Телефон поддержки пока не указан — воспользуйтесь формой ниже, обращение
+            всё равно зарегистрируется.
+          </div>
+        )}
+      </div>
+
+      <div className="mb-2 text-[13px] text-muted">Канал для ответа</div>
       <div className="mb-4 grid grid-cols-3 gap-2">
         {channels.map((c) => (
           <button key={c.id} type="button" onClick={() => setChannel(c.id)} className={`rounded-[13px] p-3.5 text-center ${c.cls} ${channel === c.id ? 'ring-2 ring-lime' : ''}`}>

@@ -6,6 +6,11 @@ import { SiteHeader } from '@/components/SiteHeader';
 export const metadata: Metadata = {
   title: 'Публичная оферта — AliStore',
   description: 'Договор публичной оферты AliStore.',
+  // Пока документ состоит из плейсхолдеров ([Предмет договора], [Реквизиты], [Дата]),
+  // он не должен попадать в поиск как действующая оферта магазина. Баннер «ЧЕРНОВИК»
+  // предупреждает человека, а noindex — поисковик. Снять оба разом, когда владелец
+  // даст финальный текст и реквизиты.
+  robots: { index: false, follow: false },
 };
 
 const SECTIONS: Array<{ title: string; body: string[] }> = [

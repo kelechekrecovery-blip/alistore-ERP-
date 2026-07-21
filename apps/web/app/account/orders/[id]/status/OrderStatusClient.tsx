@@ -112,7 +112,11 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
       <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
         <Link href="/account/orders" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">🧾 Чек</Link>
         <Link href="/account/devices" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">🛡 Гарантия</Link>
-        <a href="https://wa.me/996700000000" target="_blank" rel="noreferrer" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">💬 WhatsApp</a>
+        {/* Здесь стоял зашитый `wa.me/996700000000` — несуществующий номер. Клиент,
+            которому что-то не так с заказом, нажимал «WhatsApp» и попадал в пустоту.
+            Ведём в поддержку: там номер берётся из контента витрины, которым владелец
+            управляет через ERP, и если он не задан — честно об этом сказано. */}
+        <Link href="/support" className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-bright">💬 Поддержка</Link>
         <Link href={`/account/orders/${order.id}`} className="rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-muted">Детали</Link>
       </div>
     </div>,
