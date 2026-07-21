@@ -5127,3 +5127,10 @@
 - Changes: removed cashier and senior-seller `giftcards:issue` grants from API Casbin policy and the Web permission mirror until issuance is bound to a cash shift; updated the money-permission regression.
 - Checks: Web tests `68/68`; API production build; `git diff --check`.
 - Result: unauthorized staff cannot initiate an unverified cash/liability event through the UI or API policy.
+
+## COURIER-WEB-2026-07-21H
+
+- Scope: accept the Web Courier operational surface.
+- Changes: added courier route and COD receiver views, typed API client, delivery Evidence upload, server-authoritative delivery/failure transitions, COD handover UI and role-aware session handling; stabilized the UI E2E session setup.
+- Checks: Courier Chromium UI E2E `3/3`; Web production Docker build already includes `/courier` and `/courier-cash` routes; API courier/evidence suites `27/27`.
+- Result: Courier Web software flow is accepted locally. Physical camera/network/maps and staging/live provider certification remain open.
