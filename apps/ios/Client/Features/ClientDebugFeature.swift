@@ -1,6 +1,11 @@
 import SwiftUI
 import AliStoreCore
 
+// В СБОРКУ ДЛЯ МАГАЗИНА НЕ ВХОДИТ.
+// Роутер отладочных экранов: ссылается на выдуманные экраны напрямую. Раньше его защищал только тот факт, что UITestBootstrap.featureRoute в Release возвращает nil, — одна правка до регрессии.
+// Apple дважды отклоняла сборку за мокапы, выдаваемые за рабочие функции (Guideline 2.3).
+#if DEBUG
+
 // Maps a `--ui-testing-feature=<name>` launch arg to a 3.0 feature screen so the
 // visual gate can capture each without walking the account navigation. DEBUG-only.
 enum ClientDebugFeature: String, Identifiable {
@@ -33,3 +38,4 @@ enum ClientDebugFeature: String, Identifiable {
         .preferredColorScheme(.dark)
     }
 }
+#endif

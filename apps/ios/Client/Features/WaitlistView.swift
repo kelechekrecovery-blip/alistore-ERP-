@@ -1,6 +1,11 @@
 import SwiftUI
 import AliStoreCore
 
+// В СБОРКУ ДЛЯ МАГАЗИНА НЕ ВХОДИТ.
+// Лист ожидания без серверной части.
+// Apple дважды отклоняла сборку за мокапы, выдаваемые за рабочие функции (Guideline 2.3).
+#if DEBUG
+
 // «Снова в наличии» — restock waitlist (3.0 deck: WAITLIST).
 // Locally persisted (UserDefaults) until the notifications backend tracks watches.
 // The product card's «Уведомить» CTA adds here; a push fires when stock returns.
@@ -153,4 +158,5 @@ struct WaitlistView: View {
     NavigationStack { WaitlistView() }
         .preferredColorScheme(.dark)
 }
+#endif
 #endif

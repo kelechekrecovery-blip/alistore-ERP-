@@ -846,45 +846,68 @@ private struct ClientNotificationRow: View {
     }
 }
 
-private enum ClientLocalState {
-    private static let cartKey = "alistore.client.cart.v1"
-    private static let favoritesKey = "alistore.client.favorites.v1"
-    private static let comparedKey = "alistore.client.compared.v1"
+/**
+ Корзина, избранное и сравнение — на устройстве, но по аккаунту.
 
-    static func cart() -> [String: Int] {
-        guard let data = UserDefaults.standard.data(forKey: cartKey),
+ Ключи были общими на всё приложение, поэтому состояние переживало выход: следующий
+ вошедший видел чужую корзину и чужое избранное. В магазине, где одним телефоном
+ пользуются по очереди, это и утечка интереса покупателя, и заказ, собранный не тем
+ человеком.
+ */
+private enum ClientLocalState {
+    private static func key(_ base: String, owner: String?) -> String {
+        // Гость — отдельное пространство, а не общее: иначе гостевая корзина
+        // подмешивалась бы к первому же вошедшему.
+        "alistore.client.\(base).v2.\(owner ?? "guest")"
+    }
+
+    static func cart(owner: String?) -> [String: Int] {
+        guard let data = UserDefaults.standard.data(forKey: key("cart", owner: owner)),
               let value = try? JSONDecoder().decode([String: Int].self, from: data) else {
             return [:]
         }
         return value
     }
 
-    static func favorites() -> Set<String> {
-        guard let data = UserDefaults.standard.data(forKey: favoritesKey),
+    static func favorites(owner: String?) -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: key("favorites", owner: owner)),
               let value = try? JSONDecoder().decode([String].self, from: data) else {
             return []
         }
         return Set(value)
     }
 
-    static func compared() -> Set<String> {
-        guard let data = UserDefaults.standard.data(forKey: comparedKey),
+    static func compared(owner: String?) -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: key("compared", owner: owner)),
               let value = try? JSONDecoder().decode([String].self, from: data) else {
             return []
         }
         return Set(value)
     }
 
-    static func save(cart: [String: Int], favorites: Set<String>, compared: Set<String>) {
+    static func save(cart: [String: Int], favorites: Set<String>, compared: Set<String>, owner: String?) {
         let encoder = JSONEncoder()
         if let data = try? encoder.encode(cart) {
-            UserDefaults.standard.set(data, forKey: cartKey)
+            UserDefaults.standard.set(data, forKey: key("cart", owner: owner))
         }
         if let data = try? encoder.encode(Array(favorites).sorted()) {
-            UserDefaults.standard.set(data, forKey: favoritesKey)
+            UserDefaults.standard.set(data, forKey: key("favorites", owner: owner))
         }
         if let data = try? encoder.encode(Array(compared).sorted()) {
-            UserDefaults.standard.set(data, forKey: comparedKey)
+            UserDefaults.standard.set(data, forKey: key("compared", owner: owner))
+        }
+    }
+
+    /// Стирает состояние конкретного владельца — вызывается при выходе, чтобы
+    /// на общем устройстве от прежнего аккаунта не оставалось следов.
+    static func clear(owner: String?) {
+        for base in ["cart", "favorites", "compared"] {
+            UserDefaults.standard.removeObject(forKey: key(base, owner: owner))
+        }
+        // Ключи первой версии были общими на всех: убираем их при первом же
+        // выходе, иначе чужая корзина осталась бы на устройстве навсегда.
+        for legacy in ["alistore.client.cart.v1", "alistore.client.favorites.v1", "alistore.client.compared.v1"] {
+            UserDefaults.standard.removeObject(forKey: legacy)
         }
     }
 }
@@ -914,7 +937,11 @@ private struct ClientRootView: View {
     @State private var compared: Set<String> = []
     @State private var orderRefreshRevision = 0
     @State private var pushStatus = "Push не настроен"
+#if DEBUG
+    // Отладочный роутер экранов существует только в DEBUG: экраны, на которые
+    // он ведёт, содержат выдуманные данные и в сборку для магазина не входят.
     @State private var debugFeature: ClientDebugFeature?
+#endif
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
@@ -926,7 +953,9 @@ private struct ClientRootView: View {
             environment: environment,
             restoresStoredSession: !UITestBootstrap.disablesSessionRestore && !UITestBootstrap.startsSignedIn
         ))
+#if DEBUG
         _debugFeature = State(initialValue: ClientDebugFeature.fromLaunch)
+#endif
     }
 
     var body: some View {
@@ -967,9 +996,11 @@ private struct ClientRootView: View {
             }
         }
         .preferredColorScheme(.dark)
+#if DEBUG
         .fullScreenCover(item: $debugFeature) { feature in
             feature.screen
         }
+#endif
         .overlay {
             if auth.requiresQuickUnlock, let session = auth.session {
                 QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout(); guestMode = false } })
@@ -1020,6 +1051,15 @@ private struct ClientRootView: View {
         .onChange(of: cart) { _, _ in saveLocalState() }
         .onChange(of: favorites) { _, _ in saveLocalState() }
         .onChange(of: compared) { _, _ in saveLocalState() }
+        // Смена владельца — это и выход, и вход другого человека, и истечение
+        // сессии. Раньше корзина и избранное были общими на всё приложение и
+        // переживали выход: следующий вошедший видел чужую корзину. Телефоном
+        // в магазине пользуются по очереди, поэтому состояние прежнего владельца
+        // с устройства уходит, а новый получает своё.
+        .onChange(of: auth.session?.customerId) { previous, current in
+            if let previous, previous != current { forgetLocalState(of: previous) }
+            restoreLocalState()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsToken)) { notification in
             guard let token = notification.object as? String else { return }
             Task { await registerPushToken(token) }
@@ -1038,16 +1078,30 @@ private struct ClientRootView: View {
         }
     }
 
+    /// Владелец локального состояния. Пока человек не вошёл — «гость», и это
+    /// отдельное пространство, а не общее с аккаунтами.
+    private var localStateOwner: String? { auth.session?.customerId }
+
     private func restoreLocalState() {
         guard !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart else { return }
-        cart = ClientLocalState.cart()
-        favorites = ClientLocalState.favorites()
-        compared = ClientLocalState.compared()
+        let owner = localStateOwner
+        cart = ClientLocalState.cart(owner: owner)
+        favorites = ClientLocalState.favorites(owner: owner)
+        compared = ClientLocalState.compared(owner: owner)
     }
 
     private func saveLocalState() {
         guard !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart else { return }
-        ClientLocalState.save(cart: cart, favorites: favorites, compared: compared)
+        ClientLocalState.save(cart: cart, favorites: favorites, compared: compared, owner: localStateOwner)
+    }
+
+    /// Выход обязан унести с устройства корзину и интересы прежнего аккаунта:
+    /// телефоном в магазине пользуются по очереди.
+    private func forgetLocalState(of owner: String?) {
+        ClientLocalState.clear(owner: owner)
+        cart = [:]
+        favorites = []
+        compared = []
     }
 
     private func loadCatalog() async {
@@ -1814,40 +1868,54 @@ private struct CartView: View {
                 : selectedDeliverySlot.map { slotLabel($0) }
         )
         let idempotencyKey = UUID().uuidString
+        // Создание заказа и запуск оплаты — две разные операции, и раньше они
+        // стояли под одним `catch`. Если заказ создавался, а оплата падала по
+        // сети, покупатель читал «сохранено офлайн» про уже существующий заказ,
+        // `completedOrder` не выставлялся — и работающая кнопка повторной оплаты
+        // становилась недостижимой. Заказ висел неоплаченным.
+        let order: CustomerOrder
         do {
-            let order: CustomerOrder = try await APIClient(baseURL: environment.apiBaseURL).post(
+            order = try await APIClient(baseURL: environment.apiBaseURL).post(
                 "orders/mine",
                 body: request,
                 token: session.accessToken,
                 idempotencyKey: idempotencyKey
             )
-            if let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) {
-                paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
-                    "payments/intents/mine",
-                    body: CreatePaymentIntentRequest(
-                        orderId: order.id,
-                        method: onlineMethod,
-                        amount: order.total,
-                        returnUrl: paymentReturnURL(for: order.id)
-                    ),
-                    token: session.accessToken,
-                    idempotencyKey: UUID().uuidString
-                )
-            }
-            completedOrder = order
-            cart.removeAll()
         } catch {
-            if error is URLError {
-                do {
-                    try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
-                    queuedOffline = true
-                    cart.removeAll()
-                } catch {
-                    errorMessage = error.localizedDescription
-                }
-            } else {
+            guard error is URLError else {
+                errorMessage = error.localizedDescription
+                return
+            }
+            do {
+                try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
+                queuedOffline = true
+                cart.removeAll()
+            } catch {
                 errorMessage = error.localizedDescription
             }
+            return
+        }
+
+        // С этого места заказ существует на сервере. Офлайн-очередь здесь уже
+        // неуместна: повторять нечего, платить — есть чем.
+        completedOrder = order
+        cart.removeAll()
+
+        guard let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) else { return }
+        do {
+            paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "payments/intents/mine",
+                body: CreatePaymentIntentRequest(
+                    orderId: order.id,
+                    method: onlineMethod,
+                    amount: order.total,
+                    returnUrl: paymentReturnURL(for: order.id)
+                ),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+        } catch {
+            retryErrorMessage = "Заказ создан, но оплата не началась. Повторите оплату — заказ не потерян."
         }
     }
 
@@ -5769,8 +5837,6 @@ private struct ClientHomeView: View {
     @Binding var favorites: Set<String>
     let openCatalog: () -> Void
 
-    @State private var showStories = false
-    @State private var storyStart = 0
 
     private let categories = [("Смартфоны", "iphone"), ("Ноутбуки", "laptopcomputer"), ("Аудио", "airpodsmax"), ("Часы", "applewatch"), ("Планшеты", "ipad")]
 
@@ -5791,17 +5857,14 @@ private struct ClientHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    StoriesRail(items: [
-                        .init(id: 0, emoji: "🔥", label: "Хиты"),
-                        .init(id: 1, emoji: "🎁", label: "Акции"),
-                        .init(id: 2, emoji: "♻️", label: "Trade-in"),
-                        .init(id: 3, emoji: "🆕", label: "Новинки"),
-                        .init(id: 4, emoji: "⚡️", label: "1–2 ч"),
-                    ], onSelect: { storyStart = $0; showStories = true })
                     HStack(spacing: 10) {
-                        ServiceCard(title: "Доставка 1–2 ч", detail: "по Бишкеку", symbol: "bolt.fill", highlighted: true)
-                        ServiceCard(title: "Самовывоз", detail: "бесплатно", symbol: "building.2")
-                        ServiceCard(title: "Trade-in", detail: "оценка за 30с", symbol: "arrow.triangle.2.circlepath")
+                        // Сроки и стоимость доставки задаются оператором и приходят
+                        // в checkout-options. Пока они не прочитаны с сервера, обещать
+                        // «1–2 часа» и «бесплатно» нельзя: это тот же класс, за который
+                        // Apple отклоняла сборку дважды.
+                        ServiceCard(title: "Доставка", detail: "по Бишкеку", symbol: "bolt.fill", highlighted: true)
+                        ServiceCard(title: "Самовывоз", detail: "из магазина", symbol: "building.2")
+                        ServiceCard(title: "Trade-in", detail: "обмен старого", symbol: "arrow.triangle.2.circlepath")
                     }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -5885,9 +5948,6 @@ private struct ClientHomeView: View {
             }
             .background(ClientTheme.background)
             .navigationTitle("AliStore")
-            .fullScreenCover(isPresented: $showStories) {
-                StoriesViewer(startIndex: storyStart)
-            }
         }
     }
 }

@@ -3,6 +3,11 @@ import MapKit
 import CoreImage.CIFilterBuiltins
 import AliStoreCore
 
+// В СБОРКУ ДЛЯ МАГАЗИНА НЕ ВХОДИТ.
+// Выдуманный заказ: static let sample с несуществующим курьером и его телефоном, подставляемый по умолчанию.
+// Apple дважды отклоняла сборку за мокапы, выдаваемые за рабочие функции (Guideline 2.3).
+#if DEBUG
+
 // Order tracking (3.0 deck: ORDER STATUS) — live courier route + pickup QR + stage timeline.
 // Fulfilment toggles courier (MapKit route) vs pickup (CoreImage QR). Sample data until the
 // live courier GPS feed lands; stage timeline mirrors the Event Ledger order stages.
@@ -262,4 +267,5 @@ struct OrderTrackingView: View {
     NavigationStack { OrderTrackingView() }
         .preferredColorScheme(.dark)
 }
+#endif
 #endif

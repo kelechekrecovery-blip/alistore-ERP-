@@ -1,6 +1,11 @@
 import SwiftUI
 import AliStoreCore
 
+// В СБОРКУ ДЛЯ МАГАЗИНА НЕ ВХОДИТ.
+// Выдуманный график рассрочки: static let sample, подставляемый по умолчанию.
+// Apple дважды отклоняла сборку за мокапы, выдаваемые за рабочие функции (Guideline 2.3).
+#if DEBUG
+
 // «Моя рассрочка» — customer installment plan (3.0 deck: INSTALLMENT).
 // Client-side model: the customer-facing installment endpoint lands later, so this
 // renders a representative plan (next payment + full schedule) styled 1:1 with the deck.
@@ -251,4 +256,5 @@ func installmentSom(_ value: Int) -> String {
     NavigationStack { InstallmentView() }
         .preferredColorScheme(.dark)
 }
+#endif
 #endif

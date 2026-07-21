@@ -1,6 +1,11 @@
 import SwiftUI
 import AliStoreCore
 
+// В СБОРКУ ДЛЯ МАГАЗИНА НЕ ВХОДИТ.
+// Реферальная программа без серверной части.
+// Apple дважды отклоняла сборку за мокапы, выдаваемые за рабочие функции (Guideline 2.3).
+#if DEBUG
+
 // «Пригласи друга» — referral program (3.0 deck: REFERRAL).
 // Client-side: code + share link + earned-bonuses stats. Attribution flows to the
 // Marketing center campaign (k-factor / channel ROAS) once the backend module lands.
@@ -152,4 +157,5 @@ func installmentGrouped(_ value: Int) -> String {
     NavigationStack { ReferralView() }
         .preferredColorScheme(.dark)
 }
+#endif
 #endif

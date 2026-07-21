@@ -3,6 +3,22 @@ import AliStoreCore
 
 // Fullscreen stories viewer (3.0 deck: story overlay).
 // Progress bars, tap zones (prev/next), auto-advance, swipe/× to dismiss.
+//
+// СБОРКА ДЛЯ МАГАЗИНА ЭТОТ ЭКРАН НЕ СОДЕРЖИТ.
+//
+// Содержимое сторис — выдуманные коммерческие обещания: «Скидки до −30%»,
+// «рассрочка 0%», «Доставка за 1–2 часа», «Бесплатно от 5 000 сом» и названные
+// модели «iPhone 15, MacBook Air и AirPods». Ни одно из них не читается с
+// сервера, а все кнопки CTA ведут в finish(), то есть просто закрывают экран.
+//
+// Apple дважды отклоняла сборку ровно за этот класс (Guideline 2.3): плитки
+// Client, ведущие на выдуманные данные, и мокап «Добавить товар» в Staff.
+// Экран висел первым блоком на главной, вне #if DEBUG.
+//
+// Чтобы вернуть его в продажу, нужны реальные источники: акции — из storefront
+// blocks, сроки и порог бесплатной доставки — из checkout-options, хиты — из
+// каталога, и работающая навигация по CTA.
+#if DEBUG
 
 struct StoryPage: Identifiable, Sendable {
     let id: Int
@@ -182,4 +198,5 @@ extension Array {
 #Preview {
     StoriesViewer().preferredColorScheme(.dark)
 }
+#endif
 #endif

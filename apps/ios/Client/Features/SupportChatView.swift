@@ -1,6 +1,11 @@
 import SwiftUI
 import AliStoreCore
 
+// В СБОРКУ ДЛЯ МАГАЗИНА НЕ ВХОДИТ.
+// Экран поддержки без серверной части.
+// Apple дважды отклоняла сборку за мокапы, выдаваемые за рабочие функции (Guideline 2.3).
+#if DEBUG
+
 // Live support chat (3.0 deck: SUPPORT CHAT).
 // A local assistant with keyword routing + typing delay; «Позвать оператора» escalates
 // to a real ticket. Wired to POST /support/tickets/mine when the transport lands.
@@ -223,4 +228,5 @@ struct SupportChatView: View {
     NavigationStack { SupportChatView() }
         .preferredColorScheme(.dark)
 }
+#endif
 #endif
