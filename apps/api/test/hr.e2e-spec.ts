@@ -184,4 +184,66 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: posted.body.id } }, orderBy: { ts: 'asc' } });
     expect(events.map((event) => event.type)).toEqual(['hr.payroll_posted', 'accounting.entry_posted', 'hr.payroll_paid', 'accounting.entry_posted']);
   });
+
+  /**
+   * Комиссия начислялась только с наличных — и не тому, кто продал.
+   *
+   * Два дефекта, усиливающие друг друга:
+   *
+   * 1. `payments.service.ts` пишет `shiftId` только для наличных:
+   *    `shiftId: tender.method === 'cash' ? cashShift?.id : null`. У карты,
+   *    перевода, подарочной карты и бонусов смены нет.
+   * 2. `hr.service.ts` выбирал платежи через `where: { shift: { point } }` и
+   *    относил выручку на `payment.shift.staffId`. Платёж без смены в выборку
+   *    не попадал вовсе, а наличный относился на владельца смены — кассира, —
+   *    а не на продавца, который продал.
+   *
+   * `receivedBy` при этом записывается на каждом платеже и не читался нигде.
+   *
+   * Практический смысл: продавец закрывает сделку картой на 100 000 и получает
+   * ноль комиссии. Продаёт за наличные — комиссию получает кассир. Ошибка
+   * тихая, повторяется каждый месяц и обнаруживается только жалобой.
+   *
+   * У `Payment` есть собственные `point` и `receivedBy` с индексом
+   * `[point, createdAt]` — выборка не нуждается в смене вообще.
+   */
+  it('начисляет комиссию продавцу с безналичной продажи и по факту продавшего', async () => {
+    const point = `${payrollPoint}-ATTR`;
+    const period = '2026-07';
+    await prisma.hrSchedule.create({ data: {
+      staffId: sellerId, point, shiftDate: new Date('2026-07-16T00:00:00.000Z'),
+      startsAt: new Date('2026-07-16T03:00:00.000Z'), endsAt: new Date('2026-07-16T12:00:00.000Z'),
+      createdBy: 'test', idempotencyKey: `hr-attr-plan-${run}`,
+    } });
+
+    // Карта: смены нет вовсе — до правки платёж не попадал в выборку.
+    await prisma.payment.create({ data: {
+      amount: 100_000, method: 'card', status: 'received', point, receivedBy: sellerId,
+      createdAt: new Date('2026-07-16T08:00:00.000Z'),
+    } });
+    // Наличные внутри чужой смены: продал продавец, смена кассира.
+    const cashierShift = await prisma.cashShift.create({ data: {
+      staffId: `cashier-attr-${run}`, point, openCash: 0,
+      openedAt: new Date('2026-07-16T03:00:00.000Z'),
+    } });
+    await prisma.payment.create({ data: {
+      shiftId: cashierShift.id, amount: 50_000, method: 'cash', status: 'received',
+      point, receivedBy: sellerId, createdAt: new Date('2026-07-16T09:00:00.000Z'),
+    } });
+
+    const preview = await request(app.getHttpServer())
+      .get(`/hr/payroll/preview?period=${period}&point=${point}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+
+    const sellerLine = preview.body.lines.find((line: { staffId: string }) => line.staffId === sellerId);
+    expect(sellerLine).toBeDefined();
+    // Обе продажи продавца: 150 000 × commissionBps.
+    expect(sellerLine.revenue).toBe(150_000);
+    // Кассир смены не продавал ничего — комиссии у него быть не должно.
+    const cashierLine = preview.body.lines.find(
+      (line: { staffId: string }) => line.staffId === cashierShift.staffId,
+    );
+    expect(cashierLine?.revenue ?? 0).toBe(0);
+  });
 });

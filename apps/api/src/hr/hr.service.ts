@@ -99,12 +99,28 @@ export class HrService {
         where: { status: 'approved', type: { in: ['annual_leave', 'sick_leave'] }, startsOn: { lt: end }, endsOn: { gte: start } },
       }),
       tx.payment.findMany({
-        where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] }, createdAt: { gte: start, lt: end }, shift: { point } },
-        select: { amount: true, shift: { select: { staffId: true } } },
+        // Выборка шла через `shift: { point }`, а `shiftId` пишется только для
+        // наличных (`payments.service.ts`: card/transfer/giftcard/bonus дают
+        // null). Безналичная продажа не попадала в расчёт вовсе. У `Payment`
+        // есть собственный `point` с индексом `[point, createdAt]`; `shift.point`
+        // оставлен для исторических строк, где `point` не заполнялся.
+        where: {
+          amount: { gt: 0 },
+          status: { in: ['received', 'reconciled'] },
+          createdAt: { gte: start, lt: end },
+          OR: [{ point }, { shift: { point } }],
+        },
+        select: { amount: true, receivedBy: true, shift: { select: { staffId: true } } },
       }),
     ]);
+    // Выручка принадлежит тому, кто продал (`receivedBy`), а не владельцу
+    // смены: наличные пробиваются в смене кассира, но закрывает сделку
+    // продавец. Откат на владельца смены — для исторических платежей, у
+    // которых `receivedBy` ещё не заполнялся.
+    const soldBy = (payment: { receivedBy: string | null; shift: { staffId: string } | null }) =>
+      payment.receivedBy ?? payment.shift?.staffId ?? null;
     const staffIds = new Set<string>(schedules.map((row) => row.staffId));
-    payments.forEach((payment) => { if (payment.shift?.staffId) staffIds.add(payment.shift.staffId); });
+    payments.forEach((payment) => { const seller = soldBy(payment); if (seller) staffIds.add(seller); });
     const staff = await tx.staffUser.findMany({ where: { id: { in: [...staffIds] } }, select: { id: true, username: true } });
     const names = new Map(staff.map((person) => [person.id, person.username]));
     const lines = [...staffIds].map((staffId) => {
@@ -115,7 +131,7 @@ export class HrService {
       const workedMinutes = completed.reduce((sum, row) => sum + Math.max(0, Math.round((row.attendance!.checkedOutAt!.getTime() - row.attendance!.checkedInAt.getTime()) / 60_000)), 0);
       const lateMinutes = completed.reduce((sum, row) => sum + Math.max(0, Math.round((row.attendance!.checkedInAt.getTime() - row.startsAt.getTime()) / 60_000)), 0);
       const overtimeMinutes = completed.reduce((sum, row) => sum + Math.max(0, Math.round((row.attendance!.checkedOutAt!.getTime() - row.endsAt.getTime()) / 60_000)), 0);
-      const staffPayments = payments.filter((payment) => payment.shift?.staffId === staffId);
+      const staffPayments = payments.filter((payment) => soldBy(payment) === staffId);
       const revenue = staffPayments.reduce((sum, payment) => sum + payment.amount, 0);
       const coveredShifts = Math.min(plans.length, completed.length + paidAbsenceShifts);
       const baseEarned = plans.length ? Math.round(PAYROLL_CONFIG.baseAmount * coveredShifts / plans.length) : 0;
