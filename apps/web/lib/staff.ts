@@ -20,12 +20,31 @@ export interface ClosedShift extends Shift {
   closedAt: string;
 }
 
+/**
+ * Пустой ответ (200 без тела) означает «смены нет». Всё остальное — сбой, и он
+ * обязан быть виден.
+ *
+ * Здесь стояло `if (!res.ok) return null`, то есть 401, 403 и 500 приходили в
+ * интерфейс как «смена не открыта». Кассир, проработавший день, видел экран
+ * «Откройте смену»: форма слепого пересчёта и кнопка «Закрыть» исчезали
+ * целиком — они внутри ветки `shift ? …`. Нажатие «Открыть смену» давало 409 и
+ * односложный тост.
+ *
+ * Закрытие смены — единственная точка, где наличные в ящике встречаются с
+ * системой. Молчаливый отказ в ней означает день без сверки кассы.
+ */
 export async function currentShift(accessToken: string): Promise<Shift | null> {
   const res = await fetch(`${API_BASE}/shifts/current`, {
     headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    throw new Error(
+      res.status === 401 || res.status === 403
+        ? 'Сессия истекла — войдите заново, чтобы закрыть смену'
+        : `Не удалось получить смену (${res.status})`,
+    );
+  }
   const text = await res.text();
   return text ? (JSON.parse(text) as Shift) : null;
 }

@@ -79,7 +79,7 @@ function buildSecondaryKpis(d: Dashboard | null): { label: string; value: string
 
 interface DashboardViewProps {
   d: Dashboard | null;
-  risks: RiskSignal[];
+  risks: RiskSignal[] | null;
   revenue: { day: string; amount: number }[];
   trend: RevenueTrend | null;
   period: number;
@@ -147,7 +147,7 @@ export function DashboardView({ d, risks, revenue, trend, onSignal }: DashboardV
 
   const decisions = useMemo<Decision[]>(
     () =>
-      risks.slice(0, 5).map((r) => ({
+      (risks ?? []).slice(0, 5).map((r) => ({
         text: r.detail,
         action: 'перейти',
         color: SEV_COLOR[r.severity] ?? '#8A7F76',
@@ -163,11 +163,13 @@ export function DashboardView({ d, risks, revenue, trend, onSignal }: DashboardV
         <div className="mt-3 min-w-0 sm:mt-0 sm:flex-1">
           <div className="font-mono text-[10px] uppercase tracking-[.12em] text-[#ff9a6e]">AI-ассистент</div>
           <p className="mt-1 text-[13px] leading-5 text-white/80">
-            {d
-              ? risks.length > 0
-                ? <>Открытых сигналов: <strong className="text-[#ff9a6e]">{risks.length}</strong>. Спросите ассистента о выручке, остатках или рисках.</>
-                : <>Открытых сигналов нет. Спросите ассистента о выручке, остатках или закупках.</>
-              : 'Загрузка данных…'}
+            {!d
+              ? 'Загрузка данных…'
+              : risks === null
+                ? 'Сигналы не загружены — «открытых сигналов нет» утверждать нельзя.'
+                : risks.length > 0
+                  ? <>Открытых сигналов: <strong className="text-[#ff9a6e]">{risks.length}</strong>. Спросите ассистента о выручке, остатках или рисках.</>
+                  : <>Открытых сигналов нет. Спросите ассистента о выручке, остатках или закупках.</>}
           </p>
         </div>
         <button type="button" onClick={() => onSignal('ai')} className="mt-3 shrink-0 rounded-[10px] border border-white/15 bg-white/[.07] px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-[#ff7a4d] hover:text-white sm:mt-0">Спросить AI →</button>
@@ -211,7 +213,7 @@ export function DashboardView({ d, risks, revenue, trend, onSignal }: DashboardV
           <div className="mb-3.5 font-display text-[15px] font-bold text-white">Требуют решения</div>
           {decisions.length === 0 && (
             <p className="text-[12px] leading-5 text-muted">
-              {d ? 'Открытых сигналов нет.' : 'Загрузка…'}
+              {!d ? 'Загрузка…' : risks === null ? 'Сигналы не загружены.' : 'Открытых сигналов нет.'}
             </p>
           )}
           <div className="flex flex-col gap-3">

@@ -121,7 +121,9 @@ export default function ErpPage() {
   const [route, setRoute] = useState<Route>('dash');
   const [d, setD] = useState<Dashboard | null>(null);
   const [kpi, setKpi] = useState<Kpi | null>(null);
-  const [risks, setRisks] = useState<RiskSignal[]>([]);
+  // null — «ещё не знаем»: до ответа сервера и при сбое. Пустой массив теперь
+  // означает ровно одно — сигналов действительно нет.
+  const [risks, setRisks] = useState<RiskSignal[] | null>(null);
   const [ledger, setLedger] = useState<LedgerEvent[]>([]);
   const [period, setPeriod] = useState(7);
   const [revenue, setRevenue] = useState<{ day: string; amount: number }[]>([]);
@@ -179,7 +181,13 @@ export default function ErpPage() {
       setKpi(null);
       setCockpitError(cause instanceof Error ? cause.message : 'Не удалось загрузить показатели');
     });
-    fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks([]));
+    // `setRisks([])` превращал упавшую загрузку в зелёное «Тревог нет — всё
+    // сходится» сразу в четырёх местах: риск-центре, бейдже сайдбара, блоке
+    // «Требуют решения» и CRM. Экран прямо утверждал, что касса, COD и долги в
+    // норме, — при том что система об этом ничего не знала. `RiskCenterView` и
+    // `CrmView` уже типизированы под `null` и умеют показывать «загружается»;
+    // ветка была мертва, потому что null не приходил никогда.
+    fetchRisks(session.accessToken).then((r) => setRisks(r.signals)).catch(() => setRisks(null));
     fetchLedger(session.accessToken).then(setLedger).catch(() => setLedger([]));
     // Право staff_tasks:manage есть не у всех, кто открывает ERP: без него
     // счётчика просто не будет — как у бейджа готовности ниже.
@@ -348,7 +356,7 @@ export default function ErpPage() {
             >
               <span className="text-base">{m.icon}</span>
               <span>{m.label}</span>
-              {m.id === 'risks' && risks.length > 0 && <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{risks.length}</span>}
+              {m.id === 'risks' && (risks?.length ?? 0) > 0 && <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{risks!.length}</span>}
               {m.id === 'readiness' && readiness?.summary.blockingRemaining ? <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{readiness.summary.blockingRemaining}</span> : null}
             </button>
           ))}

@@ -4,7 +4,7 @@ import { Camera, Check, QrCode, RefreshCw, ShieldCheck, Wrench } from 'lucide-re
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from './Card';
 import { som } from '@/lib/format';
-import { fetchCatalog, printServerSvg, renderQrLabel, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, isCatalogUnavailable, printServerSvg, renderQrLabel, type CatalogProduct } from '@/lib/api';
 import { SITE_URL } from '@/lib/site';
 import { canPrintLabels } from '@/lib/staff-permissions';
 import {
@@ -48,6 +48,7 @@ function stockChip(units: number): { label: string; color: string; bg: string } 
 export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | null; accessToken: string; role: string; staffId: string }) {
   const [stockSection, setStockSection] = useState<'overview' | 'serial' | 'quantity' | 'consignment' | 'receiving' | 'quarantine'>('overview');
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [reconciliation, setReconciliation] = useState<InventoryValuationReconciliation | null>(null);
   const [reconciliationError, setReconciliationError] = useState('');
   const [rollForward, setRollForward] = useState<InventoryValuationRollForward | null>(null);
@@ -87,9 +88,21 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
   }, [accessToken, canManageQuarantine]);
 
   useEffect(() => {
-    fetchCatalog({ limit: 100 })
-      .then((response) => setProducts(response.items))
-      .catch(() => setProducts([]));
+    // `fetchCatalog` не бросает никогда — при сбое возвращает сентинел
+    // `CATALOG_UNAVAILABLE` (её собственный комментарий требует проверять его
+    // везде, где результат видит человек). Витрина это делает в восьми местах,
+    // ERP — не делала: `catch` был мёртвым, а кладовщик видел «Позиций 0 · На
+    // сумму 0 сом · Мало остатка 0», причём ноль в «мало остатка» подсвечен
+    // зелёным, то есть «всё хорошо».
+    fetchCatalog({ limit: 100 }).then((response) => {
+      if (isCatalogUnavailable(response)) {
+        setProducts(null);
+        setCatalogError('Каталог не ответил — остатки и сумма не показаны');
+        return;
+      }
+      setCatalogError(null);
+      setProducts(response.items);
+    });
   }, []);
 
   useEffect(() => {
@@ -195,6 +208,11 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
       <nav aria-label="Разделы склада" className="flex gap-1 overflow-x-auto border-b border-surface-3 pb-px">
         {stockTabs.map((tab) => <button key={tab.id} type="button" onClick={() => selectStockSection(tab.id)} className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-semibold transition ${stockSection === tab.id ? 'border-[#FF5B2E] text-white' : 'border-transparent text-subtle hover:text-bright'}`}>{tab.label}</button>)}
       </nav>
+      {catalogError && (
+        <div className="rounded-[12px] border border-[#5A2418] bg-[#2A1410] px-3.5 py-2.5 text-[13px] text-[#FF8A7A]">
+          {catalogError}
+        </div>
+      )}
       {/* stat cards */}
       <div className="grid grid-cols-3 gap-3.5">
         <Card>
@@ -205,15 +223,19 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
         </Card>
         <Card>
           <div className="text-xs text-subtle">На сумму</div>
-          <div className="mt-1.5 font-display text-2xl font-extrabold text-white">{som(totalValue)}</div>
+          <div className="mt-1.5 font-display text-2xl font-extrabold text-white">
+            {products === null ? '—' : som(totalValue)}
+          </div>
         </Card>
         <Card>
           <div className="text-xs text-subtle">Мало остатка</div>
           <div
             className="mt-1.5 font-display text-2xl font-extrabold"
-            style={{ color: low > 0 ? '#E5B23C' : '#C6FF3D' }}
+            // Зелёный ноль читается как «дозаказывать нечего». При неотвеченном
+            // каталоге это утверждение системе неизвестно.
+            style={{ color: products === null ? '#8A8A8A' : low > 0 ? '#E5B23C' : '#C6FF3D' }}
           >
-            {low}
+            {products === null ? '—' : low}
           </div>
         </Card>
       </div>

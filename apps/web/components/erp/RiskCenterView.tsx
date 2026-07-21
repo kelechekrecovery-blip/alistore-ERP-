@@ -44,9 +44,25 @@ export function RiskCenterView({
   risks,
   onSignal,
 }: {
-  risks: RiskSignal[];
+  risks: RiskSignal[] | null;
   onSignal: (kind: string) => void;
 }) {
+  // Зелёное «всё сходится» — сильное утверждение: касса, COD, резервы и долги в
+  // норме. Раньше его печатала любая упавшая загрузка, потому что страница
+  // ловила ошибку в пустой массив. Утверждать это можно только по ответу.
+  if (risks === null) {
+    return (
+      <Card>
+        <div className="flex flex-col items-center gap-2 py-10 text-center">
+          <div className="font-display text-lg font-bold text-white">Сигналы не загружены</div>
+          <div className="text-sm text-subtle">
+            Риск-центр не ответил. Это не значит, что тревог нет — значит, что мы их не видим.
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   const counts = { high: 0, medium: 0, low: 0 } as Record<Severity, number>;
   for (const r of risks) counts[r.severity as Severity] = (counts[r.severity as Severity] ?? 0) + 1;
 

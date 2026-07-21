@@ -183,7 +183,7 @@ export default function StaffPage() {
       current[quote.id] ?? String(quote.quotedTotal ?? quote.listTotal),
     ])));
   }, [session]);
-  useEffect(() => { if (tab === 'b2b' && session) loadB2B(); }, [tab, loadB2B, session]);
+  useEffect(() => { if (tab === 'b2b' && session && staffTabAllowed(session.role, 'b2b')) loadB2B(); }, [tab, loadB2B, session]);
 
   const loadProtection = useCallback(async () => {
     if (!session) return;
@@ -195,7 +195,7 @@ export default function StaffPage() {
       current[policy.id] ?? String(policy.premium ?? ''),
     ])));
   }, [session]);
-  useEffect(() => { if (tab === 'protection' && session) loadProtection(); }, [tab, loadProtection, session]);
+  useEffect(() => { if (tab === 'protection' && session && staffTabAllowed(session.role, 'protection')) loadProtection(); }, [tab, loadProtection, session]);
 
   const loadTasks = useCallback(async () => {
     if (!session) return;
@@ -686,8 +686,8 @@ export default function StaffPage() {
               </div>
 
               <div className="mb-4 flex gap-2 overflow-x-auto" aria-label="Дополнительные операции">
-                <CompactAction label="B2B · Опт" onClick={() => setTab('b2b')} />
-                <CompactAction label="Защита" onClick={() => setTab('protection')} />
+                {staffTabAllowed(session.role, 'b2b') && <CompactAction label="B2B · Опт" onClick={() => setTab('b2b')} />}
+                {staffTabAllowed(session.role, 'protection') && <CompactAction label="Защита" onClick={() => setTab('protection')} />}
                 {(canCreateDebt(session.role) || canPayDebt(session.role)) && (
                   <CompactAction label="Долги" onClick={() => setTab('debts')} />
                 )}
@@ -698,9 +698,13 @@ export default function StaffPage() {
                 <Link href="/pos" className="flex-shrink-0 rounded-chip border border-[#2E2822] bg-[#221E19] px-3 py-2 text-xs font-semibold text-[#D8CFC6]">POS · Касса</Link>
               </div>
 
+              {/* «🤖 ЗАДАЧА ОТ AI» с текстом про аксессуары была статичной строкой:
+                  /ai/insights в приложении сотрудника не вызывается вообще, а
+                  «сегодня» было одинаковым каждый день. Оставлена кнопка к
+                  реальным задачам. */}
               <div className="erp3-glass rounded-[16px] p-4">
-                <div className="mb-2 font-mono text-xs text-lime">🤖 ЗАДАЧА ОТ AI</div>
-                <div className="text-[14px] leading-relaxed">Мало продаж аксессуаров сегодня. Предлагай чехол/зарядку к каждому телефону — цель +5 к чеку.</div>
+                <div className="mb-2 font-mono text-xs text-lime">ЗАДАЧИ СМЕНЫ</div>
+                <div className="text-[14px] leading-relaxed text-[#D8CFC6]">Список задач приходит с сервера — откройте доску.</div>
                 <button type="button" onClick={() => setTab('tasks')} className="erp3-coral-action mt-3 w-full rounded-[10px] py-2.5 text-[13px] font-bold text-white">К задачам</button>
               </div>
             </>
@@ -751,11 +755,12 @@ export default function StaffPage() {
           {tab === 'tasks' && (
             <div className="pt-1">
               <SectionTitle title="Задачи и KPI" onBack={() => setTab('home')} />
-              <div className="erp3-glass mb-3.5 rounded-[16px] p-4">
-                <div className="mb-2 flex justify-between text-[13px]"><span className="text-[#D8CFC6]">KPI месяца</span><span className="font-mono text-lime">92%</span></div>
-                <div className="h-2 overflow-hidden rounded-chip bg-[#16130F]"><div className="h-full w-[92%] bg-gradient-to-r from-[#C6FF3D] to-[#8FD40F]" /></div>
-                <div className="mt-2 text-[11px] text-[#8A7F76]">До бонуса 15 000 сом осталось 8%</div>
-              </div>
+              {/* Здесь стоял «KPI месяца 92%» с полосой прогресса и подписью «До
+                  бонуса 15 000 сом осталось 8%». Ни одного запроса: одинаково у
+                  каждого сотрудника, в любом месяце, всегда. Продавец приходил
+                  за бонусом со ссылкой на этот экран. Настоящий расчёт живёт в
+                  /reports/payroll и доступен только admin/owner — пока его не
+                  открыли роли, честнее не показывать ничего. */}
               {tasks === null && <p className="py-8 text-center text-sm text-[#8A7F76]">Загрузка…</p>}
               {taskError && (
                 <div className="py-7 text-center">

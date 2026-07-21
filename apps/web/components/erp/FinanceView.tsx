@@ -237,19 +237,18 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
     { label: 'Валовая прибыль', value: d.money.operatingProfit + d.money.expenses, color: '#C6FF3D' },
     { label: 'Операционные расходы', value: -d.money.expenses, color: '#FF8A7A' },
     { label: 'Чистая прибыль', value: d.money.operatingProfit, color: '#C6FF3D' },
-  ] : [
-    { label: 'Выручка', value: 8_420_000, color: '#fff' },
-    { label: 'Себестоимость товаров', value: -6_100_000, color: '#FF8A7A' },
-    { label: 'Валовая прибыль', value: 2_320_000, color: '#C6FF3D' },
-    { label: 'Операционные расходы', value: -1_180_000, color: '#FF8A7A' },
-    { label: 'Чистая прибыль', value: 1_140_000, color: '#C6FF3D' },
-  ];
-  const kpiCards = [
-    { label: 'Выручка', value: d ? som(d.money.salesGross) : '8.42 млн', color: '#fff' },
-    { label: 'Себестоимость', value: d ? som(Math.abs(pnlRows[1].value)) : '6.10 млн', color: '#fff' },
-    { label: 'Валовая', value: d ? som(pnlRows[2].value) : '2.32 млн', color: '#C6FF3D' },
-    { label: 'Чистая', value: d ? som(d.money.operatingProfit) : '1.14 млн', color: '#FF8A5F' },
-  ];
+  ] : [];
+  // Пока кокпит не ответил (или упал), здесь стоял запасной P&L на 8.42 млн
+  // выручки и 1.14 млн чистой прибыли — с теми же подписями и тем же
+  // оформлением, что настоящий. Он показывался на каждом холодном открытии
+  // страницы, и его же выгружала кнопка «↓ Excel» в pnl-erp-2.0.csv.
+  // Выдуманная прибыль уезжала файлом бухгалтеру или в банк.
+  const kpiCards = d ? [
+    { label: 'Выручка', value: som(d.money.salesGross), color: '#fff' },
+    { label: 'Себестоимость', value: som(Math.abs(pnlRows[1].value)), color: '#fff' },
+    { label: 'Валовая', value: som(pnlRows[2].value), color: '#C6FF3D' },
+    { label: 'Чистая', value: som(d.money.operatingProfit), color: '#FF8A5F' },
+  ] : [];
   const financeTabs = [
     { id: 'overview' as const, label: 'Обзор' },
     { id: 'cash' as const, label: 'Касса' },
@@ -266,6 +265,8 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
   };
 
   function exportPnlXls() {
+    // Выгружать нечего, пока данных нет: пустой файл честнее выдуманного.
+    if (pnlRows.length === 0) return;
     const csv = ['Статья;Сумма', ...pnlRows.map((r) => `${r.label};${r.value}`)].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -308,25 +309,37 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
       </section>
       <section id="finance-overview" aria-label="Финансовый обзор" className="scroll-mt-6">
       {/* Finance 3.0 overview */}
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        {kpiCards.map((k) => (
-          <div key={k.label} className="rounded-[16px] border border-surface-3 bg-surface p-4">
-            <div className="text-xs text-subtle">{k.label}</div>
-            <div className="mt-1.5 font-display text-[22px] font-extrabold tabular" style={{ color: k.color }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
+      {kpiCards.length === 0 ? (
+        <div className="rounded-[16px] border border-surface-3 bg-surface p-4 text-[13px] text-subtle">
+          Финансовые итоги ещё не загружены. Цифры появятся, когда ответит кокпит.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+          {kpiCards.map((k) => (
+            <div key={k.label} className="rounded-[16px] border border-surface-3 bg-surface p-4">
+              <div className="text-xs text-subtle">{k.label}</div>
+              <div className="mt-1.5 font-display text-[22px] font-extrabold tabular" style={{ color: k.color }}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <Card>
         <div className="mb-3.5 flex items-center justify-between">
           <div className="font-display text-[15px] font-bold text-white">Отчёт P&amp;L</div>
           <button
             type="button"
             onClick={exportPnlXls}
-            className="rounded-[9px] bg-[#1F3D2E] px-3.5 py-2 text-xs font-semibold text-lime transition hover:brightness-110"
+            disabled={pnlRows.length === 0}
+            className="rounded-[9px] bg-[#1F3D2E] px-3.5 py-2 text-xs font-semibold text-lime transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ↓ Excel
           </button>
         </div>
+        {pnlRows.length === 0 && (
+          <div className="py-2.5 text-[13px] text-subtle">
+            Отчёт построится, когда ответит кокпит. Прежде здесь показывались запасные цифры — их больше нет.
+          </div>
+        )}
         {pnlRows.map((row) => (
           <div key={row.label} className="flex justify-between border-b border-surface-2 py-2.5 text-[13px] last:border-0">
             <span style={{ color: row.color }}>{row.label}</span>
