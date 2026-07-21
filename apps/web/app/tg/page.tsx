@@ -9,11 +9,13 @@ import {
   type CatalogProduct,
   type CreatedOrder,
   fetchCatalog,
+  isCatalogUnavailable,
   fetchCheckoutOptions,
   type OnlinePaymentMethod,
   type PaymentIntent,
   type StorePoint,
 } from '@/lib/api';
+import { LoadFailure } from '@/components/LoadFailure';
 import { som, conditionLabel } from '@/lib/format';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
 
@@ -54,6 +56,8 @@ function productIcon(category: string): string {
 export default function TelegramMiniAppPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -79,10 +83,16 @@ export default function TelegramMiniAppPage() {
 
   useEffect(() => {
     fetchCatalog({ limit: 100 })
+      .then((response) => { if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил'); return response; })
       .then((catalog) => setProducts(catalog.items))
-      .catch(() => setProducts([]))
+      .catch((cause: unknown) => {
+        // «Ничего не найдено» и «сервер недоступен» — разные вещи. Первое
+        // отправляет менять запрос, второе — повторить попытку.
+        setProducts([]);
+        setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [reloadToken]);
 
   useEffect(() => {
     fetchCheckoutOptions(new Date().toISOString().slice(0, 10))
@@ -273,6 +283,12 @@ export default function TelegramMiniAppPage() {
           <section className="min-h-0 flex-1 overflow-y-auto px-4 pb-28">
             {loading ? (
               <p className="py-8 font-mono text-sm text-subtle">Загрузка…</p>
+            ) : loadError !== '' ? (
+              <LoadFailure
+                what="товары"
+                detail={loadError.trim()}
+                onRetry={() => { setLoadError(''); setLoading(true); setReloadToken((value) => value + 1); }}
+              />
             ) : visibleProducts.length === 0 ? (
               <p className="py-8 text-sm text-subtle">Ничего не найдено.</p>
             ) : (

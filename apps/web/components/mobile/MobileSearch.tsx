@@ -3,23 +3,32 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { LoadFailure } from '@/components/LoadFailure';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
-import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, isCatalogUnavailable, type CatalogProduct } from '@/lib/api';
 
 const POPULAR = ['iPhone', 'Samsung', 'AirPods', 'MacBook', 'iPad', 'Часы'];
 
 export default function MobileSearch() {
   const router = useRouter();
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [q, setQ] = useState('');
 
   useEffect(() => {
     setQ(new URLSearchParams(window.location.search).get('q') ?? '');
     fetchCatalog({ limit: 100 })
+      .then((response) => { if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил'); return response; })
       .then((response) => setProducts(response.items))
-      .catch(() => setProducts([]));
-  }, []);
+      .catch((cause: unknown) => {
+      // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
+      // покупателю то же, что видит владелец пустого магазина.
+      setProducts(null);
+      setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+    });
+  }, [reloadToken]);
 
   const results = useMemo(() => {
     const query = q.trim().toLocaleLowerCase('ru');
@@ -81,7 +90,7 @@ export default function MobileSearch() {
               ))}
             </div>
           </>
-        ) : products === null ? (
+        ) : loadError !== '' ? <LoadFailure what="товары" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? (
           <div className="py-10 text-center text-sm text-subtle">Поиск…</div>
         ) : (
           <div className="py-12 text-center">

@@ -4,11 +4,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, BadgeCheck, Headphones, ImageOff, Laptop, PackagePlus, RotateCcw, ShieldCheck, Smartphone, Tablet, Truck, Tv, Watch } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { LoadFailure } from '@/components/LoadFailure';
 import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import MobileHome from '@/components/mobile/MobileHome';
-import { fetchCatalog, fetchPublicStorefrontBlocks, fetchStorefrontContent, type CatalogProduct, type StorefrontBlock, type StorefrontPayload } from '@/lib/api';
+import { fetchCatalog, isCatalogUnavailable, fetchPublicStorefrontBlocks, fetchStorefrontContent, type CatalogProduct, type StorefrontBlock, type StorefrontPayload } from '@/lib/api';
 
 const QUICK_CATEGORIES: Array<{ name: string; href: string; icon: ReactNode }> = [
   { name: 'Смартфоны', href: '/catalog?category=Смартфоны', icon: <Smartphone /> },
@@ -27,6 +28,8 @@ export default function HomePage() {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
   const [blocks, setBlocks] = useState<StorefrontBlock[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     Promise.all([fetchStorefrontContent(), fetchPublicStorefrontBlocks('desktop')]).then(async ([payload, publishedBlocks]) => {
@@ -36,9 +39,18 @@ export default function HomePage() {
         setProducts(payload.featuredProducts);
         return;
       }
-      setProducts((await fetchCatalog({ limit: 12, sort: 'stock_desc' })).items);
-    }).catch(() => setProducts([]));
-  }, []);
+      const catalog = await fetchCatalog({ limit: 12, sort: 'stock_desc' });
+      // Клиент каталога отдаёт мягкий отказ вместо исключения; без этой проверки
+      // сбой сервера доходил до экрана как «товаров нет».
+      if (isCatalogUnavailable(catalog)) throw new Error('Каталог не ответил');
+      setProducts(catalog.items);
+    }).catch((cause: unknown) => {
+      // `setProducts([])` показывал покупателю «Каталог обновляется» — то же
+      // самое, что видит владелец пустого магазина. Сбой обязан выглядеть иначе.
+      setProducts(null);
+      setLoadError(cause instanceof Error && cause.message ? cause.message : '');
+    });
+  }, [reloadToken]);
 
   return (
     <>
@@ -88,7 +100,7 @@ export default function HomePage() {
               <div><p className="text-xs font-bold uppercase text-[#ff9a6e]">Подборка магазина</p><h2 className="mt-1 text-[28px] font-extrabold text-white">{storefront?.content.featuredTitle ?? 'Популярное'}</h2></div>
               <Link href="/catalog" className="flex items-center gap-2 text-sm font-bold text-[#ff9a6e] hover:text-white">Весь каталог <ArrowRight size={17} /></Link>
             </div>
-            {products === null ? <CatalogSkeleton /> : products.length > 0 ? <div className="grid grid-cols-4 gap-4">{products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} variant="design3" />)}</div> : <div className="rounded-[12px] border border-white/10 bg-white/[.04] px-6 py-12 text-center text-white/45">Каталог обновляется. <Link href="/catalog" className="font-bold text-[#ff9a6e]">Открыть каталог</Link></div>}
+            {loadError !== '' ? <LoadFailure what="товары" detail={loadError} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? <CatalogSkeleton /> : products.length > 0 ? <div className="grid grid-cols-4 gap-4">{products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} variant="design3" />)}</div> : <div className="rounded-[12px] border border-white/10 bg-white/[.04] px-6 py-12 text-center text-white/45">Каталог обновляется. <Link href="/catalog" className="font-bold text-[#ff9a6e]">Открыть каталог</Link></div>}
           </section>}
         </main>
         <SiteFooter />

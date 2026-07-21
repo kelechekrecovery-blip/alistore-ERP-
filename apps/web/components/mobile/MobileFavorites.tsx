@@ -3,10 +3,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { LoadFailure } from '@/components/LoadFailure';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { productImage } from '@/components/ProductCard';
 import { som } from '@/lib/format';
-import { fetchCatalog, type CatalogProduct } from '@/lib/api';
+import { fetchCatalog, isCatalogUnavailable, type CatalogProduct } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
 import { useCart } from '@/lib/cart';
 
@@ -14,12 +15,20 @@ export default function MobileFavorites() {
   const favorites = useFavorites();
   const { add } = useCart();
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     fetchCatalog({ limit: 100 })
+      .then((response) => { if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил'); return response; })
       .then((response) => setProducts(response.items))
-      .catch(() => setProducts([]));
-  }, []);
+      .catch((cause: unknown) => {
+      // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
+      // покупателю то же, что видит владелец пустого магазина.
+      setProducts(null);
+      setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+    });
+  }, [reloadToken]);
 
   const items = useMemo(
     () => (products ?? []).filter((p) => favorites.has(p.id)),
@@ -31,7 +40,7 @@ export default function MobileFavorites() {
       <div className="px-4 pb-6 pt-1">
         <div className="mb-3.5 font-display text-[20px] font-bold text-white">Избранное</div>
 
-        {products === null ? (
+        {loadError !== '' ? <LoadFailure what="избранное" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? (
           <div className="space-y-2.5">
             {Array.from({ length: 3 }, (_, i) => (
               <div key={i} className="h-[98px] animate-pulse rounded-[14px] border border-surface-3 bg-surface-2" />

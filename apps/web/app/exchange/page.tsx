@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   exchangeDevice,
   fetchCatalog,
+  isCatalogUnavailable,
   fetchUnit,
   type CatalogProduct,
   type ExchangeResult,
@@ -12,6 +13,7 @@ import {
   uploadEvidenceImage,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { LoadFailure } from '@/components/LoadFailure';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { clearStaffSession, loadStaffSession, type StaffSession } from '@/lib/staff-session';
 
@@ -26,6 +28,8 @@ export default function ExchangePage() {
   const [imei, setImei] = useState('');
   const [unit, setUnit] = useState<UnitLookup | null>(null);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [newId, setNewId] = useState('');
   const [method, setMethod] = useState('cash');
   const [busy, setBusy] = useState(false);
@@ -37,8 +41,13 @@ export default function ExchangePage() {
   useEffect(() => {
     setSession(loadStaffSession());
     setHydrated(true);
-    fetchCatalog({ limit: 100, stockOnly: true }).then((c) => setProducts(c.items)).catch(() => setProducts([]));
-  }, []);
+    fetchCatalog({ limit: 100, stockOnly: true }).then((c) => { if (isCatalogUnavailable(c)) throw new Error('Каталог не ответил'); setProducts(c.items); setLoadError(''); }).catch((cause: unknown) => {
+      // Пустой список в этом select читается как «менять не на что». Это не так:
+      // сервер недоступен, и клиенту нужно сказать об этом, а не показать пустоту.
+      setProducts([]);
+      setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+    });
+  }, [reloadToken]);
 
   const newProduct = products.find((p) => p.id === newId) ?? null;
   const surcharge = unit && newProduct ? newProduct.price - unit.price : 0;
@@ -184,6 +193,13 @@ export default function ExchangePage() {
               {/* step 2: new device */}
               <div className={`rounded-[16px] border border-surface-3 bg-surface p-5 ${!unit ? 'opacity-40' : ''}`}>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">2 · Новое устройство</div>
+                {loadError !== '' ? (
+                  <LoadFailure
+                    what="список товаров"
+                    detail={loadError.trim()}
+                    onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }}
+                  />
+                ) : (
                 <select
                   value={newId}
                   disabled={!unit}
@@ -195,6 +211,7 @@ export default function ExchangePage() {
                     <option key={p.id} value={p.id}>{p.name} · {som(p.price)}</option>
                   ))}
                 </select>
+                )}
                 {unit && newProduct && (
                   <div className="mt-3 flex items-center justify-between rounded-[12px] border border-surface-3 bg-surface-2 p-3 text-sm">
                     <span className="text-muted">Доплата</span>

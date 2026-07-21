@@ -65,8 +65,22 @@ export async function fetchCatalog(query: CatalogQuery = {}): Promise<CatalogRes
     if (!res.ok) throw new Error(`catalog responded ${res.status}`);
     return (await res.json()) as CatalogResponse;
   } catch {
-    return { source: 'unavailable', total: 0, limit: 0, offset: 0, items: [] };
+    // Мягкий отказ намеренный: серверные компоненты и офлайн-касса не должны
+    // падать из-за недоступного каталога. Но `source` здесь — не украшение, а
+    // единственный признак, по которому вызывающий отличит «товаров нет» от
+    // «мы не смогли спросить». Долгое время его не читал никто, и покупатель
+    // видел пустой магазин вместо сообщения о неполадке. Проверяйте
+    // `isCatalogUnavailable` везде, где показываете результат человеку.
+    return { source: CATALOG_UNAVAILABLE, total: 0, limit: 0, offset: 0, items: [] };
   }
+}
+
+/** Ответ каталога, полученный не с сервера, а из аварийной ветки клиента. */
+export const CATALOG_UNAVAILABLE = 'unavailable';
+
+/** Отличить «каталог пуст» от «каталог не ответил». */
+export function isCatalogUnavailable(response: { source: string }): boolean {
+  return response.source === CATALOG_UNAVAILABLE;
 }
 
 export async function fetchCatalogDelta(

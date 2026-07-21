@@ -4,10 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { GitCompareArrows, ImageOff, ShoppingBag, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LoadFailure } from "@/components/LoadFailure";
 import { productImage } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { fetchCatalog, type CatalogProduct } from "@/lib/api";
+import { fetchCatalog, isCatalogUnavailable, type CatalogProduct } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { useCompare } from "@/lib/compare";
 import { conditionLabel, som } from "@/lib/format";
@@ -26,11 +27,19 @@ export default function ComparePage() {
   const compare = useCompare();
   const { add } = useCart();
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   useEffect(() => {
     fetchCatalog({ limit: 100 })
+      .then((response) => { if (isCatalogUnavailable(response)) throw new Error("Каталог не ответил"); return response; })
       .then((response) => setProducts(response.items))
-      .catch(() => setProducts([]));
-  }, []);
+      .catch((cause: unknown) => {
+      // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
+      // покупателю то же, что видит владелец пустого магазина.
+      setProducts(null);
+      setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+    });
+  }, [reloadToken]);
   const list = compare.ids
     .map((id) => (products ?? []).find((product) => product.id === id))
     .filter(Boolean) as CatalogProduct[];
@@ -46,7 +55,7 @@ export default function ComparePage() {
         <p className="mt-2 text-white/45">
           Сопоставьте цены, состояние, память и наличие.
         </p>
-        {products === null ? (
+        {loadError !== '' ? <LoadFailure what="сравнение" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? (
           <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-white/10 bg-white/[.04]"><div className="h-8 w-48 animate-pulse rounded-full bg-white/10" /></div>
         ) : compare.hydrated && list.length === 0 ? (
           <div className="mt-10 grid min-h-[330px] place-items-center rounded-[12px] border border-white/10 bg-white/[.04] text-center">

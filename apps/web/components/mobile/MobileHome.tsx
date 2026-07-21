@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { LoadFailure } from '@/components/LoadFailure';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
 import { Pressable, Stagger, StaggerItem } from '@/components/motion/primitives';
-import { fetchCatalog, fetchPublicStorefrontBlocks, fetchStorefrontContent, type CatalogProduct, type StorefrontBlock, type StorefrontPayload } from '@/lib/api';
+import { fetchCatalog, isCatalogUnavailable, fetchPublicStorefrontBlocks, fetchStorefrontContent, type CatalogProduct, type StorefrontBlock, type StorefrontPayload } from '@/lib/api';
 
 const CATS: [string, string][] = [
   ['📱', 'Смартфоны'],
@@ -19,6 +20,8 @@ const CATS: [string, string][] = [
 
 export default function MobileHome() {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
   const [blocks, setBlocks] = useState<StorefrontBlock[]>([]);
 
@@ -30,9 +33,16 @@ export default function MobileHome() {
         setProducts(payload.featuredProducts);
         return;
       }
-      setProducts((await fetchCatalog({ limit: 20, sort: 'stock_desc' })).items);
-    }).catch(() => setProducts([]));
-  }, []);
+      const catalog = await fetchCatalog({ limit: 20, sort: 'stock_desc' });
+      if (isCatalogUnavailable(catalog)) throw new Error('Каталог не ответил');
+      setProducts(catalog.items);
+    }).catch((cause: unknown) => {
+      // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
+      // покупателю то же, что видит владелец пустого магазина.
+      setProducts(null);
+      setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+    });
+  }, [reloadToken]);
 
   const hits = (products ?? []).slice(0, 6);
 
@@ -108,7 +118,7 @@ export default function MobileHome() {
             Все →
           </Link>
         </StaggerItem>
-        {products === null ? (
+        {loadError !== '' ? <LoadFailure what="товары" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? (
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 4 }, (_, i) => (
               <div key={i} className="h-[232px] animate-pulse rounded-[16px] border border-surface-3 bg-surface-2" />
