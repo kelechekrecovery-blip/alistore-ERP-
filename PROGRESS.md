@@ -5639,3 +5639,12 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `scripts/ecosystem-contract-audit.mjs --strict` passed with zero blockers; design corpus `128 tracked / 81 linked / 81 present / 0 missing`; visual, iOS, Android, four reconciliation gates and composite ecosystem E2E all PASS.
 - Result: software ecosystem contract is green on the committed source tree. This does not certify physical devices, live providers, production infrastructure, legal approval or store review.
 - Next: perform staging/physical-device/provider certification before any production or App Store readiness claim.
+
+## PUBLIC-ORIGIN-102-2026-07-22
+- Task: diagnose the public `ali.kg` outage after the software release was pushed to `origin/main`.
+- Evidence: Cloudflare zone `ali.kg` routes `ali.kg`, `www.ali.kg`, `admin.ali.kg` and `api.ali.kg` to tunnel `alistore-erp` (`18298193-08ff-440e-86d6-aa5c3114821b`); Cloudflare reports `status=down` and `connections=[]`.
+- Tunnel ingress: web hosts target `http://127.0.0.1:3000`, API/media target `http://127.0.0.1:4000`.
+- Local verification: Next responds `200` on `127.0.0.1:3000`; API readiness responds `200` on `127.0.0.1:4000/api/health/ready`; public hosts respond Cloudflare `530`/error `1033`.
+- Result: the outage is an unavailable origin connector, not a Web/API route failure. No DNS mutation was made because no Render custom-domain target is available and changing records blindly could worsen the outage.
+- Blocker: start the existing tunnel connector with its owner-held token, or attach the Render services to the custom domains and update DNS to those verified Render hostnames.
+- Next: after origin restoration, rerun public smoke for storefront, admin, API live/ready, media, CORS, Host allowlist and demo mode; then update this incident with HTTP evidence.
