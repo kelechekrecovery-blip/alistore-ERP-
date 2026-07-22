@@ -655,6 +655,24 @@ export class PosService {
     if (payload?.marginFingerprint && payload.marginFingerprint !== marginFingerprint) {
       throw new ForbiddenError('discount_mismatch', 'Одобрение скидки не совпадает с текущей продажей');
     }
+    // Одноразовость одобрения — атомарно. У `discount` нет исполнителя в
+    // ACTION_EXECUTORS (в отличие от refund/write_off/…): решение менеджера лишь
+    // ставит status='approved', а списывает его эта продажа. Без отметки о
+    // расходовании одно одобрение проигрывалось на неограниченное число продаж
+    // разным покупателям — особенно на количественных SKU, где отпечаток маржи
+    // стабилен (costRef пуст), так что проверки выше второй раз тоже проходят.
+    //
+    // Легитимный сетевой ретрай сюда не доходит: он короткозамыкается на
+    // replaySale по clientSaleId раньше в sale(). Значит это либо первая продажа
+    // по одобрению (count 1), либо попытка проиграть его заново (count 0).
+    // Конкурентные попытки: только одна получит count 1 (условный updateMany).
+    const claimed = await this.prisma.approval.updateMany({
+      where: { id: approvalId, action: 'discount', status: 'approved', consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    if (claimed.count === 0) {
+      throw new ForbiddenError('discount_approval_already_used', 'Это одобрение скидки уже использовано');
+    }
   }
 
   private approvalReason(discountApprovalNeeded: boolean, marginApprovalNeeded: boolean) {

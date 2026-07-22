@@ -2630,6 +2630,11 @@ model Approval {
   reason                String
   evidence              Json? // обязательно для high-risk
   createdAt             DateTime                 @default(now())
+  // Одноразовость одобрения. Действия из ACTION_EXECUTORS исполняются атомарно
+  // в момент решения; у `discount` исполнителя нет — продажа списывает его
+  // позже, и без этой отметки одно одобрение можно было проиграть на сколько
+  // угодно продаж. POS-продажа проставляет consumedAt атомарным updateMany.
+  consumedAt            DateTime?
   refund                Refund?
   quarantineDisposition InventoryQuarantineCase?
   exchangeRequest       ExchangeRequest?
