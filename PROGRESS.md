@@ -1,5 +1,35 @@
 # PROGRESS
 
+## 2026-07-22 — ruflo как оркестратор + риск-свип денежной поверхности
+
+Установлен **ruflo** (agent meta-harness, MIT) в режиме сосуществования и сделан ведущим
+слоем оркестрации (запись в `CLAUDE.md`): координирует read-only, доменный money/ledger-код
+остаётся за проектными скиллами/сабагентами. Существующие `CLAUDE.md`/`.mcp.json`/6 проектных
+агентов не тронуты; рантайм ruflo под `.gitignore`; фоновый демон погашен (он авто-поднимается
+при `npx ruflo` — держим выключенным, он сканирует общее дерево с Codex).
+
+Им же «посмотрели» экосистему (`analyze complexity` полезен; `diff --risk`/`deps --security`/
+`circular` ненадёжны на монорепо — проверял руками/сабагентами). Из находок — план и срезы:
+
+| Срез | Что |
+|---|---|
+| deps | `fast-uri` 3.1.3→3.1.4 (GHSA-v2hh-gcrm-f6hx) корневым `overrides`; `sharp<0.35` под next оставлен (все стабильные next@16 требуют `^0.34.5`, прод-роут webhook недостижим) → `DEP-AUDIT-SHARP-001` |
+| approvals | `price` executor валидирует `newPrice` из parked-снимка (RED→GREEN); `reject_refund` берёт `FOR UPDATE` симметрично с `refund` (defense-in-depth, замаскировано Approval-локом) |
+| rbac | авторитетная матрица `canApprove` заперта исчерпывающим тестом (12×10, 123/123); decide-путь держится только на ней |
+
+Риск-свип всей денежной поверхности (approvals/refunds/campaigns/auth/catalog/pos): критики нет,
+деньги/сток/статус везде через `audit.transaction`. 6 несоответствий разложены в `BACKLOG.md`
+(`LEDGER-HARDEN-31..36`) с line-числами — каждое блокировано решением/дизайном/внешним провайдером,
+не «тихая правка»: webhook-подпись (внешний блокер), resolveConfirm concurrency (дизайн),
+Casbin↔canApprove дрейф (архитектура, `finance,approve` живой), step-up на reject (продукт+blast-radius).
+
+Проверки (изолированный worktree, DB-safety gated): web build ✓, консолидированная регрессия
+**156/156** (refund-aggregate 18/18, refund-approval 9/9, product-management, approvals-rbac,
+price-snapshot, matrix 123/123), tsc ✓. Полный `api:test`/`mvp:verify` — отложен до тихого дерева
+(Codex параллельно гоняет jest по общей `alistore_test`). Работа на ветках
+`chore/ruflo-review-hardening` (Фазы 0–2, вперемешку с коммитами Codex) и `chore/ledger-phase3`
+(worktree, Фаза 3) — сведение веток ждёт простоя Codex.
+
 ## 2026-07-22 — ВОЛНА 3 (бэкенд): PII-доказательства
 
 Дерево `apps/api` освободилось (Codex закоммитил SMS-мост), взял бэкенд-часть.
