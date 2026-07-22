@@ -119,6 +119,12 @@ async function trackOutage(key, up, humanName) {
   }
 }
 
+// Напоминание про сон показываем не чаще раза в час: в журнал пишем каждый цикл
+// (там это дёшево и полезно для истории), а уведомлением раз в минуту довели бы
+// до того, что его отключат — и вместе с ним пропустят настоящую аварию.
+const SLEEP_NAG_INTERVAL_MS = 60 * 60 * 1000;
+let lastSleepNagAt = 0;
+
 async function checkSleepGuard() {
   const stdout = await run('/usr/bin/pmset', ['-g']).then((r) => r.stdout, () => '');
   if (/SleepDisabled\s+1/.test(stdout)) return;
@@ -127,6 +133,13 @@ async function checkSleepGuard() {
   // процесс. Поэтому не «чиним», а громко фиксируем, если защиту сняли.
   await log('ВНИМАНИЕ: sleep не запрещён — закрытая крышка снова погасит сайт.');
   await log('         включите: sudo pmset -a disablesleep 1');
+
+  if (Date.now() - lastSleepNagAt < SLEEP_NAG_INTERVAL_MS) return;
+  lastSleepNagAt = Date.now();
+  await notify(
+    'AliStore: защита от сна выключена',
+    'Закрытая крышка погасит магазин. Выполните: sudo pmset -a disablesleep 1',
+  );
 }
 
 async function checkOnce() {
