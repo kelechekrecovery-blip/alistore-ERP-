@@ -9,8 +9,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/visual-e60ca0603146e3918c53e45bd239805681ff42b495ca82534f135373bc75aaeb.json",
-          "sha256": "e60ca0603146e3918c53e45bd239805681ff42b495ca82534f135373bc75aaeb"
+          "path": "docs/acceptance/artifacts/visual-d009350d8cd09ad42ec1901e4e416b64ea468ae2ede60ca600022dc78b0b264d.json",
+          "sha256": "d009350d8cd09ad42ec1901e4e416b64ea468ae2ede60ca600022dc78b0b264d"
         }
       ]
     },
@@ -21,8 +21,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/ios-app-ui-42b79abf91b3ca75512e73a8645f37e32cff00d21844d2f2e4caeb2b0f3210ac.json",
-          "sha256": "42b79abf91b3ca75512e73a8645f37e32cff00d21844d2f2e4caeb2b0f3210ac"
+          "path": "docs/acceptance/artifacts/ios-app-ui-7dad7a9d4860f85bfbcc43451cbfbc1dc4c2507a9781dfc28223a1c548d13993.json",
+          "sha256": "7dad7a9d4860f85bfbcc43451cbfbc1dc4c2507a9781dfc28223a1c548d13993"
         }
       ]
     },
@@ -45,8 +45,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/android-app-ui-3465ae443f6b170e907bf44e5c324b79902d08855022958964b1952061581943.json",
-          "sha256": "3465ae443f6b170e907bf44e5c324b79902d08855022958964b1952061581943"
+          "path": "docs/acceptance/artifacts/android-app-ui-548e402d81ff6b2c776e7394fdd055d6cfc28b7930e9887f7349b154c3b02dbf.json",
+          "sha256": "548e402d81ff6b2c776e7394fdd055d6cfc28b7930e9887f7349b154c3b02dbf"
         }
       ]
     },
@@ -57,8 +57,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-9403664f547d8244bbf486baff965b9e9e151506465c1e44206927ff8eef14bd.json",
-          "sha256": "9403664f547d8244bbf486baff965b9e9e151506465c1e44206927ff8eef14bd"
+          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-628f4ec09ef905c9887a05d2329536e30532fa2e07993c75aba6a64011971019.json",
+          "sha256": "628f4ec09ef905c9887a05d2329536e30532fa2e07993c75aba6a64011971019"
         }
       ]
     },
@@ -69,8 +69,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-3df66a3962b718f238798e988a179b0efe054b58ce8edb5c023d433908e89924.json",
-          "sha256": "3df66a3962b718f238798e988a179b0efe054b58ce8edb5c023d433908e89924"
+          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-1c2d873ebcce59d32158b2d15bade03a06be77770396fbbd035a21496acccf98.json",
+          "sha256": "1c2d873ebcce59d32158b2d15bade03a06be77770396fbbd035a21496acccf98"
         }
       ]
     },
@@ -81,8 +81,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-ff2cb807ffee2ae5e7f4945e38c34a7d45fe173080eeff95351ef988630e11af.json",
-          "sha256": "ff2cb807ffee2ae5e7f4945e38c34a7d45fe173080eeff95351ef988630e11af"
+          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-f98a4ad053a3f2af623bc6137ee9398d604bb876a7929adafc26d433a7112235.json",
+          "sha256": "f98a4ad053a3f2af623bc6137ee9398d604bb876a7929adafc26d433a7112235"
         }
       ]
     },
@@ -93,8 +93,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-bae1208f03dfa56f51a28f08c0ab5308fe2027f9ca3d0c890c572856d9f245b9.json",
-          "sha256": "bae1208f03dfa56f51a28f08c0ab5308fe2027f9ca3d0c890c572856d9f245b9"
+          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-de4d274a69780cc796bf4e2742f262c4b83c17112a853d5b265139680acbaea1.json",
+          "sha256": "de4d274a69780cc796bf4e2742f262c4b83c17112a853d5b265139680acbaea1"
         }
       ]
     },
@@ -105,8 +105,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/reconciled-e2e-f78f707aebd5c5845bfadbd5ff53bde5ddb1485a63643f55cd8a7a3cbebb86d6.json",
-          "sha256": "f78f707aebd5c5845bfadbd5ff53bde5ddb1485a63643f55cd8a7a3cbebb86d6"
+          "path": "docs/acceptance/artifacts/reconciled-e2e-353d6b9e831bc91d8f2afbb97bd6a6f20df2f23c5bb88ff4dcca8f8db35dcddb.json",
+          "sha256": "353d6b9e831bc91d8f2afbb97bd6a6f20df2f23c5bb88ff4dcca8f8db35dcddb"
         }
       ]
     }

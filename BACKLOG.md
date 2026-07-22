@@ -1,5 +1,11 @@
 # BACKLOG
 
+## EVIDENCE-REFRESH-143 — принять свежий полный software ecosystem snapshot
+- **Сделано:** на чистой временной копии текущего source tree повторно записаны visual, iOS UI, Android connected UI, POS/refund, Courier/COD, Service Center/loaner, procurement/sale и aggregate reconciled E2E evidence.
+- **Проверено:** strict contract audit завершился без GAP; design corpus `128/128`, iOS Client `23/23`, Staff `10/10`, Courier `3/3`, POS `5/5`, Android Core `38/38`, Client `1/1`, Staff `2/2`, Courier `1/1`, POS `2/2`; aggregate matrix `4/4`.
+- **Ограничение:** это software/simulator/emulator evidence. Physical devices, live providers, Render deployment, App Store review and owner credentials remain external gates.
+- **Следующий шаг:** перенести evidence commit в основной branch, затем закрывать external release gates in owner-controlled environments.
+
 ## PUBLIC-RUNTIME-API-DOCS-001 — закрыть Swagger на публичном laptop-туннеле
 - **Сделано:** добавлен явный `API_DOCS_ENABLED=false` для launchd API, Render production и staging environment groups; fail-closed тест политики; sandbox payment confirm также явно выключен во всех контурах.
 - **Проверено:** локальный и публичный `/api/docs` и `/api/docs-json` возвращают `404`; health endpoints возвращают `200`; sandbox confirm возвращает `404`.
