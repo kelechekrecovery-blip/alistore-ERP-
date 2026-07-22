@@ -4,6 +4,11 @@ import { bootstrapStaff, postJson, prisma, resetDb } from './helpers';
 test('staff intake creates a trade-in contract with IMEI risk reference', async ({ request }) => {
   await resetDb();
   const staffToken = await bootstrapStaff(request);
+  // Приёмка Б/У выдаёт наличные из ящика, поэтому у принимающего нужна открытая
+  // смена (`pos.service`/`tradeins` теперь отклоняют движение наличных без неё —
+  // изменение поведения, а не регресс). id сотрудника — в `sub` JWT.
+  const staffId = JSON.parse(Buffer.from(staffToken.split('.')[1], 'base64').toString('utf8')).sub as string;
+  await prisma.cashShift.create({ data: { staffId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() } });
   const customer = await prisma.customer.create({ data: { phone: '+996700900004', name: 'Trade In' } });
 
   const tradeIn = await postJson<{ id: string; contractId: string; sellerPassportMasked: string; imei: string }>(
