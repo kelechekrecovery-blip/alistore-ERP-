@@ -22,6 +22,12 @@
 - **Evidence:** новый artifact привязан к тому же source tree `d02ba4118c93a06e766d1ad7144d340b455765b7c9d186bc987ff6b9d2a00a0e` и добавлен в acceptance manifest.
 - **Ограничение:** simulator evidence не заменяет physical iPhone camera/APNs/biometric smoke и App Store review.
 
+## VISUAL-084 — stabilize ERP visual acceptance
+- **Найдено:** ERP golden был календарно-зависимым: подписи revenue chart сдвигались ежедневно; текущий demo-banner также стал частью публичного sandbox shell.
+- **Сделано:** chart получил явный visual-test boundary и маскируется адресно; ERP golden обновлён после обычного visual `3/3`, banner сохранён в baseline.
+- **Проверено:** trusted visual recorder прошёл exact screenshot tests `3/3` и записал hash-bound artifact.
+- **Следующий шаг:** перейти к обновлению reconciliation evidence; не маскировать бизнес-данные за пределами определённого динамического графика.
+
 ## VERIFY-079 — trusted ecosystem toolchain lock
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
 - **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.
