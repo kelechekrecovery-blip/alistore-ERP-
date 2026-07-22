@@ -13,6 +13,11 @@
 - **Правило:** не включать live providers и не отправлять incomplete apps; секреты и review credentials не добавлять в Git.
 - **Следующий шаг:** владелец заполняет внешние панели и credentials; после этого выполнить staging deploy, provider/device certification и unified App Review submission.
 
+## WEB-CROSS-BROWSER-145 — подтвердить checkout в Chromium/WebKit/Firefox
+- **Проверено:** `npm run e2e:cross-browser` прошёл `27/27` тестов: consent, campaign attribution, sandbox checkout, delivery zones/slots, variants, bundles, loyalty/promo и Client handoff theme.
+- **Результат:** новый Web cross-browser дефект не найден; runtime smoke остаётся `200` на публичной витрине, admin и API health.
+- **Следующий шаг:** повторить тот же gate после Render staging deployment, поскольку локальный/public tunnel не доказывает cloud production readiness.
+
 ## PUBLIC-RUNTIME-API-DOCS-001 — закрыть Swagger на публичном laptop-туннеле
 - **Сделано:** добавлен явный `API_DOCS_ENABLED=false` для launchd API, Render production и staging environment groups; fail-closed тест политики; sandbox payment confirm также явно выключен во всех контурах.
 - **Проверено:** локальный и публичный `/api/docs` и `/api/docs-json` возвращают `404`; health endpoints возвращают `200`; sandbox confirm возвращает `404`.
