@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Держит машину бодрствующей, пока боевой магазин живёт на этом ноутбуке.
+
+  ЗАЧЕМ. Замер по `pmset -g log` за сутки: 118 минут простоя сайта — это
+  чистый сон машины. Каждый сон = Cloudflare отдаёт 530, покупатель видит
+  «сайт недоступен». Защита была, но держалась живым процессом `caffeinate`,
+  запущенным вручную: после перезагрузки её не оставалось вовсе.
+
+  ЧЕГО ЭТОТ АГЕНТ НЕ УМЕЕТ. `caffeinate` не удерживает сон по закрытию крышки
+  (в журнале это «Clamshell Sleep», два случая за те же сутки). Крышку держит
+  только `sudo pmset -a disablesleep 1` — это делает владелец, пароль нужен.
+
+  Правильное решение — увезти прод с ноутбука (docs/PRODUCTION-ARCHITECTURE-REVIEW.md);
+  агент лишь снижает частоту простоев, пока переезда нет.
+
+  Включить:
+    cp scripts/com.alistore.nosleep.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.alistore.nosleep.plist
+  Выключить:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.nosleep.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.nosleep</string>
+
+  <!-- -s: не спать от сети, -i: не спать по простою, -d: не гасить дисплей
+       (дисплей важен: часть режимов сна тянется за его засыпанием). -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-s</string>
+    <string>-i</string>
+    <string>-d</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-nosleep.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-nosleep.err.log</string>
+</dict>
+</plist>
