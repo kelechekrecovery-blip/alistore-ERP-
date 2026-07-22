@@ -51,12 +51,14 @@ _Last updated: 2026-07-23 by App Store Connect API verification._
 - Screenshot sets are uploaded and `COMPLETE`: Client 10+10, Staff 4+4,
   Courier 3+3 and POS 3+3 for iPhone/iPad, plus the required iPad Pro 12.9
   sets for all four apps.
-- Unified review-submission drafts exist for all four apps and are currently
-  `READY_FOR_REVIEW`; no item is submitted yet.
+- The latest App Store Connect API recheck found no `reviewSubmission` relationship
+  for any of the four versions. All four versions remain `PREPARE_FOR_SUBMISSION`;
+  no review submission exists and nothing has been submitted.
 
 API verification on 2026-07-23 confirmed that the current iOS version for each
-app is still `PREPARE_FOR_SUBMISSION` in App Store Connect. No review
-submission was created or submitted by this verification.
+app is still `PREPARE_FOR_SUBMISSION` in App Store Connect and that no
+`reviewSubmission` relationship is present. No review submission was created or
+submitted by this verification.
 
 ## Blocked before App Review submission
 
