@@ -59,7 +59,9 @@ const PUBLIC_PROBES = [
 const downSince = new Map();
 
 async function log(message) {
-  const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  // Местное время, а не UTC: журнал сверяют с `pmset -g log`, который пишет в
+  // местном. Расхождение в шесть часов превращало сверку простоев в загадку.
+  const stamp = new Date().toLocaleString('sv-SE');
   await appendFile(LOG, `${stamp} ${message}\n`).catch(() => {});
 }
 
@@ -135,7 +137,14 @@ async function checkOnce() {
   }
 
   // Туннель: без него сайт недоступен снаружи, даже если процессы живы.
-  const tunnelUp = await run('/usr/bin/pgrep', ['-f', 'cloudflared tunnel']).then(() => true, () => false);
+  //
+  // -x (точное имя процесса), а НЕ -f 'cloudflared tunnel'. Прежний шаблон
+  // никогда не совпадал: реальная командная строка — «cloudflared --logfile X
+  // tunnel run», то есть слова "cloudflared" и "tunnel" не соседи. Сторож
+  // каждую минуту считал живой туннель мёртвым и убивал его через kickstart -k,
+  // сам создавая простой, который потом же и фиксировал. Поймано на прогоне
+  // 23.07.2026 до включения агента.
+  const tunnelUp = await run('/usr/bin/pgrep', ['-x', 'cloudflared']).then(() => true, () => false);
   if (!tunnelUp) await revive({ label: 'com.alistore.cloudflared', name: 'туннель cloudflared' });
 
   for (const probe of PUBLIC_PROBES) {
