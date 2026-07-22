@@ -5706,3 +5706,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: isolated `e2e/courier-ui.spec.ts` passed `3/3`; finance UI passed `3/3`; service/procurement UI passed `5/5`.
 - Result: delivery, failed-delivery evidence, COD handover and role rejection are green without weakening server-side shift controls.
 - Next: run checkout/return/protection and then reassess the remaining offline home test mismatch.
+
+## WEB-CUSTOMER-109-2026-07-23
+- Task: verify the customer commerce and post-sale verticals after the demo-banner fix.
+- Checks: isolated `e2e/exchange.spec.ts` `2/2`, `e2e/protection.spec.ts` `1/1`, `e2e/return-refund.spec.ts` `1/1`, and `e2e/web-checkout.spec.ts` `7/7` passed.
+- Result: checkout/payment, delivery zone and slot, variants/bundles, loyalty/promotion, protection, returns/refund approval and exchange flows are green.
+- Next: resolve the remaining offline home test harness mismatch, then rerun the full browser audit without masking failures.
