@@ -150,21 +150,49 @@
   выверено опытом: запрос снаружи через свободный ingress `new.ali.kg` показал
   `X-Forwarded-For` ровно с одной записью — реальным IP клиента.
 - API переведён с `ts-node` на собранный `dist/main.js`.
-- Написаны `scripts/com.alistore.api.plist`, `scripts/com.alistore.web.plist` и
-  обёртки `scripts/run-api-prod.sh`, `scripts/run-web-prod.sh`.
-- `scripts/keep-site-up.sh` переписан: вместо `nohup`-сирот (именно они и
-  породили нынешний бардак) — `launchctl kickstart` существующего агента.
+- **Автоперезапуск включён и проверен.** `scripts/com.alistore.api.plist` и
+  `scripts/com.alistore.web.plist` загружены; убийство процесса `kill -9`
+  возвращает сервис за 1 секунду с новым PID. Сервисы больше не зависят ни от
+  Codex, ни от открытого терминала.
+- `scripts/keep-site-up.mjs` — сторож зависаний: вместо `nohup`-сирот (именно они
+  и породили нынешний бардак) — `launchctl kickstart` существующего агента.
+  Он же ведёт журнал простоев с длительностью (`/tmp/alistore-keepalive.log`) и
+  показывает уведомление на экране.
+
+### Грабли TCC: почему bash здесь не работает
+
+Первая пересадка на launchd уронила сайт: агенты падали с кодом 126
+«Operation not permitted». Дело не в plist'ах — репозиторий лежит в `~/Desktop`,
+а это TCC-защищённая папка. Проверено пробными агентами:
+
+| Что запускает launchd | Доступ к `~/Desktop` |
+|---|---|
+| `/bin/bash` | **DENIED** |
+| `node` | **OK** (и `WorkingDirectory` выставляется штатно) |
+
+Поэтому bash-обёртки удалены как принципиально нерабочие в этой роли, а plist'ы
+вызывают `node` напрямую. `keep-site-up.sh` по той же причине заменён на
+`keep-site-up.mjs`. **Не возвращайте shell-варианты** — это стоило одного
+простоя на диагностику. Full Disk Access при таком решении не нужен.
+
+### Баг, пойманный до включения сторожа
+
+Проверка туннеля была `pgrep -f 'cloudflared tunnel'` — шаблон не совпадал
+никогда, потому что реальная командная строка выглядит как
+`cloudflared --logfile X tunnel run`. Сторож каждую минуту считал живой туннель
+мёртвым и убивал его через `kickstart -k`, сам создавая простой, который затем
+же и фиксировал. Заменено на `pgrep -x cloudflared`.
 - Бэкапы: `RunAtLoad=true`, второе окно 13:17, выгрузка копии в iCloud Drive,
   проверка размера дампа. Восстановление проверено: 131 таблица, ноль
   предупреждений, счётчики боевой и восстановленной БД совпали.
 
 ## Остаётся нерешённым
 
-- **Автоперезапуск не включён: TCC.** macOS запрещает launchd-агентам доступ к
-  `~/Desktop`, где лежит репозиторий. Проверено пробным агентом: корень домашней
-  папки — `OK`, `Desktop` и `Documents` — `DENIED`. Агенты падают с кодом 126.
-  Лечится выдачей Full Disk Access для `/bin/bash` либо переносом репозитория
-  за пределы `~/Desktop`.
+- **Сон — единственная незакрытая причина простоев, и она за владельцем.**
+  `sudo pmset -a disablesleep 1` требует пароля администратора. Пока не включено,
+  всё вышеперечисленное бессильно: спящая машина не выполняет ни агентов, ни
+  сторожа. Это ~95% измеренного простоя. Сторож пишет об этом в журнал при каждой
+  проверке.
 - **`NODE_ENV=production` не включён.** `main.ts:13` вызывает
   `assertProductionRuntimeReady`, который валит старт, пока не зелены все
   проверки `health/production-preflight.ts`. Блокируют 8, и каждая требует
@@ -174,6 +202,48 @@
   `apps/api/.env.production`; актуальный список — `npm run launch:preflight`.
   Поэтому остаются открытыми `/api/docs`, отсутствие HSTS, cookie без `Secure`
   и Host-allowlist на уровне приложения.
-- **Мониторинга нет.** О простое по-прежнему узнают, открыв сайт.
+- **Мониторинг только локальный.** Сторож фиксирует простои с длительностью в
+  `/tmp/alistore-keepalive.log` и показывает уведомление на экране — этого
+  достаточно для падения процесса, но принципиально недостаточно для сна и
+  выключения: мёртвая машина о себе не сообщит. Внешняя проверка (Cloudflare
+  Health Checks по уже подключённой зоне либо UptimeRobot) остаётся за
+  владельцем — нужен его аккаунт. Адреса для проверки: `https://ali.kg/` и
+  `https://api.ali.kg/api/health/ready`, ожидаемый код `200`.
+- **Флаги бизнес-поведения намеренно не трогали.** `OUTBOX_RELAY_ENABLED`,
+  `RESERVATION_SWEEP_ENABLED`, `DEBT_REMINDERS_ENABLED` и группа refund-relay
+  выглядят как «просто включить», но это отправка уведомлений покупателям,
+  снятие резервов со стока и напоминания о долгах. По правилам репозитория такие
+  изменения идут через TDD и ревью, а не флагом в конфиге посреди инцидента.
 - **Главное — зависимость от одного ноутбука.** Всё выше сокращает простой, но
   не убирает причину. План переезда — в разделах выше.
+
+## Что сейчас держит сайт (состояние на 23.07.2026)
+
+| Агент launchd | Что делает | Файл |
+|---|---|---|
+| `com.alistore.api` | боевой API, порт 4000, `dist/main.js` | `scripts/com.alistore.api.plist` |
+| `com.alistore.web` | витрина, порт 3000, `next start` | `scripts/com.alistore.web.plist` |
+| `com.alistore.keepsiteup` | сторож зависаний + журнал простоев | `scripts/com.alistore.keepsiteup.plist` |
+| `com.alistore.cloudflared` | туннель наружу | `scripts/com.alistore.cloudflared.plist` |
+| `kg.alistore.backup` | дамп БД 03:17 и 13:17 + копия в iCloud | `~/Library/LaunchAgents/` |
+
+Установка с нуля (все агенты user-scoped и обратимы):
+
+```
+cp scripts/com.alistore.{api,web,keepsiteup,cloudflared}.plist ~/Library/LaunchAgents/
+for a in api web keepsiteup cloudflared; do
+  launchctl load ~/Library/LaunchAgents/com.alistore.$a.plist
+done
+```
+
+Проверка, что супервизия жива, — убить процесс и увидеть новый PID:
+
+```
+launchctl list | grep alistore
+kill -9 $(lsof -ti tcp:4000); sleep 5
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4000/api/health/ready
+```
+
+Журналы: `/tmp/alistore-api-prod.log`, `/tmp/alistore-web-prod.log`,
+`/tmp/alistore-keepalive.log` (простои с длительностью),
+`~/Library/Logs/alistore-backup.log`.

@@ -4,21 +4,24 @@
   LaunchAgent боевого API (порт 4000).
 
   Зачем: до 23.07.2026 боевой API был дочерним процессом приложения ChatGPT/Codex
-  и умирал вместе с ним, а перезапускать его было некому. Теперь владелец
-  процесса — launchd: KeepAlive поднимает упавший процесс сам.
+  (цепочка 59978 → 59918 → 59888 → 14785) и умирал вместе с ним, а перезапускать
+  его было некому. Плюс он работал через ts-node — режим разработки. Здесь снято
+  и то и другое: владелец процесса — launchd, запускается собранный dist.
+
+  ПОЧЕМУ node ВЫЗЫВАЕТСЯ НАПРЯМУЮ, А НЕ ЧЕРЕЗ bash-обёртку.
+  Репозиторий лежит в ~/Desktop, а это TCC-защищённая папка. Агент с
+  ProgramArguments = /bin/bash падал с кодом 126: «Operation not permitted».
+  Проверено пробными агентами: под launchd `/bin/bash` к Desktop не пускают,
+  а `node` — пускает, и launchd успешно выставляет сюда WorkingDirectory.
+  Поэтому обёртки на bash здесь принципиально нерабочие, и добавлять их обратно
+  не нужно: это будет стоить ещё одного простоя на диагностику.
+
+  WorkingDirectory обязателен: @nestjs/config читает `.env` относительно cwd.
+  Без него процесс поднимется без DATABASE_URL и JWT_SECRET.
 
   KeepAlive лечит падение, но не зависание. Зависший процесс держит порт и не
   отвечает — это работа сторожа scripts/keep-site-up.mjs, который бьёт по
   health-check и делает launchctl kickstart.
-
-
-  ПОЧЕМУ node ВЫЗЫВАЕТСЯ НАПРЯМУЮ, А НЕ ЧЕРЕЗ bash-обёртку.
-  Репозиторий лежит в ~/Desktop — это TCC-защищённая папка. Агент с
-  ProgramArguments = /bin/bash падал с кодом 126 «Operation not permitted»,
-  и сайт при пересадке лёг. Проверено пробными агентами 23.07.2026: под launchd
-  /bin/bash к Desktop не пускают, а node — пускает, и WorkingDirectory сюда
-  выставляется штатно. Обёртки на bash здесь принципиально нерабочие; не
-  возвращайте их — это будет стоить ещё одного простоя на диагностику.
 
   Установить:
     cp scripts/com.alistore.api.plist ~/Library/LaunchAgents/
@@ -27,8 +30,6 @@
   Снять:
     launchctl unload ~/Library/LaunchAgents/com.alistore.api.plist
     rm ~/Library/LaunchAgents/com.alistore.api.plist
-
-  Путь к репозиторию ниже поправьте под свою машину.
 -->
 <plist version="1.0">
 <dict>
@@ -49,11 +50,11 @@
   <key>KeepAlive</key>
   <true/>
 
-  <!-- launchd не наследует PATH сессии; node лежит в пользовательском префиксе. -->
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
     <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <!-- Так же, как в npm-скрипте start:prod. -->
     <key>NODE_PATH</key>
     <string>./node_modules</string>
   </dict>
