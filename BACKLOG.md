@@ -1,5 +1,11 @@
 # BACKLOG
 
+## WEB-AUTH-088 — восстановить dev-only customer fixture для browser E2E
+- **Найдено:** после перехода Web на HttpOnly session cookies `AuthProvider` удалял legacy `alistore.auth.v1` до чтения, поэтому customer service flows перенаправлялись на login, хотя staff и API операции проходили.
+- **Сделано:** legacy bearer fixture читается только вне production и валидируется через `/auth/me`; production по-прежнему игнорирует localStorage и использует только cookie session.
+- **Проверено:** `service-center-ui.spec.ts` зелёный `3/3` на свежем E2E контуре.
+- **Следующий шаг:** повторно записать все hash-bound visual/native/reconciliation evidence после source change.
+
 ## IOS-UI-080 — единый формат денег в форме возврата
 - **Сделано:** форма создания возврата в iOS Client переведена с локального ручного группирования на общий `Money.som`, чтобы цена совпадала с принятым форматом `ru_KG` и shared UI contract.
 - **Найдено тестом:** полный `ios:ui` выявил расхождение пробелов в отображении `24 900 сом`; targeted XCUITest после исправления зелёный `1/1`.

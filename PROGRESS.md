@@ -5547,3 +5547,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: trusted `npm run visual:e2e`; 3/3 exact screenshot tests passed.
 - Result: visual evidence accepted for source tree `55a012b464b7acb3dde15f4a30593cacb0d9e529ec268061578fc0b03ec42a1d`.
 - Next: commit the artifact, then record the four reconciliation gates and composite E2E without source changes.
+### WEB-AUTH-088-2026-07-22
+- Task: restore compatibility between the cookie-based Web auth migration and local customer browser fixtures.
+- Finding: service-center UI reconciliation redirected customer pages to login because `AuthProvider` removed `alistore.auth.v1` before reading it; production cookie behavior itself remained correct.
+- Fix: read and validate the legacy bearer fixture only when `NODE_ENV !== production`, call `/auth/me`, and keep production localStorage ignored.
+- Checks: isolated `service-center-ui.spec.ts` with fresh API/Web servers passed `3/3`.
+- Result: service browser integration fixed; all previous hash-bound acceptance evidence must be re-recorded against the new source tree.
+- Next: run trusted visual, iOS UI, Android UI, four reconciliation gates and composite E2E on one clean commit sequence.

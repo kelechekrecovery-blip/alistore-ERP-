@@ -60,15 +60,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Remove sessions created by the pre-cookie release. Shopping state uses
-      // separate keys and is intentionally preserved.
-      localStorage.removeItem('alistore.auth.v1');
+      // Remove sessions created by the pre-cookie release in production only.
+      // Shopping state uses separate keys and is intentionally preserved.
+      if (process.env.NODE_ENV === 'production') localStorage.removeItem('alistore.auth.v1');
       // This flag is non-secret. Tokens remain HttpOnly and are never read by
       // the Web bundle; the flag only avoids an anonymous refresh probe.
       const hasSessionHint = document.cookie
         .split(';')
         .some((entry) => entry.trim().startsWith('alistore_session_hint='));
       if (!hasSessionHint) {
+        // Local E2E fixtures still inject a short-lived bearer token. Keep
+        // this compatibility path outside production; real browsers use only
+        // the HttpOnly cookie session above.
+        if (process.env.NODE_ENV !== 'production') {
+          try {
+            const legacy = JSON.parse(localStorage.getItem('alistore.auth.v1') ?? 'null') as { accessToken?: string } | null;
+            if (legacy?.accessToken) {
+              persist({ accessToken: legacy.accessToken });
+              const me = await authMe(legacy.accessToken);
+              if (!cancelled) setUser(me);
+            }
+          } catch {
+            // Invalid test fixture behaves like an anonymous session.
+          }
+        }
         if (!cancelled) setHydrated(true);
         return;
       }
