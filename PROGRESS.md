@@ -5806,3 +5806,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: Web/API and native build command contracts are present. Readiness remains RED for durable visual evidence, clean source tree, iOS XCUITest evidence, Android packaged UI evidence, four reconciliation evidence profiles and aggregate reconciled ecosystem E2E.
 - Note: the source tree is intentionally not clean because a parallel `e2e/storefront-offline.spec.ts` edit and local `.claude/settings.local.json` remain outside this workstream; no user change was reverted.
 - Next: freeze the source tree, refresh hash-verified evidence, then run native UI gates on available simulator/emulator/device infrastructure.
+
+## ECOSYSTEM-RECON-122-2026-07-23
+- Task: independently verify the reconciliation verticals reported as blocked by the strict contract audit.
+- Checks: POS/refund Playwright passed `1/1` on isolated ports; Courier/COD Playwright passed `1/1`; Service Center API suites passed `11/11`; Service Center browser flows passed `3/3`; Procurement API suite passed `10/10` after a clean test-database reset.
+- Result: the four software reconciliation verticals are functionally green when executed sequentially against an isolated database. A parallel run against the shared acceptance database produced fixture-cleanup contamination (`QuantityConsignmentLot_balanceId_fkey` and missing Service Ledger rows), so those failures are not valid product defects.
+- Audit status: strict acceptance remains RED because committed result artifacts have stale source/toolchain hashes after later commits, the source worktree contains a parallel `e2e/storefront-offline.spec.ts` edit and local settings file, and native connected/UI evidence is not currently reproducible in this run.
+- Next: run the full Web E2E gate with a stable server/database workload, then refresh trusted evidence only after the source tree is frozen; do not claim production or App Store readiness.
