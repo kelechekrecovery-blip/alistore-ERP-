@@ -5841,3 +5841,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: the two reported unbounded interactive queries and schema/index drift are addressed without changing money, stock, status, or Ledger semantics.
 - Caveat: AP aging is intentionally a bounded report window; consumers must surface `truncated` before treating it as a complete export. Strict ecosystem evidence remains blocked by the dirty parallel worktree and external certification requirements.
 - Next: run the broader API gate after this isolated change, then continue with evidence refresh when the source tree is frozen.
+
+## API-GATE-127-2026-07-23
+- Task: повторно выполнить полный API release gate после bounded-query изменений.
+- Checks: `npm run api:build` passed; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run api:test` passed `200/200` suites and `960/960` tests; focused approvals security suite passed `4/4`.
+- Result: approvals JWT/RBAC, finance/refunds, inventory/valuation, procurement, POS replay, customer PII, IDOR and resilience suites are green on the current commit. The earlier isolated approvals 404 did not reproduce on the focused or full rerun.
+- Caveat: this confirms API software behavior only. Strict ecosystem acceptance remains RED for dirty parallel files, stale hash-bound evidence, physical-device/provider certification and App Store submission.
+- Next: inspect and close the remaining release blockers without claiming production or store readiness.
