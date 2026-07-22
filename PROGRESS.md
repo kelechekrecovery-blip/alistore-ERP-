@@ -5656,3 +5656,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: the public sandbox is reachable again and the connector is configured to restart automatically for this macOS user session.
 - Limitation: this remains a laptop-backed origin. Render staging/production deployment, physical-device certification, live providers, legal approval and App Store review remain open release gates.
 - Next: migrate DNS/origin to verified Render services before calling the public contour production-ready, then rerun full external smoke and store submission preflight.
+
+## RELEASE-AUDIT-104-2026-07-23
+- Task: rerun the full local release gate and verify App Store preparation after restoring the public sandbox origin.
+- Checks: isolated API Jest `200/200` test files passed; `git diff --check` passed; launchd plist and shell syntax checks passed; strict App Store preflight and ASC API credential verification passed; public `ali.kg` storefront, admin, sitemap/robots and API live/ready returned HTTP `200`.
+- Result: API and public-origin checks are green. Playwright started 139 browser tests but exposed existing failures in accessibility smoke (home/catalog/cart/checkout/login), courier UI timeout, finance expense timeout, POS/customer binding, POS UI, print flows, procurement UI, protection/return/service-center, Staff shell, one storefront visual route and desktop offline handling. The run was stopped after a worker stopped producing output; no failures were hidden or marked passing.
+- App Review: not submitted. App Store Connect versions remain prepared, but real review demo accounts, App Privacy answers, pricing confirmation and final review contact fields are still required; repository placeholders must not be submitted as real credentials.
+- Limitation: uncommitted parallel launchd/API/web supervisor changes are preserved and intentionally not included in this audit commit. Production readiness remains RED until the browser failures and external owner gates are closed.
+- Next: fix the browser failures as separate regression commits, rerun the complete Playwright gate, then complete owner-provided App Store Connect review fields and submit only after final public/production smoke.
