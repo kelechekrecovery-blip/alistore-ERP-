@@ -772,6 +772,12 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Evidence:** принят artifact `docs/acceptance/artifacts/visual-ed276e8a0df7099fec8324a39041c6fa746c1fd85e49584231b795cdd7d9dd90.json`, привязанный к текущему source tree.
 - **Следующий шаг:** strict ecosystem audit.
 
+## RELEASE-GATE-101 — закрыть software evidence phase
+- **Результат:** strict ecosystem audit прошёл с `0 blockers`; все hash-bound Web/native/reconciliation gates зелёные.
+- **Подтверждено:** design corpus `128 tracked / 81 linked / 81 present / 0 missing`; visual, iOS `41/41`, Android packaged, POS/COD/service/procurement и composite E2E приняты.
+- **Ограничение:** physical devices, live providers, production infrastructure, legal approval и store review ещё не сертифицированы.
+- **Следующий шаг:** staging, physical-device и provider certification.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
