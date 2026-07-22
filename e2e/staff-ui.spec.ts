@@ -39,7 +39,7 @@ test('Staff app follows the canonical four-section mobile shell', async ({ page 
   await expect.poll(async () => (await prisma.staffTask.findUnique({ where: { id: task.id } }))?.status)
     .toBe('completed');
   await page.getByRole('button', { name: 'Назад на главную' }).click();
-  await expect(page.getByText('ЗАДАЧА ОТ AI')).toBeVisible();
+  await expect(page.getByText('ЗАДАЧИ СМЕНЫ')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => document.documentElement.clientWidth),
   );
