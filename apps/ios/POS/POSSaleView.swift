@@ -91,7 +91,7 @@ struct POSSaleView: View {
                     .textInputAutocapitalization(.characters).autocorrectionDisabled()
                     .submitLabel(.search)
                     .onSubmit { Task { await applyScanner(scannerCode) } }
-                Button { showScanner = true } label: { Image(systemName: "camera.fill") }
+                Button { showScanner = true } label: { Image(systemName: "camera.fill").minTapTarget() }
                     .buttonStyle(.borderedProminent).tint(POSPalette.coral)
                     .accessibilityLabel("Сканировать камерой")
             }
@@ -115,11 +115,11 @@ struct POSSaleView: View {
                         Text("IMEI …\(imei.suffix(6))").font(.caption2).foregroundStyle(POSPalette.lime)
                     }
                     HStack {
-                        Button { change(product, by: -1) } label: { Image(systemName: "minus") }
+                        Button { change(product, by: -1) } label: { Image(systemName: "minus").minTapTarget() }
                             .disabled((cart[product.id] ?? 0) == 0)
                             .accessibilityIdentifier("pos-qty-minus-\(product.id)")
                         Text("\(cart[product.id] ?? 0)").frame(minWidth: 24)
-                        Button { change(product, by: 1) } label: { Image(systemName: "plus") }
+                        Button { change(product, by: 1) } label: { Image(systemName: "plus").minTapTarget() }
                             .disabled((cart[product.id] ?? 0) >= product.availableUnits)
                             .accessibilityIdentifier("pos-qty-plus-\(product.id)")
                     }

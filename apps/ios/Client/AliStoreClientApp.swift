@@ -165,9 +165,9 @@ private struct ClientHeader: View {
                     .font(ClientTheme.body(12, weight: .medium))
                     .foregroundStyle(ClientTheme.muted)
                 Spacer()
-                Button(action: onCompare) { Image(systemName: "arrow.left.arrow.right") }
+                Button(action: onCompare) { Image(systemName: "arrow.left.arrow.right").minTapTarget() }
                     .accessibilityLabel("Сравнение")
-                Button(action: onNotifications) { Image(systemName: "bell") }
+                Button(action: onNotifications) { Image(systemName: "bell").minTapTarget() }
                     .accessibilityLabel("Уведомления")
             }
             .foregroundStyle(.white)
@@ -1547,6 +1547,7 @@ private struct CartView: View {
                                     Image(systemName: "minus")
                                         .font(.system(size: 11, weight: .bold))
                                         .frame(width: 28, height: 28)
+                                        .minTapTarget()
                                 }
                                 .accessibilityLabel("Уменьшить количество \(product.name)")
                                 Text("\(quantity)")
@@ -1559,6 +1560,7 @@ private struct CartView: View {
                                     Image(systemName: "plus")
                                         .font(.system(size: 11, weight: .bold))
                                         .frame(width: 28, height: 28)
+                                        .minTapTarget()
                                 }
                                 .accessibilityLabel("Увеличить количество \(product.name)")
                             }

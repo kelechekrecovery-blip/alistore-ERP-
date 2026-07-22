@@ -30,6 +30,7 @@
 		351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */; };
 		3C122434725480BD6FD225EF /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3DD3BC46F9BEDBEE0AF1907A /* GolosText-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 85E2CA210C5423F5C9A6CBED /* GolosText-Medium.ttf */; };
+		47114D40B91D8CEC8066151E /* TapTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 280AD44CDBD85F9C4615C1E8 /* TapTarget.swift */; };
 		478D1BA4ECEEE8573B9C8190 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		485B9CF6D9364BB326708FB7 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 28FC92D118D7CEE4EED81419 /* Localizable.strings */; };
 		492FE010C8F04B72F808B040 /* ReferralView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D9ECDFDBC25D5BACF48D03 /* ReferralView.swift */; };
@@ -245,6 +246,7 @@
 		20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerMeContractTests.swift; sourceTree = "<group>"; };
 		23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POSReturnFlowTests.swift; sourceTree = "<group>"; };
 		242B1D211D250E4D9D64635B /* OFL-JetBrainsMono.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-JetBrainsMono.txt"; sourceTree = "<group>"; };
+		280AD44CDBD85F9C4615C1E8 /* TapTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapTarget.swift; sourceTree = "<group>"; };
 		2840B95D664B9ABE46B5943B /* PrivacyCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyCover.swift; sourceTree = "<group>"; };
 		2962E44FB9BB3C792A4757AC /* GolosText-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GolosText-Regular.ttf"; sourceTree = "<group>"; };
 		2984688119D5255CF5B06009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -395,6 +397,7 @@
 				3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */,
 				915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */,
 				2A617D85C85DD435B687E350 /* StaffLoginView.swift */,
+				280AD44CDBD85F9C4615C1E8 /* TapTarget.swift */,
 				EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */,
 			);
 			path = Shared;
@@ -1055,6 +1058,7 @@
 				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,
 				77F2D261D59534FDD6B7F788 /* StaffAuthStore.swift in Sources */,
 				E6E658A8C44D36ED57827236 /* StaffLoginView.swift in Sources */,
+				47114D40B91D8CEC8066151E /* TapTarget.swift in Sources */,
 				4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
