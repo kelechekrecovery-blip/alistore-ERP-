@@ -6,6 +6,13 @@
 - **Ограничение:** это software/simulator/emulator evidence. Physical devices, live providers, Render deployment, App Store review and owner credentials remain external gates.
 - **Следующий шаг:** перенести evidence commit в основной branch, затем закрывать external release gates in owner-controlled environments.
 
+## RELEASE-READINESS-144 — повторная проверка внешних release gates
+- **Проверено:** публичные `https://ali.kg/`, `https://admin.ali.kg/`, API live и API ready отвечают `200`; строгий iOS preflight с локальным App Store Connect API key проходит для Client, Staff, Courier и POS.
+- **Открыто:** production preflight блокирует 8 конфигурационных групп; external readiness блокирует 10 provider/infra групп и 1 manual hardware gate: SMS, payment/refund, Telegram, WhatsApp, Apple/Telegram login, notification delivery, FCM, R2/S3, Sentry, Redis/BullMQ и POS hardware.
+- **App Review:** версии `1.0.0 (2)` технически подготовлены, но фактически не отправлены; отсутствуют owner-controlled App Privacy confirmation, pricing confirmation, review contact и защищённые seeded demo accounts.
+- **Правило:** не включать live providers и не отправлять incomplete apps; секреты и review credentials не добавлять в Git.
+- **Следующий шаг:** владелец заполняет внешние панели и credentials; после этого выполнить staging deploy, provider/device certification и unified App Review submission.
+
 ## PUBLIC-RUNTIME-API-DOCS-001 — закрыть Swagger на публичном laptop-туннеле
 - **Сделано:** добавлен явный `API_DOCS_ENABLED=false` для launchd API, Render production и staging environment groups; fail-closed тест политики; sandbox payment confirm также явно выключен во всех контурах.
 - **Проверено:** локальный и публичный `/api/docs` и `/api/docs-json` возвращают `404`; health endpoints возвращают `200`; sandbox confirm возвращает `404`.

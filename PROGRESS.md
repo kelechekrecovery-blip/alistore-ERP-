@@ -5965,3 +5965,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: strict contract audit on the clean snapshot passed with zero GAP; design corpus `128/128`, linked designs present `81/81`. No production code change was required.
 - Caveat: main shared worktree still contains untouched user/parallel changes in `e2e/storefront-offline.spec.ts`, `package-lock.json`, `.claude/settings.local.json`; therefore the shared checkout is not a clean strict-audit target. Physical devices, live providers, Render deployment, credentials and App Store review remain open.
 - Next: commit only acceptance artifacts and documentation on the project branch, then proceed with owner-controlled staging/provider/device gates.
+
+## RELEASE-READINESS-144-2026-07-23
+- Task: повторно проверить публичный runtime, production readiness и App Store Connect preflight без изменения секретов.
+- Checks: `https://ali.kg/`, `https://admin.ali.kg/`, API live и ready — HTTP `200`; strict iOS preflight с локальным ASC API key прошёл для Client, Staff, Courier и POS; native metadata/privacy configuration прошла.
+- Result: технический iOS submission preflight зелёный. Production preflight остаётся заблокированным на 8 группах конфигурации; strict external readiness показывает 10 отсутствующих provider/infra групп и 1 manual POS hardware gate.
+- App Review: версии `1.0.0 (2)` остаются `PREPARE_FOR_SUBMISSION`; фактическая review submission не создавалась. Нужны owner-controlled App Privacy, pricing, review contact и seeded demo accounts.
+- Security: ключи не выводились и не записывались в репозиторий; пользовательские незакоммиченные файлы не изменялись.
+- Next: owner-controlled Render/provider/device/App Store steps, затем повторные strict readiness и submission checks.
