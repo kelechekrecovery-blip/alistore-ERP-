@@ -33,6 +33,15 @@ struct StaffScannerView: View {
     private let environment = AppEnvironment.live()
 
     private let entityTypes = ["order", "warranty", "shift", "inventory", "support", "return", "tradein"]
+    // Метки для скупки — фиксированный словарь, а не свободный текст. Свободное
+    // поле по умолчанию слало `buyback_evidence`, которого нет в PII-списке
+    // сервера, поэтому паспорт продавца не удалялся никогда. Значения совпадают с
+    // серверной классификацией: паспортные метки — PII, `tradein_device` — нет.
+    private let tradeinLabels: [(id: String, title: String)] = [
+        ("passport_front", "Паспорт — разворот"),
+        ("passport_back", "Паспорт — прописка"),
+        ("tradein_device", "Фото устройства"),
+    ]
     private let background = Design3.screen
     private let surface = Design3.surface
     private let surfaceSoft = Design3.surfaceRaised
@@ -132,7 +141,9 @@ struct StaffScannerView: View {
                 mode = .evidence
                 entityType = "tradein"
                 entityId = entityId.isEmpty ? "tradein-draft" : entityId
-                label = "buyback_evidence"
+                // Договор скупки начинается с паспорта продавца — метка PII, чтобы
+                // фото попало под срок хранения, а не осело в базе навсегда.
+                label = "passport_front"
             }
             .font(.headline.weight(.bold))
             .buttonStyle(.plain)
@@ -154,10 +165,28 @@ struct StaffScannerView: View {
                     ForEach(entityTypes, id: \.self) { Text(entityLabel($0)).tag($0) }
                 }
                 .pickerStyle(.menu)
+                // При переходе на скупку свободная метка вроде `operation_photo`
+                // не входит в словарь — иначе Picker остался бы без валидного
+                // выбора, а паспорт ушёл бы под нераспознанной меткой.
+                .onChange(of: entityType) { _, newValue in
+                    if newValue == "tradein", !tradeinLabels.contains(where: { $0.id == label }) {
+                        label = tradeinLabels[0].id
+                    }
+                }
                 styledTextField("ID сущности", text: $entityId)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                styledTextField("Метка фото", text: $label)
+                // При скупке метку выбирают из фиксированного словаря: паспорт
+                // помечается PII-меткой и удаляется по сроку. Свободный текст,
+                // который слал `buyback_evidence`, оставлял паспорт в базе навсегда.
+                if entityType == "tradein" {
+                    Picker("Что на фото", selection: $label) {
+                        ForEach(tradeinLabels, id: \.id) { Text($0.title).tag($0.id) }
+                    }
+                    .pickerStyle(.segmented)
+                } else {
+                    styledTextField("Метка фото", text: $label)
+                }
                 HStack(spacing: 10) {
                     Button(action: openCamera) {
                         Label("Снять фото", systemImage: "camera.fill")

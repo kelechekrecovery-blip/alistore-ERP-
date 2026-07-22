@@ -4,18 +4,33 @@ import { EvidenceRetentionService } from '../src/evidence/evidence-retention.ser
 import { decideEvidenceRetention } from '../src/evidence/evidence-retention.policy';
 
 describe('Evidence PII retention', () => {
-  it('classifies only explicit trade-in identity labels and computes a bounded deadline', () => {
+  it('treats trade-in evidence as PII by default and exempts only device labels (fail-closed)', () => {
     const config = new ConfigService({ EVIDENCE_PII_RETENTION_DAYS: '30', EVIDENCE_RETENTION_POLICY_VERSION: 'kg-privacy-test' });
     const createdAt = new Date('2026-01-01T00:00:00.000Z');
+
+    // Явные метки паспорта — PII, как и раньше.
     expect(decideEvidenceRetention(config, 'tradein', 'passport_front', createdAt)).toMatchObject({
       isPii: true,
       retentionUntil: new Date('2026-01-31T00:00:00.000Z'),
       policyVersion: 'kg-privacy-test',
     });
-    expect(decideEvidenceRetention(config, 'tradein', 'imei_photo', createdAt)).toMatchObject({
+
+    // Настоящий дефект: `buyback_evidence` — метка, которую iOS слал по умолчанию
+    // для всех фото скупки, включая паспорт. При fail-open она не считалась PII, и
+    // паспорт продавца не удалялся никогда. Теперь любое tradein-фото — PII, пока
+    // явно не помечено как фото устройства.
+    expect(decideEvidenceRetention(config, 'tradein', 'buyback_evidence', createdAt).isPii).toBe(true);
+    expect(decideEvidenceRetention(config, 'tradein', undefined, createdAt).isPii).toBe(true);
+    expect(decideEvidenceRetention(config, 'tradein', 'что-то новое', createdAt).isPii).toBe(true);
+
+    // Фото устройства нужны анти-фроду и гарантии — их не удаляем.
+    expect(decideEvidenceRetention(config, 'tradein', 'tradein_device', createdAt)).toMatchObject({
       isPii: false,
       retentionUntil: null,
     });
+    expect(decideEvidenceRetention(config, 'tradein', 'imei_photo', createdAt).isPii).toBe(false);
+
+    // Паспорт вне скупки в этот флоу не попадает — политика покрывает только tradein.
     expect(decideEvidenceRetention(config, 'warranty', 'passport_front', createdAt).isPii).toBe(false);
   });
 
