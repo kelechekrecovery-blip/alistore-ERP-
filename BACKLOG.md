@@ -767,6 +767,11 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Ограничение:** physical devices, live providers, deep native journeys и missing visual handoffs остаются отдельными release gates.
 - **Следующий шаг:** strict audit и фиксация оставшихся блокеров.
 
+## VISUAL-100 — durable visual acceptance
+- **Проверено:** trusted `npm run visual:e2e`; exact screenshot suite `3/3` passed.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/visual-ed276e8a0df7099fec8324a39041c6fa746c1fd85e49584231b795cdd7d9dd90.json`, привязанный к текущему source tree.
+- **Следующий шаг:** strict ecosystem audit.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
