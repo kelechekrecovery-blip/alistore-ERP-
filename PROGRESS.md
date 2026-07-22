@@ -5712,3 +5712,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: isolated `e2e/exchange.spec.ts` `2/2`, `e2e/protection.spec.ts` `1/1`, `e2e/return-refund.spec.ts` `1/1`, and `e2e/web-checkout.spec.ts` `7/7` passed.
 - Result: checkout/payment, delivery zone and slot, variants/bundles, loyalty/promotion, protection, returns/refund approval and exchange flows are green.
 - Next: resolve the remaining offline home test harness mismatch, then rerun the full browser audit without masking failures.
+
+## WEB-OFFLINE-110-2026-07-23
+- Task: verify storefront offline/error/retry behavior against the SSR/CSR split.
+- Checks: isolated `e2e/storefront-offline.spec.ts` passed `6/6` on fresh Web/API ports.
+- Result: server-rendered desktop home remains usable when only browser requests are blocked; mobile, favorites, compare and Telegram surfaces show explicit failure states; retry performs a new request.
+- Note: the corresponding E2E clarification is an existing parallel uncommitted change and was not included in this commit.
+- Next: rerun build and the broader route audit, then update the remaining release blockers from actual results.
