@@ -735,6 +735,12 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Ограничение:** physical iPhone, APNs, camera, biometrics и App Store review остаются внешними gates.
 - **Следующий шаг:** Android packaged UI и четыре reconciliation gates на том же clean tree.
 
+## ANDROID-UI-094 — обновить packaged UI evidence для четырёх Android apps
+- **Проверено:** trusted `npm run android:ui`; Core `38/38`, Client `1/1`, Staff `2/2`, Courier `1/1`, POS `2/2`; Gradle `BUILD SUCCESSFUL` на `savio_api36_arm64`.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/android-app-ui-ab596186d7d15e445433fbddd72aca75e3dbdecf5eb3603e05177b106c17e601.json`, привязанный к текущему source tree.
+- **Ограничение:** physical Android, push, biometrics, camera, maps, scanner, printer and terminal certification остаются внешними gates.
+- **Следующий шаг:** четыре reconciliation gates и composite ecosystem E2E.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
