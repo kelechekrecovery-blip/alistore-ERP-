@@ -6,6 +6,12 @@
 - **Ограничение:** текущий публичный контур всё ещё обслуживается ноутбучным Cloudflare tunnel; Render production deployment, provider certification и App Review остаются внешними gates.
 - **Следующий шаг:** выполнить immutable staging/production deployment и повторить public smoke уже на Render origin.
 
+## VERIFY-ECO-140 — полный software ecosystem gate
+- **Проверено:** `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run ecosystem:verify` прошёл API `200/200`, Playwright `137 passed / 2 skipped`, Prisma/migrations, iOS all-target build, Android build/unit/lint и Web production build.
+- **Публичный smoke:** `ali.kg`, `admin.ali.kg`, API live/ready возвращают `200`; API docs endpoints возвращают `404`.
+- **Ограничение:** native UI tests и physical-device/provider certification не являются частью обычного `ecosystem:verify`; они остаются отдельными gates.
+- **Следующий шаг:** повторить native UI suite на чистом committed SHA, затем staging Render deploy.
+
 ## WEB-AUTH-088 — восстановить dev-only customer fixture для browser E2E
 - **Найдено:** после перехода Web на HttpOnly session cookies `AuthProvider` удалял legacy `alistore.auth.v1` до чтения, поэтому customer service flows перенаправлялись на login, хотя staff и API операции проходили.
 - **Сделано:** legacy bearer fixture читается только вне production и валидируется через `/auth/me`; production по-прежнему игнорирует localStorage и использует только cookie session.
