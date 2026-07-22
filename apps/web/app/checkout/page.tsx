@@ -104,6 +104,7 @@ export default function CheckoutPage() {
   const [deliveryCapacityLoading, setDeliveryCapacityLoading] = useState(true);
   const [deliveryCapacityError, setDeliveryCapacityError] = useState(false);
   const [cartRefreshing, setCartRefreshing] = useState(true);
+  const [cartRefreshError, setCartRefreshError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [giftBusy, setGiftBusy] = useState(false);
   const [giftCode, setGiftCode] = useState('');
@@ -155,11 +156,21 @@ export default function CheckoutPage() {
     }
     let active = true;
     setCartRefreshing(true);
-    Promise.all(items.map((item) => fetchProduct(item.id))).then((products) => {
-      if (!active) return;
-      reconcileAvailability(products.filter((product): product is NonNullable<typeof product> => Boolean(product)));
-      setCartRefreshing(false);
-    });
+    setCartRefreshError(false);
+    Promise.all(items.map((item) => fetchProduct(item.id)))
+      .then((products) => {
+        if (!active) return;
+        reconcileAvailability(products.filter((product): product is NonNullable<typeof product> => Boolean(product)));
+      })
+      .catch(() => {
+        // A rejected fetch must not leave the "Далее" button disabled forever —
+        // surface the failure and let the customer retry or continue; the server
+        // remains authoritative and re-validates price/stock at order creation.
+        if (active) setCartRefreshError(true);
+      })
+      .finally(() => {
+        if (active) setCartRefreshing(false);
+      });
     return () => { active = false; };
     // The cart context clamps quantity and refreshes the displayed unit price.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -477,6 +488,7 @@ export default function CheckoutPage() {
               </>
             )}
             {cartRefreshing && <p className="mb-2 text-xs text-muted">Проверяем актуальные цены и остатки…</p>}
+            {cartRefreshError && <p className="mb-2 text-xs text-coral-tint">Не удалось проверить актуальные цены и остатки. Можно продолжить — сервер перепроверит их при оформлении.</p>}
             <button type="button" disabled={cartRefreshing || deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
           </>
         )}

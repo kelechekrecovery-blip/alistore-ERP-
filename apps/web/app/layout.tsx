@@ -9,8 +9,13 @@ import { FavoritesProvider } from '@/lib/favorites';
 import { CompareProvider } from '@/lib/compare';
 import { DemoModeBanner } from '@/components/DemoModeBanner';
 import { AttributionCapture } from '@/components/AttributionCapture';
+import { SITE_URL } from '@/lib/site';
 
 export const metadata: Metadata = {
+  // Resolves relative openGraph/twitter image URLs (e.g. product photos stored as
+  // root-relative `/uploads/...` paths) against the public origin instead of Next's
+  // "http://localhost:3000" fallback, which would break link previews in production.
+  metadataBase: new URL(SITE_URL),
   title: 'AliStore — электроника с гарантией в Кыргызстане',
   description:
     'Новое и Б/У привозное с гарантией. Смартфоны, ноутбуки, аудио, часы — с проверкой по IMEI и честной ценой.',
