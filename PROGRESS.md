@@ -5779,3 +5779,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: targeted pair passed `15/15` tests.
 - Result: the affected suites can run consecutively without leaving `OrderItem_orderId_fkey` failures for later suites.
 - Next: rerun the complete API gate and address any newly exposed cleanup or behavioral failures.
+
+## API-GATE-118-2026-07-23
+- Task: rerun the complete API release gate after KPI aggregation and test-isolation fixes.
+- Checks: `npm run api:build` passed; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run api:test` passed `200/200` suites and `960/960` tests.
+- Result: API compilation, RBAC/IDOR, finance, refunds, inventory, procurement, HR, POS replay, customer PII and resilience coverage are green. Expected outage warnings remain test evidence, not failures.
+- Next: refresh Web/native trusted evidence only after parallel source edits stop changing the worktree.
