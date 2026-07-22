@@ -746,6 +746,11 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Evidence:** принят artifact `docs/acceptance/artifacts/pos-refund-reconciliation-5f0af2a01367d7ac759e057415cee62fc127079e308d95418911e79e7f8ad027.json`.
 - **Следующий шаг:** Courier COD, Service loaner и Procurement sale reconciliation.
 
+## COURIER-COD-096 — обновить Courier COD reconciliation evidence
+- **Проверено:** trusted `npm run ecosystem:courier-cod:e2e`; Playwright `1/1` passed: checkout → warehouse → courier handover → cash reconciliation, exactly once.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/courier-cod-reconciliation-b65b7dcf8372572d3a006090a2b49a645f92ff46965078571325d3863a2c13a3.json`.
+- **Следующий шаг:** Service loaner и Procurement sale reconciliation.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
