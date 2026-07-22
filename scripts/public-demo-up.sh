@@ -11,8 +11,21 @@ command -v cloudflared >/dev/null 2>&1 || {
   exit 1
 }
 
-if [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
-  echo "Set CLOUDFLARE_TUNNEL_TOKEN in the shell environment; never put it in Git." >&2
+TUNNEL_AUTH_ARGS=()
+if [ -n "${CLOUDFLARE_TUNNEL_TOKEN_FILE:-}" ]; then
+  if [ ! -f "$CLOUDFLARE_TUNNEL_TOKEN_FILE" ]; then
+    echo "Cloudflare tunnel token file does not exist: $CLOUDFLARE_TUNNEL_TOKEN_FILE" >&2
+    exit 1
+  fi
+  if [ "$(stat -f '%Lp' "$CLOUDFLARE_TUNNEL_TOKEN_FILE" 2>/dev/null || stat -c '%a' "$CLOUDFLARE_TUNNEL_TOKEN_FILE")" != "600" ]; then
+    echo "Cloudflare tunnel token file must have mode 600." >&2
+    exit 1
+  fi
+  TUNNEL_AUTH_ARGS+=(--token-file "$CLOUDFLARE_TUNNEL_TOKEN_FILE")
+elif [ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
+  TUNNEL_AUTH_ARGS+=(--token "$CLOUDFLARE_TUNNEL_TOKEN")
+else
+  echo "Set CLOUDFLARE_TUNNEL_TOKEN_FILE or CLOUDFLARE_TUNNEL_TOKEN; never put the token in Git." >&2
   exit 1
 fi
 
@@ -61,7 +74,7 @@ bash scripts/local-up.sh
 if [ -f "$TUNNEL_PID" ] && kill -0 "$(cat "$TUNNEL_PID")" 2>/dev/null; then
   echo "Cloudflare tunnel is already running (PID $(cat "$TUNNEL_PID"))"
 else
-  nohup cloudflared tunnel run --token "$CLOUDFLARE_TUNNEL_TOKEN" alistore-erp >"$TUNNEL_LOG" 2>&1 &
+  nohup cloudflared tunnel run "${TUNNEL_AUTH_ARGS[@]}" alistore-erp >"$TUNNEL_LOG" 2>&1 &
   echo $! >"$TUNNEL_PID"
   echo "Started Cloudflare tunnel (PID $!)"
 fi
