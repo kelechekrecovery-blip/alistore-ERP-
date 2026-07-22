@@ -5785,3 +5785,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run api:build` passed; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run api:test` passed `200/200` suites and `960/960` tests.
 - Result: API compilation, RBAC/IDOR, finance, refunds, inventory, procurement, HR, POS replay, customer PII and resilience coverage are green. Expected outage warnings remain test evidence, not failures.
 - Next: refresh Web/native trusted evidence only after parallel source edits stop changing the worktree.
+
+## WEB-ROUTES-119-2026-07-23
+- Task: повторно проверить полный Web route audit после устранения временного негативного флага SSR главной страницы.
+- Checks: отдельное воспроизведение главной на свежих API/Web портах не показало failed requests или console errors; `E2E_REUSE_EXISTING_SERVER=false E2E_WEB_PORT=3254 E2E_API_PORT=4254 npm run web:route-audit -- --reporter=line` passed `46/46`.
+- Result: публичные маршруты, customer redirect shells, ERP/POS/Staff/Warehouse entrypoints и system endpoints зелёные на локальном sandbox-контуре. Предыдущий единичный `ERR_NAME_NOT_RESOLVED` не воспроизвёлся и не подтверждён как дефект приложения.
+- Note: worktree всё ещё содержит параллельный комментарий в `e2e/storefront-offline.spec.ts` и локальный `.claude/settings.local.json`; они не включены в этот commit.
+- Next: rerun the broader Web E2E/visual/accessibility gates, then refresh strict ecosystem evidence only after a source-tree freeze.
