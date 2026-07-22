@@ -5692,3 +5692,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: isolated `e2e/pos-customer-binding.spec.ts` passed `1/1`; prior `e2e/pos-ui.spec.ts` passed `1/1`; Web production build remains green.
 - Result: customer lookup, loyalty display, cash sale and customer-bound paid order verified end to end.
 - Next: inspect remaining POS/print failures and then rerun the Web regression subset.
+
+## WEB-PRINT-107-2026-07-23
+- Task: verify the POS/receipt/label print cluster after the POS customer-binding fix.
+- Checks: isolated `e2e/pos-customer-binding.spec.ts` `1/1`, `e2e/pos-ui.spec.ts` `1/1`, and `e2e/print-ui.spec.ts` `4/4` passed on fresh Web/API ports.
+- Result: customer-bound cash sale, catalog delta sync, invoice PDF, server receipt, QR price tag, IMEI labels and write-off act PDF are green.
+- Next: run the remaining service-center, procurement and fulfillment UI subsets; full Playwright gate is still not yet accepted.
