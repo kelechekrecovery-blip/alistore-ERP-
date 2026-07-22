@@ -5856,3 +5856,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: design corpus `128 tracked / 81 linked / 81 present / 0 missing`, link graph `153 / 0 broken`; Web/API and native build command contracts pass. Audit честно сообщает 9 блокеров: dirty source tree, stale hash-bound visual/native/reconciliation evidence for the current source/toolchain hash, and related acceptance artifacts.
 - Caveat: это не закрывает production, physical-device, provider или App Store gates. `e2e/storefront-offline.spec.ts` и `.claude/settings.local.json` остаются вне коммита как параллельные локальные изменения.
 - Next: refresh trusted evidence from a clean source snapshot or keep the current strict blockers explicit; do not manufacture acceptance artifacts.
+
+## IOS-ASC-PREFLIGHT-129-2026-07-23
+- Task: повторно проверить строгую готовность iOS store pipeline с локальным App Store Connect API key.
+- Checks: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer npm run ios:store-preflight -- --env-file apps/ios/.env.production --strict-asc --strict-signing` passed. API credentials verified; all four apps (`kg.alistore.client`, `kg.alistore.staff`, `kg.alistore.courier`, `kg.alistore.pos`) have HTTPS API, AppIcon, production APNs, metadata/privacy manifests and Apple Distribution signing material.
+- Result: archive/upload pipeline is technically ready for the current `1.0.0 (2)` release artifacts.
+- Caveat: this does not submit App Review. App Store Connect still requires owner-provided review demo accounts, published App Privacy answers, pricing/contact fields and reachable public `ali.kg` review URLs.
+- Next: keep review submission blocked until those owner-controlled fields and public-origin smoke are verified; continue local software gates and evidence cleanup.
