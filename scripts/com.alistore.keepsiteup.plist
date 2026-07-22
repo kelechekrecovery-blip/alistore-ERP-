@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent-сторож: держит витрину и API поднятыми, пока сайт живёт на этой
+  машине через Cloudflare Tunnel.
+
+  ВРЕМЕННАЯ мера. Причина простоев и план переезда — в
+  docs/PRODUCTION-ARCHITECTURE-REVIEW.md. Правильное решение: развернуть
+  render.yaml и увести DNS с туннеля; тогда сторож не нужен вовсе.
+
+  Включить (user-scoped, обратимо):
+    cp scripts/com.alistore.keepsiteup.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.alistore.keepsiteup.plist
+
+  Выключить:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.keepsiteup.plist
+    rm ~/Library/LaunchAgents/com.alistore.keepsiteup.plist
+
+  Путь к репозиторию ниже при необходимости поправьте под свою машину.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.keepsiteup</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/alistore/Desktop/alistore-erp/scripts/keep-site-up.sh</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Скрипт сам крутит цикл раз в минуту; если процесс упадёт — перезапустить. -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-keepalive.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-keepalive.err.log</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp</string>
+</dict>
+</plist>
