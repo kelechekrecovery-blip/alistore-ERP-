@@ -333,6 +333,21 @@ export class CampaignsService {
       return this.roiFor(id);
     }
     await this.audit.transaction(async (tx) => {
+      // Serialize concurrent identical requests on the idempotency key and
+      // re-check inside the tx (mirrors refunds). Without this, two requests
+      // that both pass the pre-check above race into create() and the loser
+      // surfaces a raw unique-constraint error instead of a clean replay.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'campaign-spend:' + dto.idempotencyKey}))::text AS locked`;
+      const raced = await tx.campaignSpendEntry.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
+      if (raced) {
+        if (
+          raced.campaignId !== id || raced.provider !== dto.provider.trim()
+          || raced.externalRef !== dto.externalRef.trim() || raced.amount !== dto.amount
+        ) {
+          throw new ConflictError('idempotency_payload_mismatch', 'Idempotency-Key уже использован с другими данными');
+        }
+        return { result: raced, events: [] };
+      }
       const campaign = await this.lockCampaign(tx, id);
       if (campaign.status === 'draft' || campaign.status === 'review') {
         throw new ConflictError('campaign_not_approved', 'Расход можно провести только по согласованной кампании');
