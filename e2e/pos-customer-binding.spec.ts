@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+import { postJson, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
 test.afterEach(async () => {
   await resetDb();
 });
 
-test('POS finds an existing customer and binds the completed sale to that customer', async ({ page }) => {
+test('POS finds an existing customer and binds the completed sale to that customer', async ({ page, request }) => {
   await resetDb();
   const staff = await seedStaffCredentials('cashier', 'e2e-pos-customer');
   const { product } = await seedProduct('POS-CUSTOMER');
@@ -21,6 +21,13 @@ test('POS finds an existing customer and binds the completed sale to that custom
       sourceRef: `pos-customer-e2e:${customer.id}`,
     },
   });
+  await postJson(
+    request,
+    '/shifts/open',
+    { staffId: staff.staffId, point: 'BISHKEK-1', openCash: 5000 },
+    staff.accessToken,
+    { 'idempotency-key': `e2e-pos-customer-open-${Date.now()}` },
+  );
 
   await page.addInitScript((auth) => {
     localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(auth));
