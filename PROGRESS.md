@@ -5892,3 +5892,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Main worktree strict audit remains RED because the pre-existing `e2e/storefront-offline.spec.ts` modification changes the tested source hash and `.claude/settings.local.json` is untracked. These files were not edited, staged, or reverted.
 - Result: refreshed acceptance artifacts are committed in `fbdf1bd6`; no production or App Store readiness claim is made.
 - Next: run the aggregate reconciled suite from a clean, committed source snapshot with an isolated database and explicit timeout; then continue owner-controlled store/provider/device gates.
+
+## RECONCILED-E2E-134-2026-07-23
+- Task: rerun and record the complete four-vertical ecosystem matrix after the transient procurement hang.
+- Checks: `npm run ecosystem:e2e` passed all four verticals in order: POS/refund, Courier/COD, Service Center/loaner, and Procurement/sale. Procurement completed `10/10` API tests and browser E2E `1/1`; the aggregate finished with `4/4` verticals passed.
+- Result: new hash-verified `reconciled-e2e` evidence was recorded from the clean current source snapshot. The previous five-minute hang did not reproduce after the interrupted process and database state had settled; no product code change was required.
+- Caveat: this remains software evidence only. Physical devices, live providers, App Store review, production credentials and the untouched parallel worktree files remain outside this gate.
+- Next: commit the aggregate evidence, rerun strict audit, and continue external release readiness checks.
