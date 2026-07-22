@@ -1,5 +1,10 @@
 # BACKLOG
 
+## PUBLIC-RUNTIME-147 — синхронизировать owner launch runbook с текущим smoke
+- **Сделано:** runbook обновлён по фактическому smoke от 2026-07-23: storefront, admin, API live и API ready отвечают `200`; публичные OpenAPI endpoints отвечают `404`; HSTS и security headers активны.
+- **Ограничение:** Cloudflare proxy скрывает origin, поэтому Render ownership/release SHA, custom domains, catalog seed и deployment smoke ещё требуют проверки владельцем в Render/Cloudflare.
+- **Следующий шаг:** после owner-controlled Render deployment повторить deployment smoke, rollback и isolated staging ERP/storefront E2E.
+
 ## EVIDENCE-REFRESH-143 — принять свежий полный software ecosystem snapshot
 - **Сделано:** на чистой временной копии текущего source tree повторно записаны visual, iOS UI, Android connected UI, POS/refund, Courier/COD, Service Center/loaner, procurement/sale и aggregate reconciled E2E evidence.
 - **Проверено:** strict contract audit завершился без GAP; design corpus `128/128`, iOS Client `23/23`, Staff `10/10`, Courier `3/3`, POS `5/5`, Android Core `38/38`, Client `1/1`, Staff `2/2`, Courier `1/1`, POS `2/2`; aggregate matrix `4/4`.

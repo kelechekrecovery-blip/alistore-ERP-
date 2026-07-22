@@ -5987,3 +5987,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: ERP → storefront integration is green at software/browser level; no code defect found.
 - Caveat: test uses the local acceptance runtime. Render staging, isolated cloud database, backup/restore and rollback remain external deployment gates.
 - Next: repeat this gate on Render staging after owner-controlled Blueprint deployment.
+
+## PUBLIC-RUNTIME-147-2026-07-23
+- Task: синхронизировать owner launch runbook с текущим публичным runtime smoke.
+- Changes: `docs/OWNER-LAUNCH-CHECKLIST.md` больше не сообщает устаревший 502 и пустой каталог как текущее состояние; зафиксированы storefront/admin/API `200`, API docs `404`, HSTS/security headers и caveat о скрытом Cloudflare origin.
+- Checks: публичные `https://ali.kg/`, `/catalog`, `https://admin.ali.kg/`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; `git diff --check` проходит.
+- Result: launch runbook соответствует фактическому состоянию и отделяет подтверждённый sandbox smoke от неподтверждённого Render production ownership.
+- Caveat: Render deployment, origin SHA, catalog seed, real providers, physical devices and App Review remain owner-controlled gates.
+- Next: выполнить Render staging deployment и повторить deployment smoke/rollback на изолированной cloud environment.
