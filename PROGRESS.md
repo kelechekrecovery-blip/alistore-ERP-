@@ -5885,3 +5885,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: current-SHA artifacts were generated from the clean snapshot and copied into `docs/acceptance`; the source snapshot used `bd9d3cbd...` and the trusted toolchain manifest.
 - Caveat: the aggregate `reconciled-e2e` recorder was stopped after its procurement Jest phase hung for five minutes, while the same procurement gate passed independently. No aggregate result is claimed from that interrupted run. The main worktree still contains the pre-existing parallel `e2e/storefront-offline.spec.ts` edit and `.claude/settings.local.json`; neither was modified or staged.
 - Next: commit only the refreshed acceptance artifacts and this progress record, rerun strict audit, then address remaining clean-tree and external certification blockers.
+
+## EVIDENCE-AUDIT-133-2026-07-23
+- Task: validate the refreshed evidence against both the clean snapshot and the shared worktree.
+- Checks: clean snapshot strict audit passes all design, visual, native and four standalone reconciliation contracts; only `reconciled-ecosystem-e2e` remains blocked because its aggregate runner hangs during the procurement phase, although the standalone procurement gate passes `10/10` API tests plus browser E2E.
+- Main worktree strict audit remains RED because the pre-existing `e2e/storefront-offline.spec.ts` modification changes the tested source hash and `.claude/settings.local.json` is untracked. These files were not edited, staged, or reverted.
+- Result: refreshed acceptance artifacts are committed in `fbdf1bd6`; no production or App Store readiness claim is made.
+- Next: run the aggregate reconciled suite from a clean, committed source snapshot with an isolated database and explicit timeout; then continue owner-controlled store/provider/device gates.
