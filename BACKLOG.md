@@ -1,5 +1,48 @@
 # BACKLOG
 
+## Харденинг денежной поверхности (риск-свип ruflo) 2026-07-22
+Из систематического ревью «Very Complex» модулей `apps/api`. Все деньги/сток/статус идут
+через `audit.transaction`, критики нет. Найдены несоответствия — приоритет по риску.
+Фазы 2 (`price`-guard, `reject_refund` lock, RBAC-тест) уже сделаны отдельными коммитами.
+
+- `LEDGER-HARDEN-31` **Refund-webhook без проверки подписи на sandbox/staging — нужно решение.**
+  `apps/api/src/refunds/refund-webhooks.controller.ts` — публичный неаутентифицированный роут
+  (`ApiExcludeController`); в прод защищён `gateway.verifyRefundWebhook` (подпись) + Throttler
+  60/мин, но на sandbox/staging подпись **не** проверяется (в комментарии). Путь к смене статусов
+  возвратов извне на не-прод стендах. **Решение владельца:** проверять подпись и в staging /
+  ужесточить throttle / allowlist источника. Затем срез: deep-review + тест на отказ без подписи.
+- `LEDGER-HARDEN-32` **Асимметрия concurrency `resolveConfirm` vs `resolveCancel` — нужен дизайн.**
+  `apps/api/src/refunds/refunds.processor.ts`: `resolveCancel` (:443) в одной `audit.transaction`
+  берёт advisory-lock `refund-resolve:` (:451) и перепроверяет replay в tx (:452). `resolveConfirm`
+  (:384) читает refund **вне** tx (:392), replay-pre-check только общий вне tx (`resolveRefund:368`),
+  а сериализацию оставляет per-allocation `FOR UPDATE` в `finalize` (:537-538). Reviewer: «likely
+  safe, но несимметрично». **Не быстрый фикс:** `resolveConfirm` — цикл отдельных транзакций
+  (`finalize` per allocation, ради partial-success), а `pg_advisory_xact_lock` живёт лишь внутри
+  своей tx; session-level лок с пулом Prisma ненадёжен. Требует дизайна (внешняя короткая tx с
+  advisory-lock вокруг цикла, либо перепроверка replay внутри finalize первой аллокации). Латентно.
+- `LEDGER-HARDEN-33` **Дрейф двух матриц авторизации — архитектурное решение.** Casbin `RBAC_POLICY`
+  (контроллеры) vs сервисный `APPROVAL_APPROVER_ROLES` (`apps/api/src/rbac/permissions.ts:24`).
+  `PATCH /approvals/:id/decide` без `@RequirePermission` — держится только на `canApprove`
+  (`approvals.service.ts:163`); Casbin `*, approve`-строки для этого пути не используются и могут
+  разойтись молча. Уже есть naming-drift: Casbin `writeoff` vs `write_off`; нет строк
+  `campaign_budget`/`quarantine_write_off`/`exchange`. Инвариант «senior_seller → 403» уже закреплён
+  тестом (Фаза 2.3). Остаётся: свести к одному источнику истины **или** тест на согласованность двух
+  матриц. Решить, какой из подходов.
+- `LEDGER-HARDEN-34` **Step-up TOTP только на approve, не на reject — продуктовое решение.**
+  `apps/api/src/approvals/approvals.controller.ts:72` роутит по `dto.status`: approve идёт через
+  `decideWithStepUp`, reject — через `decide` без второго фактора, хотя `ACTION_REJECTION_EXECUTORS`
+  могут восстановить/списать сток. Требовать ли step-up на reject опасных действий — за владельцем;
+  если да — срез с тестом.
+- `LEDGER-HARDEN-35` **`campaigns.recordSpend` idempotency вне транзакции (мелко).**
+  `apps/api/src/campaigns/campaigns.service.ts:322` проверяет ключ вне tx и ловит гонку сырым
+  unique-constraint (вместо advisory-lock double-check как в refunds) → сырой Prisma-error вместо
+  `ConflictError`. Косметика надёжности; отдельным мелким срезом.
+- `LEDGER-HARDEN-36` **POS без advisory-lock и без единой ledger-tx (инвариант-заметка).**
+  `apps/api/src/pos/pos.service.ts` — сага; корректность держится на инвариантах подчинённых
+  сервисов + uniques `Order.idempotencyKey`/`Payment.txnId` + resume/replay (`saleRequestHash`,
+  `assertReplayCompatible`). Не дефект — записано как инвариант, чтобы будущий харденинг
+  orders/payments/shifts/units не сломал POS crash-recovery.
+
 ## Зависимости 2026-07-22
 - `DEP-AUDIT-SHARP-001` **`sharp <0.35.0` под `next` — принято, ждём upstream.** `npm audit
   --omit=dev` даёт 2 high (GHSA-f88m-g3jw-g9cj, CVE-2026-33327/33328/35590/35591 в libvips):
