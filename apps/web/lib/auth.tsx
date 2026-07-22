@@ -80,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const me = await authMe(legacy.accessToken);
               if (!cancelled) setUser(me);
             }
+            // fixtures-allowed: битая локальная тест-фикстура (только вне прода) и означает анонимную сессию — показывать покупателю тут нечего
           } catch {
             // Invalid test fixture behaves like an anonymous session.
           }
