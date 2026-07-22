@@ -42,6 +42,7 @@ private final class POSAppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct AliStorePOSApp: App {
     @UIApplicationDelegateAdaptor(POSAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var auth: StaffAuthStore
 
     init() {
@@ -54,31 +55,40 @@ struct AliStorePOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if auth.isRestoring {
-                ProgressView("Восстанавливаем кассу…")
-            } else if let session = auth.session {
-                if auth.requiresQuickUnlock {
-                    QuickUnlockView(title: "AliStore POS", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
-                } else if ["cashier", "admin", "owner"].contains(session.role) {
-                    POSRootView(session: session, logout: auth.logout)
-                        .preferredColorScheme(.dark)
-                } else {
-                    ContentUnavailableView(
-                        "Нет доступа к кассе",
-                        systemImage: "lock.shield",
-                        description: Text("Роль \(session.role) не может выполнять POS-операции")
-                    )
-                    .overlay(alignment: .bottom) {
-                        Button("Выйти", role: .destructive, action: auth.logout)
-                            .padding(24)
-                    }
+            content
+                // Касса без связи — самый острый случай: разблокированный
+                // терминал открывает смену и выручку. Закрываем при уходе в фон.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { auth.lock() }
                 }
-            } else {
-                POSLoginView(auth: auth)
-                    .preferredColorScheme(.dark)
-            }
         }
         .modelContainer(OfflineStore.container())
+    }
+
+    @ViewBuilder private var content: some View {
+        if auth.isRestoring {
+            ProgressView("Восстанавливаем кассу…")
+        } else if let session = auth.session {
+            if auth.requiresQuickUnlock {
+                QuickUnlockView(title: "AliStore POS", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+            } else if ["cashier", "admin", "owner"].contains(session.role) {
+                POSRootView(session: session, logout: auth.logout)
+                    .preferredColorScheme(.dark)
+            } else {
+                ContentUnavailableView(
+                    "Нет доступа к кассе",
+                    systemImage: "lock.shield",
+                    description: Text("Роль \(session.role) не может выполнять POS-операции")
+                )
+                .overlay(alignment: .bottom) {
+                    Button("Выйти", role: .destructive, action: auth.logout)
+                        .padding(24)
+                }
+            }
+        } else {
+            POSLoginView(auth: auth)
+                .preferredColorScheme(.dark)
+        }
     }
 }
 

@@ -13,11 +13,21 @@ public final class StaffAuthStore {
     private let api: APIClient
     private let tokens: SecureTokenStore
     public let quickUnlockService: String
+    /// Настроен ли PIN. Инъектируется, потому что `AliStoreCoreTests` — hostless
+    /// бандл с `CODE_SIGNING_ALLOWED=NO`, где Keychain недоступен: без подмены
+    /// тест проверял бы окружение, а не логику блокировки.
+    private let isPinConfigured: () -> Bool
 
-    public init(environment: AppEnvironment, keychainService: String, restoresStoredSession: Bool = true) {
+    public init(
+        environment: AppEnvironment,
+        keychainService: String,
+        restoresStoredSession: Bool = true,
+        isPinConfigured: (() -> Bool)? = nil
+    ) {
         self.api = APIClient(baseURL: environment.apiBaseURL)
         self.tokens = SecureTokenStore(service: keychainService)
         self.quickUnlockService = keychainService
+        self.isPinConfigured = isPinConfigured ?? { LocalPINStore(service: keychainService).isConfigured }
         #if DEBUG
         if UITestBootstrap.startsSignedIn {
             session = StaffSession(accessToken: "ui-test-staff-token", staffId: "staff-ui-test", username: "azizbek", role: UITestBootstrap.staffRole)
@@ -77,6 +87,17 @@ public final class StaffAuthStore {
     }
 
     public func unlock() { requiresQuickUnlock = false }
+
+    /// Повторно закрывает рабочее пространство при уходе приложения в фон.
+    ///
+    /// Без этого сессия оставалась открытой между запусками: кто угодно, взявший
+    /// разблокированный телефон кассира, видел смену, выручку и Customer 360.
+    /// Блокируем только при активной сессии и настроенном PIN — гейт без второго
+    /// фактора не защищает, а лишь запирал бы человека при каждом сворачивании.
+    public func lock() {
+        guard QuickUnlockGate.shouldLock(hasSession: session != nil, pinConfigured: isPinConfigured()) else { return }
+        requiresQuickUnlock = true
+    }
 
     private func clearQuickUnlock() {
         try? tokens.clear(account: "quick-unlock-pin")

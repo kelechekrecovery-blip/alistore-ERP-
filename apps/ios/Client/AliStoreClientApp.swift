@@ -1043,9 +1043,18 @@ private struct ClientRootView: View {
             orderRefreshRevision += 1
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, auth.session != nil {
-                orderRefreshRevision += 1
-                Task { await replayPendingOrders() }
+            switch phase {
+            case .active:
+                if auth.session != nil {
+                    orderRefreshRevision += 1
+                    Task { await replayPendingOrders() }
+                }
+            case .background:
+                // Закрываем аккаунт при уходе в фон: на общем устройстве иначе
+                // следующий увидит заказы, адреса и историю предыдущего.
+                auth.lock()
+            default:
+                break
             }
         }
         .onChange(of: cart) { _, _ in saveLocalState() }

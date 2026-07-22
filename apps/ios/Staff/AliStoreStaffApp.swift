@@ -43,6 +43,7 @@ private final class StaffAppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct AliStoreStaffApp: App {
     @UIApplicationDelegateAdaptor(StaffAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var auth: StaffAuthStore
 
     init() {
@@ -55,19 +56,29 @@ struct AliStoreStaffApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if auth.isRestoring {
-                ProgressView("Восстанавливаем рабочее место…")
-            } else if let session = auth.session {
-                if auth.requiresQuickUnlock {
-                    QuickUnlockView(title: "AliStore Staff", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
-                } else {
-                    StaffRootView(session: session, logout: auth.logout)
+            content
+                // Закрываем рабочее место при уходе в фон: разблокированный
+                // телефон сотрудника иначе открывает смену, выручку и Customer 360
+                // до следующего перезапуска, которого может не быть весь день.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { auth.lock() }
                 }
-            } else {
-                StaffLoginView(auth: auth, title: "AliStore Staff")
-            }
         }
         .modelContainer(OfflineStore.container())
+    }
+
+    @ViewBuilder private var content: some View {
+        if auth.isRestoring {
+            ProgressView("Восстанавливаем рабочее место…")
+        } else if let session = auth.session {
+            if auth.requiresQuickUnlock {
+                QuickUnlockView(title: "AliStore Staff", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+            } else {
+                StaffRootView(session: session, logout: auth.logout)
+            }
+        } else {
+            StaffLoginView(auth: auth, title: "AliStore Staff")
+        }
     }
 }
 

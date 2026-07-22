@@ -43,6 +43,7 @@ final class CourierAppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct AliStoreCourierApp: App {
     @UIApplicationDelegateAdaptor(CourierAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var auth: StaffAuthStore
 
     init() {
@@ -55,27 +56,36 @@ struct AliStoreCourierApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if auth.isRestoring {
-                ProgressView("Восстанавливаем рабочее место…")
-            } else if let session = auth.session {
-                if auth.requiresQuickUnlock {
-                    QuickUnlockView(title: "AliStore Courier", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
-                } else if session.role == "courier" {
-                    CourierRootView(session: session, logout: auth.logout)
-                } else {
-                    ContentUnavailableView(
-                        "Нет доступа курьера",
-                        systemImage: "person.crop.circle.badge.xmark",
-                        description: Text("Войдите под активной учётной записью с ролью courier.")
-                    )
-                    .safeAreaInset(edge: .bottom) {
-                        Button("Выйти", role: .destructive, action: auth.logout).padding()
-                    }
+            content
+                // Закрываем рабочее место курьера при уходе в фон: иначе
+                // разблокированный телефон открывает маршрут, адреса и суммы COD.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { auth.lock() }
                 }
-            } else {
-                StaffLoginView(auth: auth, title: "AliStore Courier")
-            }
         }
         .modelContainer(OfflineStore.container())
+    }
+
+    @ViewBuilder private var content: some View {
+        if auth.isRestoring {
+            ProgressView("Восстанавливаем рабочее место…")
+        } else if let session = auth.session {
+            if auth.requiresQuickUnlock {
+                QuickUnlockView(title: "AliStore Courier", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+            } else if session.role == "courier" {
+                CourierRootView(session: session, logout: auth.logout)
+            } else {
+                ContentUnavailableView(
+                    "Нет доступа курьера",
+                    systemImage: "person.crop.circle.badge.xmark",
+                    description: Text("Войдите под активной учётной записью с ролью courier.")
+                )
+                .safeAreaInset(edge: .bottom) {
+                    Button("Выйти", role: .destructive, action: auth.logout).padding()
+                }
+            }
+        } else {
+            StaffLoginView(auth: auth, title: "AliStore Courier")
+        }
     }
 }

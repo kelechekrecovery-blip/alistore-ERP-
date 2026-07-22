@@ -158,6 +158,16 @@ public struct LocalPINStore: Sendable {
     private static var nowMillis: Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
 }
 
+/// Решение о повторной блокировке при уходе в фон. Вынесено из сторов, потому что
+/// сессия в них приватна и заводится только сетевым логином — а само правило
+/// («блокировать лишь при активной сессии и настроенном PIN») проверяемо без
+/// сети и Keychain.
+public enum QuickUnlockGate {
+    public static func shouldLock(hasSession: Bool, pinConfigured: Bool) -> Bool {
+        hasSession && pinConfigured
+    }
+}
+
 public enum QuickUnlockError: LocalizedError, Sendable, Equatable {
     case invalidPIN
     case wrongPIN

@@ -15,16 +15,20 @@ public final class CustomerAuthStore {
     private let api: APIClient
     private let tokens: SecureTokenStore
     private let restoresStoredSession: Bool
+    /// См. `StaffAuthStore.isPinConfigured` — та же причина инъекции.
+    private let isPinConfigured: () -> Bool
 
     public init(
         environment: AppEnvironment,
         keychainService: String = "kg.alistore.client.auth",
-        restoresStoredSession: Bool = true
+        restoresStoredSession: Bool = true,
+        isPinConfigured: (() -> Bool)? = nil
     ) {
         self.api = APIClient(baseURL: environment.apiBaseURL)
         self.tokens = SecureTokenStore(service: keychainService)
         self.quickUnlockService = keychainService
         self.restoresStoredSession = restoresStoredSession
+        self.isPinConfigured = isPinConfigured ?? { LocalPINStore(service: keychainService).isConfigured }
         if !restoresStoredSession { isRestoring = false }
     }
 
@@ -122,6 +126,14 @@ public final class CustomerAuthStore {
     }
 
     public func unlock() { requiresQuickUnlock = false }
+
+    /// Повторно закрывает аккаунт при уходе приложения в фон — иначе на общем
+    /// устройстве следующий увидит заказы, адреса и историю предыдущего. Только
+    /// при активной сессии и настроенном PIN.
+    public func lock() {
+        guard QuickUnlockGate.shouldLock(hasSession: session != nil, pinConfigured: isPinConfigured()) else { return }
+        requiresQuickUnlock = true
+    }
 
     #if DEBUG
     /// Supplies a non-network session for deterministic SwiftUI account screenshots.
