@@ -151,19 +151,26 @@ struct StatusPill: View {
 struct Skeleton: View {
     var radius: CGFloat = Design3.Radius.card
     @State private var animate = false
+    // Бесконечный shimmer — движение, которое некоторым людям некомфортно
+    // (вестибулярные расстройства). При включённом «снижении движения» не
+    // запускаем его: показываем статичную полупрозрачную плашку.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         RoundedRectangle(cornerRadius: radius, style: .continuous)
             .fill(Color.white.opacity(0.06))
             .overlay {
-                GeometryReader { geo in
-                    LinearGradient(colors: [.clear, Color.white.opacity(0.09), .clear],
-                                   startPoint: .leading, endPoint: .trailing)
-                        .frame(width: geo.size.width * 0.6)
-                        .offset(x: animate ? geo.size.width : -geo.size.width * 0.6)
+                if !reduceMotion {
+                    GeometryReader { geo in
+                        LinearGradient(colors: [.clear, Color.white.opacity(0.09), .clear],
+                                       startPoint: .leading, endPoint: .trailing)
+                            .frame(width: geo.size.width * 0.6)
+                            .offset(x: animate ? geo.size.width : -geo.size.width * 0.6)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             }
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { animate = true }
             }
     }

@@ -55,6 +55,9 @@ struct StoriesViewer: View {
     @State private var index: Int = 0
     @State private var progress: Double = 0
     @Environment(\.dismiss) private var dismiss
+    // При «снижении движения» прогресс-бар не анимируем плавно, а обновляем
+    // скачком: истории всё равно листаются, но декоративная плавность убрана.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let storyDuration: Double = 5
 
@@ -169,7 +172,12 @@ struct StoriesViewer: View {
         for step in 1...steps {
             try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             if Task.isCancelled { return }
-            withAnimation(.linear(duration: interval)) { progress = Double(step) / Double(steps) }
+            let next = Double(step) / Double(steps)
+            if reduceMotion {
+                progress = next
+            } else {
+                withAnimation(.linear(duration: interval)) { progress = next }
+            }
         }
         advance()
     }
