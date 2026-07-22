@@ -5582,3 +5582,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run build -w @alistore/web` passed with 45 routes; product/catalog Playwright scenarios passed **2/2**.
 - Result: CMS explicitly bypasses the shared content cache after publish and local font assets are preloaded. No business data or server authority changed.
 - Next: commit this source slice, then record visual evidence against the final source hash.
+
+## IOS-UI-093-2026-07-22
+- Task: refresh the hash-bound native iOS UI acceptance evidence after the final Web performance slice.
+- Checks: trusted `npm run ios:ui`; Client `23/23`, Staff `10/10`, Courier `3/3`, POS `5/5`; Xcode reported `** TEST SUCCEEDED **` on iPhone 17 Pro Simulator.
+- Result: accepted artifact recorded for source tree `881cfbbce7d346b6581e0fe757c5f99dd4e546c0362a18d0b0df07ee4fcaaf11` and committed baseline `a097f8ab`.
+- Limitation: simulator evidence does not replace physical-device camera, APNs, biometrics or App Store review gates.
+- Next: record Android and reconciliation evidence on the same clean source tree.

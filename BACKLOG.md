@@ -729,6 +729,12 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
   scenarios **2/2**.
 - Next: refresh trusted visual/native/reconciliation evidence from the final clean tree.
 
+## IOS-UI-093 — обновить hash-bound UI evidence для четырёх iOS apps
+- **Проверено:** trusted `npm run ios:ui` на чистом source tree; Client `23/23`, Staff `10/10`, Courier `3/3`, POS `5/5`; Xcode `** TEST SUCCEEDED **`.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/ios-app-ui-e8757e8ee565e1106ed2e7b5e776c736a1bfb82b4c21cf2c5e066dd92b01aa16.json`, привязанный к `a097f8ab`.
+- **Ограничение:** physical iPhone, APNs, camera, biometrics и App Store review остаются внешними gates.
+- **Следующий шаг:** Android packaged UI и четыре reconciliation gates на том же clean tree.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
