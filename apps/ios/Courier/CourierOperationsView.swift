@@ -317,7 +317,7 @@ private struct CourierDeliveryCard: View {
             }
             Text(delivery.deliveryAddress ?? "Адрес не указан").foregroundStyle(courierMuted)
             if let slot = delivery.deliverySlot { Text(slot).font(.caption).foregroundStyle(courierMuted) }
-            Text("\(delivery.items.reduce(0) { $0 + $1.qty }) шт. · \(delivery.outstandingCOD) сом COD")
+            Text("\(delivery.items.reduce(0) { $0 + $1.qty }) шт. · \(Money.som(delivery.outstandingCOD)) COD")
                 .font(.subheadline.bold()).foregroundStyle(.white)
             if focused { Label("Открыто из уведомления", systemImage: "bell.fill").font(.caption).foregroundStyle(courierCoral) }
 
@@ -343,7 +343,7 @@ private struct CourierDeliveryCard: View {
                     TextField("Причина частичной оплаты", text: $partialCODReason, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                 }
-                primaryButton("Доставлено · \(collectedCODValue) сом", disabled: !canCompleteCOD || evidenceImage == nil) {
+                primaryButton("Доставлено · \(Money.som(collectedCODValue))", disabled: !canCompleteCOD || evidenceImage == nil) {
                     guard let key = await uploadEvidence(label: CourierEvidenceLabel.delivered) else { return }
                     await execute(
                         endpoint: "courier/orders/\(delivery.id)/deliver",
@@ -563,7 +563,7 @@ private struct CourierRunCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Рейс \(run.id.suffix(6))").font(.headline).foregroundStyle(.white)
-            Text("Собрано \(run.collectedTotal) из \(run.codTotal) сом").foregroundStyle(courierMuted)
+            Text("Собрано \(Money.som(run.collectedTotal)) из \(Money.som(run.codTotal))").foregroundStyle(courierMuted)
             if run.handedOver {
                 Label("Сверено", systemImage: "checkmark.seal.fill").foregroundStyle(courierLime)
             } else {

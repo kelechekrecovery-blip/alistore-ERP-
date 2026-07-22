@@ -27,7 +27,8 @@ final class AliStoreCourierUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Начать доставку"].exists)
         XCTAssertTrue(app.staticTexts["Элина Осмонова"].exists)
         XCTAssertTrue(app.staticTexts["Evidence доставки"].exists)
-        XCTAssertTrue(app.buttons["Доставлено · 45900 сом"].exists)
+        // Сумма форматируется через Money.som (ru_KG, неразрывные пробелы).
+        XCTAssertTrue(app.buttons["Доставлено · 45\u{00A0}900\u{00A0}сом"].exists)
 
         app.buttons["COD"].firstMatch.tap()
 

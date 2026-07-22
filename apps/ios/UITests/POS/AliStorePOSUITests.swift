@@ -42,7 +42,8 @@ final class AliStorePOSUITests: XCTestCase {
 
         app.buttons["pos-sale-submit"].tap()
 
-        XCTAssertTrue(app.staticTexts["POS-4102 · оплачено 109900 сом · Event Ledger"].waitForExistence(timeout: 5))
+        // Сумма форматируется через Money.som (ru_KG, неразрывные пробелы).
+        XCTAssertTrue(app.staticTexts["POS-4102 · оплачено 109\u{00A0}900\u{00A0}сом · Event Ledger"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Чек с сервера"].exists)
         let receipt = app.staticTexts["pos-receipt-markup"]
         XCTAssertTrue(receipt.exists)

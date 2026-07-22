@@ -107,7 +107,7 @@ struct POSSaleView: View {
                     Text(product.name).font(.subheadline.weight(.semibold)).lineLimit(2)
                     Text(product.sku).font(.caption2).foregroundStyle(POSPalette.muted)
                     HStack {
-                        Text("\(product.price) сом").font(.caption.weight(.bold))
+                        Text(Money.som(product.price)).font(.caption.weight(.bold))
                         Spacer()
                         Text("\(product.availableUnits) шт.").font(.caption2).foregroundStyle(POSPalette.muted)
                     }
@@ -167,7 +167,7 @@ struct POSSaleView: View {
             HStack {
                 Text("Итого").font(.headline)
                 Spacer()
-                Text("\(total) сом").font(.title3.weight(.black)).foregroundStyle(POSPalette.lime)
+                Text(Money.som(total)).font(.title3.weight(.black)).foregroundStyle(POSPalette.lime)
             }
             if shift == nil {
                 Button("Открыть смену", systemImage: "clock.badge.checkmark", action: openShift)
@@ -177,7 +177,7 @@ struct POSSaleView: View {
                 Task { await submit() }
             } label: {
                 if isBusy { ProgressView().frame(maxWidth: .infinity) }
-                else { Label("Оплатить \(total) сом", systemImage: "creditcard.fill").frame(maxWidth: .infinity) }
+                else { Label("Оплатить \(Money.som(total))", systemImage: "creditcard.fill").frame(maxWidth: .infinity) }
             }
             .buttonStyle(.borderedProminent).tint(POSPalette.lime).foregroundStyle(POSPalette.ink)
             .disabled(isBusy || shift == nil || cart.isEmpty || total <= 0)
@@ -292,13 +292,13 @@ struct POSSaleView: View {
         )
         #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            message = "POS-4102 · оплачено \(total) сом · Event Ledger"
+            message = "POS-4102 · оплачено \(Money.som(total)) · Event Ledger"
             let markup = """
                 AliStore POS
                 Смена: \(shift.id)
                 Товаров: \(request.lines.reduce(0) { $0 + $1.qty })
                 Оплата: \(payments.map { "\($0.method)=\($0.amount)" }.joined(separator: ", "))
-                Итого: \(total) сом
+                Итого: \(Money.som(total))
                 """
             receipt = POSReceipt(markup: markup, svg: "", escposBase64: "")
             cart = [:]
@@ -351,7 +351,7 @@ struct POSSaleView: View {
             approvalId = id
             message = "Требуется одобрение: \(reason)"
         case let .completed(orderId, receiptNo, paidTotal, _, _, _):
-            message = "\(receiptNo) · оплачено \(paidTotal) сом · Event Ledger"
+            message = "\(receiptNo) · оплачено \(Money.som(paidTotal)) · Event Ledger"
             receipt = try? await api.get("receipts/order/\(orderId)", token: session.accessToken)
             // Скидка раньше не сбрасывалась вместе с остальным: следующий
             // покупатель молча получал скидку предыдущего, а при превышении
