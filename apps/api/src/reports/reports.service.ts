@@ -11,7 +11,7 @@ import {
 } from './risk-signals';
 import { buildKpi, SellerKpi, TOP_PRODUCTS_LIMIT, TopProduct } from './kpi';
 import { buildPayroll } from './payroll';
-import { sellerRevenueRows, sellerRevenueWhere, soldBy } from './seller-revenue';
+import { sellerRevenueWhere } from './seller-revenue';
 import {
   buildRangeBuckets,
   buildRevenueBuckets,
@@ -102,18 +102,6 @@ export class ReportsService {
    * считали её независимо (а дашборд не считал вовсе), из-за чего «операционная
    * прибыль» и «валовая маржа» на соседних экранах расходились на всю закупку.
    */
-  /**
-   * Платежи для расчёта выручки продавца. Условие и атрибуция живут в
-   * `reports/seller-revenue.ts` вместе с HR: раньше два экрана зарплаты
-   * держали свои копии и разошлись в десять раз.
-   */
-  private sellerRevenuePayments() {
-    return this.prisma.payment.findMany({
-      where: sellerRevenueWhere(),
-      select: { amount: true, receivedBy: true, shift: { select: { staffId: true } } },
-    });
-  }
-
   /**
    * Выручка и число продаж по продавцам — сведением на стороне БД.
    *
