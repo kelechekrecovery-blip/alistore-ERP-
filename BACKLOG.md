@@ -13,7 +13,7 @@
   пока нет боевого подписанного адаптера. Реализовать проверку подписи **нельзя без живого
   провайдера** (внешний блокер из `docs/READINESS.md` — «Боевой платёжный шлюз»). Держать как
   gated-on-external: когда появится адаптер — включить `verifyRefundWebhook` подпись и на staging + тест на отказ.
-- `LEDGER-HARDEN-32` **Асимметрия concurrency `resolveConfirm` vs `resolveCancel` — нужен дизайн.**
+- `LEDGER-HARDEN-32` ✅ **ЗАКРЫТО** (advisory-lock replay entry-gate на `resolveConfirm`, симметрично с cancel; finalize-цикл не тронут, partial-success сохранён; refund-сьюты 38/38). Ниже — исходный контекст. **Асимметрия concurrency `resolveConfirm` vs `resolveCancel`.**
   `apps/api/src/refunds/refunds.processor.ts`: `resolveCancel` (:443) в одной `audit.transaction`
   берёт advisory-lock `refund-resolve:` (:451) и перепроверяет replay в tx (:452). `resolveConfirm`
   (:384) читает refund **вне** tx (:392), replay-pre-check только общий вне tx (`resolveRefund:368`),
@@ -22,7 +22,7 @@
   (`finalize` per allocation, ради partial-success), а `pg_advisory_xact_lock` живёт лишь внутри
   своей tx; session-level лок с пулом Prisma ненадёжен. Требует дизайна (внешняя короткая tx с
   advisory-lock вокруг цикла, либо перепроверка replay внутри finalize первой аллокации). Латентно.
-- `LEDGER-HARDEN-33` **Дрейф двух матриц авторизации — архитектурное решение.** Casbin `RBAC_POLICY`
+- `LEDGER-HARDEN-33` ✅ **ЗАКРЫТО** (Casbin approve-строки сведены к `canApprove`: `writeoff`→`write_off` + добавлены `quarantine_write_off`/`exchange`/`campaign_budget`; cross-consistency тест `authz-approval-consistency` запирает совпадение обеих матриц по 12×10; approve-строки опасных действий на роутах мертвы — behavior-preserving). Ниже — исходный контекст. **Дрейф двух матриц авторизации.** Casbin `RBAC_POLICY`
   (контроллеры) vs сервисный `APPROVAL_APPROVER_ROLES` (`apps/api/src/rbac/permissions.ts:24`).
   `PATCH /approvals/:id/decide` без `@RequirePermission` — держится только на `canApprove`
   (`approvals.service.ts:163`); Casbin `*, approve`-строки для этого пути не используются и могут
@@ -35,12 +35,12 @@
   **Остаётся архитектурное решение:** свести Casbin `*, approve` к `APPROVAL_APPROVER_ROLES` как к
   единому источнику (устранив naming-drift и мёртвые строки) **или** оставить и добавить cross-тест
   согласованности. Не делаю автономно — меняет живую policy.
-- `LEDGER-HARDEN-34` **Step-up TOTP только на approve, не на reject — продуктовое решение.**
+- `LEDGER-HARDEN-34` ✅ **ЗАКРЫТО** (reject теперь через `decideWithStepUp` — 2FA обязательна и на отклонение; web Approval Inbox распространил свой 2FA-гейт на reject; тест `approvals-reject-stepup`: без токена→403 `staff_2fa_token_required`, с токеном→rejected; сервис-прямые вызовы не затронуты). Ниже — исходный контекст. **Step-up TOTP только на approve, не на reject.**
   `apps/api/src/approvals/approvals.controller.ts:72` роутит по `dto.status`: approve идёт через
   `decideWithStepUp`, reject — через `decide` без второго фактора, хотя `ACTION_REJECTION_EXECUTORS`
   могут восстановить/списать сток. Требовать ли step-up на reject опасных действий — за владельцем;
   если да — срез с тестом.
-- `LEDGER-HARDEN-35` **`campaigns.recordSpend` idempotency вне транзакции (мелко).**
+- `LEDGER-HARDEN-35` ✅ **ЗАКРЫТО** (advisory-lock `campaign-spend:<key>` + re-check внутри tx, паттерн refunds; гонка возвращает replay вместо сырого unique-error; campaigns 2/2). Ниже — исходный контекст. **`campaigns.recordSpend` idempotency вне транзакции (мелко).**
   `apps/api/src/campaigns/campaigns.service.ts:322` проверяет ключ вне tx и ловит гонку сырым
   unique-constraint (вместо advisory-lock double-check как в refunds) → сырой Prisma-error вместо
   `ConflictError`. Косметика надёжности; отдельным мелким срезом.
