@@ -13,6 +13,13 @@
       "runtimeArgs": ["next", "start", "-p", "3000"],
       "cwd": "apps/web",
       "port": 3000
+    },
+    {
+      "name": "web-verify",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "start", "-p", "3100"],
+      "cwd": "apps/web",
+      "port": 3100
     }
   ]
 }
