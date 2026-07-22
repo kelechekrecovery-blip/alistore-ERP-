@@ -5863,3 +5863,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: archive/upload pipeline is technically ready for the current `1.0.0 (2)` release artifacts.
 - Caveat: this does not submit App Review. App Store Connect still requires owner-provided review demo accounts, published App Privacy answers, pricing/contact fields and reachable public `ali.kg` review URLs.
 - Next: keep review submission blocked until those owner-controlled fields and public-origin smoke are verified; continue local software gates and evidence cleanup.
+
+## PUBLIC-SMOKE-130-2026-07-23
+- Task: проверить доступность текущего публичного sandbox-контура.
+- Checks: `https://ali.kg/` returned HTTP `200`; `https://admin.ali.kg/` returned HTTP `200`; `https://api.ali.kg/api/health/ready` returned HTTP `200` with database and memory status `up`.
+- Result: the current public Web/Admin/API origin is reachable from this environment. The API probe is `/api/health/ready`; `/healthz` is a Web/Render route and is not the API readiness URL.
+- Caveat: this is an external availability smoke, not production certification, App Review submission, provider certification or full business-flow validation.
+- Next: owner-controlled App Store metadata/review fields and trusted current-SHA evidence remain open.
