@@ -750,7 +750,7 @@ model InventoryQuarantineCase {
   updatedAt             DateTime                        @updatedAt
 
   @@unique([sourceType, returnId, unitId])
-  @@index([status, createdAt])
+  @@index([status, createdAt(sort: Desc)])
   @@index([unitId, status])
   @@index([returnId])
 }

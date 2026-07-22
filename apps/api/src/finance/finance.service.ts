@@ -915,6 +915,7 @@ export class FinanceService {
   }
 
   async supplierAging(query: SupplierAgingQueryDto) {
+    const reportLimit = 500;
     const asOf = query.asOf ? new Date(query.asOf) : new Date();
     if (Number.isNaN(asOf.getTime())) throw new ValidationError('invalid_ap_as_of', 'Дата AP aging некорректна');
     const invoices = await this.prisma.supplierInvoice.findMany({
@@ -932,6 +933,7 @@ export class FinanceService {
         advanceAllocations: { where: { appliedAt: { lte: asOf } }, select: { id: true, amount: true, appliedAt: true, accountingEntryId: true, advance: { select: { id: true, paymentReference: true } } } },
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+      take: reportLimit,
     });
     const rows = invoices.map((invoice) => {
       const creditApplied = invoice.creditNotes.reduce((sum, note) => sum + note.amount, 0);
@@ -946,7 +948,7 @@ export class FinanceService {
     });
     const buckets = ['current', '1_30', '31_60', '61_90', '90_plus', 'paid'] as const;
     const totals = Object.fromEntries(buckets.map((bucket) => [bucket, rows.filter((row) => row.bucket === bucket).reduce((sum, row) => sum + row.amount, 0)]));
-    return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), totalCreditReceivable: rows.reduce((sum, row) => sum + row.creditReceivable, 0), totalCreditApplied: rows.reduce((sum, row) => sum + row.creditApplied, 0), totalAdvanceApplied: rows.reduce((sum, row) => sum + row.advanceApplied, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size };
+    return { asOf, rows, totals, totalOutstanding: rows.reduce((sum, row) => sum + row.outstanding, 0), totalCreditReceivable: rows.reduce((sum, row) => sum + row.creditReceivable, 0), totalCreditApplied: rows.reduce((sum, row) => sum + row.creditApplied, 0), totalAdvanceApplied: rows.reduce((sum, row) => sum + row.advanceApplied, 0), supplierCount: new Set(rows.map((row) => row.supplier.id)).size, truncated: rows.length === reportLimit };
   }
 
   async customerAging(query: ArAgingQueryDto) {

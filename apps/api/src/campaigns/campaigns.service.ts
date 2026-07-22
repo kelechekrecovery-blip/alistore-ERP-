@@ -22,6 +22,21 @@ import {
 
 type PrismaLike = PrismaService | Prisma.TransactionClient;
 
+// Audience delivery is intentionally bounded. A campaign can target at most 500
+// recipients, so scanning a fixed larger window prevents an interactive request
+// from materializing an unbounded customer/order/payment graph.
+const AUDIENCE_SCAN_LIMIT = 5_000;
+
+type CustomerSpendRow = {
+  id: string;
+  name: string;
+  phone: string;
+  consent: boolean;
+  segments: string[];
+  ltv: number;
+  spent: bigint | number;
+};
+
 export interface CampaignRoi {
   campaign: Campaign;
   rules: SegmentRules;
@@ -525,10 +540,22 @@ export class CampaignsService {
   }
 
   private async loadCustomersWithSpend(client: PrismaLike): Promise<AudienceCustomer[]> {
-    const customers = await client.customer.findMany({
-      orderBy: { createdAt: 'asc' },
-      include: { orders: { select: { payments: { select: { amount: true, status: true } } } } },
-    });
+    const customers = await client.$queryRaw<CustomerSpendRow[]>`
+      SELECT
+        c."id",
+        c."name",
+        c."phone",
+        c."consent",
+        c."segments",
+        c."ltv",
+        COALESCE(SUM(CASE WHEN p."status" = 'received' AND p."amount" > 0 THEN p."amount" ELSE 0 END), 0)::bigint AS "spent"
+      FROM "Customer" c
+      LEFT JOIN "Order" o ON o."customerId" = c."id"
+      LEFT JOIN "Payment" p ON p."orderId" = o."id"
+      GROUP BY c."id", c."name", c."phone", c."consent", c."segments", c."ltv", c."createdAt"
+      ORDER BY c."createdAt" ASC
+      LIMIT ${AUDIENCE_SCAN_LIMIT}
+    `;
     return customers.map((customer) => ({
       id: customer.id,
       name: customer.name,
@@ -536,13 +563,7 @@ export class CampaignsService {
       consent: customer.consent,
       segments: customer.segments,
       ltv: customer.ltv,
-      spent: customer.orders.reduce(
-        (sum, order) => sum + order.payments.reduce(
-          (acc, payment) => payment.status === 'received' && payment.amount > 0 ? acc + payment.amount : acc,
-          0,
-        ),
-        0,
-      ),
+      spent: Number(customer.spent),
     }));
   }
 
