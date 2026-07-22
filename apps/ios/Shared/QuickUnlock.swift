@@ -83,7 +83,13 @@ public struct LocalPINStore: Sendable {
         guard parts.count == 2, let failures = Int(parts[0]), let lockedUntil = Int64(parts[1]) else {
             return PINAttemptStatus()
         }
-        let remaining = max(0, lockedUntil - Self.nowMillis)
+        // Клампим остаток к полному окну лок-аута. Дедлайн хранится в монотонных
+        // часах (`systemUptime`), которые пользователь не может отмотать назад,
+        // но которые обнуляются при перезагрузке. После ребута сохранённый дедлайн
+        // окажется «в будущем» относительно нового аптайма — кламп превращает это
+        // в повторное наложение тех же 30 секунд, а не в вечную блокировку.
+        // Инвариант: лок-аут нельзя ни обойти сменой часов, ни растянуть сверх окна.
+        let remaining = min(Self.lockoutMillis, max(0, lockedUntil - Self.nowMillis))
         return PINAttemptStatus(
             allowed: remaining == 0,
             retryAfterSeconds: Int((remaining + 999) / 1000),
@@ -155,7 +161,11 @@ public struct LocalPINStore: Sendable {
     }
 
     private func read(account: String) -> String? { (try? tokens.read(account: account)) ?? nil }
-    private static var nowMillis: Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+
+    /// Монотонные часы: секунды с загрузки, а не настенное время. Перевод
+    /// системных часов на них не влияет — иначе лок-аут снимался бы установкой
+    /// времени вперёд. Обнуление при ребуте обезврежено клампом в `attemptStatus`.
+    private static var nowMillis: Int64 { Int64(ProcessInfo.processInfo.systemUptime * 1000) }
 }
 
 /// Решение о повторной блокировке при уходе в фон. Вынесено из сторов, потому что

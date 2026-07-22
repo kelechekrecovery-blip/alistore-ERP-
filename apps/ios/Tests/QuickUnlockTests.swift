@@ -79,6 +79,24 @@ final class QuickUnlockTests: XCTestCase {
         XCTAssertTrue(store.matches(pin: "111111"))
     }
 
+    /// Лок-аут держится на монотонных часах и клампится к окну. Симулируем
+    /// состояние после перезагрузки: в хранилище лежит дедлайн «из будущего»
+    /// (записан при большом аптайме, а аптайм обнулился). Кламп обязан свести
+    /// остаток к 30 секундам, а не к вечной блокировке — и при этом лок-аут
+    /// нельзя обойти, потому что монотонные часы не отматываются переводом
+    /// системного времени.
+    func testLockoutIsClampedToTheWindowAfterAReboot() throws {
+        let storage = MemoryStorage()
+        let store = LocalPINStore(storage: storage)
+        try store.setInitialPIN("111111")
+        // failures:lockedUntil — дедлайн заведомо больше любого реального аптайма.
+        try storage.save("5:999999999999", account: "quick-unlock-pin-attempts")
+
+        let status = store.attemptStatus
+        XCTAssertFalse(status.allowed, "устаревший дедлайн всё ещё блокирует — это верно")
+        XCTAssertLessThanOrEqual(status.retryAfterSeconds, 30, "лок-аут не должен превышать окно в 30 секунд")
+    }
+
     func testFormatIsValidatedForBothOperations() throws {
         let empty = LocalPINStore(storage: MemoryStorage())
         XCTAssertThrowsError(try empty.setInitialPIN("12345")) { XCTAssertEqual($0 as? QuickUnlockError, .invalidPIN) }
