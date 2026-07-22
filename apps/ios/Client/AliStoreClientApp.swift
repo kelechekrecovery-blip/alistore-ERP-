@@ -918,8 +918,14 @@ struct AliStoreClientApp: App {
     private let container = OfflineStore.container()
 
     var body: some Scene {
-        WindowGroup { ClientRootView(environment: .live()) }
-            .modelContainer(container)
+        WindowGroup {
+            ClientRootView(environment: .live())
+                // Dynamic Type поддержан, но ограничен сверху: витрина — плотная
+                // сетка карточек, безлимитный AX5 разорвал бы её. accessibility2
+                // покрывает подавляющую часть нужд, не ломая раскладку.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        }
+        .modelContainer(container)
     }
 }
 

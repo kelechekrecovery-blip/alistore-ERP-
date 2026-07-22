@@ -71,14 +71,20 @@ public enum Design3 {
     // MARK: - Typography
     // Manrope = headings/prices · Golos Text = body/UI · JetBrains Mono = numbers/SKU/IMEI/codes.
     // Uses PostScript names; if a face is not registered, `Font.custom` falls back to the system font.
+    //
+    // `relativeTo:` подключает Dynamic Type: кастомные шрифты через
+    // `.custom(_:size:)` были фиксированного размера и не реагировали на
+    // системную настройку размера текста. Базовый размер остаётся `size`,
+    // меняется только реакция на настройку доступности. Рост ограничен на корне
+    // приложений (`dynamicTypeSize`), чтобы плотная вёрстка не ломалась на AX5.
     public static func heading(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        .custom("Manrope-\(styleName(weight))", size: size)
+        .custom("Manrope-\(styleName(weight))", size: size, relativeTo: .body)
     }
     public static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .custom("GolosText-\(styleName(weight))", size: size)
+        .custom("GolosText-\(styleName(weight))", size: size, relativeTo: .body)
     }
     public static func mono(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font {
-        .custom("JetBrainsMono-\(styleName(weight))", size: size)
+        .custom("JetBrainsMono-\(styleName(weight))", size: size, relativeTo: .body)
     }
 
     private static func styleName(_ weight: Font.Weight) -> String {

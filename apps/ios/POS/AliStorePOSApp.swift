@@ -63,6 +63,10 @@ struct AliStorePOSApp: App {
                 }
                 // Прячем смену и выручку из превью в переключателе приложений.
                 .privacyCover("AliStore POS")
+                // Dynamic Type поддержан, но ограничен сверху: касса — плотная
+                // сетка, безлимитный AX5 разорвал бы её. accessibility2 покрывает
+                // подавляющую часть нужд, не ломая раскладку.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         }
         .modelContainer(OfflineStore.container())
     }

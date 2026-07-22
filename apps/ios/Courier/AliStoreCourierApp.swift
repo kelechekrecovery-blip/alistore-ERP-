@@ -64,6 +64,8 @@ struct AliStoreCourierApp: App {
                 }
                 // Прячем маршрут, адреса и суммы COD из превью в свитчере.
                 .privacyCover("AliStore Courier")
+                // Dynamic Type с верхним пределом — см. POS.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         }
         .modelContainer(OfflineStore.container())
     }

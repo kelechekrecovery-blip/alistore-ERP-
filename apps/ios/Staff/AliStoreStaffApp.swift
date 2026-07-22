@@ -65,6 +65,8 @@ struct AliStoreStaffApp: App {
                 }
                 // Прячем Customer 360, паспорт и смену из превью в свитчере.
                 .privacyCover("AliStore Staff")
+                // Dynamic Type с верхним пределом — см. POS.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         }
         .modelContainer(OfflineStore.container())
     }
