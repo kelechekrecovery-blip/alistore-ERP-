@@ -12,7 +12,9 @@ COPY . .
 # те действуют только в рантайме сервера и на уже собранный бандл не влияют.
 # Менять адрес API или демо-режим витрины нужно ЗДЕСЬ.
 ARG NEXT_PUBLIC_API_BASE=https://api.ali.kg/api
-ARG NEXT_PUBLIC_DEMO_MODE=true
+# Production is the default image target. Demo deployments must opt in
+# explicitly at build time instead of inheriting a public demo client bundle.
+ARG NEXT_PUBLIC_DEMO_MODE=false
 ARG NEXT_PUBLIC_SITE_URL=https://ali.kg
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE

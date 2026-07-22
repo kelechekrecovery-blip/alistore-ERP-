@@ -26,6 +26,7 @@ import { NonePaymentGatewayProvider } from '../src/payments/none-payment-gateway
  */
 describe('render.yaml · боевой режим', () => {
   const blueprint = readFileSync(join(__dirname, '../../../render.yaml'), 'utf8');
+  const webDockerfile = readFileSync(join(__dirname, '../../../docker/web.Dockerfile'), 'utf8');
 
   /**
    * Разбор текстом, а не через js-yaml: зависимость (и её типы) ради нескольких
@@ -50,6 +51,11 @@ describe('render.yaml · боевой режим', () => {
     // читает NEXT_PUBLIC_DEMO_MODE, заказы — PUBLIC_DEMO_MODE.
     expect(new Set(valuesOf('PUBLIC_DEMO_MODE'))).toEqual(new Set(['false']));
     expect(new Set(valuesOf('NEXT_PUBLIC_DEMO_MODE'))).toEqual(new Set(['false']));
+  });
+
+  it('не встраивает demo-клиент в production Web image по умолчанию', () => {
+    expect(webDockerfile).toMatch(/ARG NEXT_PUBLIC_DEMO_MODE=false/);
+    expect(webDockerfile).not.toMatch(/ARG NEXT_PUBLIC_DEMO_MODE=true/);
   });
 
   it('выбирает честно недоступный шлюз на значении из блюпринта', () => {
