@@ -5899,3 +5899,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: new hash-verified `reconciled-e2e` evidence was recorded from the clean current source snapshot. The previous five-minute hang did not reproduce after the interrupted process and database state had settled; no product code change was required.
 - Caveat: this remains software evidence only. Physical devices, live providers, App Store review, production credentials and the untouched parallel worktree files remain outside this gate.
 - Next: commit the aggregate evidence, rerun strict audit, and continue external release readiness checks.
+
+## ECOSYSTEM-AUDIT-135-2026-07-23
+- Task: validate the final trusted software evidence snapshot after aggregate acceptance.
+- Checks: strict audit on the clean source snapshot passed with `0` blockers; design corpus `128/128` tracked and linked references valid; visual, iOS UI, Android UI, all four reconciliation verticals and aggregate ecosystem E2E accepted.
+- Main worktree audit remains non-green only because the untouched parallel `e2e/storefront-offline.spec.ts` edit and `.claude/settings.local.json` make the shared checkout dirty and change the source hash relative to the tested clean snapshot.
+- Result: aggregate evidence is committed and pushed in `8b37c521`; the software acceptance contract is green on the clean snapshot.
+- Next: proceed to owner-controlled release gates: physical-device certification, live provider credentials, App Store/TestFlight submission, and production deployment validation.
