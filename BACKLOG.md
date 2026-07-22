@@ -12,6 +12,16 @@
 - **Ограничение:** native UI tests и physical-device/provider certification не являются частью обычного `ecosystem:verify`; они остаются отдельными gates.
 - **Следующий шаг:** повторить native UI suite на чистом committed SHA, затем staging Render deploy.
 
+## IOS-REVIEW-141 — отправка iOS приложений на App Review
+- **Текущее состояние:** технический preflight и ASC API authentication проходят для Client, Staff, Courier и POS; сборка `1.0.0 (2)` валидна.
+- **Проверено API:** все четыре версии находятся в `PREPARE_FOR_SUBMISSION`; `reviewSubmission` отсутствует, поэтому приложения фактически не отправлены.
+- **Внешний блокер:** нужны owner-controlled App Privacy answers, подтверждение бесплатной цены, App Review contact details и защищённые demo accounts с seeded review data. Нельзя фабриковать эти значения или отправлять неполные версии.
+- **Следующий шаг:** владелец заполняет поля и предоставляет review accounts, затем запускается unified review-submission workflow.
+
+## VERIFY-TOOLCHAIN-142 — trusted audit после параллельного lock-изменения
+- **Найдено:** `npm run ecosystem:audit:strict` остановлен до contract audit, потому что незакоммиченный параллельный `package-lock.json` не совпадает с `scripts/ecosystem-toolchain-lock.json`.
+- **Ограничение:** файл изменён не мной и не перезаписывается; strict audit нельзя объявлять зелёным до согласования этого изменения и пересчёта trusted fingerprint на чистом SHA.
+
 ## WEB-AUTH-088 — восстановить dev-only customer fixture для browser E2E
 - **Найдено:** после перехода Web на HttpOnly session cookies `AuthProvider` удалял legacy `alistore.auth.v1` до чтения, поэтому customer service flows перенаправлялись на login, хотя staff и API операции проходили.
 - **Сделано:** legacy bearer fixture читается только вне production и валидируется через `/auth/me`; production по-прежнему игнорирует localStorage и использует только cookie session.

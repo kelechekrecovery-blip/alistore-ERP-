@@ -5944,3 +5944,16 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: software acceptance remains green on the committed source; no new code defect found.
 - Caveat: current public service is still laptop-backed tunnel; Render deployment, owner credentials, physical devices, live providers and App Review remain open. Native UI was not rerun inside this command because it is a separate device/simulator gate.
 - Next: run `npm run ecosystem:verify:ui` on the clean committed SHA, then execute Render staging deployment and rollback drill.
+
+## IOS-REVIEW-141-2026-07-23
+- Task: повторно проверить фактическую отправку четырёх iOS приложений в App Review через App Store Connect API.
+- Checks: strict `ios:store-preflight` passed; all four app records returned HTTP `200`; versions `1.0.0` are `PREPARE_FOR_SUBMISSION`; no `reviewSubmission` relationship is present.
+- Result: ни одно приложение не отправлено на review. Локальный статусный документ синхронизирован в commit `73c901ae`.
+- Blockers: owner-controlled App Privacy, free pricing confirmation, review contact details and protected seeded demo accounts remain required; неполные значения не подставлялись.
+- Next: после заполнения полей владельцем повторить preflight and unified review-submission workflow.
+
+## VERIFY-TOOLCHAIN-142-2026-07-23
+- Task: повторить строгий ecosystem audit на текущем общем worktree.
+- Checks: `npm run ecosystem:audit:strict` остановился до contract audit с ошибкой trusted toolchain lock mismatch; `package-lock.json` имеет незакоммиченный параллельный diff (удалён только `dev: true` у optional `fsevents`).
+- Result: кодовый дефект не подтверждён; strict audit не объявляется зелёным для этого общего checkout. Параллельные `e2e/storefront-offline.spec.ts`, `package-lock.json` и `.claude/settings.local.json` не изменялись.
+- Next: согласовать/закоммитить параллельный lock change, пересчитать trusted fingerprint на чистом SHA и повторить strict audit.
