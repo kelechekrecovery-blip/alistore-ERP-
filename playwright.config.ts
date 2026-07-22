@@ -39,13 +39,13 @@ export default defineConfig({
   }),
   webServer: [
     {
-      command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" CORS_ORIGINS="http://127.0.0.1:${webPort},http://localhost:${webPort}" E2E_TEST=true NODE_ENV=test AI_PROVIDER=rules AI_PROVIDER_KEY= OPENROUTER_API_KEY= ANTHROPIC_API_KEY= AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
+      command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" CORS_ORIGINS="http://127.0.0.1:${webPort},http://localhost:${webPort}" E2E_TEST=true NODE_ENV=test PAYMENTS_SANDBOX_CONFIRM_ENABLED=true AI_PROVIDER=rules AI_PROVIDER_KEY= OPENROUTER_API_KEY= ANTHROPIC_API_KEY= AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
       url: `http://127.0.0.1:${apiPort}/api/health/live`,
       reuseExistingServer,
       timeout: 240_000,
     },
     {
-      command: `NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" npm exec -w @alistore/web -- next dev --webpack -p ${webPort}`,
+      command: `NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" NEXT_PUBLIC_DEMO_MODE=true PUBLIC_DEMO_MODE=true npm exec -w @alistore/web -- next dev --webpack -p ${webPort}`,
       url: `http://127.0.0.1:${webPort}/checkout`,
       reuseExistingServer,
       timeout: 240_000,
