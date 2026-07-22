@@ -5870,3 +5870,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: the current public Web/Admin/API origin is reachable from this environment. The API probe is `/api/health/ready`; `/healthz` is a Web/Render route and is not the API readiness URL.
 - Caveat: this is an external availability smoke, not production certification, App Review submission, provider certification or full business-flow validation.
 - Next: owner-controlled App Store metadata/review fields and trusted current-SHA evidence remain open.
+
+## TOOLCHAIN-AUDIT-131-2026-07-23
+- Task: синхронизировать tracked trusted dependency fingerprint после чистого `npm ci`.
+- Changes: `scripts/ecosystem-toolchain-lock.json` обновлён с предыдущего stale tree hash на фактический стабильный hash `d0dfec...` после `npm ci` и `prisma generate`.
+- Checks: `npm ci` completed; Prisma Client regenerated; `git diff --check` passed before commit preparation.
+- Result: local trusted evidence bootstrap is aligned with the current tracked dependency installation; no package versions or runtime source changed.
+- Caveat: evidence recording still requires a clean committed source snapshot; parallel user files remain untouched.
+- Next: commit this fingerprint, then record current-SHA visual/native/reconciliation artifacts from a clean snapshot.
