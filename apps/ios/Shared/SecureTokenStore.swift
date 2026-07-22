@@ -8,6 +8,17 @@ public struct SecureTokenStore: Sendable {
         self.service = service
     }
 
+    // Доступность токена: `AfterFirstUnlockThisDeviceOnly`. Устройство-только
+    // (не уезжает в бэкап и на другой телефон) и читается лишь после первой
+    // разблокировки за загрузку.
+    //
+    // Намеренно НЕ `.biometryCurrentSet`: токен читается только в `restore()` на
+    // холодном старте, до экрана quick-unlock и в фоновой Task без UI-контекста.
+    // Биометрия на этом чтении сработала бы раньше гейта, конфликтовала бы с ним
+    // (quick-unlock уже спрашивает Face ID/PIN сам) и требовала бы `LAContext`
+    // на старте. Защиту «взяли разблокированный телефон» даёт связка
+    // «токен device-only + quick-unlock, в том числе при уходе в фон», а не
+    // биометрия на каждом чтении Keychain.
     public func save(_ token: String, account: String = "access-token") throws {
         let data = Data(token.utf8)
         let query: [String: Any] = [
@@ -49,6 +60,19 @@ public struct SecureTokenStore: Sendable {
     }
 }
 
-public struct KeychainError: Error, Sendable {
+public struct KeychainError: LocalizedError, Sendable {
     public let status: OSStatus
+
+    public init(status: OSStatus) {
+        self.status = status
+    }
+
+    // Раньше пользователь и разработчик видели «error 1» вместо кода ошибки:
+    // `KeychainError` не давал ни `OSStatus`, ни расшифровки. Теперь несёт и код,
+    // и системный текст (`errSecMissingEntitlement` и т.п.) — это ровно то, что
+    // маскировало настоящую причину при отладке входа.
+    public var errorDescription: String? {
+        let message = SecCopyErrorMessageString(status, nil) as String?
+        return "Ошибка Keychain \(status): \(message ?? "неизвестная")"
+    }
 }
