@@ -57,6 +57,11 @@
     <!-- Так же, как в npm-скрипте start:prod. -->
     <key>NODE_PATH</key>
     <string>./node_modules</string>
+    <!-- Public tunnel must never expose API documentation or sandbox confirmation. -->
+    <key>API_DOCS_ENABLED</key>
+    <string>false</string>
+    <key>PAYMENTS_SANDBOX_CONFIRM_ENABLED</key>
+    <string>false</string>
   </dict>
 
   <!-- Пауза между рестартами: без неё падение на старте (например, недоступный

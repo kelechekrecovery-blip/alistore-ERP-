@@ -5920,3 +5920,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: builds `1.0.0 (2)` and signing/upload pipeline are technically ready, but ни одно приложение не отправлено на review.
 - Blockers: owner-controlled App Privacy answers, free pricing confirmation, review contact details and protected demo accounts with seeded review data are still required. Credentials were not fabricated and no submission was created.
 - Next: owner completes the four App Store Connect fields and supplies review accounts; then rerun preflight and submit the prepared versions through the unified review-submission workflow.
+
+## PUBLIC-RUNTIME-API-DOCS-138-2026-07-23
+- Task: закрыть публичную Swagger-документацию и sandbox payment confirmation на текущем laptop-backed API runtime.
+- Changes: `shouldExposeOpenApi` получил явный deny switch `API_DOCS_ENABLED=false`; launchd API plist получил `API_DOCS_ENABLED=false` и `PAYMENTS_SANDBOX_CONFIRM_ENABLED=false`. Параллельные изменения `e2e/storefront-offline.spec.ts`, `.claude/settings.local.json` и `package-lock.json` не трогались.
+- Checks: OpenAPI Jest `3/3`; `npm run api:build`; `git diff --check`; после reload launchd job local/public `/api/health/live` и `/api/health/ready` `200`, `/api/docs` и `/api/docs-json` `404`, sandbox confirm `404`.
+- Result: публичный API больше не раскрывает Swagger и не принимает sandbox confirmation через текущий tunnel. Это runtime hardening текущего demo-контура, не production certification.
+- Caveat: API всё ещё запущен на локальном ноутбуке через Cloudflare tunnel; Render immutable deployment, real providers, physical-device checks и App Review остаются открыты.
+- Next: перенести deny flags в Render environment group, затем провести staging deployment/rollback и повторить public smoke на Render origin.

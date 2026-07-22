@@ -1,5 +1,11 @@
 # BACKLOG
 
+## PUBLIC-RUNTIME-API-DOCS-001 — закрыть Swagger на публичном laptop-туннеле
+- **Сделано:** добавлен явный `API_DOCS_ENABLED=false` для launchd API и fail-closed тест политики; sandbox payment confirm также явно выключен.
+- **Проверено:** локальный и публичный `/api/docs` и `/api/docs-json` возвращают `404`; health endpoints возвращают `200`; sandbox confirm возвращает `404`.
+- **Ограничение:** текущий публичный контур всё ещё обслуживается ноутбучным Cloudflare tunnel; Render production deployment, provider certification и App Review остаются внешними gates.
+- **Следующий шаг:** перенести те же runtime flags в Render environment group и выполнить immutable staging/production deployment.
+
 ## WEB-AUTH-088 — восстановить dev-only customer fixture для browser E2E
 - **Найдено:** после перехода Web на HttpOnly session cookies `AuthProvider` удалял legacy `alistore.auth.v1` до чтения, поэтому customer service flows перенаправлялись на login, хотя staff и API операции проходили.
 - **Сделано:** legacy bearer fixture читается только вне production и валидируется через `/auth/me`; production по-прежнему игнорирует localStorage и использует только cookie session.

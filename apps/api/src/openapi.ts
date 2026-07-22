@@ -9,6 +9,7 @@ const description = [
 ].join(' ');
 
 export function shouldExposeOpenApi(env: RuntimeEnvReader = (name) => process.env[name]): boolean {
+  if (env('API_DOCS_ENABLED')?.trim().toLowerCase() === 'false') return false;
   return env('NODE_ENV') !== 'production';
 }
 
