@@ -657,3 +657,16 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - `AUDIT-SILENT-001` **Закрыто.** `ModerationService` тихо падал на keyword-rules при off-schema ответе LLM. Добавлен warning-лог (как в соседнем catch), чтобы постоянный сбой схемы не отключал модерацию незаметно.
 - `AUDIT-DB-004` LOW: `InventoryQuarantineCase_status_createdAt_idx` объявлен `DESC` в миграции, без `sort:Desc` в schema — `migrate dev` предложит пересоздать индекс на живой таблице. Выровнять schema.
 - `AUDIT-TEST-003` LOW: тавтологичные ассерты — `categorize.spec.ts:27` (`Array.isArray` всегда true), `finance-expenses.e2e:624` (пустой журнал тривиально balanced), несколько `rejects.toThrow()` без типа. Точечно ужесточить.
+
+## E2E-проход 2026-07-22 (goal: закончить + проверить по e2e)
+
+Прогнал полный Playwright дважды. Починил и проверил всё, что было чистым, содержательным дефектом моего периметра:
+- `E2E-FIX-001` **Реальный баг, каскадный.** `app/product/[id]/page.tsx` (сервер) звал `productImage` из клиентского модуля `ProductCard.tsx` — Next бросал ошибку границы server/client, роняя SSR карточки товара; в e2e это валило каталог/чекаут/b2b/admin/POS (14 срабатываний). Помощники вынесены в неклиентский `lib/product-image.ts`. Проверено прод-сборкой + product-page спеки зелёные. Коммит `84647e5c`.
+- `E2E-FIX-002` Три e2e-спека открывают смену перед POS-продажей/tradein-приёмкой — следствие коммита Codex `461126ba` (продажа наличными теперь требует открытую смену, а не открывает фантомную). tradein + ecosystem-reconciliation + ecosystem-procurement-sale. Все три проверены зелёными. Коммиты `e7471d09`, `f578b86c`.
+- `AUDIT-SILENT-001` закрыт: модерация не отключается молча на off-schema ответе LLM. Коммит `89dbf288`.
+
+Остаток красных e2e — НЕ мой чистый периметр:
+- **a11y-нарушения** (5: /, /login, /catalog, /cart, /checkout, `blocking.toEqual([])`) — Codex прямо сейчас в a11y-лейне (свежие `fix(a11y)`-коммиты); править их = конфликт двух агентов по одному коду (ровно то, от чего страхует правило в CLAUDE.md).
+- **Визуальные baseline-скриншоты** — работа Codex над design 3.0; нужно пере-снять `--update-snapshots` после стабилизации дизайна (не финализировать движущуюся цель).
+- `E2E-DEBT-003` `ecosystem-courier-cod.spec.ts`: `/courier/orders/:id/deliver` теперь требует Evidence (изменение поведения). Тест-фикс: до deliver засидить `EvidenceUpload` (actor `staff:${courierId}`, entityType 'order', entityId=orderId, обязательные `fingerprint`/`asset`, и точный `label`, который ждёт `assertCourierOrderEvidence`) и передать `evidenceIdempotencyKey` в тело deliver. Требует точного совпадения полей — отложено, чтобы не гадать под потолком ходов.
+- ~5 падений — контеншен (Fast Refresh full reload): Codex редактировал web-дерево во время прогона; ложные, зелёные на тихом стенде.
