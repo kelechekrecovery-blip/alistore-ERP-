@@ -64,6 +64,37 @@ describe('External readiness report', () => {
     expect(report.nextActions).toEqual([]);
   });
 
+  /**
+   * Мост через Android-телефон закрывает *работоспособность* доставки OTP, но
+   * не сертификацию. Настроенный шлюз обязан снимать статус `missing` — иначе
+   * дашборд врёт, что входа нет, хотя он работает, — но оставаться
+   * `manual_required`, пока не появится договор с оператором. Маркер
+   * `SMS_PROVIDER_CERTIFIED` этот срез НЕ выставляет ни при каких условиях.
+   */
+  it('recognises the Android gateway bridge but keeps SMS certification manual', () => {
+    const report = buildExternalReadinessReport(
+      (name) =>
+        ({
+          SMS_PROVIDER: 'android_gateway',
+          SMS_GATEWAY_URL: 'https://api.sms-gate.app/3rdparty/v1',
+          SMS_GATEWAY_USERNAME: 'device-user',
+          SMS_GATEWAY_PASSWORD: 'device-secret',
+          SMS_GATEWAY_ENCRYPTION_PASSPHRASE: 'passphrase-secret',
+        })[name],
+    );
+    const sms = report.checks.find((check) => check.id === 'sms_provider');
+    expect(sms?.status).toBe('manual_required');
+    expect(sms?.missingEnv).toEqual([]);
+    // Секреты устройства не утекают в отчёт.
+    expect(JSON.stringify(report)).not.toContain('device-secret');
+    expect(JSON.stringify(report)).not.toContain('passphrase-secret');
+  });
+
+  it('still reports SMS missing when neither a provider nor the bridge is configured', () => {
+    const report = buildExternalReadinessReport(() => undefined);
+    expect(report.checks.find((check) => check.id === 'sms_provider')?.status).toBe('missing');
+  });
+
   it('accepts direct channel provider credentials for campaign delivery', () => {
     const telegramReport = buildExternalReadinessReport(
       (name) =>

@@ -224,6 +224,20 @@ envVarGroups:
         value: disabled
       - key: SMS_PROVIDER_CERTIFIED
         value: "false"
+      # Мост через Android-телефон. Чтобы включить: SMS_PROVIDER=android_gateway
+      # и задать эти четыре секрета в дашборде Render (sync: false — значения не
+      # в блюпринте, вводит владелец). Passphrase обязана совпадать с заданной на
+      # устройстве: код входа уходит в публичное облако зашифрованным, и без
+      # совпадения телефон его не расшифрует. Покрыто otp-sender-selector.spec.ts
+      # и production-preflight.spec.ts.
+      - key: SMS_GATEWAY_URL
+        sync: false
+      - key: SMS_GATEWAY_USERNAME
+        sync: false
+      - key: SMS_GATEWAY_PASSWORD
+        sync: false
+      - key: SMS_GATEWAY_ENCRYPTION_PASSPHRASE
+        sync: false
       - key: POS_HARDWARE_CERTIFIED
         value: "false"
       - key: JOB_BACKEND

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AndroidGatewayOtpSender } from '../src/auth/android-gateway-otp.sender';
 import { NoopOtpSender } from '../src/auth/noop-otp.sender';
 import { selectOtpSender } from '../src/auth/otp-sender-selector';
 import { ProductionOtpSender } from '../src/auth/production-otp.sender';
@@ -26,6 +27,43 @@ describe('OTP sender selector', () => {
       SMS_API_KEY: 'secret',
       SMS_SENDER_ID: 'AliStore',
     })).toBeInstanceOf(ProductionOtpSender);
+  });
+
+  /**
+   * Мост через телефон с обычной SIM. Отдельное имя режима, а не `production`,
+   * выбрано намеренно: это не сертифицированный A2P-канал, и preflight с
+   * external-readiness обязаны отличать одно от другого.
+   */
+  const gatewayEnv = {
+    SMS_PROVIDER: 'android_gateway',
+    SMS_GATEWAY_URL: 'https://api.sms-gate.app/3rdparty/v1',
+    SMS_GATEWAY_USERNAME: 'device-user',
+    SMS_GATEWAY_PASSWORD: 'device-pass',
+    SMS_GATEWAY_ENCRYPTION_PASSPHRASE: 'passphrase',
+  };
+
+  it('selects the Android gateway bridge for a complete env set', () => {
+    expect(select(gatewayEnv)).toBeInstanceOf(AndroidGatewayOtpSender);
+  });
+
+  it('fails closed when the Android gateway env is incomplete', () => {
+    // Парольная фраза сюда не входит: у неё отдельное сообщение, потому что её
+    // отсутствие — не неполная настройка, а выключенное шифрование (тест ниже).
+    const connection = ['SMS_GATEWAY_URL', 'SMS_GATEWAY_USERNAME', 'SMS_GATEWAY_PASSWORD'];
+    for (const omitted of connection) {
+      const partial = { ...gatewayEnv, [omitted]: '' };
+      expect(() => select(partial)).toThrow('Incomplete Android SMS gateway configuration');
+    }
+  });
+
+  /**
+   * Парольная фраза — не «ещё одна переменная»: без неё код входа ушёл бы в
+   * публичное облако открытым текстом. Проверяем её отдельно, чтобы никто не
+   * сделал её необязательной ради удобства запуска.
+   */
+  it('refuses the gateway without an encryption passphrase', () => {
+    expect(() => select({ ...gatewayEnv, SMS_GATEWAY_ENCRYPTION_PASSPHRASE: '' }))
+      .toThrow('SMS_GATEWAY_ENCRYPTION_PASSPHRASE');
   });
 
   /**

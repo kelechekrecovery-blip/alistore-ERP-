@@ -233,7 +233,7 @@ const CHECKS: CheckDefinition[] = [
     area: 'identity',
     title: 'SMS provider is a value the code understands',
     requiredEnv: ['SMS_PROVIDER'],
-    note: 'Допустимы production (с полным набором SMS_*), disabled (вход по SMS выключен) и noop вне production.',
+    note: 'Допустимы production (с полным набором SMS_*), android_gateway (мост через телефон, с полным набором SMS_GATEWAY_*), disabled (вход по SMS выключен) и noop вне production.',
     evaluate: (env) => {
       // Блюпринт задавал `silent` — значение, которого селектор не знает
       // (`otp-sender-selector.ts`). Вызов стоит в useFactory провайдера
@@ -243,6 +243,15 @@ const CHECKS: CheckDefinition[] = [
       const mode = env('SMS_PROVIDER')?.trim().toLowerCase();
       if (!mode) return 'missing';
       if (mode === 'disabled') return 'ready';
+      // Мост через Android-телефон. Парольная фраза входит в обязательные не
+      // для полноты списка: без неё одноразовый код ушёл бы в публичное облако
+      // открытым текстом, а оно годится только для нечувствительных данных.
+      if (mode === 'android_gateway') {
+        return ['SMS_GATEWAY_URL', 'SMS_GATEWAY_USERNAME', 'SMS_GATEWAY_PASSWORD', 'SMS_GATEWAY_ENCRYPTION_PASSPHRASE']
+          .every((name) => Boolean(env(name)?.trim()))
+          ? 'ready'
+          : 'unsafe';
+      }
       if (mode !== 'production') return 'unsafe';
       const complete = ['SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID']
         .every((name) => Boolean(env(name)?.trim()));

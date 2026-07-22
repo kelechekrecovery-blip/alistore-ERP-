@@ -93,6 +93,38 @@ describe('Production preflight report', () => {
   });
 
   /**
+   * Мост через Android-телефон — четвёртое допустимое значение SMS_PROVIDER.
+   * Проверка та же самая, что однажды поймала `silent` в блюпринте: селектор
+   * вызывается в `useFactory` провайдера OTP_SENDER, поэтому неизвестное
+   * значение роняет контейнер Nest до первого запроса.
+   */
+  describe('SMS provider value: Android gateway bridge', () => {
+    const gateway: Record<string, string> = {
+      SMS_PROVIDER: 'android_gateway',
+      SMS_GATEWAY_URL: 'https://api.sms-gate.app/3rdparty/v1',
+      SMS_GATEWAY_USERNAME: 'device-user',
+      SMS_GATEWAY_PASSWORD: 'device-pass',
+      SMS_GATEWAY_ENCRYPTION_PASSPHRASE: 'passphrase',
+    };
+    const smsCheck = (env: Record<string, string>) =>
+      buildProductionPreflightReport((name) => env[name])
+        .checks.find((check) => check.id === 'sms_provider_value');
+
+    it('принимает режим при полном наборе переменных', () => {
+      expect(smsCheck(gateway)?.status).toBe('ready');
+    });
+
+    it('отвергает режим без парольной фразы — иначе код уйдёт в облако открытым', () => {
+      expect(smsCheck({ ...gateway, SMS_GATEWAY_ENCRYPTION_PASSPHRASE: '' })?.status).toBe('unsafe');
+    });
+
+    it('отвергает режим без адреса или учётных данных шлюза', () => {
+      expect(smsCheck({ ...gateway, SMS_GATEWAY_URL: '' })?.status).toBe('unsafe');
+      expect(smsCheck({ ...gateway, SMS_GATEWAY_PASSWORD: '' })?.status).toBe('unsafe');
+    });
+  });
+
+  /**
    * Магазин за наличные — законное боевое состояние, а не полумера.
    *
    * До этого кейса `refund_relay` считался пройденным только при

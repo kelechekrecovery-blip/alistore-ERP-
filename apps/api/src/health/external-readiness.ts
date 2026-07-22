@@ -48,15 +48,24 @@ const CHECKS: CheckDefinition[] = [
     id: 'sms_provider',
     area: 'auth',
     title: 'Production SMS/OTP provider',
-    requiredEnv: ['SMS_PROVIDER', 'SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID'],
+    // Две альтернативы: боевой оператор ИЛИ мост через Android-телефон
+    // (`SMS_PROVIDER=android_gateway`). Настроенный мост снимает статус
+    // `missing` — вход работает, — но `completionMarkerEnv` держит его на
+    // `manual_required`: абонентская SIM не сертифицированный A2P-канал, и
+    // `SMS_PROVIDER_CERTIFIED=true` для неё не выставляется.
+    requiredAny: [
+      ['SMS_PROVIDER', 'SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID'],
+      ['SMS_PROVIDER', 'SMS_GATEWAY_URL', 'SMS_GATEWAY_USERNAME', 'SMS_GATEWAY_PASSWORD', 'SMS_GATEWAY_ENCRYPTION_PASSPHRASE'],
+    ],
     completionMarkerEnv: 'SMS_PROVIDER_CERTIFIED',
     manualChecks: [
       'Login and recovery OTP delivered to a real Kyrgyzstan phone number',
-      'Sender ID approved and visible on the handset',
+      'Sender ID approved and visible on the handset (n/a for the phone bridge — sender is a number)',
       'Provider outage returns an error without leaving a usable challenge',
+      'Bridge only: SIM operator permits this A2P traffic and the volume stays within OTP-only limits',
     ],
     blocking: true,
-    note: 'OTP sender port is ready; production activation requires a provider contract, sender ID, credentials, and live delivery certification.',
+    note: 'OTP sender port is ready. Certified activation needs a provider contract, sender ID, credentials and live delivery. The Android phone bridge (SMS_PROVIDER=android_gateway) delivers OTP end-to-end encrypted but is not a certified A2P channel.',
   },
   {
     id: 'payment_gateway',

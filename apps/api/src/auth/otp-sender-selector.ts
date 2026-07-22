@@ -1,3 +1,4 @@
+import { AndroidGatewayOtpSender } from './android-gateway-otp.sender';
 import { DisabledOtpSender } from './disabled-otp.sender';
 import { NoopOtpSender } from './noop-otp.sender';
 import { OtpSender } from './otp-sender';
@@ -19,6 +20,31 @@ export function selectOtpSender(env: OtpEnvReader): OtpSender {
       throw new Error('SMS_PROVIDER is required in production (use "disabled" to run without SMS login)');
     }
     return new NoopOtpSender();
+  }
+  // Мост через Android-телефон с обычной SIM. Отдельный режим, а не вариант
+  // `production`: договора с оператором нет, отправитель — номер вместо бренда,
+  // и выдавать это за сертифицированный канал нельзя.
+  if (mode === 'android_gateway') {
+    const passphrase = value(env, 'SMS_GATEWAY_ENCRYPTION_PASSPHRASE');
+    // Отдельной проверкой и раньше остальных: без неё код входа ушёл бы в
+    // публичное облако открытым текстом, а оно официально годится только для
+    // нечувствительных данных. Пустая фраза — не «неполная конфигурация», а
+    // отключённая защита, поэтому и сообщение отдельное.
+    if (!passphrase) {
+      throw new Error(
+        'SMS_GATEWAY_ENCRYPTION_PASSPHRASE is required: OTP must not reach the public relay in cleartext',
+      );
+    }
+    const gateway = {
+      url: value(env, 'SMS_GATEWAY_URL'),
+      username: value(env, 'SMS_GATEWAY_USERNAME'),
+      password: value(env, 'SMS_GATEWAY_PASSWORD'),
+    };
+    const absent = Object.entries(gateway).filter(([, item]) => !item).map(([name]) => name);
+    if (absent.length) {
+      throw new Error(`Incomplete Android SMS gateway configuration: ${absent.join(', ')}`);
+    }
+    return new AndroidGatewayOtpSender({ ...gateway, passphrase });
   }
   if (mode !== 'production') {
     throw new Error(`Unsupported SMS_PROVIDER: ${mode}`);
