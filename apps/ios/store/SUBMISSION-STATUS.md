@@ -12,7 +12,7 @@ Public App Store scope confirmed by the owner on 2026-07-19:
 The original Client-only npm/store pipeline remains Client-only. Staff, Courier
 and POS use the separate ecosystem metadata and screenshot scripts.
 
-_Last updated: 2026-07-20 by automated App Store Connect release prep._
+_Last updated: 2026-07-23 by App Store Connect API verification._
 
 ## Ready and verified
 
@@ -54,6 +54,10 @@ _Last updated: 2026-07-20 by automated App Store Connect release prep._
 - Unified review-submission drafts exist for all four apps and are currently
   `READY_FOR_REVIEW`; no item is submitted yet.
 
+API verification on 2026-07-23 confirmed that the current iOS version for each
+app is still `PREPARE_FOR_SUBMISSION` in App Store Connect. No review
+submission was created or submitted by this verification.
+
 ## Blocked before App Review submission
 
 The apps have been uploaded and processed, but have **not** been submitted for
@@ -70,7 +74,9 @@ App Review:
 - App Store Connect's current unified `reviewSubmissions` workflow must be
   completed after the demo accounts and review contact details are supplied.
 - The public `ali.kg` origin must remain reachable from outside the development
-  machine; App Review URLs must return HTTP 200 during submission.
+  machine; App Review URLs must return HTTP 200 during submission. Current
+  external checks returned HTTP 200 for `https://ali.kg/privacy` and
+  `https://ali.kg/support` on 2026-07-23.
 
 Owner action required:
 

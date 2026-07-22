@@ -5913,3 +5913,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Missing groups include BullMQ/Redis, outbox/refund relay flags, S3/R2 media storage, alerting, real payment/SMS/Telegram/WhatsApp/FCM credentials, Sentry, and physical POS certification.
 - Result: no secrets were written to Git or environment files. The launch gate correctly prevents accidental production activation while provider certification is absent.
 - Next: owner must supply credentials and complete live/manual checklists; then rerun the same strict commands and staging/rollback drills.
+
+## IOS-REVIEW-137-2026-07-23
+- Task: проверить возможность отправки четырёх iOS приложений на App Review.
+- Checks: строгий `ios:store-preflight` passed for Client, Staff, Courier and POS; App Store Connect API returned HTTP `200`; current version state for all four apps is `PREPARE_FOR_SUBMISSION`; `https://ali.kg/privacy` and `https://ali.kg/support` returned HTTP `200`.
+- Result: builds `1.0.0 (2)` and signing/upload pipeline are technically ready, but ни одно приложение не отправлено на review.
+- Blockers: owner-controlled App Privacy answers, free pricing confirmation, review contact details and protected demo accounts with seeded review data are still required. Credentials were not fabricated and no submission was created.
+- Next: owner completes the four App Store Connect fields and supplies review accounts; then rerun preflight and submit the prepared versions through the unified review-submission workflow.
