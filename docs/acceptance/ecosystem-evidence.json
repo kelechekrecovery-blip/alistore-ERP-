@@ -9,8 +9,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/visual-ed276e8a0df7099fec8324a39041c6fa746c1fd85e49584231b795cdd7d9dd90.json",
-          "sha256": "ed276e8a0df7099fec8324a39041c6fa746c1fd85e49584231b795cdd7d9dd90"
+          "path": "docs/acceptance/artifacts/visual-e60ca0603146e3918c53e45bd239805681ff42b495ca82534f135373bc75aaeb.json",
+          "sha256": "e60ca0603146e3918c53e45bd239805681ff42b495ca82534f135373bc75aaeb"
         }
       ]
     },
@@ -21,8 +21,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/ios-app-ui-e8757e8ee565e1106ed2e7b5e776c736a1bfb82b4c21cf2c5e066dd92b01aa16.json",
-          "sha256": "e8757e8ee565e1106ed2e7b5e776c736a1bfb82b4c21cf2c5e066dd92b01aa16"
+          "path": "docs/acceptance/artifacts/ios-app-ui-42b79abf91b3ca75512e73a8645f37e32cff00d21844d2f2e4caeb2b0f3210ac.json",
+          "sha256": "42b79abf91b3ca75512e73a8645f37e32cff00d21844d2f2e4caeb2b0f3210ac"
         }
       ]
     },
@@ -45,8 +45,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/android-app-ui-ab596186d7d15e445433fbddd72aca75e3dbdecf5eb3603e05177b106c17e601.json",
-          "sha256": "ab596186d7d15e445433fbddd72aca75e3dbdecf5eb3603e05177b106c17e601"
+          "path": "docs/acceptance/artifacts/android-app-ui-3465ae443f6b170e907bf44e5c324b79902d08855022958964b1952061581943.json",
+          "sha256": "3465ae443f6b170e907bf44e5c324b79902d08855022958964b1952061581943"
         }
       ]
     },
@@ -57,8 +57,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-37b9d9e1be4ae5baf686e597c2555108e66c6ce2f8bbbe8d4135cec6d676dcb2.json",
-          "sha256": "37b9d9e1be4ae5baf686e597c2555108e66c6ce2f8bbbe8d4135cec6d676dcb2"
+          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-9403664f547d8244bbf486baff965b9e9e151506465c1e44206927ff8eef14bd.json",
+          "sha256": "9403664f547d8244bbf486baff965b9e9e151506465c1e44206927ff8eef14bd"
         }
       ]
     },
@@ -69,8 +69,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-5d180146ebd409c62b6279ca3f4c01d8f6c9482842026b6b6f2b9b035316e6d0.json",
-          "sha256": "5d180146ebd409c62b6279ca3f4c01d8f6c9482842026b6b6f2b9b035316e6d0"
+          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-3df66a3962b718f238798e988a179b0efe054b58ce8edb5c023d433908e89924.json",
+          "sha256": "3df66a3962b718f238798e988a179b0efe054b58ce8edb5c023d433908e89924"
         }
       ]
     },
@@ -81,8 +81,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-765660ce6b23038903154dce96d6b706fdda62891d836d48d27a4382508bd81b.json",
-          "sha256": "765660ce6b23038903154dce96d6b706fdda62891d836d48d27a4382508bd81b"
+          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-ff2cb807ffee2ae5e7f4945e38c34a7d45fe173080eeff95351ef988630e11af.json",
+          "sha256": "ff2cb807ffee2ae5e7f4945e38c34a7d45fe173080eeff95351ef988630e11af"
         }
       ]
     },
@@ -93,8 +93,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-b2648ad2a27bcee72745ccf8fc2b7958309216b590c953d1fa4cb4351b2c21a0.json",
-          "sha256": "b2648ad2a27bcee72745ccf8fc2b7958309216b590c953d1fa4cb4351b2c21a0"
+          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-bae1208f03dfa56f51a28f08c0ab5308fe2027f9ca3d0c890c572856d9f245b9.json",
+          "sha256": "bae1208f03dfa56f51a28f08c0ab5308fe2027f9ca3d0c890c572856d9f245b9"
         }
       ]
     },

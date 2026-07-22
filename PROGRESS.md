@@ -5878,3 +5878,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: local trusted evidence bootstrap is aligned with the current tracked dependency installation; no package versions or runtime source changed.
 - Caveat: evidence recording still requires a clean committed source snapshot; parallel user files remain untouched.
 - Next: commit this fingerprint, then record current-SHA visual/native/reconciliation artifacts from a clean snapshot.
+
+## EVIDENCE-REFRESH-132-2026-07-23
+- Task: refresh trusted acceptance evidence from a clean snapshot of the current source.
+- Checks: visual acceptance passed `3/3`; iOS app UI passed with all four XCUITest targets (`Client 23`, `Staff 10`, `Courier 3`, `POS 5`); Android connected UI passed all five Gradle modules; POS/refund `1/1`; Courier/COD `1/1`; Service Center/loaner API `11/11` plus browser `3/3`; procurement API `10/10` plus browser `1/1`.
+- Result: current-SHA artifacts were generated from the clean snapshot and copied into `docs/acceptance`; the source snapshot used `bd9d3cbd...` and the trusted toolchain manifest.
+- Caveat: the aggregate `reconciled-e2e` recorder was stopped after its procurement Jest phase hung for five minutes, while the same procurement gate passed independently. No aggregate result is claimed from that interrupted run. The main worktree still contains the pre-existing parallel `e2e/storefront-offline.spec.ts` edit and `.claude/settings.local.json`; neither was modified or staged.
+- Next: commit only the refreshed acceptance artifacts and this progress record, rerun strict audit, then address remaining clean-tree and external certification blockers.
