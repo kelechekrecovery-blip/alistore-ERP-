@@ -17,6 +17,11 @@
 - **Evidence:** manifest обновлён новым source-tree-bound artifact `android-app-ui-5af6c73b8e6203a36bf8fcf51711d5d158035c7e06ba20c1371014b5aaa94f11.json`.
 - **Ограничение:** это emulator/software evidence; physical Android push, biometrics, camera, maps, scanner, printer and terminal certification остаются отдельными gates.
 
+## IOS-UI-083 — refresh four-app XCUITest evidence
+- **Проверено:** trusted recorder `ios-app-ui` прошёл Client, Staff, Courier и POS UI suites на iPhone 17 Pro Simulator; Xcode завершился `** TEST SUCCEEDED **`.
+- **Evidence:** новый artifact привязан к тому же source tree `d02ba4118c93a06e766d1ad7144d340b455765b7c9d186bc987ff6b9d2a00a0e` и добавлен в acceptance manifest.
+- **Ограничение:** simulator evidence не заменяет physical iPhone camera/APNs/biometric smoke и App Store review.
+
 ## VERIFY-079 — trusted ecosystem toolchain lock
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
 - **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.
