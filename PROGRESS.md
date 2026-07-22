@@ -5542,3 +5542,8 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run ios:ui` via trusted recorder; Client 23/23, Staff 10/10, Courier 3/3, POS 5/5; Xcode reported `** TEST SUCCEEDED **` on iPhone 17 Pro simulator.
 - Result: accepted hash-bound iOS evidence recorded against source tree `55a012b464b7acb3dde15f4a30593cacb0d9e529ec268061578fc0b03ec42a1d`.
 - Next: commit evidence and run the strict ecosystem contract audit.
+### VISUAL-087-2026-07-22
+- Task: re-record storefront and ERP visual acceptance after native evidence was aligned to the final source tree.
+- Checks: trusted `npm run visual:e2e`; 3/3 exact screenshot tests passed.
+- Result: visual evidence accepted for source tree `55a012b464b7acb3dde15f4a30593cacb0d9e529ec268061578fc0b03ec42a1d`.
+- Next: commit the artifact, then record the four reconciliation gates and composite E2E without source changes.
