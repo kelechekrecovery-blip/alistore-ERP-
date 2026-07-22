@@ -172,6 +172,41 @@ describe('Debts (integration)', () => {
     expect(payments).toHaveLength(2);
   });
 
+  it('does not double-charge when a debt payment is retried with the same idempotency key', async () => {
+    // Дедуп погашения (`debt:${idempotencyKey}`) существует в debts.service, но
+    // не проверялся ни одним тестом. Регрессия здесь означала бы: сетевой
+    // ретрай кассира создаёт ВТОРОЙ Payment и списывает баланс дважды — клиент
+    // платит вдвое. Тест это фиксирует.
+    const { orderId } = await order();
+    const debt = (await debts.create({ orderId, principal: 20000 }, 'seller')) as DebtPlan;
+    const key = `debt-pay-idem-${seq}`;
+
+    const first = await debts.pay(debt.id, { amount: 12000, idempotencyKey: key }, 'cashier');
+    expect(first.debt.balance).toBe(8000);
+    expect(first.idempotent).toBeFalsy();
+
+    // Тот же ключ, та же сумма — ретрай. Баланс не должен списаться второй раз.
+    const replay = await debts.pay(debt.id, { amount: 12000, idempotencyKey: key }, 'cashier');
+    expect(replay.idempotent).toBe(true);
+    expect(replay.paymentId).toBe(first.paymentId);
+    expect(replay.debt.balance).toBe(8000);
+
+    // Ровно один платёж и одно списание в БД.
+    const payments = await prisma.payment.findMany({ where: { orderId } });
+    expect(payments).toHaveLength(1);
+    const fresh = await prisma.debtPlan.findUniqueOrThrow({ where: { id: debt.id } });
+    expect(fresh.balance).toBe(8000);
+  });
+
+  it('rejects a debt payment reusing an idempotency key with a different amount', async () => {
+    const { orderId } = await order();
+    const debt = (await debts.create({ orderId, principal: 20000 }, 'seller')) as DebtPlan;
+    const key = `debt-pay-conflict-${seq}`;
+    await debts.pay(debt.id, { amount: 5000, idempotencyKey: key }, 'cashier');
+    const err = await debts.pay(debt.id, { amount: 7000, idempotencyKey: key }, 'cashier').catch((e) => e);
+    expect(err).toMatchObject({ code: 'debt_payment_idempotency_conflict' });
+  });
+
   it('rejects a payment over the remaining balance', async () => {
     const { orderId } = await order();
     const debt = (await debts.create({ orderId, principal: 5000 }, 'seller')) as DebtPlan;
