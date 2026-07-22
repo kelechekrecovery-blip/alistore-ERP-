@@ -66,6 +66,8 @@ describe('Debt RBAC', () => {
     await prisma.approval.deleteMany();
     await prisma.debtPlan.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.quantityConsignmentAllocation.deleteMany();
+    await prisma.orderQuantityAllocation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.reservation.deleteMany();

@@ -5772,3 +5772,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run api:build` passed; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm --prefix apps/api test -- --runInBand test/reports.e2e-spec.ts` passed `8/8`.
 - Result: the KPI path no longer loads the full order-item/payment history into application memory for its top-product and seller rankings.
 - Next: rerun the full API gate and refresh acceptance evidence after the source tree is frozen.
+
+## API-TEST-CLEANUP-117-2026-07-23
+- Task: remove the full-gate-only FK contamination caused by allocation rows surviving test cleanup.
+- Changes: `product-bundles` and `debt-rbac` cleanup now deletes quantity-consignment and order-quantity allocations before order items/orders.
+- Checks: targeted pair passed `15/15` tests.
+- Result: the affected suites can run consecutively without leaving `OrderItem_orderId_fkey` failures for later suites.
+- Next: rerun the complete API gate and address any newly exposed cleanup or behavioral failures.

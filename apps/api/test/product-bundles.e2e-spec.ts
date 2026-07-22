@@ -71,6 +71,8 @@ describe('Product bundles (integration)', () => {
     await prisma.orderBundleAllocation.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.payment.deleteMany();
+    await prisma.quantityConsignmentAllocation.deleteMany();
+    await prisma.orderQuantityAllocation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.cashShift.deleteMany();
