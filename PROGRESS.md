@@ -5620,3 +5620,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: trusted `npm run ecosystem:procurement-sale:e2e`; API `10/10` and browser `1/1` passed.
 - Result: accepted artifact recorded for source tree `881cfbbce7d346b6581e0fe757c5f99dd4e546c0362a18d0b0df07ee4fcaaf11`; exactly-once stock, AP and COGS assertions passed.
 - Next: record composite ecosystem E2E, then run strict audit.
+
+## ECOSYSTEM-E2E-099-2026-07-22
+- Task: record the composite ecosystem reconciliation gate on the final clean source tree.
+- Checks: trusted `npm run ecosystem:e2e`; POS refund, Courier COD, Service loaner and Procurement sale verticals all passed; software matrix `4/4`.
+- Result: accepted artifact recorded for source tree `881cfbbce7d346b6581e0fe757c5f99dd4e546c0362a18d0b0df07ee4fcaaf11`.
+- Limitation: physical devices, live providers, deep native journeys and missing visual handoffs remain separate release gates.
+- Next: commit evidence and run `npm run ecosystem:audit:strict`.
