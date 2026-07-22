@@ -21,6 +21,7 @@ import { PosService } from '../src/pos/pos.service';
 describe('Event Ledger coverage — invariant #10 (integration)', () => {
   let prisma: PrismaService;
   let pos: PosService;
+  let shifts: ShiftsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -29,10 +30,11 @@ describe('Event Ledger coverage — invariant #10 (integration)', () => {
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     const approvals = new ApprovalsService(prisma, audit);
+    shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
-      new ShiftsService(prisma, audit),
+      shifts,
       units,
       new OrdersService(prisma, audit, units),
       new PaymentsService(prisma, audit, units, approvals),
@@ -84,9 +86,11 @@ describe('Event Ledger coverage — invariant #10 (integration)', () => {
 
   async function cashSale() {
     const product = await seedProduct(1);
+    const staffId = `staff_ledger_${seq}`;
+    await shifts.open({ staffId, point: 'BISHKEK-1', openCash: 0 }, staffId);
     return expectCompleted(
       await pos.sale({
-        staffId: `staff_ledger_${seq}`,
+        staffId,
         point: 'BISHKEK-1',
         method: 'cash',
         lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],

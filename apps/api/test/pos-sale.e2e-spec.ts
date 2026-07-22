@@ -21,6 +21,7 @@ describe('POS sale (integration)', () => {
   let prisma: PrismaService;
   let pos: PosService;
   let approvals: ApprovalsService;
+  let shifts: ShiftsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -29,10 +30,11 @@ describe('POS sale (integration)', () => {
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     approvals = new ApprovalsService(prisma, audit);
+    shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
-      new ShiftsService(prisma, audit),
+      shifts,
       units,
       new OrdersService(prisma, audit, units),
       new PaymentsService(prisma, audit, units, approvals),
@@ -40,6 +42,11 @@ describe('POS sale (integration)', () => {
       new SettingsService(prisma, audit),
     );
   });
+
+  /** A cashier must have an open shift before a counter sale (Event Ledger invariant). */
+  function openShift(staffId: string, point = 'BISHKEK-1') {
+    return shifts.open({ staffId, point, openCash: 0 }, staffId);
+  }
 
   afterAll(async () => {
     await prisma.$disconnect();
@@ -81,6 +88,7 @@ describe('POS sale (integration)', () => {
 
   it('completes a cash sale: order paid, unit sold, shift + ledger recorded', async () => {
     const product = await seedProduct(2);
+    await openShift('staff_pos_1');
 
     const result = expectCompleted(await pos.sale({
       staffId: 'staff_pos_1',
@@ -123,6 +131,7 @@ describe('POS sale (integration)', () => {
     });
     const clientSaleId = `pos-customer-${RUN}`;
     const customerBinding = issuePosCustomerBinding(customer.id, 'staff_pos_customer', 'BISHKEK-1', clientSaleId);
+    await openShift('staff_pos_customer');
 
     const result = expectCompleted(await pos.sale({
       staffId: 'staff_pos_customer',
@@ -254,6 +263,7 @@ describe('POS sale (integration)', () => {
 
   it('completes a split payment sale and records each tender separately', async () => {
     const product = await seedProduct(1);
+    await openShift('staff_pos_split');
 
     const result = expectCompleted(await pos.sale({
       staffId: 'staff_pos_split',
@@ -362,6 +372,7 @@ describe('POS sale (integration)', () => {
       where: { productId: product.id, status: 'in_stock' },
       orderBy: { id: 'desc' },
     });
+    await openShift('staff_pos_scanner');
 
     const result = expectCompleted(await pos.sale({
       staffId: 'staff_pos_scanner',
@@ -392,9 +403,29 @@ describe('POS sale (integration)', () => {
     expect(await prisma.order.count()).toBe(0);
   });
 
-  it('reuses an already-open shift instead of opening a second', async () => {
+  it('rejects a sale when the cashier has no open cash shift', async () => {
+    // The shift is the reconciliation unit; auto-opening one with openCash: 0
+    // would fabricate a shortage/surplus the cashier never caused (срез 2.9).
+    const product = await seedProduct(1);
+
+    const err = await pos.sale({
+      staffId: 'staff_pos_no_shift',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    }).catch((error) => error);
+
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.code).toBe('cash_shift_required');
+    expect(await prisma.order.count()).toBe(0);
+    expect(await prisma.cashShift.count({ where: { staffId: 'staff_pos_no_shift' } })).toBe(0);
+    expect(await prisma.deviceUnit.count({ where: { productId: product.id, status: 'sold' } })).toBe(0);
+  });
+
+  it('reuses an already-open shift instead of opening a second one', async () => {
     const p1 = await seedProduct(1);
     const p2 = await seedProduct(1);
+    await openShift('staff_pos_2');
     const first = expectCompleted(await pos.sale({
       staffId: 'staff_pos_2', point: 'BISHKEK-1', method: 'cash',
       lines: [{ productId: p1.id, sku: p1.sku, price: 100000, qty: 1 }],
@@ -404,8 +435,8 @@ describe('POS sale (integration)', () => {
       lines: [{ productId: p2.id, sku: p2.sku, price: 100000, qty: 1 }],
     }));
     expect(second.shiftId).toBe(first.shiftId);
-    const shifts = await prisma.cashShift.count({ where: { staffId: 'staff_pos_2' } });
-    expect(shifts).toBe(1);
+    const shiftCount = await prisma.cashShift.count({ where: { staffId: 'staff_pos_2' } });
+    expect(shiftCount).toBe(1);
   });
 
   it('deduplicates offline POS retries by clientSaleId', async () => {
@@ -417,6 +448,7 @@ describe('POS sale (integration)', () => {
       clientSaleId: `offline-pos-1-${RUN}`,
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_pos_offline');
 
     const first = expectCompleted(await pos.sale(dto));
     const retry = expectCompleted(await pos.sale(dto));
@@ -436,6 +468,7 @@ describe('POS sale (integration)', () => {
       method: 'cash' as const,
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_pos_nokey');
 
     const first = expectCompleted(await pos.sale(dto));
     const retry = expectCompleted(await pos.sale(dto)); // same cart, same window → same key
@@ -477,6 +510,7 @@ describe('POS sale (integration)', () => {
 
     // senior approves, cashier retries with the approvalId → sale completes at 25% off
     await approvals.decide(approvalId, { status: 'approved', approver: 'senior_1', approverRole: 'senior_seller' });
+    await openShift('staff_pos_4');
     const done = expectCompleted(await pos.sale({ ...dto, approvalId }));
     expect(done.total).toBe(75000);
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);
@@ -505,6 +539,7 @@ describe('POS sale (integration)', () => {
     expect(payload?.payload?.marginBreaches?.[0]).toMatchObject({ sku: product.sku, margin: -3000 });
 
     await approvals.decide(approvalId, { status: 'approved', approver: 'senior_1', approverRole: 'senior_seller' });
+    await openShift('staff_pos_margin');
     const done = expectCompleted(await pos.sale({ ...dto, approvalId }));
     expect(done.total).toBe(95000);
     expect(await prisma.deviceUnit.count({ where: { status: 'sold' } })).toBe(1);

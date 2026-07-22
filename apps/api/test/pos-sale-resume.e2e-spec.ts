@@ -22,6 +22,7 @@ describe('POS sale resume after payment failure (integration)', () => {
   let pos: PosService;
   let orders: OrdersService;
   let payments: PaymentsService;
+  let shifts: ShiftsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -32,10 +33,11 @@ describe('POS sale resume after payment failure (integration)', () => {
     const approvals = new ApprovalsService(prisma, audit);
     orders = new OrdersService(prisma, audit, units);
     payments = new PaymentsService(prisma, audit, units, approvals);
+    shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
-      new ShiftsService(prisma, audit),
+      shifts,
       units,
       orders,
       payments,
@@ -43,6 +45,11 @@ describe('POS sale resume after payment failure (integration)', () => {
       new SettingsService(prisma, audit),
     );
   });
+
+  /** A cashier must have an open shift before a counter sale (Event Ledger invariant). */
+  function openShift(staffId: string, point = 'BISHKEK-1') {
+    return shifts.open({ staffId, point, openCash: 0 }, staffId);
+  }
 
   afterAll(async () => {
     await prisma.$disconnect();
@@ -108,6 +115,7 @@ describe('POS sale resume after payment failure (integration)', () => {
       clientSaleId: 'resume-key-pay',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_resume_pay');
     jest.spyOn(payments, 'payMany').mockRejectedValueOnce(new Error('provider down'));
     await expect(pos.sale(dto)).rejects.toThrow('provider down');
 
@@ -145,6 +153,7 @@ describe('POS sale resume after payment failure (integration)', () => {
       clientSaleId: 'resume-key-created',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_resume_created');
     jest.spyOn(orders, 'fulfill').mockRejectedValueOnce(new Error('stock lock timeout'));
     await expect(pos.sale(dto)).rejects.toThrow('stock lock timeout');
 
@@ -170,6 +179,7 @@ describe('POS sale resume after payment failure (integration)', () => {
       clientSaleId: 'resume-key-split',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 2 }],
     };
+    await openShift('staff_resume_split');
     jest.spyOn(payments, 'payMany').mockRejectedValueOnce(new Error('provider down'));
     await expect(pos.sale(dto)).rejects.toThrow('provider down');
     expect(await prisma.orderItem.count()).toBe(2); // per-unit rows, not one qty:2 line
@@ -190,6 +200,7 @@ describe('POS sale resume after payment failure (integration)', () => {
       clientSaleId: 'resume-key-conflict',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_resume_conflict');
     jest.spyOn(payments, 'payMany').mockRejectedValueOnce(new Error('provider down'));
     await expect(pos.sale(dto)).rejects.toThrow('provider down');
 
@@ -222,6 +233,7 @@ describe('POS sale resume after payment failure (integration)', () => {
       clientSaleId: 'resume-key-discount',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_resume_discount');
     jest.spyOn(payments, 'payMany').mockRejectedValueOnce(new Error('provider down'));
     await expect(pos.sale(dto)).rejects.toThrow('provider down');
 
@@ -231,5 +243,41 @@ describe('POS sale resume after payment failure (integration)', () => {
     expect(err.code).toBe('idempotency_key_reused');
     expect(await prisma.order.count()).toBe(1);
     expect(await prisma.payment.count()).toBe(0);
+  });
+
+  it('rejects resuming a stuck sale when the shift was closed before the retry', async () => {
+    // Guards the second auto-open spot (inside resumeSale): if the cashier's
+    // shift closes between the failed attempt and the retry, the resume must
+    // fail closed rather than fabricate a fresh shift to push the sale through.
+    const product = await seedProduct(1);
+    const dto = {
+      staffId: 'staff_resume_no_shift',
+      point: 'BISHKEK-1',
+      method: 'cash' as const,
+      clientSaleId: 'resume-key-no-shift',
+      lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
+    };
+    await openShift('staff_resume_no_shift');
+    jest.spyOn(payments, 'payMany').mockRejectedValueOnce(new Error('provider down'));
+    await expect(pos.sale(dto)).rejects.toThrow('provider down');
+
+    const stuck = await prisma.order.findFirstOrThrow();
+    expect(stuck.status).toBe('reserved');
+    const openShiftRow = await shifts.currentOpen('staff_resume_no_shift');
+    await shifts.close(
+      openShiftRow!.id,
+      { closeCash: 0 },
+      'staff_resume_no_shift',
+      'close-key-resume-no-shift',
+    );
+
+    const err = await pos.sale(dto).catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.code).toBe('cash_shift_required');
+    // The stuck sale is untouched: still reserved, still unpaid.
+    expect(await prisma.order.count()).toBe(1);
+    expect((await prisma.order.findFirstOrThrow()).status).toBe('reserved');
+    expect(await prisma.payment.count()).toBe(0);
+    expect(await prisma.cashShift.count({ where: { staffId: 'staff_resume_no_shift', closedAt: null } })).toBe(0);
   });
 });

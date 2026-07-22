@@ -20,6 +20,7 @@ import { ConflictError } from '../src/common/errors';
 describe('POS sale replay (integration)', () => {
   let prisma: PrismaService;
   let pos: PosService;
+  let shifts: ShiftsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -28,10 +29,11 @@ describe('POS sale replay (integration)', () => {
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     const approvals = new ApprovalsService(prisma, audit);
+    shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
-      new ShiftsService(prisma, audit),
+      shifts,
       units,
       new OrdersService(prisma, audit, units),
       new PaymentsService(prisma, audit, units, approvals),
@@ -39,6 +41,11 @@ describe('POS sale replay (integration)', () => {
       new SettingsService(prisma, audit),
     );
   });
+
+  /** A cashier must have an open shift before a counter sale (Event Ledger invariant). */
+  function openShift(staffId: string, point = 'BISHKEK-1') {
+    return shifts.open({ staffId, point, openCash: 0 }, staffId);
+  }
 
   afterAll(async () => {
     await prisma.$disconnect();
@@ -93,6 +100,7 @@ describe('POS sale replay (integration)', () => {
 
   it('rejects a replay that reuses the clientSaleId with a different cart (409)', async () => {
     const product = await seedProduct(1);
+    await openShift('staff_replay_key');
     const first = expectCompleted(await pos.sale({
       staffId: 'staff_replay_key',
       point: 'BISHKEK-1',
@@ -127,6 +135,7 @@ describe('POS sale replay (integration)', () => {
       clientSaleId: 'shared-counter-key',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_replay_owner');
     expectCompleted(await pos.sale({ ...dto, staffId: 'staff_replay_owner' }));
 
     // Same key, same cart, different cashier: returning the first receipt would hand
@@ -148,6 +157,7 @@ describe('POS sale replay (integration)', () => {
       method: 'cash' as const,
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_replay_distinct');
 
     const first = expectCompleted(await pos.sale({ ...dto, clientSaleId: 'distinct-sale-a' }));
     const second = expectCompleted(await pos.sale({ ...dto, clientSaleId: 'distinct-sale-b' }));
@@ -168,6 +178,7 @@ describe('POS sale replay (integration)', () => {
       clientSaleId: 'true-replay-1',
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_replay_true');
 
     const first = expectCompleted(await pos.sale(dto));
     const retry = expectCompleted(await pos.sale(dto));
@@ -189,6 +200,7 @@ describe('POS sale replay (integration)', () => {
       method: 'cash' as const,
       lines: [{ productId: product.id, sku: product.sku, price: 100000, qty: 1 }],
     };
+    await openShift('staff_replay_fingerprint');
 
     const first = expectCompleted(await pos.sale(dto));
     const retry = expectCompleted(await pos.sale(dto)); // same cart, same window → same key

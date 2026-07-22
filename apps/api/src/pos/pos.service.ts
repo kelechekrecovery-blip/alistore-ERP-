@@ -248,7 +248,7 @@ export class PosService {
           // batch (LOGIC-012): re-running the whole flow re-created nothing but died on
           // fulfill (`reserved→reserved` 422) or on stock resolution, because the units
           // are already held by this order. Resume at the step that failed instead.
-          return this.resumeSale(existingOrder, dto, txnId, storePoint.inventoryLocation);
+          return this.resumeSale(existingOrder, dto, txnId);
         }
         throw new ConflictError(
           'sale_key_burned',
@@ -315,12 +315,13 @@ export class PosService {
       throw new ValidationError('pos_customer_not_found', 'Выбранный клиент не найден');
     }
 
-    let shift = await this.shifts.currentOpen(dto.staffId);
+    const shift = await this.shifts.currentOpen(dto.staffId);
     if (!shift) {
-      shift = await this.shifts.open(
-        { staffId: dto.staffId, point: storePoint.inventoryLocation, openCash: 0 },
-        actor,
-      );
+      // The shift is the unit of cash reconciliation. Auto-opening one here with
+      // openCash: 0 used to fabricate a shortage/surplus the cashier never caused,
+      // and hid that the wrong person (or an unreconciled drawer) was ringing the
+      // sale. Fail closed instead: the cashier must open a shift first.
+      throw new ConflictError('cash_shift_required', 'Для продажи нужна открытая кассовая смена');
     }
 
     const orderItems = items.map(({ productId: _productId, unitCost: _unitCost, costRef: _costRef, ...item }) => item);
@@ -706,7 +707,6 @@ export class PosService {
     existing: { id: string; total: number; posShiftId: string | null },
     dto: PosSaleDto,
     txnId: string,
-    inventoryLocation: string,
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: existing.id },
@@ -722,12 +722,12 @@ export class PosService {
       // A zero-total order flips to paid inside fulfill; no Payment row ever exists.
       return this.completedFromExistingPayment(existing.id, existing.posShiftId);
     }
-    let shift = await this.shifts.currentOpen(dto.staffId);
+    const shift = await this.shifts.currentOpen(dto.staffId);
     if (!shift) {
-      shift = await this.shifts.open(
-        { staffId: dto.staffId, point: inventoryLocation, openCash: 0 },
-        dto.staffId,
-      );
+      // Same invariant as the main sale path: never fabricate a shift to push a
+      // resumed sale through. If the cashier's shift closed between the failed
+      // attempt and this retry, resuming must fail closed, not open a new one.
+      throw new ConflictError('cash_shift_required', 'Для продажи нужна открытая кассовая смена');
     }
     const tenders = this.normalizePayments(dto, existing.total);
     const paid = await this.payments.payMany(

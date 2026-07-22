@@ -21,6 +21,7 @@ describe('Quantity inventory (integration)', () => {
   let orders: OrdersService;
   let payments: PaymentsService;
   let pos: PosService;
+  let shifts: ShiftsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -34,10 +35,11 @@ describe('Quantity inventory (integration)', () => {
     const units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
     payments = new PaymentsService(prisma, audit, units, approvals);
+    shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
-      new ShiftsService(prisma, audit),
+      shifts,
       units,
       orders,
       payments,
@@ -45,6 +47,11 @@ describe('Quantity inventory (integration)', () => {
       new SettingsService(prisma, audit),
     );
   });
+
+  /** A cashier must have an open shift before a counter sale (Event Ledger invariant). */
+  function openShift(staffId: string, point = 'BISHKEK-1') {
+    return shifts.open({ staffId, point, openCash: 0 }, staffId);
+  }
 
   afterAll(async () => {
     await clean();
@@ -364,6 +371,7 @@ describe('Quantity inventory (integration)', () => {
       clientSaleId: `quantity-pos-${seq}`,
       lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 3 }],
     };
+    await openShift('cashier-quantity-pos');
 
     const first = await pos.sale(payload);
     const replay = await pos.sale(payload);

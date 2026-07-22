@@ -23,6 +23,7 @@ describe('Product bundles (integration)', () => {
   let payments: PaymentsService;
   let approvals: ApprovalsService;
   let reservations: ReservationsService;
+  let shifts: ShiftsService;
   let seq = 0;
 
   beforeAll(async () => {
@@ -40,10 +41,11 @@ describe('Product bundles (integration)', () => {
     );
     products = new ProductsService(prisma, audit, approvals);
     payments = new PaymentsService(prisma, audit, units, approvals);
+    shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
       new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
-      new ShiftsService(prisma, audit),
+      shifts,
       units,
       orders,
       payments,
@@ -51,6 +53,11 @@ describe('Product bundles (integration)', () => {
       new SettingsService(prisma, audit),
     );
   });
+
+  /** A cashier must have an open shift before a counter sale (Event Ledger invariant). */
+  function openShift(staffId: string, point = 'BISHKEK-1') {
+    return shifts.open({ staffId, point, openCash: 0 }, staffId);
+  }
 
   afterAll(async () => {
     await clean();
@@ -144,6 +151,7 @@ describe('Product bundles (integration)', () => {
       clientSaleId: `bundle-sale-replay-${RUN}-${seq}`,
       lines: [{ productId: seeded.product.id, sku: seeded.product.sku, price: 70000, qty: 1 }],
     };
+    await openShift('bundle-cashier');
 
     const first = await pos.sale(dto);
     const replay = await pos.sale(dto);
@@ -191,6 +199,7 @@ describe('Product bundles (integration)', () => {
       await prisma.deviceUnit.deleteMany({ where: { productId: seeded.phone.id } });
       return fulfill(orderId, actor);
     });
+    await openShift('bundle-race-cashier');
 
     await expect(pos.sale({
       staffId: 'bundle-race-cashier',
@@ -219,6 +228,7 @@ describe('Product bundles (integration)', () => {
     const parked = await pos.sale(dto);
     if (!parked.pendingApproval) throw new Error('zero-total bundle should require approval');
     await approvals.decide(parked.approvalId, { status: 'approved', approver: 'bundle-owner', approverRole: 'owner' });
+    await openShift('bundle-free-cashier');
 
     const first = await pos.sale({ ...dto, approvalId: parked.approvalId });
     const replay = await pos.sale({ ...dto, approvalId: parked.approvalId });

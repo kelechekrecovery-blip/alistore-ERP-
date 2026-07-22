@@ -303,6 +303,14 @@ describe('Staff session rollout for operational endpoints', () => {
 
     await request(app.getHttpServer()).post('/pos/sale').send(payload).expect(401);
 
+    // A counter sale requires an open cash shift (Event Ledger invariant): the
+    // cashier opens one before ringing anything, it is never fabricated by the sale.
+    await request(app.getHttpServer())
+      .post('/shifts/open')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ staffId: 'spoof', point: 'BISHKEK-1', openCash: 0 })
+      .expect(201);
+
     const sale = await request(app.getHttpServer())
       .post('/pos/sale')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -360,6 +368,12 @@ describe('Staff session rollout for operational endpoints', () => {
       .set('Authorization', `Bearer ${warehouseToken}`)
       .send(payload)
       .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/shifts/open')
+      .set('Authorization', `Bearer ${cashierToken}`)
+      .send({ staffId: 'spoof', point: 'BISHKEK-1', openCash: 0 })
+      .expect(201);
 
     const sale = await request(app.getHttpServer())
       .post('/pos/sale')
