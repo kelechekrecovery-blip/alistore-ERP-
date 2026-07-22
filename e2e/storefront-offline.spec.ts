@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedProduct } from './helpers';
 
 /**
  * Упавший каталог обязан выглядеть как сбой, а не как пустой магазин.
@@ -62,6 +63,10 @@ async function killCatalog(page: Page): Promise<void> {
 for (const surface of SURFACES) {
   test(`${surface.name}: сбой каталога показан как сбой, а не как пустой магазин`, async ({ page }) => {
     await page.setViewportSize(surface.mobile ? { width: 390, height: 844 } : { width: 1400, height: 900 });
+    // Серверной поверхности нужен хотя бы один товар: иначе «пустой магазин» —
+    // честное состояние, и проверять было бы нечего. Сеем явно, чтобы тест не
+    // зависел от того, что осталось в базе от соседних спеков.
+    if (surface.serverRendered) await seedProduct('OFFLINE-E2E');
     await killCatalog(page);
     await page.goto(surface.path);
 
