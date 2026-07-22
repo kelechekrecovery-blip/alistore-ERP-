@@ -5813,3 +5813,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: the four software reconciliation verticals are functionally green when executed sequentially against an isolated database. A parallel run against the shared acceptance database produced fixture-cleanup contamination (`QuantityConsignmentLot_balanceId_fkey` and missing Service Ledger rows), so those failures are not valid product defects.
 - Audit status: strict acceptance remains RED because committed result artifacts have stale source/toolchain hashes after later commits, the source worktree contains a parallel `e2e/storefront-offline.spec.ts` edit and local settings file, and native connected/UI evidence is not currently reproducible in this run.
 - Next: run the full Web E2E gate with a stable server/database workload, then refresh trusted evidence only after the source tree is frozen; do not claim production or App Store readiness.
+
+## WEB-GATE-123-2026-07-23
+- Task: run the complete browser regression and cross-browser/accessibility gates after the targeted Web fixes.
+- Checks: isolated Chromium Web E2E passed `137/139` with `2` intentional skips; `npm run e2e:cross-browser` passed `27/27` across Chromium, WebKit and Firefox; `npm run web:a11y` passed `5/5`.
+- Result: customer checkout, ERP/CMS, POS, Staff, Courier, Warehouse, Service Center, offline/retry, route audit, visual checks and system endpoints passed the current Web regression suite. No new P0/P1 Web defect was reproduced.
+- Caveat: this is software/Web readiness evidence only. Strict acceptance remains RED until current-HEAD trusted artifacts, native connected/UI evidence, device certification and production/provider gates are independently completed.
+- Next: inspect local Xcode/Android environments and run the strongest available native build/test gates; preserve the parallel dirty files.
