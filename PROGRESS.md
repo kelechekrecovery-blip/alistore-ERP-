@@ -5820,3 +5820,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: customer checkout, ERP/CMS, POS, Staff, Courier, Warehouse, Service Center, offline/retry, route audit, visual checks and system endpoints passed the current Web regression suite. No new P0/P1 Web defect was reproduced.
 - Caveat: this is software/Web readiness evidence only. Strict acceptance remains RED until current-HEAD trusted artifacts, native connected/UI evidence, device certification and production/provider gates are independently completed.
 - Next: inspect local Xcode/Android environments and run the strongest available native build/test gates; preserve the parallel dirty files.
+
+## NATIVE-GATE-124-2026-07-23
+- Task: run the strongest available Android and iOS native release gates on the current AliStore sources.
+- Checks: Android debug build passed for `app`, `staff`, `courier` and `pos`; Android unit/lint passed; connected Compose tests passed for all four modules on the connected API 36 emulator. iOS build passed for all app/core/UI targets; Core XCTest passed `90/90`; XCUITest passed `41/41` (`Client 23`, `Staff 10`, `Courier 3`, `POS 5`) on `iPhone 17 Pro` simulator.
+- Result: native simulator/emulator software gates are green for the four AliStore applications. The Android AVD label `savio_api36_arm64` is only the local emulator name; the tested Gradle modules are the AliStore `app`, `staff`, `courier` and `pos` applications.
+- Caveat: this does not certify physical-device Face ID/APNs/FCM/camera/GPS/scanner/printer/terminal behavior, store review, signing, or live providers. Strict ecosystem evidence remains stale until the source tree and evidence recorder can be frozen without parallel local changes.
+- Next: run native visual/store preflight where available, then refresh readiness and trusted evidence only after a clean source-tree freeze.
