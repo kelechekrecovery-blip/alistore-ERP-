@@ -53,6 +53,11 @@ describe('render.yaml · боевой режим', () => {
     expect(new Set(valuesOf('NEXT_PUBLIC_DEMO_MODE'))).toEqual(new Set(['false']));
   });
 
+  it('явно закрывает Swagger и sandbox confirmation в production blueprint', () => {
+    expect(valuesOf('API_DOCS_ENABLED')).toEqual(['false']);
+    expect(valuesOf('PAYMENTS_SANDBOX_CONFIRM_ENABLED')).toEqual(['false']);
+  });
+
   it('не встраивает demo-клиент в production Web image по умолчанию', () => {
     expect(webDockerfile).toMatch(/ARG NEXT_PUBLIC_DEMO_MODE=false/);
     expect(webDockerfile).not.toMatch(/ARG NEXT_PUBLIC_DEMO_MODE=true/);
@@ -176,5 +181,10 @@ describe('infra/render.staging.yaml · staging обязан стартовать
   it('health-check API смотрит на базу, а не только на живость процесса', () => {
     const healthLine = blueprint.split('\n').find((line) => line.trim().startsWith('healthCheckPath: /api/'));
     expect(healthLine?.trim()).toBe('healthCheckPath: /api/health/ready');
+  });
+
+  it('явно закрывает Swagger и sandbox confirmation в staging blueprint', () => {
+    expect(valuesOf('API_DOCS_ENABLED')).toEqual(['false']);
+    expect(valuesOf('PAYMENTS_SANDBOX_CONFIRM_ENABLED')).toEqual(['false']);
   });
 });

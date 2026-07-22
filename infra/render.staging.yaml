@@ -111,8 +111,10 @@ envVarGroups:
       - { key: ALLOWED_HOSTS, value: api-staging.ali.kg }
       - { key: PUBLIC_DEMO_MODE, value: "true" }
       - { key: AUTH_OTP_DEV_ECHO, value: "false" }
+      - { key: API_DOCS_ENABLED, value: "false" }
       - { key: PAYMENT_PROVIDER, value: sandbox }
       - { key: PAYMENT_PROVIDER_CERTIFIED, value: "false" }
+      - { key: PAYMENTS_SANDBOX_CONFIRM_ENABLED, value: "false" }
       - { key: JOB_BACKEND, value: bullmq }
       - { key: RESERVATION_SWEEP_ENABLED, value: "true" }
       - { key: SERVICE_SLA_SWEEP_ENABLED, value: "true" }

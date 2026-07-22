@@ -206,6 +206,8 @@ envVarGroups:
         value: "false"
       - key: AUTH_OTP_DEV_ECHO
         value: "false"
+      - key: API_DOCS_ENABLED
+        value: "false"
       # Запуск за наличные при получении: онлайн-шлюза нет по решению
       # владельца. `sandbox` здесь означал, что реальный покупатель на реальном
       # домене получает счёт со страницей «Списание средств не производится» и
@@ -214,6 +216,8 @@ envVarGroups:
       - key: PAYMENT_PROVIDER
         value: none
       - key: PAYMENT_PROVIDER_CERTIFIED
+        value: "false"
+      - key: PAYMENTS_SANDBOX_CONFIRM_ENABLED
         value: "false"
       # `silent` селектор не знает: otp-sender-selector.ts принимает `noop` и
       # `production`. Вызов стоит в useFactory провайдера OTP_SENDER, поэтому
