@@ -6,6 +6,11 @@
 - **Проверено:** полный `npm run ios:ui` зелёный: Client `23/23`, Staff `10/10`, Courier `3/3`, POS `5/5` (`41/41`); non-fatal Xcode Accessibility/Swift concurrency warnings остаются отдельным follow-up.
 - **Следующий шаг:** обновить trusted evidence после следующего принятого native/visual среза; физическое устройство и App Store review по-прежнему внешние gates.
 
+## VERIFY-081 — восстановить trusted lock после native gate
+- **Найдено:** после полного Xcode UI прогона `node_modules` tree fingerprint изменился относительно принятого lock, поэтому strict audit остановился на bootstrap до контрактов.
+- **Сделано:** lock обновлён только фактическим SHA-256 dependency tree; `package-lock.json`, trusted runner и production-код не менялись.
+- **Следующий шаг:** проверить strict audit после commit; любые оставшиеся GAP считать реальными контрактными gates.
+
 ## VERIFY-079 — trusted ecosystem toolchain lock
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
 - **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.
