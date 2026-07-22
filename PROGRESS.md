@@ -5725,3 +5725,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run web:route-audit` with isolated Web/API ports passed `46/46`.
 - Result: anonymous storefront/service routes, authenticated shell redirect safety, ERP/POS/Staff/Warehouse entrypoints and system endpoints (`healthz`, app links, robots, sitemap) are green.
 - Next: run strict API/security verification and then the remaining full ecosystem gates.
+
+## API-GATE-112-2026-07-23
+- Task: verify the API contract and security suite after the Web fixes.
+- Checks: `npm run api:build` passed; `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run api:test` passed `200/200` suites and `957/957` tests.
+- Result: API compilation, RBAC/IDOR, payments/refunds, inventory, POS, logistics, evidence, notifications, production preflight and invariant suites are green on the current source tree.
+- Note: provider outage warnings are intentional resilience-test evidence; no test failed.
+- Next: run ecosystem reconciliation/strict audit and inspect remaining deployment/store blockers.
