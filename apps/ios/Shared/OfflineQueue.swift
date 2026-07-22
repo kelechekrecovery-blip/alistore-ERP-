@@ -362,26 +362,28 @@ private struct IgnoredMutationResponse: Decodable, Sendable {
 /// Первая версия офлайн-схемы. `PendingMutation` намеренно остаётся top-level
 /// классом, а не вкладывается сюда: имя сущности SwiftData берёт из имени класса,
 /// и вложение переименовало бы её — существующие очереди стали бы невидимыми.
+/// Текущая (и пока единственная) версия схемы. Указывает на живой
+/// `PendingMutation` — со всеми его полями, включая опциональный `owner`.
+///
+/// Почему одна версия, а не V1+V2 со стадией: `owner` — опциональное поле, и
+/// SwiftData добавляет такую колонку сам, автоматической lightweight-миграцией.
+/// Две `VersionedSchema`, обе ссылающиеся на один живой класс, дают ОДИНАКОВУЮ
+/// контрольную сумму — SwiftData падает на старте с `Duplicate version checksums
+/// detected` у каждого, у кого уже есть store. Именно это и произошло: срез с
+/// добавлением `owner` ввёл вторую версию поверх той же модели и ронял запуск.
 public enum OfflineSchemaV1: VersionedSchema {
     public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
     public static var models: [any PersistentModel.Type] { [PendingMutation.self] }
 }
 
-/// V2 добавляет `owner` — необязательное поле, поэтому переход облегчённый:
-/// у записей, созданных до него, владелец остаётся пустым, и они не теряются.
-public enum OfflineSchemaV2: VersionedSchema {
-    public static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
-    public static var models: [any PersistentModel.Type] { [PendingMutation.self] }
-}
-
-/// План миграций. Ровно ради него делался предыдущий срез: без плана добавление
-/// поля в модель молча ломало бы запуск у всех, включая устройства с
-/// непроведёнными продажами.
+/// План миграций с одной версией и без стадий. Ценность не в текущем содержимом,
+/// а в каркасе: следующее НЕтривиальное изменение модели (переименование поля,
+/// смена типа) добавит сюда новую `VersionedSchema` со своим снимком модели и
+/// стадию — и не будет молча ломать запуск. Для добавления опционального поля
+/// новая версия не нужна и вредна (дубль контрольной суммы).
 public enum OfflineMigrationPlan: SchemaMigrationPlan {
-    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self, OfflineSchemaV2.self] }
-    public static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: OfflineSchemaV1.self, toVersion: OfflineSchemaV2.self)]
-    }
+    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self] }
+    public static var stages: [MigrationStage] { [] }
 }
 
 @MainActor
@@ -405,7 +407,7 @@ public enum OfflineStore {
     /// - Parameter url: путь к store. `nil` — расположение по умолчанию;
     ///   продовый путь своё имя не задаёт, иначе сменился бы файл базы.
     public static func open(url: URL? = nil) -> Opened {
-        let schema = Schema(versionedSchema: OfflineSchemaV2.self)
+        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
         do {
             let configuration = url.map { ModelConfiguration(schema: schema, url: $0) }
                 ?? ModelConfiguration(schema: schema)

@@ -43,7 +43,7 @@ final class OfflineStoreTests: XCTestCase {
     func testExistingQueueSurvivesVersionedSchema() throws {
         // Прямой сторож инварианта: имя сущности — это и есть ключ, по которому
         // SwiftData находит накопленные строки. Меняется имя — очередь исчезает.
-        let entities = Schema(versionedSchema: OfflineSchemaV2.self).entities.map(\.name)
+        let entities = Schema(versionedSchema: OfflineSchemaV1.self).entities.map(\.name)
         XCTAssertEqual(entities, ["PendingMutation"], "имя сущности менять нельзя — осиротеют существующие очереди")
 
         let url = directory.appendingPathComponent("queue.store")
@@ -70,10 +70,14 @@ final class OfflineStoreTests: XCTestCase {
         XCTAssertEqual(survived.first?.idempotencyKey, "sale-1")
     }
 
-    /// Настоящая проверка плана миграций: store, записанный схемой V1, обязан
-    /// открыться после того, как в модель добавили поле (V2), и непроведённая
-    /// продажа обязана уцелеть. Без плана это был бы отказ запуска у всех
-    /// устройств разом — вместе с единственным следом этих продаж.
+    /// Store, записанный текущей схемой, обязан переоткрываться без потерь.
+    ///
+    /// История: сюда пытались добавить отдельную V2-схему под опциональное поле
+    /// `owner`. Обе версии ссылались на один живой класс `PendingMutation`, и
+    /// SwiftData падал на старте с `Duplicate version checksums detected` у всех,
+    /// у кого уже был store — поймано живым прогоном на симуляторе. Опциональное
+    /// поле новой версии не требует: SwiftData добавляет колонку автоматической
+    /// lightweight-миграцией. Схема снова одна.
     @MainActor
     func testQueueWrittenBeforeTheOwnerFieldSurvivesMigration() throws {
         let url = directory.appendingPathComponent("v1.store")

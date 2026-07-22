@@ -25,7 +25,7 @@ final class OfflinePOSQueueTests: XCTestCase {
     /// разделяются внутри процесса, и записи одного теста доживали до соседнего.
     @MainActor
     private func makeContext() throws -> ModelContext {
-        let schema = Schema(versionedSchema: OfflineSchemaV2.self)
+        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
         let container = try ModelContainer(
             for: schema,
             configurations: ModelConfiguration(
