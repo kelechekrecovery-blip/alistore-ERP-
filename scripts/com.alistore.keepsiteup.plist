@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  LaunchAgent-сторож: держит витрину и API поднятыми, пока сайт живёт на этой
-  машине через Cloudflare Tunnel.
+  LaunchAgent-сторож: ловит ЗАВИСШИЕ витрину и API и возвращает их через
+  launchctl kickstart. Упавшие процессы поднимает сам launchd (KeepAlive в
+  com.alistore.api / com.alistore.web) — сторож закрывает то, чего KeepAlive не
+  умеет: живой процесс, который держит порт и не отвечает.
 
   ВРЕМЕННАЯ мера. Причина простоев и план переезда — в
   docs/PRODUCTION-ARCHITECTURE-REVIEW.md. Правильное решение: развернуть
   render.yaml и увести DNS с туннеля; тогда сторож не нужен вовсе.
+
+  ВАЖНО: сторож не спасает от сна. Спящая машина не выполняет ничего, включая
+  этот скрипт, а сон от закрытой крышки давал 22ч37м простоя из 52ч (23.07.2026).
+  Обязательное условие: sudo pmset -a disablesleep 1 и ноутбук в зарядке.
 
   Включить (user-scoped, обратимо):
     cp scripts/com.alistore.keepsiteup.plist ~/Library/LaunchAgents/
@@ -34,6 +41,13 @@
   <!-- Скрипт сам крутит цикл раз в минуту; если процесс упадёт — перезапустить. -->
   <key>KeepAlive</key>
   <true/>
+
+  <!-- launchd не наследует PATH: скрипту нужны curl, pgrep, pmset, launchctl. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+  </dict>
 
   <key>StandardOutPath</key>
   <string>/tmp/alistore-keepalive.out.log</string>

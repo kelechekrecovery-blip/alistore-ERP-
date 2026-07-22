@@ -5732,3 +5732,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: API compilation, RBAC/IDOR, payments/refunds, inventory, POS, logistics, evidence, notifications, production preflight and invariant suites are green on the current source tree.
 - Note: provider outage warnings are intentional resilience-test evidence; no test failed.
 - Next: run ecosystem reconciliation/strict audit and inspect remaining deployment/store blockers.
+
+## LOCAL-SUPERVISOR-113-2026-07-23
+- Task: preserve and validate the local sandbox runtime supervision changes present in the shared worktree.
+- Changes: added launchd agents and production-only API/Web wrappers; keep-site-up now restarts the supervised services and documents the laptop/TCC limitation; retained the corrected SSR-aware storefront offline audit and production architecture incident record.
+- Checks: `bash -n` passed for all shell wrappers; `plutil -lint` passed for all launchd plists; `git diff --check` passed.
+- Result: the local sandbox can be managed as explicit API/Web processes without changing domain business logic. This does not certify Render production, monitoring, backups, or TCC permissions.
+- Next: refresh trusted ecosystem evidence on the resulting clean source tree and rerun the strict audit.

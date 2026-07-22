@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent боевого API (порт 4000).
+
+  Зачем: до 23.07.2026 боевой API был дочерним процессом приложения ChatGPT/Codex
+  и умирал вместе с ним, а перезапускать его было некому. Теперь владелец
+  процесса — launchd: KeepAlive поднимает упавший процесс сам.
+
+  KeepAlive лечит падение, но не зависание. Зависший процесс держит порт и не
+  отвечает — это работа сторожа scripts/keep-site-up.sh, который бьёт по
+  health-check и делает launchctl kickstart.
+
+  Установить:
+    cp scripts/com.alistore.api.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.alistore.api.plist
+
+  Снять:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.api.plist
+    rm ~/Library/LaunchAgents/com.alistore.api.plist
+
+  Путь к репозиторию ниже поправьте под свою машину.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.api</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/alistore/Desktop/alistore-erp/scripts/run-api-prod.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- launchd не наследует PATH сессии; node лежит в пользовательском префиксе. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <!-- Пауза между рестартами: без неё падение на старте (например, недоступный
+       Postgres) превращается в петлю перезапусков на сотни в минуту. -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-api-prod.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-api-prod.err.log</string>
+</dict>
+</plist>

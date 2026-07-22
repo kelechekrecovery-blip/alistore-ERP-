@@ -4,19 +4,25 @@
 # Это ВРЕМЕННАЯ мера, а не архитектура. Причина простоев описана в
 # docs/PRODUCTION-ARCHITECTURE-REVIEW.md: боевой магазин не должен зависеть от
 # того, включён ли ноутбук. Правильное решение — развернуть render.yaml и
-# переключить DNS с туннеля на Render. Сторож лишь сокращает простой до минуты,
-# пока переезд не сделан.
+# переключить DNS с туннеля на Render.
 #
-# Что делает: раз в минуту проверяет витрину (3000) и API (4000); если процесс
-# не отвечает — поднимает его заново. Ничего не удаляет и не мигрирует.
+# Разделение обязанностей:
+#   launchd (KeepAlive)  — поднимает УПАВШИЙ процесс;
+#   этот сторож          — ловит ЗАВИСШИЙ: процесс жив, порт занят, health молчит.
+# Второе launchd не умеет в принципе, поэтому сторож нужен и при живых агентах.
 #
-# Запуск вручную:      bash scripts/keep-site-up.sh
+# Почему kickstart, а не запуск руками: прежняя версия поднимала сервисы через
+# `nohup ... & disown`, и они становились сиротами вне launchd. Именно так
+# 23.07.2026 боевой API оказался дочерним процессом приложения Codex, а витрина —
+# процессом с PPID 1 без супервизора вовсе. Сторож обязан возвращать сервис
+# ТОМУ ЖЕ владельцу, а не плодить второго.
+#
+# Запуск вручную:      bash scripts/keep-site-up.sh --once
 # Включить постоянно:  см. scripts/com.alistore.keepsiteup.plist
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-API_BASE_PUBLIC="https://api.ali.kg/api"
 LOG="${TMPDIR:-/tmp}/alistore-keepalive.log"
+DOMAIN="gui/$(id -u)"
 
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 
@@ -26,27 +32,37 @@ is_up() { # $1 = url
   [ "$code" = "200" ]
 }
 
-start_web() {
-  log "витрина (3000) не отвечает — поднимаю"
-  cd "$REPO/apps/web" || return 1
-  nohup env NEXT_PUBLIC_API_BASE="$API_BASE_PUBLIC" NODE_ENV=production \
-    npx next start -p 3000 >> "${TMPDIR:-/tmp}/alistore-web-prod.log" 2>&1 &
-  disown 2>/dev/null || true
-}
+agent_loaded() { launchctl print "$DOMAIN/$1" >/dev/null 2>&1; }
 
-start_api() {
-  log "API (4000) не отвечает — поднимаю"
-  cd "$REPO" || return 1
-  nohup npm run start:prod -w @alistore/api >> "${TMPDIR:-/tmp}/alistore-api-prod.log" 2>&1 &
-  disown 2>/dev/null || true
+# Возвращает сервис launchd, а не запускает копию мимо него. -kшлёт SIGKILL
+# текущему процессу, если он ещё жив: зависший процесс держит порт, и без этого
+# новый экземпляр не поднялся бы.
+revive() { # $1 = label, $2 = человеческое имя
+  if ! agent_loaded "$1"; then
+    log "ВНИМАНИЕ: агент $1 не загружен — $2 поднять некому."
+    log "         установите: cp scripts/$1.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/$1.plist"
+    return 1
+  fi
+  log "$2 не отвечает — перезапускаю через launchctl kickstart $1"
+  launchctl kickstart -k "$DOMAIN/$1" >/dev/null 2>&1
 }
 
 check_once() {
-  is_up "http://127.0.0.1:4000/api/health/ready" || start_api
-  is_up "http://127.0.0.1:3000/"                || start_web
+  is_up "http://127.0.0.1:4000/api/health/ready" || revive com.alistore.api "API (4000)"
+  is_up "http://127.0.0.1:3000/"                || revive com.alistore.web "витрина (3000)"
+
   # Туннель: без него сайт недоступен снаружи, даже если процессы живы.
-  pgrep -f "cloudflared tunnel" >/dev/null 2>&1 || \
-    log "ВНИМАНИЕ: cloudflared не запущен — сайт недоступен снаружи (поднимите туннель вручную)"
+  if ! pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
+    revive com.alistore.cloudflared "туннель cloudflared"
+  fi
+
+  # Сон — главная причина простоев (22ч37м из 52ч на 23.07.2026), и сторож против
+  # него бессилен: спящая машина не выполняет ничего, включая этот скрипт.
+  # Поэтому не «чиним», а громко фиксируем, если защиту сняли.
+  if [ "$(pmset -g 2>/dev/null | awk '/SleepDisabled/{print $2}')" != "1" ]; then
+    log "ВНИМАНИЕ: sleep не запрещён — закрытая крышка снова погасит сайт."
+    log "         включите: sudo pmset -a disablesleep 1"
+  fi
 }
 
 if [ "${1:-}" = "--once" ]; then

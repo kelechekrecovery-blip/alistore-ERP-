@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent боевой витрины (порт 3000).
+
+  Зачем: до 23.07.2026 витрина была процессом-сиротой (PPID 1), запущенным
+  вручную. Падение оставляло магазин лежать до ручного вмешательства — именно
+  это и наблюдалось как 502 на ali.kg.
+
+  Установить:
+    cp scripts/com.alistore.web.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.alistore.web.plist
+
+  Снять:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.web.plist
+    rm ~/Library/LaunchAgents/com.alistore.web.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.web</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/alistore/Desktop/alistore-erp/scripts/run-web-prod.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>NEXT_PUBLIC_API_BASE</key>
+    <string>https://api.ali.kg/api</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-web-prod.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-web-prod.err.log</string>
+</dict>
+</plist>
