@@ -5827,3 +5827,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: native simulator/emulator software gates are green for the four AliStore applications. The Android AVD label `savio_api36_arm64` is only the local emulator name; the tested Gradle modules are the AliStore `app`, `staff`, `courier` and `pos` applications.
 - Caveat: this does not certify physical-device Face ID/APNs/FCM/camera/GPS/scanner/printer/terminal behavior, store review, signing, or live providers. Strict ecosystem evidence remains stale until the source tree and evidence recorder can be frozen without parallel local changes.
 - Next: run native visual/store preflight where available, then refresh readiness and trusted evidence only after a clean source-tree freeze.
+
+## IOS-STORE-PREFLIGHT-125-2026-07-23
+- Task: verify App Store configuration for all four iOS targets before attempting archive/upload.
+- Checks: `npm run ios:store-preflight` passed for Client, Staff, Courier and POS. HTTPS API, bundle IDs (`kg.alistore.client`, `kg.alistore.staff`, `kg.alistore.courier`, `kg.alistore.pos`), AppIcon, production APNs configuration, version `1.0.0 (2)`, metadata and privacy manifests are present.
+- Caveat: non-strict preflight intentionally skips Apple credential validation. This is configuration readiness only and does not mean an archive was uploaded or an App Store review was submitted.
+- Next: owner-controlled Apple signing/API credentials and an archive upload are still required; then TestFlight processing and review submission must be confirmed in App Store Connect.
