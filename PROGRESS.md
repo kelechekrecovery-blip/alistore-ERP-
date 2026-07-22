@@ -5719,3 +5719,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: server-rendered desktop home remains usable when only browser requests are blocked; mobile, favorites, compare and Telegram surfaces show explicit failure states; retry performs a new request.
 - Note: the corresponding E2E clarification is an existing parallel uncommitted change and was not included in this commit.
 - Next: rerun build and the broader route audit, then update the remaining release blockers from actual results.
+
+## WEB-ROUTES-111-2026-07-23
+- Task: complete the browser route inventory audit after the Web regression fixes.
+- Checks: `npm run web:route-audit` with isolated Web/API ports passed `46/46`.
+- Result: anonymous storefront/service routes, authenticated shell redirect safety, ERP/POS/Staff/Warehouse entrypoints and system endpoints (`healthz`, app links, robots, sitemap) are green.
+- Next: run strict API/security verification and then the remaining full ecosystem gates.
