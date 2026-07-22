@@ -751,6 +751,11 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Evidence:** принят artifact `docs/acceptance/artifacts/courier-cod-reconciliation-b65b7dcf8372572d3a006090a2b49a645f92ff46965078571325d3863a2c13a3.json`.
 - **Следующий шаг:** Service loaner и Procurement sale reconciliation.
 
+## SERVICE-LOANER-097 — обновить Service Center loaner reconciliation evidence
+- **Проверено:** trusted `npm run ecosystem:service-loaner:e2e`; API `11/11` и browser `3/3` passed: диагностика, платный ремонт, approval, выдача/возврат loaner и customer custody.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/service-loaner-reconciliation-2812e615b3243487cf8e9528a8a37f35023b95a758fad412e96fac8d74494ad0.json`.
+- **Следующий шаг:** Procurement sale reconciliation и composite ecosystem E2E.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
