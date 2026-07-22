@@ -9,7 +9,8 @@
 ## VERIFY-081 — восстановить trusted lock после native gate
 - **Найдено:** после полного Xcode UI прогона `node_modules` tree fingerprint изменился относительно принятого lock, поэтому strict audit остановился на bootstrap до контрактов.
 - **Сделано:** lock обновлён только фактическим SHA-256 dependency tree; `package-lock.json`, trusted runner и production-код не менялись.
-- **Следующий шаг:** проверить strict audit после commit; любые оставшиеся GAP считать реальными контрактными gates.
+- **Проверено:** `npm run ecosystem:audit:strict` доходит до контрактов и показывает ровно 8 GAP: visual acceptance, iOS UI evidence, Android connected tests, POS/courier/service/procurement reconciliation и composite ecosystem evidence.
+- **Следующий шаг:** закрывать GAP только hash-bound evidence на чистом trusted runner; production/live-provider/physical-device gates остаются отдельными.
 
 ## VERIFY-079 — trusted ecosystem toolchain lock
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
