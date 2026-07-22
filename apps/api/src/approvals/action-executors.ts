@@ -413,6 +413,12 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
 const reject_refund: ActionRejectionExecutor = async (tx, payload, approver, approvalId, reason, events) => {
   const refundId = String(payload['refundId'] ?? '');
   if (!refundId) return;
+  // Mirrors `refund` (:395) — lock the row before reading it. Currently
+  // redundant with the Approval-level `FOR UPDATE` + atomic claim in
+  // decideOnTx (only one decide can ever reach this executor per Refund),
+  // but keeping the lock symmetric is defense-in-depth against any future
+  // path that mutates a `requested` Refund outside the Approval lock.
+  await tx.$queryRaw`SELECT id FROM "Refund" WHERE id = ${refundId} FOR UPDATE`;
   const aggregate = await tx.refund.findUnique({ where: { id: refundId } });
   if (!aggregate || aggregate.approvalId !== approvalId || aggregate.status !== 'requested') {
     throw new ConflictError('refund_approval_snapshot_changed', 'Refund больше не ожидает это согласование');
@@ -431,6 +437,9 @@ const reject_refund: ActionRejectionExecutor = async (tx, payload, approver, app
 const price: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const productId = String(payload['productId']);
   const newPrice = Number(payload['newPrice']);
+  if (!Number.isSafeInteger(newPrice) || newPrice < 0) {
+    throw new ValidationError('price_snapshot_invalid', 'Снимок изменения цены повреждён');
+  }
   const product = await tx.product.findUnique({ where: { id: productId } });
   if (!product) throw new ValidationError('product_not_found', 'Товар не найден');
   await tx.product.update({ where: { id: productId }, data: { price: newPrice } });
