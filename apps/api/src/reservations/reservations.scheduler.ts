@@ -8,9 +8,11 @@ import { ConfigService } from '@nestjs/config';
 import type { PgBoss as PgBossClient } from 'pg-boss';
 import { ReservationsService } from './reservations.service';
 import { ExchangesService } from '../exchanges/exchanges.service';
+import { AlerterService } from '../observability/alerter.service';
 
 const QUEUE = 'reservation-expiry';
 const EVERY_MINUTE = '* * * * *';
+const ALERT_SOURCE = 'reservation-expiry-scheduler';
 
 /**
  * Durable scheduler for the reservation-expiry sweep, backed by pg-boss on the
@@ -31,6 +33,7 @@ export class ReservationsScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly reservations: ReservationsService,
     private readonly exchanges: ExchangesService,
+    private readonly alerter: AlerterService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -56,21 +59,31 @@ export class ReservationsScheduler implements OnModuleInit, OnModuleDestroy {
       await this.boss.start();
       await this.boss.createQueue(QUEUE);
       await this.boss.work(QUEUE, async () => {
-        const { released } = await this.reservations.releaseExpired();
-        const { expired } = await this.exchanges.sweepExpired();
-        if (released > 0) {
-          this.logger.log(`Released ${released} expired reservation(s)`);
-        }
-        if (expired > 0) {
-          this.logger.log(`Released ${expired} expired exchange request(s)`);
+        try {
+          const { released } = await this.reservations.releaseExpired();
+          const { expired } = await this.exchanges.sweepExpired();
+          if (released > 0) {
+            this.logger.log(`Released ${released} expired reservation(s)`);
+          }
+          if (expired > 0) {
+            this.logger.log(`Released ${expired} expired exchange request(s)`);
+          }
+        } catch (err) {
+          // Молчащий сбой тика = истёкшие резервы держат сток бесконечно.
+          // Поднимаем алерт и пробрасываем, чтобы pg-boss повторил.
+          this.logger.error('Reservation sweep tick failed', err as Error);
+          this.alerter.notifyCritical({ source: ALERT_SOURCE, message: 'Reservation sweep tick failed', error: err });
+          throw err;
         }
       });
       await this.boss.schedule(QUEUE, EVERY_MINUTE);
       this.logger.log('Reservation sweep scheduled (every minute via pg-boss)');
     } catch (err) {
-      // Graceful degradation: queue infra being down must not take the API down.
+      // Graceful degradation: queue infra being down must not take the API down —
+      // но и молчать нельзя, иначе истёкшие резервы копятся невидимо.
       this.boss = undefined;
       this.logger.error('Failed to start reservation sweep', err as Error);
+      this.alerter.notifyCritical({ source: ALERT_SOURCE, message: 'Failed to start reservation sweep', error: err });
     }
   }
 

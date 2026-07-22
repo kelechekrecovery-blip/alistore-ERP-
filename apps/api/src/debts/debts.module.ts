@@ -7,9 +7,10 @@ import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
 import { OutboxModule } from '../outbox/outbox.module';
 import { DebtsReminderScheduler } from './debts.scheduler';
+import { ObservabilityModule } from '../observability/observability.module';
 
 @Module({
-  imports: [SettingsModule, ApprovalsModule, StaffAuthModule, AuthzModule, OutboxModule],
+  imports: [SettingsModule, ApprovalsModule, StaffAuthModule, AuthzModule, OutboxModule, ObservabilityModule],
   providers: [DebtsService, DebtsReminderScheduler],
   controllers: [DebtsController],
   exports: [DebtsService],

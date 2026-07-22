@@ -4,9 +4,11 @@ import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import type { PgBoss as PgBossClient } from 'pg-boss';
 import { ServiceSlaService } from './service-sla.service';
+import { AlerterService } from '../observability/alerter.service';
 
 const QUEUE = 'service-sla-sweep';
 const SCHEDULER_ID = 'service-sla-every-minute';
+const ALERT_SOURCE = 'service-sla-scheduler';
 
 @Injectable()
 export class ServiceSlaScheduler implements OnModuleInit, OnModuleDestroy {
@@ -16,7 +18,11 @@ export class ServiceSlaScheduler implements OnModuleInit, OnModuleDestroy {
   private worker?: Worker;
   private redis?: Redis;
 
-  constructor(private readonly config: ConfigService, private readonly sla: ServiceSlaService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly sla: ServiceSlaService,
+    private readonly alerter: AlerterService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     if (this.config.get<string>('SERVICE_SLA_SWEEP_ENABLED') !== 'true') return;
@@ -34,6 +40,7 @@ export class ServiceSlaScheduler implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.boss = undefined;
       this.logger.error('Failed to start service SLA sweep', error as Error);
+      this.alerter.notifyCritical({ source: ALERT_SOURCE, message: 'Failed to start service SLA sweep (pg-boss)', error });
     }
   }
 
@@ -71,15 +78,23 @@ export class ServiceSlaScheduler implements OnModuleInit, OnModuleDestroy {
       this.worker = undefined;
       this.queue = undefined;
       this.redis = undefined;
+      this.alerter.notifyCritical({ source: ALERT_SOURCE, message: 'Failed to connect BullMQ service SLA producer', error });
       if (processRole === 'worker') throw error;
       this.logger.error('Failed to connect BullMQ service SLA producer', error as Error);
     }
   }
 
   private async runSweep() {
-    const { escalated } = await this.sla.escalateOverdue();
-    const { escalated: overdueLoaners } = await this.sla.escalateOverdueLoaners();
-    if (escalated > 0) this.logger.warn(`Escalated ${escalated} overdue service case(s)`);
-    if (overdueLoaners > 0) this.logger.warn(`Escalated ${overdueLoaners} overdue loaner device(s)`);
+    try {
+      const { escalated } = await this.sla.escalateOverdue();
+      const { escalated: overdueLoaners } = await this.sla.escalateOverdueLoaners();
+      if (escalated > 0) this.logger.warn(`Escalated ${escalated} overdue service case(s)`);
+      if (overdueLoaners > 0) this.logger.warn(`Escalated ${overdueLoaners} overdue loaner device(s)`);
+    } catch (error) {
+      // Молчащий сбой = просроченные ремонты и подменные не эскалируются.
+      this.logger.error('Service SLA sweep tick failed', error as Error);
+      this.alerter.notifyCritical({ source: ALERT_SOURCE, message: 'Service SLA sweep tick failed', error });
+      throw error;
+    }
   }
 }

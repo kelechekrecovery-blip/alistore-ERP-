@@ -8,9 +8,10 @@ import { ServiceSlaScheduler } from './service-sla.scheduler';
 import { ServiceSlaService } from './service-sla.service';
 import { ServiceLoanerService } from './service-loaner.service';
 import { OutboxModule } from '../outbox/outbox.module';
+import { ObservabilityModule } from '../observability/observability.module';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule, OutboxModule],
+  imports: [StaffAuthModule, AuthzModule, OutboxModule, ObservabilityModule],
   controllers: [ServiceCenterController],
   providers: [ServiceCenterService, ServiceExecutionService, ServiceLoanerService, ServiceSlaService, ServiceSlaScheduler],
   exports: [ServiceCenterService, ServiceExecutionService, ServiceLoanerService, ServiceSlaService],
