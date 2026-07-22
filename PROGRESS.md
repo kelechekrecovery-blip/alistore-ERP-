@@ -5906,3 +5906,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Main worktree audit remains non-green only because the untouched parallel `e2e/storefront-offline.spec.ts` edit and `.claude/settings.local.json` make the shared checkout dirty and change the source hash relative to the tested clean snapshot.
 - Result: aggregate evidence is committed and pushed in `8b37c521`; the software acceptance contract is green on the clean snapshot.
 - Next: proceed to owner-controlled release gates: physical-device certification, live provider credentials, App Store/TestFlight submission, and production deployment validation.
+
+## RELEASE-READINESS-136-2026-07-23
+- Task: execute the strict production launch checks against the configured `.env.production` without changing credentials.
+- Checks: `npm run launch:preflight:strict` blocked with `8` missing configuration groups; `npm run launch:readiness:strict` blocked with `11` external/manual items; `npm run launch:check` stops at the same preflight gate.
+- Missing groups include BullMQ/Redis, outbox/refund relay flags, S3/R2 media storage, alerting, real payment/SMS/Telegram/WhatsApp/FCM credentials, Sentry, and physical POS certification.
+- Result: no secrets were written to Git or environment files. The launch gate correctly prevents accidental production activation while provider certification is absent.
+- Next: owner must supply credentials and complete live/manual checklists; then rerun the same strict commands and staging/rollback drills.
