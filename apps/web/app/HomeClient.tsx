@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, BadgeCheck, Headphones, ImageOff, Laptop, PackagePlus, RotateCcw, ShieldCheck, Smartphone, Tablet, Truck, Tv, Watch } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LoadFailure } from '@/components/LoadFailure';
 import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -24,14 +24,33 @@ const QUICK_CATEGORIES: Array<{ name: string; href: string; icon: ReactNode }> =
 
 const BENEFIT_ICONS = [ShieldCheck, Truck, RotateCcw, BadgeCheck];
 
-export default function HomePage() {
-  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
-  const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
-  const [blocks, setBlocks] = useState<StorefrontBlock[]>([]);
+interface HomePageProps {
+  /** Витрина, полученная сервером; `null` — сервер не смог, клиент запросит сам. */
+  initialStorefront?: StorefrontPayload | null;
+  initialBlocks?: StorefrontBlock[];
+  /** Подборка первого экрана; `null` — данных с сервера нет (не «товаров нет»). */
+  initialProducts?: CatalogProduct[] | null;
+}
+
+export default function HomePage({ initialStorefront = null, initialBlocks = [], initialProducts = null }: HomePageProps = {}) {
+  const [products, setProducts] = useState<CatalogProduct[] | null>(initialProducts);
+  const [storefront, setStorefront] = useState<StorefrontPayload | null>(initialStorefront);
+  const [blocks, setBlocks] = useState<StorefrontBlock[]>(initialBlocks);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
 
+  /**
+   * Сервер уже отрисовал первый экран — повторять его запросы на монтировании
+   * незачем. Кнопка «Повторить» и любой следующий прогон эффекта работают как
+   * прежде: флаг снимается после первого пропуска.
+   */
+  const hasServerFirstPage = useRef(initialProducts !== null);
+
   useEffect(() => {
+    if (hasServerFirstPage.current) {
+      hasServerFirstPage.current = false;
+      return;
+    }
     Promise.all([fetchStorefrontContent(), fetchPublicStorefrontBlocks('desktop')]).then(async ([payload, publishedBlocks]) => {
       setStorefront(payload);
       setBlocks(publishedBlocks);

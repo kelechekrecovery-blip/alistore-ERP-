@@ -1,14 +1,30 @@
 import type { Metadata } from 'next';
 import HomePage from './HomeClient';
 import { JsonLdScript } from '@/components/JsonLdScript';
+import {
+  fetchCatalog,
+  fetchPublicStorefrontBlocks,
+  fetchStorefrontContent,
+  isCatalogUnavailable,
+  type CatalogProduct,
+  type StorefrontBlock,
+  type StorefrontPayload,
+} from '@/lib/api';
 import { SITE_URL } from '@/lib/site';
 
 /**
- * Серверная оболочка главной. Сама страница осталась клиентской
- * (`HomeClient.tsx`) — она тянет витрину и подборку через `useEffect`. Но из
- * модуля с 'use client' нельзя экспортировать `metadata`, поэтому у главной не
- * было ни canonical, ни Open Graph — только общий заголовок корневого layout.
- * Разметка организации и сайта отдаётся отсюда же: роботы не выполняют JS.
+ * Серверная оболочка главной.
+ *
+ * Раньше страница была клиентской целиком: герой, преимущества и подборка
+ * приходили через `useEffect`, поэтому в первичном HTML их не было вовсе —
+ * робот получал пустую оболочку, а покупатель ждал JS. Метаданные из модуля с
+ * 'use client' тоже не экспортируются, так что у главной не было ни canonical,
+ * ни Open Graph.
+ *
+ * Теперь первая выборка делается здесь и уезжает в разметку, а клиент получает
+ * её пропсами и не повторяет запрос на старте. Число обращений к API не выросло:
+ * они переехали с клиента на сервер — тот же приём, что уже применён в
+ * `app/catalog/page.tsx`.
  */
 
 const TITLE = 'AliStore — электроника с гарантией в Кыргызстане';
@@ -32,14 +48,54 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION, images: [OG_IMAGE] },
 };
 
-export default function Page() {
+export default async function Page() {
+  const initial = await loadFirstScreen();
+
   return (
     <>
       <JsonLdScript data={ORGANIZATION_JSON_LD} />
       <JsonLdScript data={WEB_SITE_JSON_LD} />
-      <HomePage />
+      <HomePage
+        initialStorefront={initial.storefront}
+        initialBlocks={initial.blocks}
+        initialProducts={initial.products}
+      />
     </>
   );
+}
+
+interface FirstScreen {
+  storefront: StorefrontPayload | null;
+  blocks: StorefrontBlock[];
+  products: CatalogProduct[] | null;
+}
+
+/**
+ * Ровно то, что клиент раньше собирал сам в первом `useEffect`: витрина,
+ * опубликованные десктопные блоки и подборка — из CMS, а если владелец её не
+ * задал, то первые позиции каталога.
+ *
+ * `products: null` означает «сервер не смог», а не «товаров нет»: клиент по
+ * этому признаку сходит за данными сам и покажет честный экран сбоя вместо
+ * пустого магазина.
+ */
+async function loadFirstScreen(): Promise<FirstScreen> {
+  const [storefront, blocks] = await Promise.all([
+    fetchStorefrontContent(),
+    fetchPublicStorefrontBlocks('desktop'),
+  ]);
+
+  if (storefront === null) return { storefront: null, blocks, products: null };
+  if (storefront.featuredProducts.length > 0) {
+    return { storefront, blocks, products: storefront.featuredProducts };
+  }
+
+  try {
+    const catalog = await fetchCatalog({ limit: 12, sort: 'stock_desc' });
+    return { storefront, blocks, products: isCatalogUnavailable(catalog) ? null : catalog.items };
+  } catch {
+    return { storefront, blocks, products: null };
+  }
 }
 
 /**
