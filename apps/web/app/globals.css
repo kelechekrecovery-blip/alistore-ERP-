@@ -228,7 +228,24 @@
 
   .erp3-coral-action {
     background: linear-gradient(135deg, var(--erp-coral-hi), var(--deep));
+    color: #14110e !important;
     box-shadow: 0 6px 18px rgba(255, 91, 46, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  }
+
+  /* Dark storefront copy must remain readable at the small sizes used by the
+     handoff. These opacity utilities were originally tuned for atmosphere,
+     but several fell below WCAG AA against the dark shell. */
+  .text-white\/35 { color: rgba(255, 255, 255, 0.60) !important; }
+  .text-white\/40 { color: rgba(255, 255, 255, 0.60) !important; }
+  .text-white\/45 { color: rgba(255, 255, 255, 0.65) !important; }
+  .text-white\/50 { color: rgba(255, 255, 255, 0.70) !important; }
+  .text-white\/55 { color: rgba(255, 255, 255, 0.75) !important; }
+
+  /* Coral is the brand surface; dark ink is the accessible foreground on it. */
+  .bg-coral.text-white,
+  .checkout-primary,
+  .login-shell .bg-coral {
+    color: #14110e !important;
   }
 
   /* Legacy operations pages keep their business markup but inherit the 3.0 glass shell. */
@@ -482,7 +499,7 @@
   .login-shell .bg-lime,
   .login-panel .bg-lime {
     background: #ff5b2e !important;
-    color: #fff !important;
+    color: #14110e !important;
   }
   .login-shell .text-lime,
   .login-panel .text-lime {

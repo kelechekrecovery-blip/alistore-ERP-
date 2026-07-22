@@ -68,7 +68,7 @@ export function SiteHeader({ variant = 'design3' }: { variant?: 'light' | 'desig
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="AliStore Electronics">
           {design3 && <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-gradient-to-br from-[#ff7a4d] to-[#e8410f] text-sm font-extrabold text-white shadow-[0_5px_14px_rgba(255,91,46,.35)]">A</span>}
           <strong className="font-display text-[22px] font-extrabold leading-none md:text-2xl">AliStore</strong>
-          <span className={`${design3 ? 'text-white/40' : 'text-faint'} hidden text-[10px] uppercase tracking-[0.15em] lg:inline`}>Electronics</span>
+          <span className={`${design3 ? 'text-white/60' : 'text-faint'} hidden text-[10px] uppercase tracking-[0.15em] lg:inline`}>Electronics</span>
         </Link>
 
         <Link href="/catalog" className={`hidden h-11 items-center gap-2.5 rounded-[10px] px-[18px] text-sm font-bold text-white transition md:flex ${design3 ? 'erp3-coral-action hover:brightness-110' : 'bg-coral hover:bg-deep'}`}>
