@@ -61,6 +61,8 @@ struct AliStorePOSApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .background { auth.lock() }
                 }
+                // Прячем смену и выручку из превью в переключателе приложений.
+                .privacyCover("AliStore POS")
         }
         .modelContainer(OfflineStore.container())
     }

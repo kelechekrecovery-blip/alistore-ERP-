@@ -63,6 +63,8 @@ struct AliStoreStaffApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .background { auth.lock() }
                 }
+                // Прячем Customer 360, паспорт и смену из превью в свитчере.
+                .privacyCover("AliStore Staff")
         }
         .modelContainer(OfflineStore.container())
     }

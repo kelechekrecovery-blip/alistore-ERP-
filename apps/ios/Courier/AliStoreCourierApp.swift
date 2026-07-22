@@ -62,6 +62,8 @@ struct AliStoreCourierApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .background { auth.lock() }
                 }
+                // Прячем маршрут, адреса и суммы COD из превью в свитчере.
+                .privacyCover("AliStore Courier")
         }
         .modelContainer(OfflineStore.container())
     }
