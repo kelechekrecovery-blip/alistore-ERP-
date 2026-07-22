@@ -195,7 +195,7 @@ export function DashboardView({ d, risks, revenue, trend, onSignal }: DashboardV
           {bars.length === 0 ? (
             <div className="flex h-[160px] items-center justify-center text-[12px] text-muted">Нет данных о выручке за период</div>
           ) : (
-            <div className="flex h-[160px] items-end gap-2.5">
+            <div data-testid="dashboard-revenue-chart" className="flex h-[160px] items-end gap-2.5">
               {bars.map((b, index) => (
                 <div key={`${b.day}-${index}`} className="flex flex-1 flex-col items-center gap-1.5">
                   <div

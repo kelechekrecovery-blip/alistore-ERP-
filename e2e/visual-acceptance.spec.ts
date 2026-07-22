@@ -103,6 +103,7 @@ test('ERP desktop visual baseline', async ({ page }) => {
     fullPage: true,
     mask: [
       page.locator('.h-40'),
+      page.getByTestId('dashboard-revenue-chart'),
       page.locator('[data-testid="kpi-metric"]'),
       page.locator('[data-testid="risk-decision"]'),
     ],
