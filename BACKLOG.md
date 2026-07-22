@@ -18,6 +18,11 @@
 - **Результат:** новый Web cross-browser дефект не найден; runtime smoke остаётся `200` на публичной витрине, admin и API health.
 - **Следующий шаг:** повторить тот же gate после Render staging deployment, поскольку локальный/public tunnel не доказывает cloud production readiness.
 
+## ERP-CMS-INTEGRATION-146 — подтвердить ERP → storefront handoff
+- **Проверено:** `npm run ecosystem:erp-cms:e2e` прошёл `5/5`: публикация коллекции, reorder CMS blocks, draft editing, review moderation и promotion quote redemption.
+- **Результат:** ERP изменения доходят до storefront и checkout через server API; новые интеграционные дефекты не найдены.
+- **Следующий шаг:** повторить на Render staging с отдельной БД и миграцией, затем проверить backup/restore и rollback.
+
 ## PUBLIC-RUNTIME-API-DOCS-001 — закрыть Swagger на публичном laptop-туннеле
 - **Сделано:** добавлен явный `API_DOCS_ENABLED=false` для launchd API, Render production и staging environment groups; fail-closed тест политики; sandbox payment confirm также явно выключен во всех контурах.
 - **Проверено:** локальный и публичный `/api/docs` и `/api/docs-json` возвращают `404`; health endpoints возвращают `200`; sandbox confirm возвращает `404`.
