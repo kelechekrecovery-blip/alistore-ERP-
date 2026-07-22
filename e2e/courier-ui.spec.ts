@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedStaffCredentials } from './helpers';
+import { postJson, prisma, resetDb, seedStaffCredentials } from './helpers';
 
 const evidencePng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -8,10 +8,17 @@ const evidencePng = Buffer.from(
 
 test.afterEach(async () => resetDb());
 
-test('courier completes an assigned delivery and reconciles COD through the web app', async ({ page }) => {
+test('courier completes an assigned delivery and reconciles COD through the web app', async ({ page, request }) => {
   await resetDb();
   const courier = await seedStaffCredentials('courier', 'e2e-courier-web');
   const cashier = await seedStaffCredentials('cashier', 'e2e-courier-cashier');
+  await postJson(
+    request,
+    '/shifts/open',
+    { staffId: cashier.staffId, point: 'BISHKEK-1', openCash: 5000 },
+    cashier.accessToken,
+    { 'idempotency-key': `e2e-courier-cashier-open-${Date.now()}` },
+  );
   const customer = await prisma.customer.create({
     data: { phone: '+996700123456', name: 'Айжан Т.' },
   });

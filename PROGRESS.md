@@ -5698,3 +5698,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: isolated `e2e/pos-customer-binding.spec.ts` `1/1`, `e2e/pos-ui.spec.ts` `1/1`, and `e2e/print-ui.spec.ts` `4/4` passed on fresh Web/API ports.
 - Result: customer-bound cash sale, catalog delta sync, invoice PDF, server receipt, QR price tag, IMEI labels and write-off act PDF are green.
 - Next: run the remaining service-center, procurement and fulfillment UI subsets; full Playwright gate is still not yet accepted.
+
+## WEB-COURIER-108-2026-07-23
+- Task: close the Courier UI COD handover regression.
+- Finding: the demo banner intercepted mobile bottom-nav clicks, and the handover test omitted the receiving cashier's required open shift.
+- Changes: demo banner is now informational-only for pointer input; Courier E2E opens the cashier shift before COD acceptance.
+- Checks: isolated `e2e/courier-ui.spec.ts` passed `3/3`; finance UI passed `3/3`; service/procurement UI passed `5/5`.
+- Result: delivery, failed-delivery evidence, COD handover and role rejection are green without weakening server-side shift controls.
+- Next: run checkout/return/protection and then reassess the remaining offline home test mismatch.
