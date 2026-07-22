@@ -35,7 +35,9 @@ export function StorefrontView({ accessToken, role }: { accessToken: string; rol
 
   async function load() {
     const [payload, history] = await Promise.all([
-      fetchStorefrontContent(),
+      // Только свежее: `load()` вызывается сразу после публикации, и ответ из
+      // общего кэша витрины выглядел бы как «изменения не сохранились».
+      fetchStorefrontContent({ fresh: true }),
       fetchStorefrontRevisions(accessToken),
     ]);
     if (payload) {

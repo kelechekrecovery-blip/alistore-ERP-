@@ -5575,3 +5575,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run build -w @alistore/web` passed with 45 routes; product/catalog Playwright scenarios passed **2/2**.
 - Result: concurrent reads share a 30-second promise cache; failed responses do not stick. Business truth remains API/PostgreSQL-backed.
 - Next: commit, then run the trusted visual recorder on the immutable tree.
+
+## WEB-PERF-092-2026-07-22
+- Task: keep CMS publish reads fresh while improving first-screen font loading.
+- Files: `apps/web/lib/api/storefront.ts`, `apps/web/components/erp/StorefrontView.tsx`, `apps/web/app/layout.tsx`.
+- Checks: `npm run build -w @alistore/web` passed with 45 routes; product/catalog Playwright scenarios passed **2/2**.
+- Result: CMS explicitly bypasses the shared content cache after publish and local font assets are preloaded. No business data or server authority changed.
+- Next: commit this source slice, then record visual evidence against the final source hash.

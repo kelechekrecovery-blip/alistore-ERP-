@@ -32,6 +32,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        {/*
+          Шрифты первого экрана. Браузер находит @font-face только разобрав CSS,
+          то есть узнаёт о них позже, чем мог бы; preload убирает эту задержку.
+          Здесь ровно два файла основного семейства — кириллица и латиница
+          Golos Text: остальные начертания нарезаны по unicode-range и грузятся
+          сами, только если такие символы реально встретились на странице.
+        */}
+        <link rel="preload" as="font" type="font/woff2" crossOrigin="anonymous" href="/fonts/cfdfbee4d6cf0a93-s.p.1jwcpm6w583_v.woff2" />
+        <link rel="preload" as="font" type="font/woff2" crossOrigin="anonymous" href="/fonts/b4a06a523f527a0e-s.p.3psl0_mnhzy2y.woff2" />
       </head>
       <body className="min-h-screen bg-night">
         <AttributionCapture />
