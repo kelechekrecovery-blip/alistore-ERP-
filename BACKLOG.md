@@ -12,6 +12,11 @@
 - **Проверено:** `npm run ecosystem:audit:strict` доходит до контрактов и показывает ровно 8 GAP: visual acceptance, iOS UI evidence, Android connected tests, POS/courier/service/procurement reconciliation и composite ecosystem evidence.
 - **Следующий шаг:** закрывать GAP только hash-bound evidence на чистом trusted runner; production/live-provider/physical-device gates остаются отдельными.
 
+## ANDROID-UI-082 — refresh packaged connected evidence
+- **Проверено:** trusted recorder `android-app-ui` на AVD `savio_api36_arm64` прошёл все четыре packaged modules и shared core: Core `38/38`, Client `1/1`, Staff `2/2`, Courier `1/1`, POS `2/2`; Gradle `BUILD SUCCESSFUL`.
+- **Evidence:** manifest обновлён новым source-tree-bound artifact `android-app-ui-5af6c73b8e6203a36bf8fcf51711d5d158035c7e06ba20c1371014b5aaa94f11.json`.
+- **Ограничение:** это emulator/software evidence; physical Android push, biometrics, camera, maps, scanner, printer and terminal certification остаются отдельными gates.
+
 ## VERIFY-079 — trusted ecosystem toolchain lock
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
 - **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.
