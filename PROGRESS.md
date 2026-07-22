@@ -5848,3 +5848,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: approvals JWT/RBAC, finance/refunds, inventory/valuation, procurement, POS replay, customer PII, IDOR and resilience suites are green on the current commit. The earlier isolated approvals 404 did not reproduce on the focused or full rerun.
 - Caveat: this confirms API software behavior only. Strict ecosystem acceptance remains RED for dirty parallel files, stale hash-bound evidence, physical-device/provider certification and App Store submission.
 - Next: inspect and close the remaining release blockers without claiming production or store readiness.
+
+## TOOLCHAIN-AUDIT-128-2026-07-23
+- Task: восстановить строгий ecosystem audit после переустановки lock-зависимостей.
+- Changes: обновлён только `scripts/ecosystem-toolchain-lock.json` с fingerprint текущего `npm ci` + `prisma generate` dependency tree.
+- Checks: `npm ci` completed; `npm run prisma:generate -w @alistore/api` passed; `npm run tooling:verify` passed; `npm run ecosystem:audit:strict` теперь выполняет полный контрактный аудит.
+- Result: design corpus `128 tracked / 81 linked / 81 present / 0 missing`, link graph `153 / 0 broken`; Web/API and native build command contracts pass. Audit честно сообщает 9 блокеров: dirty source tree, stale hash-bound visual/native/reconciliation evidence for the current source/toolchain hash, and related acceptance artifacts.
+- Caveat: это не закрывает production, physical-device, provider или App Store gates. `e2e/storefront-offline.spec.ts` и `.claude/settings.local.json` остаются вне коммита как параллельные локальные изменения.
+- Next: refresh trusted evidence from a clean source snapshot or keep the current strict blockers explicit; do not manufacture acceptance artifacts.
