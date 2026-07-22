@@ -7,6 +7,15 @@
   вручную. Падение оставляло магазин лежать до ручного вмешательства — именно
   это и наблюдалось как 502 на ali.kg.
 
+
+  ПОЧЕМУ node ВЫЗЫВАЕТСЯ НАПРЯМУЮ, А НЕ ЧЕРЕЗ bash-обёртку.
+  Репозиторий лежит в ~/Desktop — это TCC-защищённая папка. Агент с
+  ProgramArguments = /bin/bash падал с кодом 126 «Operation not permitted»,
+  и сайт при пересадке лёг. Проверено пробными агентами 23.07.2026: под launchd
+  /bin/bash к Desktop не пускают, а node — пускает, и WorkingDirectory сюда
+  выставляется штатно. Обёртки на bash здесь принципиально нерабочие; не
+  возвращайте их — это будет стоить ещё одного простоя на диагностику.
+
   Установить:
     cp scripts/com.alistore.web.plist ~/Library/LaunchAgents/
     launchctl load ~/Library/LaunchAgents/com.alistore.web.plist
@@ -22,12 +31,15 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>/Users/alistore/Desktop/alistore-erp/scripts/run-web-prod.sh</string>
+    <string>/Users/alistore/.local/bin/node</string>
+    <string>/Users/alistore/Desktop/alistore-erp/node_modules/next/dist/bin/next</string>
+    <string>start</string>
+    <string>-p</string>
+    <string>3000</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/alistore/Desktop/alistore-erp</string>
+  <string>/Users/alistore/Desktop/alistore-erp/apps/web</string>
 
   <key>RunAtLoad</key>
   <true/>

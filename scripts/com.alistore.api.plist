@@ -8,8 +8,17 @@
   процесса — launchd: KeepAlive поднимает упавший процесс сам.
 
   KeepAlive лечит падение, но не зависание. Зависший процесс держит порт и не
-  отвечает — это работа сторожа scripts/keep-site-up.sh, который бьёт по
+  отвечает — это работа сторожа scripts/keep-site-up.mjs, который бьёт по
   health-check и делает launchctl kickstart.
+
+
+  ПОЧЕМУ node ВЫЗЫВАЕТСЯ НАПРЯМУЮ, А НЕ ЧЕРЕЗ bash-обёртку.
+  Репозиторий лежит в ~/Desktop — это TCC-защищённая папка. Агент с
+  ProgramArguments = /bin/bash падал с кодом 126 «Operation not permitted»,
+  и сайт при пересадке лёг. Проверено пробными агентами 23.07.2026: под launchd
+  /bin/bash к Desktop не пускают, а node — пускает, и WorkingDirectory сюда
+  выставляется штатно. Обёртки на bash здесь принципиально нерабочие; не
+  возвращайте их — это будет стоить ещё одного простоя на диагностику.
 
   Установить:
     cp scripts/com.alistore.api.plist ~/Library/LaunchAgents/
@@ -28,12 +37,12 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>/Users/alistore/Desktop/alistore-erp/scripts/run-api-prod.sh</string>
+    <string>/Users/alistore/.local/bin/node</string>
+    <string>/Users/alistore/Desktop/alistore-erp/apps/api/dist/main.js</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/alistore/Desktop/alistore-erp</string>
+  <string>/Users/alistore/Desktop/alistore-erp/apps/api</string>
 
   <key>RunAtLoad</key>
   <true/>
@@ -45,6 +54,8 @@
   <dict>
     <key>PATH</key>
     <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>NODE_PATH</key>
+    <string>./node_modules</string>
   </dict>
 
   <!-- Пауза между рестартами: без неё падение на старте (например, недоступный
