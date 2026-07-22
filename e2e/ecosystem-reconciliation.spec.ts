@@ -25,6 +25,9 @@ test('POS sale, customer return, approved refund and warehouse receipt reconcile
     clientSaleId: saleKey,
     lines: [{ productId: product.id, sku: product.sku, price: SALE_AMOUNT, qty: 1, imei: unit.imei }],
   };
+  // POS-продажа наличными требует открытую смену у кассира (изменение поведения
+  // 461126ba: раньше открывалась фантомная смена, теперь продажа отклоняется).
+  await prisma.cashShift.create({ data: { staffId: cashier.staffId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() } });
   const sale = await postJson<{ orderId: string; shiftId: string; status: string }>(
     request,
     '/pos/sale',

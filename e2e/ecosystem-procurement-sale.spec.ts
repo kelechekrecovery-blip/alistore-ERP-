@@ -48,6 +48,9 @@ test('partial procurement receiving becomes exactly-once sellable stock with rec
     clientSaleId: `ecosystem-procurement-sale-${firstImei}`,
     lines: [{ productId: product.id, sku: product.sku, price: 100_000, qty: 1, imei: firstImei }],
   };
+  // POS-продажа наличными требует открытую смену у кассира (изменение поведения
+  // 461126ba: раньше открывалась фантомная смена, теперь продажа отклоняется).
+  await prisma.cashShift.create({ data: { staffId: cashier.staffId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() } });
   const sale = await postJson<{ orderId: string; status: string }>(request, '/pos/sale', saleBody, cashier.accessToken);
   const saleReplay = await postJson<{ orderId: string; status: string }>(request, '/pos/sale', saleBody, cashier.accessToken);
   expect(saleReplay).toMatchObject({ orderId: sale.orderId, status: 'paid' });
