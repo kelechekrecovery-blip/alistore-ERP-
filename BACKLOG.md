@@ -697,6 +697,19 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - `AUDIT-DB-004` LOW: `InventoryQuarantineCase_status_createdAt_idx` объявлен `DESC` в миграции, без `sort:Desc` в schema — `migrate dev` предложит пересоздать индекс на живой таблице. Выровнять schema.
 - `AUDIT-TEST-003` LOW: тавтологичные ассерты — `categorize.spec.ts:27` (`Array.isArray` всегда true), `finance-expenses.e2e:624` (пустой журнал тривиально balanced), несколько `rejects.toThrow()` без типа. Точечно ужесточить.
 
+## WEB-SEO-089 — server route entrypoints and product structured data
+
+- Client-only homepage/catalog modules were renamed out of `page.tsx`; Next typegen
+  still requires route entrypoints. Thin server wrappers restore the route contract
+  without changing the UI implementation.
+- Product JSON-LD (`Product`/`Offer` and `BreadcrumbList`) now renders in the initial
+  server HTML through a dedicated server component. Existing client hydration keeps
+  the interactive product experience.
+- Checks: `npm run build -w @alistore/web`; product variant and bundle Playwright
+  scenarios, **2/2**.
+- Next: commit this coherent source slice, then refresh all hash-bound ecosystem
+  evidence on the resulting immutable tree.
+
 ## E2E-проход 2026-07-22 (goal: закончить + проверить по e2e)
 
 Прогнал полный Playwright дважды. Починил и проверил всё, что было чистым, содержательным дефектом моего периметра:

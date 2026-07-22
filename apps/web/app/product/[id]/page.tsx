@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import ProductPage from './ProductClient';
-import { fetchProductWithRelated } from '@/lib/api';
-import { productImage } from '@/lib/product-image';
+import { JsonLdScript } from '@/components/JsonLdScript';
+import { fetchProductWithRelated, type CatalogProduct } from '@/lib/api';
+import { productImage, productImages } from '@/lib/product-image';
 import { som } from '@/lib/format';
 import { SITE_URL } from '@/lib/site';
 
@@ -62,5 +63,61 @@ export async function generateMetadata({
 }
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <ProductPage params={await params} />;
+  const { id } = await params;
+  // Тот же вызов, что и в `generateMetadata`: `fetchProductWithRelated` держит
+  // TTL-кэш промиса по id, поэтому второго обращения к API здесь не возникает.
+  const { product } = await fetchProductWithRelated(id).catch(() => ({ product: null }));
+
+  return (
+    <>
+      {product && <JsonLdScript data={productJsonLd(product)} />}
+      {product?.category && <JsonLdScript data={breadcrumbJsonLd(product)} />}
+      <ProductPage params={{ id }} />
+    </>
+  );
+}
+
+/**
+ * Product + Offer для поисковой выдачи. Раньше строился в `ProductClient.tsx`
+ * (клиентский модуль) и появлялся только после гидратации — то есть для робота
+ * его не было вовсе. Цена и наличие берутся из того же ответа каталога, что и
+ * видимая карточка, чтобы разметка не расходилась с экраном.
+ */
+function productJsonLd(product: CatalogProduct): Record<string, unknown> {
+  const images = productImages(product);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    sku: product.sku,
+    ...(images.length > 0 ? { image: images } : {}),
+    category: product.category,
+    offers: {
+      '@type': 'Offer',
+      url: `${SITE_URL}/product/${product.id}`,
+      price: product.price,
+      priceCurrency: 'KGS',
+      availability: product.availableUnits > 0
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+    },
+  };
+}
+
+function breadcrumbJsonLd(product: CatalogProduct): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Главная', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Каталог', item: `${SITE_URL}/catalog` },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: product.category,
+        item: `${SITE_URL}/catalog?category=${encodeURIComponent(product.category)}`,
+      },
+      { '@type': 'ListItem', position: 4, name: product.name, item: `${SITE_URL}/product/${product.id}` },
+    ],
+  };
 }

@@ -28,7 +28,6 @@ import { useCart } from "@/lib/cart";
 import { useCompare } from "@/lib/compare";
 import { useFavorites } from "@/lib/favorites";
 import { conditionLabel, som } from "@/lib/format";
-import { SITE_URL } from "@/lib/site";
 
 export default function ProductPage({ params }: { params: { id: string } }) {
   const { add } = useCart();
@@ -100,42 +99,6 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     ? `${(reviews.avgRating ?? 0).toFixed(1)} · ${reviews.count} отзывов`
     : "Отзывов пока нет";
 
-  const productUrl = `${SITE_URL}/product/${product.id}`;
-  const productJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.name,
-    sku: product.sku,
-    ...(productImages(product).length > 0 ? { image: productImages(product) } : {}),
-    category: product.category,
-    offers: {
-      "@type": "Offer",
-      url: productUrl,
-      price: product.price,
-      priceCurrency: "KGS",
-      availability: inStock
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-    },
-  };
-  const breadcrumbJsonLd = product.category
-    ? {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Главная", item: SITE_URL },
-          { "@type": "ListItem", position: 2, name: "Каталог", item: `${SITE_URL}/catalog` },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: product.category,
-            item: `${SITE_URL}/catalog?category=${encodeURIComponent(product.category)}`,
-          },
-          { "@type": "ListItem", position: 4, name: product.name, item: productUrl },
-        ],
-      }
-    : null;
-
   function addToCart() {
     if (!product || typeof product === "string") return;
     add(
@@ -172,8 +135,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   return (
     <>
-      <JsonLdScript data={productJsonLd} />
-      {breadcrumbJsonLd && <JsonLdScript data={breadcrumbJsonLd} />}
+      {/* Разметка Product/Offer/BreadcrumbList переехала в серверный
+          `page.tsx`: роботы не выполняют JS, поэтому отсюда её было не видно. */}
       <div className="md:hidden">
         <MobileProduct
           product={product}
@@ -540,17 +503,6 @@ function StoreMessage({ children }: { children: React.ReactNode }) {
       <SiteHeader variant="design3" />
       <div className="grid min-h-[70vh] place-items-center">{children}</div>
     </div>
-  );
-}
-/** Renders a schema.org JSON-LD block; `<` is escaped so the script body can't break out. */
-function JsonLdScript({ data }: { data: Record<string, unknown> }) {
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{
-        __html: JSON.stringify(data).replace(/</g, "\\u003c"),
-      }}
-    />
   );
 }
 function variantLabel(product: CatalogProduct): string {

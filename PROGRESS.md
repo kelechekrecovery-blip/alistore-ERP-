@@ -5554,3 +5554,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: isolated `service-center-ui.spec.ts` with fresh API/Web servers passed `3/3`.
 - Result: service browser integration fixed; all previous hash-bound acceptance evidence must be re-recorded against the new source tree.
 - Next: run trusted visual, iOS UI, Android UI, four reconciliation gates and composite E2E on one clean commit sequence.
+
+## WEB-SEO-089-2026-07-22
+- Task: preserve Next route entrypoints after separating homepage/catalog client modules and move product structured data into server-rendered HTML.
+- Files: `apps/web/app/page.tsx`, `apps/web/app/HomeClient.tsx`, `apps/web/app/catalog/page.tsx`, `apps/web/app/catalog/CatalogClient.tsx`, `apps/web/app/product/[id]/page.tsx`, `apps/web/app/product/[id]/ProductClient.tsx`, `apps/web/components/JsonLdScript.tsx`.
+- Checks: `npm run build -w @alistore/web` passed with 45 routes; product variant and bundle Playwright scenarios passed **2/2**.
+- Result: route typegen contract restored; Product/Offer/BreadcrumbList is available to crawlers in the initial HTML. This source change invalidates previous hash-bound acceptance artifacts until they are re-recorded.
+- Next: commit the source slice, then refresh trusted visual, iOS, Android, reconciliation and composite ecosystem evidence on one clean source tree.
