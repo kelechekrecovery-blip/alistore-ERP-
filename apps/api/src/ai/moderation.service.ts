@@ -37,7 +37,17 @@ export class ModerationService {
         model: isAnthropic(client) ? fastModel() : undefined,
         maxTokens: 300,
       });
-      return coerceModeration(res.parsed, res.source) ?? fallback;
+      const coerced = coerceModeration(res.parsed, res.source);
+      if (!coerced) {
+        // Успешный вызов, но ответ не по схеме (нет boolean `allowed`). Раньше
+        // тихо падали на keyword-rules — и постоянный сбой схемы (смена модели,
+        // особенность провайдера) навсегда и незаметно отключал модерацию
+        // контента. Логируем так же, как соседний catch: «сбой, выданный за
+        // норму» отличим от «провайдер выключен намеренно».
+        this.logger.warn(`LLM moderation returned off-schema output (source=${res.source}), using rules`);
+        return fallback;
+      }
+      return coerced;
     } catch (err) {
       this.logger.warn(`LLM moderation failed, using rules: ${String(err)}`);
       return fallback;
