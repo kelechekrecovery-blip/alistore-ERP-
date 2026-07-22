@@ -134,9 +134,25 @@ test('web COD checkout, warehouse, courier and cash handover reconcile exactly o
   });
   expect(prematureCompletion.status()).toBe(422);
 
+  // Доставка теперь требует Evidence (фото подтверждения) — изменение поведения.
+  // Засеваем EvidenceUpload, которую ждёт assertCourierOrderEvidence: тот же
+  // курьер, entityType 'order', тот же заказ, точный label «Подтверждение
+  // доставки». `evidenceIdempotencyKey` в теле связывает доставку с фото.
+  const evidenceKey = `ecosystem-cod-evidence-${order.id}`;
+  await prisma.evidenceUpload.create({
+    data: {
+      idempotencyKey: evidenceKey,
+      actor: `staff:${courier.staffId}`,
+      entityType: 'order',
+      entityId: order.id,
+      label: 'Подтверждение доставки',
+      fingerprint: `fp-${order.id}`,
+      asset: { key: `evidence/${order.id}.png`, contentType: 'image/png', bytes: 1 },
+    },
+  });
   const deliveryKey = `ecosystem-cod-deliver-${order.id}`;
-  await postJson(request, `/courier/orders/${order.id}/deliver`, { codAmount: order.total }, courier.accessToken, { 'idempotency-key': deliveryKey });
-  await postJson(request, `/courier/orders/${order.id}/deliver`, { codAmount: order.total }, courier.accessToken, { 'idempotency-key': deliveryKey });
+  await postJson(request, `/courier/orders/${order.id}/deliver`, { codAmount: order.total, evidenceIdempotencyKey: evidenceKey }, courier.accessToken, { 'idempotency-key': deliveryKey });
+  await postJson(request, `/courier/orders/${order.id}/deliver`, { codAmount: order.total, evidenceIdempotencyKey: evidenceKey }, courier.accessToken, { 'idempotency-key': deliveryKey });
   const unreconciledCompletion = await request.post(`${API_BASE}/orders/${order.id}/transition`, {
     data: { to: 'completed' },
     headers: { authorization: `Bearer ${owner.accessToken}` },
@@ -144,6 +160,9 @@ test('web COD checkout, warehouse, courier and cash handover reconcile exactly o
   expect(unreconciledCompletion.status()).toBe(409);
   expect(await unreconciledCompletion.json()).toMatchObject({ code: 'order_money_unreconciled' });
 
+  // Приём COD-налички кассиром — движение наличных, требует открытую смену у
+  // принимающего кассира (то же изменение поведения 461126ba).
+  await prisma.cashShift.create({ data: { staffId: cashier.staffId, point: 'BISHKEK-1', openCash: 0, openedAt: new Date() } });
   const handoverKey = `ecosystem-cod-handover-${run.id}`;
   const handover = await postJson<{ id: string; handedOver: boolean; diff: number }>(
     request,
