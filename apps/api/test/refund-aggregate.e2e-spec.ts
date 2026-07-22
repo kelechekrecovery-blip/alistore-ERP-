@@ -35,6 +35,7 @@ describe('Refund aggregate FIN-003E (integration)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.returnItem.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.cashShift.deleteMany();

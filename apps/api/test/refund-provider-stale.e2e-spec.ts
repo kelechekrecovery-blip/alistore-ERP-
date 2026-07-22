@@ -64,6 +64,7 @@ describe('Refund provider_pending stale sweep and manual resolve (LOGIC-007)', (
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.returnItem.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.cashShift.deleteMany();
@@ -476,6 +477,7 @@ describe('POST /refunds/:id/resolve RBAC (LOGIC-007)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.returnItem.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.return.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.cashShift.deleteMany();

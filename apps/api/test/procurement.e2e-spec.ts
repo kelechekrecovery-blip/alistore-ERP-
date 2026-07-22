@@ -71,6 +71,7 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     await prisma.inventoryValuationLayer.deleteMany();
     await prisma.inventoryBalance.deleteMany();
     await prisma.productBundleComponent.deleteMany();
+    await prisma.inventoryQuarantineCase.deleteMany();
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
   }

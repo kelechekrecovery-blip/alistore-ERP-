@@ -51,6 +51,8 @@ describe('Finance expenses (integration + RBAC)', () => {
     await prisma.accountingTaxSettlement.deleteMany();
     await prisma.$transaction([
       prisma.cashIncassation.deleteMany(),
+      // Orders retain the POS shift FK; detach them before clearing shared test shifts.
+      prisma.order.updateMany({ where: { posShiftId: { not: null } }, data: { posShiftId: null } }),
       prisma.cashShift.deleteMany(),
       prisma.accountingPeriod.deleteMany(),
       prisma.bankStatement.deleteMany(),
