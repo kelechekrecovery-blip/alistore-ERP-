@@ -26,45 +26,39 @@ interface KpiInput {
   revenue: number;
   cogs: number;
   paidOrders: number;
-  items: { sku: string; qty: number; price: number }[];
+  /** Уже сведённые строки «товар → штуки и выручка»; ранжирование здесь. */
+  productRows: Omit<TopProduct, 'name'>[];
   names: Record<string, string>; // sku → product name
-  sellerRows: { staffId: string; amount: number }[]; // positive payments with a shift
+  /** Уже сведённые строки «продавец → выручка и число продаж». */
+  sellerRows: SellerKpi[];
 }
+
+export const TOP_PRODUCTS_LIMIT = 5;
+export const TOP_SELLERS_LIMIT = 8;
 
 /**
  * Owner KPIs derived from ledger-backed figures: gross margin (revenue − COGS),
  * average check, and top products by revenue. Pure — all figures supplied by the
  * caller so the numbers can never diverge from the tables the ledger writes.
+ *
+ * Сведение по товарам и продавцам делает вызывающий: раньше сюда приезжала вся
+ * история `orderItem` и `payment`, и кокпит владельца перебирал её в памяти при
+ * каждом открытии. Здесь остаётся только ранжирование и отсечение хвоста.
  */
 export function buildKpi(input: KpiInput): Kpi {
-  const { revenue, cogs, paidOrders, items, names } = input;
+  const { revenue, cogs, paidOrders, productRows, names } = input;
   const grossMargin = revenue - cogs;
   const marginPct = revenue > 0 ? Math.round((grossMargin / revenue) * 1000) / 10 : 0;
   const avgCheck = paidOrders > 0 ? Math.round(revenue / paidOrders) : 0;
 
-  const byProduct = new Map<string, { units: number; revenue: number }>();
-  for (const i of items) {
-    const cur = byProduct.get(i.sku) ?? { units: 0, revenue: 0 };
-    cur.units += i.qty;
-    cur.revenue += i.price * i.qty;
-    byProduct.set(i.sku, cur);
-  }
-  const topProducts: TopProduct[] = [...byProduct.entries()]
-    .map(([sku, v]) => ({ sku, name: names[sku] ?? sku, units: v.units, revenue: v.revenue }))
+  const topProducts: TopProduct[] = [...productRows]
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
+    .slice(0, TOP_PRODUCTS_LIMIT)
+    .map((row) => ({ ...row, name: names[row.sku] ?? row.sku }));
 
-  const bySeller = new Map<string, { revenue: number; sales: number }>();
-  for (const s of input.sellerRows) {
-    const cur = bySeller.get(s.staffId) ?? { revenue: 0, sales: 0 };
-    cur.revenue += s.amount;
-    cur.sales += 1;
-    bySeller.set(s.staffId, cur);
-  }
-  const sellers: SellerKpi[] = [...bySeller.entries()]
-    .map(([staffId, v]) => ({ staffId, revenue: v.revenue, sales: v.sales }))
+  const sellers: SellerKpi[] = [...input.sellerRows]
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 8);
+    .slice(0, TOP_SELLERS_LIMIT);
 
   return { revenue, cogs, grossMargin, marginPct, avgCheck, paidOrders, topProducts, sellers };
 }

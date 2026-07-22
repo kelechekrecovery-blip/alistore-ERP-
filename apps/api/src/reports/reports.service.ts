@@ -9,7 +9,7 @@ import {
   computeRepeatReturns,
   computeWriteOffSpike,
 } from './risk-signals';
-import { buildKpi } from './kpi';
+import { buildKpi, SellerKpi, TOP_PRODUCTS_LIMIT, TopProduct } from './kpi';
 import { buildPayroll } from './payroll';
 import { sellerRevenueRows, sellerRevenueWhere, soldBy } from './seller-revenue';
 import {
@@ -112,6 +112,98 @@ export class ReportsService {
       where: sellerRevenueWhere(),
       select: { amount: true, receivedBy: true, shift: { select: { staffId: true } } },
     });
+  }
+
+  /**
+   * Выручка и число продаж по продавцам — сведением на стороне БД.
+   *
+   * Раньше `sellerRevenuePayments()` поднимал в память КАЖДЫЙ выручковый платёж
+   * за всю историю магазина, и это делали сразу два экрана: KPI кокпита и
+   * расчёт зарплат. На реальном обороте оба встали бы.
+   *
+   * Продавец определяется как в `soldBy`: сначала `receivedBy`, при его
+   * отсутствии — сотрудник смены. Поэтому здесь две группировки: прямая и
+   * через смену, а затем их надо сложить — один и тот же человек попадает в
+   * обе, если часть платежей принял лично, а часть прошла по его смене.
+   */
+  private async sellerRevenueTotals(): Promise<SellerKpi[]> {
+    const where = sellerRevenueWhere();
+    const [direct, viaShift] = await Promise.all([
+      this.prisma.payment.groupBy({
+        by: ['receivedBy'],
+        where: { ...where, receivedBy: { not: null } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.payment.groupBy({
+        by: ['shiftId'],
+        where: { ...where, receivedBy: null, shiftId: { not: null } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const totals = new Map<string, { revenue: number; sales: number }>();
+    const add = (staffId: string, revenue: number, sales: number) => {
+      const cur = totals.get(staffId) ?? { revenue: 0, sales: 0 };
+      totals.set(staffId, { revenue: cur.revenue + revenue, sales: cur.sales + sales });
+    };
+
+    for (const row of direct) {
+      if (row.receivedBy) add(row.receivedBy, row._sum.amount ?? 0, row._count._all);
+    }
+
+    // Смены читаем только те, что реально встретились в группировке.
+    const shiftIds = viaShift.map((row) => row.shiftId).filter((id): id is string => id !== null);
+    if (shiftIds.length > 0) {
+      const shifts = await this.prisma.cashShift.findMany({
+        where: { id: { in: shiftIds } },
+        select: { id: true, staffId: true },
+      });
+      const staffByShift = new Map(shifts.map((shift) => [shift.id, shift.staffId]));
+      for (const row of viaShift) {
+        const staffId = row.shiftId ? staffByShift.get(row.shiftId) : undefined;
+        if (staffId) add(staffId, row._sum.amount ?? 0, row._count._all);
+      }
+    }
+
+    return [...totals.entries()].map(([staffId, value]) => ({ staffId, ...value }));
+  }
+
+  /**
+   * Топ товаров по выручке — сведением на стороне БД.
+   *
+   * Выручка позиции это `price * qty`, а такое произведение Prisma в `groupBy`
+   * посчитать не умеет. Поэтому цена входит в ключ группировки: внутри группы
+   * она постоянна, и `_sum.qty * price` даёт точную выручку без сырого SQL.
+   * Групп получается «SKU × различные цены», а не «все позиции всех заказов».
+   *
+   * Имена подтягиваются только для попавших в топ, а не для всего каталога.
+   */
+  private async topProductRows(): Promise<{ rows: Omit<TopProduct, 'name'>[]; names: Record<string, string> }> {
+    const grouped = await this.prisma.orderItem.groupBy({
+      by: ['sku', 'price'],
+      where: { order: { status: { in: REVENUE_STATUSES } } },
+      _sum: { qty: true },
+    });
+
+    const byProduct = new Map<string, { units: number; revenue: number }>();
+    for (const row of grouped) {
+      const units = row._sum.qty ?? 0;
+      const cur = byProduct.get(row.sku) ?? { units: 0, revenue: 0 };
+      byProduct.set(row.sku, { units: cur.units + units, revenue: cur.revenue + units * row.price });
+    }
+
+    const rows = [...byProduct.entries()]
+      .map(([sku, value]) => ({ sku, ...value }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, TOP_PRODUCTS_LIMIT);
+
+    const products = await this.prisma.product.findMany({
+      where: { sku: { in: rows.map((row) => row.sku) } },
+      select: { sku: true, name: true },
+    });
+    return { rows, names: Object.fromEntries(products.map((p) => [p.sku, p.name])) };
   }
 
   private async soldCogs(): Promise<number> {
@@ -388,7 +480,7 @@ export class ReportsService {
   /** Owner KPIs: gross margin (revenue − COGS), average check, top products. */
   async kpi() {
     const paid = REVENUE_STATUSES;
-    const [rev, codRevenue, cogs, paidOrders, items, products, sellerPayments] = await Promise.all([
+    const [rev, codRevenue, cogs, paidOrders, top, sellerRows] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
         where: { amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
@@ -404,17 +496,11 @@ export class ReportsService {
       }),
       this.soldCogs(),
       this.prisma.order.count({ where: { status: { in: paid } } }),
-      this.prisma.orderItem.findMany({
-        where: { order: { status: { in: paid } } },
-        select: { sku: true, qty: true, price: true },
-      }),
-      this.prisma.product.findMany({ select: { sku: true, name: true } }),
-      this.sellerRevenuePayments(),
+      this.topProductRows(),
+      this.sellerRevenueTotals(),
     ]);
     const revenue = (rev._sum.amount ?? 0) + (codRevenue._sum.documentAmount ?? 0);
-    const names = Object.fromEntries(products.map((p) => [p.sku, p.name]));
-    const sellerRows = sellerRevenueRows(sellerPayments);
-    return buildKpi({ revenue, cogs, paidOrders, items, names, sellerRows });
+    return buildKpi({ revenue, cogs, paidOrders, productRows: top.rows, names: top.names, sellerRows });
   }
 
   /**
@@ -426,25 +512,17 @@ export class ReportsService {
    * quote different salaries.
    */
   async payroll() {
-    const sellerPayments = await this.sellerRevenuePayments();
-    const bySeller = new Map<string, { revenue: number; sales: number }>();
-    for (const payment of sellerPayments) {
-      const staffId = soldBy(payment);
-      if (!staffId) continue;
-      const cur = bySeller.get(staffId) ?? { revenue: 0, sales: 0 };
-      cur.revenue += payment.amount;
-      cur.sales += 1;
-      bySeller.set(staffId, cur);
-    }
+    // Та же сведённая выборка, что у KPI: раньше здесь поднимался в память весь
+    // список выручковых платежей за всю историю магазина.
+    const bySeller = await this.sellerRevenueTotals();
     const staff = await this.prisma.staffUser.findMany({
-      where: { id: { in: [...bySeller.keys()] } },
+      where: { id: { in: bySeller.map((row) => row.staffId) } },
       select: { id: true, username: true },
     });
     const names = new Map(staff.map((row) => [row.id, row.username]));
-    const sellers = [...bySeller.entries()].map(([staffId, v]) => ({
-      staffId,
-      username: names.get(staffId) ?? staffId,
-      ...v,
+    const sellers = bySeller.map((row) => ({
+      ...row,
+      username: names.get(row.staffId) ?? row.staffId,
     }));
     const [base, commissionBps] = await Promise.all([
       this.settings.value('payroll.base_amount_som'),
