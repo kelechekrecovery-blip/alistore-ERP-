@@ -699,7 +699,7 @@ private struct ClientOverlayView: View {
                 .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 4) {
                 Text(product.name).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
-                Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.display(14, weight: .bold)).foregroundStyle(.white)
+                Text(Money.som(product.price)).font(ClientTheme.display(14, weight: .bold)).foregroundStyle(.white)
                 Text(searchStockLabel(product))
                     .font(ClientTheme.body(11))
                     .foregroundStyle(searchStockColor(product))
@@ -741,7 +741,7 @@ private struct ClientOverlayView: View {
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .frame(minHeight: 32, alignment: .top)
-            Text(product.price.formatted(.currency(code: "KGS")))
+            Text(Money.som(product.price))
                 .font(ClientTheme.display(15, weight: .black))
                 .foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 3) {
@@ -784,7 +784,7 @@ private struct ClientOverlayView: View {
             ClientProductImage(product: product, cornerRadius: 9).frame(width: 58, height: 58)
             VStack(alignment: .leading, spacing: 4) {
                 Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                Text(Money.som(product.price)).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
             }
             Spacer()
             Button {
@@ -1530,7 +1530,7 @@ private struct CartView: View {
                             .font(ClientTheme.body(13, weight: .semibold))
                             .foregroundStyle(.white)
                             .lineLimit(2)
-                        Text(product.price.formatted(.currency(code: "KGS")))
+                        Text(Money.som(product.price))
                             .font(ClientTheme.display(15, weight: .black))
                             .foregroundStyle(.white)
                         HStack(spacing: 8) {
@@ -1566,7 +1566,7 @@ private struct CartView: View {
                         }
                     }
                     Spacer(minLength: 0)
-                    Text((product.price * quantity).formatted(.currency(code: "KGS")))
+                    Text(Money.som((product.price * quantity)))
                         .font(ClientTheme.display(14, weight: .bold))
                         .foregroundStyle(ClientTheme.lime)
                         .multilineTextAlignment(.trailing)
@@ -1579,8 +1579,8 @@ private struct CartView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +)) шт.", emphasized: false)
-                ClientSummaryRow(title: "Сумма товаров", value: total.formatted(.currency(code: "KGS")), emphasized: false)
-                ClientSummaryRow(title: "Итого", value: total.formatted(.currency(code: "KGS")), emphasized: true)
+                ClientSummaryRow(title: "Сумма товаров", value: Money.som(total), emphasized: false)
+                ClientSummaryRow(title: "Итого", value: Money.som(total), emphasized: true)
             }
             .padding(16)
             .glass(radius: 14)
@@ -1623,7 +1623,7 @@ private struct CartView: View {
                     if managedCourierDelivery {
                         Text("Зона доставки").font(ClientTheme.body(11, weight: .medium)).foregroundStyle(ClientTheme.muted)
                         ForEach(deliveryZones) { zone in
-                            ClientChoiceRow(symbol: "map", title: zone.name, detail: "Доставка по зоне", trailing: zone.fee.formatted(.currency(code: "KGS")), selected: selectedDeliveryZoneId == zone.id) {
+                            ClientChoiceRow(symbol: "map", title: zone.name, detail: "Доставка по зоне", trailing: Money.som(zone.fee), selected: selectedDeliveryZoneId == zone.id) {
                                 selectedDeliveryZoneId = zone.id
                                 selectedDeliverySlotId = zone.slots.first(where: { $0.available })?.id ?? ""
                             }
@@ -1656,7 +1656,7 @@ private struct CartView: View {
                 ClientChoiceRow(symbol: "calendar", title: "Рассрочка", detail: "Условия зависят от банка-партнёра", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.installment.rawValue) { paymentMethod = OnlinePaymentMethod.installment.rawValue }
                 promoSection
                 if loyaltyBalance > 0 {
-                    ClientChoiceRow(symbol: "gift.fill", title: "Списать бонусы", detail: "Доступно \(loyaltyBalance.formatted()) · спишем \(bonusDiscount.formatted(.currency(code: "KGS")))", trailing: bonusApplied ? "−\(bonusDiscount.formatted(.currency(code: "KGS")))" : nil, selected: bonusApplied) { bonusApplied.toggle() }
+                    ClientChoiceRow(symbol: "gift.fill", title: "Списать бонусы", detail: "Доступно \(loyaltyBalance.formatted()) · спишем \(Money.som(bonusDiscount))", trailing: bonusApplied ? "−\(Money.som(bonusDiscount))" : nil, selected: bonusApplied) { bonusApplied.toggle() }
                     .accessibilityIdentifier("checkout-bonus-toggle")
                 }
             case .review:
@@ -1694,7 +1694,7 @@ private struct CartView: View {
             }
             if let appliedPromoCode {
                 HStack(spacing: 6) {
-                    Text("\(appliedPromoCode): −\(promoDiscount.formatted(.currency(code: "KGS")))")
+                    Text("\(appliedPromoCode): −\(Money.som(promoDiscount))")
                         .font(ClientTheme.body(12, weight: .medium))
                         .foregroundStyle(ClientTheme.lime)
                     Spacer()
@@ -1722,7 +1722,7 @@ private struct CartView: View {
                         ClientProductImage(product: product, cornerRadius: 10).frame(width: 54, height: 54)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
-                            Text("\(quantity) × \(product.price.formatted(.currency(code: "KGS")))").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                            Text("\(quantity) × \(Money.som(product.price))").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
                         }
                         Spacer()
                     }
@@ -1738,17 +1738,17 @@ private struct CartView: View {
                 ClientSummaryRow(title: "Оплата", value: paymentLabel, emphasized: false)
                 ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +))", emphasized: false)
                 Divider().overlay(ClientTheme.line)
-                ClientSummaryRow(title: "Сумма товаров", value: total.formatted(.currency(code: "KGS")), emphasized: false)
+                ClientSummaryRow(title: "Сумма товаров", value: Money.som(total), emphasized: false)
                 if deliveryFee > 0 {
-                    ClientSummaryRow(title: "Доставка", value: deliveryFee.formatted(.currency(code: "KGS")), emphasized: false)
+                    ClientSummaryRow(title: "Доставка", value: Money.som(deliveryFee), emphasized: false)
                 }
                 if promoDiscount > 0 {
-                    ClientSummaryRow(title: "Промокод \(appliedPromoCode ?? "")", value: "−\(promoDiscount.formatted(.currency(code: "KGS")))", emphasized: false)
+                    ClientSummaryRow(title: "Промокод \(appliedPromoCode ?? "")", value: "−\(Money.som(promoDiscount))", emphasized: false)
                 }
                 if bonusDiscount > 0 {
-                    ClientSummaryRow(title: "Бонусы", value: "−\(bonusDiscount.formatted(.currency(code: "KGS")))", emphasized: false)
+                    ClientSummaryRow(title: "Бонусы", value: "−\(Money.som(bonusDiscount))", emphasized: false)
                 }
-                ClientSummaryRow(title: "К оплате", value: payable.formatted(.currency(code: "KGS")), emphasized: true)
+                ClientSummaryRow(title: "К оплате", value: Money.som(payable), emphasized: true)
             }
             .padding(16)
             .glass(radius: 14)
@@ -2091,7 +2091,7 @@ private struct ClientPaymentResultView: View {
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("payment-result-title")
-            Text("Заказ #\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
+            Text("Заказ #\(order.id.suffix(6)) · \(Money.som(order.total))")
                 .font(ClientTheme.body(14))
                 .foregroundStyle(ClientTheme.muted)
             Text(detail)
@@ -2214,7 +2214,7 @@ private struct ClientOrderStatusView: View {
                             Text("Заказ \(displayOrderNumber)")
                                 .font(ClientTheme.display(20, weight: .bold))
                                 .foregroundStyle(.white)
-                            Text("\(order.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(order.total.formatted(.currency(code: "KGS")))")
+                            Text("\(order.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(Money.som(order.total))")
                                 .font(ClientTheme.body(12))
                                 .foregroundStyle(ClientTheme.muted)
                         }
@@ -2650,7 +2650,7 @@ private struct ClientOrderCard: View {
             HStack {
                 Label("\(order.items.reduce(0) { $0 + $1.qty }) тов.", systemImage: "shippingbox")
                 Spacer()
-                Text(order.total.formatted(.currency(code: "KGS")))
+                Text(Money.som(order.total))
                     .font(ClientTheme.display(15, weight: .bold))
                     .foregroundStyle(ClientTheme.lime)
             }
@@ -2952,7 +2952,7 @@ private struct CustomerReturnsView: View {
                     Text(returnProductTitle(item))
                         .font(ClientTheme.body(13, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text(item.refundAmount.formatted(.currency(code: "KGS")))
+                    Text(Money.som(item.refundAmount))
                         .font(ClientTheme.body(12))
                         .foregroundStyle(ClientTheme.muted)
                     Text("Возврат #\(item.id.suffix(6)) · \(item.createdAt.formatted(.dateTime.day().month()))")
@@ -3093,7 +3093,7 @@ private struct CustomerReturnRequestView: View {
                         Text("Заказ").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
                         Picker("Заказ", selection: $orderId) {
                             ForEach(orders) { order in
-                                Text("#\(order.id.suffix(6)) · \(order.total.formatted(.currency(code: "KGS")))")
+                                Text("#\(order.id.suffix(6)) · \(Money.som(order.total))")
                                     .tag(order.id)
                             }
                         }
@@ -3478,7 +3478,7 @@ private struct CustomerTradeInCard: View {
                         .foregroundStyle(ClientTheme.muted)
                 }
                 Spacer()
-                Text(tradeIn.price.formatted(.currency(code: "KGS")))
+                Text(Money.som(tradeIn.price))
                     .font(ClientTheme.body(14, weight: .bold))
                     .foregroundStyle(ClientTheme.lime)
             }
@@ -5994,7 +5994,7 @@ private struct NativeProductCard: View {
                 Button { if favorites.contains(product.id) { favorites.remove(product.id) } else { favorites.insert(product.id) } } label: { Image(systemName: favorites.contains(product.id) ? "heart.fill" : "heart").foregroundStyle(favorites.contains(product.id) ? ClientTheme.coral : .white).frame(width: 44, height: 44) }
             }
             Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
-            Text(product.price.formatted(.currency(code: "KGS"))).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
+            Text(Money.som(product.price)).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
             Text(product.availableUnits > 0 ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии") : "Нет в наличии")
                 .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Design3.danger)
             Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
@@ -6066,7 +6066,7 @@ private struct ProductDetail: View {
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundStyle(displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
                     Text(displayProduct.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
-                    Text(displayProduct.price.formatted(.currency(code: "KGS")))
+                    Text(Money.som(displayProduct.price))
                         .font(ClientTheme.display(26, weight: .black)).foregroundStyle(.white)
                     Text("или \(Int(displayProduct.price / 12).formatted(.number.grouping(.never))) сом × 12 мес")
                         .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)

@@ -166,7 +166,8 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Возврат товара"].exists)
         XCTAssertTrue(app.staticTexts["Выберите товар из заказа №4102"].exists)
         XCTAssertTrue(app.staticTexts["AirPods Pro 2"].exists)
-        XCTAssertTrue(app.staticTexts["24 900 сом"].exists)
+        // Сумма форматируется через Money.som (ru_KG, неразрывные пробелы).
+        XCTAssertTrue(app.staticTexts["24\u{00A0}900\u{00A0}сом"].exists)
         XCTAssertTrue(app.staticTexts["Причина возврата"].exists)
         XCTAssertTrue(app.buttons["return-reason-Не подошёл цвет"].exists)
         XCTAssertTrue(app.buttons["return-photo-picker"].exists)
