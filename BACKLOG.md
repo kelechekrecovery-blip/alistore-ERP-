@@ -1,5 +1,10 @@
 # BACKLOG
 
+## VERIFY-079 — trusted ecosystem toolchain lock
+- **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
+- **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.
+- **Следующий шаг:** после commit повторить strict audit; закрывать только реальные GAP через hash-verified visual/native/reconciliation evidence.
+
 ## Зависимости 2026-07-22
 - `DEP-AUDIT-SHARP-001` **`sharp <0.35.0` под `next` — принято, ждём upstream.** `npm audit
   --omit=dev` даёт 2 high (GHSA-f88m-g3jw-g9cj, CVE-2026-33327/33328/35590/35591 в libvips):
