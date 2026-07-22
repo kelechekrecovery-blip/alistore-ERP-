@@ -26,7 +26,9 @@ describe('Production preflight report', () => {
     // помечающая сообщения `sent` при нуле доставленных.
     // +2: напоминания о долгах и канал алертов — обе наблюдаемости, которых не
     // хватало, чтобы авария стала видимой.
-    expect(report.summary.missing).toBe(10);
+    // +1: media_storage — без объектного хранилища доказательства (паспорта)
+    // раздаются публично с диска без подписи.
+    expect(report.summary.missing).toBe(11);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
@@ -84,6 +86,7 @@ describe('Production preflight report', () => {
         PAYMENT_PROVIDER_CERTIFIED: 'true',
         JOB_BACKEND: 'bullmq',
         REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
+        MEDIA_STORAGE: 's3',
       })[name],
     );
 
@@ -98,6 +101,45 @@ describe('Production preflight report', () => {
    * вызывается в `useFactory` провайдера OTP_SENDER, поэтому неизвестное
    * значение роняет контейнер Nest до первого запроса.
    */
+  describe('media storage: доказательства не должны раздаваться публично с диска', () => {
+    const base: Record<string, string> = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://alistore.internal:5432/alistore',
+      CORS_ORIGINS: 'https://ali.kg',
+      ALLOWED_HOSTS: 'api.ali.kg',
+      JWT_SECRET: '0123456789abcdef0123456789abcdef',
+      AUTH_OTP_DEV_ECHO: 'false',
+      RESERVATION_SWEEP_ENABLED: 'true',
+      OUTBOX_RELAY_ENABLED: 'true',
+      DEBT_REMINDERS_ENABLED: 'true',
+      ALERT_TELEGRAM_BOT_TOKEN: 'bot-token',
+      ALERT_TELEGRAM_CHAT_ID: '-100123',
+      NOTIFICATION_TRANSPORT: 'realtime',
+      SMS_PROVIDER: 'disabled',
+      PUBLIC_DEMO_MODE: 'false',
+      PAYMENT_PROVIDER: 'none',
+      PAYMENT_PROVIDER_CERTIFIED: 'false',
+      JOB_BACKEND: 'bullmq',
+      REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
+      PROCESS_ROLE: 'api',
+      REFUND_RELAY_ENABLED: 'false',
+    };
+    const mediaCheck = (env: Record<string, string>) =>
+      buildProductionPreflightReport((name) => env[name]).checks.find((check) => check.id === 'media_storage');
+
+    // LocalDiskStorage — дефолт: `getReadUrl` отдаёт публичный путь, а main.ts
+    // раздаёт весь ./uploads через useStaticAssets без auth. Паспорт продавца
+    // оказывается публично скачиваемым по угадываемому ключу.
+    it('блокирует прод без объектного хранилища с подписанными URL', () => {
+      expect(mediaCheck(base)?.status).toBe('missing');
+      expect(mediaCheck({ ...base, MEDIA_STORAGE: 'local' })?.status).toBe('unsafe');
+    });
+
+    it('признаёт прод с MEDIA_STORAGE=s3 — evidence уходит подписанными ссылками', () => {
+      expect(mediaCheck({ ...base, MEDIA_STORAGE: 's3' })?.status).toBe('ready');
+    });
+  });
+
   describe('SMS provider value: Android gateway bridge', () => {
     const gateway: Record<string, string> = {
       SMS_PROVIDER: 'android_gateway',
@@ -154,6 +196,7 @@ describe('Production preflight report', () => {
       JOB_BACKEND: 'bullmq',
       REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
       PROCESS_ROLE: 'api',
+      MEDIA_STORAGE: 's3',
     };
 
     const ready = buildProductionPreflightReport(
@@ -191,6 +234,7 @@ describe('Production preflight report', () => {
       PAYMENT_PROVIDER_CERTIFIED: 'false',
       JOB_BACKEND: 'bullmq',
       REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
+      MEDIA_STORAGE: 's3',
     };
     const worker = buildProductionPreflightReport((name) => ({ ...base, PROCESS_ROLE: 'worker' })[name]);
     const api = buildProductionPreflightReport((name) => ({ ...base, PROCESS_ROLE: 'api' })[name]);

@@ -207,6 +207,23 @@ const CHECKS: CheckDefinition[] = [
     },
   },
   {
+    id: 'media_storage',
+    area: 'security',
+    title: 'Evidence media on signed object storage',
+    requiredEnv: ['MEDIA_STORAGE'],
+    // `LocalDiskStorage` (дефолт) отдаёт `getReadUrl` как публичный путь, а
+    // `main.ts` раздаёт весь ./uploads через `useStaticAssets` без auth. В проде
+    // это значит, что паспорт продавца при скупке публично скачивается по
+    // угадываемому ключу `evidence/tradein/<id>/...`. Только `s3` отдаёт evidence
+    // подписанными ссылками с коротким TTL, поэтому в проде оно обязательно.
+    note: 'MEDIA_STORAGE=s3 обязателен в проде: локальный диск раздаёт доказательства (паспорта) публично без подписи.',
+    evaluate: (env) => {
+      const mode = env('MEDIA_STORAGE')?.trim().toLowerCase();
+      if (!mode) return 'missing';
+      return mode === 's3' ? 'ready' : 'unsafe';
+    },
+  },
+  {
     id: 'bullmq_runtime',
     area: 'jobs',
     title: 'BullMQ Redis runtime configured',
