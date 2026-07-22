@@ -19,6 +19,17 @@ const nextConfig = {
   allowedDevOrigins: ['127.0.0.1', 'ali.kg', 'www.ali.kg', 'admin.ali.kg'],
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
   reactStrictMode: true,
+  images: {
+    // Каталог — это фотографии товаров, и весь исходный материал лежит как
+    // PNG/JPEG. Без этой строки оптимизатор отдаёт исходный формат: AVIF режет
+    // карточку товара в разы, WebP остаётся запасным для старых браузеров.
+    // Порядок значим — Next выбирает первый поддерживаемый клиентом.
+    formats: ['image/avif', 'image/webp'],
+    // `remotePatterns` намеренно пуст: сегодня все картинки локальные
+    // (`/products/...`), а разрешать произвольные хосты значит открыть
+    // оптимизатор как прокси. Внешние URL из CMS рендерятся `unoptimized`
+    // (см. `MediaImage` в app/page.tsx) — так же, как до этой правки.
+  },
   async headers() {
     const noIndexHeaders = [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }];
     return [

@@ -1,18 +1,14 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-
+/**
+ * Плашка демо-стенда. Серверный компонент по расчёту: признак берётся из env,
+ * а значит известен уже при рендере страницы.
+ *
+ * Раньше это был клиентский компонент, который на КАЖДОЙ загрузке страницы
+ * дёргал `/api/runtime-config` — только чтобы узнать то, что сервер и так знал.
+ * В проде ответ всегда `demoMode: false`, то есть запрос был чистой платой за
+ * ничего, на всех страницах витрины сразу (компонент висит в корневом layout).
+ */
 export function DemoModeBanner() {
-  const [visible, setVisible] = useState(process.env.NEXT_PUBLIC_DEMO_MODE === 'true');
-
-  useEffect(() => {
-    fetch('/api/runtime-config')
-      .then((response) => response.ok ? response.json() : null)
-      .then((config: { demoMode?: boolean } | null) => setVisible(config?.demoMode === true))
-      .catch(() => undefined);
-  }, []);
-
-  if (!visible) return null;
+  if (!isDemoMode()) return null;
   return (
     <aside
       aria-label="Демонстрационный режим"
@@ -20,5 +16,16 @@ export function DemoModeBanner() {
     >
       Демо-режим: списание, резерв товара и фискализация не производятся
     </aside>
+  );
+}
+
+/**
+ * Обе переменные читаются намеренно: `NEXT_PUBLIC_DEMO_MODE` инлайнится в бандл
+ * на сборке, `PUBLIC_DEMO_MODE` задаётся на рантайме — стенд поднимают и так, и
+ * так. Та же пара, что читает `app/api/runtime-config/route.ts`.
+ */
+export function isDemoMode(): boolean {
+  return [process.env.PUBLIC_DEMO_MODE, process.env.NEXT_PUBLIC_DEMO_MODE].some(
+    (value) => value?.trim().toLowerCase() === 'true',
   );
 }

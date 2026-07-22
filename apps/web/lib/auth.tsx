@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  const persist = useCallback((t: AuthTokens | null) => {
+  const persist = useCallback((t: Pick<AuthTokens, 'accessToken'> | null) => {
     if (t) {
       tokens.current = { accessToken: t.accessToken };
     } else {
