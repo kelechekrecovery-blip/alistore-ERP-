@@ -69,9 +69,11 @@ export class ApprovalsController {
       approverRole: user.role as Role,
       reason: dto.reason,
     };
-    return dto.status === 'approved'
-      ? this.approvals.decideWithStepUp(id, input, dto.totpToken)
-      : this.approvals.decide(id, input);
+    // Both approve and reject require a 2FA step-up: a rejection still runs the
+    // action's rejection executor (which can restore/void stock), so denying a
+    // dangerous action is gated by the same second factor as approving it
+    // (LEDGER-HARDEN-34).
+    return this.approvals.decideWithStepUp(id, input, dto.totpToken);
   }
 
   private assertStaff(user: AuthPrincipal) {
