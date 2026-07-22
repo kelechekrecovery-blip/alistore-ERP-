@@ -741,6 +741,11 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Ограничение:** physical Android, push, biometrics, camera, maps, scanner, printer and terminal certification остаются внешними gates.
 - **Следующий шаг:** четыре reconciliation gates и composite ecosystem E2E.
 
+## POS-REFUND-095 — обновить POS refund reconciliation evidence
+- **Проверено:** trusted `npm run ecosystem:pos-refund:e2e`; Playwright `1/1` passed: sale → return → approval → refund → warehouse receipt, exactly once.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/pos-refund-reconciliation-5f0af2a01367d7ac759e057415cee62fc127079e308d95418911e79e7f8ad027.json`.
+- **Следующий шаг:** Courier COD, Service loaner и Procurement sale reconciliation.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
