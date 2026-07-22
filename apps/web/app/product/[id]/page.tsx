@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import ProductPage from './ProductClient';
 import { fetchProductWithRelated } from '@/lib/api';
-import { productImage } from '@/components/ProductCard';
+import { productImage } from '@/lib/product-image';
 import { som } from '@/lib/format';
 import { SITE_URL } from '@/lib/site';
 

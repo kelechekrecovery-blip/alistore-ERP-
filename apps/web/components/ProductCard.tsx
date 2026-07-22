@@ -9,21 +9,12 @@ import { conditionLabel, som } from '@/lib/format';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
+// Чистые помощники по картинкам вынесены в неклиентский модуль, чтобы их мог
+// звать серверный `generateMetadata`. Ре-экспорт сохранён для совместимости с
+// существующими импортами из ProductCard.
+import { productImage, productImages } from '@/lib/product-image';
 
-function validMediaUrl(value: unknown): value is string {
-  return typeof value === 'string' && ((value.startsWith('/') && !value.startsWith('//')) || value.startsWith('https://'));
-}
-
-export function productImages(product: CatalogProduct): string[] {
-  const attrs = product.attrs ?? {};
-  const media = Array.isArray(attrs.media) ? attrs.media.filter(validMediaUrl) : [];
-  const candidates = [attrs.imageUrl, attrs.image, ...media].filter(validMediaUrl);
-  return [...new Set(candidates)];
-}
-
-export function productImage(product: CatalogProduct): string | null {
-  return productImages(product)[0] ?? null;
-}
+export { productImage, productImages };
 
 const PRESENTATION_ATTRS = new Set([
   'description',
