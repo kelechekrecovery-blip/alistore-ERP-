@@ -5614,3 +5614,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: trusted `npm run ecosystem:service-loaner:e2e`; API `11/11` across 3 suites and browser `3/3` passed.
 - Result: accepted artifact recorded for source tree `881cfbbce7d346b6581e0fe757c5f99dd4e546c0362a18d0b0df07ee4fcaaf11`; customer approval and loaner custody are visible on the site.
 - Next: record Procurement sale reconciliation, then composite ecosystem E2E.
+
+## PROCUREMENT-SALE-098-2026-07-22
+- Task: refresh procurement partial-receiving to sellable-stock, AP and COGS reconciliation evidence.
+- Checks: trusted `npm run ecosystem:procurement-sale:e2e`; API `10/10` and browser `1/1` passed.
+- Result: accepted artifact recorded for source tree `881cfbbce7d346b6581e0fe757c5f99dd4e546c0362a18d0b0df07ee4fcaaf11`; exactly-once stock, AP and COGS assertions passed.
+- Next: record composite ecosystem E2E, then run strict audit.

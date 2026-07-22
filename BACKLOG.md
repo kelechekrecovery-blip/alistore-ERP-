@@ -756,6 +756,11 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - **Evidence:** принят artifact `docs/acceptance/artifacts/service-loaner-reconciliation-2812e615b3243487cf8e9528a8a37f35023b95a758fad412e96fac8d74494ad0.json`.
 - **Следующий шаг:** Procurement sale reconciliation и composite ecosystem E2E.
 
+## PROCUREMENT-SALE-098 — обновить procurement-to-sale reconciliation evidence
+- **Проверено:** trusted `npm run ecosystem:procurement-sale:e2e`; API `10/10` и browser `1/1` passed: partial receiving → sellable stock → AP/COGS reconciliation, exactly once.
+- **Evidence:** принят artifact `docs/acceptance/artifacts/procurement-sale-reconciliation-688931649ec9e9dc54cfd90eef8fea18fa52f4305ef74776cc3321e05b8eb065.json`.
+- **Следующий шаг:** composite ecosystem E2E и strict audit.
+
 ## WEB-PERF-092 — CMS freshness and font preload
 
 - CMS storefront reloads request a fresh content snapshot after publish, bypassing
