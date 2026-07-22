@@ -5987,21 +5987,44 @@ private struct NativeProductCard: View {
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
 
+    private var availabilityText: String {
+        product.availableUnits > 0
+            ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии")
+            : "Нет в наличии"
+    }
+    private var isFavorite: Bool { favorites.contains(product.id) }
+
+    private func toggleFavorite() {
+        if isFavorite { favorites.remove(product.id) } else { favorites.insert(product.id) }
+    }
+    private func addToCart() {
+        cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topTrailing) {
                 ClientProductImage(product: product, cornerRadius: 12).frame(height: 120)
-                Button { if favorites.contains(product.id) { favorites.remove(product.id) } else { favorites.insert(product.id) } } label: { Image(systemName: favorites.contains(product.id) ? "heart.fill" : "heart").foregroundStyle(favorites.contains(product.id) ? ClientTheme.coral : .white).frame(width: 44, height: 44) }
+                Button { toggleFavorite() } label: { Image(systemName: isFavorite ? "heart.fill" : "heart").foregroundStyle(isFavorite ? ClientTheme.coral : .white).frame(width: 44, height: 44) }
             }
             Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
             Text(Money.som(product.price)).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
-            Text(product.availableUnits > 0 ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии") : "Нет в наличии")
+            Text(availabilityText)
                 .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Design3.danger)
-            Button { cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1) } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
+            Button { addToCart() } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
         }
         .padding(10)
         .glass(radius: 16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+        // VoiceOver: карточка — один элемент с описанием, а «В корзину» и
+        // избранное вынесены в действия ротора. Иначе на каждую карточку было
+        // по пять свайпов; на экране с полусотней товаров это сотни свайпов.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(product.name). \(Money.som(product.price)). \(availabilityText)")
+        .accessibilityAction(named: product.availableUnits > 0 ? "В корзину" : "Уведомить о наличии") {
+            if product.availableUnits > 0 { addToCart() }
+        }
+        .accessibilityAction(named: isFavorite ? "Убрать из избранного" : "В избранное") { toggleFavorite() }
     }
 }
 
