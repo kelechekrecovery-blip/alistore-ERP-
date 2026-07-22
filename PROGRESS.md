@@ -5568,3 +5568,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run build -w @alistore/web` passed with 45 routes; product/catalog Playwright scenarios passed **2/2**.
 - Result: filtered initial catalog and `ItemList` metadata are available before hydration; interactive client state remains intact. The earlier visual recorder had already failed before this source slice was accepted, so no partial evidence is carried forward.
 - Next: commit this source slice, then rerun all trusted evidence from the clean resulting tree.
+
+## WEB-PERF-091-2026-07-22
+- Task: avoid duplicate storefront-content requests when desktop/mobile shells and shared chrome mount together.
+- Files: `apps/web/lib/api/storefront.ts`.
+- Checks: `npm run build -w @alistore/web` passed with 45 routes; product/catalog Playwright scenarios passed **2/2**.
+- Result: concurrent reads share a 30-second promise cache; failed responses do not stick. Business truth remains API/PostgreSQL-backed.
+- Next: commit, then run the trusted visual recorder on the immutable tree.

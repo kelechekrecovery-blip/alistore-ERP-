@@ -720,6 +720,15 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
   **2/2**.
 - Next: commit and refresh trusted evidence again because source hashes are strict.
 
+## WEB-PERF-091 — deduplicate storefront content reads
+
+- Coalesce concurrent storefront-content requests into one short-lived promise
+  cache and clear failed responses immediately; the API remains the source of
+  truth and no browser storage is used.
+- Checks: Web production build with 45 routes; product/catalog Playwright
+  scenarios **2/2**.
+- Next: refresh trusted visual/native/reconciliation evidence from the final clean tree.
+
 ## E2E-проход 2026-07-22 (goal: закончить + проверить по e2e)
 
 Прогнал полный Playwright дважды. Починил и проверил всё, что было чистым, содержательным дефектом моего периметра:
