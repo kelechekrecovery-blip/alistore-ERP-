@@ -5648,3 +5648,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: the outage is an unavailable origin connector, not a Web/API route failure. No DNS mutation was made because no Render custom-domain target is available and changing records blindly could worsen the outage.
 - Blocker: start the existing tunnel connector with its owner-held token, or attach the Render services to the custom domains and update DNS to those verified Render hostnames.
 - Next: after origin restoration, rerun public smoke for storefront, admin, API live/ready, media, CORS, Host allowlist and demo mode; then update this incident with HTTP evidence.
+
+## PUBLIC-ORIGIN-103-2026-07-22
+- Task: restore and keep alive the current Cloudflare Tunnel sandbox origin.
+- Changes: added `scripts/com.alistore.cloudflared.plist`; installed it as the user LaunchAgent `com.alistore.cloudflared` using the owner-held token file at mode `600`; added file-backed token support to `scripts/public-demo-up.sh`.
+- Checks: LaunchAgent state `running`; Cloudflare registered four active connector connections; public `https://ali.kg/`, `/catalog`, `/privacy`, `/support`, `/robots.txt`, `/sitemap.xml`, `https://admin.ali.kg/`, `https://api.ali.kg/api/health/live` and `/ready` returned HTTP `200`.
+- Result: the public sandbox is reachable again and the connector is configured to restart automatically for this macOS user session.
+- Limitation: this remains a laptop-backed origin. Render staging/production deployment, physical-device certification, live providers, legal approval and App Store review remain open release gates.
+- Next: migrate DNS/origin to verified Render services before calling the public contour production-ready, then rerun full external smoke and store submission preflight.
