@@ -287,4 +287,61 @@ describe('Reports (integration)', () => {
       ref: 'inventory',
     });
   });
+
+  /**
+   * Топ товаров и продавцы в KPI кокпита.
+   *
+   * Обе величины считались перебором в памяти всей истории `orderItem` и
+   * `payment`, поэтому фиксируем их поведение до переноса агрегации в БД:
+   * ранжирование по выручке, суммирование одного SKU из разных заказов, имя
+   * товара из карточки и склейка продавца по `receivedBy`/смене.
+   */
+  it('ранжирует топ товаров по выручке и сводит продажи по продавцам', async () => {
+    const customer = await prisma.customer.create({ data: { phone: '+996700900010', name: 'KPI' } });
+    const [phone, laptop] = await Promise.all([
+      prisma.product.create({
+        data: { sku: 'KPI-PHONE', name: 'Телефон', price: 20000, cost: 12000, category: 'c', attrs: {} },
+      }),
+      prisma.product.create({
+        data: { sku: 'KPI-LAPTOP', name: 'Ноутбук', price: 30000, cost: 20000, category: 'c', attrs: {} },
+      }),
+    ]);
+
+    // Телефон продан двумя заказами — выручка обязана сложиться, а не
+    // показаться двумя строками.
+    const first = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'pos', total: 40000, status: 'paid' },
+    });
+    const second = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'pos', total: 50000, status: 'paid' },
+    });
+    await prisma.orderItem.createMany({
+      data: [
+        { orderId: first.id, sku: phone.sku, qty: 2, price: 20000 }, // 40000
+        { orderId: second.id, sku: phone.sku, qty: 1, price: 20000 }, // → телефон: 60000 / 3 шт
+        { orderId: second.id, sku: laptop.sku, qty: 1, price: 30000 }, // ноутбук: 30000 / 1 шт
+      ],
+    });
+
+    // Продавец определяется как `receivedBy`, а при его отсутствии — по смене.
+    const shift = await prisma.cashShift.create({
+      data: { staffId: 'kpi-seller-shift', point: 'BISHKEK-1', openCash: 0 },
+    });
+    await prisma.payment.createMany({
+      data: [
+        { orderId: first.id, amount: 40000, method: 'cash', status: 'received', receivedBy: 'kpi-seller-direct' },
+        { orderId: second.id, amount: 30000, method: 'cash', status: 'received', receivedBy: 'kpi-seller-direct' },
+        { orderId: second.id, amount: 20000, method: 'cash', status: 'received', shiftId: shift.id },
+      ],
+    });
+
+    const kpi = await reports.kpi();
+
+    expect(kpi.topProducts[0]).toMatchObject({ sku: 'KPI-PHONE', name: 'Телефон', units: 3, revenue: 60000 });
+    expect(kpi.topProducts[1]).toMatchObject({ sku: 'KPI-LAPTOP', name: 'Ноутбук', units: 1, revenue: 30000 });
+
+    // Прямой продавец обошёл того, кто опознан только по смене.
+    expect(kpi.sellers[0]).toEqual({ staffId: 'kpi-seller-direct', revenue: 70000, sales: 2 });
+    expect(kpi.sellers[1]).toEqual({ staffId: 'kpi-seller-shift', revenue: 20000, sales: 1 });
+  });
 });
