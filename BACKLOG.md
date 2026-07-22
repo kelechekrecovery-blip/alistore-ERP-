@@ -636,3 +636,24 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - `AUDIT-OPEN-006` — касса по-прежнему не умеет: внести размен в открытую смену (`openCash`
   пишется один раз), инкассировать до закрытия, отменить чек, получить X-отчёт. Статус `syncing`
   в офлайн-очереди по-прежнему могила.
+
+## Аудит экосистемы 2026-07-22 (4 параллельных read-only агента + личная верификация)
+
+Каждая находка перепроверена лично перед действием — треть не подтвердилась в заявленной форме.
+
+### Исправлено и закоммичено
+- `AUDIT-SEC-001` **CRITICAL, деньги.** Одобрение скидки на кассе было многоразовым: `assertDiscountApproved` не помечала его израсходованным, а у `discount` нет исполнителя в ACTION_EXECUTORS. Кассир после одного одобрения 25% проигрывал `approvalId` на неограниченное число продаж (бил по количественным SKU — стабильный отпечаток маржи; серийные самозащищены per-IMEI costRef). Фикс: `Approval.consumedAt` + атомарный `updateMany`-claim. Коммит `aa1903ec`, TDD RED→GREEN на количественном товаре.
+- `AUDIT-OBS-001` **HIGH.** Три durable-шедулера (напоминания о долгах, освобождение резервов, эскалация SLA) при провале старта/тика молча писали в лог — `/observability/status` про них не знал, деньги утекали без события. Приведены к контракту OutboxRelay/RefundRelay (AlerterService). Heartbeat намеренно не добавлен для суточного долгового джоба (ложное «протухло» 23ч/24). Коммит `c29b1ff9`.
+- `AUDIT-TEST-001` **HIGH (money-honesty).** Дедуп погашения долга (`debt:${key}`) не проверялся — регрессия двойного списания прошла бы зелёной. Добавлен регресс-тест. Коммит `dc32c62d`.
+
+### Проверено — НЕ дефект (ложная тревога, не перепроверять заново)
+- `AUDIT-DB-001` Заявлен CRITICAL: `OutboxMessage.nextAttemptAt` без DB-DEFAULT якобы даёт NULL → релей не видит сообщений. **Опровергнуто личным воспроизведением через Prisma client**: `@default(now())` Prisma проставляет на стороне клиента, `nextAttemptAt` приходит с реальным таймстампом, релей сообщение видит. Агент делал raw-SQL INSERT (минует client-side default) — отсюда ложный вывод. Остаётся лишь косметический дрейф схема↔миграция (schema объявляет `@default(now())`, физической колонке дефолта нет) — не баг, опционально выровнять.
+
+### Реальные, отложенные (с обоснованием)
+- `AUDIT-SEC-002` HIGH, но **прод-безопасно и документированно-принято**: `refund-webhooks.controller` без проверки подписи. В проде `PAYMENT_PROVIDER=none` → 503 (недостижим); на sandbox/staging открыт, но под rate-limit, и это явно принятое временное состояние до боевого платёжного адаптера (owner-gated контракт). Правильный фикс (сигнатура) сцеплен с production-payment-gateway. Не трогал.
+- `AUDIT-DB-002` HIGH, перф: `reports.service` `kpi()/payroll()/risks()` грузят весь исторический `orderItem`/`payment` в память на каждом открытии кокпита (тот же анти-паттерн, что я чинил в `soldCogs` коммитом `eff36243`, но эти три остались). Фикс известен (groupBy/агрегат в SQL). Не взял: `reports.service` активно правит Codex (рескоп COGS) — риск конфликта; «на масштабе одного магазина» не критично.
+- `AUDIT-DB-003` HIGH, перф: `GET /finance/ap-aging` (`supplierAging`) и `POST /campaigns/preview` (`loadCustomersWithSpend`) — unbounded findMany с глубоким include на интерактивных эндпоинтах. Соседний `customerAging` уже с `take:500` — образец. Фикс: пагинация/окно + агрегация в SQL.
+- `AUDIT-TEST-002` MEDIUM (money-honesty): денежный след не проверен ассертами у loaner deposit (Дт1000/Кт2400), consignment payout, quantity-consignment sale accrual (count-only), retail POS sale-capture (строки проводки), courier handover→drawer wiring. Логика работает — не хватает регресс-ассертов.
+- `AUDIT-SILENT-001` MEDIUM: `ModerationService` тихо падает на keyword-rules при off-schema ответе LLM (в отличие от соседнего catch — без лога). Добавить warning при `coerceModeration → null`.
+- `AUDIT-DB-004` LOW: `InventoryQuarantineCase_status_createdAt_idx` объявлен `DESC` в миграции, без `sort:Desc` в schema — `migrate dev` предложит пересоздать индекс на живой таблице. Выровнять schema.
+- `AUDIT-TEST-003` LOW: тавтологичные ассерты — `categorize.spec.ts:27` (`Array.isArray` всегда true), `finance-expenses.e2e:624` (пустой журнал тривиально balanced), несколько `rejects.toThrow()` без типа. Точечно ужесточить.
