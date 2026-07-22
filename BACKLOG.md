@@ -1,5 +1,11 @@
 # BACKLOG
 
+## IOS-UI-080 — единый формат денег в форме возврата
+- **Сделано:** форма создания возврата в iOS Client переведена с локального ручного группирования на общий `Money.som`, чтобы цена совпадала с принятым форматом `ru_KG` и shared UI contract.
+- **Найдено тестом:** полный `ios:ui` выявил расхождение пробелов в отображении `24 900 сом`; targeted XCUITest после исправления зелёный `1/1`.
+- **Проверено:** полный `npm run ios:ui` зелёный: Client `23/23`, Staff `10/10`, Courier `3/3`, POS `5/5` (`41/41`); non-fatal Xcode Accessibility/Swift concurrency warnings остаются отдельным follow-up.
+- **Следующий шаг:** обновить trusted evidence после следующего принятого native/visual среза; физическое устройство и App Store review по-прежнему внешние gates.
+
 ## VERIFY-079 — trusted ecosystem toolchain lock
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
 - **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.

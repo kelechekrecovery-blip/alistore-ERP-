@@ -3119,7 +3119,7 @@ private struct CustomerReturnRequestView: View {
                                 Text(itemTitle(item))
                                     .font(ClientTheme.body(13, weight: .semibold))
                                     .foregroundStyle(.white)
-                                Text("\(clientGroupedDigits(item.price)) сом\(item.qty > 1 ? " · \(item.qty) шт" : "")")
+                                Text("\(Money.som(item.price))\(item.qty > 1 ? " · \(item.qty) шт" : "")")
                                     .font(ClientTheme.body(12))
                                     .foregroundStyle(ClientTheme.muted)
                             }
