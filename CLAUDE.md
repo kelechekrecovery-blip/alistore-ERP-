@@ -27,6 +27,28 @@ iOS/Android. Монорепо на npm workspaces.
 - **prisma-migration-reviewer** — read-only ревью схемы/миграций: инварианты-первыми, индексы, uniques, дрейф истории.
 - **e2e-acceptance-engineer** — jest-интеграция + Playwright по ролям (хелперы `e2e/helpers.ts`, Postgres-предусловие).
 
+## Оркестрация: ruflo ведёт (с 22.07.2026)
+
+**ruflo — слой оркестрации по умолчанию.** Для многоагентных задач, координации
+роёв, памяти агентов, роутинга задача→агент, декомпозиции воркфлоу — сначала бери
+ruflo (скилл `ruflo`, его `swarm`/`memory`/`hooks`, `.claude-flow/` рантайм).
+
+**Граница жёсткая — ruflo координирует, но не пишет доменный код.** Любое изменение
+`apps/api` / `apps/web`, затрагивающее деньги/сток/статусы/Event Ledger, идёт через
+проектные скиллы и сабагентов выше (**test-driven-development**, **writing-plans**,
+**verification-before-completion**, **nestjs-ledger-engineer**, **ledger-security-reviewer**).
+Они знают `audit.transaction`, advisory-lock, idempotency — агенты ruflo не знают.
+При конфликте «как делать код» проектные скиллы важнее ruflo.
+
+**Факты установки (режим сосуществования):** `.claude/settings.json` → `permissions.allow`
+разрешает `npx claude-flow*` и `mcp__claude-flow__*`; рантайм (`.claude-flow/`, `.swarm/`,
+`ruvector.db`, `skills-lock.json`) под `.gitignore` — не коммитим. MCP-сервер ruflo
+в `.mcp.json` **не** зарегистрирован. **Фоновый демон может авто-подниматься сам**
+(`config.yaml → hooks.autoExecute: true`) при вызовах `npx ruflo` — держим его погашенным,
+т.к. он сканирует то же дерево, что и Codex. Перед выводом «дерево тихое» проверяй
+`ruflo daemon status` (и `ps aux | grep "daemon start"`); гасить — `npx ruflo daemon stop`.
+Полное удаление: `npx ruflo@latest cleanup`.
+
 ## Команды (это правда — сверено)
 
 | Задача | Команда |
