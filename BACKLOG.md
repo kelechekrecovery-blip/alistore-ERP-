@@ -710,6 +710,16 @@ agent. New harness: `e2e-prod/prod-smoke.spec.ts`, `playwright.prod-smoke.config
 - Next: commit this coherent source slice, then refresh all hash-bound ecosystem
   evidence on the resulting immutable tree.
 
+## WEB-SEO-090 — server-first catalog route
+
+- Catalog now has a server route shell that loads the initial filtered page and
+  categories, while the client preserves interactive filtering and pagination.
+- Added an `ItemList` JSON-LD block and a shared page-size constant; `Suspense`
+  contains `useSearchParams` so the route remains valid under Next type generation.
+- Checks: Web production build with 45 routes; product/catalog Playwright scenarios
+  **2/2**.
+- Next: commit and refresh trusted evidence again because source hashes are strict.
+
 ## E2E-проход 2026-07-22 (goal: закончить + проверить по e2e)
 
 Прогнал полный Playwright дважды. Починил и проверил всё, что было чистым, содержательным дефектом моего периметра:

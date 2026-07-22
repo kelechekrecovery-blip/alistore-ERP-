@@ -1,35 +1,52 @@
 'use client';
 
 import { SlidersHorizontal, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { ProductCard } from '@/components/ProductCard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import MobileCatalog from '@/components/mobile/MobileCatalog';
 import { fetchCatalog, fetchCatalogCategories, isCatalogUnavailable, type CatalogProduct, type CatalogQuery } from '@/lib/api';
+import { CATALOG_PAGE_SIZE as PAGE_SIZE } from '@/lib/catalog-view';
 
-const PAGE_SIZE = 24;
+interface CatalogPageProps {
+  /** Первая страница, уже полученная сервером; `null` — каталог не ответил. */
+  initialProducts?: CatalogProduct[] | null;
+  initialTotal?: number;
+  initialCategories?: string[];
+}
 
-export default function CatalogPage() {
-  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('Все');
+export default function CatalogPage({ initialProducts = null, initialTotal = 0, initialCategories = [] }: CatalogPageProps) {
+  // Фильтры инициализируются из URL сразу, а не в эффекте: сервер отрисовал
+  // выборку именно под эти параметры, и стартовое состояние обязано совпасть,
+  // иначе первый же прогон эффекта перезапросит то же самое.
+  const searchParams = useSearchParams();
+  const [products, setProducts] = useState<CatalogProduct[] | null>(initialProducts);
+  const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const [category, setCategory] = useState(searchParams.get('category') ?? 'Все');
   const [stockOnly, setStockOnly] = useState(false);
   const [sort, setSort] = useState<CatalogQuery['sort']>('stock_desc');
-  const [categories, setCategories] = useState<string[]>(['Все']);
-  const [total, setTotal] = useState(0);
+  const [categories, setCategories] = useState<string[]>(['Все', ...initialCategories]);
+  const [total, setTotal] = useState(initialTotal);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setQuery(params.get('q') ?? '');
-    setCategory(params.get('category') ?? 'Все');
-    fetchCatalogCategories().then((items) => setCategories(['Все', ...items.map((item) => item.category)]));
-  }, []);
+  /** Серверные данные уже на экране — первый прогон эффекта повторять их не должен. */
+  const hasServerFirstPage = useRef(initialProducts !== null);
 
   useEffect(() => {
+    if (initialCategories.length > 0) return;
+    // Резерв на случай, когда сервер не смог получить список категорий.
+    fetchCatalogCategories().then((items) => setCategories(['Все', ...items.map((item) => item.category)]));
+  }, [initialCategories.length]);
+
+  useEffect(() => {
+    if (hasServerFirstPage.current) {
+      hasServerFirstPage.current = false;
+      return;
+    }
     const timer = window.setTimeout(() => {
       setProducts(null);
       setError(false);

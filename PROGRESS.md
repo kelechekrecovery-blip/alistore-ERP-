@@ -5561,3 +5561,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: `npm run build -w @alistore/web` passed with 45 routes; product variant and bundle Playwright scenarios passed **2/2**.
 - Result: route typegen contract restored; Product/Offer/BreadcrumbList is available to crawlers in the initial HTML. This source change invalidates previous hash-bound acceptance artifacts until they are re-recorded.
 - Next: commit the source slice, then refresh trusted visual, iOS, Android, reconciliation and composite ecosystem evidence on one clean source tree.
+
+## WEB-SEO-090-2026-07-22
+- Task: make the catalog server-rendered on first load without losing client filtering, pagination or stock refresh behavior.
+- Files: `apps/web/app/catalog/page.tsx`, `apps/web/app/catalog/CatalogClient.tsx`, `apps/web/lib/catalog-view.ts`.
+- Checks: `npm run build -w @alistore/web` passed with 45 routes; product/catalog Playwright scenarios passed **2/2**.
+- Result: filtered initial catalog and `ItemList` metadata are available before hydration; interactive client state remains intact. The earlier visual recorder had already failed before this source slice was accepted, so no partial evidence is carried forward.
+- Next: commit this source slice, then rerun all trusted evidence from the clean resulting tree.
