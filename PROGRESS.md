@@ -5746,3 +5746,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: four profile artifacts are present in the acceptance manifest for committed source tree `e6dc2000cd68c04dbce8f29467e42a80c1ebc2d49a2ddf9a8e34f1e1158eb7e6`.
 - Blocker: the aggregate recorder was not accepted because parallel edits repeatedly dirtied the source tree and occupied the standard Playwright ports. Strict audit therefore remains red for clean-source and aggregate evidence; native iOS/Android UI evidence is also still absent.
 - Next: freeze the worktree, record `reconciled-e2e`, then address visual/native gates without fabricating evidence.
+
+## REPORTS-KPI-115-2026-07-23
+- Task: lock the ERP KPI cockpit aggregation contract for top products and sellers.
+- Changes: added an integration regression covering revenue aggregation across orders, product-name lookup, seller attribution through `receivedBy` and cash-shift fallback, and ranking order.
+- Checks: `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm --prefix apps/api test -- --runInBand test/reports.e2e-spec.ts` passed `8/8`.
+- Result: the report contract is executable and protects the ERP dashboard metrics from duplicate-row or seller-attribution regressions.
+- Next: run the complete API gate after the current parallel edits are frozen, then refresh trusted evidence for the new source tree.
