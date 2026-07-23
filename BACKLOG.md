@@ -2,9 +2,9 @@
 
 ## WEB-CHECKOUT-149 — стабилизировать холодный выбор способа доставки
 - **Сделано:** способы получения в checkout отключены до гидрации корзины и загрузки логистических зон/слотов; это исключает потерю первого клика по SSR-разметке на холодном запуске.
-- **Проверено:** courier delivery test повторён `5/5`; полный MVP-прогон дошёл до Playwright без checkout-дефекта.
-- **Открыто:** один полный `mvp:verify` остановился на независимом timeout в `support-rbac.e2e-spec.ts`; изолированный suite проходит `2/2`, требуется отдельная стабилизация общего API runner.
-- **Следующий шаг:** повторить полный MVP gate после стабилизации runner, затем обновить release evidence.
+- **Проверено:** courier delivery test повторён `5/5`; полный `npm run e2e` прошёл `137 passed / 2 skipped`; отдельный API rerun `mvp:verify --skip-e2e` прошёл `200/200`.
+- **Открыто:** полный единый `mvp:verify` после фикса ещё не перезапускался одной командой; внешние Render/provider/device/App Review gates остаются открыты.
+- **Следующий шаг:** выполнить полный единый `mvp:verify`, затем повторить staging/deployment evidence.
 
 ## PUBLIC-SMOKE-148 — повторно подтвердить публичный sandbox runtime
 - **Проверено:** storefront, `/catalog`, `admin`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; ready сообщает database `up`; HSTS и security headers присутствуют.
