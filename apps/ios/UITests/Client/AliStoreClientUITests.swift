@@ -46,6 +46,29 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Каталог"].exists)
     }
 
+    func testCatalogExposesExactlyOneSearchEntryPoint() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        // На главной кнопка поиска в шапке — единственный вход в поиск.
+        let headerSearch = app.buttons["Поиск техники и брендов"]
+        XCTAssertTrue(headerSearch.waitForExistence(timeout: 10))
+
+        app.buttons["Каталог"].tap()
+        XCTAssertTrue(app.buttons["Категория: Все"].waitForExistence(timeout: 10))
+
+        // На каталоге фильтрует поле в ящике навбара, поэтому кнопка шапки,
+        // уводившая на отдельный экран поиска, скрыта: два входа в одну
+        // функцию на одном экране — дефект, а не удобство.
+        XCTAssertTrue(app.searchFields["Техника и бренды"].waitForExistence(timeout: 5))
+        XCTAssertFalse(headerSearch.exists)
+
+        // Возврат на главную возвращает и кнопку.
+        app.buttons["Главная"].tap()
+        XCTAssertTrue(headerSearch.waitForExistence(timeout: 5))
+    }
+
     func testHeaderRoutesToSearchCompareAndNotifications() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]

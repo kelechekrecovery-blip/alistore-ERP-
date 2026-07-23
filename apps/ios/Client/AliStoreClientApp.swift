@@ -157,6 +157,11 @@ private struct ClientHeader: View {
     let onCompare: () -> Void
     let onNotifications: () -> Void
     let onSearch: () -> Void
+    // На каталоге поиск уже живёт в ящике навбара (`.searchable`) и фильтрует
+    // сетку на месте. Кнопка в общей шапке открывала второй, отдельный экран
+    // поиска — два разных входа в одну функцию на одном экране. Прячем её
+    // только там; на остальных вкладках `.searchable` нет и кнопка нужна.
+    var showsSearch = true
 
     var body: some View {
         VStack(spacing: 10) {
@@ -171,21 +176,23 @@ private struct ClientHeader: View {
                     .accessibilityLabel("Уведомления")
             }
             .foregroundStyle(.white)
-            Button(action: onSearch) {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(Design3.textFaint)
-                    Text("Поиск техники, брендов…")
-                        .font(ClientTheme.body(14))
-                        .foregroundStyle(Design3.textFaint)
-                    Spacer()
+            if showsSearch {
+                Button(action: onSearch) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(Design3.textFaint)
+                        Text("Поиск техники, брендов…")
+                            .font(ClientTheme.body(14))
+                            .foregroundStyle(Design3.textFaint)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                 }
-                .padding(.horizontal, 14)
-                .frame(height: 44)
-                .glass(radius: 13)
-                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                .buttonStyle(.plain)
+                .accessibilityLabel("Поиск техники и брендов")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Поиск техники и брендов")
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
@@ -972,7 +979,12 @@ private struct ClientRootView: View {
                 ClientLoginView(auth: auth, onGuest: { guestMode = true })
             } else {
                 VStack(spacing: 0) {
-                    ClientHeader(onCompare: { overlay = .compare }, onNotifications: { overlay = .notifications }, onSearch: { overlay = .search })
+                    ClientHeader(
+                        onCompare: { overlay = .compare },
+                        onNotifications: { overlay = .notifications },
+                        onSearch: { overlay = .search },
+                        showsSearch: selectedTab != .catalog
+                    )
                     ZStack {
                         switch selectedTab {
                         case .home:
