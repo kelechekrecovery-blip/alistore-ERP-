@@ -1007,3 +1007,7 @@ Trusted evidence runner должен запускаться после `prisma g
 ## RECON-162 — принятие reconciliation evidence
 
 POS refund, courier COD, service/loaner и procurement/sale теперь имеют hash-bound evidence и проходят strict audit. Открыты только durable visual evidence, app-specific iOS/Android UI evidence и общий reconciled ecosystem E2E. Пользовательский `apps/web/tsconfig.json` не изменять и не коммитить.
+
+## ANDROID-163 — packaged connected UI gate принят
+
+Все четыре Android-модуля прошли connected tests на доступном AVD; evidence записано `66c0ef97`. Не считать это физическим устройством или store certification. Остались iOS UI, visual evidence и общий ecosystem E2E.
