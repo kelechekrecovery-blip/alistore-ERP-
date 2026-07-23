@@ -1015,3 +1015,7 @@ POS refund, courier COD, service/loaner и procurement/sale теперь име�
 ## ECOSYSTEM-164 — composite software matrix принят
 
 Общий fail-fast E2E прошёл все четыре вертикали и получил evidence `ef46852a`. Остались durable visual evidence и iOS app-specific UI gate; production credentials, physical-device smoke и App Store submission остаются внешними release gates.
+
+## VISUAL-165 — стабилизировать hash-bound visual runner
+
+Три visual assertions проходят, но Next меняет tracked `apps/web/tsconfig.json` при создании нового `.next-e2e-*` каталога, поэтому recorder отказывается писать evidence. Сохранить пользовательские include paths; исправить runner так, чтобы generated path не менял source во время gate.
