@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { clearGiftCardTransactions } from './db-test-cleanup';
-import { ACCOUNTING_ACCOUNT_SEED } from '../src/finance/accounting-chart';
+import { ensureReferenceData } from '../src/finance/ensure-reference-data';
 
 const prisma = new PrismaClient();
 
@@ -9,10 +9,10 @@ beforeEach(async () => {
 });
 
 beforeAll(async () => {
-  await prisma.accountingAccount.createMany({
-    data: ACCOUNTING_ACCOUNT_SEED.map((account) => ({ ...account })),
-    skipDuplicates: true,
-  });
+  // Тот же установщик, что и у деплоя. Раньше харнесс ставил план счетов своей
+  // копией кода — тесты чинили себя сами, и пустой справочник в рабочей базе
+  // никто не замечал.
+  await ensureReferenceData(prisma);
   await prisma.storePoint.upsert({
     where: { id: 'alistore-bishkek-1' },
     update: { active: true },

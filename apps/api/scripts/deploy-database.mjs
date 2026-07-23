@@ -12,6 +12,10 @@ if (!databaseUrl) {
 run('npx', ['prisma', 'migrate', 'deploy']);
 run('node', ['scripts/check-inventory-valuation-locations.mjs']);
 run('node', ['scripts/postdeploy-indexes.mjs']);
+// Справочники ставятся деплоем, а не миграцией и не тестами: до этого план
+// счетов существовал только в INSERT-е миграции и в тестовом харнессе, и в
+// рабочей базе его могло не оказаться вовсе.
+run('node', ['scripts/ensure-reference-data.mjs']);
 
 function run(command, args) {
   const result = spawnSync(command, args, {
