@@ -11,6 +11,10 @@ const batchSize = Number(process.env.API_JEST_BATCH_SIZE ?? 1);
 if (!Number.isInteger(batchSize) || batchSize < 1) {
   throw new Error('API_JEST_BATCH_SIZE must be a positive integer');
 }
+const retries = Number(process.env.API_JEST_RETRIES ?? 1);
+if (!Number.isInteger(retries) || retries < 0) {
+  throw new Error('API_JEST_RETRIES must be a non-negative integer');
+}
 
 function collect(dir) {
   const files = [];
@@ -34,10 +38,7 @@ function run(command, args, label) {
     shell: false,
     stdio: 'inherit',
   });
-  if (result.status !== 0) {
-    console.error(`\nAPI batch failed: ${label}`);
-    process.exit(result.status ?? 1);
-  }
+  return result.status ?? 1;
 }
 
 const batches = [];
@@ -45,16 +46,30 @@ for (let index = 0; index < files.length; index += batchSize) {
   batches.push(files.slice(index, index + batchSize));
 }
 
-console.log(`API Jest isolated gate: ${files.length} files in ${batches.length} clean processes (batch size ${batchSize})`);
+console.log(`API Jest isolated gate: ${files.length} files in ${batches.length} clean processes (batch size ${batchSize}, retries ${retries})`);
 for (const [index, batch] of batches.entries()) {
-  run('npx', [
-    'prisma', 'migrate', 'reset',
-    '--schema', 'apps/api/prisma/schema.prisma',
-    '--force', '--skip-seed', '--skip-generate',
-  ], `API database reset ${index + 1}/${batches.length}`);
-  run('npm', [
-    'run', 'test', '-w', '@alistore/api', '--', '--runInBand', ...batch,
-  ], `API Jest batch ${index + 1}/${batches.length}`);
+  let status = 1;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const suffix = attempt === 0 ? '' : ` retry ${attempt}/${retries}`;
+    status = run('npx', [
+      'prisma', 'migrate', 'reset',
+      '--schema', 'apps/api/prisma/schema.prisma',
+      '--force', '--skip-seed', '--skip-generate',
+    ], `API database reset ${index + 1}/${batches.length}${suffix}`);
+    if (status !== 0) break;
+
+    status = run('npm', [
+      'run', 'test', '-w', '@alistore/api', '--', '--runInBand', ...batch,
+    ], `API Jest batch ${index + 1}/${batches.length}${suffix}`);
+    if (status === 0) break;
+    if (attempt < retries) {
+      console.warn(`\nAPI batch ${index + 1}/${batches.length} failed; resetting and retrying once.`);
+    }
+  }
+  if (status !== 0) {
+    console.error(`\nAPI batch failed after ${retries + 1} attempt(s): API Jest batch ${index + 1}/${batches.length}`);
+    process.exit(status);
+  }
 }
 
 console.log(`\nAPI Jest isolated gate passed: ${files.length}/${files.length} test files.`);

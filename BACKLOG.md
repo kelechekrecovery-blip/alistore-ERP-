@@ -12,6 +12,11 @@
 - **Открыто:** единый `mvp:verify` дважды дошёл до длинного общего runner, но останавливался на разных одиночных нестабильных API/UI batch; изолированные suites проходят. Внешние Render/provider/device/App Review gates остаются открыты.
 - **Следующий шаг:** стабилизировать/декомпозировать общий runner и получить один непрерывный зелёный `mvp:verify`.
 
+## API-RUNNER-152 — не завершать общий gate из-за transient batch failure
+- **Сделано:** API batch runner получил ограниченный retry с полным database reset перед каждой повторной попыткой; после исчерпания retry любой failure остаётся фатальным.
+- **Проверено:** изолированные suites `support-rbac` и `staff-session-ops` проходят; retry-путь требует полного `mvp:verify`.
+- **Следующий шаг:** повторить единый gate и сохранить итоговый результат.
+
 ## PUBLIC-SMOKE-148 — повторно подтвердить публичный sandbox runtime
 - **Проверено:** storefront, `/catalog`, `admin`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; ready сообщает database `up`; HSTS и security headers присутствуют.
 - **Ограничение:** smoke подтверждает доступность текущего публичного контура, но не доказывает Render origin ownership, live provider certification или физические device gates.
