@@ -6505,3 +6505,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: **141/141 passed in 10.3m**; storefront, checkout, ERP, POS, Staff, warehouse, courier, service center, visual baselines, offline states, email auth and route audit зелёные.
 - Evidence: isolated API/Web processes; no stale server reuse. Production/provider/device/App Store gates remain separate and are not implied by this Web gate.
 - Next: rerun strict ecosystem audit on a clean accepted source snapshot; then continue external release gates.
+
+## ECOSYSTEM-AUDIT-178D-2026-07-23
+- Task: rerun strict ecosystem contract audit after accepting the full Web gate.
+- Result: design corpus `128/128`, link graph `153/153`, broken links `0`; strict audit remains **RED with 9 blockers**.
+- Remaining blockers: hash-verified visual contract, clean source tree, iOS UI evidence, Android connected evidence, four reconciliation evidence suites and aggregate reconciled ecosystem evidence.
+- Interpretation: Web is green, but the overall ecosystem is not yet release-ready. Uncommitted parallel changes remain preserved and were not staged.
