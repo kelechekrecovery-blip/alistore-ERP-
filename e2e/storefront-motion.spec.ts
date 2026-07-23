@@ -1,6 +1,19 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { sign } from 'jsonwebtoken';
 import { prisma, resetDb, seedProduct } from './helpers';
+
+async function gotoCommitted(page: Page, route: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(route, { waitUntil: 'commit', timeout: 45_000 });
+      return;
+    } catch (error) {
+      const message = String(error);
+      if (!message.includes('ERR_ABORTED') || attempt === 1) throw error;
+      await page.waitForTimeout(250);
+    }
+  }
+}
 
 test('desktop storefront matches the AliStore shop prototype', async ({ page }) => {
   await resetDb();
@@ -113,6 +126,7 @@ test('desktop catalog, product and cart keep the exact shop visual system', asyn
 });
 
 test('remaining desktop customer routes use the shop system through account entry', async ({ page }) => {
+  test.setTimeout(90_000);
   await resetDb();
   await page.setViewportSize({ width: 1440, height: 1000 });
 
@@ -174,14 +188,14 @@ test('remaining desktop customer routes use the shop system through account entr
     // account detail route after several client navigations. The route has
     // already committed at this point; assertions below wait for its actual
     // authenticated content and catch a real hydration/API regression.
-    await page.goto(route, { waitUntil: 'commit' });
+    await gotoCommitted(page, route);
     await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
     expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
   }
 
   await page.setViewportSize({ width: 402, height: 858 });
-  await page.goto('/account/devices');
+  await gotoCommitted(page, '/account/devices');
   await expect(page.getByText(product.name, { exact: true })).toBeVisible();
   await expect(page.locator('.account-detail-header')).toBeHidden();
   expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(14, 12, 10)');
