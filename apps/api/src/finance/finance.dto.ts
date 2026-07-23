@@ -130,6 +130,15 @@ export class CreateCashIncassationDto {
   @Min(1)
   amount!: number;
 
+  /**
+   * Where the cash goes. '1010' — расчётный счёт (по умолчанию, перемещение
+   * актива); '3000' — Капитал владельца (выемка, распределение). Другие счета
+   * плана запрещены: инкассация не должна становиться произвольной проводкой.
+   */
+  @IsOptional()
+  @IsIn(['1010', '3000'])
+  destinationCode?: string;
+
   @IsOptional()
   @IsString()
   reference?: string;

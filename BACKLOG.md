@@ -256,6 +256,55 @@
 - **В работе:** `scripts/ecosystem-toolchain-lock.json` отставал от текущего committed `package-lock.json`, установленного dependency tree и обновлённого Chrome, поэтому `ecosystem:audit:strict` останавливался до проверки контрактов.
 - **Сделано в текущем срезе:** зависимости восстановлены из `package-lock` через `npm ci`, npm CLI shims восстановлены через `npm install --ignore-scripts`, fingerprints пересчитаны без изменения production-кода и без ослабления trusted runner.
 - **Следующий шаг:** после commit повторить strict audit; закрывать только реальные GAP через hash-verified visual/native/reconciliation evidence.
+## Харденинг денежной поверхности (риск-свип ruflo) 2026-07-22
+Из систематического ревью «Very Complex» модулей `apps/api`. Все деньги/сток/статус идут
+через `audit.transaction`, критики нет. Найдены несоответствия — приоритет по риску.
+Фазы 2 (`price`-guard, `reject_refund` lock, RBAC-тест) уже сделаны отдельными коммитами.
+
+- `LEDGER-HARDEN-31` **Refund-webhook без подписи на sandbox/staging — внешний блокер, НЕ живая прод-дыра.**
+  `apps/api/src/refunds/refund-webhooks.controller.ts` — публичный неаутентифицированный роут
+  (`ApiExcludeController`). Уточнено по коду (комментарий :19-23): **в прод провайдер `none`,
+  `verifyRefundWebhook` отдаёт 503 → роут недостижим** (возвраты идут наличными через домен
+  refunds). Skip подписи только на sandbox/staging, где throttle 60/мин закрывает перебор статусов,
+  пока нет боевого подписанного адаптера. Реализовать проверку подписи **нельзя без живого
+  провайдера** (внешний блокер из `docs/READINESS.md` — «Боевой платёжный шлюз»). Держать как
+  gated-on-external: когда появится адаптер — включить `verifyRefundWebhook` подпись и на staging + тест на отказ.
+- `LEDGER-HARDEN-32` ✅ **ЗАКРЫТО** (advisory-lock replay entry-gate на `resolveConfirm`, симметрично с cancel; finalize-цикл не тронут, partial-success сохранён; refund-сьюты 38/38). Ниже — исходный контекст. **Асимметрия concurrency `resolveConfirm` vs `resolveCancel`.**
+  `apps/api/src/refunds/refunds.processor.ts`: `resolveCancel` (:443) в одной `audit.transaction`
+  берёт advisory-lock `refund-resolve:` (:451) и перепроверяет replay в tx (:452). `resolveConfirm`
+  (:384) читает refund **вне** tx (:392), replay-pre-check только общий вне tx (`resolveRefund:368`),
+  а сериализацию оставляет per-allocation `FOR UPDATE` в `finalize` (:537-538). Reviewer: «likely
+  safe, но несимметрично». **Не быстрый фикс:** `resolveConfirm` — цикл отдельных транзакций
+  (`finalize` per allocation, ради partial-success), а `pg_advisory_xact_lock` живёт лишь внутри
+  своей tx; session-level лок с пулом Prisma ненадёжен. Требует дизайна (внешняя короткая tx с
+  advisory-lock вокруг цикла, либо перепроверка replay внутри finalize первой аллокации). Латентно.
+- `LEDGER-HARDEN-33` ✅ **ЗАКРЫТО** (Casbin approve-строки сведены к `canApprove`: `writeoff`→`write_off` + добавлены `quarantine_write_off`/`exchange`/`campaign_budget`; cross-consistency тест `authz-approval-consistency` запирает совпадение обеих матриц по 12×10; approve-строки опасных действий на роутах мертвы — behavior-preserving). Ниже — исходный контекст. **Дрейф двух матриц авторизации.** Casbin `RBAC_POLICY`
+  (контроллеры) vs сервисный `APPROVAL_APPROVER_ROLES` (`apps/api/src/rbac/permissions.ts:24`).
+  `PATCH /approvals/:id/decide` без `@RequirePermission` — держится только на `canApprove`
+  (`approvals.service.ts:163`); Casbin `*, approve`-строки для этого пути не используются и могут
+  разойтись молча. Уже есть naming-drift: Casbin `writeoff` vs `write_off`; нет строк
+  `campaign_budget`/`quarantine_write_off`/`exchange`. Инвариант «senior_seller → 403» закреплён
+  тестом (Фаза 2.3), а **авторитетная матрица `canApprove` заперта исчерпывающим unit-тестом**
+  `apps/api/src/rbac/permissions.spec.ts` (12 действий × 10 ролей, 123/123) — теперь любое
+  расширение/сужение прав approve ловится. Проверено: Casbin `authz.can(...)` живой (customers/
+  evidence/orders/support/warranty), но его `*, approve`-строки на decide-путь не влияют.
+  **Остаётся архитектурное решение:** свести Casbin `*, approve` к `APPROVAL_APPROVER_ROLES` как к
+  единому источнику (устранив naming-drift и мёртвые строки) **или** оставить и добавить cross-тест
+  согласованности. Не делаю автономно — меняет живую policy.
+- `LEDGER-HARDEN-34` ✅ **ЗАКРЫТО** (reject теперь через `decideWithStepUp` — 2FA обязательна и на отклонение; web Approval Inbox распространил свой 2FA-гейт на reject; тест `approvals-reject-stepup`: без токена→403 `staff_2fa_token_required`, с токеном→rejected; сервис-прямые вызовы не затронуты). Ниже — исходный контекст. **Step-up TOTP только на approve, не на reject.**
+  `apps/api/src/approvals/approvals.controller.ts:72` роутит по `dto.status`: approve идёт через
+  `decideWithStepUp`, reject — через `decide` без второго фактора, хотя `ACTION_REJECTION_EXECUTORS`
+  могут восстановить/списать сток. Требовать ли step-up на reject опасных действий — за владельцем;
+  если да — срез с тестом.
+- `LEDGER-HARDEN-35` ✅ **ЗАКРЫТО** (advisory-lock `campaign-spend:<key>` + re-check внутри tx, паттерн refunds; гонка возвращает replay вместо сырого unique-error; campaigns 2/2). Ниже — исходный контекст. **`campaigns.recordSpend` idempotency вне транзакции (мелко).**
+  `apps/api/src/campaigns/campaigns.service.ts:322` проверяет ключ вне tx и ловит гонку сырым
+  unique-constraint (вместо advisory-lock double-check как в refunds) → сырой Prisma-error вместо
+  `ConflictError`. Косметика надёжности; отдельным мелким срезом.
+- `LEDGER-HARDEN-36` **POS без advisory-lock и без единой ledger-tx (инвариант-заметка).**
+  `apps/api/src/pos/pos.service.ts` — сага; корректность держится на инвариантах подчинённых
+  сервисов + uniques `Order.idempotencyKey`/`Payment.txnId` + resume/replay (`saleRequestHash`,
+  `assertReplayCompatible`). Не дефект — записано как инвариант, чтобы будущий харденинг
+  orders/payments/shifts/units не сломал POS crash-recovery.
 
 ## Зависимости 2026-07-22
 - `DEP-AUDIT-SHARP-001` **`sharp <0.35.0` под `next` — принято, ждём upstream.** `npm audit

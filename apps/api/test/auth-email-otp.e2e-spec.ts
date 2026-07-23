@@ -20,6 +20,7 @@ describe('Auth: email + OTP → JWT (integration)', () => {
   let auth: AuthService;
   let seq = 0;
   let phoneSeq = 0;
+  let ownCustomerIds: string[] = [];
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -38,15 +39,27 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     await prisma.$disconnect();
   });
 
+  // Чистим ровно то, что создали сами. Прежняя версия сносила все refreshToken
+  // без фильтра и всех покупателей с телефоном на `+99678` — а это префикс
+  // кыргызских мобильных, а не метка фикстур этого сьюта. На общей базе она
+  // выносила чужих покупателей (падая на `Order_customerId_fkey`, если у них
+  // были заказы) и чужие сессии, роняя `auth.e2e-spec.ts`. Доменная дисциплина
+  // `@emailotp.test` из шапки этого файла распространяется и на чистку.
   beforeEach(async () => {
-    await prisma.refreshToken.deleteMany();
+    await prisma.refreshToken.deleteMany({ where: { customerId: { in: ownCustomerIds } } });
     await prisma.otpChallenge.deleteMany({
       where: { email: { endsWith: '@emailotp.test' } },
     });
-    await prisma.customer.deleteMany({
-      where: { phone: { startsWith: '+99678' } },
-    });
+    await prisma.customer.deleteMany({ where: { id: { in: ownCustomerIds } } });
+    ownCustomerIds = [];
   });
+
+  /** Заводит покупателя и запоминает его id, чтобы чистка не выходила за пределы сьюта. */
+  async function createOwnCustomer(data: { phone: string; name: string; email?: string }) {
+    const customer = await prisma.customer.create({ data });
+    ownCustomerIds = [...ownCustomerIds, customer.id];
+    return customer;
+  }
 
   function nextEmail(): string {
     seq += 1;
@@ -59,9 +72,7 @@ describe('Auth: email + OTP → JWT (integration)', () => {
   }
 
   async function seedCustomerWithEmail(email: string) {
-    return prisma.customer.create({
-      data: { phone: nextPhone(), name: 'Тест', email },
-    });
+    return createOwnCustomer({ phone: nextPhone(), name: 'Тест', email });
   }
 
   it('logs an existing customer in by their attached email', async () => {
@@ -197,9 +208,7 @@ describe('Auth: email + OTP → JWT (integration)', () => {
   describe('attaching an email to an account', () => {
     it('attaches only after the code sent to that address is confirmed', async () => {
       const email = nextEmail();
-      const customer = await prisma.customer.create({
-        data: { phone: nextPhone(), name: 'Без почты' },
-      });
+      const customer = await createOwnCustomer({ phone: nextPhone(), name: 'Без почты' });
 
       const { devCode } = await auth.requestEmailAttach(customer.id, email);
       expect(devCode).toMatch(/^\d{6}$/);
@@ -219,9 +228,7 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     it('refuses an address already attached to another account', async () => {
       const email = nextEmail();
       await seedCustomerWithEmail(email);
-      const other = await prisma.customer.create({
-        data: { phone: nextPhone(), name: 'Другой' },
-      });
+      const other = await createOwnCustomer({ phone: nextPhone(), name: 'Другой' });
 
       const { devCode } = await auth.requestEmailAttach(other.id, email);
       await expect(
@@ -230,9 +237,7 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     });
 
     it('rejects a malformed address before issuing any code', async () => {
-      const customer = await prisma.customer.create({
-        data: { phone: nextPhone(), name: 'Кривой ввод' },
-      });
+      const customer = await createOwnCustomer({ phone: nextPhone(), name: 'Кривой ввод' });
       await expect(auth.requestEmailAttach(customer.id, 'не-почта')).rejects.toBeInstanceOf(
         ValidationError,
       );

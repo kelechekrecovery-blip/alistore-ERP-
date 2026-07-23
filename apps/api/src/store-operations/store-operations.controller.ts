@@ -16,9 +16,15 @@ import { CreateStoreChecklistDto, CreateStoreIncidentDto, ResolveStoreIncidentDt
 export class StoreOperationsController {
   constructor(private readonly operations: StoreOperationsService) {}
 
+  /**
+   * Scoped to the caller's own point: `store_operations:read` is held by every
+   * role standing in a store, and an unfiltered overview used to return the
+   * whole network's checklists and free-text incidents. admin/owner may still
+   * ask for another point explicitly.
+   */
   @Get('overview')
   @RequirePermission('store_operations', 'read')
-  overview(@Query() query: StoreOperationsQueryDto) { return this.operations.overview(query); }
+  overview(@CurrentUser() user: AuthPrincipal, @Query() query: StoreOperationsQueryDto) { return this.operations.overview(query, user); }
 
   @Post('checklists')
   @RequirePermission('store_operations', 'manage')

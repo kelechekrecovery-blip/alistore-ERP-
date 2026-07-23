@@ -20,14 +20,18 @@ m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
 export const RBAC_POLICY = `
 p, senior_seller, discount, approve
 p, admin, refund, approve
-p, owner, writeoff, approve
+p, owner, write_off, approve
 p, admin, price, approve
 p, senior_seller, debt, approve
 p, owner, stock_adjust, approve
 p, owner, delete, approve
 p, admin, pii, approve
+p, owner, quarantine_write_off, approve
+p, senior_seller, exchange, approve
+p, admin, campaign_budget, approve
 p, owner, staff, manage
 p, owner, settings, manage
+p, marketer, approvals, read
 p, senior_seller, approvals, read
 p, admin, approvals, read
 p, owner, approvals, read
@@ -269,6 +273,7 @@ p, admin, finance, approve
 p, owner, finance, approve
 p, admin, manual_adjustment, approve
 p, owner, manual_adjustment, approve
+p, admin, storefront_publish, approve
 p, admin, finance, pay
 p, owner, finance, pay
 p, cashier, debts, create

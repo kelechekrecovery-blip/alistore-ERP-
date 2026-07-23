@@ -202,9 +202,20 @@ export interface CashIncassation {
   shiftId: string;
   point: string;
   amount: number;
+  /** '1010' — расчётный счёт, '3000' — выемка владельцем (Капитал владельца). */
+  destinationCode: string;
   status: 'deposited' | 'reconciled' | 'disputed';
   depositedAt: string;
   accountingEntryId: string | null;
+}
+
+export interface CollectableShift {
+  id: string;
+  point: string;
+  closedAt: string | null;
+  closeCash: number;
+  deposited: number;
+  available: number;
 }
 
 export interface FinancePlanFactRow {
@@ -370,6 +381,17 @@ export const fetchBankStatements = (accessToken: string) =>
 
 export const fetchCashIncassations = (accessToken: string) =>
   getJson<CashIncassation[]>('/finance/cash-incassations', accessToken);
+
+/** Closed shifts that still hold uncollected cash — the incassation picker. */
+export const fetchCollectableShifts = (accessToken: string) =>
+  getJson<CollectableShift[]>('/finance/collectable-shifts', accessToken);
+
+export const createCashIncassation = (
+  shiftId: string,
+  input: { amount: number; destinationCode: '1010' | '3000'; reference?: string },
+  idempotencyKey: string,
+  accessToken: string,
+) => postAuthJson<CashIncassation>(`/finance/cash-incassations/${encodeURIComponent(shiftId)}`, input, accessToken, { 'idempotency-key': idempotencyKey });
 
 export const fetchTrialBalance = (period: string, point: string, accessToken: string) => {
   const [year, month] = period.split('-').map(Number);

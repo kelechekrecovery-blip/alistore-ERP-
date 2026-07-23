@@ -15,13 +15,13 @@ describe('AuthzService (casbin — Role Permission Matrix)', () => {
   it('owner inherits admin + senior_seller permissions', async () => {
     expect(await authz.can('owner', 'refund', 'approve')).toBe(true); // via admin
     expect(await authz.can('owner', 'discount', 'approve')).toBe(true); // via senior_seller
-    expect(await authz.can('owner', 'writeoff', 'approve')).toBe(true); // direct
+    expect(await authz.can('owner', 'write_off', 'approve')).toBe(true); // direct
   });
 
   it('a plain seller may not approve any dangerous action', async () => {
     expect(await authz.can('seller', 'discount', 'approve')).toBe(false);
     expect(await authz.can('seller', 'refund', 'approve')).toBe(false);
-    expect(await authz.can('seller', 'writeoff', 'approve')).toBe(false);
+    expect(await authz.can('seller', 'write_off', 'approve')).toBe(false);
   });
 
   it('keeps inventory valuation and GL reconciliation financial', async () => {

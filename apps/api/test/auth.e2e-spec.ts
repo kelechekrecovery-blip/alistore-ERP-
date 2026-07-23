@@ -5,13 +5,16 @@ import { AuthService } from '../src/auth/auth.service';
 import { ValidationError } from '../src/common/errors';
 
 /**
- * Phone+OTP login (integration, real Postgres). Uses the +99679… phone prefix so
- * it never collides with other integration suites' customers.
+ * Phone+OTP login (integration, real Postgres). Numbers come from the +99679…
+ * range, but that alone guarantees nothing: it is an ordinary Kyrgyz mobile
+ * prefix, and other suites generate numbers inside it. Isolation comes from the
+ * cleanup below, which touches only the numbers this suite handed out.
  */
 describe('Auth: phone + OTP → JWT (integration)', () => {
   let prisma: PrismaService;
   let auth: AuthService;
   let seq = 0;
+  let ownPhones: string[] = [];
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -30,19 +33,27 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     await prisma.$disconnect();
   });
 
+  // Чистим только собственные номера. `+99679` — префикс кыргызских мобильных, а
+  // не метка фикстур этого сьюта: по нему чистка выносила покупателей других
+  // сьютов и падала на `Order_customerId_fkey`, когда у них были заказы. Здесь
+  // покупателя создаёт сам AuthService при входе, поэтому опорой служат номера,
+  // которые выдал `nextPhone`, а не id из явного create.
   beforeEach(async () => {
-    await prisma.refreshToken.deleteMany();
-    await prisma.otpChallenge.deleteMany({
-      where: { phone: { startsWith: '+99679' } },
+    const own = await prisma.customer.findMany({
+      where: { phone: { in: ownPhones } },
+      select: { id: true },
     });
-    await prisma.customer.deleteMany({
-      where: { phone: { startsWith: '+99679' } },
-    });
+    await prisma.refreshToken.deleteMany({ where: { customerId: { in: own.map((c) => c.id) } } });
+    await prisma.otpChallenge.deleteMany({ where: { phone: { in: ownPhones } } });
+    await prisma.customer.deleteMany({ where: { phone: { in: ownPhones } } });
+    ownPhones = [];
   });
 
   function nextPhone(): string {
     seq += 1;
-    return `+99679${seq.toString().padStart(7, '0')}`;
+    const phone = `+99679${seq.toString().padStart(7, '0')}`;
+    ownPhones = [...ownPhones, phone];
+    return phone;
   }
 
   it('requests then verifies an OTP, issuing access + refresh tokens', async () => {

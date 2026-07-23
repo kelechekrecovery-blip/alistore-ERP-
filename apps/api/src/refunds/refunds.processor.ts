@@ -389,6 +389,25 @@ export class RefundProcessor {
     requestHash: string,
     idempotencyRef: string,
   ) {
+    // Symmetric with resolveCancel (LEDGER-HARDEN-32): take the resolve advisory
+    // lock and re-check replay under it before any provider confirmation, so two
+    // confirms for the same idempotency key serialize here and a confirm that
+    // races a completed resolve returns idempotently instead of re-finalizing.
+    // The per-allocation finalize loop below keeps its own transactions to
+    // preserve partial success, and stays the authority against double-refund
+    // via each allocation's FOR UPDATE + status guard.
+    const replayed = await this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'refund-resolve:' + idempotencyRef}))::text AS locked`;
+      const replay = await tx.auditEvent.findFirst({
+        where: { type: EventType.RefundResolved, refs: { has: idempotencyRef } },
+      });
+      if (replay && (!replay.refs.includes(refundId) || (replay.payload as Record<string, unknown>).requestHash !== requestHash)) {
+        throw new ConflictError('idempotency_key_reused', 'Ключ уже использован с другим запросом');
+      }
+      return { result: Boolean(replay), events: [] };
+    });
+    if (replayed) return this.prisma.refund.findUniqueOrThrow({ where: { id: refundId } });
+
     const refund = await this.prisma.refund.findUnique({
       where: { id: refundId },
       include: { allocations: { orderBy: { ordinal: 'asc' } } },

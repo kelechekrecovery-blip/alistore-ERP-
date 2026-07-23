@@ -10,7 +10,10 @@ describe('Runtime security configuration', () => {
   const env = (values: Record<string, string>) => (name: string) => values[name];
 
   it('reflects localhost origins only in non-production development', () => {
-    expect(resolveCorsOptions(env({ NODE_ENV: 'development' }))).toEqual({ origin: true });
+    // credentials must be on here too: staff/customer web auth is cookie-based
+    // (`credentials: 'include'`), and without Access-Control-Allow-Credentials the
+    // browser blocks every login with a bare "Failed to fetch" in local dev.
+    expect(resolveCorsOptions(env({ NODE_ENV: 'development' }))).toEqual({ origin: true, credentials: true });
   });
 
   it('requires a valid explicit CORS allowlist in production', () => {

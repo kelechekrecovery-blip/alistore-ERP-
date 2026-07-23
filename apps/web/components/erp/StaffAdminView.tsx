@@ -4,22 +4,21 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   ApiError,
   STAFF_ROLES,
+  changeStaffRole,
   createStaffAccount,
   deactivateStaffAccount,
-  fetchHrWeek,
+  fetchStaffAccounts,
+  reactivateStaffAccount,
+  resetStaffPassword,
   resetStaffTotp,
-  type HrStaff,
+  type StaffAccountRow,
   type StaffRole,
 } from '@/lib/api';
 
-function mondayIso() {
-  const now = new Date();
-  const day = now.getDay() || 7;
-  now.setDate(now.getDate() - day + 1);
-  return now.toISOString().slice(0, 10);
-}
-
-type PendingAction = { kind: 'deactivate' | 'totp-reset'; staff: HrStaff } | null;
+type PendingAction =
+  | { kind: 'deactivate' | 'totp-reset' | 'password-reset' | 'reactivate'; staff: StaffAccountRow }
+  | { kind: 'role'; staff: StaffAccountRow; role: StaffRole }
+  | null;
 
 /**
  * UI-STAFF-ADMIN: owner-only staff account admin (STAFF-001/002 API). The account
@@ -28,18 +27,19 @@ type PendingAction = { kind: 'deactivate' | 'totp-reset'; staff: HrStaff } | nul
  * are shown under the account row.
  */
 export function StaffAdminView({ accessToken }: { accessToken: string }) {
-  const [staff, setStaff] = useState<HrStaff[] | null>(null);
+  const [staff, setStaff] = useState<StaffAccountRow[] | null>(null);
   const [message, setMessage] = useState('');
   const [notice, setNotice] = useState('');
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
   const [pending, setPending] = useState<PendingAction>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ username: '', password: '', role: 'seller' as StaffRole, point: 'BISHKEK-1' });
 
   const reload = useCallback(() => {
     setMessage('');
-    fetchHrWeek(mondayIso(), '', accessToken)
-      .then((result) => setStaff(result.staff))
+    fetchStaffAccounts(accessToken)
+      .then(setStaff)
       .catch((error) => { setStaff(null); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить учётки'); });
   }, [accessToken]);
   useEffect(() => reload(), [reload]);
@@ -71,6 +71,16 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       if (kind === 'deactivate') {
         await deactivateStaffAccount(target.id, accessToken);
         setNotice(`Учётка ${target.username} деактивирована`);
+      } else if (kind === 'role') {
+        const updated = await changeStaffRole(target.id, pending.role, accessToken);
+        setNotice(`Роль ${target.username}: ${updated.role}`);
+      } else if (kind === 'reactivate') {
+        await reactivateStaffAccount(target.id, accessToken);
+        setNotice(`Учётка ${target.username} снова активна`);
+      } else if (kind === 'password-reset') {
+        await resetStaffPassword(target.id, newPassword, accessToken);
+        setNewPassword('');
+        setNotice(`Пароль ${target.username} сброшен — старые сессии завершены`);
       } else {
         await resetStaffTotp(target.id, accessToken);
         setNotice(`2FA для ${target.username} сброшена — сотрудник настроит её заново при входе`);
@@ -78,8 +88,8 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       setPending(null);
       reload();
     } catch (error) {
-      if (kind === 'deactivate' && error instanceof ApiError && error.status === 409) {
-        // STAFF-001 blockers: open cash shift and/or active courier deliveries.
+      if ((kind === 'deactivate' || kind === 'role') && error instanceof ApiError && error.status === 409) {
+        // STAFF-001 blockers (open shift / active deliveries) and STAFF-004 last_owner_protected.
         setRowError((current) => ({ ...current, [target.id]: error.message }));
         setPending(null);
       } else {
@@ -112,14 +122,40 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       </form>
 
       {staff === null && !message && <p className="mt-4 font-mono text-xs text-subtle">Загрузка…</p>}
-      {staff?.length === 0 && <p className="mt-4 text-xs text-subtle">Активных учёток нет</p>}
+      {staff?.length === 0 && <p className="mt-4 text-xs text-subtle">Учёток нет</p>}
       <ul className="mt-3 divide-y divide-surface-2">
         {(staff ?? []).map((person) => (
           <li key={person.id} className="py-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-white">{person.username}</span>
               <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-lime">{person.role}</span>
-              <span className="ml-auto flex gap-2">
+              {!person.active && <span className="rounded bg-coral-soft/20 px-1.5 py-0.5 font-mono text-[10px] text-coral-tint">неактивна</span>}
+              {!person.active && (
+                <span className="ml-auto">
+                  <button
+                    type="button"
+                    disabled={busy === person.id}
+                    onClick={() => setPending({ kind: 'reactivate', staff: person })}
+                    className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-lime hover:border-lime disabled:opacity-50"
+                  >Реактивировать</button>
+                </span>
+              )}
+              {person.active && <span className="ml-auto flex flex-wrap gap-2">
+                <select
+                  aria-label={`Роль ${person.username}`}
+                  value={person.role}
+                  disabled={busy === person.id}
+                  onChange={(event) => setPending({ kind: 'role', staff: person, role: event.target.value as StaffRole })}
+                  className="h-8 rounded-[6px] border border-line bg-surface px-2 text-[11px] text-white"
+                >
+                  {STAFF_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+                </select>
+                <button
+                  type="button"
+                  disabled={busy === person.id}
+                  onClick={() => setPending({ kind: 'password-reset', staff: person })}
+                  className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-bright hover:border-lime hover:text-lime disabled:opacity-50"
+                >Сбросить пароль</button>
                 <button
                   type="button"
                   disabled={busy === person.id}
@@ -132,19 +168,31 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
                   onClick={() => setPending({ kind: 'deactivate', staff: person })}
                   className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-danger-soft hover:border-coral-soft disabled:opacity-50"
                 >Деактивировать</button>
-              </span>
+              </span>}
             </div>
             {pending?.staff.id === person.id && (
               <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[8px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2">
                 <span className="text-xs text-coral-tint">
-                  {pending.kind === 'deactivate'
-                    ? `Деактивировать ${person.username}? Доступ отключится сразу.`
-                    : `Сбросить 2FA для ${person.username}? Текущий authenticator перестанет работать.`}
+                  {pending.kind === 'deactivate' && `Деактивировать ${person.username}? Доступ отключится сразу.`}
+                  {pending.kind === 'totp-reset' && `Сбросить 2FA для ${person.username}? Текущий authenticator перестанет работать.`}
+                  {pending.kind === 'reactivate' && `Вернуть доступ ${person.username}? Учётка снова сможет входить.`}
+                  {pending.kind === 'role' && `Сменить роль ${person.username}: ${person.role} → ${pending.role}?`}
+                  {pending.kind === 'password-reset' && `Новый пароль для ${person.username} (старые сессии завершатся):`}
                 </span>
-                <button type="button" disabled={busy === person.id} onClick={confirmPending} className="ml-auto rounded-[6px] bg-coral-soft px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
+                {pending.kind === 'password-reset' && (
+                  <input
+                    aria-label="Новый пароль"
+                    type="password"
+                    placeholder="Минимум 8 символов"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    className="h-8 rounded-[6px] border border-line bg-surface px-2 text-xs text-white"
+                  />
+                )}
+                <button type="button" disabled={busy === person.id || (pending.kind === 'password-reset' && newPassword.length < 8)} onClick={confirmPending} className="ml-auto rounded-[6px] bg-coral-soft px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
                   {busy === person.id ? '…' : 'Подтвердить'}
                 </button>
-                <button type="button" onClick={() => setPending(null)} className="rounded-[6px] border border-line px-3 py-1.5 text-[11px] text-bright">Отмена</button>
+                <button type="button" onClick={() => { setPending(null); setNewPassword(''); }} className="rounded-[6px] border border-line px-3 py-1.5 text-[11px] text-bright">Отмена</button>
               </div>
             )}
             {rowError[person.id] && (

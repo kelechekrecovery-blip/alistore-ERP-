@@ -29,6 +29,7 @@ export interface ApprovalRequest {
  */
 export const FOUR_EYES_ACTIONS: readonly string[] = [
   'campaign_budget',
+  'storefront_publish',
   'refund',
   'quarantine_write_off',
   'exchange',

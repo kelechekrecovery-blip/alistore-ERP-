@@ -9,9 +9,13 @@ export function resolveCorsOptions(env: RuntimeEnvReader): CorsOptions {
   if (env('NODE_ENV') === 'production' && origins.length === 0) {
     throw new Error('CORS_ORIGINS is required in production');
   }
+  // `credentials` must be enabled on both branches: staff and customer web auth
+  // is cookie-based (`fetch(..., { credentials: 'include' })`), and without
+  // Access-Control-Allow-Credentials the browser rejects every such response —
+  // local dev without CORS_ORIGINS could not log in at all ("Failed to fetch").
   return origins.length > 0
     ? { origin: origins, credentials: true }
-    : { origin: true };
+    : { origin: true, credentials: true };
 }
 
 export function resolveHelmetOptions(env: RuntimeEnvReader): HelmetOptions {

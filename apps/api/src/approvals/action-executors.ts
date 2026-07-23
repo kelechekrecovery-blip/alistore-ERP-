@@ -9,6 +9,7 @@ import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment
 import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
+import { publishStorefrontRevisionOnTx } from '../storefront/storefront-publish';
 
 const manual_adjustment: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const documentNumber = String(payload['documentNumber'] ?? '').trim();
@@ -735,6 +736,23 @@ const debt: ActionExecutor = async (tx, payload, approver, approvalId, events) =
   );
 };
 
+/**
+ * storefront_publish — make a parked revision public. The homepage used to go
+ * live on a single marketer POST; the revision now waits here for a second pair
+ * of eyes. Rejection needs no executor: the draft simply stays a draft.
+ */
+const storefront_publish: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const revisionId = String(payload['revisionId'] ?? '');
+  if (!revisionId) throw new ValidationError('storefront_revision_missing', 'Снимок публикации витрины повреждён');
+  await publishStorefrontRevisionOnTx(tx, revisionId, approver, events);
+  events.push({
+    type: EventType.StorefrontPublishApproved,
+    actor: approver,
+    payload: { revisionId, approvalId },
+    refs: [revisionId, approvalId],
+  });
+};
+
 export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   campaign_budget,
   refund,
@@ -745,6 +763,7 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   delete: del,
   debt,
   manual_adjustment,
+  storefront_publish,
 };
 
 export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {

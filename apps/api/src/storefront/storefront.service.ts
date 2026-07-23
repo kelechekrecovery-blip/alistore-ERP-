@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { AuditService } from '../audit/audit.service';
+import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { CatalogService } from '../catalog/catalog.service';
 import { ConflictError, ValidationError } from '../common/errors';
+import { publishStorefrontRevisionOnTx } from './storefront-publish';
 import { ModerationService } from '../ai/moderation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStorefrontContentDto, ScheduleStorefrontContentDto, StorefrontBenefitDto } from './storefront.dto';
@@ -98,35 +99,9 @@ export class StorefrontService {
 
   async publish(id: string, actor: string) {
     return this.audit.transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('storefront-content-publish'))`;
-      const revision = await tx.storefrontContentRevision.findUnique({ where: { id } });
-      if (!revision) throw new ValidationError('storefront_revision_not_found', 'Ревизия витрины не найдена');
-      if (revision.status === 'published') return { result: revision, events: [] };
-      if (revision.status !== 'draft') throw new ConflictError('storefront_revision_not_draft', 'Опубликовать можно только черновик');
-      await tx.storefrontContentRevision.updateMany({
-        where: {
-          OR: [
-            { status: 'published' },
-            { status: 'scheduled', startsAt: { lte: new Date() } },
-          ],
-        },
-        data: { status: 'archived' },
-      });
-      const published = await tx.storefrontContentRevision.update({
-        where: { id },
-        data: {
-          status: 'published',
-          publishedBy: actor,
-          publishedAt: new Date(),
-          scheduledBy: null,
-          startsAt: null,
-          endsAt: null,
-        },
-      });
-      return {
-        result: published,
-        events: [{ type: EventType.StorefrontContentPublished, actor, payload: { revisionId: id, version: published.version }, refs: [id] }],
-      };
+      const events: AuditInput[] = [];
+      const published = await publishStorefrontRevisionOnTx(tx, id, actor, events);
+      return { result: published, events };
     });
   }
 

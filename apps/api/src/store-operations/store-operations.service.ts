@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, StoreChecklistType, StoreIncidentStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
-import { ConflictError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStoreChecklistDto, CreateStoreIncidentDto, ResolveStoreIncidentDto, StoreOperationsQueryDto, UpdateChecklistItemDto } from './store-operations.dto';
 
@@ -52,9 +53,27 @@ function serialise<T extends ChecklistCommandResult>(value: T): Prisma.InputJson
 export class StoreOperationsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  async overview(query: StoreOperationsQueryDto) {
+  /**
+   * Staff read their own point and nothing else. Only admin/owner may name a
+   * different one (or omit it entirely for a network-wide view) — everyone else
+   * is pinned, so omitting the filter can no longer widen the result set.
+   */
+  private async resolveReadablePoint(requested: string | undefined, user: AuthPrincipal): Promise<string | undefined> {
+    const staff = await this.prisma.staffUser.findUnique({
+      where: { id: user.customerId },
+      select: { point: true, role: true },
+    });
+    if (!staff) throw new ForbiddenError('staff_not_found', 'Сотрудник не найден');
+    if (staff.role === 'admin' || staff.role === 'owner') return requested;
+    if (requested && requested !== staff.point) {
+      throw new ForbiddenError('store_point_mismatch', 'Доступны операции только своей точки');
+    }
+    return staff.point;
+  }
+
+  async overview(query: StoreOperationsQueryDto, user: AuthPrincipal) {
     const date = businessDate(query.date);
-    const point = query.point?.trim() || undefined;
+    const point = await this.resolveReadablePoint(query.point?.trim() || undefined, user);
     const [checklists, incidents] = await Promise.all([
       this.prisma.storeOperationChecklist.findMany({
         where: { businessDate: date, ...(point ? { point } : {}) },
