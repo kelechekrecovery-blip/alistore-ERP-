@@ -1,4 +1,4 @@
-import { API_BASE, getJson, postAuthJson, postJson } from './http';
+import { API_BASE, getJson, patchAuthJson, postAuthJson, postJson } from './http';
 
 export interface StaffLoginResult {
   accessToken: string;
@@ -128,4 +128,22 @@ export function resetStaffTotp(
   accessToken: string,
 ): Promise<StaffPublicProfile> {
   return postAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/totp-reset`, {}, accessToken);
+}
+
+/** STAFF-004: promote/demote. 409 last_owner_protected guards the last active owner. */
+export function changeStaffRole(
+  staffId: string,
+  role: StaffRole,
+  accessToken: string,
+): Promise<StaffPublicProfile> {
+  return patchAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/role`, { role }, accessToken);
+}
+
+/** STAFF-004: admin password reset; the target's refresh sessions die with the old password. */
+export function resetStaffPassword(
+  staffId: string,
+  password: string,
+  accessToken: string,
+): Promise<StaffPublicProfile> {
+  return postAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/password-reset`, { password }, accessToken);
 }

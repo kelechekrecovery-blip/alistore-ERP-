@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   ApiError,
   STAFF_ROLES,
+  changeStaffRole,
   createStaffAccount,
   deactivateStaffAccount,
   fetchHrWeek,
+  resetStaffPassword,
   resetStaffTotp,
   type HrStaff,
   type StaffRole,
@@ -19,7 +21,10 @@ function mondayIso() {
   return now.toISOString().slice(0, 10);
 }
 
-type PendingAction = { kind: 'deactivate' | 'totp-reset'; staff: HrStaff } | null;
+type PendingAction =
+  | { kind: 'deactivate' | 'totp-reset' | 'password-reset'; staff: HrStaff }
+  | { kind: 'role'; staff: HrStaff; role: StaffRole }
+  | null;
 
 /**
  * UI-STAFF-ADMIN: owner-only staff account admin (STAFF-001/002 API). The account
@@ -34,6 +39,7 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
   const [pending, setPending] = useState<PendingAction>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ username: '', password: '', role: 'seller' as StaffRole, point: 'BISHKEK-1' });
 
   const reload = useCallback(() => {
@@ -71,6 +77,13 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       if (kind === 'deactivate') {
         await deactivateStaffAccount(target.id, accessToken);
         setNotice(`Учётка ${target.username} деактивирована`);
+      } else if (kind === 'role') {
+        const updated = await changeStaffRole(target.id, pending.role, accessToken);
+        setNotice(`Роль ${target.username}: ${updated.role}`);
+      } else if (kind === 'password-reset') {
+        await resetStaffPassword(target.id, newPassword, accessToken);
+        setNewPassword('');
+        setNotice(`Пароль ${target.username} сброшен — старые сессии завершены`);
       } else {
         await resetStaffTotp(target.id, accessToken);
         setNotice(`2FA для ${target.username} сброшена — сотрудник настроит её заново при входе`);
@@ -78,8 +91,8 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       setPending(null);
       reload();
     } catch (error) {
-      if (kind === 'deactivate' && error instanceof ApiError && error.status === 409) {
-        // STAFF-001 blockers: open cash shift and/or active courier deliveries.
+      if ((kind === 'deactivate' || kind === 'role') && error instanceof ApiError && error.status === 409) {
+        // STAFF-001 blockers (open shift / active deliveries) and STAFF-004 last_owner_protected.
         setRowError((current) => ({ ...current, [target.id]: error.message }));
         setPending(null);
       } else {
@@ -119,7 +132,22 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-white">{person.username}</span>
               <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-lime">{person.role}</span>
-              <span className="ml-auto flex gap-2">
+              <span className="ml-auto flex flex-wrap gap-2">
+                <select
+                  aria-label={`Роль ${person.username}`}
+                  value={person.role}
+                  disabled={busy === person.id}
+                  onChange={(event) => setPending({ kind: 'role', staff: person, role: event.target.value as StaffRole })}
+                  className="h-8 rounded-[6px] border border-line bg-surface px-2 text-[11px] text-white"
+                >
+                  {STAFF_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+                </select>
+                <button
+                  type="button"
+                  disabled={busy === person.id}
+                  onClick={() => setPending({ kind: 'password-reset', staff: person })}
+                  className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-bright hover:border-lime hover:text-lime disabled:opacity-50"
+                >Сбросить пароль</button>
                 <button
                   type="button"
                   disabled={busy === person.id}
@@ -137,14 +165,25 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
             {pending?.staff.id === person.id && (
               <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[8px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2">
                 <span className="text-xs text-coral-tint">
-                  {pending.kind === 'deactivate'
-                    ? `Деактивировать ${person.username}? Доступ отключится сразу.`
-                    : `Сбросить 2FA для ${person.username}? Текущий authenticator перестанет работать.`}
+                  {pending.kind === 'deactivate' && `Деактивировать ${person.username}? Доступ отключится сразу.`}
+                  {pending.kind === 'totp-reset' && `Сбросить 2FA для ${person.username}? Текущий authenticator перестанет работать.`}
+                  {pending.kind === 'role' && `Сменить роль ${person.username}: ${person.role} → ${pending.role}?`}
+                  {pending.kind === 'password-reset' && `Новый пароль для ${person.username} (старые сессии завершатся):`}
                 </span>
-                <button type="button" disabled={busy === person.id} onClick={confirmPending} className="ml-auto rounded-[6px] bg-coral-soft px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
+                {pending.kind === 'password-reset' && (
+                  <input
+                    aria-label="Новый пароль"
+                    type="password"
+                    placeholder="Минимум 8 символов"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    className="h-8 rounded-[6px] border border-line bg-surface px-2 text-xs text-white"
+                  />
+                )}
+                <button type="button" disabled={busy === person.id || (pending.kind === 'password-reset' && newPassword.length < 8)} onClick={confirmPending} className="ml-auto rounded-[6px] bg-coral-soft px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
                   {busy === person.id ? '…' : 'Подтвердить'}
                 </button>
-                <button type="button" onClick={() => setPending(null)} className="rounded-[6px] border border-line px-3 py-1.5 text-[11px] text-bright">Отмена</button>
+                <button type="button" onClick={() => { setPending(null); setNewPassword(''); }} className="rounded-[6px] border border-line px-3 py-1.5 text-[11px] text-bright">Отмена</button>
               </div>
             )}
             {rowError[person.id] && (
