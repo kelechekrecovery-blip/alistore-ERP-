@@ -37,10 +37,10 @@
  * --keep leaves the run database in place for post-mortem inspection.
  */
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { migrationCountOnDisk } from './lib/pg-structure.mjs';
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -84,11 +84,6 @@ function run(command, args, env) {
   return result.status ?? 1;
 }
 
-function migrationCount() {
-  return readdirSync(path.join(repoRoot, 'apps/api/prisma/migrations'))
-    .filter((entry) => /^\d/.test(entry)).length;
-}
-
 /**
  * The template is rebuilt when its applied-migration count no longer matches the
  * migrations on disk. That is a coarse check, but it fails in the safe direction:
@@ -96,7 +91,7 @@ function migrationCount() {
  * deploy.
  */
 async function ensureTemplate() {
-  const expected = migrationCount();
+  const expected = migrationCountOnDisk(repoRoot);
   const exists = await admin('SELECT 1 FROM pg_database WHERE datname = $1', [TEMPLATE_DB]);
   let applied = -1;
   if (exists.rowCount) {
