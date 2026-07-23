@@ -6492,3 +6492,9 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Checks: isolated sandbox checkout `1/1`; isolated account-device, warehouse-delivery and storefront-motion subset `2/3` before fixture fix; consignment payout after fixture fix `1/1`.
 - Fix: `e2e/warehouse-consignment-ui.spec.ts` создаёт открытую смену владельца, потому что наличная выплата должна проходить через cash-drawer invariant.
 - Remaining: ERP visual snapshot diff `7,615` пикселей требует проверки актуальности baseline; полный Web E2E ещё не повторён после fixture fix.
+
+## WEB-GATE-178B-2026-07-23
+- Task: проверить ERP visual mismatch изолированно на исправленном source snapshot.
+- Check: isolated `visual-acceptance.spec.ts -g "ERP desktop visual baseline"` — **1/1 passed**.
+- Interpretation: прежний visual diff не воспроизведён; baseline не обновлялся.
+- Next: повторить полный Web E2E после `e0b1378c`.
