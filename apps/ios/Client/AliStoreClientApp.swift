@@ -6099,7 +6099,10 @@ private struct ProductDetail: View {
                     Text(displayProduct.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
                     Text(Money.som(displayProduct.price))
                         .font(ClientTheme.display(26, weight: .black)).foregroundStyle(.white)
-                    Text("или \(Int(displayProduct.price / 12).formatted(.number.grouping(.never))) сом × 12 мес")
+                    // Разряды здесь были отключены явно (`.grouping(.never)`), из-за чего
+                    // под ценой «39 900 сом» стояло «3325 сом» — тот же экран печатал
+                    // деньги двумя разными способами.
+                    Text("или \(Money.som(displayProduct.price / 12)) × 12 мес")
                         .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)
                     HStack(spacing: 8) {
                         ForEach(displayVariants) { variant in
