@@ -6280,3 +6280,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Commit: `50001846`.
 - Caveat: production provider remains intentionally disabled until live merchant certification; this fix does not certify payment processing.
 - Next: protected merge/deploy and external provider certification.
+
+## GATE-170-2026-07-23
+- Task: повторно принять локальный native/UI и ecosystem gate после исправления подписи sandbox webhook.
+- Checks: trusted `npm run ios:ui` завершён с `**TEST SUCCEEDED**`: Client, Staff, Courier и POS UI suites без failures; iOS evidence записан для source tree `fb402c295d69271367a3548fe43006f236cd610aebe2dfae8581cb4bb4b38bab` и принят коммитом `b87a7682`. Strict `scripts/ecosystem-contract-audit.mjs --strict` прошёл: `0 missing`, `0 broken`, все software gates PASS.
+- Result: локальный software acceptance gate зелёный на одном committed source/evidence snapshot; предыдущие visual, Android, reconciliation и composite evidence обновлены после security fix.
+- Caveat: пользовательское `apps/web/tsconfig.json` и параллельный `apps/api/test/auth-email-otp.e2e-spec.ts` сохранены незакоммиченными. Это не production certification.
+- Next: owner-controlled merge/deploy, Render staging/production, live provider credentials, physical-device/hardware smoke, App Store submission/review и юридическое UAT.
