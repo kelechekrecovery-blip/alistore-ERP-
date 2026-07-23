@@ -28,6 +28,7 @@ p, owner, delete, approve
 p, admin, pii, approve
 p, owner, staff, manage
 p, owner, settings, manage
+p, marketer, approvals, read
 p, senior_seller, approvals, read
 p, admin, approvals, read
 p, owner, approvals, read

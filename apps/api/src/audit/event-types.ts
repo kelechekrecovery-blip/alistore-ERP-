@@ -187,6 +187,7 @@ export const EventType = {
   CampaignConverted: 'campaign.converted',
   StorefrontContentDrafted: 'storefront.content_drafted',
   StorefrontContentPublished: 'storefront.content_published',
+  StorefrontPublishApproved: 'storefront.publish_approved',
   StorefrontContentScheduled: 'storefront.content_scheduled',
   StorefrontContentScheduleCancelled: 'storefront.content_schedule_cancelled',
   StorefrontBlockCreated: 'storefront.block_created',
