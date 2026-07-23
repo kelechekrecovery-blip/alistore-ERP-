@@ -1,5 +1,18 @@
 # PROGRESS
 
+## 2026-07-23 — PUBLIC-SMOKE-007: публичный sandbox отвечает
+
+Сетевой smoke подтвердил доступность публичного контура: `https://ali.kg/`,
+каталог, поиск, корзина, checkout, login, ERP, POS, warehouse, warranty,
+support, trade-in, `robots.txt` и `sitemap.xml` вернули **14/14 HTTP 200**.
+`https://api.ali.kg/api/health/ready` вернул HTTP 200; database и memory heap
+имеют статус `up`.
+
+Это подтверждает доступность маршрутов, но не production readiness: контур
+остаётся sandbox/demo, live providers, физические устройства и App Store review
+не сертифицированы. Strict audit дополнительно остановлен нестабильным локальным
+`node_modules` fingerprint после `npm ci`; `package-lock.json` совпадает с lock.
+
 ## 2026-07-23 — ANDROID-UI-006: packaged Compose UI gate выполнен
 
 Запущен `npm run android:ui:all` на подключённом `emulator-5554`. Все packaged

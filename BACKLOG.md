@@ -1,5 +1,11 @@
 # BACKLOG
 
+## PUBLIC-SMOKE-007 — сетевой sandbox smoke проверен
+- **Проверено:** `https://ali.kg/`, storefront, account, ERP/POS/warehouse/service routes, `robots.txt` и `sitemap.xml`: **14/14 HTTP 200**.
+- **Проверено:** `https://api.ali.kg/api/health/ready` — HTTP 200, database и memory heap `up`.
+- **Ограничение:** публичный контур остаётся sandbox/demo; live payment/SMS/OFD, physical devices и App Store review не сертифицированы.
+- **Инфраструктурная проблема:** strict audit после локального `npm ci` видит нестабильный `node_modules` fingerprint; package-lock совпадает, исходный код не повреждён.
+
 ## ANDROID-UI-006 — packaged Compose UI gate выполнен
 - **Проверено:** `npm run android:ui:all` на подключённом `emulator-5554`: Core **38/38**, Client **1/1**, Staff **2/2**, Courier **1/1**, POS **2/2**, `BUILD SUCCESSFUL` за 9:53.
 - **Примечание:** AVD называется `savio_api36_arm64`, но Gradle запускал AliStore packages и все четыре AliStore-модуля; это имя эмулятора, не application id.
