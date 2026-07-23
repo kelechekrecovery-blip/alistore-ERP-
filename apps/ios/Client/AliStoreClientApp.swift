@@ -5806,8 +5806,19 @@ private struct CatalogView: View {
                     .padding(16)
                 }
             }
+            // Экран рисует собственную шапку и собственный заголовок секции
+            // «Каталог», поэтому крупный навигационный заголовок был вторым и
+            // наезжал на карточки при прокрутке. `.inline` его схлопывает.
             .navigationTitle("Каталог")
-            .searchable(text: $search, prompt: "Техника и бренды")
+            .navigationBarTitleDisplayMode(.inline)
+            // В iOS 26 `.searchable` по умолчанию всплывает нижней плашкой и
+            // закрывает нижний ряд товаров вместе с кнопками «В корзину».
+            // Ящик под навбаром оставляет сетку полностью видимой.
+            .searchable(
+                text: $search,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Техника и бренды"
+            )
         }
         .task(id: filterKey) { await loadFilteredCatalog() }
     }
