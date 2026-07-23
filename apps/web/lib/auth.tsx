@@ -14,9 +14,11 @@ import {
   authLogout,
   authMe,
   authRefresh,
+  authRequestEmailOtp,
   authRequestRecoveryOtp,
   authRequestOtp,
   authTelegramLogin,
+  authVerifyEmailOtp,
   authVerifyRecoveryOtp,
   authVerifyOtp,
   type AuthTokens,
@@ -31,6 +33,9 @@ interface AuthContextValue {
   verifyOtp: (phone: string, code: string) => Promise<void>;
   requestRecoveryOtp: (phone: string) => Promise<{ devCode?: string }>;
   verifyRecoveryOtp: (phone: string, code: string) => Promise<void>;
+  /** Second login channel into the same account — Customer.phone stays the unique key. */
+  requestEmailOtp: (email: string) => Promise<{ devCode?: string }>;
+  verifyEmailOtp: (email: string, code: string) => Promise<void>;
   telegramLogin: (initData: string, source?: 'mini_app' | 'login_widget') => Promise<void>;
   logout: () => Promise<void>;
   /** Run an authed request with the access token, refreshing once on failure. */
@@ -173,6 +178,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const requestEmailOtp = useCallback(async (email: string) => {
+    const { devCode } = await authRequestEmailOtp(email);
+    return { devCode };
+  }, []);
+
+  const verifyEmailOtp = useCallback(
+    async (email: string, code: string) => {
+      const t = await authVerifyEmailOtp(email, code);
+      persist(t);
+      setUser(await authMe(t.accessToken));
+    },
+    [persist],
+  );
+
   const telegramLogin = useCallback(
     async (initData: string, source: 'mini_app' | 'login_widget' = 'mini_app') => {
       const t = await authTelegramLogin(initData, source);
@@ -234,6 +253,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyOtp,
       requestRecoveryOtp,
       verifyRecoveryOtp,
+      requestEmailOtp,
+      verifyEmailOtp,
       telegramLogin,
       logout,
       authed,
@@ -245,6 +266,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyOtp,
       requestRecoveryOtp,
       verifyRecoveryOtp,
+      requestEmailOtp,
+      verifyEmailOtp,
       telegramLogin,
       logout,
       authed,
