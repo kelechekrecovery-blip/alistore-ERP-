@@ -79,6 +79,7 @@
 		B92D85D26242A0D8F65E1A52 /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		BB51670BC2D528ECA213E260 /* Manrope-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4138BDA48D595174DC088C57 /* Manrope-ExtraBold.ttf */; };
 		BB9F1E820E92F5AE7302734F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2CD07CA19B272D575A7C4E3D /* Assets.xcassets */; };
+		BC6EFDB330B0627978F58CFC /* DesignContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0F2DCD1399601FE8B4EB7A /* DesignContrastTests.swift */; };
 		BCA60888879A0F2A828FCBE4 /* CheckoutContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */; };
 		BE916851B616DAF5F4F639FA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 75FA9A6B569FE2E36871089D /* PrivacyInfo.xcprivacy */; };
 		C980E64308632EB4DEBCEFC2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F23ACBE05CF3A0E1499E0B /* APIClient.swift */; };
@@ -313,6 +314,7 @@
 		AAB7EC94315C8CB6A45D9EDF /* POS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = POS.entitlements; sourceTree = "<group>"; };
 		AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Staff.entitlements; sourceTree = "<group>"; };
 		AE157FE93CD516D1CBF400CF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		AF0F2DCD1399601FE8B4EB7A /* DesignContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignContrastTests.swift; sourceTree = "<group>"; };
 		B0A2FC533C51FAD384EC7235 /* AliStoreStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1E18DBDC8F966E6FE986281 /* OfflineStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStoreTests.swift; sourceTree = "<group>"; };
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
@@ -602,6 +604,7 @@
 				C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */,
 				1CE1A8940ABDD296D92B57EA /* CustomerEmailLoginTests.swift */,
 				20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */,
+				AF0F2DCD1399601FE8B4EB7A /* DesignContrastTests.swift */,
 				20075A636D86A0A09A4E63B4 /* IdempotencyKeysTests.swift */,
 				5ADA4F6602AA2F3A5B46C08A /* MoneyTests.swift */,
 				9B0BAEBFAF767B6B133B548E /* OfflinePOSQueueTests.swift */,
@@ -1029,6 +1032,7 @@
 				BCA60888879A0F2A828FCBE4 /* CheckoutContractTests.swift in Sources */,
 				E06055CD8D92A7D7E659B1BB /* CustomerEmailLoginTests.swift in Sources */,
 				351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */,
+				BC6EFDB330B0627978F58CFC /* DesignContrastTests.swift in Sources */,
 				5534D8E321985F5649E82E83 /* IdempotencyKeysTests.swift in Sources */,
 				5037E16A0F70A56273F0E75B /* MoneyTests.swift in Sources */,
 				DC66825077F7278C6C1C9AB2 /* OfflinePOSQueueTests.swift in Sources */,

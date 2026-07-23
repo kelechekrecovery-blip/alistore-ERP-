@@ -1909,7 +1909,7 @@ private struct CartView: View {
                     Spacer()
                 }
                 .font(ClientTheme.body(15, weight: .bold))
-                .foregroundStyle(canAdvance ? .black : Design3.textFaint)
+                .foregroundStyle(canAdvance ? .black : Design3.textDisabled)
                 .frame(height: 50)
                 .background(canAdvance ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 13))
             }

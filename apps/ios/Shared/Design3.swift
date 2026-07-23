@@ -34,9 +34,18 @@ public enum Design3 {
     // MARK: - Text ramp
     public static let textPrimary = Color.white
     public static let textBright = hex(0xD8CFC6)
-    public static let textMuted = hex(0xA79C92)
-    public static let textSubtle = hex(0x8A7F76)
-    public static let textFaint = hex(0x6E645C)      // placeholder
+    public static let textMuted = hex(0xA79C92)      // 5.76:1 на surface
+    // Нижние две ступени рампы были ниже AA: textSubtle давал 3.96:1, а textFaint
+    // — 2.68:1 на surface при норме 4.5:1. textFaint это плейсхолдеры всех полей
+    // ввода, включая поиск: их буквально не было видно. Приведение к норме
+    // схлопывает две ступени в одну — это осознанный размен читаемости на один
+    // уровень иерархии, а не потеря.
+    public static let textSubtle = hex(0x96887D)     // 4.51:1 на surface
+    public static let textFaint = hex(0x96887D)      // placeholder, 4.51:1
+    /// Только для по-настоящему отключённых элементов: WCAG 1.4.3 их не требует
+    /// контрастными, и «нечитаемо» здесь несёт смысл «нажать нельзя». Ставить его
+    /// на обычный текст нельзя — это прежний нечитаемый textFaint.
+    public static let textDisabled = hex(0x6E645C)
 
     // MARK: - Glass (liquid-glass surfaces)
     /// Base translucent material — pair with `glassTint`/`hairlineGlass` for the deck look.
