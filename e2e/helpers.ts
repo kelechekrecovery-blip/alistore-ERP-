@@ -123,7 +123,7 @@ export async function resetDb() {
     },
   });
   await prisma.accountingAccount.createMany({
-    data: ACCOUNTING_ACCOUNT_SEED.map((account) => ({ ...account })),
+    data: ACCOUNTING_ACCOUNT_SEED.map(({ code, name, type }) => ({ code, name, type })),
     skipDuplicates: true,
   });
 }
