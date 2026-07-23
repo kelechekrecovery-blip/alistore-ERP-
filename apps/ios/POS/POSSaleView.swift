@@ -42,7 +42,6 @@ struct POSSaleView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
-                    header
                     scanner
                     if let errorMessage { POSNotice(text: errorMessage, isError: true) }
                     // Три разных состояния, а не одно: грузим — спиннер; загрузилось пусто —
@@ -58,6 +57,19 @@ struct POSSaleView: View {
                 .padding(16)
             }
             .background(POSPalette.ink.ignoresSafeArea())
+            // Навбар скрыт, поэтому подложки у статус-бара нет: прокручиваемый
+            // контент уезжал под часы и Dynamic Island — карточка сканера
+            // сталкивалась со временем. Шапка закреплена в safe area с
+            // непрозрачным фоном, и контент уходит под НЕЁ, а не под часы.
+            // Для кассы это ещё и правильнее: индикатор смены виден всегда,
+            // а не только пока список прокручен вверх.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                header
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+                    .background(POSPalette.ink)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .task { await refresh() }
             .refreshable { await refresh() }
