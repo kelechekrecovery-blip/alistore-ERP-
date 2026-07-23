@@ -1,32 +1,60 @@
-export const ACCOUNTING_ACCOUNT_SEED = [
-  { code: '1000', name: 'Наличные в кассе', type: 'asset' },
-  { code: '1010', name: 'Расчётный счёт', type: 'asset' },
-  { code: '1020', name: 'Деньги у платёжных провайдеров', type: 'asset' },
-  { code: '1100', name: 'Дебиторская задолженность', type: 'asset' },
-  { code: '1200', name: 'Товарные запасы', type: 'asset' },
-  { code: '1300', name: 'Авансы поставщикам', type: 'asset' },
-  { code: '1250', name: 'Расчёты с подотчётными лицами', type: 'asset' },
-  { code: '1400', name: 'Основные средства', type: 'asset' },
-  { code: '1410', name: 'Накопленная амортизация', type: 'asset' },
-  { code: '2000', name: 'Задолженность поставщикам', type: 'liability' },
-  { code: '2100', name: 'Задолженность по зарплате', type: 'liability' },
-  { code: '2200', name: 'Налоги к уплате', type: 'liability' },
-  { code: '2300', name: 'Обязательства по подарочным картам', type: 'liability' },
-  // Залог за подменное устройство: деньги клиента в кассе магазина, которые
-  // придётся вернуть. Без собственного счёта залог не проводился нигде и
-  // выглядел как излишек кассы при выдаче и недостача при возврате.
-  { code: '2400', name: 'Залоги клиентов', type: 'liability' },
-  { code: '3000', name: 'Капитал владельца', type: 'equity' },
-  { code: '4000', name: 'Выручка от продаж', type: 'revenue' },
-  { code: '4100', name: 'Выручка сервисного центра', type: 'revenue' },
-  { code: '5000', name: 'Себестоимость продаж', type: 'expense' },
-  { code: '6100', name: 'Расходы на зарплату', type: 'expense' },
-  { code: '6200', name: 'Аренда', type: 'expense' },
-  { code: '6300', name: 'Логистика', type: 'expense' },
-  { code: '6400', name: 'Маркетинг', type: 'expense' },
-  { code: '6500', name: 'Коммунальные расходы', type: 'expense' },
-  { code: '6600', name: 'Расходы на закупку', type: 'expense' },
-  { code: '6700', name: 'Расходы на амортизацию', type: 'expense' },
-  { code: '6900', name: 'Прочие операционные расходы', type: 'expense' },
-  { code: '6990', name: 'Финансовые расхождения', type: 'expense' },
-] as const;
+import type { AccountingAccountType } from '@prisma/client';
+// Файл данных называется `.data.json`, а не `accounting-chart.json`, намеренно:
+// в `jest.config.js` расширение `json` стоит РАНЬШЕ `ts`, поэтому одноимённый
+// JSON затеняет этот модуль — `import { ... } from './accounting-chart'` в
+// соседних файлах начинает резолвиться в данные и отдаёт undefined.
+import * as chartModule from './accounting-chart.data.json';
+
+/**
+ * JSON приходит в двух формах в зависимости от того, кто нас грузит: ts-node и
+ * сборка дают массив в `default`, ts-jest отдаёт сам массив. Нормализуем здесь
+ * один раз, чтобы ни один потребитель не знал об этой разнице.
+ */
+const chart = (Array.isArray(chartModule)
+  ? chartModule
+  : (chartModule as { default: unknown[] }).default) as Array<{
+  code: string;
+  name: string;
+  type: string;
+  note?: string;
+}>;
+
+export interface AccountingAccountSeed {
+  code: string;
+  name: string;
+  type: AccountingAccountType;
+  /** Почему счёт заведён — там, где это неочевидно. В базу не пишется. */
+  note?: string;
+}
+
+const ACCOUNT_TYPES: ReadonlySet<string> = new Set<AccountingAccountType>([
+  'asset',
+  'liability',
+  'equity',
+  'revenue',
+  'expense',
+]);
+
+/**
+ * План счетов — единственный источник правды.
+ *
+ * Лежит в JSON, а не массивом в TypeScript, потому что его читают три разных
+ * потребителя: приложение (через этот модуль), тестовый харнесс и скрипт
+ * деплоя на голом Node без сборки. Пока список был массивом в `.ts`, скрипт
+ * деплоя прочитать его не мог, и справочник ставился только миграцией и
+ * тестами. Тесты чинили себя сами, поэтому пустой план счетов в рабочей базе
+ * никто не замечал — отказ вылез за три шага от причины: приёмка товара упала
+ * с «Счёт 1200 не найден».
+ *
+ * JSON не проверяется компилятором, поэтому тип счёта сверяется здесь: опечатка
+ * должна ронять запуск, а не создавать счёт, на который потом не встанет ни одна
+ * проводка.
+ */
+export const ACCOUNTING_ACCOUNT_SEED: readonly AccountingAccountSeed[] = chart.map((account) => {
+  if (!ACCOUNT_TYPES.has(account.type)) {
+    throw new Error(
+      `accounting-chart.json: счёт ${account.code} имеет неизвестный тип «${account.type}»`,
+    );
+  }
+  return account as AccountingAccountSeed;
+});
