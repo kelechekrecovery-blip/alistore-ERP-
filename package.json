@@ -11,6 +11,7 @@
     "api": "npm run start:dev -w @alistore/api",
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api -- --runInBand",
+    "api:test:isolated": "node scripts/run-isolated-api-tests.mjs",
     "e2e": "playwright test",
     "web:route-audit": "playwright test e2e/web-route-audit.spec.ts",
     "e2e:cross-browser": "E2E_BROWSERS=chromium,webkit,firefox playwright test e2e/web-checkout.spec.ts e2e/checkout-consent.spec.ts",
