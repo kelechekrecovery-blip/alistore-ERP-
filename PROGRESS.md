@@ -6210,3 +6210,11 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: toolchain mismatch устранён для текущего clean install; strict audit не объявлен зелёным.
 - Commit: pending.
 - Next: завершить iOS targeted failures, затем повторить strict audit на clean committed source.
+
+## TOOLCHAIN-161-2026-07-23
+- Task: учесть Prisma-generated client в trusted dependency fingerprint.
+- Change: после `npm run prisma:generate -w @alistore/api` обновлён generated `nodeModulesTreeSha256` до фактического clean tree.
+- Checks: `npm run prisma:generate -w @alistore/api` passed; reconciliation tests после генерации прошли POS `1/1`, Courier COD `1/1`, Service/Loaner API `11/11` и UI `3/3`, Procurement API `10/10` и UI `1/1`.
+- Result: все четыре локальных reconciliation сценария доказательно зелёные; evidence recorder ещё требует отдельного trusted rerun на committed fingerprint.
+- Commit: pending.
+- Next: записать четыре hash-bound reconciliation evidence и повторить strict audit.
