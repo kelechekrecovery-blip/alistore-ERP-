@@ -270,6 +270,7 @@ p, admin, finance, approve
 p, owner, finance, approve
 p, admin, manual_adjustment, approve
 p, owner, manual_adjustment, approve
+p, admin, storefront_publish, approve
 p, admin, finance, pay
 p, owner, finance, pay
 p, cashier, debts, create
