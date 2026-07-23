@@ -36,8 +36,8 @@ const SCREENS: Screen[] = [
   { nav: /AI-ассистент/, route: '**/api/ai/insights*', cleaned: true },
   { nav: /CRM/, route: '**/api/campaigns/preview*', cleaned: true },
   { nav: /Задачи/, route: '**/api/staff-tasks?*', cleaned: true },
-  { nav: /Сервис-центр/, route: '**/api/service-center/**', cleaned: false },
-  { nav: /Склад/, route: '**/api/catalog/products*', cleaned: false },
+  { nav: /Сервис-центр/, route: '**/api/service-center/**', cleaned: true },
+  { nav: /Склад/, route: '**/api/catalog/products*', cleaned: true },
 ];
 
 async function signIn(page: Page): Promise<void> {

@@ -66,6 +66,18 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
   const [priceTagBusy, setPriceTagBusy] = useState('');
   const [priceTagError, setPriceTagError] = useState('');
 
+  const loadCatalog = useCallback(async () => {
+    setProducts(null);
+    setCatalogError(null);
+    const response = await fetchCatalog({ limit: 100 });
+    if (isCatalogUnavailable(response)) {
+      setProducts(null);
+      setCatalogError('Не удалось загрузить каталог — остатки и сумма не показаны');
+      return;
+    }
+    setProducts(response.items);
+  }, []);
+
   async function printPriceTag(product: CatalogProduct) {
     setPriceTagBusy(product.id);
     setPriceTagError('');
@@ -94,16 +106,8 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
     // ERP — не делала: `catch` был мёртвым, а кладовщик видел «Позиций 0 · На
     // сумму 0 сом · Мало остатка 0», причём ноль в «мало остатка» подсвечен
     // зелёным, то есть «всё хорошо».
-    fetchCatalog({ limit: 100 }).then((response) => {
-      if (isCatalogUnavailable(response)) {
-        setProducts(null);
-        setCatalogError('Каталог не ответил — остатки и сумма не показаны');
-        return;
-      }
-      setCatalogError(null);
-      setProducts(response.items);
-    });
-  }, []);
+    void loadCatalog();
+  }, [loadCatalog]);
 
   useEffect(() => {
     if (!canReadFinance) return;
@@ -195,6 +199,22 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
     document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  if (catalogError) {
+    return (
+      <section className="space-y-4" data-testid="warehouse-error-state">
+        <header className="border-b border-surface-3 pb-4">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A4D]">Центр управления · Warehouse 3.0</div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">Складской учёт</h1>
+          <p className="mt-1 text-xs leading-5 text-subtle">Остатки и финансовые агрегаты появятся после ответа каталога.</p>
+        </header>
+        <div role="alert" className="rounded-[12px] border border-[#5A2418] bg-[#2A1410] px-3.5 py-3 text-[13px] text-[#FF8A7A]">
+          <div>{catalogError}</div>
+          <button type="button" onClick={() => void loadCatalog()} className="mt-3 inline-flex items-center gap-1.5 rounded-[8px] border border-[#7A3425] px-3 py-1.5 text-xs font-semibold text-[#FF8A7A] hover:border-[#FF8A7A]"><RefreshCw size={13} /> Повторить загрузку</button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="space-y-3.5">
       <header className="flex flex-col gap-3 border-b border-surface-3 pb-4 lg:flex-row lg:items-end lg:justify-between">
@@ -208,11 +228,6 @@ export function StockView({ d, accessToken, role, staffId }: { d: Dashboard | nu
       <nav aria-label="Разделы склада" className="flex gap-1 overflow-x-auto border-b border-surface-3 pb-px">
         {stockTabs.map((tab) => <button key={tab.id} type="button" onClick={() => selectStockSection(tab.id)} className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-semibold transition ${stockSection === tab.id ? 'border-[#FF5B2E] text-white' : 'border-transparent text-subtle hover:text-bright'}`}>{tab.label}</button>)}
       </nav>
-      {catalogError && (
-        <div className="rounded-[12px] border border-[#5A2418] bg-[#2A1410] px-3.5 py-2.5 text-[13px] text-[#FF8A7A]">
-          {catalogError}
-        </div>
-      )}
       {/* stat cards */}
       <div className="grid grid-cols-3 gap-3.5">
         <Card>

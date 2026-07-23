@@ -172,7 +172,7 @@ export function ServiceCenterView({ accessToken, staffId, role }: { accessToken:
         {TABS.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold ${tab === item.id ? 'border-coral text-white' : 'border-transparent text-subtle'}`}>{item.label}</button>)}
       </div>
 
-      {error && <div role="alert" className="rounded-[8px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
+      {error && <div role="alert" className="rounded-[8px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"><div>{error}</div><button type="button" onClick={() => void load()} className="mt-3 inline-flex items-center gap-1.5 rounded-[8px] border border-danger/40 px-3 py-1.5 text-xs font-semibold text-danger hover:border-danger"><RefreshCw size={13} /> Повторить загрузку</button></div>}
       {tab === 'queue' && (
         <>
           {overdue > 0 && <div className="flex items-center gap-3 rounded-[8px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"><Clock3 size={17} /><strong>{overdue} обращений вышли за SLA</strong></div>}
