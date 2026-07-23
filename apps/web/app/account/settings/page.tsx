@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
+import { authConfirmEmailAttach, authRequestEmailAttach, deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
+import { describeAuthError } from '@/lib/auth-errors';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SettingsPage() {
   const { user, authed, logout } = useAuth();
@@ -18,6 +21,15 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [emailFormOpen, setEmailFormOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailCodeStep, setEmailCodeStep] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [emailDevCode, setEmailDevCode] = useState<string | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const emailValid = EMAIL_RE.test(emailInput.trim());
 
   const reload = useCallback(() => {
     if (!user) return Promise.resolve();
@@ -39,6 +51,51 @@ export default function SettingsPage() {
       setError(value instanceof Error ? value.message : 'Не удалось сохранить настройки');
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openEmailForm() {
+    setEmailFormOpen(true);
+    setEmailCodeStep(false);
+    setEmailInput('');
+    setEmailCode('');
+    setEmailDevCode(null);
+    setEmailError('');
+  }
+
+  function closeEmailForm() {
+    setEmailFormOpen(false);
+    setEmailCodeStep(false);
+    setEmailCode('');
+    setEmailDevCode(null);
+    setEmailError('');
+  }
+
+  async function requestEmailAttach() {
+    if (!emailValid) return setEmailError('Введите корректный email.');
+    setEmailBusy(true); setEmailError('');
+    try {
+      const { devCode } = await authed((token) => authRequestEmailAttach(emailInput.trim(), token));
+      setEmailDevCode(devCode ?? null);
+      if (devCode) setEmailCode(devCode);
+      setEmailCodeStep(true);
+    } catch (err) {
+      setEmailError(describeAuthError(err, 'Не удалось отправить код.'));
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function confirmEmailAttach() {
+    setEmailBusy(true); setEmailError('');
+    try {
+      await authed((token) => authConfirmEmailAttach(emailInput.trim(), emailCode.trim(), token));
+      closeEmailForm();
+      await reload();
+    } catch (err) {
+      setEmailError(describeAuthError(err, 'Не удалось подтвердить код.'));
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -106,6 +163,62 @@ export default function SettingsPage() {
         <div className="mt-2 flex items-center justify-between py-2 text-[13px] text-muted">
           <span>Вход по телефону и OTP</span>
           <span className="text-lime">активен</span>
+        </div>
+        <div className="border-t border-surface-3 py-3 text-[13px]">
+          <div className="flex items-center justify-between text-muted">
+            <span>Вход по почте</span>
+            {settings?.email ? (
+              <span className="font-mono text-[12px] text-lime">{settings.email}</span>
+            ) : (
+              <span className="text-faint">не привязан</span>
+            )}
+          </div>
+          {!emailFormOpen ? (
+            <button
+              type="button"
+              disabled={!settings}
+              onClick={openEmailForm}
+              className="mt-2.5 w-full rounded-[8px] border border-surface-3 bg-ink-dark py-2.5 text-[13px] font-semibold disabled:text-faint"
+            >
+              {settings?.email ? 'Изменить адрес' : 'Привязать почту'}
+            </button>
+          ) : !emailCodeStep ? (
+            <div className="mt-2.5">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(event) => setEmailInput(event.target.value)}
+                placeholder="you@example.com"
+                aria-label="Email для привязки"
+                className="w-full rounded-[8px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none focus:border-lime"
+                autoFocus
+              />
+              {emailError && <p className="mt-2 text-[12px] text-danger-soft">{emailError}</p>}
+              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={closeEmailForm} className="rounded-[8px] border border-surface-3 bg-ink-dark py-2.5 text-[13px] font-semibold">Отмена</button>
+                <button type="button" disabled={emailBusy} onClick={requestEmailAttach} className="rounded-[8px] bg-lime py-2.5 text-[13px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">{emailBusy ? 'Отправляем…' : 'Получить код'}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2.5">
+              <div className="text-[12px] text-subtle">Код отправлен на {emailInput.trim()}</div>
+              <input
+                inputMode="numeric"
+                value={emailCode}
+                onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-значный код"
+                aria-label="Код подтверждения email"
+                className="mt-1.5 w-full rounded-[8px] border border-surface-3 bg-ink-dark p-3 text-center font-mono text-lg tracking-[0.4em] outline-none focus:border-lime"
+                autoFocus
+              />
+              {emailDevCode && <p className="mt-2 rounded-[8px] bg-ink-dark px-3 py-2 text-center font-mono text-[11px] text-lime">dev-код: {emailDevCode}</p>}
+              {emailError && <p className="mt-2 text-[12px] text-danger-soft">{emailError}</p>}
+              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={closeEmailForm} className="rounded-[8px] border border-surface-3 bg-ink-dark py-2.5 text-[13px] font-semibold">Отмена</button>
+                <button type="button" disabled={emailBusy || emailCode.length !== 6} onClick={confirmEmailAttach} className="rounded-[8px] bg-lime py-2.5 text-[13px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">{emailBusy ? 'Проверяем…' : 'Подтвердить'}</button>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between border-t border-surface-3 py-2 text-[13px] text-muted">
           <span>Сессия</span>

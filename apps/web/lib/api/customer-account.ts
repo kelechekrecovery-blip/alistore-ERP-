@@ -20,6 +20,8 @@ export interface CustomerAddress {
 export interface CustomerSettings {
   id: string;
   phone: string;
+  /** Second login channel into the same account; null when none is attached. */
+  email: string | null;
   name: string;
   consent: boolean;
   push: boolean;
