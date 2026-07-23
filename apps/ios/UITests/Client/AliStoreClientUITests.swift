@@ -62,6 +62,31 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Кабинет"].exists)
     }
 
+    func testProductOpensFromHomeAndFavorites() {
+        let home = XCUIApplication()
+        home.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        home.launch()
+
+        // Главная — первый экран магазина. Карточка здесь была видимой, но
+        // немой: открыть товар можно было только через вкладку «Каталог».
+        let hit = home.buttons["client-product-ui-product-iphone"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 10))
+        hit.firstMatch.tap()
+        XCTAssertTrue(home.staticTexts["Характеристики"].waitForExistence(timeout: 5))
+
+        let favorites = XCUIApplication()
+        favorites.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        favorites.launch()
+        favorites.buttons["Избранное"].tap()
+        XCTAssertTrue(favorites.staticTexts["Избранное"].waitForExistence(timeout: 5))
+        let favouriteCard = favorites.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "client-product-")
+        ).firstMatch
+        XCTAssertTrue(favouriteCard.waitForExistence(timeout: 5))
+        favouriteCard.tap()
+        XCTAssertTrue(favorites.staticTexts["Характеристики"].waitForExistence(timeout: 5))
+    }
+
     func testCatalogUsesPrototypeFiltersAndSortControls() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]

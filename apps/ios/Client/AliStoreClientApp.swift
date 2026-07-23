@@ -1096,11 +1096,11 @@ private struct ClientRootView: View {
                     ZStack {
                         switch selectedTab {
                         case .home:
-                            ClientHomeView(products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
+                            ClientHomeView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
                         case .catalog:
                             CatalogView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
                         case .favorites:
-                            FavoritesView(products: products, cart: $cart, favorites: $favorites)
+                            FavoritesView(environment: environment, products: products, cart: $cart, favorites: $favorites)
                         case .cart:
                             CartView(
                                 environment: environment,
@@ -6082,6 +6082,7 @@ private struct CatalogView: View {
 }
 
 private struct ClientHomeView: View {
+    let environment: AppEnvironment
     let products: [Product]
     let isLoading: Bool
     let errorMessage: String?
@@ -6169,8 +6170,14 @@ private struct ClientHomeView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
                                 ForEach(personalizedProducts) { product in
-                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
-                                        .frame(width: 168)
+                                    NavigationLink {
+                                        ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                    } label: {
+                                        NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                            .frame(width: 168)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("client-product-\(product.id)")
                                 }
                             }
                             .padding(.horizontal, 2)
@@ -6191,7 +6198,13 @@ private struct ClientHomeView: View {
                     } else {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                             ForEach(products.prefix(6)) { product in
-                                NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                NavigationLink {
+                                    ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                } label: {
+                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("client-product-\(product.id)")
                             }
                         }
                     }
@@ -6205,6 +6218,7 @@ private struct ClientHomeView: View {
 }
 
 private struct FavoritesView: View {
+    let environment: AppEnvironment
     let products: [Product]
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
@@ -6217,7 +6231,20 @@ private struct FavoritesView: View {
                 if items.isEmpty {
                     ContentUnavailableView("Нет избранного", systemImage: "heart", description: Text("Сохраняйте товары, чтобы быстро вернуться к ним."))
                 } else {
-                    ScrollView { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) { ForEach(items) { NativeProductCard(product: $0, cart: $cart, favorites: $favorites) } }.padding(16) }
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                            ForEach(items) { product in
+                                NavigationLink {
+                                    ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                } label: {
+                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("client-product-\(product.id)")
+                            }
+                        }
+                        .padding(16)
+                    }
                 }
             }
             .navigationTitle("Избранное")
