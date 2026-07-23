@@ -13,7 +13,11 @@ settings:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 2
+    # Сборка 2 уже загружена в App Store Connect, а код с тех пор менялся
+    # существенно: формат денег, локализация ru-KG, safe area кассы, единый
+    # вход в поиск каталога. Отправлять надо новый билд, а не тот, что лежит
+    # в ASC, — отсюда 3.
+    CURRENT_PROJECT_VERSION: 3
     MARKETING_VERSION: 1.0.0
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Отдельно от developmentLanguage: build-переменная, на которую ссылается
