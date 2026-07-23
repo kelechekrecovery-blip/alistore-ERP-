@@ -6498,3 +6498,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Check: isolated `visual-acceptance.spec.ts -g "ERP desktop visual baseline"` — **1/1 passed**.
 - Interpretation: прежний visual diff не воспроизведён; baseline не обновлялся.
 - Next: повторить полный Web E2E после `e0b1378c`.
+
+## WEB-GATE-178C-2026-07-23
+- Task: принять полный Web E2E после исправления consignment cash-shift fixture.
+- Command: `E2E_REUSE_EXISTING_SERVER=false E2E_API_PORT=4800 E2E_WEB_PORT=3800 npm run e2e`.
+- Result: **141/141 passed in 10.3m**; storefront, checkout, ERP, POS, Staff, warehouse, courier, service center, visual baselines, offline states, email auth and route audit зелёные.
+- Evidence: isolated API/Web processes; no stale server reuse. Production/provider/device/App Store gates remain separate and are not implied by this Web gate.
+- Next: rerun strict ecosystem audit on a clean accepted source snapshot; then continue external release gates.
