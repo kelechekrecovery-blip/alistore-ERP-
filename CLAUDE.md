@@ -83,6 +83,16 @@ ruflo (скилл `ruflo`, его `swarm`/`memory`/`hooks`, `.claude-flow/` ра
   проверено — коммит давал PASS 18/18 в одиночку и два FAIL под конфликтом.
   Перед разбором падения: `ps aux | grep -e jest -e "playwright test"`, затем перепроверь
   одиночным `--testPathPattern` — детерминированный баг падает и в одиночку.
+- **Playwright e2e бьётся о ту же БД.** `playwright.config.ts:6-9` резолвит
+  `E2E_DATABASE_URL ?? DATABASE_URL ?? alistore_test` — по умолчанию это **та же база**,
+  что у jest. Замерено 23.07: полный прогон при работающем рядом jest дал `7 failed /
+  132 passed`; все семь перепроверены в изолированной БД и **прошли** (`web-checkout` 7/7,
+  `storefront-motion` + `web-route-audit` 52/52) — то есть были чистой контаминацией.
+  Чтобы прогнать e2e честно при занятой машине, поднимай свою базу и порты:
+  `E2E_DATABASE_URL=postgresql://alistore@localhost:5432/<имя>_test?schema=public`
+  `E2E_API_PORT=4310 E2E_WEB_PORT=3310 npx playwright test …`
+  Имя БД обязано содержать `test` как отдельное слово — иначе предохранитель
+  `e2e/helpers.ts:135` откажет в очистке.
 - **Нет ESLint и Prettier.** Единственный статический гейт — **`tsc`** (+ `prisma validate`).
   Не ссылайся на lint/format — их нет. Нет enforced coverage %.
 - `mvp:verify` бросает без `TEST_DATABASE_URL` и не ресетит БД без «test» в имени.
