@@ -10,5 +10,6 @@ module.exports = {
   setupFiles: ['<rootDir>/test/setup-env.ts'],
   setupFilesAfterEnv: ['<rootDir>/test/setup-db.ts'],
   testTimeout: 30000,
+  testSequencer: '<rootDir>/test/alphabetic-sequencer.js',
   maxWorkers: 1,
 };

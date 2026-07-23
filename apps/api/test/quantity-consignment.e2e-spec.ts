@@ -163,7 +163,12 @@ describe('Quantity consignment inventory (integration)', () => {
     await prisma.order.update({ where: { id: order.id }, data: { status: 'completed' } });
     const payout = await inventory.createConsignmentPayout({ idempotencyKey: `qcons-payout-${seq}`, quantityAllocationIds: [allocation.id] }, 'owner:qcons');
     expect(payout).toMatchObject({ grossAmount: 2_000, commissionAmount: 200, ownerAmount: 1_800 });
-    await inventory.payConsignmentPayout(payout.id, { paymentKey: `qcons-bank-${seq}` }, 'owner:qcons');
+    // paymentMethod is required here: it defaults to cash, and a cash payout needs
+    // an open CashShift this spec never opens — so the test only passed while a
+    // neighbouring suite happened to leave one open in the shared database. The
+    // key already says "bank"; state the non-cash channel explicitly, as
+    // consignment-inventory.e2e-spec.ts does.
+    await inventory.payConsignmentPayout(payout.id, { paymentKey: `qcons-bank-${seq}`, paymentMethod: 'card' }, 'owner:qcons');
 
     const ret = await prisma.return.create({ data: { orderId: order.id, reason: 'Не подошло', status: 'paid' } });
     await returns.transition(ret.id, 'reconciled', 'returns:qcons', 'BISHKEK-1');
