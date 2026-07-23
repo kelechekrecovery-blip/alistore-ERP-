@@ -22,6 +22,34 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
     }
 
+    func testLoginOffersEmailChannelAlongsidePhone() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Вход в AliStore"].waitForExistence(timeout: 10))
+        // Телефон — канал по умолчанию: по нему заводится аккаунт.
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertFalse(app.textFields["client-email"].exists)
+
+        app.buttons["client-channel-email"].tap()
+
+        let email = app.textFields["client-email"]
+        XCTAssertTrue(email.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["client-phone"].exists)
+        XCTAssertTrue(app.buttons["client-request-otp"].exists)
+        // Кнопка не активна, пока адрес не похож на адрес.
+        XCTAssertFalse(app.buttons["client-request-otp"].isEnabled)
+
+        email.tap()
+        email.typeText("owner@example.com")
+        XCTAssertTrue(app.buttons["client-request-otp"].isEnabled)
+
+        app.buttons["client-channel-phone"].tap()
+        XCTAssertTrue(app.textFields["client-phone"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["client-email"].exists)
+    }
+
     func testGuestShellUsesPrototypeNavigation() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]

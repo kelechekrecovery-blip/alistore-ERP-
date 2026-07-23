@@ -259,10 +259,22 @@ private struct ClientBottomNav: View {
     }
 }
 
+/// Канал входа. Телефон остаётся первичным — по нему заводится аккаунт и по нему
+/// работают доставка и COD. Почта это второй ключ от той же двери: войти по ней
+/// может только тот, кто раньше привязал адрес в кабинете.
+private enum LoginChannel: String, CaseIterable {
+    case phone
+    case email
+
+    var title: String { self == .phone ? "Телефон" : "Почта" }
+}
+
 private struct ClientLoginView: View {
     @Bindable var auth: CustomerAuthStore
     let onGuest: () -> Void
+    @State private var channel: LoginChannel = .phone
     @State private var phone = "+996 "
+    @State private var email = ""
     @State private var code = ""
     @State private var requested = false
 
@@ -280,21 +292,38 @@ private struct ClientLoginView: View {
                     Text("Вход в AliStore")
                         .font(ClientTheme.display(30, weight: .black))
                         .foregroundStyle(.white)
-                    Text("Техника с гарантией и trade-in. Войдите по номеру — быстро и безопасно.")
+                    Text(subtitle)
                         .font(ClientTheme.body(14))
                         .foregroundStyle(ClientTheme.muted)
                         .lineSpacing(4)
                         .padding(.top, 10)
-                    TextField("+996 700 12 34 56", text: $phone)
-                        .keyboardType(.phonePad)
-                        .textContentType(.telephoneNumber)
-                        .foregroundStyle(.white)
-                        .font(.system(size: 15, design: .monospaced))
-                        .padding(14)
-                        .glass(radius: 13)
-                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
-                        .padding(.top, 26)
-                        .accessibilityIdentifier("client-phone")
+                    channelSwitcher
+                        .padding(.top, 22)
+                    if channel == .phone {
+                        TextField("+996 700 12 34 56", text: $phone)
+                            .keyboardType(.phonePad)
+                            .textContentType(.telephoneNumber)
+                            .foregroundStyle(.white)
+                            .font(.system(size: 15, design: .monospaced))
+                            .padding(14)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("client-phone")
+                    } else {
+                        TextField("you@example.com", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .foregroundStyle(.white)
+                            .font(.system(size: 15))
+                            .padding(14)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("client-email")
+                    }
                     if requested {
                         TextField("6-значный код", text: $code)
                             .keyboardType(.numberPad)
@@ -314,22 +343,37 @@ private struct ClientLoginView: View {
                     }
                     Button {
                         Task {
-                            if requested {
+                            switch (channel, requested) {
+                            case (.phone, true):
                                 await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
-                            } else {
+                            case (.phone, false):
                                 requested = await auth.requestOTP(phone: normalizedPhone)
+                            case (.email, true):
+                                await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
+                            case (.email, false):
+                                requested = await auth.requestEmailOTP(email: email)
                             }
                         }
                     } label: {
-                        HStack { Spacer(); if auth.isLoading { ProgressView().tint(.black) } else { Text(requested ? "Войти" : "Получить код по SMS") }; Spacer() }
+                        HStack { Spacer(); if auth.isLoading { ProgressView().tint(.black) } else { Text(actionTitle) }; Spacer() }
                             .font(ClientTheme.body(15, weight: .bold))
                             .foregroundStyle(.black)
                             .frame(height: 50)
                             .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
                     }
-                    .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (requested && code.filter(\.isNumber).count != 6))
+                    .disabled(auth.isLoading || !canSubmit)
                     .padding(.top, 12)
                     .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
+                    if channel == .email && !requested {
+                        // Честное предупреждение вместо «письмо отправлено» в пустоту:
+                        // сервер отвечает одинаково на любой адрес, чтобы не выдавать,
+                        // у кого есть аккаунт, поэтому объяснить это должен клиент.
+                        Text("Письмо придёт, если этот адрес привязан к аккаунту. Привязать его можно в кабинете, войдя по номеру.")
+                            .font(ClientTheme.body(12))
+                            .foregroundStyle(ClientTheme.muted)
+                            .lineSpacing(3)
+                            .padding(.top, 10)
+                    }
                     // Кнопки «Войти по Face ID» здесь быть не может: на экране входа нет
                     // сессии, которую можно разблокировать, а эндпоинта биометрического
                     // входа на сервере не существует. Прежняя версия при успешной
@@ -350,6 +394,70 @@ private struct ClientLoginView: View {
                 .frame(minHeight: 700)
             }
         }
+    }
+
+    private var channelSwitcher: some View {
+        HStack(spacing: 6) {
+            ForEach(LoginChannel.allCases, id: \.self) { option in
+                Button {
+                    guard channel != option else { return }
+                    channel = option
+                    // Запрошенный код принадлежит прежнему каналу: оставить его
+                    // означало бы предложить ввести SMS-код в форму почты.
+                    requested = false
+                    code = ""
+                } label: {
+                    Text(option.title)
+                        .font(ClientTheme.body(13, weight: channel == option ? .bold : .medium))
+                        .foregroundStyle(channel == option ? .black : ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(
+                            channel == option ? AnyShapeStyle(ClientTheme.lime) : AnyShapeStyle(.clear),
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("client-channel-\(option.rawValue)")
+            }
+        }
+        .padding(4)
+        .glass(radius: 13)
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+
+    private var subtitle: String {
+        channel == .phone
+            ? "Техника с гарантией и trade-in. Войдите по номеру — быстро и безопасно."
+            : "Войдите по адресу, привязанному к вашему аккаунту. Код придёт письмом."
+    }
+
+    private var actionTitle: String {
+        if requested { return "Войти" }
+        return channel == .phone ? "Получить код по SMS" : "Получить код на почту"
+    }
+
+    private var canSubmit: Bool {
+        if requested { return code.filter(\.isNumber).count == 6 }
+        switch channel {
+        case .phone: return normalizedPhone.filter(\.isNumber).count >= 9
+        case .email: return isPlausibleEmail
+        }
+    }
+
+    /// Ровно та же форма, что принимает сервер (`EMAIL_PATTERN` в auth.service.ts):
+    /// непустое имя, «собака», домен с точкой. Строже проверять смысла нет —
+    /// адрес всё равно подтверждается письмом.
+    private var isPlausibleEmail: Bool {
+        let value = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count <= 254, let at = value.firstIndex(of: "@") else { return false }
+        let local = value[value.startIndex..<at]
+        let domain = value[value.index(after: at)...]
+        return !local.isEmpty
+            && !domain.isEmpty
+            && domain.contains(".")
+            && !value.contains(" ")
+            && domain.firstIndex(of: "@") == nil
     }
 
     private var normalizedPhone: String {
