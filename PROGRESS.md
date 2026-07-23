@@ -1,5 +1,18 @@
 # PROGRESS
 
+## 2026-07-23 — AUDIT-OPEN-002B: канал выплаты комитенту закрыт
+
+Добавлено сохранение фактического `PaymentMethod` для `ConsignmentPayout` и миграция
+`20260723180000_add_consignment_payout_method`. Проводка выплаты теперь кредитует
+счёт, соответствующий каналу (`1020` для карты/перевода), а движение кассы создаётся
+только для наличных. Повтор уже оплаченной выплаты с другим ключом или каналом
+отклоняется.
+
+Проверки: `consignment-inventory.e2e-spec.ts` — **5/5**, `npm run api:build` и
+`git diff --check` — зелёные. Локальная test БД пересоздана через полный migration
+reset; production readiness по-прежнему не заявляется из-за внешних provider,
+storage, device и live-certification блокеров.
+
 ## 2026-07-23 — MVP-GATE-177: полный локальный MVP gate зелёный
 
 На текущем SHA полный `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify`

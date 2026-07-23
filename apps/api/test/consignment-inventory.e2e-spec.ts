@@ -43,6 +43,18 @@ describe('Serialized consignment inventory (integration)', () => {
     await prisma.consignmentItem.deleteMany();
     await prisma.consignmentPayout.deleteMany();
     await prisma.payment.deleteMany();
+    const accountingEntries = await prisma.accountingJournalEntry.findMany({
+      where: { sourceType: { in: ['payment.receipt', 'consignment.sale', 'consignment.payout'] } },
+      select: { id: true },
+    });
+    if (accountingEntries.length > 0) {
+      const entryIds = accountingEntries.map(({ id }) => id);
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe('SET CONSTRAINTS "AccountingJournalLine_balanced_entry_check" DEFERRED');
+        await tx.accountingJournalLine.deleteMany({ where: { entryId: { in: entryIds } } });
+        await tx.accountingJournalEntry.deleteMany({ where: { id: { in: entryIds } } });
+      });
+    }
     await prisma.returnItem.deleteMany();
     await prisma.return.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -153,14 +165,40 @@ describe('Serialized consignment inventory (integration)', () => {
       .rejects.toMatchObject({ code: 'consignment_idempotency_mismatch' });
     expect(payout).toMatchObject({ grossAmount: 50_000, commissionAmount: 5_000, ownerAmount: 45_000, status: 'created' });
 
-    const paid = await inventory.payConsignmentPayout(payout.id, { paymentKey: 'bank-1' }, 'owner-test');
+    const paid = await inventory.payConsignmentPayout(payout.id, { paymentKey: 'bank-1', paymentMethod: 'card' }, 'owner-test');
     const paidReplay = await inventory.payConsignmentPayout(payout.id, { paymentKey: 'bank-1' }, 'owner-test');
     expect(paid.status).toBe('paid');
     expect(paidReplay.status).toBe('paid');
     await expect(inventory.payConsignmentPayout(payout.id, { paymentKey: 'bank-2' }, 'owner-test'))
       .rejects.toMatchObject({ code: 'consignment_payment_key_reused' });
+    await expect(inventory.payConsignmentPayout(payout.id, { paymentKey: 'bank-1', paymentMethod: 'cash' }, 'owner-test'))
+      .rejects.toMatchObject({ code: 'consignment_payment_key_reused' });
     expect((await prisma.consignmentItem.findUnique({ where: { id: item.id } }))?.status).toBe('settled');
     expect(await prisma.auditEvent.count({ where: { type: 'consignment.payout_paid' } })).toBe(1);
+  });
+
+  it('uses the declared non-cash channel without reducing the cash drawer', async () => {
+    const product = await serializedProduct();
+    const item = await receive(product.id);
+    const order = await sell(product.id, product.sku, item.unit.imei);
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'completed' } });
+    const payout = await inventory.createConsignmentPayout({ idempotencyKey: 'payout-card-1', itemIds: [item.id] }, 'owner-test');
+
+    const paid = await inventory.payConsignmentPayout(
+      payout.id,
+      { paymentKey: 'card-transfer-1', paymentMethod: 'card' },
+      'owner-test',
+    );
+    expect(paid).toMatchObject({ status: 'paid', paymentMethod: 'card' });
+    const entry = await prisma.accountingJournalEntry.findUnique({
+      where: { idempotencyKey: `accounting:consignment.payout:${payout.id}:card-transfer-1` },
+      include: { lines: true },
+    });
+    expect(entry?.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '2000', debit: 45_000 }),
+      expect.objectContaining({ accountCode: '1020', credit: 45_000 }),
+    ]));
+    expect(await prisma.cashDrawerMovement.count({ where: { sourceRef: payout.id } })).toBe(0);
   });
 
   it('blocks settlement while a return is active and rejects bundle components', async () => {

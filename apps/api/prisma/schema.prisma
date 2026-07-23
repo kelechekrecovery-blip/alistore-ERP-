@@ -1067,6 +1067,7 @@ model ConsignmentPayout {
   ownerAmount         Int
   status              ConsignmentPayoutStatus         @default(created)
   paymentKey          String?                         @unique
+  paymentMethod       PaymentMethod                    @default(cash)
   createdBy           String
   paidBy              String?
   paidAt              DateTime?

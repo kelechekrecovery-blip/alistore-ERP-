@@ -1,5 +1,10 @@
 # BACKLOG
 
+## AUDIT-OPEN-002B — канал выплаты комитенту
+- **Сделано:** `PayConsignmentPayoutDto` принимает только разрешённые каналы и сохраняет `paymentMethod`; проводка использует `paymentAccountCode`; `CashDrawerMovement` создаётся только для наличной выплаты.
+- **Проверено:** serialized consignment regression — `5/5`, включая банковский канал `1020`, отсутствие движения кассы и replay с другим каналом; API build и `git diff --check` зелёные.
+- **Закрыто:** выплата комитенту больше не всегда списывается с кассового счёта `1000`.
+
 ## MVP-GATE-177 — полный локальный MVP gate принят
 - **Проверено:** `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` прошёл Prisma validation/generate, migration upgrade paths, API build, Web build, API Jest `202/202` и Playwright `139/139`.
 - **Безопасность:** unsigned sandbox webhook остаётся fail-closed (`404`); payment fixtures используют подписанный raw body; ERP, checkout, fulfillment, refund, COD, POS и Evidence suites зелёные.

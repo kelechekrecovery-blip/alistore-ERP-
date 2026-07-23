@@ -1,5 +1,6 @@
 import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentMethod } from '@prisma/client';
 
 export class CountDto {
   @ApiProperty({ example: 'clx_product_001' })
@@ -187,9 +188,27 @@ export class CreateConsignmentPayoutDto {
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) quantityAllocationIds?: string[];
 }
 
+const CONSIGNMENT_PAYOUT_METHODS = [
+  PaymentMethod.cash,
+  PaymentMethod.card,
+  PaymentMethod.qr_mbank,
+  PaymentMethod.qr_odengi,
+  PaymentMethod.bakai_pos,
+  PaymentMethod.obank,
+] as const;
+
 export class PayConsignmentPayoutDto {
   @ApiProperty({ example: 'bank-transfer-2026-001' })
   @IsString() @MaxLength(128) paymentKey!: string;
+
+  @ApiPropertyOptional({
+    enum: [PaymentMethod.cash, PaymentMethod.card, PaymentMethod.qr_mbank, PaymentMethod.qr_odengi, PaymentMethod.bakai_pos, PaymentMethod.obank],
+    default: PaymentMethod.cash,
+    description: 'Фактический канал выплаты владельцу.',
+  })
+  @IsOptional()
+  @IsIn(CONSIGNMENT_PAYOUT_METHODS)
+  paymentMethod?: PaymentMethod;
 }
 
 export class MovementDto {

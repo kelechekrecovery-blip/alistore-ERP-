@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PaymentMethod, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -20,7 +20,8 @@ import {
   TransferQuantityDto,
 } from './inventory.dto';
 import { transferQuantityConsignmentOnTx } from './consignment-accounting';
-import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { paymentAccountCode, postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { adjustQuantityValuationOnTx, transferQuantityValuationOnTx } from './inventory-valuation';
 import { inventoryValuationRollForward } from './inventory-roll-forward';
 
@@ -922,14 +923,17 @@ export class InventoryService {
         throw new ConflictError('consignment_payout_cancelled', 'Отменённую выплату нельзя провести');
       }
       if (payout.status === 'paid') {
-        if (payout.paymentKey !== dto.paymentKey) throw new ConflictError('consignment_payment_key_reused', 'Выплата уже проведена с другим ключом');
+        if (payout.paymentKey !== dto.paymentKey || (dto.paymentMethod && payout.paymentMethod !== dto.paymentMethod)) {
+          throw new ConflictError('consignment_payment_key_reused', 'Выплата уже проведена с другим ключом или каналом');
+        }
         return { result: payout, events: [] };
       }
+      const paymentMethod = dto.paymentMethod ?? PaymentMethod.cash;
       const duplicate = await tx.consignmentPayout.findUnique({ where: { paymentKey: dto.paymentKey } });
       if (duplicate && duplicate.id !== id) throw new ConflictError('consignment_payment_key_reused', 'Ключ платежа уже использован');
       const paid = await tx.consignmentPayout.update({
         where: { id },
-        data: { status: 'paid', paymentKey: dto.paymentKey, paidBy: actor, paidAt: new Date() },
+        data: { status: 'paid', paymentKey: dto.paymentKey, paymentMethod, paidBy: actor, paidAt: new Date() },
         include: { items: true, quantityAllocations: true },
       });
       if (paid.ownerAmount > 0) {
@@ -942,15 +946,22 @@ export class InventoryService {
           createdBy: actor,
           lines: [
             { accountCode: '2000', debit: paid.ownerAmount, memo: 'Погашение обязательства перед владельцем' },
-            { accountCode: '1000', credit: paid.ownerAmount, memo: 'Выплата владельцу' },
+            { accountCode: paymentAccountCode(paymentMethod), credit: paid.ownerAmount, memo: `Выплата владельцу (${paymentMethod})` },
           ],
         });
-        // К кассовой смене выплата НЕ привязывается сознательно: комитенту
-        // платят переводом (спеки так и называют ключи — `bank-1`), а не из
-        // ящика. Настоящий дефект здесь другой и остаётся открытым: счёт 1000
-        // «Наличные в кассе» захардкожен независимо от канала, поэтому
-        // банковский перевод списывается с кассы. Чинить это надо способом
-        // оплаты в DTO — как сделано для долгов и подарочных карт.
+        if (paymentMethod === PaymentMethod.cash) {
+          await recordCashDrawerMovementOnTx(tx, {
+            idempotencyKey: `drawer:consignment.payout:${id}:${dto.paymentKey}`,
+            staffId: actor,
+            amount: -paid.ownerAmount,
+            kind: 'consignment_payout',
+            sourceType: 'consignment.payout',
+            sourceRef: id,
+            reason: `Наличная выплата владельцу ${paid.ownerName}`,
+            createdBy: actor,
+            accountingEntryId: null,
+          });
+        }
       }
       await tx.consignmentItem.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
       await tx.quantityConsignmentAllocation.updateMany({ where: { payoutId: id, status: 'sold' }, data: { status: 'settled' } });
