@@ -688,6 +688,56 @@ describe('Purchase order procurement (integration + RBAC)', () => {
       .expect(422);
   });
 
+  it('отказывает в приёмке по IMEI для количественного товара', async () => {
+    // Импорт из Excel без колонки «тип учёта» заводит товар количественным
+    // (import.service.ts:96 — сознательно, чтобы аксессуары не уходили в
+    // IMEI-учёт). Приёмка при этом на тип учёта не смотрела и создавала
+    // серийные единицы, которых не видит ни одна витрина: наличие для
+    // количественного товара читается из StockBalance, а его приёмка не пишет.
+    // Товар принят, склад пуст, ошибки нигде — это и надо поймать здесь.
+    const supplier = await prisma.supplier.create({ data: { name: `Qty Supplier ${RUN}-${Math.random()}` } });
+    const product = await prisma.product.create({
+      data: {
+        sku: `PO-QTY-${RUN}-${Math.random()}`,
+        name: 'Кабель USB-C',
+        price: 900,
+        cost: 400,
+        category: 'accessories',
+        trackingMode: 'quantity',
+        attrs: {},
+      },
+    });
+
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        idempotencyKey: `qty-${RUN}-${Math.random()}`,
+        supplierId: supplier.id,
+        location: 'BISHKEK-1',
+        items: [{ productId: product.id, qty: 1, unitCost: 400 }],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/send`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201);
+
+    const rejected = await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        idempotencyKey: `qty-recv-${RUN}-${Math.random()}`,
+        lines: [{ itemId: created.body.items[0].id, imeis: ['356938035999001'] }],
+      })
+      .expect(422);
+
+    expect(rejected.body.code).toBe('product_not_serialized');
+    // И главное — молчаливых единиц не осталось.
+    expect(await prisma.deviceUnit.count({ where: { productId: product.id } })).toBe(0);
+  });
+
   it('rejects direct procurement of a virtual bundle', async () => {
     const { supplier, product: component } = await fixture();
     const bundle = await prisma.product.create({
