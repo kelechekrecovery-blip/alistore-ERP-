@@ -7,6 +7,12 @@
 - **Ограничение:** Render/provider/device/App Review gates остаются внешними; локальный Web gate не объявляет production readiness.
 - **Следующий шаг:** повторить единый `mvp:verify`, затем перейти к следующему программному security/release gap.
 
+## MVP-GATE-157 — API gate зелёный, E2E требует повторяемости runner
+- **Проверено:** единый `mvp:verify` на текущем SHA прошёл Prisma/migration upgrade, fixture guard, API build и API Jest `200/200`.
+- **Открыто:** Playwright завершился `138/139`; единственный сбой — `ERR_ABORTED/frame detached` при `page.goto('/account/devices')` после смены viewport во время Fast Refresh, без assertion/data failure.
+- **Проверено повторно:** тот же customer-route сценарий на свежих портах `4470/3470` прошёл `1/1`; полный Web E2E ранее прошёл `139/139`.
+- **Правило:** не объявлять единый `mvp:verify` зелёным по targeted rerun; нужен непрерывный повтор на стабильном runner или исправление lifecycle без смешивания пользовательского изменения теста.
+
 ## WEB-AUTH-156 — убрать зависание account routes на восстановлении локальной E2E-сессии
 - **Сделано:** для non-production bearer fixture UI получает временную customer identity из JWT payload и сразу продолжает рендер; `/auth/me` остаётся обязательным серверным подтверждением для замены identity, а все защищённые reads/mutations по-прежнему выполняются через bearer и API authorization.
 - **Сделано:** account detail маршрутный тест ждёт commit навигации, затем проверяет реальный authenticated DOM, чтобы не зависеть от нестабильного `load`-события Next dev compilation после серии переходов.

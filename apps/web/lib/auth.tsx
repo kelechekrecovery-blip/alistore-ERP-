@@ -203,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             persist({ accessToken: legacy.accessToken });
             stored = tokens.current;
           }
+        // fixtures-allowed: malformed non-production localStorage is intentionally treated as anonymous auth state.
         } catch {
           // Treat malformed local test state as anonymous.
         }

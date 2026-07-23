@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-23 — MVP-GATE-157: API полный, Playwright поймал transient navigation abort
+
+Единый `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` прошёл все
+подготовительные проверки, API build и **200/200 API Jest suites**. Playwright
+завершился **138/139**: единственный сбой произошёл на мобильном переходе
+`/account/devices` с `net::ERR_ABORTED; frame was detached` во время серии
+Next Fast Refresh reload, без ошибки assertion и без нарушения данных.
+
+Точечный повтор customer-route сценария на свежих портах `4470/3470` прошёл
+**1/1**, а отдельный полный Web E2E до этого прошёл **139/139**. Поэтому
+дефект классифицирован как нестабильность runner/lifecycle, а не как принятие
+маршрута без данных. Единый `mvp:verify` остаётся открытым до непрерывного
+зелёного повторения.
+
 ## 2026-07-23 — WEB-AUTH-156: принят полный Web gate и исправлено ложное empty-state устройств
 
 Полный браузерный контур повторён на свежих изолированных API/Web портах
