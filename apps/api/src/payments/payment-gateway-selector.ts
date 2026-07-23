@@ -8,7 +8,7 @@ export type PaymentEnvReader = (name: string) => string | undefined;
 export function selectPaymentGatewayProvider(env: PaymentEnvReader): PaymentGatewayProvider {
   const mode = env('PAYMENT_PROVIDER')?.trim().toLowerCase();
   if (!mode || mode === 'sandbox') {
-    return new SandboxPaymentGatewayProvider();
+    return new SandboxPaymentGatewayProvider(value(env, 'PAYMENTS_SANDBOX_WEBHOOK_SECRET'));
   }
   // Явный отказ от онлайн-оплаты: магазин продаёт за наличные при получении и
   // не нуждается в шлюзе. Ветка стоит до проверки на 'production', потому что

@@ -186,5 +186,6 @@ describe('infra/render.staging.yaml · staging обязан стартовать
   it('явно закрывает Swagger и sandbox confirmation в staging blueprint', () => {
     expect(valuesOf('API_DOCS_ENABLED')).toEqual(['false']);
     expect(valuesOf('PAYMENTS_SANDBOX_CONFIRM_ENABLED')).toEqual(['false']);
+    expect(blueprint).toContain('PAYMENTS_SANDBOX_WEBHOOK_SECRET');
   });
 });

@@ -10,7 +10,8 @@ import {
   PaymentIntentView,
   PaymentProviderName,
 } from './payment-gateway-provider';
-import { createHash } from 'node:crypto';
+import { NotFoundException } from '@nestjs/common';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 const PROVIDER: Record<GatewayCreateIntentInput['method'], PaymentProviderName> = {
   card: 'card',
@@ -21,6 +22,8 @@ const PROVIDER: Record<GatewayCreateIntentInput['method'], PaymentProviderName> 
 
 export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
   readonly name = 'sandbox' as const;
+
+  constructor(private readonly webhookSecret = '') {}
 
   assertOperational(): void {}
 
@@ -49,6 +52,7 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
   }
 
   async verifyWebhook(input: GatewayWebhookRequest): Promise<GatewayWebhookPayload> {
+    this.assertWebhookSignature(input.rawBody, input.headers);
     return input.payload;
   }
 
@@ -57,11 +61,31 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
   }
 
   async verifyRefundWebhook(input: GatewayRefundWebhookRequest): Promise<GatewayRefundWebhookPayload> {
+    this.assertWebhookSignature(input.rawBody, input.headers);
     const payload = input.payload as Partial<GatewayRefundWebhookPayload>;
     if (!payload.providerRefundId || !['succeeded', 'failed'].includes(payload.status ?? '')) {
       throw new Error('invalid sandbox refund webhook');
     }
     return payload as GatewayRefundWebhookPayload;
+  }
+
+  private assertWebhookSignature(
+    rawBody: Buffer | undefined,
+    headers: Readonly<Record<string, string | string[] | undefined>>,
+  ): void {
+    const provided = headers['x-alistore-signature'];
+    const signature = Array.isArray(provided) ? provided[0] : provided;
+    if (!this.webhookSecret || !rawBody || !signature) {
+      throw new NotFoundException('Webhook недоступен');
+    }
+
+    const expected = createHmac('sha256', this.webhookSecret).update(rawBody).digest('hex');
+    const normalized = signature.startsWith('sha256=') ? signature.slice('sha256='.length) : signature;
+    const expectedBytes = Buffer.from(expected, 'utf8');
+    const receivedBytes = Buffer.from(normalized, 'utf8');
+    if (receivedBytes.length !== expectedBytes.length || !timingSafeEqual(receivedBytes, expectedBytes)) {
+      throw new NotFoundException('Webhook недоступен');
+    }
   }
 
   private paymentUrl(provider: PaymentProviderName, intentId: string, returnUrl?: string): string {
