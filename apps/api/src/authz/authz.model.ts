@@ -31,6 +31,7 @@ p, senior_seller, exchange, approve
 p, admin, campaign_budget, approve
 p, owner, staff, manage
 p, owner, settings, manage
+p, marketer, approvals, read
 p, senior_seller, approvals, read
 p, admin, approvals, read
 p, owner, approvals, read
@@ -272,6 +273,7 @@ p, admin, finance, approve
 p, owner, finance, approve
 p, admin, manual_adjustment, approve
 p, owner, manual_adjustment, approve
+p, admin, storefront_publish, approve
 p, admin, finance, pay
 p, owner, finance, pay
 p, cashier, debts, create

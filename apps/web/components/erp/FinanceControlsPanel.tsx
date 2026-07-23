@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { closeAccountingPeriod, downloadAccountingJournal, fetchAccountingPeriods, fetchBankStatements, fetchCashIncassations, fetchCustomerAging, fetchFinancialStatements, fetchSupplierAging, fetchTaxPeriod, settleTaxPeriod, type AccountingPeriod, type ArAgingReport, type BankStatementSummary, type CashIncassation, type FinancialStatements, type SupplierAgingReport, type TaxPeriodReport } from '@/lib/api';
+import { closeAccountingPeriod, createCashIncassation, downloadAccountingJournal, fetchAccountingPeriods, fetchBankStatements, fetchCashIncassations, fetchCollectableShifts, fetchCustomerAging, fetchFinancialStatements, fetchSupplierAging, fetchTaxPeriod, settleTaxPeriod, type AccountingPeriod, type ArAgingReport, type BankStatementSummary, type CashIncassation, type CollectableShift, type FinancialStatements, type SupplierAgingReport, type TaxPeriodReport } from '@/lib/api';
 import { som } from '@/lib/format';
 
 export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
@@ -15,6 +15,9 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
   const [periods, setPeriods] = useState<AccountingPeriod[]>([]);
   const [banks, setBanks] = useState<BankStatementSummary[]>([]);
   const [incassations, setIncassations] = useState<CashIncassation[]>([]);
+  const [collectable, setCollectable] = useState<CollectableShift[]>([]);
+  const [draft, setDraft] = useState({ shiftId: '', amount: '', destinationCode: '3000' as '1010' | '3000', reference: '' });
+  const [collecting, setCollecting] = useState(false);
   const [tax, setTax] = useState<TaxPeriodReport | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [action, setAction] = useState<'idle' | 'soft' | 'tax' | 'hard'>('idle');
@@ -31,12 +34,30 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
       fetchBankStatements(accessToken),
       fetchCashIncassations(accessToken),
       fetchTaxPeriod(period, point, accessToken),
-    ]).then(([nextStatements, nextAging, nextArAging, nextPeriods, nextBanks, nextIncassations, nextTax]) => {
-      setStatements(nextStatements); setAging(nextAging); setArAging(nextArAging); setPeriods(nextPeriods); setBanks(nextBanks); setIncassations(nextIncassations); setTax(nextTax); setState('ready');
+      fetchCollectableShifts(accessToken),
+    ]).then(([nextStatements, nextAging, nextArAging, nextPeriods, nextBanks, nextIncassations, nextTax, nextCollectable]) => {
+      setStatements(nextStatements); setAging(nextAging); setArAging(nextArAging); setPeriods(nextPeriods); setBanks(nextBanks); setIncassations(nextIncassations); setTax(nextTax); setCollectable(nextCollectable); setState('ready');
     }).catch(() => setState('error'));
   }, [accessToken, arDate, period, point]);
 
   useEffect(() => reload(), [reload]);
+
+  async function submitIncassation() {
+    const amount = Number(draft.amount);
+    if (!draft.shiftId || !Number.isSafeInteger(amount) || amount < 1) return;
+    setCollecting(true); setNotice('');
+    try {
+      // Stable key per (shift, amount, destination) so a double click replays
+      // instead of collecting twice.
+      const key = `ui-inc-${draft.shiftId}-${amount}-${draft.destinationCode}`;
+      await createCashIncassation(draft.shiftId, { amount, destinationCode: draft.destinationCode, reference: draft.reference.trim() || undefined }, key, accessToken);
+      setDraft({ shiftId: '', amount: '', destinationCode: draft.destinationCode, reference: '' });
+      setNotice(draft.destinationCode === '3000' ? 'Выемка владельцем проведена' : 'Инкассация в банк проведена');
+      reload();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Инкассация не проведена');
+    } finally { setCollecting(false); }
+  }
 
   const runAction = async (next: 'soft' | 'tax' | 'hard') => {
     setAction(next); setNotice('');
@@ -89,7 +110,7 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
         <Metric label="Движение денег" value={som(statements?.cashFlow.cashMovement ?? 0)} />
         <Metric label="AP к оплате" value={som(aging?.totalOutstanding ?? 0)} tone="text-[#FFB86B]" />
         <Metric label="AR к получению" value={som(arAging?.totalOutstanding ?? 0)} tone="text-[#8FD3FF]" />
-        <Metric label="Инкассация" value={som(incassations.reduce((sum, row) => sum + row.amount, 0))} />
+        <Metric label="К инкассации" value={som(collectable.reduce((sum, row) => sum + row.available, 0))} tone={collectable.length ? 'text-[#FFB86B]' : 'text-lime'} />
         <Metric label="Проводки" value={String(statements?.entries ?? 0)} tone={statements?.balanced ? 'text-lime' : 'text-danger-soft'} />
         <Metric label="Исходящий НДС" value={som(tax?.outputTax ?? 0)} tone="text-[#FFB86B]" />
         <Metric label="НДС к уплате" value={som(tax?.payableAmount ?? 0)} tone={(tax?.payableAmount ?? 0) > 0 ? 'text-danger-soft' : 'text-lime'} />
@@ -97,7 +118,60 @@ export function FinanceControlsPanel({ accessToken }: { accessToken: string }) {
       <div className="mt-3 grid gap-3 lg:grid-cols-5">
         <ControlList title="Периоды" empty="Периоды еще не открывались">{periods.slice(0, 4).map((row) => <Row key={row.id} label={row.period} value={row.status === 'hard_closed' ? 'закрыт' : row.status === 'soft_closed' ? 'мягко закрыт' : 'открыт'} tone={row.status === 'hard_closed' ? 'text-coral-tint' : 'text-lime'} />)}</ControlList>
         <ControlList title="Банковские выписки" empty="Выписок еще нет">{banks.slice(0, 4).map((row) => <Row key={row.id} label={row.statementNumber} value={`${row.status} · ${som(row.closingBalance)}`} tone={row.status === 'reconciled' ? 'text-lime' : 'text-[#FFB86B]'} />)}</ControlList>
-        <ControlList title="Инкассация" empty="Инкассаций еще нет">{incassations.slice(0, 4).map((row) => <Row key={row.id} label={row.point} value={`${row.status} · ${som(row.amount)}`} tone={row.status === 'reconciled' ? 'text-lime' : 'text-[#FFB86B]'} />)}</ControlList>
+        <ControlList title="Инкассация" empty="Инкассаций еще нет">
+          {incassations.slice(0, 4).map((row) => <Row key={row.id} label={`${row.point} · ${row.destinationCode === '3000' ? 'владелец' : 'банк'}`} value={`${row.status} · ${som(row.amount)}`} tone={row.status === 'reconciled' ? 'text-lime' : 'text-[#FFB86B]'} />)}
+          <div className="mt-3 border-t border-surface-2 pt-3">
+            {collectable.length === 0 && <p className="text-[11px] text-subtle">Нет закрытых смен с наличными</p>}
+            {collectable.length > 0 && (
+              <div className="grid gap-2">
+                <select
+                  aria-label="Смена для инкассации"
+                  value={draft.shiftId}
+                  onChange={(event) => {
+                    const shift = collectable.find((row) => row.id === event.target.value);
+                    setDraft((current) => ({ ...current, shiftId: event.target.value, amount: shift ? String(shift.available) : '' }));
+                  }}
+                  className="h-8 rounded-[6px] border border-line bg-surface px-2 text-[11px] text-white"
+                >
+                  <option value="">Смена…</option>
+                  {collectable.map((row) => <option key={row.id} value={row.id}>{row.point} · {som(row.available)}</option>)}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    aria-label="Сумма инкассации"
+                    inputMode="numeric"
+                    value={draft.amount}
+                    onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value.replace(/[^0-9]/g, '') }))}
+                    placeholder="Сумма"
+                    className="h-8 w-24 rounded-[6px] border border-line bg-surface px-2 text-[11px] text-white"
+                  />
+                  <select
+                    aria-label="Назначение"
+                    value={draft.destinationCode}
+                    onChange={(event) => setDraft((current) => ({ ...current, destinationCode: event.target.value as '1010' | '3000' }))}
+                    className="h-8 flex-1 rounded-[6px] border border-line bg-surface px-2 text-[11px] text-white"
+                  >
+                    <option value="3000">Владельцу</option>
+                    <option value="1010">В банк</option>
+                  </select>
+                </div>
+                <input
+                  aria-label="Комментарий к инкассации"
+                  value={draft.reference}
+                  onChange={(event) => setDraft((current) => ({ ...current, reference: event.target.value }))}
+                  placeholder="Комментарий"
+                  className="h-8 rounded-[6px] border border-line bg-surface px-2 text-[11px] text-white"
+                />
+                <button
+                  type="button"
+                  disabled={collecting || !draft.shiftId || !draft.amount}
+                  onClick={submitIncassation}
+                  className="h-8 rounded-[6px] bg-lime px-3 text-[11px] font-bold text-[#1A2300] disabled:opacity-50"
+                >{collecting ? '…' : 'Провести'}</button>
+              </div>
+            )}
+          </div>
+        </ControlList>
         <ControlList title={`Дебиторка · ${arDate}`} empty="Открытых долгов нет">
           {arAging && <>
             <Row label="К получению" value={som(arAging.totalOutstanding)} tone="text-[#8FD3FF]" />
