@@ -6,11 +6,10 @@ export function AccountDetailFrame({ children }: { children: ReactNode }) {
   return (
     <div
       className="account-detail-shell fixed inset-0 z-40 flex justify-center bg-night font-sans"
-      style={{
-        // Keep the first committed frame visually stable while Next loads the
-        // responsive stylesheet after a cold account-detail navigation.
-        backgroundColor: typeof window !== 'undefined' && window.innerWidth < 768 ? '#0e0c0a' : '#0b0a08',
-      }}
+      // Keep the first committed frame visually stable while Next loads the
+      // responsive stylesheet after a cold account-detail navigation. Mobile
+      // overrides this constant through the media rule in globals.css.
+      style={{ backgroundColor: '#0b0a08' }}
     >
       <div className="account-detail-header">
         <SiteHeader variant="design3" />

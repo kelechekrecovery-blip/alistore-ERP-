@@ -1,5 +1,22 @@
 # PROGRESS
 
+## 2026-07-23 — WEB-AUTH-156: устранён hydration mismatch account shell
+
+Адаптивный фон account detail больше не вычисляется через `window` во время
+SSR/render. Desktop получает стабильный inline background, mobile переопределяет
+его CSS media rule, поэтому первый committed кадр не прозрачен и SSR/client
+атрибуты совпадают.
+
+Проверки:
+
+- targeted motion + route-audit selection — **4/4**;
+- `npm run build -w @alistore/web` — **45/45** статических страниц и TypeScript
+  зелёные.
+
+Полный Web gate остаётся открытым: последний длинный прогон был остановлен после
+частичных flaky failures в catalog/customer seed и Telegram route; отдельные
+targeted suites проходят.
+
 ## 2026-07-23 — WEB-AUTH-156: warranty shell больше не пустой при задержке auth
 
 Полный прогон после первого auth timeout подтвердил повторяемый edge case:

@@ -609,6 +609,12 @@
 }
 
 @media (max-width: 767px) {
+  .account-detail-shell {
+    background-color: #0e0c0a !important;
+  }
+}
+
+@media (max-width: 767px) {
   .account-detail-header,
   .account-detail-footer {
     display: none;
