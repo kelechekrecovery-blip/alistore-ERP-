@@ -49,6 +49,17 @@ function csvCell(value: unknown) {
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 
+/**
+ * Where an incassation may send cash. Bank is a transfer between assets; the
+ * owner draw is a distribution against equity — different account type, so the
+ * type check below is per-destination rather than a blanket `asset`.
+ */
+const INCASSATION_DESTINATIONS: Record<string, { type: 'asset' | 'equity'; memo: string; label: string }> = {
+  '1010': { type: 'asset', memo: 'Поступление инкассации на расчетный счет', label: 'Инкассация' },
+  '3000': { type: 'equity', memo: 'Выемка наличных владельцем', label: 'Выемка владельцем' },
+};
+const DEFAULT_INCASSATION_DESTINATION = '1010';
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -651,9 +662,12 @@ export class FinanceService {
   async createCashIncassation(shiftId: string, dto: CreateCashIncassationDto, actor: string, idempotencyKey: string) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`cash-incassation:${shiftId}`}))::text`;
+      const destinationCode = dto.destinationCode?.trim() || DEFAULT_INCASSATION_DESTINATION;
+      const destinationSpec = INCASSATION_DESTINATIONS[destinationCode];
+      if (!destinationSpec) throw new ValidationError('cash_incassation_destination_invalid', `Счет ${destinationCode} не разрешен для инкассации`);
       const existing = await tx.cashIncassation.findUnique({ where: { idempotencyKey }, include: { accountingEntry: true } });
       if (existing) {
-        if (existing.shiftId !== shiftId || existing.amount !== dto.amount) throw new ConflictError('cash_incassation_idempotency_mismatch', 'Ключ инкассации уже использован для другой суммы или смены');
+        if (existing.shiftId !== shiftId || existing.amount !== dto.amount || existing.destinationCode !== destinationCode) throw new ConflictError('cash_incassation_idempotency_mismatch', 'Ключ инкассации уже использован для другой суммы, смены или назначения');
         return { result: { ...existing, idempotent: true }, events: [] };
       }
       const shift = await tx.cashShift.findUnique({ where: { id: shiftId }, include: { incassations: { select: { amount: true } } } });
@@ -662,29 +676,29 @@ export class FinanceService {
       const alreadyDeposited = shift.incassations.reduce((sum, item) => sum + item.amount, 0);
       const available = shift.closeCash - alreadyDeposited;
       if (dto.amount > available) throw new ConflictError('cash_incassation_exceeds_drawer', `Инкассация ${dto.amount} сом превышает доступный остаток кассы ${available} сом`);
-      const destination = await tx.accountingAccount.findUnique({ where: { code: '1010' }, select: { code: true, active: true, type: true } });
-      if (!destination?.active || destination.type !== 'asset') throw new ValidationError('cash_incassation_destination_invalid', 'Счет безналичных денежных средств 1010 не настроен');
+      const destination = await tx.accountingAccount.findUnique({ where: { code: destinationCode }, select: { code: true, active: true, type: true } });
+      if (!destination?.active || destination.type !== destinationSpec.type) throw new ValidationError('cash_incassation_destination_invalid', `Счет назначения ${destinationCode} не настроен`);
       const depositedAt = new Date();
       const incassation = await tx.cashIncassation.create({
-        data: { idempotencyKey, shiftId, point: shift.point, amount: dto.amount, reference: dto.reference?.trim() || null, depositedBy: actor, depositedAt },
+        data: { idempotencyKey, shiftId, point: shift.point, amount: dto.amount, destinationCode, reference: dto.reference?.trim() || null, depositedBy: actor, depositedAt },
       });
       const entry = await postAccountingEntryOnTx(tx, {
         idempotencyKey: `accounting:cash-incassation:${idempotencyKey}`,
         sourceType: 'cash.incassation',
         sourceRef: incassation.id,
-        description: `Инкассация кассы ${shift.point} · смена ${shift.id}`,
+        description: `${destinationSpec.label} кассы ${shift.point} · смена ${shift.id}`,
         point: shift.point,
         occurredAt: depositedAt,
         createdBy: actor,
         lines: [
-          { accountCode: '1010', debit: dto.amount, memo: 'Поступление инкассации на расчетный счет' },
+          { accountCode: destinationCode, debit: dto.amount, memo: destinationSpec.memo },
           { accountCode: '1000', credit: dto.amount, memo: 'Выбытие наличных из кассы' },
         ],
       });
       const linked = await tx.cashIncassation.update({ where: { id: incassation.id }, data: { accountingEntryId: entry.id }, include: { accountingEntry: true } });
       return {
         result: { ...linked, idempotent: false },
-        events: [{ type: 'finance.cash_incassation.deposited', actor, payload: { incassationId: linked.id, shiftId, point: shift.point, amount: dto.amount, accountingEntryId: entry.id }, refs: [linked.id, shiftId, entry.id] }],
+        events: [{ type: 'finance.cash_incassation.deposited', actor, payload: { incassationId: linked.id, shiftId, point: shift.point, amount: dto.amount, destinationCode, accountingEntryId: entry.id }, refs: [linked.id, shiftId, entry.id] }],
       };
     });
   }
