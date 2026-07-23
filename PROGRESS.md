@@ -9,11 +9,11 @@ customer-bound привязку адреса через отдельный OTP. 
 существования аккаунта.
 
 Проверки: `npm run test -w @alistore/web` — **87/87**, `npm run build -w
-@alistore/web` — **45/45**, `npm run api:build` — зелёный, `git diff --check` —
-зелёный. Acceptance browser test добавлен, но его повторный запуск отложен до
-стабилизации параллельных изменений в `apps/api/src/auth/auth.service.ts` и
-`apps/api/test/auth-email-otp.e2e-spec.ts`; эти файлы не принадлежат текущему
-срезу и не коммитятся.
+@alistore/web` — **45/45**, `npm run api:build` — зелёный, browser acceptance
+`web-email-login.spec.ts` — **2/2** на изолированных портах `4791/3791`,
+`git diff --check` — зелёный. Параллельные изменения в
+`apps/api/src/auth/auth.service.ts` и `apps/api/test/auth-email-otp.e2e-spec.ts`
+сохранены и не включены в этот commit.
 
 ## 2026-07-23 — E2E-RUNNER-001: убрать переиспользование stale API по умолчанию
 

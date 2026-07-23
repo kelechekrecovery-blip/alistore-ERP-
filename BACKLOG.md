@@ -3,7 +3,7 @@
 ## WEB-AUTH-EMAIL-176 — подключить email OTP к клиентской витрине
 - **Сделано:** `/login` поддерживает телефонный и email-каналы; `/account/settings` позволяет привязать/изменить email через customer-bound OTP; ошибки API переводятся по доменному `code`.
 - **Проверено:** Web Vitest **87/87**, production Web build **45/45**; API build зелёный.
-- **Открыто:** browser acceptance `web-email-login.spec.ts` нужно повторить после стабилизации параллельных изменений в API auth; SMTP delivery и production certification остаются внешними.
+- **Проверено:** browser acceptance `web-email-login.spec.ts` — **2/2** на изолированных API/Web портах; SMTP delivery и production certification остаются внешними.
 
 ## E2E-RUNNER-001 — запретить stale-сервер по умолчанию
 - **Найдено:** прямой `npm run ecosystem:pos-refund:e2e` мог переиспользовать старый API на порту 4200 и давать ложные ошибки reconciliation (включая FK/`return_not_found`).

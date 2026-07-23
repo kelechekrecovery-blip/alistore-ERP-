@@ -72,5 +72,8 @@ test('an unattached email cannot be used to sign in', async ({ page }) => {
   await expect(page.getByText(/dev-код:/)).not.toBeVisible();
   await page.locator('input[inputmode="numeric"]').fill('000000');
   await page.getByRole('button', { name: 'Войти' }).click();
-  await expect(page.getByText('Код не найден или истёк. Запросите новый.')).toBeVisible();
+  // Unknown addresses receive a deliberately indistinguishable challenge row;
+  // with a supplied code the server therefore returns the generic invalid-code
+  // response rather than revealing whether the address exists.
+  await expect(page.getByText('Неверный код.')).toBeVisible();
 });
