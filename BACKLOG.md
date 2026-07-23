@@ -6,6 +6,12 @@
 - **Открыто:** полный единый `mvp:verify` после фикса ещё не перезапускался одной командой; внешние Render/provider/device/App Review gates остаются открыты.
 - **Следующий шаг:** выполнить полный единый `mvp:verify`, затем повторить staging/deployment evidence.
 
+## WEB-COMPARE-151 — защитить compare state от раннего клика
+- **Сделано:** чтение compare `localStorage` больше не перезаписывает выбор пользователя, сделанный до завершения гидрации провайдера.
+- **Проверено:** compare UI test повторён `20/20`; Web production build проходит.
+- **Открыто:** единый `mvp:verify` дважды дошёл до длинного общего runner, но останавливался на разных одиночных нестабильных API/UI batch; изолированные suites проходят. Внешние Render/provider/device/App Review gates остаются открыты.
+- **Следующий шаг:** стабилизировать/декомпозировать общий runner и получить один непрерывный зелёный `mvp:verify`.
+
 ## PUBLIC-SMOKE-148 — повторно подтвердить публичный sandbox runtime
 - **Проверено:** storefront, `/catalog`, `admin`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; ready сообщает database `up`; HSTS и security headers присутствуют.
 - **Ограничение:** smoke подтверждает доступность текущего публичного контура, но не доказывает Render origin ownership, live provider certification или физические device gates.

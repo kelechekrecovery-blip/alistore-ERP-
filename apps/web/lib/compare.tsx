@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -30,11 +31,12 @@ const STORAGE_KEY = 'alistore.compare.v1';
 export function CompareProvider({ children }: { children: ReactNode }) {
   const [ids, setIds] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const interactionBeforeHydration = useRef(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setIds((JSON.parse(raw) as string[]).slice(0, COMPARE_MAX));
+      if (raw && !interactionBeforeHydration.current) setIds((JSON.parse(raw) as string[]).slice(0, COMPARE_MAX));
       // fixtures-allowed: список сравнения — чисто клиентское состояние; при испорченном или недоступном localStorage восстанавливать его неоткуда, пустой список здесь и есть правда
     } catch {
       /* ignore */
@@ -54,6 +56,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
 
   const has = useCallback((id: string) => ids.includes(id), [ids]);
   const toggle = useCallback((id: string) => {
+    if (!hydrated) interactionBeforeHydration.current = true;
     let accepted = true;
     setIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
@@ -64,7 +67,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
       return [...prev, id];
     });
     return accepted;
-  }, []);
+  }, [hydrated]);
   const remove = useCallback((id: string) => setIds((prev) => prev.filter((x) => x !== id)), []);
   const clear = useCallback(() => setIds([]), []);
 
