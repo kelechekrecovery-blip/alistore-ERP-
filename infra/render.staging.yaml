@@ -37,6 +37,11 @@ services:
     envVars:
       - key: ALLOWED_HOSTS
         sync: false
+      # The browser must use the staging API hostname at build time. Without
+      # this value Next falls back to the web origin and checkout/account
+      # requests are sent to the wrong service after deployment.
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://api-staging.ali.kg/api
       - key: PUBLIC_DEMO_MODE
         value: "true"
       - key: NEXT_PUBLIC_DEMO_MODE

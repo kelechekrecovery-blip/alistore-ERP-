@@ -188,4 +188,8 @@ describe('infra/render.staging.yaml · staging обязан стартовать
     expect(valuesOf('PAYMENTS_SANDBOX_CONFIRM_ENABLED')).toEqual(['false']);
     expect(blueprint).toContain('PAYMENTS_SANDBOX_WEBHOOK_SECRET');
   });
+
+  it('явно направляет staging web на staging API', () => {
+    expect(valuesOf('NEXT_PUBLIC_API_BASE')).toEqual(['https://api-staging.ali.kg/api']);
+  });
 });
