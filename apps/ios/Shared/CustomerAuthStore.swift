@@ -65,6 +65,13 @@ public final class CustomerAuthStore {
         }
     }
 
+    /// Показывает ошибку входа, случившуюся до обращения к серверу — например
+    /// когда Apple не вернула токен. Иначе экран молчит, и человек не понимает,
+    /// нажалась кнопка или нет.
+    public func reportSignInFailure(_ message: String) {
+        errorMessage = message
+    }
+
     /// Вход через Apple: обменивает identityToken на сессию.
     ///
     /// `nonce` передаётся ровно тем, что было положено в

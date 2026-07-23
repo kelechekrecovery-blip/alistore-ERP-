@@ -22,6 +22,24 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
     }
 
+    func testLoginOffersAppleSignInAlongsideCodeChannels() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Вход в AliStore"].waitForExistence(timeout: 10))
+        // Apple стоит рядом с кодом, а не вместо него: телефон остаётся первичным
+        // идентификатором, без него не работают доставка и COD.
+        XCTAssertTrue(app.buttons["client-apple-signin"].exists)
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
+
+        // Кнопка не исчезает при переключении канала — она общая для обоих.
+        app.buttons["client-channel-email"].tap()
+        XCTAssertTrue(app.textFields["client-email"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["client-apple-signin"].exists)
+    }
+
     func testLoginOffersEmailChannelAlongsidePhone() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-out"]

@@ -9,5 +9,13 @@
     </array>
     <key>aps-environment</key>
     <string>$(APS_ENVIRONMENT)</string>
+    <!-- Sign in with Apple. Требует, чтобы в Apple Developer у App ID
+         kg.alistore.client была включена возможность «Sign in with Apple», иначе
+         архив не подпишется. Профили в репозитории созданы раньше — их придётся
+         перевыпустить. Подробности в OWNER-LAUNCH-CHECKLIST. -->
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
 </dict>
 </plist>

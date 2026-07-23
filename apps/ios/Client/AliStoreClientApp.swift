@@ -1,4 +1,5 @@
 import AliStoreCore
+import AuthenticationServices
 import PhotosUI
 import SwiftData
 import SwiftUI
@@ -282,6 +283,9 @@ private struct ClientLoginView: View {
     @Bindable var auth: CustomerAuthStore
     let onGuest: () -> Void
     @State private var channel: LoginChannel = .phone
+    /// Сырой nonce живёт только между запросом и ответом Apple: на сервер уходит
+    /// его хэш, а сама строка нужна лишь чтобы хэш был непредсказуем.
+    @State private var appleRawNonce = ""
     @State private var phone = "+996 "
     @State private var email = ""
     @State private var code = ""
@@ -389,6 +393,24 @@ private struct ClientLoginView: View {
                     // биометрии вызывала onGuest() — то есть обещала вход в аккаунт, а
                     // делала гостем, ровно как кнопка ниже. Биометрия остаётся там, где
                     // она осмысленна: в QuickUnlock уже открытой сессии.
+                    // Apple ниже кода, а не вместо него: телефон остаётся первичным
+                    // идентификатором, без него не работают доставка и COD. Apple —
+                    // быстрый вход для тех, у кого аккаунт уже связан.
+                    SignInWithAppleButton(.signIn) { request in
+                        let raw = AppleSignInNonce.random()
+                        appleRawNonce = raw
+                        request.requestedScopes = [.fullName, .email]
+                        // На сервер уйдёт эта же строка: Apple кладёт её в claim токена.
+                        request.nonce = AppleSignInNonce.hashed(raw)
+                    } onCompletion: { result in
+                        Task { await handleApple(result) }
+                    }
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("client-apple-signin")
+
                     Button("Продолжить как гость →", action: onGuest)
                         .font(ClientTheme.body(13))
                         .foregroundStyle(ClientTheme.muted)
@@ -402,6 +424,32 @@ private struct ClientLoginView: View {
                 .frame(maxWidth: 402)
                 .frame(minHeight: 700)
             }
+        }
+    }
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .success(let authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let identityToken = String(data: tokenData, encoding: .utf8)
+            else {
+                auth.reportSignInFailure("Apple не вернула токен входа")
+                return
+            }
+            let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            await auth.signInWithApple(
+                identityToken: identityToken,
+                nonce: AppleSignInNonce.hashed(appleRawNonce),
+                name: fullName
+            )
+        case .failure(let error):
+            // Отмену пользователем не показываем как ошибку: он просто передумал.
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            auth.reportSignInFailure(error.localizedDescription)
         }
     }
 
