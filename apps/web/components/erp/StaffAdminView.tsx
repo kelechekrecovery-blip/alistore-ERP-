@@ -7,23 +7,17 @@ import {
   changeStaffRole,
   createStaffAccount,
   deactivateStaffAccount,
-  fetchHrWeek,
+  fetchStaffAccounts,
+  reactivateStaffAccount,
   resetStaffPassword,
   resetStaffTotp,
-  type HrStaff,
+  type StaffAccountRow,
   type StaffRole,
 } from '@/lib/api';
 
-function mondayIso() {
-  const now = new Date();
-  const day = now.getDay() || 7;
-  now.setDate(now.getDate() - day + 1);
-  return now.toISOString().slice(0, 10);
-}
-
 type PendingAction =
-  | { kind: 'deactivate' | 'totp-reset' | 'password-reset'; staff: HrStaff }
-  | { kind: 'role'; staff: HrStaff; role: StaffRole }
+  | { kind: 'deactivate' | 'totp-reset' | 'password-reset' | 'reactivate'; staff: StaffAccountRow }
+  | { kind: 'role'; staff: StaffAccountRow; role: StaffRole }
   | null;
 
 /**
@@ -33,7 +27,7 @@ type PendingAction =
  * are shown under the account row.
  */
 export function StaffAdminView({ accessToken }: { accessToken: string }) {
-  const [staff, setStaff] = useState<HrStaff[] | null>(null);
+  const [staff, setStaff] = useState<StaffAccountRow[] | null>(null);
   const [message, setMessage] = useState('');
   const [notice, setNotice] = useState('');
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -44,8 +38,8 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
 
   const reload = useCallback(() => {
     setMessage('');
-    fetchHrWeek(mondayIso(), '', accessToken)
-      .then((result) => setStaff(result.staff))
+    fetchStaffAccounts(accessToken)
+      .then(setStaff)
       .catch((error) => { setStaff(null); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить учётки'); });
   }, [accessToken]);
   useEffect(() => reload(), [reload]);
@@ -80,6 +74,9 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       } else if (kind === 'role') {
         const updated = await changeStaffRole(target.id, pending.role, accessToken);
         setNotice(`Роль ${target.username}: ${updated.role}`);
+      } else if (kind === 'reactivate') {
+        await reactivateStaffAccount(target.id, accessToken);
+        setNotice(`Учётка ${target.username} снова активна`);
       } else if (kind === 'password-reset') {
         await resetStaffPassword(target.id, newPassword, accessToken);
         setNewPassword('');
@@ -125,14 +122,25 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
       </form>
 
       {staff === null && !message && <p className="mt-4 font-mono text-xs text-subtle">Загрузка…</p>}
-      {staff?.length === 0 && <p className="mt-4 text-xs text-subtle">Активных учёток нет</p>}
+      {staff?.length === 0 && <p className="mt-4 text-xs text-subtle">Учёток нет</p>}
       <ul className="mt-3 divide-y divide-surface-2">
         {(staff ?? []).map((person) => (
           <li key={person.id} className="py-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-white">{person.username}</span>
               <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-lime">{person.role}</span>
-              <span className="ml-auto flex flex-wrap gap-2">
+              {!person.active && <span className="rounded bg-coral-soft/20 px-1.5 py-0.5 font-mono text-[10px] text-coral-tint">неактивна</span>}
+              {!person.active && (
+                <span className="ml-auto">
+                  <button
+                    type="button"
+                    disabled={busy === person.id}
+                    onClick={() => setPending({ kind: 'reactivate', staff: person })}
+                    className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-lime hover:border-lime disabled:opacity-50"
+                  >Реактивировать</button>
+                </span>
+              )}
+              {person.active && <span className="ml-auto flex flex-wrap gap-2">
                 <select
                   aria-label={`Роль ${person.username}`}
                   value={person.role}
@@ -160,13 +168,14 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
                   onClick={() => setPending({ kind: 'deactivate', staff: person })}
                   className="rounded-[6px] border border-line px-2.5 py-1.5 text-[11px] text-danger-soft hover:border-coral-soft disabled:opacity-50"
                 >Деактивировать</button>
-              </span>
+              </span>}
             </div>
             {pending?.staff.id === person.id && (
               <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[8px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2">
                 <span className="text-xs text-coral-tint">
                   {pending.kind === 'deactivate' && `Деактивировать ${person.username}? Доступ отключится сразу.`}
                   {pending.kind === 'totp-reset' && `Сбросить 2FA для ${person.username}? Текущий authenticator перестанет работать.`}
+                  {pending.kind === 'reactivate' && `Вернуть доступ ${person.username}? Учётка снова сможет входить.`}
                   {pending.kind === 'role' && `Сменить роль ${person.username}: ${person.role} → ${pending.role}?`}
                   {pending.kind === 'password-reset' && `Новый пароль для ${person.username} (старые сессии завершатся):`}
                 </span>

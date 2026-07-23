@@ -96,6 +96,25 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
     }
   });
 
+  it('lists the full roster including deactivated accounts (owner only)', async () => {
+    const target = await makeStaff('roster-inactive');
+    await staffAuth.deactivateStaff('test-admin', target.id);
+
+    await request(app.getHttpServer())
+      .get('/staff-auth/staff')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .expect(403);
+
+    const res = await request(app.getHttpServer())
+      .get('/staff-auth/staff')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    const row = (res.body as Array<{ username: string; active: boolean; passwordHash?: string }>)
+      .find((item) => item.username === `${RUN}-roster-inactive`);
+    expect(row).toMatchObject({ active: false });
+    expect(row?.passwordHash).toBeUndefined();
+  });
+
   it('owner reactivates a deactivated account, idempotently', async () => {
     const target = await makeStaff('rehire');
     await staffAuth.deactivateStaff('test-admin', target.id);

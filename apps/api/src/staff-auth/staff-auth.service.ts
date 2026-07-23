@@ -366,6 +366,15 @@ export class StaffAuthService {
     return this.publicView(updated);
   }
 
+  /** STAFF-004: full roster incl. deactivated — hr/week shows active only. */
+  async listStaff() {
+    const staff = await this.prisma.staffUser.findMany({
+      select: { id: true, username: true, role: true, point: true, active: true, totpEnabled: true },
+      orderBy: [{ active: 'desc' }, { username: 'asc' }],
+    });
+    return staff;
+  }
+
   /** Step-up gate for approving dangerous actions. Rejecting remains fast. */
   async verifyStepUp(staffId: string, token?: string) {
     const staff = await this.getActiveStaff(staffId);

@@ -130,6 +130,20 @@ export function resetStaffTotp(
   return postAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/totp-reset`, {}, accessToken);
 }
 
+export interface StaffAccountRow {
+  id: string; username: string; role: StaffRole; point: string; active: boolean; totpEnabled: boolean;
+}
+
+/** STAFF-004: full roster incl. deactivated (hr/week is active-only). */
+export function fetchStaffAccounts(accessToken: string): Promise<StaffAccountRow[]> {
+  return getJson('/staff-auth/staff', accessToken);
+}
+
+/** STAFF-004: bring a deactivated account back (idempotent). */
+export function reactivateStaffAccount(staffId: string, accessToken: string): Promise<StaffPublicProfile> {
+  return postAuthJson(`/staff-auth/staff/${encodeURIComponent(staffId)}/reactivate`, {}, accessToken);
+}
+
 /** STAFF-004: promote/demote. 409 last_owner_protected guards the last active owner. */
 export function changeStaffRole(
   staffId: string,

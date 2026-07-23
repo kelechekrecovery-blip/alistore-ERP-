@@ -149,6 +149,14 @@ export class StaffAuthController {
     return this.staffAuth.deactivateStaff(user.customerId, id);
   }
 
+  /** STAFF-004: full account list (incl. deactivated) for the admin screen. */
+  @Get('staff')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  listStaff() {
+    return this.staffAuth.listStaff();
+  }
+
   /** STAFF-004: promote/demote. Owner-only; last active owner is protected. */
   @Patch('staff/:id/role')
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
