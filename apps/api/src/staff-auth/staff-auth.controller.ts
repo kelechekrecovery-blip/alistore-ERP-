@@ -1,9 +1,12 @@
-import { Body, Controller, ForbiddenException, Get, HttpCode, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Patch, Body, Controller, ForbiddenException, Get, HttpCode, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
-import { BootstrapOwnerDto, CreateStaffDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
+import { BootstrapOwnerDto, ChangeStaffRoleDto,
+  CreateStaffDto,
+  ResetStaffPasswordDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
 import { RefreshDto } from '../auth/auth.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
@@ -144,6 +147,30 @@ export class StaffAuthController {
   @RequirePermission('staff', 'manage')
   deactivate(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     return this.staffAuth.deactivateStaff(user.customerId, id);
+  }
+
+  /** STAFF-004: promote/demote. Owner-only; last active owner is protected. */
+  @Patch('staff/:id/role')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  changeRole(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ChangeStaffRoleDto) {
+    return this.staffAuth.changeRole(user.customerId, id, dto.role);
+  }
+
+  /** STAFF-004: bring a deactivated account back (idempotent). */
+  @Post('staff/:id/reactivate')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  reactivate(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.staffAuth.reactivateStaff(user.customerId, id);
+  }
+
+  /** STAFF-004: admin password reset; revokes the target's refresh sessions. */
+  @Post('staff/:id/password-reset')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  resetPassword(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ResetStaffPasswordDto) {
+    return this.staffAuth.resetPasswordByAdmin(user.customerId, id, dto.password);
   }
 
   /** Never expose the password hash. */

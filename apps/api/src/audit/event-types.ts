@@ -207,6 +207,9 @@ export const EventType = {
   // Staff account administration (STAFF-001/002) — security forensics trail.
   StaffTotpReset: 'staff.totp_reset',
   StaffDeactivated: 'staff.deactivated',
+  StaffReactivated: 'staff.reactivated',
+  StaffRoleChanged: 'staff.role_changed',
+  StaffPasswordReset: 'staff.password_reset',
 
   // settings — owner-editable business parameters (was: TypeScript constants)
   SettingChanged: 'settings.changed',

@@ -287,6 +287,85 @@ export class StaffAuthService {
     return this.publicView(updated);
   }
 
+  /**
+   * STAFF-004: change a staff member's role (promote/demote). Guarded against
+   * removing the last active owner so the system can never lock itself out of
+   * staff:manage. No-op when the role is unchanged; ledger records from/to.
+   */
+  async changeRole(actorId: string, targetStaffId: string, role: Role) {
+    const updated = await this.auditLedger().transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
+      const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
+      if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
+      if (target.role === role) return { result: target, events: [] };
+      if (target.role === 'owner') {
+        const owners = await tx.staffUser.count({ where: { role: 'owner', active: true, id: { not: target.id } } });
+        if (owners === 0) {
+          throw new ConflictError('last_owner_protected', 'Нельзя снять роль у последнего активного владельца');
+        }
+      }
+      const staff = await tx.staffUser.update({ where: { id: target.id }, data: { role } });
+      return {
+        result: staff,
+        events: [{
+          type: EventType.StaffRoleChanged,
+          actor: actorId,
+          payload: { targetStaffId: target.id, username: target.username, from: target.role, to: role },
+          refs: [target.id],
+        }],
+      };
+    });
+    return this.publicView(updated);
+  }
+
+  /** STAFF-004: bring a deactivated account back. Idempotent; ledger records it. */
+  async reactivateStaff(actorId: string, targetStaffId: string) {
+    const updated = await this.auditLedger().transaction(async (tx) => {
+      const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
+      if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
+      if (target.active) return { result: target, events: [] };
+      const staff = await tx.staffUser.update({ where: { id: target.id }, data: { active: true } });
+      return {
+        result: staff,
+        events: [{
+          type: EventType.StaffReactivated,
+          actor: actorId,
+          payload: { targetStaffId: target.id, username: target.username },
+          refs: [target.id],
+        }],
+      };
+    });
+    return this.publicView(updated);
+  }
+
+  /**
+   * STAFF-004: admin password reset (forgotten password). Revokes every live
+   * refresh session of the target in the same transaction, so a stolen session
+   * dies with the old password. The ledger never sees the password itself.
+   */
+  async resetPasswordByAdmin(actorId: string, targetStaffId: string, password: string) {
+    const passwordHash = await argon2.hash(password);
+    const updated = await this.auditLedger().transaction(async (tx) => {
+      const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
+      if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
+      const staff = await tx.staffUser.update({ where: { id: target.id }, data: { passwordHash } });
+      const revoked = await tx.refreshToken.updateMany({
+        where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return {
+        result: staff,
+        events: [{
+          type: EventType.StaffPasswordReset,
+          actor: actorId,
+          payload: { targetStaffId: target.id, username: target.username, revokedSessions: revoked.count },
+          refs: [target.id],
+        }],
+      };
+    });
+    return this.publicView(updated);
+  }
+
   /** Step-up gate for approving dangerous actions. Rejecting remains fast. */
   async verifyStepUp(staffId: string, token?: string) {
     const staff = await this.getActiveStaff(staffId);

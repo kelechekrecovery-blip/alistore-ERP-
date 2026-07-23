@@ -23,6 +23,15 @@ export class CreateStaffDto {
   @IsString() @IsNotEmpty() @MaxLength(80) point!: string;
 }
 
+export class ChangeStaffRoleDto {
+  @IsEnum(Role) role!: Role;
+}
+
+/** Admin reset — same strength bar as bootstrap, the shopper never sets this. */
+export class ResetStaffPasswordDto {
+  @IsString() @MinLength(8) @MaxLength(200) password!: string;
+}
+
 export class StaffTotpTokenDto {
   @IsString() @IsNotEmpty() token!: string;
 }

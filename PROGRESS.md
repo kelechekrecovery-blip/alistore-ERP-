@@ -1,5 +1,20 @@
 # PROGRESS
 
+## 2026-07-23 — Жизненный цикл персонала: роль/реактивация/пароль (STAFF-004)
+
+Владелец мог создать и деактивировать сотрудника, но не вести цикл дальше:
+повысить/понизить, вернуть уволенного, сбросить забытый пароль. Три новых
+owner-only маршрута (`staff:manage`): `PATCH staff/:id/role` (FOR UPDATE,
+защита последнего активного owner — `last_owner_protected`, no-op при той же
+роли), `POST staff/:id/reactivate` (идемпотентно), `POST staff/:id/password-reset`
+(argon2, в той же транзакции ревокает все refresh-сессии цели; пароль в леджер
+не попадает). События: `staff.role_changed` (from/to), `staff.reactivated`,
+`staff.password_reset` (+`revokedSessions`). RED→GREEN
+`staff-admin-lifecycle.e2e-spec.ts` 5/5 (RBAC 403, леджер, идемпотентность,
+старый пароль и старая сессия мертвы); регрессия staff/hr-сьютов 42/42;
+tsc + `api:build` чистые. UI в StaffAdminView — следующим срезом.
+
+
 ## 2026-07-23 — Алерты владельцу (OWNER-ALERTS-001)
 
 Леджер и так фиксирует недостачи и опасные действия — но сигналы лежали в Risk
