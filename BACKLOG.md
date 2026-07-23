@@ -1,5 +1,11 @@
 # BACKLOG
 
+## ANDROID-UI-006 — packaged Compose UI gate выполнен
+- **Проверено:** `npm run android:ui:all` на подключённом `emulator-5554`: Core **38/38**, Client **1/1**, Staff **2/2**, Courier **1/1**, POS **2/2**, `BUILD SUCCESSFUL` за 9:53.
+- **Примечание:** AVD называется `savio_api36_arm64`, но Gradle запускал AliStore packages и все четыре AliStore-модуля; это имя эмулятора, не application id.
+- **Ограничение:** в логах были Netty/grpc classloading warnings эмуляторного tooling; тестовые задачи завершились без failures. Hash-verified evidence ещё не зарегистрирован из-за грязного source tree.
+- **Следующий шаг:** повторить evidence recording на чистом source commit и закрыть reconciliation gaps.
+
 ## IOS-UI-005 — полный iOS UI smoke прогон выполнен
 - **Проверено:** `npm run ios:ui` на iPhone 17 Pro Simulator: Client **25/25**, Staff **10/10**, Courier **3/3**, POS **5/5**, всего **43/43** без падений.
 - **Покрыто:** login/session shells, storefront visual flows, account, returns, support, trade-in, Staff orders/support/tasks/buyback, Courier route/COD, POS shift/split sale/receipt.

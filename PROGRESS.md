@@ -1,5 +1,17 @@
 # PROGRESS
 
+## 2026-07-23 — ANDROID-UI-006: packaged Compose UI gate выполнен
+
+Запущен `npm run android:ui:all` на подключённом `emulator-5554`. Все packaged
+Android UI suites завершились успешно: Core **38/38**, Client **1/1**, Staff
+**2/2**, Courier **1/1**, POS **2/2**; итог Gradle — `BUILD SUCCESSFUL` за 9:53.
+
+Gradle использовал AVD с техническим именем `savio_api36_arm64`, но задачи
+запускали AliStore-модули и application packages, а не приложение Savio. В логе
+были шумные Netty/grpc classloading warnings от tooling эмулятора, однако ни один
+тест не завершился failure. Strict evidence пока не принят: source tree содержит
+параллельные незакоммиченные изменения.
+
 ## 2026-07-23 — IOS-UI-005: полный native iOS UI gate выполнен
 
 Запущен `npm run ios:ui` на iPhone 17 Pro Simulator. Все четыре AliStore targets
