@@ -47,9 +47,8 @@ npm install
 cp apps/api/.env.example apps/api/.env
 createdb alistore_dev && createdb alistore_test
 
-# миграции + сиды
+# миграции (демо-сидера нет — данные заводятся через ERP)
 npm run db:migrate           # prisma migrate dev (apps/api)
-npm run db:seed
 
 # API (http://localhost:4000/api)
 npm run api

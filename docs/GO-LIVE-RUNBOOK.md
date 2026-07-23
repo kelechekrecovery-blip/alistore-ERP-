@@ -23,14 +23,28 @@ Open + merge the PR (recommended — keeps clean history vs the concurrent Codex
   (belt-and-suspenders; `apps/web/lib/api/http.ts` also self-heals from the origin).
 - Deploy `apps/web` and `apps/api`; approve the production deploy.
 
-### 3. Populate the prod catalog (owner — needs prod DATABASE_URL)
-```bash
-DATABASE_URL="<PROD_DATABASE_URL>" npm run db:seed -w @alistore/api
-```
-This upserts 18 products (+ 2 IMEI units each) and a published storefront revision
-(hero + benefits). Alternatively add products/collections via the ERP CMS.
-Real product photos: drop files into `apps/web/public/products/` and point each
-product's `attrs.imageUrl` in `apps/api/prisma/seed.ts` (or via ERP).
+### 3. Наполнить боевой каталог (владелец) — только через ERP
+
+**Демо-сидера больше нет.** Прежняя редакция этого шага предписывала запустить
+`npm run db:seed` против боевой `DATABASE_URL`. Это залило бы в продакшен 18
+выдуманных товаров с фиктивными IMEI, демо-клиентов, демо-отзывы и служебные
+учётки `demo.*` — в отчётах и Event Ledger они неотличимы от настоящих продаж.
+Сидер удалён вместе со скриптом `db:seed`; команда больше не существует.
+
+Порядок наполнения с нуля:
+
+1. **Первый вход.** Сотрудников в чистой базе нет. Проверить
+   `GET /api/staff-auth/bootstrap-status` → если `needsBootstrap: true`, создать
+   первого владельца через `POST /api/staff-auth/bootstrap` (логин + пароль).
+   Эндпоинт работает ровно один раз — пока в базе ноль сотрудников.
+2. **Сотрудники.** Владелец заводит остальных в ERP (роли `seller`, `courier`,
+   `cashier`). Здесь же создаются учётки для ревью Apple — см.
+   `OWNER-LAUNCH-CHECKLIST`.
+3. **Каталог.** Товары, цены, категории и себестоимость — через ERP (Товары).
+4. **Остатки.** Единицы с реальными IMEI заводятся **приёмкой на склад**, а не
+   вручную в БД: только так серийный учёт и Event Ledger сойдутся.
+5. **Витрина.** Hero, подборки и блоки — через Marketing CMS. Фото товаров
+   загружаются в ERP; складывать файлы в репозиторий не нужно.
 
 ### 4. Verify (agent can run on request, once prod is up)
 ```bash

@@ -18,7 +18,8 @@
 ```bash
 npm install
 npm run db:migrate        # применить миграции
-npm run db:seed           # демо-данные (товары, единицы, клиент)
+# Демо-сидера нет: тестовые данные убраны, каталог и сотрудники заводятся через ERP.
+# Первый вход: GET /staff-auth/bootstrap-status → POST /staff-auth/bootstrap (первый владелец).
 ```
 
 ### Dev-режим (с авто-перезагрузкой)
