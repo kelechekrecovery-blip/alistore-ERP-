@@ -130,7 +130,7 @@ private struct ClientProductImage: View {
                     .padding(14)
             } else {
                 Image(systemName: fallbackSymbol)
-                    .font(.system(size: 52, weight: .ultraLight))
+                    .font(ClientTheme.body(52, weight: .ultraLight))
                     .foregroundStyle(.white.opacity(0.8))
             }
         }
@@ -230,7 +230,7 @@ private struct ClientBottomNav: View {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 3) {
                     Image(systemName: selected == tab ? "\(symbol).fill" : symbol)
-                        .font(.system(size: 19, weight: .medium))
+                        .font(ClientTheme.body(19, weight: .medium))
                     Text(title).font(ClientTheme.body(9.5, weight: selected == tab ? .bold : .medium))
                 }
                 .foregroundStyle(selected == tab ? Design3.orange : ClientTheme.muted)
@@ -245,7 +245,7 @@ private struct ClientBottomNav: View {
                 }
                 if tab == .cart, cartCount > 0 {
                     Text("\(cartCount)")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(ClientTheme.body(9, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -304,7 +304,7 @@ private struct ClientLoginView: View {
                             .keyboardType(.phonePad)
                             .textContentType(.telephoneNumber)
                             .foregroundStyle(.white)
-                            .font(.system(size: 15, design: .monospaced))
+                            .font(Design3.mono(15))
                             .padding(14)
                             .glass(radius: 13)
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
@@ -317,7 +317,7 @@ private struct ClientLoginView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .foregroundStyle(.white)
-                            .font(.system(size: 15))
+                            .font(ClientTheme.body(15))
                             .padding(14)
                             .glass(radius: 13)
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
@@ -662,7 +662,7 @@ private struct ClientOverlayView: View {
                     HStack(spacing: 10) {
                         Button { dismiss() } label: {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(ClientTheme.body(17, weight: .bold))
                                 .foregroundStyle(.white)
                         }
                         .buttonStyle(.plain)
@@ -932,7 +932,7 @@ private struct ClientNotificationRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text(icon)
-                .font(.system(size: 20))
+                .font(ClientTheme.body(20))
                 .frame(width: 24, alignment: .center)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -1378,7 +1378,7 @@ private struct ClientChoiceRow: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(ClientTheme.body(19, weight: .semibold))
                     .foregroundStyle(selected ? .black : ClientTheme.lime)
                     .frame(width: 40, height: 40)
                     .background(selected ? ClientTheme.lime : ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
@@ -1665,20 +1665,20 @@ private struct CartView: View {
                                     quantityBinding(product.id).wrappedValue = quantity - 1
                                 } label: {
                                     Image(systemName: "minus")
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(ClientTheme.body(11, weight: .bold))
                                         .frame(width: 28, height: 28)
                                         .minTapTarget()
                                 }
                                 .accessibilityLabel("Уменьшить количество \(product.name)")
                                 Text("\(quantity)")
-                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                    .font(Design3.mono(13, .semibold))
                                     .foregroundStyle(.white)
                                     .frame(minWidth: 20)
                                 Button {
                                     quantityBinding(product.id).wrappedValue = quantity + 1
                                 } label: {
                                     Image(systemName: "plus")
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(ClientTheme.body(11, weight: .bold))
                                         .frame(width: 28, height: 28)
                                         .minTapTarget()
                                 }
@@ -1800,7 +1800,7 @@ private struct CartView: View {
                 .foregroundStyle(ClientTheme.muted)
             HStack(spacing: 8) {
                 TextField("SALE5000", text: $promoInput)
-                    .font(.system(size: 14, design: .monospaced))
+                    .font(Design3.mono(14))
                     .foregroundStyle(.white)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -1925,7 +1925,7 @@ private struct CartView: View {
 
     private var offlineState: some View {
         VStack(spacing: 14) {
-            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 38)).foregroundStyle(ClientTheme.lime)
+            Image(systemName: "arrow.triangle.2.circlepath").font(ClientTheme.body(38)).foregroundStyle(ClientTheme.lime)
             Text("Заказ сохранён офлайн").font(ClientTheme.display(20, weight: .bold)).foregroundStyle(.white)
             Text("Он отправится автоматически после восстановления связи. Повторить отправку можно в Кабинет → Синхронизация.")
                 .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.center)
@@ -2210,7 +2210,7 @@ private struct ClientPaymentResultView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: resultState == .success ? "checkmark" : resultState == .failed ? "xmark" : "creditcard")
-                .font(.system(size: 30, weight: .bold))
+                .font(ClientTheme.body(30, weight: .bold))
                 .foregroundStyle(.black)
                 .frame(width: 80, height: 80)
                 .background(resultState == .success ? ClientTheme.lime : resultState == .failed ? ClientTheme.coral : Design3.gold, in: Circle())
@@ -2330,7 +2330,7 @@ private struct ClientOrderStatusView: View {
                             dismiss()
                         } label: {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .bold))
+                                .font(ClientTheme.body(16, weight: .bold))
                                 .foregroundStyle(.white)
                                 .frame(width: 34, height: 34)
                                 .background(ClientTheme.surface, in: Circle())
@@ -2353,7 +2353,7 @@ private struct ClientOrderStatusView: View {
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(spacing: 0) {
                                     Image(systemName: step.isDone ? "checkmark" : stepIcons[index])
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(ClientTheme.body(12, weight: .bold))
                                         .foregroundStyle(step.isDone ? .black : ClientTheme.muted)
                                         .frame(width: 26, height: 26)
                                         .background(step.isDone ? ClientTheme.lime : ClientTheme.background, in: Circle())
@@ -2608,7 +2608,7 @@ private struct ClientReceiptView: View {
                         ClientCallout(symbol: "doc.text.magnifyingglass", title: "Чек пока недоступен", detail: errorMessage)
                     } else if let receipt {
                         Text(receipt.markup)
-                            .font(.system(size: 13, weight: .regular, design: .monospaced))
+                            .font(Design3.mono(13, .regular))
                             .foregroundStyle(Design3.textBright)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -3134,7 +3134,7 @@ private struct CustomerReturnsView: View {
     private func timelineRow(title: String, isActive: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: isActive ? "circle.fill" : "circle")
-                .font(.system(size: 9, weight: .bold))
+                .font(ClientTheme.body(9, weight: .bold))
                 .foregroundStyle(isActive ? ClientTheme.lime : Design3.textFaint)
             Text(title)
                 .font(ClientTheme.body(12))
@@ -3245,7 +3245,7 @@ private struct CustomerReturnRequestView: View {
                             }
                             Spacer()
                             Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(ClientTheme.body(14, weight: .bold))
                                 .foregroundStyle(ClientTheme.lime)
                         }
                         .padding(12)
@@ -3361,7 +3361,7 @@ private struct ClientReturnProductTile: View {
             .fill(LinearGradient(colors: [Design3.surfaceRaised, Design3.surface], startPoint: .topLeading, endPoint: .bottomTrailing))
             .overlay {
                 Image(systemName: "shippingbox")
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(ClientTheme.body(24, weight: .semibold))
                     .foregroundStyle(Design3.textBright.opacity(0.72))
             }
     }
@@ -3602,7 +3602,7 @@ private struct CustomerTradeInCard: View {
                         .foregroundStyle(.white)
                         .lineLimit(2)
                     Text(tradeIn.contractId ?? "Договор формируется")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Design3.mono(11))
                         .foregroundStyle(ClientTheme.muted)
                 }
                 Spacer()
@@ -3619,7 +3619,7 @@ private struct CustomerTradeInCard: View {
             .foregroundStyle(ClientTheme.muted)
             if let imei = tradeIn.imei, !imei.isEmpty {
                 Text("IMEI \(imei)")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Design3.mono(11))
                     .foregroundStyle(ClientTheme.muted)
             }
             PhotosPicker(selection: $selectedPhoto, matching: .images, photoLibrary: .shared()) {
@@ -3909,7 +3909,7 @@ private struct AccountView: View {
                             .foregroundStyle(.white)
                         if let loyalty {
                             Text(loyalty.level.uppercased())
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .font(Design3.mono(9, .bold))
                                 .foregroundStyle(.black)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
@@ -3917,7 +3917,7 @@ private struct AccountView: View {
                         }
                     }
                     Text(maskedPhone(session.phone))
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(Design3.mono(12))
                         .foregroundStyle(ClientTheme.muted)
                 }
                 Spacer(minLength: 0)
@@ -3938,7 +3938,7 @@ private struct AccountView: View {
                         Spacer()
                         if let loyalty {
                             Text("\(clientGroupedDigits(loyalty.balance)) бонусов")
-                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .font(Design3.mono(13, .medium))
                                 .foregroundStyle(ClientTheme.lime)
                         }
                     }
@@ -4256,7 +4256,7 @@ private struct AccountMenuTile<Destination: View>: View {
             VStack(alignment: .leading, spacing: 9) {
                 Image(systemName: symbol)
                     .foregroundStyle(ClientTheme.lime)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(ClientTheme.body(17, weight: .semibold))
                     .frame(width: 34, height: 34)
                     .background(ClientTheme.lime.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
                 Text(title)
@@ -4305,7 +4305,7 @@ private struct CustomerLoyaltyView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 10) {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(ClientTheme.body(17, weight: .bold))
                                 .foregroundStyle(.white)
                             Text("Бонусы и купоны")
                                 .font(ClientTheme.display(20, weight: .bold))
@@ -4344,7 +4344,7 @@ private struct CustomerLoyaltyView: View {
                             ForEach(loyalty.coupons) { coupon in
                                 HStack(spacing: 12) {
                                     Text(couponIcon(coupon))
-                                        .font(.system(size: 24))
+                                        .font(ClientTheme.body(24))
                                         .frame(width: 30)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(coupon.title)
@@ -4352,7 +4352,7 @@ private struct CustomerLoyaltyView: View {
                                             .foregroundStyle(.white)
                                         HStack(spacing: 6) {
                                             Text(coupon.code)
-                                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                                .font(Design3.mono(11, .semibold))
                                                 .foregroundStyle(ClientTheme.muted)
                                             if let expiresAt = coupon.expiresAt {
                                                 Text("до \(expiresAt, format: .dateTime.day().month().year())")
@@ -4393,7 +4393,7 @@ private struct CustomerLoyaltyView: View {
                                     }
                                     Spacer()
                                     Text("\(entry.amount >= 0 ? "+" : "")\(entry.amount)")
-                                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                        .font(Design3.mono(13, .semibold))
                                         .foregroundStyle(entry.amount >= 0 ? ClientTheme.lime : ClientTheme.coral)
                                 }
                                 .padding(.vertical, 10)
@@ -4484,7 +4484,7 @@ private struct CustomerAddressesView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 10) {
                             Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(ClientTheme.body(17, weight: .bold))
                                 .foregroundStyle(.white)
                             Text("Адреса доставки")
                                 .font(ClientTheme.display(20, weight: .bold))
@@ -5279,7 +5279,7 @@ private struct ClientSupportChannel: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(icon)
-                .font(.system(size: 24))
+                .font(ClientTheme.body(24))
             Text(title)
                 .font(ClientTheme.body(12, weight: .medium))
                 .foregroundStyle(tint)
@@ -5479,7 +5479,7 @@ private struct ClientDeviceCard: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(ClientTheme.coral.opacity(0.16))
                     Image(systemName: device.product.localizedCaseInsensitiveContains("mac") ? "laptopcomputer" : "iphone.gen3")
-                        .font(.system(size: 24, weight: .medium))
+                        .font(ClientTheme.body(24, weight: .medium))
                         .foregroundStyle(ClientTheme.coral)
                 }
                 .frame(width: 54, height: 54)
@@ -5489,7 +5489,7 @@ private struct ClientDeviceCard: View {
                         .font(ClientTheme.body(15, weight: .bold))
                         .foregroundStyle(.white)
                     Text("IMEI \(device.imei)")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Design3.mono(11))
                         .foregroundStyle(ClientTheme.muted)
                     Text("Статус: \(device.status)")
                         .font(ClientTheme.body(11))
@@ -5565,7 +5565,7 @@ private struct ClientDeviceFact: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title.uppercased())
-                .font(.system(size: 9, weight: .semibold))
+                .font(ClientTheme.body(9, weight: .semibold))
                 .foregroundStyle(ClientTheme.muted)
             Text(value)
                 .font(ClientTheme.body(13, weight: .semibold))
@@ -5582,7 +5582,7 @@ private struct ClientStateCard: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: symbol)
-                .font(.system(size: 28, weight: .medium))
+                .font(ClientTheme.body(28, weight: .medium))
                 .foregroundStyle(ClientTheme.lime)
             Text(title)
                 .font(ClientTheme.body(17, weight: .bold))
@@ -5720,7 +5720,7 @@ private struct ClientWarrantyCertificate: View {
                 .font(ClientTheme.display(20, weight: .bold))
                 .foregroundStyle(.white)
             Text("IMEI \(device.imei)")
-                .font(.system(size: 12, design: .monospaced))
+                .font(Design3.mono(12))
                 .foregroundStyle(ClientTheme.muted)
             HStack(spacing: 0) {
                 ClientDeviceFact(title: "Гарантия до", value: formattedDate(device.warrantyUntil) ?? "Не указана")
@@ -6356,7 +6356,7 @@ private struct ProductDetail: View {
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text(displayProduct.availableUnits > 0 ? "В НАЛИЧИИ" : "НЕТ В НАЛИЧИИ")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(Design3.mono(11, .bold))
                         .foregroundStyle(displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
                     Text(displayProduct.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
                     Text(Money.som(displayProduct.price))
