@@ -2,9 +2,9 @@
 
 ## WEB-GATE-178 — закрыть 5 дефектов полного Web E2E
 - **Последний прогон:** `E2E_REUSE_EXISTING_SERVER=false E2E_API_PORT=4794 E2E_WEB_PORT=3794 npm run e2e` — **136/141 passed**.
-- **Открыто:** checkout sandbox не переходит на guest order; account devices не видит созданное устройство; ERP visual snapshot расходится на 7,615 пикселей; consignment payout требует открытую кассовую смену; warehouse delivery completion получает detached DOM.
-- **Приоритет:** checkout и складские reconciliation — P1; account devices и visual snapshot — P2/acceptance.
-- **Следующий шаг:** воспроизвести каждый дефект изолированно, добавить regression assertion, затем повторить полный Web gate. Снапшоты не обновлять до проверки причины.
+- **Изолированно подтверждено:** checkout **1/1**, account devices **1/1** и warehouse delivery **1/1** проходят; падения полного прогона для них были нестабильными.
+- **Исправлено:** consignment E2E теперь создаёт открытую кассовую смену владельца перед наличной выплатой; targeted gate **1/1**.
+- **Открыто:** ERP visual snapshot расходится на 7,615 пикселей и требует визуальной проверки; затем повторить полный Web gate.
 
 ## WEB-AUTH-EMAIL-176 — подключить email OTP к клиентской витрине
 - **Сделано:** `/login` поддерживает телефонный и email-каналы; `/account/settings` позволяет привязать/изменить email через customer-bound OTP; ошибки API переводятся по доменному `code`.

@@ -8,6 +8,15 @@ test.afterEach(async () => {
 test('owner receives consignment stock and reconciles a completed owner payout', async ({ page }) => {
   await resetDb();
   const session = await seedStaffCredentials('owner', 'e2e-consignment');
+  await prisma.cashShift.create({
+    data: {
+      staffId: session.staffId,
+      point: 'BISHKEK-1',
+      openCash: 0,
+      openIdempotencyKey: `e2e-consignment-shift-${Date.now()}`,
+      openedAt: new Date(),
+    },
+  });
   const product = await prisma.product.create({
     data: {
       sku: `E2E-CONSIGN-${Date.now().toString(36)}`.toUpperCase(),
