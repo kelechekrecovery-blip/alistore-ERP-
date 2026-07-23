@@ -659,6 +659,33 @@ export class FinanceService {
     });
   }
 
+  /**
+   * Closed shifts that still hold uncollected cash. Without this the owner has
+   * no way to find a shift id to collect against, and the ERP «К инкассации»
+   * tile had no number to show.
+   */
+  async collectableShifts(point?: string) {
+    const shifts = await this.prisma.cashShift.findMany({
+      where: { closedAt: { not: null }, ...(point ? { point } : {}) },
+      include: { incassations: { select: { amount: true } } },
+      orderBy: { closedAt: 'desc' },
+      take: 50,
+    });
+    return shifts
+      .map((shift) => {
+        const deposited = shift.incassations.reduce((sum, item) => sum + item.amount, 0);
+        return {
+          id: shift.id,
+          point: shift.point,
+          closedAt: shift.closedAt,
+          closeCash: shift.closeCash ?? 0,
+          deposited,
+          available: (shift.closeCash ?? 0) - deposited,
+        };
+      })
+      .filter((shift) => shift.available > 0);
+  }
+
   async createCashIncassation(shiftId: string, dto: CreateCashIncassationDto, actor: string, idempotencyKey: string) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`cash-incassation:${shiftId}`}))::text`;

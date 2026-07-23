@@ -80,6 +80,13 @@ export class FinancePlanningController {
     return this.finance.createCurrencyRate(dto, user.customerId);
   }
 
+  /** Closed shifts with cash still uncollected — the picker for an incassation. */
+  @Get('collectable-shifts')
+  @RequirePermission('finance', 'read')
+  collectableShifts(@Query('point') point?: string) {
+    return this.finance.collectableShifts(point?.trim() || undefined);
+  }
+
   @Get('cash-incassations')
   @RequirePermission('finance', 'read')
   cashIncassations(@Query('point') point?: string) {

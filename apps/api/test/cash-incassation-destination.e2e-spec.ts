@@ -126,6 +126,27 @@ describe('Cash incassation destination (bank vs owner draw)', () => {
       .send({ amount: 5_000, destinationCode: '1010' }).expect(409);
   });
 
+  it('lists only closed shifts that still hold uncollected cash', async () => {
+    const shift = await closedShift(9_000);
+    const before = await request(app.getHttpServer())
+      .get(`/finance/collectable-shifts?point=${point}`)
+      .set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect(before.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: shift.id, available: 9_000, deposited: 0 }),
+    ]));
+
+    // Collect it all — the shift must drop out of the list.
+    await request(app.getHttpServer())
+      .post(`/finance/cash-incassations/${shift.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `inc-drain-${run}`)
+      .send({ amount: 9_000, destinationCode: '3000' }).expect(201);
+
+    const after = await request(app.getHttpServer())
+      .get(`/finance/collectable-shifts?point=${point}`)
+      .set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    expect((after.body as Array<{ id: string }>).some((row) => row.id === shift.id)).toBe(false);
+  });
+
   it('rejects an account that is not a permitted destination', async () => {
     const shift = await closedShift(10_000);
     await request(app.getHttpServer())
