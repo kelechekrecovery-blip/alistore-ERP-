@@ -1011,3 +1011,7 @@ POS refund, courier COD, service/loaner и procurement/sale теперь име�
 ## ANDROID-163 — packaged connected UI gate принят
 
 Все четыре Android-модуля прошли connected tests на доступном AVD; evidence записано `66c0ef97`. Не считать это физическим устройством или store certification. Остались iOS UI, visual evidence и общий ecosystem E2E.
+
+## ECOSYSTEM-164 — composite software matrix принят
+
+Общий fail-fast E2E прошёл все четыре вертикали и получил evidence `ef46852a`. Остались durable visual evidence и iOS app-specific UI gate; production credentials, physical-device smoke и App Store submission остаются внешними release gates.
