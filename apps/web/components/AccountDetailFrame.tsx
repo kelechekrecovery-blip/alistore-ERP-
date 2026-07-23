@@ -4,7 +4,14 @@ import { SiteHeader } from './SiteHeader';
 
 export function AccountDetailFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="account-detail-shell fixed inset-0 z-40 flex justify-center bg-night font-sans">
+    <div
+      className="account-detail-shell fixed inset-0 z-40 flex justify-center bg-night font-sans"
+      style={{
+        // Keep the first committed frame visually stable while Next loads the
+        // responsive stylesheet after a cold account-detail navigation.
+        backgroundColor: typeof window !== 'undefined' && window.innerWidth < 768 ? '#0e0c0a' : '#0b0a08',
+      }}
+    >
       <div className="account-detail-header">
         <SiteHeader variant="design3" />
       </div>

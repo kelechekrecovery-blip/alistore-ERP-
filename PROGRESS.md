@@ -18,6 +18,13 @@
 Полный gate нужно повторить отдельно: предыдущий полный прогон после auth-only
 фикса был **138/139**, поэтому production readiness не объявляется.
 
+Повторный полный прогон после shell-фикса не принят: `2 passed / 4 failed` в
+`storefront-motion.spec.ts`, потому что тестовый Next/API контур оставил
+несколько страниц без seeded catalog/customer data после серии перезапусков.
+Это отдельная нестабильность общего E2E runner; targeted `storefront-motion`
+остаётся зелёным, а production build проходит. Нужна отдельная стабилизация
+lifecycle/reset общего runner до объявления полного Web gate.
+
 ## 2026-07-23 — WEB-AUTH-156: закрыта блокировка warranty-маршрута при полном E2E
 
 Полный Web прогон ранее оставлял `/account/warranty/:imei` на глобальном
