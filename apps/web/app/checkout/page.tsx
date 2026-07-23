@@ -404,7 +404,7 @@ export default function CheckoutPage() {
           <>
             <div className="mb-3 font-display text-base font-bold">Способ получения</div>
             {DELIVERY.map((d) => (
-              <button key={d.id} type="button" aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${delivery === d.id ? 'border-lime' : 'border-surface-3'}`}>
+              <button key={d.id} type="button" disabled={!hydrated || deliveryCapacityLoading} aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left disabled:cursor-wait disabled:opacity-60 ${delivery === d.id ? 'border-lime' : 'border-surface-3'}`}>
                 <d.icon size={22} className="text-ink" />
                 <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-muted">{d.meta}</div></div>
                 <span className="text-[13px] text-bright">{d.price}</span>
