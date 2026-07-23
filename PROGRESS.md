@@ -1,5 +1,18 @@
 # PROGRESS
 
+## 2026-07-23 — MVP-GATE-176: закрыт устаревший unsigned-webhook expectation
+
+Повторный полный `mvp:verify` после HMAC-фикса дошёл до API batch 51/202 и
+нашёл расхождение в security regression: `dangerous-endpoint-rbac` отправлял
+неподписанный sandbox callback и ожидал доменный `422`. Текущий контракт
+намеренно fail-closed и скрывает неподписанные callbacks через `404`, поэтому
+тест обновлён без ослабления проверки подписи. Подписанный callback с
+неизвестным заказом остаётся покрыт payment integration suite.
+
+Проверки: `dangerous-endpoint-rbac.e2e-spec.ts` — **4/4**, API build и
+`git diff --check` — зелёные. Полный gate остановлен именно на этой
+регрессии; следующий шаг — новый полный прогон с текущего commit.
+
 ## 2026-07-23 — PAYMENTS-WEBHOOK-175: восстановлен полный HMAC payment gate
 
 Полный mvp:verify дошёл до API batch 34/202 и обнаружил старые integration

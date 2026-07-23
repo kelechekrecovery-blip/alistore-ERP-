@@ -1,5 +1,11 @@
 # BACKLOG
 
+## MVP-GATE-176 — синхронизировать RBAC regression с fail-closed webhook
+- **Найдено:** полный `mvp:verify` прошёл до API batch 51/202; `dangerous-endpoint-rbac.e2e-spec.ts` ожидал `422` для неподписанного sandbox webhook, но защищённый endpoint корректно возвращает `404`.
+- **Исправлено:** regression теперь фиксирует security-контракт: неподписанный callback скрывается как недоступный маршрут; signed unknown-order payload проверяется в payment integration suite.
+- **Проверено:** suite `dangerous-endpoint-rbac.e2e-spec.ts` — 4/4; API build и `git diff --check` — зелёные.
+- **Следующий шаг:** повторить полный `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify`.
+
 ## PAYMENTS-WEBHOOK-175 — синхронизировать payment fixtures с HMAC-контрактом
 - **Сделано:** PaymentIntentsService разделяет внешнюю проверку provider webhook и внутреннее, отдельно защищённое sandbox-confirm действие.
 - **Сделано:** integration fixtures подписывают raw body через общий HMAC helper; sandbox provider в тестах получает тот же secret, что и helper.

@@ -203,7 +203,10 @@ describe('Dangerous product/refund endpoint RBAC', () => {
         txnId: `txn-${RUN}`,
         status: 'succeeded',
       })
-      .expect(422);
+      // Unsigned callbacks are deliberately indistinguishable from a missing
+      // webhook route. A signed unknown-order callback is covered by the
+      // payment-intents integration suite and reaches the domain 422 branch.
+      .expect(404);
   });
 
   it('allows authorized finance roles to read refund drilldown only', async () => {
