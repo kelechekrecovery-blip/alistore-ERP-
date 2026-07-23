@@ -124,6 +124,61 @@ describe('Auth: social provider login', () => {
     expect(identity?.customer.segments).toContain('auth:apple');
   });
 
+  it('принимает и веб-Services ID, и bundle id нативного приложения', async () => {
+    // У нативного Sign in with Apple в `aud` лежит bundle id приложения, а у
+    // веб-потока — Services ID. Пока сверка шла с одним значением, включение
+    // кнопки в iOS ломало вход на проде: `apple_token_invalid` с формулировкой
+    // про audience, и только после того, как владелец настроит переменную.
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = {
+      ...publicKey.export({ format: 'jwk' }),
+      kid: 'apple-key-2',
+      alg: 'RS256',
+      use: 'sig',
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ keys: [jwk] }),
+    }) as unknown as typeof fetch;
+
+    const auth = service({
+      APPLE_CLIENT_ID: 'kg.alistore.web,kg.alistore.client',
+      APPLE_JWKS_URL: 'https://apple.test/keys',
+    });
+
+    const nativeToken = (subject: string, audience: string) =>
+      signedJwt(
+        { alg: 'RS256', kid: 'apple-key-2' },
+        {
+          iss: 'https://appleid.apple.com',
+          aud: audience,
+          exp: Math.floor(Date.now() / 1000) + 300,
+          iat: Math.floor(Date.now() / 1000),
+          sub: subject,
+          email: `${subject}@privaterelay.appleid.com`,
+        },
+        privateKey,
+      );
+
+    const native = await auth.loginWithApple({
+      identityToken: nativeToken('apple-native-1', 'kg.alistore.client'),
+    });
+    expect(native.accessToken.split('.')).toHaveLength(3);
+
+    const web = await auth.loginWithApple({
+      identityToken: nativeToken('apple-web-1', 'kg.alistore.web'),
+    });
+    expect(web.accessToken.split('.')).toHaveLength(3);
+
+    // Чужая аудитория по-прежнему отвергается — список не должен превратиться
+    // в «принимаем что угодно».
+    const foreign = await auth
+      .loginWithApple({ identityToken: nativeToken('apple-foreign-1', 'kg.someone.else') })
+      .catch((error) => error);
+    expect(foreign).toBeInstanceOf(ValidationError);
+    expect((foreign as ValidationError).code).toBe('apple_token_invalid');
+  });
+
   it('fails closed when a social provider is not configured', async () => {
     const auth = service({});
     const err = await auth

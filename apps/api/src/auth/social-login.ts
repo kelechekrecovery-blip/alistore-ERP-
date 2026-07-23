@@ -226,8 +226,26 @@ function safeEqualHex(left: string, right: string): boolean {
   return timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 }
 
+/**
+ * Сверяет `aud` токена с настроенными идентификаторами клиента.
+ *
+ * `clientId` может содержать несколько значений через запятую: у нативного
+ * Sign in with Apple в `aud` лежит bundle id приложения, а у веб-потока —
+ * Services ID, и это два разных значения от одного и того же Apple-аккаунта.
+ * Пока сверка шла с одной строкой, включение кнопки в iOS ломало бы вход на
+ * проде отказом «audience is invalid».
+ *
+ * Пустые элементы отбрасываются: `APPLE_CLIENT_ID="a,,b"` не должен случайно
+ * начать принимать токен с пустой аудиторией.
+ */
 function audienceMatches(audience: string | string[] | undefined, clientId: string): boolean {
-  return Array.isArray(audience) ? audience.includes(clientId) : audience === clientId;
+  const allowed = clientId
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (allowed.length === 0) return false;
+  const claimed = Array.isArray(audience) ? audience : [audience];
+  return claimed.some((value) => typeof value === 'string' && allowed.includes(value));
 }
 
 function displayName(values: Array<string | undefined>): string | undefined {
