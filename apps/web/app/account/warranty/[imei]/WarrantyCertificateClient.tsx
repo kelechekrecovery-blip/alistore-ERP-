@@ -24,21 +24,19 @@ export default function WarrantyCertificatePage({ params }: { params: { imei: st
     if (user) { setLoadError(''); authed(fetchMyDevices).then(setDevices).catch((cause) => setLoadError(cause instanceof Error ? cause.message : 'Не удалось загрузить устройства')); }
   }, [user, authed]);
 
-  if (!hydrated || !user) {
-    return <div className="fixed inset-0 z-40 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
-  }
-
   const device = devices?.find((d) => d.imei === imei) ?? null;
 
   return (
     <AccountDetailFrame>
         <div className="flex items-center gap-3 px-4 pb-3 pt-5">
           <button type="button" onClick={() => router.back()} className="text-xl">←</button>
-          <span className="font-display text-xl font-bold">Гарантия</span>
+          <span className="font-display text-xl font-bold">Гарантийный талон</span>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-8">
-          {loadError && (
+          {!hydrated || !user ? <p className="font-mono text-sm text-subtle">Проверяем доступ…</p> : null}
+          {hydrated && !user ? <p className="mt-2 text-sm text-subtle">Для просмотра документа войдите в аккаунт.</p> : null}
+          {hydrated && user && loadError && (
             <div className="py-12 text-center">
               <div className="mt-3.5 font-display text-[17px] font-bold">Устройства не загрузились</div>
               <p className="mt-2 text-sm text-subtle">{loadError}</p>
@@ -46,15 +44,15 @@ export default function WarrantyCertificatePage({ params }: { params: { imei: st
               <Link href="/account/devices" className="mt-4 inline-block text-sm text-lime">← Мои устройства</Link>
             </div>
           )}
-          {!loadError && devices === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
-          {!loadError && devices !== null && !device && (
+          {hydrated && user && !loadError && devices === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
+          {hydrated && user && !loadError && devices !== null && !device && (
             <div className="py-12 text-center">
               <div className="text-5xl">🔍</div>
               <div className="mt-3.5 font-display text-[17px] font-bold">Устройство не найдено</div>
               <Link href="/account/devices" className="mt-4 inline-block text-sm text-lime">← Мои устройства</Link>
             </div>
           )}
-          {device && <WarrantyCertificate device={device} customerId={user.customerId} />}
+          {hydrated && user && device && <WarrantyCertificate device={device} customerId={user.customerId} />}
         </div>
     </AccountDetailFrame>
   );

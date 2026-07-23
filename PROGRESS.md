@@ -1,5 +1,23 @@
 # PROGRESS
 
+## 2026-07-23 — WEB-AUTH-156: warranty shell больше не пустой при задержке auth
+
+Полный прогон после первого auth timeout подтвердил повторяемый edge case:
+`/account/warranty/:imei` мог оставаться на глобальной загрузке после серии
+переходов и dev-server reload. Warranty detail теперь сразу показывает
+защищённую account-оболочку и заголовок «Гарантийный талон», пока идёт проверка
+сессии; персональные устройства и сам документ доступны только при
+`hydrated && user`.
+
+Проверки после wrapper-фикса:
+
+- `npx playwright test e2e/storefront-motion.spec.ts --workers=1` — **6/6**.
+- `npm run build -w @alistore/web` — **45/45** статических страниц, TypeScript и
+  production build зелёные.
+
+Полный gate нужно повторить отдельно: предыдущий полный прогон после auth-only
+фикса был **138/139**, поэтому production readiness не объявляется.
+
 ## 2026-07-23 — WEB-AUTH-156: закрыта блокировка warranty-маршрута при полном E2E
 
 Полный Web прогон ранее оставлял `/account/warranty/:imei` на глобальном

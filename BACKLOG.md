@@ -4,8 +4,9 @@
 - **Сделано:** для non-production bearer fixture UI получает временную customer identity из JWT payload и сразу продолжает рендер; `/auth/me` остаётся обязательным серверным подтверждением для замены identity, а все защищённые reads/mutations по-прежнему выполняются через bearer и API authorization.
 - **Сделано:** account detail маршрутный тест ждёт commit навигации, затем проверяет реальный authenticated DOM, чтобы не зависеть от нестабильного `load`-события Next dev compilation после серии переходов.
 - **Сделано:** JWT fixture decoder теперь корректно дополняет base64url payload; non-production `/auth/me` получает ограничение 5 секунд и не блокирует уже валидную локальную customer identity при временной задержке API.
-- **Проверено:** `storefront-motion.spec.ts` — `6/6 passed`; `npm run build -w @alistore/web` — production build и TypeScript зелёные.
-- **Открыто:** полный 139-тестовый прогон до последнего auth-race фикса зафиксировал `138 passed / 1 failed`; требуется повторить полный gate на новом SHA.
+- **Сделано:** warranty detail сохраняет защищённую account-оболочку и заголовок во время проверки сессии; персональный документ и устройства рендерятся только после `hydrated + user`, а ошибки загрузки показываются явно.
+- **Проверено:** `storefront-motion.spec.ts` после wrapper-фикса — `6/6 passed`; `npm run build -w @alistore/web` — production build и TypeScript зелёные.
+- **Открыто:** полный 139-тестовый прогон после auth-only фикса всё ещё зафиксировал `138 passed / 1 failed`; полный gate нужно повторить после последнего warranty wrapper-фикса.
 - **Следующий шаг:** выполнить свежий полный `npm run e2e`, затем единый `mvp:verify`; Render/provider/device/App Review gates остаются внешними.
 
 ## WEB-CHECKOUT-149 — стабилизировать холодный выбор способа доставки
