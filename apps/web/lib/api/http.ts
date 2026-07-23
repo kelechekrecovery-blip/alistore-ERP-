@@ -35,15 +35,23 @@ function resolveApiBase(): string {
 export const API_BASE = resolveApiBase();
 
 export class ApiError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(public readonly status: number, message: string, public readonly code?: string) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
+/**
+ * Domain errors (`apps/api/src/common/errors.ts` DomainError) reply with
+ * `{ statusCode, code, message }`. The `code` is machine-readable and stable;
+ * `message` is server prose that may change wording. Callers that need to
+ * render specific Russian copy per failure reason (see `lib/auth-errors.ts`)
+ * should switch on `code`, not parse `message`.
+ */
 async function responseError(res: Response): Promise<ApiError> {
   const detail = await res.json().catch(() => ({}));
-  return new ApiError(res.status, (detail as { message?: string }).message ?? `request failed ${res.status}`);
+  const parsed = detail as { message?: string; code?: string };
+  return new ApiError(res.status, parsed.message ?? `request failed ${res.status}`, parsed.code);
 }
 
 /** POST JSON and unwrap the response, surfacing the API's error message on failure. */
@@ -76,6 +84,29 @@ export async function postAuthJson<T>(
   });
   if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
+}
+
+/**
+ * Authenticated POST JSON (Bearer token) for endpoints that reply with no
+ * body (e.g. `POST /auth/email/attach/confirm`). Never parses the response
+ * as JSON on success — only `responseError` does, and only on failure.
+ */
+export async function postAuthVoid(
+  path: string,
+  body: unknown,
+  accessToken: string,
+  headers?: Record<string, string>,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${accessToken}`,
+      ...headers,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await responseError(res);
 }
 
 /** Authenticated PATCH JSON (Bearer token). */
