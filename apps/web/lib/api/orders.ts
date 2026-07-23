@@ -1,4 +1,4 @@
-import { API_BASE, getJson, postAuthJson } from './http';
+import { API_BASE, getJson, postAuthJson, postJson } from './http';
 import type { LedgerEvent } from '../reports';
 import type { StoredAttribution } from '../attribution';
 
@@ -34,15 +34,16 @@ export interface CreatedOrder {
   guestAccess?: { capability: string; expiresIn: number };
 }
 
-/** Find-or-create a customer by phone (guest checkout). Throws on API error. */
+/**
+ * Find-or-create a customer by phone (guest checkout).
+ *
+ * Goes through `postJson` so the API's own message reaches the shopper: a phone
+ * that already belongs to an account answers 409 `guest_customer_requires_auth`
+ * ("войдите в аккаунт перед оформлением заказа"), which is actionable — the raw
+ * `customers responded 409` this used to throw was not.
+ */
 export async function createCustomer(input: { phone: string; name?: string }): Promise<{ id: string; guestCapability: string; capabilityExpiresIn: number }> {
-  const res = await fetch(`${API_BASE}/customers`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error(`customers responded ${res.status}`);
-  return (await res.json()) as { id: string; guestCapability: string; capabilityExpiresIn: number };
+  return postJson<{ id: string; guestCapability: string; capabilityExpiresIn: number }>('/customers', input);
 }
 
 /** Create an order from the storefront cart. Throws on API error. */
@@ -63,17 +64,12 @@ export async function createOrder(input: {
   piiConsent?: boolean;
   items: OrderLine[];
 }, guestCapability: string, idempotencyKey: string): Promise<CreatedOrder> {
-  const res = await fetch(`${API_BASE}/orders`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-guest-capability': guestCapability,
-      'idempotency-key': idempotencyKey,
-    },
-    body: JSON.stringify(input),
+  // postJson surfaces the API's error message (e.g. stock/price conflicts) instead
+  // of the opaque `orders responded <status>` this used to throw.
+  return postJson<CreatedOrder>('/orders', input, {
+    'x-guest-capability': guestCapability,
+    'idempotency-key': idempotencyKey,
   });
-  if (!res.ok) throw new Error(`orders responded ${res.status}`);
-  return (await res.json()) as CreatedOrder;
 }
 
 export async function createMyOrder(input: {
