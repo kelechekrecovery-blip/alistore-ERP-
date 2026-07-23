@@ -255,7 +255,16 @@ private struct ClientBottomNav: View {
             }
         }
         .buttonStyle(.plain)
+        // Метка была голым заголовком: счётчик корзины рисуется отдельной
+        // плашкой поверх кнопки и VoiceOver его не читал — незрячий покупатель
+        // не знал, что в корзине что-то лежит. Активная вкладка тоже ничем не
+        // отличалась на слух: подсветка чисто визуальная.
+        // Счётчик уходит в value, а не в label: VoiceOver читает и то и другое,
+        // но label остаётся стабильным — иначе кнопка перестаёт находиться по
+        // имени и в тестах, и в голосовом управлении («нажми Корзина»).
         .accessibilityLabel(title)
+        .accessibilityValue(tab == .cart && cartCount > 0 ? "товаров: \(cartCount)" : "")
+        .accessibilityAddTraits(selected == tab ? [.isButton, .isSelected] : .isButton)
     }
 }
 
