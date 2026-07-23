@@ -33,7 +33,7 @@ export function StaffSessionLogin({
     e.preventDefault();
     setBusy(true);
     setError('');
-    const values = new FormData(e.currentTarget);
+    const values = new FormData(e.currentTarget as HTMLFormElement);
     const username = String(values.get('username') ?? '').trim();
     const password = String(values.get('password') ?? '');
     try {
