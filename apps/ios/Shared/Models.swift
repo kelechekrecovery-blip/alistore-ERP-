@@ -444,6 +444,9 @@ public struct UpdateCustomerAddressRequest: Encodable, Sendable {
 public struct CustomerSettings: Decodable, Sendable {
     public let id: String
     public let phone: String
+    /// Привязанный адрес входа. Необязателен: у большинства аккаунтов его нет,
+    /// а старые сборки сервера поле не присылают вовсе.
+    public let email: String?
     public let name: String
     public let consent: Bool
     public let push: Bool
@@ -451,9 +454,10 @@ public struct CustomerSettings: Decodable, Sendable {
     public let service: Bool
     public let promos: Bool
 
-    public init(id: String, phone: String, name: String, consent: Bool, push: Bool, whatsapp: Bool, service: Bool, promos: Bool) {
+    public init(id: String, phone: String, email: String? = nil, name: String, consent: Bool, push: Bool, whatsapp: Bool, service: Bool, promos: Bool) {
         self.id = id
         self.phone = phone
+        self.email = email
         self.name = name
         self.consent = consent
         self.push = push

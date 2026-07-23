@@ -158,7 +158,7 @@ public final class CustomerAuthStore {
 
     /// Тот же вид адреса, что хранит сервер. Без этого адрес, скопированный с
     /// пробелом на конце или набранный с заглавной, уезжал бы в 400.
-    static func normalizedEmail(_ rawEmail: String) -> String {
+    public static func normalizedEmail(_ rawEmail: String) -> String {
         rawEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 

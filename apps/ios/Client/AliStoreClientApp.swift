@@ -4770,6 +4770,11 @@ private struct CustomerSettingsView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var savedMessage: String?
+    @State private var emailInput = ""
+    @State private var emailCode = ""
+    @State private var emailRequested = false
+    @State private var attachedEmail: String?
+    @State private var emailMessage: String?
 
     var body: some View {
         ZStack {
@@ -4792,6 +4797,8 @@ private struct CustomerSettingsView: View {
                         if let settings {
                             Text(settings.phone).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
                         }
+
+                        emailSection
 
                         Text("Уведомления")
                             .font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted).padding(.top, 8)
@@ -4820,6 +4827,103 @@ private struct CustomerSettingsView: View {
         .tint(ClientTheme.lime)
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    /// Привязка почты как второго способа входа. Адрес принимается только после
+    /// кода, пришедшего на него: иначе можно было бы «занять» чужой ящик и
+    /// оставить его владельца без своего способа входа.
+    @ViewBuilder
+    private var emailSection: some View {
+        Text("Почта для входа")
+            .font(ClientTheme.body(12, weight: .semibold))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 8)
+
+        if let attached = attachedEmail ?? settings?.email {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(ClientTheme.lime)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attached).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                    Text("Можно входить по этому адресу").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+            }
+            .padding(13)
+            .glass(radius: 13)
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            .accessibilityIdentifier("client-attached-email")
+        } else {
+            TextField("you@example.com", text: $emailInput)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(.white)
+                .padding(13)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                .accessibilityIdentifier("client-attach-email")
+            if emailRequested {
+                TextField("6-значный код из письма", text: $emailCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .foregroundStyle(.white)
+                    .padding(13)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                    .accessibilityIdentifier("client-attach-code")
+                if let devCode = auth.devCode {
+                    Text("Код для тестового контура: \(devCode)")
+                        .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let emailMessage {
+                Text(emailMessage).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+            Button { Task { await attachEmail() } } label: {
+                HStack { Spacer(); Text(emailRequested ? "Подтвердить адрес" : "Отправить код на почту"); Spacer() }
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(height: 44)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(auth.isLoading || !canSubmitEmail)
+            .accessibilityIdentifier("client-attach-submit")
+        }
+    }
+
+    private var canSubmitEmail: Bool {
+        if emailRequested { return emailCode.filter(\.isNumber).count == 6 }
+        let value = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count <= 254, let at = value.firstIndex(of: "@") else { return false }
+        let domain = value[value.index(after: at)...]
+        return at != value.startIndex && domain.contains(".") && !value.contains(" ")
+    }
+
+    private func attachEmail() async {
+        guard let token = auth.session?.accessToken else {
+            emailMessage = "Нужно войти в аккаунт"
+            return
+        }
+        if emailRequested {
+            let ok = await auth.confirmEmailAttach(
+                email: emailInput,
+                code: emailCode.filter(\.isNumber),
+                token: token
+            )
+            if ok {
+                attachedEmail = CustomerAuthStore.normalizedEmail(emailInput)
+                emailRequested = false
+                emailCode = ""
+                emailMessage = nil
+            } else {
+                emailMessage = auth.errorMessage
+            }
+        } else {
+            emailRequested = await auth.requestEmailAttach(email: emailInput, token: token)
+            emailMessage = emailRequested ? "Код отправлен на \(CustomerAuthStore.normalizedEmail(emailInput))" : auth.errorMessage
+        }
     }
 
     private func settingsToggle(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {

@@ -119,7 +119,16 @@ export class CustomersService {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
     const preferences = await this.prisma.customerPreferences.findUnique({ where: { customerId } });
-    return { id: customer.id, phone: customer.phone, name: customer.name, consent: customer.consent, ...preferenceValues(preferences) };
+    // `email` отдаём владельцу собственного аккаунта: без него клиент не может
+    // показать, привязан ли адрес, и предлагал бы привязать уже привязанный.
+    return {
+      id: customer.id,
+      phone: customer.phone,
+      email: customer.email,
+      name: customer.name,
+      consent: customer.consent,
+      ...preferenceValues(preferences),
+    };
   }
 
   async updateSettings(customerId: string, dto: UpdateCustomerSettingsDto) {
