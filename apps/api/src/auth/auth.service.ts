@@ -112,11 +112,19 @@ export class AuthService {
    */
   async requestEmailOtp(email: string): Promise<{ challengeId: string; devCode?: string }> {
     const normalized = normalizeEmail(email);
+    // Guard стоит до поиска клиента: раньше неизвестный адрес возвращался раньше
+    // него, и на проде со сломанным SMTP неизвестные адреса получали 200, а
+    // известные — email_transport_unavailable. Это тоже был ответ на вопрос
+    // «есть ли здесь аккаунт».
+    this.emailOtpSender.assertOperational();
     const customer = await this.prisma.customer.findUnique({ where: { email: normalized } });
-    if (!customer) {
-      return { challengeId: randomBytes(16).toString('base64url') };
-    }
-    return this.issueEmailChallenge(normalized, 'login');
+    // Вызов создаётся всегда — и для неизвестного адреса тоже. Прежняя ветка
+    // возвращала `randomBytes(16).toString('base64url')`: 22 символа из
+    // [A-Za-z0-9_-] против 25-символьного cuid из базы. Одного запроса хватало,
+    // чтобы по длине ответа отличить клиента от не-клиента; статистика по
+    // времени была уже не нужна. Теперь обе ветки делают одинаковую работу —
+    // argon2 и запись строки — и различаются только тем, уходит ли письмо.
+    return this.issueEmailChallenge(normalized, 'login', { deliver: customer !== null });
   }
 
   /**
@@ -177,12 +185,16 @@ export class AuthService {
   private async issueEmailChallenge(
     email: string,
     purpose: 'login' | 'email_attach',
+    options: { deliver: boolean } = { deliver: true },
   ): Promise<{ challengeId: string; devCode?: string }> {
     if (this.config.get<string>('NODE_ENV') === 'production' && this.emailOtpSender.name === 'noop') {
       throw new ValidationError('email_transport_unavailable', 'Email transport is not configured');
     }
     this.emailOtpSender.assertOperational();
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    // argon2 считается и для недоставляемого вызова: это самая дорогая операция
+    // в запросе, и пропустить её значило бы вернуть таймингу ту же роль оракула,
+    // которую только что отняли у формы идентификатора.
     const codeHash = await argon2.hash(code);
     const challenge = await this.prisma.otpChallenge.create({
       data: {
@@ -193,18 +205,24 @@ export class AuthService {
         expiresAt: new Date(Date.now() + OTP_TTL_MS),
       },
     });
-    try {
-      await this.emailOtpSender.send({
-        email,
-        code,
-        purpose,
-        expiresInSeconds: OTP_TTL_MS / 1000,
-      });
-    } catch (error) {
-      await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
-      throw error;
+    if (options.deliver) {
+      try {
+        await this.emailOtpSender.send({
+          email,
+          code,
+          purpose,
+          expiresInSeconds: OTP_TTL_MS / 1000,
+        });
+      } catch (error) {
+        await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+        throw error;
+      }
     }
-    const echo = this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
+    // Код возвращается только если письмо действительно ушло: иначе dev-эхо
+    // выдавало бы код на чужой адрес — ровно то перечисление, от которого
+    // защищаемся, и притом в готовом виде.
+    const echo = options.deliver
+      && this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
       && this.config.get<string>('NODE_ENV') !== 'production';
     return echo ? { challengeId: challenge.id, devCode: code } : { challengeId: challenge.id };
   }
@@ -218,36 +236,60 @@ export class AuthService {
     code: string,
     purpose: 'login' | 'email_attach',
   ): Promise<void> {
-    const challenge = await this.prisma.otpChallenge.findFirst({
-      where: {
-        email,
-        channel: 'email',
-        purpose,
-        consumedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!challenge) {
-      throw new ValidationError('otp_not_found', 'Код не найден или истёк');
-    }
-    if (challenge.attempts >= OTP_MAX_ATTEMPTS) {
-      throw new ValidationError('otp_locked', 'Слишком много попыток, запросите новый код');
+    // Попытка занимается ОДНИМ запросом. Прежняя версия читала строку, сверяла
+    // `attempts >= 5` по этому снимку, считала argon2 и только потом писала
+    // increment — тремя отдельными запросами без блокировки. Десять параллельных
+    // проверок все видели attempts = 0 и все проходили лимит: бюджет перебора
+    // был не пять, а сколько пропустит throttle. Здесь строка блокируется самим
+    // UPDATE, и условие `attempts < 5` перепроверяется уже под блокировкой.
+    const claimed = await this.prisma.$queryRaw<Array<{ id: string; codeHash: string }>>`
+      UPDATE "OtpChallenge" SET attempts = attempts + 1
+      WHERE id = (
+        SELECT id FROM "OtpChallenge"
+        WHERE email = ${email}
+          AND channel::text = 'email'
+          AND purpose::text = ${purpose}
+          AND "consumedAt" IS NULL
+          -- expiresAt это timestamp БЕЗ зоны, и в нём лежит UTC; NOW() это
+          -- timestamptz. При сравнении PostgreSQL приводит колонку через пояс
+          -- сессии (здесь Asia/Bishkek), и 13:11 UTC превращается в 07:11 --
+          -- условие ложно всегда, любой код "не найден". Сравниваем в UTC.
+          AND "expiresAt" > (NOW() AT TIME ZONE 'UTC')
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      )
+      AND attempts < ${OTP_MAX_ATTEMPTS}
+      RETURNING id, "codeHash"
+    `;
+
+    if (claimed.length === 0) {
+      // Ноль строк — либо вызова нет, либо попытки исчерпаны. Различаем ради
+      // сообщения, а не ради решения: обе ветки одинаково отказывают.
+      const exhausted = await this.prisma.otpChallenge.findFirst({
+        where: { email, channel: 'email', purpose, consumedAt: null, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+      });
+      throw exhausted
+        ? new ValidationError('otp_locked', 'Слишком много попыток, запросите новый код')
+        : new ValidationError('otp_not_found', 'Код не найден или истёк');
     }
 
+    const challenge = claimed[0];
     const ok = await argon2.verify(challenge.codeHash, code).catch(() => false);
     if (!ok) {
-      await this.prisma.otpChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
       throw new ValidationError('otp_invalid', 'Неверный код');
     }
 
-    await this.prisma.otpChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
+    // Одноразовость тоже была декларацией: два параллельных запроса с верным
+    // кодом оба видели consumedAt = null и оба выдавали токены. Условие в WHERE
+    // делает победителя ровно одним.
+    const consumed = await this.prisma.$executeRaw`
+      UPDATE "OtpChallenge" SET "consumedAt" = (NOW() AT TIME ZONE 'UTC')
+      WHERE id = ${challenge.id} AND "consumedAt" IS NULL
+    `;
+    if (consumed === 0) {
+      throw new ValidationError('otp_invalid', 'Код уже использован');
+    }
   }
 
   /**

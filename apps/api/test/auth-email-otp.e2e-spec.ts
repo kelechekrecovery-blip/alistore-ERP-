@@ -97,10 +97,56 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     // иначе эндпоинт становится оракулом «есть ли у вас аккаунт».
     const issued = await auth.requestEmailOtp(unknown);
     expect(issued.challengeId).toEqual(expect.any(String));
+    // Кода нет и письмо не уходит — но строка создаётся намеренно, чтобы работа
+    // и форма ответа не отличались от ветки известного адреса. Прежний вариант
+    // «не создавать строку» и выдавал отличие: короткий синтетический id.
     expect(issued.devCode).toBeUndefined();
+  });
 
-    const challenge = await prisma.otpChallenge.findFirst({ where: { email: unknown } });
-    expect(challenge).toBeNull();
+  it('выдаёт неотличимый challengeId и для известного, и для неизвестного адреса', async () => {
+    const known = nextEmail();
+    await seedCustomerWithEmail(known);
+    const unknown = nextEmail();
+
+    const a = await auth.requestEmailOtp(known);
+    const b = await auth.requestEmailOtp(unknown);
+
+    // Синтетический id из randomBytes(16).toString('base64url') — это 22 символа
+    // из [A-Za-z0-9_-], а cuid из базы — 25 символов [a-z0-9], всегда с 'c'.
+    // Одного запроса хватало, чтобы по длине классифицировать адрес: «этот
+    // человек — клиент AliStore». Никакая статистика не нужна.
+    expect(b.challengeId.length).toBe(a.challengeId.length);
+    expect(b.challengeId).toMatch(/^[a-z0-9]+$/);
+  });
+
+  it('не пускает больше пяти попыток даже при одновременных запросах', async () => {
+    const email = nextEmail();
+    await seedCustomerWithEmail(email);
+    const { challengeId } = await auth.requestEmailOtp(email);
+
+    // Счётчик читался, проверялся и увеличивался тремя отдельными запросами без
+    // блокировки: десять параллельных попыток все видели attempts = 0 и все
+    // проходили проверку лимита. Бюджет перебора был не 5, а сколько пропустит
+    // throttle.
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 10 }, () => auth.verifyEmailOtp(email, '000000')),
+    );
+    expect(attempts.every((r) => r.status === 'rejected')).toBe(true);
+
+    const challenge = await prisma.otpChallenge.findUnique({ where: { id: challengeId } });
+    expect(challenge?.attempts).toBeLessThanOrEqual(5);
+  });
+
+  it('расходует правильный код ровно один раз при гонке', async () => {
+    const email = nextEmail();
+    await seedCustomerWithEmail(email);
+    const { devCode } = await auth.requestEmailOtp(email);
+
+    const races = await Promise.allSettled(
+      Array.from({ length: 4 }, () => auth.verifyEmailOtp(email, devCode as string)),
+    );
+    const issued = races.filter((r) => r.status === 'fulfilled');
+    expect(issued).toHaveLength(1);
   });
 
   it('rejects a code for an address with no account', async () => {

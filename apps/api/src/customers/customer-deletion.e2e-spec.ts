@@ -168,10 +168,13 @@ describe('Customer account deletion and export', () => {
     // полный токен на «удалённый» аккаунт с историей заказов и бонусами.
     const after = await prisma.customer.findUnique({ where: { id: owner.id } });
     expect(after?.email).toBeNull();
+    // Удаление снесло и вызовы по адресу — адрес не должен остаться в базе
+    // открытым текстом. Считаем здесь: следующий запрос кода намеренно создаёт
+    // строку и для неизвестного адреса, чтобы не выдавать наличие аккаунта.
+    expect(await prisma.otpChallenge.count({ where: { email } })).toBe(0);
 
     const issued = await auth.requestEmailOtp(email);
     expect(issued.devCode).toBeUndefined();
-    expect(await prisma.otpChallenge.count({ where: { email } })).toBe(0);
     await expect(auth.verifyEmailOtp(email, before.devCode!)).rejects.toThrow();
   });
 
