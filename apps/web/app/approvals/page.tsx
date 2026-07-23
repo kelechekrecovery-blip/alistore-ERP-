@@ -214,18 +214,21 @@ export default function ApprovalsPage() {
   async function decide(a: Approval, status: 'approved' | 'rejected') {
     if (!session) return;
     const code = totpToken.trim();
-    if (status === 'approved' && !session.totpEnabled) {
-      flash('Включите 2FA для одобрения');
+    // Both approve and reject require 2FA — a rejection still runs the rejection
+    // executor (may restore/void stock), so it is gated by the same step-up.
+    const verb = status === 'approved' ? 'одобрения' : 'отклонения';
+    if (!session.totpEnabled) {
+      flash(`Включите 2FA для ${verb}`);
       return;
     }
-    if (status === 'approved' && !code) {
+    if (!code) {
       flash('Введите код 2FA');
       return;
     }
     setBusy(a.id);
     try {
-      await decideApproval(a.id, status, session.accessToken, undefined, status === 'approved' ? code : undefined);
-      if (status === 'approved') setTotpToken('');
+      await decideApproval(a.id, status, session.accessToken, undefined, code);
+      setTotpToken('');
       flash(status === 'approved' ? 'Одобрено · действие поставлено в обработку' : 'Отклонено');
       load(tab.status);
     } catch (e) {
