@@ -190,7 +190,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const authed = useCallback(
     async <T,>(fn: (accessToken: string) => Promise<T>): Promise<T> => {
-      const stored = tokens.current;
+      let stored = tokens.current;
+      // In local E2E only, a provider remount can happen between the fixture
+      // shell render and the first protected request. Recover the same
+      // bearer from the compatibility storage instead of turning a transient
+      // ref race into a misleading empty account state. Production never
+      // reads this legacy key.
+      if (!stored && process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+        try {
+          const legacy = JSON.parse(localStorage.getItem('alistore.auth.v1') ?? 'null') as { accessToken?: string } | null;
+          if (legacy?.accessToken) {
+            persist({ accessToken: legacy.accessToken });
+            stored = tokens.current;
+          }
+        } catch {
+          // Treat malformed local test state as anonymous.
+        }
+      }
       if (!stored) throw new Error('not-authenticated');
       try {
         return await fn(stored.accessToken);

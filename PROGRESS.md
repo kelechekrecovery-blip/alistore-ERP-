@@ -30,6 +30,10 @@ lifecycle/reset общего runner до объявления полного Web
 запусками. Это убрало общий lock между прогонами, но customer-device сценарий
 всё ещё требует отдельной проверки seed/reset/API цепочки.
 
+Runner дополнительно ждёт `/api/health/ready` перед запуском Next, а
+non-production `authed()` восстанавливает legacy bearer после remount. Свежий
+isolated `storefront-motion.spec.ts` на этом контуре прошёл **6/6**.
+
 ## 2026-07-23 — WEB-AUTH-156: закрыта блокировка warranty-маршрута при полном E2E
 
 Полный Web прогон ранее оставлял `/account/warranty/:imei` на глобальном

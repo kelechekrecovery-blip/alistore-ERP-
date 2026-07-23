@@ -41,7 +41,9 @@ export default defineConfig({
   webServer: [
     {
       command: `DATABASE_URL="${databaseUrl}" MEDIA_LOCAL_DIR="${mediaLocalDir}" CORS_ORIGINS="http://127.0.0.1:${webPort},http://localhost:${webPort}" E2E_TEST=true NODE_ENV=test PAYMENTS_SANDBOX_CONFIRM_ENABLED=true AI_PROVIDER=rules AI_PROVIDER_KEY= OPENROUTER_API_KEY= ANTHROPIC_API_KEY= AUTH_OTP_DEV_ECHO=true JWT_SECRET=dev-secret-alistore-local PORT=${apiPort} npm run start:dev -w @alistore/api`,
-      url: `http://127.0.0.1:${apiPort}/api/health/live`,
+      // The storefront performs SSR catalog reads on first navigation; wait
+      // for database readiness, not merely for the Nest process to listen.
+      url: `http://127.0.0.1:${apiPort}/api/health/ready`,
       reuseExistingServer,
       timeout: 240_000,
     },
