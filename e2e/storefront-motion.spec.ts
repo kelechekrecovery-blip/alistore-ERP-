@@ -170,7 +170,11 @@ test('remaining desktop customer routes use the shop system through account entr
     { route: `/account/warranty/${encodeURIComponent(unit.imei)}`, text: 'Гарантийный талон' },
   ];
   for (const { route, text } of detailRoutes) {
-    await page.goto(route);
+    // The dev server can keep the load event open while compiling the next
+    // account detail route after several client navigations. The route has
+    // already committed at this point; assertions below wait for its actual
+    // authenticated content and catch a real hydration/API regression.
+    await page.goto(route, { waitUntil: 'commit' });
     await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
     expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);

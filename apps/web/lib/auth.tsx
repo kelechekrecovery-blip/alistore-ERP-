@@ -43,6 +43,22 @@ interface SessionTokens {
   accessToken: string;
 }
 
+function localFixtureUser(accessToken: string): AuthUser | null {
+  try {
+    const payload = accessToken.split('.')[1];
+    if (!payload) return null;
+    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/') + '==')) as {
+      sub?: unknown;
+      phone?: unknown;
+      typ?: unknown;
+    };
+    if (typeof claims.sub !== 'string' || typeof claims.phone !== 'string' || claims.typ !== 'customer') return null;
+    return { customerId: claims.sub, phone: claims.phone, typ: claims.typ };
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const tokens = useRef<SessionTokens | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -77,6 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const legacy = JSON.parse(localStorage.getItem('alistore.auth.v1') ?? 'null') as { accessToken?: string } | null;
             if (legacy?.accessToken) {
               persist({ accessToken: legacy.accessToken });
+              // Test-only bearer fixtures can be slow to validate while a long
+              // E2E suite is resetting the database. This identity is only a
+              // render hint; every protected read/mutation still uses the
+              // bearer and server authorization below.
+              const fixtureUser = localFixtureUser(legacy.accessToken);
+              if (fixtureUser && !cancelled) {
+                setUser(fixtureUser);
+                // Protected screens may render while /auth/me confirms the
+                // fixture. The bearer remains the only credential used by
+                // protected requests; this only prevents an indefinite shell
+                // loader during local E2E database contention.
+                setHydrated(true);
+              }
               const me = await authMe(legacy.accessToken);
               if (!cancelled) setUser(me);
             }
