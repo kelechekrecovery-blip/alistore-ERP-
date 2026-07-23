@@ -1,13 +1,15 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   AppleSocialLoginDto,
   RefreshDto,
+  RequestEmailOtpDto,
   RequestOtpDto,
   TelegramSocialLoginDto,
   VerifyOtpDto,
+  VerifyEmailOtpDto,
 } from './auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -56,6 +58,36 @@ export class AuthController {
     const tokens = await this.auth.verifyRecoveryOtp(dto.phone, dto.code);
     if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     return webAuthResponse(request, tokens);
+  }
+
+  @Post('email/request')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestEmailOtp(@Body() dto: RequestEmailOtpDto) {
+    return this.auth.requestEmailOtp(dto.email);
+  }
+
+  @Post('email/verify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyEmailOtp(@Body() dto: VerifyEmailOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.verifyEmailOtp(dto.email, dto.code);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  @Post('email/attach/request')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestEmailAttach(@CurrentUser() user: AuthPrincipal, @Body() dto: RequestEmailOtpDto) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.auth.requestEmailAttach(user.customerId, dto.email);
+  }
+
+  @Post('email/attach/confirm')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  confirmEmailAttach(@CurrentUser() user: AuthPrincipal, @Body() dto: VerifyEmailOtpDto) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.auth.confirmEmailAttach(user.customerId, dto.email, dto.code);
   }
 
   /** Telegram Mini App/Login Widget auth → access + refresh tokens. */

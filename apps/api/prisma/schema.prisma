@@ -474,6 +474,10 @@ enum CampaignCreativeType {
 model Customer {
   id                   String                @id @default(cuid())
   phone                String                @unique // PII — маскировать младшим ролям
+  // Второй канал входа в тот же аккаунт, а не вторая личность: телефон остаётся
+  // первичным идентификатором (доставка и COD без него не работают). Хранится
+  // нормализованным в нижнем регистре, поэтому @unique ловит и Ivan@… и ivan@….
+  email                String?               @unique // PII — маскировать младшим ролям
   name                 String
   consent              Boolean               @default(false) // маркетинг только при true
   segments             String[]
@@ -2991,12 +2995,23 @@ model DeviceProtectionPolicy {
 // ---------- AUTH ----------
 enum OtpPurpose {
   login
+  email_attach
+}
+
+enum OtpChannel {
+  sms
+  email
 }
 
 // One-time login code (phone+OTP). Code stored hashed; short-lived; attempt-capped.
 model OtpChallenge {
-  id         String     @id @default(cuid())
-  phone      String
+  id String @id @default(cuid())
+  // Ровно одно из двух заполнено — какое именно, говорит `channel`. Телефон стал
+  // необязательным вместе с появлением email-канала; исторические строки при
+  // миграции получили channel = sms и сохранили свой phone.
+  phone      String?
+  email      String?
+  channel    OtpChannel @default(sms)
   codeHash   String
   purpose    OtpPurpose @default(login)
   attempts   Int        @default(0)
@@ -3005,6 +3020,7 @@ model OtpChallenge {
   createdAt  DateTime   @default(now())
 
   @@index([phone])
+  @@index([email])
 }
 
 // Rotating refresh token, stored as a sha-256 hash and single-use (revoked on

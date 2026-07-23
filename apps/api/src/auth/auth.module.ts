@@ -12,6 +12,12 @@ import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { OTP_SENDER, OtpSender } from './otp-sender';
 import { selectOtpSender } from './otp-sender-selector';
+import {
+  EMAIL_OTP_SENDER,
+  EmailOtpSender,
+  NoopEmailOtpSender,
+} from './email-otp.sender';
+import { SmtpEmailOtpSender } from './smtp-email-otp.sender';
 
 /**
  * Phone+OTP authentication. AuditService and PrismaService are provided globally;
@@ -44,6 +50,14 @@ import { selectOtpSender } from './otp-sender-selector';
       inject: [ConfigService],
       useFactory: (config: ConfigService): OtpSender =>
         selectOtpSender((name) => config.get<string>(name)),
+    },
+    {
+      provide: EMAIL_OTP_SENDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): EmailOtpSender =>
+        config.get<string>('SMTP_HOST')
+          ? new SmtpEmailOtpSender(config)
+          : new NoopEmailOtpSender(),
     },
   ],
   controllers: [AuthController],

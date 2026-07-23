@@ -1,5 +1,27 @@
 # PROGRESS
 
+## 2026-07-23 — AUTH-EMAIL-174: email OTP второй канал входа
+
+Завершён вертикальный auth-поток для email без изменения phone-first модели:
+`Customer.email` нормализуется и уникален, email OTP разделён от SMS через
+`OtpChannel` и `OtpPurpose.email_attach`, а доставка выделена в
+`EMAIL_OTP_SENDER` с SMTP-реализацией и безопасным noop для dev/test. Добавлены
+login/verify и customer-bound attach endpoints. Неизвестный адрес не создаёт
+challenge в БД и не раскрывает существование аккаунта; production без SMTP
+завершается fail-closed. Race на уникальном email переводится в доменную
+ошибку `email_taken`.
+
+Проверки: `npm --prefix apps/api test -- --runInBand
+test/auth-email-otp.e2e-spec.ts` — **10/10**; `npm run api:build` — зелёный;
+миграция `20260723170000_customer_email_login` применена к локальной
+`alistore_test`; `git diff --check` — зелёный. Изменение
+`apps/web/tsconfig.json` остаётся отдельным незакоммиченным пользовательским
+изменением.
+
+Следующий шаг: проверить полный API gate на quiescent runner, затем закрыть
+staging SMTP/provider smoke; production readiness и App Store gates остаются
+внешними.
+
 ## 2026-07-23 — MVP-GATE-157: API полный, Playwright поймал transient navigation abort
 
 Единый `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` прошёл все

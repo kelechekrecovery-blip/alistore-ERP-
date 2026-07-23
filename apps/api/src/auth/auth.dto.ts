@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
 import type { TelegramAuthSource } from './social-login';
 
 const PHONE = /^\+?\d{9,15}$/;
@@ -14,6 +14,17 @@ export class VerifyOtpDto {
   @Matches(PHONE)
   phone!: string;
 
+  @IsString()
+  @Length(6, 6, { message: 'code must be 6 digits' })
+  code!: string;
+}
+
+export class RequestEmailOtpDto {
+  @IsEmail()
+  email!: string;
+}
+
+export class VerifyEmailOtpDto extends RequestEmailOtpDto {
   @IsString()
   @Length(6, 6, { message: 'code must be 6 digits' })
   code!: string;

@@ -1,5 +1,11 @@
 # BACKLOG
 
+## AUTH-EMAIL-174 — email OTP как второй канал входа
+- **Сделано:** добавлены нормализованный уникальный `Customer.email`, `OtpChannel.email`, отдельная цель `email_attach`, SMTP sender и четыре auth endpoints для email login/attach.
+- **Безопасность:** неизвестный email не раскрывает наличие аккаунта; OTP хранится только хешем, ограничен по попыткам, одноразовый и привязан к purpose; production без SMTP fail-closed.
+- **Проверено:** `auth-email-otp.e2e-spec.ts` — `10/10`; `npm run api:build` — зелёный; миграция применена к локальной test БД.
+- **Открыто:** SMTP credentials, delivery smoke и production/staging certification остаются внешним deployment gate.
+
 ## WEB-AUTH-156 — полный Web gate принят, devices error-state закрыт
 - **Сделано:** полный изолированный `npm run e2e` на API/Web портах `4450/3450` прошёл `139/139`; подтверждены storefront, checkout, ERP, POS, Staff, Telegram, visual и route audit сценарии.
 - **Сделано:** `/account/devices` больше не превращает ошибку API устройств в ложное пустое состояние; показывает явную ошибку, сохраняет данные как неизвестные и даёт повторить загрузку.

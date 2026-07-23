@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
@@ -14,6 +14,11 @@ import {
 } from './social-login';
 import { NoopOtpSender } from './noop-otp.sender';
 import { OTP_SENDER, OtpSender } from './otp-sender';
+import {
+  EMAIL_OTP_SENDER,
+  EmailOtpSender,
+  NoopEmailOtpSender,
+} from './email-otp.sender';
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 
 export interface AuthTokens {
@@ -27,6 +32,7 @@ const OTP_TTL_MS = 5 * 60 * 1000; // 5 минут
 const OTP_MAX_ATTEMPTS = 5;
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 дней
 const ACCESS_TTL = '15m';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Customer authentication by phone + OTP (Roadmap MVP: «вход по телефону+OTP»).
@@ -42,6 +48,9 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     @Inject(OTP_SENDER) private readonly otpSender: OtpSender = new NoopOtpSender(),
+    @Optional()
+    @Inject(EMAIL_OTP_SENDER)
+    private readonly emailOtpSender: EmailOtpSender = new NoopEmailOtpSender(),
   ) {}
 
   /** Verify a short-lived access token for non-HTTP transports (for example Socket.IO). */
@@ -90,6 +99,155 @@ export class AuthService {
   /** Issue an access-recovery OTP. Uses the same SMS channel without revealing account existence. */
   requestRecoveryOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
     return this.requestOtp(phone, 'recovery');
+  }
+
+  /**
+   * Issue a login OTP to an email. Email is a second channel into the same
+   * account, not a second identity: phone stays the primary Customer key, so a
+   * code is only ever delivered to an address already attached to an account.
+   *
+   * For an unknown address the call still returns a challenge id and still costs
+   * the same time — otherwise the endpoint becomes an oracle for "does this
+   * person shop here", which is exactly what an enumeration attack wants.
+   */
+  async requestEmailOtp(email: string): Promise<{ challengeId: string; devCode?: string }> {
+    const normalized = normalizeEmail(email);
+    const customer = await this.prisma.customer.findUnique({ where: { email: normalized } });
+    if (!customer) {
+      return { challengeId: randomBytes(16).toString('base64url') };
+    }
+    return this.issueEmailChallenge(normalized, 'login');
+  }
+
+  /**
+   * Verify an email OTP and log the customer in. Unlike the phone path this never
+   * creates an account: an address alone cannot become a customer, because every
+   * order needs a phone for delivery and COD.
+   */
+  async verifyEmailOtp(email: string, code: string): Promise<AuthTokens> {
+    const normalized = normalizeEmail(email);
+    await this.consumeEmailOtp(normalized, code, 'login');
+    const customer = await this.prisma.customer.findUnique({ where: { email: normalized } });
+    if (!customer) {
+      throw new ValidationError('customer_not_found', 'Аккаунт не найден');
+    }
+    return this.issueTokens(customer.id, customer.phone);
+  }
+
+  /**
+   * Send a confirmation code to an address the signed-in customer wants to
+   * attach. Nothing is written to the account here — possession of the mailbox
+   * has to be proven first, otherwise anyone could park their login on someone
+   * else's address.
+   */
+  async requestEmailAttach(
+    customerId: string,
+    email: string,
+  ): Promise<{ challengeId: string; devCode?: string }> {
+    const normalized = normalizeEmail(email);
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new ValidationError('customer_not_found', 'Аккаунт не найден');
+    }
+    return this.issueEmailChallenge(normalized, 'email_attach');
+  }
+
+  /** Confirm the attach code and bind the address to the account. */
+  async confirmEmailAttach(customerId: string, email: string, code: string): Promise<void> {
+    const normalized = normalizeEmail(email);
+    await this.consumeEmailOtp(normalized, code, 'email_attach');
+    const owner = await this.prisma.customer.findUnique({ where: { email: normalized } });
+    if (owner && owner.id !== customerId) {
+      // Один адрес — один аккаунт: иначе вход по email стал бы неоднозначным.
+      throw new ValidationError('email_taken', 'Этот адрес уже привязан к другому аккаунту');
+    }
+    try {
+      await this.prisma.customer.update({
+        where: { id: customerId },
+        data: { email: normalized },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ValidationError('email_taken', 'Этот адрес уже привязан к другому аккаунту');
+      }
+      throw error;
+    }
+  }
+
+  private async issueEmailChallenge(
+    email: string,
+    purpose: 'login' | 'email_attach',
+  ): Promise<{ challengeId: string; devCode?: string }> {
+    if (this.config.get<string>('NODE_ENV') === 'production' && this.emailOtpSender.name === 'noop') {
+      throw new ValidationError('email_transport_unavailable', 'Email transport is not configured');
+    }
+    this.emailOtpSender.assertOperational();
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = await argon2.hash(code);
+    const challenge = await this.prisma.otpChallenge.create({
+      data: {
+        email,
+        channel: 'email',
+        purpose,
+        codeHash,
+        expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      },
+    });
+    try {
+      await this.emailOtpSender.send({
+        email,
+        code,
+        purpose,
+        expiresInSeconds: OTP_TTL_MS / 1000,
+      });
+    } catch (error) {
+      await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+      throw error;
+    }
+    const echo = this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
+      && this.config.get<string>('NODE_ENV') !== 'production';
+    return echo ? { challengeId: challenge.id, devCode: code } : { challengeId: challenge.id };
+  }
+
+  /**
+   * Same attempt-capped, single-use consumption as the phone path, additionally
+   * pinned to the purpose so an attach code cannot be replayed as a login code.
+   */
+  private async consumeEmailOtp(
+    email: string,
+    code: string,
+    purpose: 'login' | 'email_attach',
+  ): Promise<void> {
+    const challenge = await this.prisma.otpChallenge.findFirst({
+      where: {
+        email,
+        channel: 'email',
+        purpose,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!challenge) {
+      throw new ValidationError('otp_not_found', 'Код не найден или истёк');
+    }
+    if (challenge.attempts >= OTP_MAX_ATTEMPTS) {
+      throw new ValidationError('otp_locked', 'Слишком много попыток, запросите новый код');
+    }
+
+    const ok = await argon2.verify(challenge.codeHash, code).catch(() => false);
+    if (!ok) {
+      await this.prisma.otpChallenge.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new ValidationError('otp_invalid', 'Неверный код');
+    }
+
+    await this.prisma.otpChallenge.update({
+      where: { id: challenge.id },
+      data: { consumedAt: new Date() },
+    });
   }
 
   /**
@@ -168,7 +326,13 @@ export class AuthService {
 
   private async consumeOtp(phone: string, code: string): Promise<void> {
     const challenge = await this.prisma.otpChallenge.findFirst({
-      where: { phone, consumedAt: null, expiresAt: { gt: new Date() } },
+      where: {
+        phone,
+        channel: 'sms',
+        purpose: 'login',
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       orderBy: { createdAt: 'desc' },
     });
     if (!challenge) {
@@ -322,6 +486,18 @@ export class AuthService {
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
+}
+
+function normalizeEmail(rawEmail: string): string {
+  const email = rawEmail.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+    throw new ValidationError('email_invalid', 'Некорректный email');
+  }
+  return email;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
 }
 
 function socialPhone(provider: string, subject: string): string {
