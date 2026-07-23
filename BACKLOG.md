@@ -1,5 +1,10 @@
 # BACKLOG
 
+## PUBLIC-SMOKE-148 — повторно подтвердить публичный sandbox runtime
+- **Проверено:** storefront, `/catalog`, `admin`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; ready сообщает database `up`; HSTS и security headers присутствуют.
+- **Ограничение:** smoke подтверждает доступность текущего публичного контура, но не доказывает Render origin ownership, live provider certification или физические device gates.
+- **Следующий шаг:** повторить этот smoke после Render staging/production deployment и сохранить origin/release SHA в evidence.
+
 ## PUBLIC-RUNTIME-147 — синхронизировать owner launch runbook с текущим smoke
 - **Сделано:** runbook обновлён по фактическому smoke от 2026-07-23: storefront, admin, API live и API ready отвечают `200`; публичные OpenAPI endpoints отвечают `404`; HSTS и security headers активны.
 - **Ограничение:** Cloudflare proxy скрывает origin, поэтому Render ownership/release SHA, custom domains, catalog seed и deployment smoke ещё требуют проверки владельцем в Render/Cloudflare.
