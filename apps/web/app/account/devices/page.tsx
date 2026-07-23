@@ -22,18 +22,32 @@ export default function DevicesPage() {
   const [loaners, setLoaners] = useState<ServiceLoanerLoan[]>([]);
   const [approving, setApproving] = useState('');
   const [serviceError, setServiceError] = useState('');
+  const [devicesError, setDevicesError] = useState('');
+
+  async function loadAccountDevices() {
+    if (!user) return;
+    setDevicesError('');
+    const [nextDevices, nextWorkOrders, nextLoaners] = await Promise.allSettled([
+      authed(fetchMyDevices),
+      authed(fetchMyServiceWorkOrders),
+      authed(fetchMyServiceLoaners),
+    ]);
+    if (nextDevices.status === 'fulfilled') {
+      setDevices(nextDevices.value);
+    } else {
+      setDevices(null);
+      setDevicesError('Не удалось загрузить устройства. Повторите попытку.');
+    }
+    setWorkOrders(nextWorkOrders.status === 'fulfilled' ? nextWorkOrders.value : []);
+    setLoaners(nextLoaners.status === 'fulfilled' ? nextLoaners.value : []);
+    if (nextLoaners.status === 'rejected') setServiceError('Статус подменного устройства временно недоступен.');
+  }
 
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account/devices'); }, [hydrated, user, router]);
   useEffect(() => {
-    if (!user) return;
-    Promise.allSettled([authed(fetchMyDevices), authed(fetchMyServiceWorkOrders), authed(fetchMyServiceLoaners)])
-      .then(([nextDevices, nextWorkOrders, nextLoaners]) => {
-        setDevices(nextDevices.status === 'fulfilled' ? nextDevices.value : []);
-        setWorkOrders(nextWorkOrders.status === 'fulfilled' ? nextWorkOrders.value : []);
-        setLoaners(nextLoaners.status === 'fulfilled' ? nextLoaners.value : []);
-        if (nextLoaners.status === 'rejected') setServiceError('Статус подменного устройства временно недоступен.');
-      });
-  }, [user, authed]);
+    void loadAccountDevices();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function approveEstimate(workOrder: ServiceWorkOrder) {
     const storageKey = `alistore.service.approve.${workOrder.id}`;
@@ -66,8 +80,12 @@ export default function DevicesPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
+          {devicesError && <div role="alert" className="mb-4 rounded-[12px] border border-danger/30 bg-danger/10 p-4 text-[13px] text-danger">
+            <div>{devicesError}</div>
+            <button type="button" onClick={() => void loadAccountDevices()} className="mt-3 rounded-[8px] border border-danger/40 px-3 py-2 font-semibold text-danger">Повторить загрузку</button>
+          </div>}
           {devices === null && <p className="font-mono text-sm text-subtle">Загрузка…</p>}
-          {devices && devices.length === 0 && paidRepairs.length === 0 && !loaners.some((loan) => ['prepared', 'issued', 'overdue'].includes(loan.status)) && (
+          {!devicesError && devices && devices.length === 0 && paidRepairs.length === 0 && !loaners.some((loan) => ['prepared', 'issued', 'overdue'].includes(loan.status)) && (
             <div className="py-12 text-center">
               <div className="text-5xl">📱</div>
               <div className="mt-3.5 font-display text-[17px] font-bold">Пока нет устройств</div>

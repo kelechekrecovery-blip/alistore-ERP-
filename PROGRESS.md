@@ -1,5 +1,28 @@
 # PROGRESS
 
+## 2026-07-23 — WEB-AUTH-156: принят полный Web gate и исправлено ложное empty-state устройств
+
+Полный браузерный контур повторён на свежих изолированных API/Web портах
+`4450/3450` с readiness-gated запуском и отдельным Next build directory.
+
+Изменения:
+
+- `/account/devices` сохраняет неопределённое состояние при ошибке API вместо
+  ложного «Пока нет устройств»;
+- добавлены явный error-state и кнопка повторной загрузки;
+- work orders и loaners продолжают отображаться независимо от сбоя списка
+  устройств.
+
+Проверки:
+
+- `npm run e2e` — **139/139 passed**;
+- authenticated route audit — **16/16 passed**;
+- `npm run build -w @alistore/web` — **45/45** статических страниц и TypeScript
+  зелёные.
+
+Результат: локальный Web gate зелёный. Render/provider/device/App Review gates
+остаются внешними и не позволяют заявлять production readiness.
+
 ## 2026-07-23 — WEB-AUTH-156: устранён hydration mismatch account shell
 
 Адаптивный фон account detail больше не вычисляется через `window` во время
