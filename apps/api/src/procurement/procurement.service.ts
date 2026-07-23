@@ -182,6 +182,27 @@ export class ProcurementService {
             throw new ConflictError('purchase_order_over_receipt', `По строке ${line.itemId} принято больше заказанного`);
           }
         }
+
+        // Приёмка создаёт только серийные единицы и не пишет StockBalance, а
+        // наличие количественного товара считается именно по балансам
+        // (`catalog.service.ts` → directAvailability). Раньше тип учёта здесь не
+        // проверялся: товар «приходовался», DeviceUnit создавались, и ни одна
+        // витрина их не видела — склад пуст, ошибки нигде. Импорт из Excel без
+        // колонки «тип учёта» заводит товар количественным, поэтому попасть сюда
+        // легко на первом же наполнении магазина.
+        const products = await tx.product.findMany({
+          where: { id: { in: [...new Set(normalizedLines.map((line) => byId.get(line.itemId)!.productId))] } },
+          select: { id: true, sku: true, name: true, trackingMode: true },
+        });
+        const quantityTracked = products.filter((product) => product.trackingMode !== 'serialized');
+        if (quantityTracked.length > 0) {
+          throw new ValidationError(
+            'product_not_serialized',
+            `Приёмка по IMEI доступна только для серийного учёта. Товар в количественном учёте: `
+              + `${quantityTracked.map((product) => `${product.sku} (${product.name})`).join(', ')}. `
+              + 'Укажите «серийный» в колонке «тип учёта» при импорте или смените тип у товара.',
+          );
+        }
         const duplicateUnits = await tx.deviceUnit.findMany({ where: { imei: { in: allImeis } }, select: { imei: true } });
         if (duplicateUnits.length) {
           throw new ConflictError('imei_already_exists', `IMEI уже есть в базе: ${duplicateUnits.map((unit) => unit.imei).join(', ')}`);
