@@ -3,6 +3,13 @@ import XCTest
 final class AliStoreClientUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
+        terminateOtherAliStoreApps()
+    }
+
+    private func terminateOtherAliStoreApps() {
+        ["kg.alistore.staff", "kg.alistore.courier", "kg.alistore.pos"].forEach {
+            XCUIApplication(bundleIdentifier: $0).terminate()
+        }
     }
 
     func testShowsPrototypeLoginShellWhenSignedOut() {
