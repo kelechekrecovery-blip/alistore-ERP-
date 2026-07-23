@@ -16,7 +16,6 @@ export function StaffSessionLogin({
   caption?: string;
   onAuthenticated: (session: StaffSession) => void;
 }) {
-  const [form, setForm] = useState({ username: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // При пустой базе (seed не создаёт учёток) показываем создание первого
@@ -34,10 +33,13 @@ export function StaffSessionLogin({
     e.preventDefault();
     setBusy(true);
     setError('');
+    const values = new FormData(e.currentTarget);
+    const username = String(values.get('username') ?? '').trim();
+    const password = String(values.get('password') ?? '');
     try {
       const session = needsBootstrap
-        ? await staffBootstrapOwner(form.username.trim(), form.password)
-        : await staffLogin(form.username.trim(), form.password);
+        ? await staffBootstrapOwner(username, password)
+        : await staffLogin(username, password);
       saveStaffSession(session);
       onAuthenticated(session);
     } catch (err) {
@@ -63,8 +65,7 @@ export function StaffSessionLogin({
           : caption}
       </div>
       <input
-        value={form.username}
-        onChange={(e) => setForm((v) => ({ ...v, username: e.target.value }))}
+        name="username"
         placeholder="username"
         autoComplete="username"
         className={
@@ -74,8 +75,7 @@ export function StaffSessionLogin({
         }
       />
       <input
-        value={form.password}
-        onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))}
+        name="password"
         placeholder="password"
         type="password"
         autoComplete={needsBootstrap ? 'new-password' : 'current-password'}

@@ -17,6 +17,11 @@
 - **Проверено:** изолированные suites `support-rbac` и `staff-session-ops` проходят; retry-путь требует полного `mvp:verify`.
 - **Следующий шаг:** повторить единый gate и сохранить итоговый результат.
 
+## WEB-STAFF-153 — сохранить ранний ввод в ERP login
+- **Сделано:** Staff login переведён на uncontrolled inputs с чтением `FormData` при submit; rerender после bootstrap-check больше не стирает username.
+- **Проверено:** CMS/ERP browser suite повторена `25/25`; Web build и compare gate остаются зелёными.
+- **Следующий шаг:** повторить единый полный `mvp:verify` на текущем SHA.
+
 ## PUBLIC-SMOKE-148 — повторно подтвердить публичный sandbox runtime
 - **Проверено:** storefront, `/catalog`, `admin`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; ready сообщает database `up`; HSTS и security headers присутствуют.
 - **Ограничение:** smoke подтверждает доступность текущего публичного контура, но не доказывает Render origin ownership, live provider certification или физические device gates.
