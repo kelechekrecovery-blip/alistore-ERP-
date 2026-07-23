@@ -26,6 +26,12 @@ describe('canApprove — authoritative approval matrix', () => {
     pii: ['admin', 'owner'],
     campaign_budget: ['admin', 'owner'],
     manual_adjustment: ['admin', 'owner'],
+    // Publishing a parked revision changes what every visitor sees, so it is
+    // approved at the same level as price and pii rather than by the marketer who
+    // drafted it. admin+owner is asserted from two independent sources that agree:
+    // permissions.ts and the Casbin row `p, admin, storefront_publish, approve`
+    // plus `g, owner, admin`.
+    storefront_publish: ['admin', 'owner'],
   };
 
   it('covers exactly the actions declared in APPROVAL_APPROVER_ROLES (no drift)', () => {
