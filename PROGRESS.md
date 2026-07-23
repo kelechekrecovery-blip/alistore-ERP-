@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-23 — PAYMENTS-WEBHOOK-175: восстановлен полный HMAC payment gate
+
+Полный mvp:verify дошёл до API batch 34/202 и обнаружил старые integration
+fixtures, которые вызывали sandbox webhook без raw body и подписи после security
+fix. Внешний путь оставлен fail-closed: provider payload всегда проходит
+HMAC-проверку. Для защищённого sandbox-confirm вынесен отдельный внутренний
+applyWebhookPayload, поэтому локальное demo-подтверждение не маскируется под
+внешний callback.
+
+Добавлен общий test helper с SHA-256 HMAC и обновлены cancel compensation,
+payment intents и giftcards fixtures. Проверки: три suite — 22/22, API build и
+git diff --check — зелёные. Следующий шаг — повторить полный
+ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify на текущем commit.
+
 ## 2026-07-23 — AUTH-EMAIL-174: email OTP второй канал входа
 
 Завершён вертикальный auth-поток для email без изменения phone-first модели:

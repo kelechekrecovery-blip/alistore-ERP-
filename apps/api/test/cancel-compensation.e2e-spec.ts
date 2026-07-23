@@ -11,6 +11,8 @@ import { CourierService } from '../src/courier/courier.service';
 import { OutboxService } from '../src/outbox/outbox.service';
 import { ReservationsService } from '../src/reservations/reservations.service';
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
+import { PaymentWebhookDto } from '../src/payments/payment-intents.dto';
+import { SANDBOX_WEBHOOK_SECRET, signedSandboxWebhook } from './helpers/sandbox-webhook';
 
 /**
  * Cancel compensation (LOGIC-011/LOGIC-004):
@@ -44,7 +46,7 @@ describe('Cancel compensation (integration)', () => {
     orders = new OrdersService(prisma, audit, units);
     giftcards = new GiftcardsService(prisma, audit);
     payments = new PaymentsService(prisma, audit, units, approvals, giftcards, orders);
-    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider());
+    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider(SANDBOX_WEBHOOK_SECRET));
     outbox = new OutboxService(prisma, { deliver: async () => undefined });
     courier = new CourierService(prisma, audit, outbox, units);
   });
@@ -132,7 +134,7 @@ describe('Cancel compensation (integration)', () => {
   async function paidOrder() {
     const seeded = await webOrder();
     const intent = await intents.create({ orderId: seeded.order.id, method: 'qr_mbank', amount: 100000, actor: 'web_checkout' });
-    await intents.webhook({
+    await webhook({
       orderId: seeded.order.id,
       method: 'qr_mbank',
       amount: 100000,
@@ -141,6 +143,10 @@ describe('Cancel compensation (integration)', () => {
       actor: 'mbank',
     });
     return seeded;
+  }
+
+  function webhook(payload: PaymentWebhookDto) {
+    return intents.webhook(payload, signedSandboxWebhook(payload));
   }
 
   it('forbids a direct cancel of a settled order and keeps the return contour as the path', async () => {
@@ -237,11 +243,11 @@ describe('Cancel compensation (integration)', () => {
     expect(second.intentId).toBe(first.intentId);
     expect(second.txnId).toBe(first.txnId);
 
-    const paid = await intents.webhook({
+    const paid = await webhook({
       orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: first.txnId, status: 'succeeded', actor: 'mbank',
     });
     expect(paid.order?.status).toBe('paid');
-    const duplicate = await intents.webhook({
+    const duplicate = await webhook({
       orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: first.txnId, status: 'succeeded', actor: 'mbank',
     });
     expect(duplicate.idempotent).toBe(true);
@@ -253,7 +259,7 @@ describe('Cancel compensation (integration)', () => {
     const intent = await intents.create({ orderId: order.id, method: 'qr_mbank', amount: 100000, actor: 'web_checkout' });
     await orders.transition(order.id, 'cancelled', 'customer');
 
-    const parked = (await intents.webhook({
+    const parked = (await webhook({
       orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank',
     })) as unknown as { parked: boolean; idempotent: boolean; payment: { id: string; orderId: string | null; amount: number; status: string } };
     expect(parked.parked).toBe(true);
@@ -261,7 +267,7 @@ describe('Cancel compensation (integration)', () => {
     expect(parked.payment).toMatchObject({ orderId: order.id, amount: 100000, status: 'pending' });
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('cancelled');
 
-    const replay = await intents.webhook({
+    const replay = await webhook({
       orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank',
     });
     expect(replay.idempotent).toBe(true);
@@ -285,7 +291,7 @@ describe('Cancel compensation (integration)', () => {
     expect(swept.released).toBeGreaterThan(0);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('confirmed');
 
-    const parked = (await intents.webhook({
+    const parked = (await webhook({
       orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank',
     })) as unknown as { parked: boolean; idempotent: boolean; payment: { id: string; status: string } };
     expect(parked.parked).toBe(true);

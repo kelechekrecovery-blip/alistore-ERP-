@@ -1,5 +1,11 @@
 # BACKLOG
 
+## PAYMENTS-WEBHOOK-175 — синхронизировать payment fixtures с HMAC-контрактом
+- **Сделано:** PaymentIntentsService разделяет внешнюю проверку provider webhook и внутреннее, отдельно защищённое sandbox-confirm действие.
+- **Сделано:** integration fixtures подписывают raw body через общий HMAC helper; sandbox provider в тестах получает тот же secret, что и helper.
+- **Проверено:** cancel compensation, payment intents и giftcards — 22/22; API build и git diff --check — зелёные.
+- **Открыто:** live provider signature/replay and staging certification остаются внешним gate.
+
 ## AUTH-EMAIL-174 — email OTP как второй канал входа
 - **Сделано:** добавлены нормализованный уникальный `Customer.email`, `OtpChannel.email`, отдельная цель `email_attach`, SMTP sender и четыре auth endpoints для email login/attach.
 - **Безопасность:** неизвестный email не раскрывает наличие аккаунта; OTP хранится только хешем, ограничен по попыткам, одноразовый и привязан к purpose; production без SMTP fail-closed.

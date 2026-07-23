@@ -9,6 +9,8 @@ import { UnitsService } from '../src/units/units.service';
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 import { ProductionPaymentGatewayProvider } from '../src/payments/production-payment-gateway.provider';
 import { ConfigService } from '@nestjs/config';
+import { PaymentWebhookDto } from '../src/payments/payment-intents.dto';
+import { SANDBOX_WEBHOOK_SECRET, signedSandboxWebhook } from './helpers/sandbox-webhook';
 
 describe('Online payment intents (integration)', () => {
   let prisma: PrismaService;
@@ -25,7 +27,7 @@ describe('Online payment intents (integration)', () => {
     units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
     payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
-    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider());
+    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider(SANDBOX_WEBHOOK_SECRET));
   });
 
   afterAll(async () => {
@@ -59,6 +61,10 @@ describe('Online payment intents (integration)', () => {
     );
   }
 
+  function webhook(payload: PaymentWebhookDto) {
+    return intents.webhook(payload, signedSandboxWebhook(payload));
+  }
+
   it('creates a QR intent by reserving stock, then confirms payment idempotently', async () => {
     const order = await webOrder();
 
@@ -71,7 +77,7 @@ describe('Online payment intents (integration)', () => {
     expect(reserved?.status).toBe('reserved');
     expect((await prisma.order.findUnique({ where: { id: order.id } }))?.status).toBe('awaiting_payment');
 
-    const paid = await intents.webhook({
+    const paid = await webhook({
       orderId: order.id,
       method: 'qr_mbank',
       amount: 100000,
@@ -83,7 +89,7 @@ describe('Online payment intents (integration)', () => {
     expect(paid.payment.method).toBe('qr_mbank');
     expect(paid.idempotent).toBe(false);
 
-    const again = await intents.webhook({
+    const again = await webhook({
       orderId: order.id,
       method: 'qr_mbank',
       amount: 100000,
@@ -100,7 +106,7 @@ describe('Online payment intents (integration)', () => {
     const order = await webOrder();
     const intent = await intents.create({ orderId: order.id, method: 'qr_mbank', amount: 100000, actor: 'web_checkout' });
     const hook = () =>
-      intents.webhook({ orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank' });
+      webhook({ orderId: order.id, method: 'qr_mbank', amount: 100000, txnId: intent.txnId, status: 'succeeded', actor: 'mbank' });
 
     // Providers commonly re-deliver a webhook on timeout; both land simultaneously here.
     const results = await Promise.allSettled([hook(), hook()]);
@@ -118,7 +124,7 @@ describe('Online payment intents (integration)', () => {
     expect(mismatch.code).toBe('payment_amount_mismatch');
 
     const intent = await intents.create({ orderId: order.id, method: 'card', amount: 100000 });
-    await intents.webhook({ orderId: order.id, method: 'card', amount: 100000, txnId: intent.txnId, status: 'succeeded' });
+    await webhook({ orderId: order.id, method: 'card', amount: 100000, txnId: intent.txnId, status: 'succeeded' });
     const paidAgain = await intents.create({ orderId: order.id, method: 'card', amount: 100000 }).catch((e) => e);
     expect(paidAgain).toBeInstanceOf(ConflictError);
     expect(paidAgain.code).toBe('order_already_paid');
@@ -206,12 +212,13 @@ describe('Online payment intents (integration)', () => {
     const product = await prisma.product.create({ data: { sku: `DEMO-PAY-${seq}`, name: 'Demo phone', price: 100000, cost: 80000, category: 'phones', attrs: {} } });
     await prisma.deviceUnit.create({ data: { imei: `DEMO-IMEI-${seq}`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
     const order = await demoOrders.create({ customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] }, 'demo:web');
-    const demoIntents = new PaymentIntentsService(prisma, demoOrders, payments, new SandboxPaymentGatewayProvider());
+    const demoIntents = new PaymentIntentsService(prisma, demoOrders, payments, new SandboxPaymentGatewayProvider(SANDBOX_WEBHOOK_SECRET));
 
     const intent = await demoIntents.create({ orderId: order.id, method: 'card', amount: 100000 });
     expect(intent.orderStatus).toBe('created');
     expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
-    await expect(demoIntents.webhook({ orderId: order.id, method: 'card', amount: 100000, txnId: intent.txnId, status: 'succeeded' }))
+    const demoWebhook = { orderId: order.id, method: 'card' as const, amount: 100000, txnId: intent.txnId, status: 'succeeded' as const };
+    await expect(demoIntents.webhook(demoWebhook, signedSandboxWebhook(demoWebhook)))
       .rejects.toMatchObject({ code: 'demo_payment_forbidden' });
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
     expect((await prisma.deviceUnit.findFirstOrThrow({ where: { productId: product.id } })).status).toBe('in_stock');

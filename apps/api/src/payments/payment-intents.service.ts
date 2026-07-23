@@ -169,7 +169,7 @@ export class PaymentIntentsService {
     if (expectedProvider && intent.provider !== expectedProvider) {
       throw new ValidationError('payment_intent_provider_mismatch', 'Провайдер платежа не совпадает с intent');
     }
-    return this.webhook({
+    return this.applyWebhookPayload({
       orderId: intent.orderId,
       method: intent.method,
       amount: intent.amount,
@@ -185,6 +185,16 @@ export class PaymentIntentsService {
       rawBody: request?.rawBody,
       headers: request?.headers ?? {},
     });
+    return this.applyWebhookPayload(verified);
+  }
+
+  /**
+   * Apply a payload that has already crossed its trust boundary.
+   * Provider webhooks must go through verifyWebhook above; the sandbox UI
+   * confirmation is a separate, guarded local action and therefore does not
+   * pretend to be a provider callback.
+   */
+  private async applyWebhookPayload(verified: PaymentWebhookDto): Promise<PaymentWebhookResult> {
     if (verified.status === 'failed') {
       throw new PaymentFailedError('payment_failed', `Провайдер отклонил платёж ${verified.txnId}`);
     }

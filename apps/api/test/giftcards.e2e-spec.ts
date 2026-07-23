@@ -9,6 +9,8 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { clearGiftCardTransactions } from './db-test-cleanup';
 import { UnitsService } from '../src/units/units.service';
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
+import { PaymentWebhookDto } from '../src/payments/payment-intents.dto';
+import { SANDBOX_WEBHOOK_SECRET, signedSandboxWebhook } from './helpers/sandbox-webhook';
 
 describe('Gift cards / store credit (integration)', () => {
   let prisma: PrismaService;
@@ -28,7 +30,7 @@ describe('Gift cards / store credit (integration)', () => {
     orders = new OrdersService(prisma, audit, units);
     giftcards = new GiftcardsService(prisma, audit);
     payments = new PaymentsService(prisma, audit, units, approvals, giftcards, orders);
-    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider());
+    intents = new PaymentIntentsService(prisma, orders, payments, new SandboxPaymentGatewayProvider(SANDBOX_WEBHOOK_SECRET));
   });
 
   afterAll(async () => {
@@ -96,6 +98,10 @@ describe('Gift cards / store credit (integration)', () => {
       'web',
     );
     return { order, customer };
+  }
+
+  function webhook(payload: PaymentWebhookDto) {
+    return intents.webhook(payload, signedSandboxWebhook(payload));
   }
 
   async function reservedOrder(total = 100000) {
@@ -201,7 +207,7 @@ describe('Gift cards / store credit (integration)', () => {
     expect(intent.amount).toBe(75000);
     expect(intent.orderStatus).toBe('awaiting_payment');
 
-    const paid = await intents.webhook({
+    const paid = await webhook({
       orderId: order.id,
       method: 'card',
       amount: 75000,
