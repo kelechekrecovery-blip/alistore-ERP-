@@ -6212,7 +6212,12 @@ private struct ClientHomeView: View {
                 .padding(16)
             }
             .background(ClientTheme.background)
-            .navigationTitle("AliStore")
+            // Крупный навигационный заголовок «AliStore» рисовался поверх
+            // собственной шапки приложения: два заголовка подряд, и его пустая
+            // область съедала около 150 pt над сгибом на первом же экране
+            // магазина — там, где должен стоять товар. Бренд уже назван в шапке.
+            // У каталога это чинили `.inline`; здесь бар не нужен вовсе.
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }
