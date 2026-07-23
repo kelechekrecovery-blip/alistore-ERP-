@@ -35,8 +35,11 @@ Open + merge the PR (recommended — keeps clean history vs the concurrent Codex
 
 1. **Первый вход.** Сотрудников в чистой базе нет. Проверить
    `GET /api/staff-auth/bootstrap-status` → если `needsBootstrap: true`, создать
-   первого владельца через `POST /api/staff-auth/bootstrap` (логин + пароль).
-   Эндпоинт работает ровно один раз — пока в базе ноль сотрудников.
+   первого владельца через `POST /api/staff-auth/bootstrap` (логин + пароль,
+   пароль от 8 символов). Эндпоинт работает ровно один раз — пока в базе ноль
+   сотрудников; дальше он отвечает `staff_already_bootstrapped`. Готовые
+   curl-команды и блокер по входу ревьюера в клиентское приложение —
+   `OWNER-LAUNCH-CHECKLIST` §4.
 2. **Сотрудники.** Владелец заводит остальных в ERP (роли `seller`, `courier`,
    `cashier`). Здесь же создаются учётки для ревью Apple — см.
    `OWNER-LAUNCH-CHECKLIST`.
