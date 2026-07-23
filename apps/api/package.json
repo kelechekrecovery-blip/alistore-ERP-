@@ -13,7 +13,6 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev && node scripts/postdeploy-indexes.mjs",
     "db:deploy": "node scripts/deploy-database.mjs",
-    "db:seed": "ts-node prisma/seed.ts",
     "test:refund-migration-upgrade": "node scripts/test-refund-migration-upgrade.mjs",
     "test:inventory-roll-forward-migration-upgrade": "node scripts/test-inventory-roll-forward-migration-upgrade.mjs",
     "benchmark:inventory-valuation": "node scripts/benchmark-inventory-roll-forward.mjs",
@@ -27,9 +26,6 @@
     "ai:eval": "ts-node test/ai-evals/run.ts",
     "test": "NODE_PATH=./node_modules jest",
     "test:watch": "NODE_PATH=./node_modules jest --watch"
-  },
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

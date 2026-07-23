@@ -57,7 +57,6 @@
     "local:down": "bash scripts/local-down.sh",
     "public:up": "bash scripts/public-demo-up.sh",
     "db:migrate": "npm run db:migrate -w @alistore/api",
-    "db:seed": "npm run db:seed -w @alistore/api",
     "db:studio": "npm run db:studio -w @alistore/api",
     "docs:sync": "node scripts/docs-sync.mjs",
     "migration:test:service-payment": "bash scripts/test-service-payment-migration.sh",
