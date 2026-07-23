@@ -22,9 +22,10 @@ public final class CustomerAuthStore {
         environment: AppEnvironment,
         keychainService: String = "kg.alistore.client.auth",
         restoresStoredSession: Bool = true,
-        isPinConfigured: (() -> Bool)? = nil
+        isPinConfigured: (() -> Bool)? = nil,
+        session: URLSession = .shared
     ) {
-        self.api = APIClient(baseURL: environment.apiBaseURL)
+        self.api = APIClient(baseURL: environment.apiBaseURL, session: session)
         self.tokens = SecureTokenStore(service: keychainService)
         self.quickUnlockService = keychainService
         self.restoresStoredSession = restoresStoredSession
@@ -62,6 +63,103 @@ public final class CustomerAuthStore {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    /// Запрашивает код входа на email.
+    ///
+    /// Сервер отвечает одинаково и для известного, и для неизвестного адреса —
+    /// он не должен подсказывать, есть ли у человека аккаунт. Поэтому `true`
+    /// здесь означает «код запрошен», а не «аккаунт существует»: письмо придёт
+    /// только владельцу привязанного адреса.
+    public func requestEmailOTP(email: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let challenge: OTPChallenge = try await api.post(
+                "auth/email/request",
+                body: EmailOTPRequest(email: Self.normalizedEmail(email))
+            )
+            devCode = challenge.devCode
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Проверяет код и открывает сессию. В отличие от телефона аккаунт здесь
+    /// никогда не создаётся: адрес без телефона клиентом стать не может.
+    public func verifyEmail(email: String, code: String) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let address = Self.normalizedEmail(email)
+            let auth: CustomerAuthTokens = try await api.post(
+                "auth/email/verify",
+                body: EmailOTPVerification(email: address, code: code)
+            )
+            let principal: CustomerPrincipal = try await api.get("auth/me", token: auth.accessToken)
+            let next = CustomerSession(
+                accessToken: auth.accessToken,
+                refreshToken: auth.refreshToken,
+                customerId: principal.customerId,
+                phone: principal.phone ?? ""
+            )
+            clearQuickUnlock()
+            try save(next)
+            session = next
+            requiresQuickUnlock = false
+            devCode = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Отправляет код подтверждения на адрес, который владелец сессии хочет привязать.
+    /// Аккаунт при этом не меняется — сначала надо доказать доступ к почтовому ящику.
+    public func requestEmailAttach(email: String, token: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let challenge: OTPChallenge = try await api.post(
+                "auth/email/attach/request",
+                body: EmailOTPRequest(email: Self.normalizedEmail(email)),
+                token: token
+            )
+            devCode = challenge.devCode
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Подтверждает код и привязывает адрес к аккаунту.
+    public func confirmEmailAttach(email: String, code: String, token: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            try await api.postNoContent(
+                "auth/email/attach/confirm",
+                body: EmailOTPVerification(email: Self.normalizedEmail(email), code: code),
+                token: token
+            )
+            devCode = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Тот же вид адреса, что хранит сервер. Без этого адрес, скопированный с
+    /// пробелом на конце или набранный с заглавной, уезжал бы в 400.
+    static func normalizedEmail(_ rawEmail: String) -> String {
+        rawEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     public func verify(phone: String, code: String) async {

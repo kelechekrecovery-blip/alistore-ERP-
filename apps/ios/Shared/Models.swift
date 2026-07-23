@@ -277,6 +277,24 @@ public struct OTPChallenge: Decodable, Sendable {
     public let devCode: String?
 }
 
+/// Тело `POST auth/email/request` и `auth/email/attach/request`.
+public struct EmailOTPRequest: Encodable, Sendable {
+    public let email: String
+
+    public init(email: String) { self.email = email }
+}
+
+/// Тело `POST auth/email/verify` и `auth/email/attach/confirm`.
+public struct EmailOTPVerification: Encodable, Sendable {
+    public let email: String
+    public let code: String
+
+    public init(email: String, code: String) {
+        self.email = email
+        self.code = code
+    }
+}
+
 public struct CustomerAuthTokens: Codable, Sendable {
     public let accessToken: String
     public let refreshToken: String
