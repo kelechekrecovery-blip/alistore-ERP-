@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const apiPort = Number(process.env.E2E_API_PORT ?? 4200);
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3200);
+const nextDistDir = process.env.E2E_NEXT_DIST_DIR ?? `.next-e2e-${webPort}`;
 const databaseUrl =
   process.env.E2E_DATABASE_URL ??
   process.env.DATABASE_URL ??
@@ -45,7 +46,7 @@ export default defineConfig({
       timeout: 240_000,
     },
     {
-      command: `NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" NEXT_PUBLIC_DEMO_MODE=true PUBLIC_DEMO_MODE=true npm exec -w @alistore/web -- next dev --webpack -p ${webPort}`,
+      command: `NEXT_DIST_DIR="${nextDistDir}" NEXT_PUBLIC_API_BASE="http://127.0.0.1:${apiPort}/api" NEXT_PUBLIC_DEMO_MODE=true PUBLIC_DEMO_MODE=true npm exec -w @alistore/web -- next dev --webpack -p ${webPort}`,
       url: `http://127.0.0.1:${webPort}/checkout`,
       reuseExistingServer,
       timeout: 240_000,

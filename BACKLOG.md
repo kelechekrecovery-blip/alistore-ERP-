@@ -7,6 +7,8 @@
 - **Сделано:** warranty detail сохраняет защищённую account-оболочку и заголовок во время проверки сессии; персональный документ и устройства рендерятся только после `hydrated + user`, а ошибки загрузки показываются явно.
 - **Проверено:** `storefront-motion.spec.ts` после wrapper-фикса — `6/6 passed`; `npm run build -w @alistore/web` — production build и TypeScript зелёные.
 - **Открыто:** полный 139-тестовый прогон после auth-only фикса всё ещё зафиксировал `138 passed / 1 failed`; полный gate нужно повторить после последнего warranty wrapper-фикса.
+- **Сделано:** Playwright использует отдельный `NEXT_DIST_DIR` по Web-порту, чтобы завершённый прогон не оставлял общий Next lock для следующего запуска.
+- **Проверено:** после этого изменения isolated motion прогон дошёл до `5/6`; оставшийся сбой — seeded customer device data после длинной серии API resets, не Next lock.
 - **Следующий шаг:** выполнить свежий полный `npm run e2e`, затем единый `mvp:verify`; Render/provider/device/App Review gates остаются внешними.
 
 ## WEB-CHECKOUT-149 — стабилизировать холодный выбор способа доставки
