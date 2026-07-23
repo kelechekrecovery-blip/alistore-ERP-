@@ -1,5 +1,18 @@
 # PROGRESS
 
+## 2026-07-23 — MVP-GATE-177: полный локальный MVP gate зелёный
+
+На текущем SHA полный `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify`
+прошёл Prisma и migration upgrade paths, API/Web build, API Jest **202/202** и
+Playwright **139/139** за 9.1 минуты. Покрыты storefront, checkout, ERP, POS,
+Staff, Courier, COD, refunds, procurement, warehouse, service center, CMS,
+Evidence, RBAC и route audit.
+
+External readiness остаётся заблокированным: `ready=1`, `missing=10`,
+`manual=1`, `blocking=11`. Это внешние live credentials/providers, R2/S3,
+Sentry, native push, POS hardware и физическая сертификация; локальный MVP gate
+не объявляет production readiness.
+
 ## 2026-07-23 — MVP-GATE-176: закрыт устаревший unsigned-webhook expectation
 
 Повторный полный `mvp:verify` после HMAC-фикса дошёл до API batch 51/202 и

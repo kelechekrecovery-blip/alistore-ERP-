@@ -1,5 +1,11 @@
 # BACKLOG
 
+## MVP-GATE-177 — полный локальный MVP gate принят
+- **Проверено:** `ALISTORE_TEST_DATABASE_CONFIRMED=1 npm run mvp:verify` прошёл Prisma validation/generate, migration upgrade paths, API build, Web build, API Jest `202/202` и Playwright `139/139`.
+- **Безопасность:** unsigned sandbox webhook остаётся fail-closed (`404`); payment fixtures используют подписанный raw body; ERP, checkout, fulfillment, refund, COD, POS и Evidence suites зелёные.
+- **Ограничение:** external readiness не зелёный: `ready=1`, `missing=10`, `manual=1`, `blocking=11`; live providers, R2/S3, Sentry, native push, POS hardware и physical certification ещё не выполнены.
+- **Следующий software-шаг:** закрыть следующий P1 из readiness/security backlog, не включать certification flags до внешней проверки.
+
 ## MVP-GATE-176 — синхронизировать RBAC regression с fail-closed webhook
 - **Найдено:** полный `mvp:verify` прошёл до API batch 51/202; `dangerous-endpoint-rbac.e2e-spec.ts` ожидал `422` для неподписанного sandbox webhook, но защищённый endpoint корректно возвращает `404`.
 - **Исправлено:** regression теперь фиксирует security-контракт: неподписанный callback скрывается как недоступный маршрут; signed unknown-order payload проверяется в payment integration suite.
