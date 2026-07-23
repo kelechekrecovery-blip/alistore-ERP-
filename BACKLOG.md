@@ -1,5 +1,11 @@
 # BACKLOG
 
+## E2E-RUNNER-001 — запретить stale-сервер по умолчанию
+- **Найдено:** прямой `npm run ecosystem:pos-refund:e2e` мог переиспользовать старый API на порту 4200 и давать ложные ошибки reconciliation (включая FK/`return_not_found`).
+- **Исправлено:** Playwright теперь по умолчанию запускает собственные API/Web процессы; переиспользование разрешается только явным `E2E_REUSE_EXISTING_SERVER=true`.
+- **Проверено:** изолированный POS → return → refund → reconciliation gate прошёл `1/1` на портах `4780/3780`; конкурентный Jest на общей test DB остаётся внешней причиной нестабильности при параллельном запуске.
+- **Открыто:** повторить весь reconciliation suite после освобождения общей test DB и зарегистрировать hash-bound evidence на чистом source tree.
+
 ## PUBLIC-SMOKE-007 — сетевой sandbox smoke проверен
 - **Проверено:** `https://ali.kg/`, storefront, account, ERP/POS/warehouse/service routes, `robots.txt` и `sitemap.xml`: **14/14 HTTP 200**.
 - **Проверено:** `https://api.ali.kg/api/health/ready` — HTTP 200, database и memory heap `up`.

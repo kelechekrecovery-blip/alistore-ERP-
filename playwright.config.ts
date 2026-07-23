@@ -10,7 +10,7 @@ const databaseUrl =
 const mediaLocalDir = `/tmp/alistore-e2e-media-${apiPort}`;
 const reuseExistingServer = process.env.E2E_REUSE_EXISTING_SERVER
   ? process.env.E2E_REUSE_EXISTING_SERVER === 'true'
-  : !process.env.CI;
+  : false;
 
 export default defineConfig({
   testDir: './e2e',
