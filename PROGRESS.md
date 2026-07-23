@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-23 — IOS-UI-005: полный native iOS UI gate выполнен
+
+Запущен `npm run ios:ui` на iPhone 17 Pro Simulator. Все четыре AliStore targets
+прошли без тестовых падений: Client **25/25**, Staff **10/10**, Courier **3/3** и
+POS **5/5**, всего **43/43**. Проверены вход, клиентские storefront/account flows,
+возвраты, support, trade-in, Staff orders/tasks/buyback, Courier route/COD и POS
+shift/split sale/receipt.
+
+Xcode сообщил `TEST SUCCEEDED`, но при сохранении `.xcresult` получил локальную
+ошибку `mkstemp: No such file or directory`. Поэтому runtime smoke подтверждён,
+однако hash-verified native evidence для `ecosystem:audit:strict` пока не принят.
+Рабочее дерево содержит параллельные изменения и не использовалось для
+переутверждения strict audit.
+
 ## 2026-07-23 — ECOSYSTEM-AUDIT-004: strict audit разблокирован
 
 После синхронизации `scripts/ecosystem-toolchain-lock.json` строгий contract audit

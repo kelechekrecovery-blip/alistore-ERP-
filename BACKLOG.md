@@ -1,5 +1,11 @@
 # BACKLOG
 
+## IOS-UI-005 — полный iOS UI smoke прогон выполнен
+- **Проверено:** `npm run ios:ui` на iPhone 17 Pro Simulator: Client **25/25**, Staff **10/10**, Courier **3/3**, POS **5/5**, всего **43/43** без падений.
+- **Покрыто:** login/session shells, storefront visual flows, account, returns, support, trade-in, Staff orders/support/tasks/buyback, Courier route/COD, POS shift/split sale/receipt.
+- **Ограничение:** Xcode завершил тесты с `TEST SUCCEEDED`, но не полностью сохранил `.xcresult` из-за локальной ошибки `mkstemp`; strict ecosystem evidence ещё не принят.
+- **Следующий шаг:** повторить с исправленным result-bundle output и зарегистрировать SHA-256 evidence на чистом commit.
+
 ## ECOSYSTEM-AUDIT-004 — strict audit разблокирован до содержательных gaps
 - **Сделано:** `scripts/ecosystem-toolchain-lock.json` синхронизирован с текущими `package-lock.json` и dependency tree после web security update.
 - **Проверено:** `npm run ecosystem:audit:strict` прошёл trusted bootstrap и выполнил contract audit; design corpus `128/128`, link graph `153/153`, broken links `0`.
