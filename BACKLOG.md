@@ -1,5 +1,11 @@
 # BACKLOG
 
+## ECOSYSTEM-AUDIT-004 — strict audit разблокирован до содержательных gaps
+- **Сделано:** `scripts/ecosystem-toolchain-lock.json` синхронизирован с текущими `package-lock.json` и dependency tree после web security update.
+- **Проверено:** `npm run ecosystem:audit:strict` прошёл trusted bootstrap и выполнил contract audit; design corpus `128/128`, link graph `153/153`, broken links `0`.
+- **Открыто:** 9 blocker’ов: dirty parallel worktree, visual acceptance, iOS UI evidence, Android connected evidence, POS/refund, courier/COD, service/loaner, procurement/sale и aggregate reconciliation evidence.
+- **Правило:** audit теперь не скрывает native/reconciliation gaps; до их принятия нельзя заявлять полную ecosystem readiness.
+
 ## SECURITY-DEPENDENCY-003 — обновить web runtime зависимости
 - **Сделано:** Next.js обновлён `16.2.10 → 16.2.11`; PostCSS закреплён на `8.5.17`; production web build проходит `45/45` статических страниц.
 - **Проверено:** `npm audit --omit=dev` больше не показывает прежний список Next advisory, но остаётся high `sharp@0.34.5`, который Next подтягивает как optional dependency `^0.34.5`.

@@ -1,5 +1,17 @@
 # PROGRESS
 
+## 2026-07-23 — ECOSYSTEM-AUDIT-004: strict audit разблокирован
+
+После синхронизации `scripts/ecosystem-toolchain-lock.json` строгий contract audit
+дошёл до содержательных проверок. Результат: design corpus **128/128**, link graph
+**153 occurrences / 0 broken**, trusted bootstrap проходит. Contract audit остаётся
+красным по 9 реальным blocker’ам: незакоммиченные параллельные изменения, visual
+acceptance, iOS XCUITest evidence, Android connected evidence, POS/refund,
+courier/COD, service/loaner, procurement/sale и aggregate reconciliation evidence.
+
+Это подтверждает, что проблема toolchain lock устранена, но native и reconciled
+ecosystem gates ещё не приняты.
+
 ## 2026-07-23 — SECURITY-DEPENDENCY-003: обновлён Next.js runtime
 
 Web dependency обновлён до Next.js `16.2.11`, а PostCSS до `8.5.17`. Production
