@@ -22,6 +22,12 @@
 - **Проверено:** CMS/ERP browser suite повторена `25/25`; Web build и compare gate остаются зелёными.
 - **Следующий шаг:** повторить единый полный `mvp:verify` на текущем SHA.
 
+## MVP-GATE-154 — получить единый зелёный software gate
+- **Сделано:** после API retry, compare hydration и Staff login fixes полный `mvp:verify` завершён успешно.
+- **Проверено:** Prisma/migration checks, API Jest `200/200`, Web production build, Playwright `137 passed / 2 skipped`, readiness report.
+- **Ограничение:** два skipped сценария требуют ERP fixtures; внешний Render/provider/device/App Review gate не входит в локальный MVP gate.
+- **Следующий шаг:** перенести тот же committed SHA в Render staging и пройти cloud/provider/device gates.
+
 ## PUBLIC-SMOKE-148 — повторно подтвердить публичный sandbox runtime
 - **Проверено:** storefront, `/catalog`, `admin`, API live и ready отвечают `200`; `/api/docs` и `/api/docs-json` отвечают `404`; ready сообщает database `up`; HSTS и security headers присутствуют.
 - **Ограничение:** smoke подтверждает доступность текущего публичного контура, но не доказывает Render origin ownership, live provider certification или физические device gates.
