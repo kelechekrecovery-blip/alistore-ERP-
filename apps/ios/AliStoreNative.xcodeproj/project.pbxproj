@@ -56,6 +56,7 @@
 		79619A82071A946BE8FD80B7 /* Design3Primitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6361088297362FC977D53407 /* Design3Primitives.swift */; };
 		7F516A224125BB6E327DCD90 /* POSSaleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82C7F7335AA46910CF656B72 /* POSSaleView.swift */; };
 		801111550678A8B136CA7459 /* POSReturnFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD7187EA0C9EF4F8DA4016FE /* POSReturnFlow.swift */; };
+		82EDF5B396B7FD48BDCAAC80 /* CustomerSocialLoginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C22CEF155E0104B33EE0588 /* CustomerSocialLoginTests.swift */; };
 		842D606BF346F6C247AA6DF7 /* OfflineQueueCodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87D9DA92BB28BB65036EFAB /* OfflineQueueCodingTests.swift */; };
 		854F379748EADD4855715C4C /* GolosText-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DDA937EE43556002834E5E61 /* GolosText-SemiBold.ttf */; };
 		8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */; };
@@ -263,6 +264,7 @@
 		3397795D183792BD78015F89 /* AliStoreCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = AliStoreCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		34EA386491279732C58F06E5 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3C22CEF155E0104B33EE0588 /* CustomerSocialLoginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerSocialLoginTests.swift; sourceTree = "<group>"; };
 		3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureTokenStore.swift; sourceTree = "<group>"; };
 		3DDD9376D59012178E0570F2 /* StaffScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffScannerView.swift; sourceTree = "<group>"; };
 		4138BDA48D595174DC088C57 /* Manrope-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-ExtraBold.ttf"; sourceTree = "<group>"; };
@@ -604,6 +606,7 @@
 				C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */,
 				1CE1A8940ABDD296D92B57EA /* CustomerEmailLoginTests.swift */,
 				20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */,
+				3C22CEF155E0104B33EE0588 /* CustomerSocialLoginTests.swift */,
 				AF0F2DCD1399601FE8B4EB7A /* DesignContrastTests.swift */,
 				20075A636D86A0A09A4E63B4 /* IdempotencyKeysTests.swift */,
 				5ADA4F6602AA2F3A5B46C08A /* MoneyTests.swift */,
@@ -1032,6 +1035,7 @@
 				BCA60888879A0F2A828FCBE4 /* CheckoutContractTests.swift in Sources */,
 				E06055CD8D92A7D7E659B1BB /* CustomerEmailLoginTests.swift in Sources */,
 				351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */,
+				82EDF5B396B7FD48BDCAAC80 /* CustomerSocialLoginTests.swift in Sources */,
 				BC6EFDB330B0627978F58CFC /* DesignContrastTests.swift in Sources */,
 				5534D8E321985F5649E82E83 /* IdempotencyKeysTests.swift in Sources */,
 				5037E16A0F70A56273F0E75B /* MoneyTests.swift in Sources */,

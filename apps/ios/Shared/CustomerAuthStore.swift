@@ -65,6 +65,44 @@ public final class CustomerAuthStore {
         }
     }
 
+    /// Вход через Apple: обменивает identityToken на сессию.
+    ///
+    /// `nonce` передаётся ровно тем, что было положено в
+    /// `ASAuthorizationAppleIDRequest.nonce` — Apple кладёт эту же строку в claim
+    /// токена, а сервер сравнивает их напрямую. Любое преобразование здесь даёт
+    /// «nonce mismatch», который на устройстве выглядит как молчаливый отказ входа.
+    public func signInWithApple(identityToken: String, nonce: String?, name: String?) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let auth: CustomerAuthTokens = try await api.post(
+                "auth/social/apple",
+                body: AppleSocialLogin(
+                    identityToken: identityToken,
+                    nonce: nonce,
+                    // Пустое имя хуже отсутствующего: сервер склеит из него displayName.
+                    name: (trimmedName?.isEmpty ?? true) ? nil : trimmedName
+                )
+            )
+            let principal: CustomerPrincipal = try await api.get("auth/me", token: auth.accessToken)
+            let next = CustomerSession(
+                accessToken: auth.accessToken,
+                refreshToken: auth.refreshToken,
+                customerId: principal.customerId,
+                phone: principal.phone ?? ""
+            )
+            clearQuickUnlock()
+            try save(next)
+            session = next
+            requiresQuickUnlock = false
+            devCode = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     /// Запрашивает код входа на email.
     ///
     /// Сервер отвечает одинаково и для известного, и для неизвестного адреса —

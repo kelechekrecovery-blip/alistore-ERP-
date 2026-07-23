@@ -277,6 +277,25 @@ public struct OTPChallenge: Decodable, Sendable {
     public let devCode: String?
 }
 
+/// Тело `POST auth/social/apple`.
+///
+/// `nonce` — ровно та строка, которую клиент положил в `ASAuthorizationAppleIDRequest.nonce`:
+/// Apple кладёт её же в claim токена, а сервер сравнивает их напрямую
+/// (`social-login.ts` → «Apple identity token nonce mismatch»).
+/// `name` Apple отдаёт только при первом входе, поэтому он необязателен —
+/// пустую строку слать нельзя, сервер склеит из неё displayName.
+public struct AppleSocialLogin: Encodable, Sendable {
+    public let identityToken: String
+    public let nonce: String?
+    public let name: String?
+
+    public init(identityToken: String, nonce: String?, name: String?) {
+        self.identityToken = identityToken
+        self.nonce = nonce
+        self.name = name
+    }
+}
+
 /// Тело `POST auth/email/request` и `auth/email/attach/request`.
 public struct EmailOTPRequest: Encodable, Sendable {
     public let email: String
