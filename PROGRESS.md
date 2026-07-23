@@ -1,5 +1,19 @@
 # PROGRESS
 
+## 2026-07-23 — SECURITY-DEPENDENCY-003: обновлён Next.js runtime
+
+Web dependency обновлён до Next.js `16.2.11`, а PostCSS до `8.5.17`. Production
+сборка прошла успешно: TypeScript, оптимизированная сборка и генерация **45/45**
+маршрутов.
+
+`npm audit --omit=dev` всё ещё показывает high vulnerability в optional
+`next/node_modules/sharp@0.34.5` и умеренный advisory для того же вложенного
+PostCSS, который Next фиксирует на `8.4.31`. Попытка override не применяется к
+optional dependency и не была оставлена как ложное исправление. Следующий шаг —
+обновление до совместимой версии Next с исправленным sharp либо подтверждённый
+безопасный способ замены nested optional dependency; strict ecosystem audit пока
+не считается зелёным.
+
 ## 2026-07-23 — AUDIT-OPEN-002B: канал выплаты комитенту закрыт
 
 Добавлено сохранение фактического `PaymentMethod` для `ConsignmentPayout` и миграция

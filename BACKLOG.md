@@ -1,5 +1,10 @@
 # BACKLOG
 
+## SECURITY-DEPENDENCY-003 — обновить web runtime зависимости
+- **Сделано:** Next.js обновлён `16.2.10 → 16.2.11`; PostCSS закреплён на `8.5.17`; production web build проходит `45/45` статических страниц.
+- **Проверено:** `npm audit --omit=dev` больше не показывает прежний список Next advisory, но остаётся high `sharp@0.34.5`, который Next подтягивает как optional dependency `^0.34.5`.
+- **Открыто:** закрыть `sharp` после выхода совместимой исправленной стабильной версии Next либо подтверждённого безопасного override; strict audit не объявлять зелёным до этого.
+
 ## AUDIT-OPEN-002B — канал выплаты комитенту
 - **Сделано:** `PayConsignmentPayoutDto` принимает только разрешённые каналы и сохраняет `paymentMethod`; проводка использует `paymentAccountCode`; `CashDrawerMovement` создаётся только для наличной выплаты.
 - **Проверено:** serialized consignment regression — `5/5`, включая банковский канал `1020`, отсутствие движения кассы и replay с другим каналом; API build и `git diff --check` зелёные.
