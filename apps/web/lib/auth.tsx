@@ -47,7 +47,9 @@ function localFixtureUser(accessToken: string): AuthUser | null {
   try {
     const payload = accessToken.split('.')[1];
     if (!payload) return null;
-    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/') + '==')) as {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+    const claims = JSON.parse(atob(padded)) as {
       sub?: unknown;
       phone?: unknown;
       typ?: unknown;
@@ -106,7 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // loader during local E2E database contention.
                 setHydrated(true);
               }
-              const me = await authMe(legacy.accessToken);
+              // A local fixture already has a scoped customer identity. Keep
+              // the shell usable when the dev API is briefly busy; protected
+              // requests still use the bearer and remain server-authorized.
+              const me = await Promise.race([
+                authMe(legacy.accessToken),
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('auth-me-timeout')), 5000)),
+              ]);
               if (!cancelled) setUser(me);
             }
             // fixtures-allowed: битая локальная тест-фикстура (только вне прода) и означает анонимную сессию — показывать покупателю тут нечего
