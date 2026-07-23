@@ -149,6 +149,32 @@ describe('Customer account deletion and export', () => {
     expect(await prisma.otpChallenge.count({ where: { phone } })).toBe(0);
   });
 
+  it('закрывает и почтовую дверь: по привязанному адресу удалённый аккаунт не воскресает', async () => {
+    const email = `deleted${run.slice(-6)}@emaildelete.test`;
+    const owner = await customer('88');
+    await prisma.customer.update({ where: { id: owner.id }, data: { email } });
+    // предусловие: до удаления вход по адресу работает
+    const before = await auth.requestEmailOtp(email);
+    expect(before.devCode).toMatch(/^\d{6}$/);
+
+    await request(app.getHttpServer())
+      .delete('/customers/me')
+      .set('Authorization', `Bearer ${token(owner)}`)
+      .expect(200);
+
+    // Переименование телефона в `deleted:<id>` раньше само закрывало вход: под
+    // регулярку RequestOtpDto такой «номер» не подходит. Почта этой защиты не
+    // наследует — её надо снимать явно, иначе любой, кто владеет ящиком, получит
+    // полный токен на «удалённый» аккаунт с историей заказов и бонусами.
+    const after = await prisma.customer.findUnique({ where: { id: owner.id } });
+    expect(after?.email).toBeNull();
+
+    const issued = await auth.requestEmailOtp(email);
+    expect(issued.devCode).toBeUndefined();
+    expect(await prisma.otpChallenge.count({ where: { email } })).toBe(0);
+    await expect(auth.verifyEmailOtp(email, before.devCode!)).rejects.toThrow();
+  });
+
   it('keeps orders and ledger rows intact for accounting', async () => {
     const owner = await customer('33');
     const order = await prisma.order.create({

@@ -296,13 +296,32 @@ export class CustomersService {
       if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
       if (isAnonymized(customer)) return { result: { id: customer.id, deleted: true }, events: [] };
 
-      // Строго до переименования: challenge'ы связаны с клиентом только телефоном,
-      // после подмены на `deleted:<id>` их уже не найти, и номер остался бы в базе
-      // открытым текстом навсегда — при том что аккаунт удалён.
-      await tx.otpChallenge.deleteMany({ where: { phone: customer.phone } });
+      // Строго до переименования: challenge'ы связаны с клиентом только телефоном
+      // и адресом, после подмены на `deleted:<id>` и обнуления email их уже не
+      // найти, и контакты остались бы в базе открытым текстом навсегда — при том
+      // что аккаунт удалён.
+      await tx.otpChallenge.deleteMany({
+        where: {
+          OR: [
+            { phone: customer.phone },
+            ...(customer.email ? [{ email: customer.email }] : []),
+          ],
+        },
+      });
+      // Телефон закрывал вход сам собой: под регулярку `RequestOtpDto`
+      // (`^\+?\d{9,15}$`) строка `deleted:<id>` не подходит, поэтому кода на неё
+      // не выдать. Почта этой защиты не наследует — `requestEmailOtp` ищет живого
+      // клиента по адресу и ничего не знает про обезличивание. Оставить адрес
+      // значило бы отдать полный токен на «удалённый» аккаунт любому, кто владеет
+      // ящиком: история заказов, бонусы, гарантии. Обнуляем явно.
       await tx.customer.update({
         where: { id: customerId },
-        data: { name: DELETED_CUSTOMER_NAME, phone: deletedPhone(customerId), consent: false },
+        data: {
+          name: DELETED_CUSTOMER_NAME,
+          phone: deletedPhone(customerId),
+          email: null,
+          consent: false,
+        },
       });
       await tx.customerAddress.deleteMany({ where: { customerId } });
       await tx.customerIdentity.deleteMany({ where: { customerId } });
