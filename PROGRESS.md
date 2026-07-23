@@ -1,5 +1,20 @@
 # PROGRESS
 
+## 2026-07-23 — Алерты владельцу (OWNER-ALERTS-001)
+
+Леджер и так фиксирует недостачи и опасные действия — но сигналы лежали в Risk
+Center, пока владелец сам не зайдёт. Новый `owner-alerts` превращает их в push
+через транзакционный Outbox (паттерн service-sla): `shift.closed` с `diff != 0`
+→ `cash_variance`, `approval.requested` → `approval_requested`; получатели — все
+активные owner. Идемпотентность — один Outbox-message на событие леджера
+(`payload.eventId`), повторный sweep ничего не дублирует; сам леджер не пишется
+(алерт — состояние доставки, не домена). Шедулер зеркалит захардненный
+`debts.scheduler`: pg-boss каждые 5 минут, выключен без `OWNER_ALERTS_ENABLED=true`,
+сбой тика поднимает ops-алерт и пробрасывается на retry. RED→GREEN:
+`owner-alerts.e2e-spec.ts` (алертит 2 из 3 событий, только активному owner,
+второй sweep — 0 новых); tsc и `api:build` чистые.
+
+
 ## 2026-07-23 — WEB-AUTH-156: принят полный Web gate и исправлено ложное empty-state устройств
 
 Полный браузерный контур повторён на свежих изолированных API/Web портах

@@ -26,6 +26,7 @@ import { WarrantyModule } from './warranty/warranty.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { ImportModule } from './import/import.module';
 import { DebtsModule } from './debts/debts.module';
+import { OwnerAlertsModule } from './owner-alerts/owner-alerts.module';
 import { SupportModule } from './support/support.module';
 import { HealthModule } from './health/health.module';
 import { DocumentsModule } from './documents/documents.module';
@@ -84,6 +85,7 @@ import { StoreOperationsModule } from './store-operations/store-operations.modul
     SuppliersModule,
     ImportModule,
     DebtsModule,
+    OwnerAlertsModule,
     SupportModule,
     HealthModule,
     DocumentsModule,
