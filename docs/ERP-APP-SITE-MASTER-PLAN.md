@@ -1,3 +1,7 @@
+> ⚠️ **ЧАСТИЧНО SUPERSEDED** — см. [docs/MASTER-PLAN.md](./MASTER-PLAN.md) (2026-07-23).
+> Актуальна только таблица «Integration contract». Схема фаз мертва: её номера
+> конфликтуют с другими документами.
+
 # ERP App and Site master plan
 
 ## Objective

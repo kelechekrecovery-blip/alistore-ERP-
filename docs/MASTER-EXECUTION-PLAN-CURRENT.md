@@ -1,3 +1,6 @@
+> ⚠️ **SUPERSEDED** — см. [docs/MASTER-PLAN.md](./MASTER-PLAN.md) (2026-07-23).
+> Файл оставлен ради истории. Утверждения о состоянии кода в нём устарели.
+
 # AliStore master execution plan
 
 Version: 2026-07-17  
