@@ -89,6 +89,23 @@ const CHECKS: CheckDefinition[] = [
     note: 'Provider port and sandbox are ready; production activation requires a merchant contract, credentials, signed webhook specification, and live refund reconciliation.',
   },
   {
+    id: 'fiscal_provider',
+    area: 'fiscal',
+    title: 'Fiscalization (OFD/KKM)',
+    // Без этой проверки launch:check проходил зелёным при полном отсутствии
+    // фискализации — то есть врал про законность торговли. Чеки сейчас
+    // «информационные» (fiscal/fiscal-provider.ts INFORMATIONAL_FISCAL_PROVIDER).
+    requiredEnv: ['FISCAL_PROVIDER', 'FISCAL_API_URL', 'FISCAL_API_KEY'],
+    completionMarkerEnv: 'FISCAL_PROVIDER_CERTIFIED',
+    manualChecks: [
+      'POS sale issues a fiscal receipt with a fiscal number and QR, reconciled with the tax cabinet',
+      'Fiscal lines present on refund and exchange',
+      'Z-report and the offline KKM queue verified',
+    ],
+    blocking: true,
+    note: 'Retail sale in KG legally requires a fiscal receipt with tax lines, a fiscal number and Z-reports. Receipts are informational only until a certified OFD/KKM contract and FISCAL_PROVIDER* credentials are in place; FISCAL_PROVIDER_CERTIFIED=true is set only after live tax-cabinet reconciliation.',
+  },
+  {
     id: 'ai_provider',
     area: 'ai',
     title: 'Hosted AI provider',

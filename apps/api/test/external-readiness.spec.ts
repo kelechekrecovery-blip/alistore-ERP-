@@ -37,6 +37,10 @@ describe('External readiness report', () => {
       PAYMENT_API_KEY: 'set',
       PAYMENT_WEBHOOK_SECRET: 'set',
       PAYMENT_PROVIDER_CERTIFIED: 'true',
+      FISCAL_PROVIDER: 'production',
+      FISCAL_API_URL: 'https://ofd.example.test',
+      FISCAL_API_KEY: 'set',
+      FISCAL_PROVIDER_CERTIFIED: 'true',
       TELEGRAM_BOT_TOKEN: 'set',
       WHATSAPP_ACCESS_TOKEN: 'set',
       WHATSAPP_PHONE_NUMBER_ID: 'set',
@@ -117,6 +121,32 @@ describe('External readiness report', () => {
     expect(
       whatsappReport.checks.find((check) => check.id === 'campaign_delivery')?.status,
     ).toBe('ready');
+  });
+
+  it('blocks launch until a certified fiscalization provider is configured', () => {
+    // launch:check was passing green with no fiscalization at all — a lie about
+    // legality. Fiscalization must be a first-class blocking check.
+    const report = buildExternalReadinessReport(() => undefined);
+    const fiscal = report.checks.find((check) => check.id === 'fiscal_provider');
+    expect(fiscal).toMatchObject({ status: 'missing', blocking: true, area: 'fiscal' });
+    expect(report.status).toBe('blocked');
+  });
+
+  it('keeps fiscalization manual until certified, ready only when certified', () => {
+    const base: Record<string, string> = {
+      FISCAL_PROVIDER: 'production',
+      FISCAL_API_URL: 'https://ofd.example.test',
+      FISCAL_API_KEY: 'set',
+    };
+    const configuredNotCertified = buildExternalReadinessReport(
+      (name) => ({ ...base, FISCAL_PROVIDER_CERTIFIED: 'false' })[name],
+    ).checks.find((check) => check.id === 'fiscal_provider');
+    expect(configuredNotCertified).toMatchObject({ status: 'manual_required', blocking: true });
+
+    const certified = buildExternalReadinessReport(
+      (name) => ({ ...base, FISCAL_PROVIDER_CERTIFIED: 'true' })[name],
+    ).checks.find((check) => check.id === 'fiscal_provider');
+    expect(certified?.status).toBe('ready');
   });
 
   it('keeps a fully configured payment gateway manual until live certification', () => {
