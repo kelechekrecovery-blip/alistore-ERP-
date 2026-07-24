@@ -773,6 +773,7 @@ model StorePoint {
   idempotencyKey     String              @unique
   orders             Order[]
   commands           StorePointCommand[]
+  staff              StaffUser[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -3105,7 +3106,11 @@ model StaffUser {
   username            String               @unique
   passwordHash        String
   role                Role
+  // Store point the account works at. References StorePoint.inventoryLocation
+  // (@unique), the value `point` has always carried — a typo can no longer detach
+  // an employee from every point-scoped report.
   point               String               @default("BISHKEK-1")
+  storePoint          StorePoint           @relation(fields: [point], references: [inventoryLocation], onDelete: Restrict, onUpdate: Cascade)
   active              Boolean              @default(true)
   totpSecret          String?
   totpEnabled         Boolean              @default(false)
@@ -3122,6 +3127,7 @@ model StaffUser {
   createdAt           DateTime             @default(now())
 
   @@index([role])
+  @@index([point])
 }
 
 model HrSchedule {

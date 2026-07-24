@@ -40,6 +40,23 @@ describe('Store Operations overview is scoped to the caller point', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     const auth = moduleRef.get(StaffAuthService);
+
+    // Staff are pinned to a real StorePoint (FK on inventoryLocation), so this
+    // suite's per-run points must exist before anyone is bound to them.
+    for (const point of [pointA, pointB]) {
+      await prisma.storePoint.create({
+        data: {
+          code: `code-${point}`,
+          name: `Точка ${point}`,
+          address: '—',
+          inventoryLocation: point,
+          hours: '—',
+          createdBy: 'test',
+          idempotencyKey: `sp-${point}`,
+        },
+      });
+    }
+
     const session = async (role: 'owner' | 'seller', label: string, point: string) => {
       const username = `${role}-scope-${label}-${run}`;
       usernames.push(username);
@@ -72,6 +89,7 @@ describe('Store Operations overview is scoped to the caller point', () => {
     await prisma.storeIncident.deleteMany({ where: { point: { in: [pointA, pointB] } } });
     await prisma.storeOperationChecklist.deleteMany({ where: { point: { in: [pointA, pointB] } } });
     await prisma.staffUser.deleteMany({ where: { username: { in: usernames } } });
+    await prisma.storePoint.deleteMany({ where: { inventoryLocation: { in: [pointA, pointB] } } });
     await app.close();
   });
 

@@ -40,9 +40,20 @@ export class StaffAuthService {
 
   /** Provision a staff account (owner tooling / seed). Password stored via argon2. */
   async createStaff(username: string, password: string, role: Role, point = 'BISHKEK-1') {
+    const resolvedPoint = point.trim() || 'BISHKEK-1';
+    // The point must reference a real StorePoint (FK on inventoryLocation). Check
+    // it here for a clean domain error instead of surfacing a raw FK violation,
+    // and so a typo can't silently detach the account from point-scoped reports.
+    const storePoint = await this.prisma.storePoint.findUnique({
+      where: { inventoryLocation: resolvedPoint },
+      select: { inventoryLocation: true },
+    });
+    if (!storePoint) {
+      throw new ValidationError('store_point_not_found', `Точка продаж «${resolvedPoint}» не найдена`);
+    }
     const passwordHash = await argon2.hash(password);
     return this.prisma.staffUser.create({
-      data: { username, passwordHash, role, point: point.trim() || 'BISHKEK-1' },
+      data: { username, passwordHash, role, point: resolvedPoint },
     });
   }
 
