@@ -220,7 +220,15 @@ Recorded drills:
 - 2026-07-18, local dev machine (macOS, PostgreSQL 16.14): PASS — 129/129 table
   row counts and schema identical after restore; full log in
   [`docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md`](../docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-18.md).
-  Staging restore is still pending and remains the launch gate.
+  Ran `infra/backup.sh` (local dump), **not** the production path.
+- 2026-07-24, local + MinIO: PASS — first drill of the **production code path**
+  (`apps/api/src/ops/backup-to-s3.ts` → S3 → `pg_restore` → integrity check via
+  `scripts/verify-restored-database.mjs`, 7/7, row counts matched). Surfaced and
+  fixed five defects in the backup job (integrity, libpq URL, SSE, rotation,
+  memory — commit `d543b9bc`). Full log in
+  [`docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-24.md`](../docs/acceptance/BACKUP-RESTORE-DRILL-2026-07-24.md).
+  Restore from the actual production R2 bucket and a staging backup job are still
+  pending and remain the launch gate.
 
 ## 8. Release Smoke
 
