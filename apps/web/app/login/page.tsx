@@ -2,6 +2,8 @@
 
 import { Mail, Phone } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useT } from '@/lib/i18n/locale';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { describeAuthError } from '@/lib/auth-errors';
@@ -34,6 +36,7 @@ function LoginForm() {
     telegramLogin,
   } = useAuth();
   const router = useRouter();
+  const { t } = useT();
   const params = useSearchParams();
   const requestedNext = params.get('next');
   const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
@@ -141,18 +144,21 @@ function LoginForm() {
       <SiteHeader variant="design3" />
       <main className="mx-auto grid min-h-[680px] w-[min(1200px,92vw)] place-items-center py-12">
       <div className="login-panel w-full max-w-[560px] rounded-[24px] border border-white/[0.11] bg-[radial-gradient(circle_at_100%_0%,rgba(249,115,22,.15),transparent_45%),rgba(255,255,255,.035)] px-7 py-9 shadow-[0_30px_90px_-60px_rgba(249,115,22,.7)] sm:px-10 sm:py-11">
-        <div className="grid h-[60px] w-[60px] place-items-center rounded-[17px] bg-coral font-display text-3xl font-extrabold">A</div>
+        <div className="flex items-start justify-between">
+          <div className="grid h-[60px] w-[60px] place-items-center rounded-[17px] bg-coral font-display text-3xl font-extrabold">A</div>
+          <LanguageToggle />
+        </div>
         <div className="mt-6 font-display text-3xl font-extrabold leading-none">
-          {channel === 'phone' && recovery ? 'Восстановление доступа' : 'Вход в AliStore'}
+          {channel === 'phone' && recovery ? t('login.title.recovery') : t('login.title.default')}
         </div>
         <div className="mt-2.5 text-sm leading-relaxed text-muted">
           {stepCode
-            ? `Код отправлен на ${identity}`
+            ? t('login.codeSentTo', { identity })
             : channel === 'email'
-              ? 'Войдите по почте — код придёт на адрес, привязанный к аккаунту.'
+              ? t('login.subtitle.email')
               : recovery
-                ? 'Введите номер аккаунта — после проверки старые сессии будут отозваны.'
-                : 'Техника с гарантией и trade-in. Войдите по номеру — быстро и безопасно.'}
+                ? t('login.subtitle.recovery')
+                : t('login.subtitle.default')}
         </div>
 
         {!stepCode && (
@@ -163,7 +169,7 @@ function LoginForm() {
               onClick={() => switchChannel('phone')}
               className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'phone' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
             >
-              <Phone size={15} /> Телефон
+              <Phone size={15} /> {t('login.channel.phone')}
             </button>
             <button
               type="button"
@@ -171,7 +177,7 @@ function LoginForm() {
               onClick={() => switchChannel('email')}
               className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'email' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
             >
-              <Mail size={15} /> Почта
+              <Mail size={15} /> {t('login.channel.email')}
             </button>
           </div>
         )}
@@ -185,14 +191,14 @@ function LoginForm() {
                   onClick={() => switchMode(false)}
                   className={`rounded-[10px] px-3 py-2 text-sm font-bold ${!recovery ? 'bg-lime text-lime-ink' : 'text-muted'}`}
                 >
-                  Войти
+                  {t('login.mode.login')}
                 </button>
                 <button
                   type="button"
                   onClick={() => switchMode(true)}
                   className={`rounded-[10px] px-3 py-2 text-sm font-bold ${recovery ? 'bg-lime text-lime-ink' : 'text-muted'}`}
                 >
-                  Восстановить
+                  {t('login.mode.recover')}
                 </button>
               </div>
             )}
@@ -203,7 +209,7 @@ function LoginForm() {
             )}
             {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
             <button type="submit" disabled={busy} className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:opacity-60">
-              {busy ? 'Отправляем…' : channel === 'email' ? 'Получить код на почту' : recovery ? 'Получить код восстановления' : 'Получить код по SMS'}
+              {busy ? t('login.cta.sending') : channel === 'email' ? t('login.cta.email') : recovery ? t('login.cta.recovery') : t('login.cta.sms')}
             </button>
             {channel === 'phone' && (
               <div className="mt-3 flex gap-2.5">
@@ -218,15 +224,15 @@ function LoginForm() {
                 </button>
               </div>
             )}
-            <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-muted">Продолжить как гость →</button>
+            <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-muted">{t('login.guest')}</button>
           </form>
         ) : (
           <form onSubmit={confirm} className="mt-3">
-            <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-значный код" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
+            <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder={t('login.code.placeholder')} className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
             {devCode && <p className="mt-2 rounded-[10px] bg-surface-2 px-3 py-2 text-center font-mono text-xs text-lime">dev-код: {devCode}</p>}
             {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
-            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:bg-line disabled:text-faint">{busy ? 'Проверяем…' : recovery ? 'Восстановить доступ' : 'Войти'}</button>
-            <button type="button" onClick={() => { setStepCode(false); setCode(''); setDevCode(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? '← Изменить email' : '← Изменить номер'}</button>
+            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:bg-line disabled:text-faint">{busy ? t('login.code.checking') : recovery ? t('login.code.recover') : t('login.code.login')}</button>
+            <button type="button" onClick={() => { setStepCode(false); setCode(''); setDevCode(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? t('login.code.changeEmail') : t('login.code.changePhone')}</button>
           </form>
         )}
       </div>

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { MotionConfig } from 'motion/react';
 import { fontDisplay, fontSans, fontMono } from './fonts';
 import { CartProvider } from '@/lib/cart';
+import { LocaleProvider } from '@/lib/i18n/locale';
 import { AuthProvider } from '@/lib/auth';
 import { FavoritesProvider } from '@/lib/favorites';
 import { CompareProvider } from '@/lib/compare';
@@ -44,16 +45,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen bg-night">
         <AttributionCapture />
-        <AuthProvider>
-          <CartProvider>
-            <FavoritesProvider>
-              <CompareProvider>
-                <MotionConfig reducedMotion="user">{children}</MotionConfig>
-                <DemoModeBanner />
-              </CompareProvider>
-            </FavoritesProvider>
-          </CartProvider>
-        </AuthProvider>
+        <LocaleProvider>
+          <AuthProvider>
+            <CartProvider>
+              <FavoritesProvider>
+                <CompareProvider>
+                  <MotionConfig reducedMotion="user">{children}</MotionConfig>
+                  <DemoModeBanner />
+                </CompareProvider>
+              </FavoritesProvider>
+            </CartProvider>
+          </AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );
