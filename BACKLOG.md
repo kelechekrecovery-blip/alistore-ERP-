@@ -10,7 +10,10 @@
   уже есть (`isSubmitting`). Оставлено как defense-in-depth.
 - **Нужно (iOS, P3):** для единообразия добавить в `enqueue` ту же проверку существующего ключа.
 
-## COURIER-OFFLINE-OWNER-001 — офлайн-очередь курьера без владельца (робастность, деньги защищены сервером)
+## COURIER-OFFLINE-OWNER-001 — ✅ ЗАКРЫТО `0d8a78b0` (24.07): курьерская очередь теперь owner-scoped
+- **Фикс:** `OfflineCourierQueue` пишет `owner: session.staffId`, `owned(_:by:)` фильтрует показ и
+  реплей; `CourierRootView` работает только с `ownedPending`. Тесты `OfflineCourierOwnerTests`.
+  Все три офлайн-очереди (POS/заказ/курьер) теперь единообразно owner-scoped. Ниже — исходный разбор.
 - **Найдено (24.07, адверсариальный ревью курьерских денег):** `OfflineCourierQueue.enqueue`/
   `enqueueEncoded` (`apps/ios/Shared/OfflineQueue.swift:107-145`) НЕ пишут `owner` (в отличие от
   `OfflinePOSQueue.enqueue(...owner:)`), а `CourierRootView.replay` (`CourierOperationsView.swift:145-158`)
