@@ -1582,6 +1582,7 @@ private struct CartView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var fulfillment = "pickup"
     @State private var paymentMethod = "cash"
+    @State private var giftCardCode = ""
     @State private var address = ""
     @State private var pickupPoints: [StorePoint] = []
     @State private var selectedStorePointId = ""
@@ -1845,6 +1846,8 @@ private struct CartView: View {
                 ClientChoiceRow(symbol: "qrcode", title: "MBank QR", detail: "Оплата в приложении MBank", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrMBank.rawValue) { paymentMethod = OnlinePaymentMethod.qrMBank.rawValue }
                 ClientChoiceRow(symbol: "qrcode", title: "O!Деньги QR", detail: "Оплата в приложении O!Деньги", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrODengi.rawValue) { paymentMethod = OnlinePaymentMethod.qrODengi.rawValue }
                 ClientChoiceRow(symbol: "calendar", title: "Рассрочка", detail: "Условия зависят от банка-партнёра", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.installment.rawValue) { paymentMethod = OnlinePaymentMethod.installment.rawValue }
+                ClientChoiceRow(symbol: "giftcard", title: "Подарочная карта", detail: "Оплатить заказ балансом карты целиком", trailing: nil, selected: paymentMethod == "gift_card") { paymentMethod = "gift_card" }
+                if paymentMethod == "gift_card" { giftCardField }
                 promoSection
                 if loyaltyBalance > 0 {
                     ClientChoiceRow(symbol: "gift.fill", title: "Списать бонусы", detail: "Доступно \(loyaltyBalance.formatted()) · спишем \(Money.som(bonusDiscount))", trailing: bonusApplied ? "−\(Money.som(bonusDiscount))" : nil, selected: bonusApplied) { bonusApplied.toggle() }
@@ -1901,6 +1904,26 @@ private struct CartView: View {
             if let promoError {
                 Text(promoError).font(ClientTheme.body(12)).foregroundStyle(Design3.danger)
             }
+        }
+    }
+
+    private var giftCardField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Код подарочной карты")
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            TextField("GC-XXXX", text: $giftCardCode)
+                .font(Design3.mono(14))
+                .foregroundStyle(.white)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .padding(13)
+                .glass(radius: 12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                .accessibilityIdentifier("checkout-giftcard-input")
+            Text("Спишем всю сумму заказа с карты. Если баланса не хватит — заказ не оформим.")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(ClientTheme.muted)
         }
     }
 
@@ -2004,7 +2027,11 @@ private struct CartView: View {
             if fulfillment == "pickup" { return !selectedStorePointId.isEmpty }
             guard !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
             return !managedCourierDelivery || !selectedDeliverySlotId.isEmpty
-        case .payment: return !paymentMethod.isEmpty
+        case .payment:
+            if paymentMethod == "gift_card" {
+                return !giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return !paymentMethod.isEmpty
         case .review: return !lines.isEmpty
         }
     }
@@ -2016,6 +2043,7 @@ private struct CartView: View {
         case OnlinePaymentMethod.qrMBank.rawValue: "MBank QR"
         case OnlinePaymentMethod.qrODengi.rawValue: "O!Деньги QR"
         case OnlinePaymentMethod.installment.rawValue: "Рассрочка"
+        case "gift_card": "Подарочная карта"
         default: paymentMethod
         }
     }
@@ -2068,6 +2096,26 @@ private struct CartView: View {
                 : selectedDeliverySlot.map { slotLabel($0) }
         )
         let idempotencyKey = UUID().uuidString
+        // Подарочная карта: покрытие проверяем ДО создания заказа. Либо карта
+        // закрывает заказ целиком, либо не оформляем — полуоплаченный заказ создавать
+        // нельзя. Само списание считает сервер, здесь только предпроверка.
+        if paymentMethod == "gift_card" {
+            let code = giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !code.isEmpty else {
+                errorMessage = "Введите код подарочной карты."
+                return
+            }
+            do {
+                let card = try await GiftCardCheckout(environment: environment).lookup(code: code)
+                guard card.redeemable, card.balance >= payable else {
+                    errorMessage = "На карте \(Money.som(card.balance)), а к оплате \(Money.som(payable)). Пополните карту или выберите другой способ."
+                    return
+                }
+            } catch {
+                errorMessage = "Не удалось проверить подарочную карту: \(error.localizedDescription)"
+                return
+            }
+        }
         // Создание заказа и запуск оплаты — две разные операции, и раньше они
         // стояли под одним `catch`. Если заказ создавался, а оплата падала по
         // сети, покупатель читал «сохранено офлайн» про уже существующий заказ,
@@ -2100,6 +2148,26 @@ private struct CartView: View {
         // неуместна: повторять нечего, платить — есть чем.
         completedOrder = order
         cart.removeAll()
+
+        // Подарочная карта закрывает заказ сразу — платёж уходит здесь же под
+        // конкретный orderId. Успех: intent остаётся nil → экран показывает успех,
+        // как при оплате «при получении». Отказ (баланс изменился между проверкой и
+        // списанием): заказ существует неоплаченным — говорим это прямо, а не ложный
+        // успех; повтор именно gift_card недоступен, поэтому уводим в поддержку.
+        if paymentMethod == "gift_card" {
+            do {
+                try await GiftCardCheckout(environment: environment).pay(
+                    orderId: order.id,
+                    amount: order.total,
+                    code: giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines),
+                    token: session.accessToken
+                )
+            } catch is CancellationError {
+            } catch {
+                retryErrorMessage = "Заказ создан, но оплата подарочной картой не прошла: \(error.localizedDescription). Проверьте баланс карты или обратитесь в поддержку."
+            }
+            return
+        }
 
         guard let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) else { return }
         do {

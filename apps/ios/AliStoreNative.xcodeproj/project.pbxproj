@@ -12,6 +12,7 @@
 		03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5A549F226050ACB113FF4E /* OfflineQueue.swift */; };
 		03E06D3A831510A208B2CA6E /* OrderTrackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3970931F4839B3C2A168BE /* OrderTrackingView.swift */; };
 		05A08312A8BD5E5165442246 /* OfflineStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E18DBDC8F966E6FE986281 /* OfflineStoreTests.swift */; };
+		06BB39FA85F8F29F1A63ADB0 /* GiftCardPaymentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F763DA7D4DDCF8C3BF9C52 /* GiftCardPaymentTests.swift */; };
 		089371EDF5A7C0073E2B88FB /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 28FC92D118D7CEE4EED81419 /* Localizable.strings */; };
 		09D8C1D12D770FC850E10E98 /* POSOperationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCB230F61743790D08A7C6 /* POSOperationsView.swift */; };
 		149FA88780F0B62AF79F30EA /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B87620B30BD0C4257DDBEE1 /* JetBrainsMono-Medium.ttf */; };
@@ -94,6 +95,7 @@
 		D3267E880FEF79B442F04BD0 /* QuickUnlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BC4CE3DCC041CF32038A86 /* QuickUnlockTests.swift */; };
 		D41D08C37ADC9A026A6A1BD9 /* OFL-JetBrainsMono.txt in Resources */ = {isa = PBXBuildFile; fileRef = 242B1D211D250E4D9D64635B /* OFL-JetBrainsMono.txt */; };
 		D8540E88D9B3581F66746FF8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3AB2DF87CCB8F267C3EFB6B1 /* PrivacyInfo.xcprivacy */; };
+		D9A5ECBAFDF55BE7FDF66654 /* GiftCardPayment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9188F1EA5A3032CFFCBF62CC /* GiftCardPayment.swift */; };
 		DAF231BFB615CD79C0300ADF /* SmartSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = C348479F602D4264A6697DC8 /* SmartSearch.swift */; };
 		DC66825077F7278C6C1C9AB2 /* OfflinePOSQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0BAEBFAF767B6B133B548E /* OfflinePOSQueueTests.swift */; };
 		DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C549DC007F324FA3CD14173 /* SecureTokenStore.swift */; };
@@ -311,6 +313,7 @@
 		8C948B07F1B2BB3F577E75BC /* Client.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Client.entitlements; sourceTree = "<group>"; };
 		8F3970931F4839B3C2A168BE /* OrderTrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderTrackingView.swift; sourceTree = "<group>"; };
 		915AE89967CFCBBAF37C4FA6 /* StaffAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffAuthStore.swift; sourceTree = "<group>"; };
+		9188F1EA5A3032CFFCBF62CC /* GiftCardPayment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardPayment.swift; sourceTree = "<group>"; };
 		92E45818EA980052BFD297EE /* AliStoreStaffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffApp.swift; sourceTree = "<group>"; };
 		942E788E79F852B2161181F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9576E77974E52F36135B72C9 /* AliStoreCourierUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreCourierUITests.swift; sourceTree = "<group>"; };
@@ -332,6 +335,7 @@
 		C348479F602D4264A6697DC8 /* SmartSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSearch.swift; sourceTree = "<group>"; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C40689F8A18A4D0BF0BB49DD /* QuickUnlockGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlockGateTests.swift; sourceTree = "<group>"; };
+		C5F763DA7D4DDCF8C3BF9C52 /* GiftCardPaymentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardPaymentTests.swift; sourceTree = "<group>"; };
 		C8FDD439193A401CC80D4A41 /* CheckoutContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutContractTests.swift; sourceTree = "<group>"; };
 		CAA9EA567F2F2F017261AF06 /* IdempotencyKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotencyKeys.swift; sourceTree = "<group>"; };
 		CCD8D652B4837DE56B9A3CA3 /* AliStoreClientUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreClientUITests.swift; sourceTree = "<group>"; };
@@ -401,6 +405,7 @@
 				521C8B8F8BACC071CBA64412 /* AppleSignInNonce.swift */,
 				7033BA33B1C79C598D5B3331 /* CustomerAuthStore.swift */,
 				2E66E9C42511A1AB67627F0E /* Design3.swift */,
+				9188F1EA5A3032CFFCBF62CC /* GiftCardPayment.swift */,
 				CAA9EA567F2F2F017261AF06 /* IdempotencyKeys.swift */,
 				A9EBC4D5C06A5630E3B7D69D /* Models.swift */,
 				1C9F2C58B4D976EACEB28F85 /* Money.swift */,
@@ -622,6 +627,7 @@
 				20417BD43EE34AC2EEC2DE55 /* CustomerMeContractTests.swift */,
 				3C22CEF155E0104B33EE0588 /* CustomerSocialLoginTests.swift */,
 				AF0F2DCD1399601FE8B4EB7A /* DesignContrastTests.swift */,
+				C5F763DA7D4DDCF8C3BF9C52 /* GiftCardPaymentTests.swift */,
 				20075A636D86A0A09A4E63B4 /* IdempotencyKeysTests.swift */,
 				5ADA4F6602AA2F3A5B46C08A /* MoneyTests.swift */,
 				9B0BAEBFAF767B6B133B548E /* OfflinePOSQueueTests.swift */,
@@ -1054,6 +1060,7 @@
 				351EBDAEDA3C3201EA8957CF /* CustomerMeContractTests.swift in Sources */,
 				82EDF5B396B7FD48BDCAAC80 /* CustomerSocialLoginTests.swift in Sources */,
 				BC6EFDB330B0627978F58CFC /* DesignContrastTests.swift in Sources */,
+				06BB39FA85F8F29F1A63ADB0 /* GiftCardPaymentTests.swift in Sources */,
 				5534D8E321985F5649E82E83 /* IdempotencyKeysTests.swift in Sources */,
 				5037E16A0F70A56273F0E75B /* MoneyTests.swift in Sources */,
 				DC66825077F7278C6C1C9AB2 /* OfflinePOSQueueTests.swift in Sources */,
@@ -1077,6 +1084,7 @@
 				E2E0D76940FDD0F377D17123 /* AppleSignInNonce.swift in Sources */,
 				72577A15EB13D14CB354087E /* CustomerAuthStore.swift in Sources */,
 				31206D7B6F17EA6847E571FB /* Design3.swift in Sources */,
+				D9A5ECBAFDF55BE7FDF66654 /* GiftCardPayment.swift in Sources */,
 				A029546AF725851820AF60E9 /* IdempotencyKeys.swift in Sources */,
 				8C5A4F7C9419670E633A9668 /* Models.swift in Sources */,
 				69737C97F4802C44E0296E66 /* Money.swift in Sources */,
