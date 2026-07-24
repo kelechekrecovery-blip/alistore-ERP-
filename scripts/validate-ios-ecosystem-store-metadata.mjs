@@ -108,11 +108,15 @@ for (const [file, expectedName, expectedBundleId] of expectedApps) {
     fail(file, 'screenshots.requiredStates must not contain duplicates');
   }
 
-  // Apple scales every other class from these two base uploads.
-  for (const [device, simulator, outputSlug, width, height] of [
-    ['iphone', 'iPhone 17 Pro Max', 'iphone-6-9', 1320, 2868],
-    ['ipad', 'iPad Pro 13-inch (M5)', 'ipad-13', 2064, 2752],
-  ]) {
+  // Apple scales every other class from these base uploads. iPhone is always
+  // required; iPad is required only for apps that ship on iPad. Staff/Courier/POS
+  // are iPhone-only (TARGETED_DEVICE_FAMILY "1"), so they declare no iPad class —
+  // demanding an iPad screenshot for an iPhone-only app would fail the packager
+  // on evidence Apple does not accept for that app.
+  const requiredDevices = [['iphone', 'iPhone 17 Pro Max', 'iphone-6-9', 1320, 2868]];
+  const optionalDevices = [['ipad', 'iPad Pro 13-inch (M5)', 'ipad-13', 2064, 2752]];
+  const declared = optionalDevices.filter(([device]) => screenshots?.devices?.[device]);
+  for (const [device, simulator, outputSlug, width, height] of [...requiredDevices, ...declared]) {
     const config = screenshots?.devices?.[device];
     text(file, config?.source, `screenshots.devices.${device}.source`, { min: 10, max: 200 });
     if (config?.simulator !== simulator) {
