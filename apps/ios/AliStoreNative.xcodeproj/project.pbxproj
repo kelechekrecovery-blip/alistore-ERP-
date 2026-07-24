@@ -120,6 +120,7 @@
 		FA0AB9B3D7316B9DA3538939 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		FC104A48C85554D4F1B0A1BA /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42436819B18857A22AC06504 /* APIClientTests.swift */; };
 		FD8E6345CCA48F01DDC039E5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2984688119D5255CF5B06009 /* Assets.xcassets */; };
+		FF8C74F64D5C6EA9ABA0AFAC /* OfflineOrderReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6C3A8587ECD07B89B84B15 /* OfflineOrderReplayTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -307,6 +308,7 @@
 		75FA9A6B569FE2E36871089D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7B1EBE9146CA6573C91B73B8 /* AliStoreStaffUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreStaffUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B78FB9F31AB637DD6A02A77 /* AliStorePOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStorePOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7C6C3A8587ECD07B89B84B15 /* OfflineOrderReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineOrderReplayTests.swift; sourceTree = "<group>"; };
 		7F3BF5A1B6E49634345025FF /* AliStoreClientUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AliStoreClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FED3419B6DC2FCCAA39BBA1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		81DBFF266CD05AAAB7F03841 /* Manrope-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-Regular.ttf"; sourceTree = "<group>"; };
@@ -641,6 +643,7 @@
 				C5F763DA7D4DDCF8C3BF9C52 /* GiftCardPaymentTests.swift */,
 				20075A636D86A0A09A4E63B4 /* IdempotencyKeysTests.swift */,
 				5ADA4F6602AA2F3A5B46C08A /* MoneyTests.swift */,
+				7C6C3A8587ECD07B89B84B15 /* OfflineOrderReplayTests.swift */,
 				9B0BAEBFAF767B6B133B548E /* OfflinePOSQueueTests.swift */,
 				B87D9DA92BB28BB65036EFAB /* OfflineQueueCodingTests.swift */,
 				B1E18DBDC8F966E6FE986281 /* OfflineStoreTests.swift */,
@@ -1076,6 +1079,7 @@
 				06BB39FA85F8F29F1A63ADB0 /* GiftCardPaymentTests.swift in Sources */,
 				5534D8E321985F5649E82E83 /* IdempotencyKeysTests.swift in Sources */,
 				5037E16A0F70A56273F0E75B /* MoneyTests.swift in Sources */,
+				FF8C74F64D5C6EA9ABA0AFAC /* OfflineOrderReplayTests.swift in Sources */,
 				DC66825077F7278C6C1C9AB2 /* OfflinePOSQueueTests.swift in Sources */,
 				842D606BF346F6C247AA6DF7 /* OfflineQueueCodingTests.swift in Sources */,
 				05A08312A8BD5E5165442246 /* OfflineStoreTests.swift in Sources */,

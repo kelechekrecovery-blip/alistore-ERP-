@@ -1358,7 +1358,9 @@ private struct ClientRootView: View {
             sortBy: [SortDescriptor(\.createdAt)]
         )
         guard let mutations = try? modelContext.fetch(descriptor) else { return }
-        for mutation in mutations where mutation.state == "queued" || mutation.state == "failed" {
+        // Включая `syncing`: заказ, на котором приложение убили посреди отправки,
+        // иначе застревал бы навсегда (см. OfflineOrderQueue.replayable).
+        for mutation in OfflineOrderQueue.replayable(mutations) {
             await OfflineOrderQueue.replay(
                 mutation,
                 api: APIClient(baseURL: environment.apiBaseURL),
@@ -5484,7 +5486,10 @@ private struct OfflineQueueView: View {
                         Button("Повторить", systemImage: "arrow.clockwise") {
                             Task { await retry(mutation) }
                         }
-                        .disabled(mutation.state == "syncing" || auth.session == nil)
+                        // `syncing` тоже разрешаем: если отправка зависла (таймаут, не
+                        // краш), авто-повтор в этот заход не сработает — даём вернуть
+                        // заказ вручную. Дубль исключён idempotencyKey.
+                        .disabled(auth.session == nil)
                     }
                     .padding(.vertical, 4)
                 }

@@ -41,6 +41,21 @@ public final class PendingMutation {
 }
 
 public enum OfflineOrderQueue {
+    /// Заказы, которые нужно переотправить. Включает `syncing` НАМЕРЕННО: `replay`
+    /// пишет `state = "syncing"` на диск ДО сетевого запроса, и если приложение
+    /// убили посреди отправки (фон, force-quit, разряд — ровно та плохая связь, из-за
+    /// которой заказ и попал в офлайн), запись навсегда застревала в `syncing` —
+    /// авто-повтор её пропускал, ручной был выключен, заказ терялся молча. То же
+    /// уже чинили в POS-очереди (`replayable`, `testSaleStuckInSyncingIsRetried`);
+    /// здесь фикс не применили. `idempotencyKey` защищает от дубля, если заказ на
+    /// самом деле ушёл.
+    public static func replayable(_ all: [PendingMutation]) -> [PendingMutation] {
+        all.filter { mutation in
+            guard mutation.endpoint == "orders/mine" else { return false }
+            return mutation.state == "queued" || mutation.state == "failed" || mutation.state == "syncing"
+        }
+    }
+
     @MainActor
     public static func enqueue(
         _ request: CreateOrderRequest,
