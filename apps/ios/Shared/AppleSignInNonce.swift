@@ -15,15 +15,21 @@ public enum AppleSignInNonce {
     public static func random(length: Int = 32) -> String {
         precondition(length > 0, "nonce length must be positive")
         // Точки и дефисы допустимы в nonce и не требуют экранирования нигде по пути.
+        // Ровно 64 символа: 256 делится на 64 нацело, поэтому `% count` не даёт
+        // смещения — каждый символ равновероятен.
         let alphabet = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
-        var result = ""
-        result.reserveCapacity(length)
-        for _ in 0..<length {
-            var byte: UInt8 = 0
-            _ = withUnsafeMutableBytes(of: &byte) { SecRandomCopyBytes(kSecRandomDefault, 1, $0.baseAddress!) }
-            result.append(alphabet[Int(byte) % alphabet.count])
+        var bytes = [UInt8](repeating: 0, count: length)
+        let status = bytes.withUnsafeMutableBytes {
+            SecRandomCopyBytes(kSecRandomDefault, length, $0.baseAddress!)
         }
-        return result
+        // Молчаливый провал здесь опаснее краша: при не-успехе байты остались бы
+        // нулями и nonce стал бы предсказуемым — сломав анти-replay Sign in with
+        // Apple. Крашим, как в референс-примере Apple (в проде SecRandomCopyBytes
+        // фактически не падает).
+        guard status == errSecSuccess else {
+            fatalError("SecRandomCopyBytes failed with OSStatus \(status)")
+        }
+        return String(bytes.map { alphabet[Int($0) % alphabet.count] })
     }
 
     /// SHA-256 в нижнем регистре hex — ровно та форма, которую ждёт Apple.

@@ -36,13 +36,13 @@ struct StaffInventoryView: View {
     }
 
     private var counted: Int? {
-        let trimmed = countedText.trimmingCharacters(in: .whitespaces)
+        let trimmed = countedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let value = Int(trimmed), value >= 0 else { return nil }
         return value
     }
 
     private var writeOffQty: Int? {
-        let trimmed = countedText.trimmingCharacters(in: .whitespaces)
+        let trimmed = countedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let value = Int(trimmed), value >= 1 else { return nil }
         return value
     }
@@ -52,7 +52,7 @@ struct StaffInventoryView: View {
         switch mode {
         case .count: return counted != nil
         case .writeOff:
-            return writeOffQty != nil && !reasonText.trimmingCharacters(in: .whitespaces).isEmpty
+            return writeOffQty != nil && !reasonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -180,14 +180,14 @@ struct StaffInventoryView: View {
     }
 
     private func submit() {
-        let point = location.trimmingCharacters(in: .whitespaces)
+        let point = location.trimmingCharacters(in: .whitespacesAndNewlines)
         switch mode {
         case .count:
             guard let counted else { return }
             Task { await store.count(productId: selectedProductId, location: point, counted: counted) }
         case .writeOff:
             guard let qty = writeOffQty else { return }
-            let reason = reasonText.trimmingCharacters(in: .whitespaces)
+            let reason = reasonText.trimmingCharacters(in: .whitespacesAndNewlines)
             Task { await store.writeOff(productId: selectedProductId, location: point, qty: qty, reason: reason) }
         }
     }

@@ -1,5 +1,22 @@
 # BACKLOG
 
+## INV-WRITEOFF-IDEMPOTENCY-001 — списание/пересчёт не идемпотентны на сервере (бэкенд-зона)
+- **Найдено (24.07, адверсариальный ревью iOS Staff-инвентаризации):** `POST /inventory/movements`
+  (write-off/adjust) и `POST /inventory/count` не защищены от повтора. Хендлер
+  `inventory.controller.ts:53/162` не читает заголовок `idempotency-key`, у `MovementDto`/`CountDto`
+  нет поля `idempotencyKey` (в отличие от `ReceiveDto`/`TransferDto`, где оно **обязательно**),
+  а `inventory.service.movement()` зовёт `approvals.request(...)` без дедупа. Два одинаковых
+  запроса → две заявки на одобрение; если ответственный одобрит обе, сток спишется дважды за
+  одно реальное списание.
+- **Клиентская мера уже есть (не фикс):** `StaffInventoryStore.isSubmitting` гасит кнопку на
+  время запроса, URLSession сам POST не переповторяет — практический риск двойного тапа низкий,
+  но серверной защиты нет. Клиентский idempotency-key добавлять бессмысленно: сервер его не
+  читает для этих маршрутов (проверено), это была бы косметика.
+- **Нужно (бэкенд, Codex-зона, P2):** сделать заявку на списание/пересчёт идемпотентной —
+  либо читать `idempotency-key` (как payments/courier/customers), либо дедуп `approvals.request`
+  по естественному ключу (product+location+qty+requester в окне). iOS-сторону (передать ключ)
+  подключу сразу, как появится серверный контракт.
+
 ## UI-010-REMAINDER — статус §3.3 (почти закрыт)
 - **Закрыто UI (готовый бэкенд, 2026-07-24):** supplier RMA scorecard (`d02230e4`),
   campaign spend (`37e24de3`), staff-tasks create (`c6bfe1c3`).
